@@ -483,4 +483,105 @@ describe("Crypto", function() {
             client.stopClient();
         });
     });
+
+    describe("encryptAndSendToDevices", () => {
+        let client: TestClient;
+        let ensureOlmSessionsForDevices: jest.SpiedFunction<typeof olmlib.ensureOlmSessionsForDevices>;
+        let encryptMessageForDevice: jest.SpiedFunction<typeof olmlib.encryptMessageForDevice>;
+        const payload = { hello: "world" };
+        let encryptedPayload: object;
+
+        beforeEach(async () => {
+            ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
+            ensureOlmSessionsForDevices.mockResolvedValue({});
+            encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
+            encryptMessageForDevice.mockImplementation(async (...[result,,,,,, payload]) => {
+                result.plaintext = JSON.stringify(payload);
+            });
+
+            client = new TestClient("@alice:example.org", "aliceweb");
+            await client.client.initCrypto();
+
+            encryptedPayload = {
+                algorithm: "m.olm.v1.curve25519-aes-sha2",
+                sender_key: client.client.crypto.olmDevice.deviceCurve25519Key,
+                ciphertext: { plaintext: JSON.stringify(payload) },
+            };
+        });
+
+        afterEach(async () => {
+            ensureOlmSessionsForDevices.mockRestore();
+            encryptMessageForDevice.mockRestore();
+            await client.stop();
+        });
+
+        it("encrypts and sends to devices", async () => {
+            client.httpBackend
+                .when("PUT", "/sendToDevice/m.room.encrypted", {
+                    messages: {
+                        "@bob:example.org": {
+                            bobweb: encryptedPayload,
+                            bobmobile: encryptedPayload,
+                        },
+                        "@carol:example.org": {
+                            caroldesktop: encryptedPayload,
+                        },
+                    },
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.client.encryptAndSendToDevices(
+                    [
+                        { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobweb") },
+                        { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobmobile") },
+                        { userId: "@carol:example.org", deviceInfo: new DeviceInfo("caroldesktop") },
+                    ],
+                    payload,
+                ),
+                client.httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("sends nothing to devices that couldn't be encrypted to", async () => {
+            encryptMessageForDevice.mockImplementation(async (...[result,,,, userId, device, payload]) => {
+                // Refuse to encrypt to Carol's desktop device
+                if (userId === "@carol:example.org" && device.deviceId === "caroldesktop") return;
+                result.plaintext = JSON.stringify(payload);
+            });
+
+            client.httpBackend
+                .when("PUT", "/sendToDevice/m.room.encrypted", {
+                    // Carol is nowhere to be seen
+                    messages: { "@bob:example.org": { bobweb: encryptedPayload } },
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.client.encryptAndSendToDevices(
+                    [
+                        { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobweb") },
+                        { userId: "@carol:example.org", deviceInfo: new DeviceInfo("caroldesktop") },
+                    ],
+                    payload,
+                ),
+                client.httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("no-ops if no devices can be encrypted to", async () => {
+            // Refuse to encrypt to anybody
+            encryptMessageForDevice.mockResolvedValue(undefined);
+
+            // Get the room keys version request out of the way
+            client.httpBackend.when("GET", "/room_keys/version").respond(404, {});
+            await client.httpBackend.flush("/room_keys/version", 1);
+
+            await client.client.encryptAndSendToDevices(
+                [{ userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobweb") }],
+                payload,
+            );
+            client.httpBackend.verifyNoOutstandingRequests();
+        });
+    });
 });
