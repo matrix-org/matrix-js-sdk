@@ -456,6 +456,8 @@ describe("Crypto", function() {
             // the second call to sendToDevice will be the key request
             expect(aliceSendToDevice).toBeCalledTimes(3);
             expect(aliceSendToDevice.mock.calls[2][2]).not.toBe(txnId);
+
+            jest.useRealTimers();
         });
     });
 
