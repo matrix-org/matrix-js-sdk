@@ -2,6 +2,7 @@ import '../olm-loader';
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
+import { MatrixClient } from "../../src/client";
 import { Crypto } from "../../src/crypto";
 import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
 import { MockStorageApi } from "../MockStorageApi";
@@ -225,8 +226,8 @@ describe("Crypto", function() {
     });
 
     describe('Key requests', function() {
-        let aliceClient;
-        let bobClient;
+        let aliceClient: MatrixClient;
+        let bobClient: MatrixClient;
 
         beforeEach(async function() {
             aliceClient = (new TestClient(
@@ -313,7 +314,7 @@ describe("Crypto", function() {
             expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
             expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
 
-            const cryptoStore = bobClient.cryptoStore;
+            const cryptoStore = bobClient.crypto.cryptoStore;
             const eventContent = events[0].getWireContent();
             const senderKey = eventContent.sender_key;
             const sessionId = eventContent.session_id;
@@ -383,9 +384,9 @@ describe("Crypto", function() {
 
             const ksEvent = await keyshareEventForEvent(aliceClient, event, 1);
             ksEvent.getContent().sender_key = undefined; // test
-            bobClient.crypto.addInboundGroupSession = jest.fn();
+            bobClient.crypto.olmDevice.addInboundGroupSession = jest.fn();
             await bobDecryptor.onRoomKeyEvent(ksEvent);
-            expect(bobClient.crypto.addInboundGroupSession).not.toHaveBeenCalled();
+            expect(bobClient.crypto.olmDevice.addInboundGroupSession).not.toHaveBeenCalled();
         });
 
         it("creates a new keyshare request if we request a keyshare", async function() {
@@ -401,7 +402,7 @@ describe("Crypto", function() {
                 },
             });
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            const cryptoStore = aliceClient.cryptoStore;
+            const cryptoStore = aliceClient.crypto.cryptoStore;
             const roomKeyRequestBody = {
                 algorithm: olmlib.MEGOLM_ALGORITHM,
                 room_id: "!someroom",
@@ -425,7 +426,8 @@ describe("Crypto", function() {
                 },
             });
             // replace Alice's sendToDevice function with a mock
-            aliceClient.sendToDevice = jest.fn().mockResolvedValue(undefined);
+            const aliceSendToDevice = jest.fn().mockResolvedValue(undefined);
+            aliceClient.sendToDevice = aliceSendToDevice;
             aliceClient.startClient();
 
             // make a room key request, and record the transaction ID for the
@@ -434,11 +436,12 @@ describe("Crypto", function() {
             // key requests get queued until the sync has finished, but we don't
             // let the client set up enough for that to happen, so gut-wrench a bit
             // to force it to send now.
+            // @ts-ignore
             aliceClient.crypto.outgoingRoomKeyRequestManager.sendQueuedRequests();
             jest.runAllTimers();
             await Promise.resolve();
-            expect(aliceClient.sendToDevice).toBeCalledTimes(1);
-            const txnId = aliceClient.sendToDevice.mock.calls[0][2];
+            expect(aliceSendToDevice).toBeCalledTimes(1);
+            const txnId = aliceSendToDevice.mock.calls[0][2];
 
             // give the room key request manager time to update the state
             // of the request
@@ -451,8 +454,8 @@ describe("Crypto", function() {
             // cancelAndResend will call sendToDevice twice:
             // the first call to sendToDevice will be the cancellation
             // the second call to sendToDevice will be the key request
-            expect(aliceClient.sendToDevice).toBeCalledTimes(3);
-            expect(aliceClient.sendToDevice.mock.calls[2][2]).not.toBe(txnId);
+            expect(aliceSendToDevice).toBeCalledTimes(3);
+            expect(aliceSendToDevice.mock.calls[2][2]).not.toBe(txnId);
         });
     });
 
