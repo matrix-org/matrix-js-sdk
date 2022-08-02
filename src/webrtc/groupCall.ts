@@ -1244,6 +1244,13 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onCallFeedsChanged = (call: MatrixCall) => {
+        // Find removed feeds
+        [...this.userMediaFeeds, ...this.screenshareFeeds].filter((gf) => gf.isDisposed()).forEach((feed) => {
+            if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
+            else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.removeScreenshareFeed(feed);
+        });
+
+        // Find new feeds
         call.getRemoteFeeds().filter((cf) => {
             return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
         }).forEach((feed) => {
