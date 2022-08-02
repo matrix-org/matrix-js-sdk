@@ -1,7 +1,8 @@
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
-import { CallErrorCode,
+import {
+    CallErrorCode,
     CallEvent,
     CallEventHandlerMap,
     CallState,
