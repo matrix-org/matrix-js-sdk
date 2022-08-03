@@ -46,39 +46,39 @@ describe("CallFeed", () => {
             });
         });
 
-        describe("should by muted by default", () => {
-            it("audio", () => {
+        describe("muting by default", () => {
+            it("should mute audio by default", () => {
                 expect(feed.isAudioMuted()).toBeTruthy();
             });
 
-            it("video", () => {
+            it("should mute video by default", () => {
                 expect(feed.isVideoMuted()).toBeTruthy();
             });
         });
 
-        describe("should not be muted after adding track", () => {
-            it("audio", () => {
+        describe("muting after adding a track", () => {
+            it("should un-mute audio", () => {
                 // @ts-ignore Mock
                 feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
                 expect(feed.isAudioMuted()).toBeFalsy();
             });
 
-            it("video", () => {
+            it("should un-mute video", () => {
                 // @ts-ignore Mock
                 feed.stream.addTrack(new MockMediaStreamTrack("track", "video", true));
                 expect(feed.isVideoMuted()).toBeFalsy();
             });
         });
 
-        describe("should be muted after calling setAudioVideoMuted()", () => {
-            it("audio ", () => {
+        describe("muting after calling setAudioVideoMuted()", () => {
+            it("should mute audio by default ", () => {
                 // @ts-ignore Mock
                 feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
                 feed.setAudioVideoMuted(true, false);
                 expect(feed.isAudioMuted()).toBeTruthy();
             });
 
-            it("video", () => {
+            it("should mute video by default", () => {
                 // @ts-ignore Mock
                 feed.stream.addTrack(new MockMediaStreamTrack("track", "video", true));
                 feed.setAudioVideoMuted(false, true);
