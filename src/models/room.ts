@@ -49,7 +49,7 @@ import {
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
-import { synthesizeReceipt, TimelineReceipts } from "./timeline-receipts";
+import { ReceiptContent, synthesizeReceipt, TimelineReceipts } from "./timeline-receipts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -2450,8 +2450,29 @@ export class Room extends TimelineReceipts<EmittedEvents, RoomEventHandlerMap> {
         }
     }
 
+    /**
+     * Add a receipt event to the room.
+     * @param {MatrixEvent} event The m.receipt event.
+     * @param {Boolean} synthetic True if this event is implicit.
+     */
     public addReceipt(event: MatrixEvent, synthetic = false): void {
-        super.addReceipt(event, synthetic);
+        const content = event.getContent<ReceiptContent>();
+        Object.keys(content).forEach((eventId: string) => {
+            Object.keys(content[eventId]).forEach((receiptType: ReceiptType) => {
+                Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
+                    const receipt = content[eventId][receiptType][userId];
+
+                    const receiptDestination = this.threads.get(event.threadRootId) ?? this;
+                    receiptDestination.addReceiptToStructure(
+                        eventId,
+                        receiptType,
+                        userId,
+                        receipt,
+                        synthetic,
+                    );
+                });
+            });
+        });
 
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.

@@ -23,10 +23,10 @@ import { IThreadBundledRelationship, MatrixEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
 import { Room } from './room';
-import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
+import { TimelineReceipts } from "./timeline-receipts";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -54,7 +54,7 @@ interface IThreadOpts {
 /**
  * @experimental
  */
-export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
+export class Thread extends TimelineReceipts<EmittedEvents, EventHandlerMap> {
     public static hasServerSideSupport: boolean;
 
     /**
@@ -428,6 +428,18 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             prevBatch,
             nextBatch,
         };
+    }
+
+    public getUnfilteredTimelineSet(): EventTimelineSet {
+        return this.timelineSet;
+    }
+
+    public get timeline(): MatrixEvent[] {
+        return this.events;
+    }
+
+    public addReceipt(event: MatrixEvent, synthetic: boolean): void {
+        throw new Error("Unsupported function on the thread model");
     }
 }
 

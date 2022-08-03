@@ -40,7 +40,7 @@ export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptTyp
     });
 }
 
-interface Receipt {
+export interface Receipt {
     ts: number;
     thread_id?: string;
 }
@@ -58,7 +58,7 @@ interface CachedReceipt {
 
 type ReceiptCache = {[eventId: string]: CachedReceipt[]};
 
-interface ReceiptContent {
+export interface ReceiptContent {
     [eventId: string]: {
         [key in ReceiptType]: {
             [userId: string]: Receipt;
@@ -151,105 +151,97 @@ export abstract class TimelineReceipts<
         return (comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId;
     }
 
-    /**
-     * Add a receipt event to the room.
-     * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} synthetic True if this event is implicit.
-     */
-    private addReceiptsToStructure(event: MatrixEvent, synthetic: boolean): void {
-        const content = event.getContent<ReceiptContent>();
-        Object.keys(content).forEach((eventId) => {
-            Object.keys(content[eventId]).forEach((receiptType) => {
-                Object.keys(content[eventId][receiptType]).forEach((userId) => {
-                    const receipt = content[eventId][receiptType][userId];
+    public addReceiptToStructure(
+        eventId: string,
+        receiptType: ReceiptType,
+        userId: string,
+        receipt: Receipt,
+        synthetic: boolean,
+    ): void {
+        if (!this.receipts[receiptType]) {
+            this.receipts[receiptType] = {};
+        }
+        if (!this.receipts[receiptType][userId]) {
+            this.receipts[receiptType][userId] = [null, null];
+        }
 
-                    if (!this.receipts[receiptType]) {
-                        this.receipts[receiptType] = {};
-                    }
-                    if (!this.receipts[receiptType][userId]) {
-                        this.receipts[receiptType][userId] = [null, null];
-                    }
+        const pair = this.receipts[receiptType][userId];
 
-                    const pair = this.receipts[receiptType][userId];
+        let existingReceipt = pair[ReceiptPairRealIndex];
+        if (synthetic) {
+            existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
+        }
 
-                    let existingReceipt = pair[ReceiptPairRealIndex];
-                    if (synthetic) {
-                        existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
-                    }
+        if (existingReceipt) {
+            // we only want to add this receipt if we think it is later than the one we already have.
+            // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
+            const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
+                existingReceipt.eventId,
+                eventId,
+            );
+            if (ordering !== null && ordering >= 0) {
+                return;
+            }
+        }
 
-                    if (existingReceipt) {
-                        // we only want to add this receipt if we think it is later than the one we already have.
-                        // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
-                        const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            existingReceipt.eventId,
-                            eventId,
-                        );
-                        if (ordering !== null && ordering >= 0) {
-                            return;
-                        }
-                    }
+        const wrappedReceipt: WrappedReceipt = {
+            eventId,
+            data: receipt,
+        };
 
-                    const wrappedReceipt: WrappedReceipt = {
-                        eventId,
-                        data: receipt,
-                    };
+        const realReceipt = synthetic ? pair[ReceiptPairRealIndex] : wrappedReceipt;
+        const syntheticReceipt = synthetic ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
 
-                    const realReceipt = synthetic ? pair[ReceiptPairRealIndex] : wrappedReceipt;
-                    const syntheticReceipt = synthetic ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
+        let ordering: number | null = null;
+        if (realReceipt && syntheticReceipt) {
+            ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
+                realReceipt.eventId,
+                syntheticReceipt.eventId,
+            );
+        }
 
-                    let ordering: number | null = null;
-                    if (realReceipt && syntheticReceipt) {
-                        ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            realReceipt.eventId,
-                            syntheticReceipt.eventId,
-                        );
-                    }
+        const preferSynthetic = ordering === null || ordering < 0;
 
-                    const preferSynthetic = ordering === null || ordering < 0;
+        // we don't bother caching just real receipts by event ID as there's nothing that would read it.
+        // Take the current cached receipt before we overwrite the pair elements.
+        const cachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
 
-                    // we don't bother caching just real receipts by event ID as there's nothing that would read it.
-                    // Take the current cached receipt before we overwrite the pair elements.
-                    const cachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
+        if (synthetic && preferSynthetic) {
+            pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
+        } else if (!synthetic) {
+            pair[ReceiptPairRealIndex] = wrappedReceipt;
 
-                    if (synthetic && preferSynthetic) {
-                        pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
-                    } else if (!synthetic) {
-                        pair[ReceiptPairRealIndex] = wrappedReceipt;
+            if (!preferSynthetic) {
+                pair[ReceiptPairSyntheticIndex] = null;
+            }
+        }
 
-                        if (!preferSynthetic) {
-                            pair[ReceiptPairSyntheticIndex] = null;
-                        }
-                    }
+        const newCachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
+        if (cachedReceipt === newCachedReceipt) return;
 
-                    const newCachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
-                    if (cachedReceipt === newCachedReceipt) return;
+        // clean up any previous cache entry
+        if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
+            const previousEventId = cachedReceipt.eventId;
+            // Remove the receipt we're about to clobber out of existence from the cache
+            this.receiptCacheByEventId[previousEventId] = (
+                this.receiptCacheByEventId[previousEventId].filter(r => {
+                    return r.type !== receiptType || r.userId !== userId;
+                })
+            );
 
-                    // clean up any previous cache entry
-                    if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
-                        const previousEventId = cachedReceipt.eventId;
-                        // Remove the receipt we're about to clobber out of existence from the cache
-                        this.receiptCacheByEventId[previousEventId] = (
-                            this.receiptCacheByEventId[previousEventId].filter(r => {
-                                return r.type !== receiptType || r.userId !== userId;
-                            })
-                        );
+            if (this.receiptCacheByEventId[previousEventId].length < 1) {
+                delete this.receiptCacheByEventId[previousEventId]; // clean up the cache keys
+            }
+        }
 
-                        if (this.receiptCacheByEventId[previousEventId].length < 1) {
-                            delete this.receiptCacheByEventId[previousEventId]; // clean up the cache keys
-                        }
-                    }
-
-                    // cache the new one
-                    if (!this.receiptCacheByEventId[eventId]) {
-                        this.receiptCacheByEventId[eventId] = [];
-                    }
-                    this.receiptCacheByEventId[eventId].push({
-                        userId: userId,
-                        type: receiptType as ReceiptType,
-                        data: receipt,
-                    });
-                });
-            });
+        // cache the new one
+        if (!this.receiptCacheByEventId[eventId]) {
+            this.receiptCacheByEventId[eventId] = [];
+        }
+        this.receiptCacheByEventId[eventId].push({
+            userId: userId,
+            type: receiptType as ReceiptType,
+            data: receipt,
         });
     }
 
@@ -263,14 +255,7 @@ export abstract class TimelineReceipts<
         return this.receiptCacheByEventId[event.getId()] || [];
     }
 
-    /**
-     * Add a receipt event to the room.
-     * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} synthetic True if this event is implicit.
-     */
-    public addReceipt(event: MatrixEvent, synthetic = false): void {
-        this.addReceiptsToStructure(event, synthetic);
-    }
+    public abstract addReceipt(event: MatrixEvent, synthetic: boolean): void;
 
     /**
      * Add a temporary local-echo receipt to the room to reflect in the
