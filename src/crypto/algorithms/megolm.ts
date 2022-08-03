@@ -22,7 +22,6 @@ limitations under the License.
 
 import { logger } from '../../logger';
 import * as olmlib from "../olmlib";
-import { EventType } from '../../@types/event';
 import {
     DecryptionAlgorithm,
     DecryptionError,
@@ -38,7 +37,6 @@ import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
 import { MatrixEvent } from "../..";
 import { IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
-import { ToDeviceBatch, ToDeviceMessage } from '../../models/ToDeviceMessage';
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -611,87 +609,22 @@ class MegolmEncryption extends EncryptionAlgorithm {
         userDeviceMap: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
-        const toDeviceBatch: ToDeviceBatch = {
-            eventType: EventType.RoomMessageEncrypted,
-            batch: [],
-        };
-
-        // Map from userId to a map of deviceId to deviceInfo
-        const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
-
-        const promises: Promise<unknown>[] = [];
-        for (let i = 0; i < userDeviceMap.length; i++) {
-            const encryptedContent: IEncryptedContent = {
-                algorithm: olmlib.OLM_ALGORITHM,
-                sender_key: this.olmDevice.deviceCurve25519Key,
-                ciphertext: {},
-            };
-            const val = userDeviceMap[i];
-            const userId = val.userId;
-            const deviceInfo = val.deviceInfo;
-            const deviceId = deviceInfo.deviceId;
-
-            // Assign to temp value to make type-checking happy
-            let userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
-
-            if (userIdDeviceInfo === undefined) {
-                userIdDeviceInfo = new Map<string, DeviceInfo>();
-
-                deviceInfoByUserIdAndDeviceId.set(userId, userIdDeviceInfo);
-            }
-
-            // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
-            userIdDeviceInfo.set(deviceId, deviceInfo);
-
-            toDeviceBatch.batch.push({
-                userId,
-                deviceId,
-                payload: encryptedContent,
-            });
-
-            promises.push(
-                olmlib.encryptMessageForDevice(
-                    encryptedContent.ciphertext,
-                    this.userId,
-                    this.deviceId,
-                    this.olmDevice,
-                    userId,
-                    deviceInfo,
-                    payload,
-                ),
-            );
-        }
-
-        return Promise.all(promises).then(() => {
-            // prune out any devices that encryptMessageForDevice could not encrypt for,
-            // in which case it will have just not added anything to the ciphertext object.
-            // There's no point sending messages to devices if we couldn't encrypt to them,
-            // since that's effectively a blank message.
-            const prunedBatch: ToDeviceMessage[] = [];
+        return this.crypto.encryptAndSendToDevices(
+            userDeviceMap,
+            payload,
+        ).then(({ toDeviceBatch, deviceInfoByUserIdAndDeviceId }) => {
+            // store that we successfully uploaded the keys of the current slice
             for (const msg of toDeviceBatch.batch) {
-                if (Object.keys(msg.payload.ciphertext).length > 0) {
-                    prunedBatch.push(msg);
-                } else {
-                    logger.log(
-                        "No ciphertext for device " +
-                        msg.userId + ":" + msg.deviceId + ": pruning",
-                    );
-                }
+                session.markSharedWithDevice(
+                    msg.userId,
+                    msg.deviceId,
+                    deviceInfoByUserIdAndDeviceId.get(msg.userId).get(msg.deviceId).getIdentityKey(),
+                    chainIndex,
+                );
             }
-
-            toDeviceBatch.batch = prunedBatch;
-
-            return this.baseApis.queueToDevice(toDeviceBatch).then(() => {
-                // store that we successfully uploaded the keys of the current slice
-                for (const msg of toDeviceBatch.batch) {
-                    session.markSharedWithDevice(
-                        msg.userId,
-                        msg.deviceId,
-                        deviceInfoByUserIdAndDeviceId.get(msg.userId).get(msg.deviceId).getIdentityKey(),
-                        chainIndex,
-                    );
-                }
-            });
+        }).catch((error) => {
+            logger.error("failed to encryptAndSendToDevices", error);
+            throw error;
         });
     }
 
