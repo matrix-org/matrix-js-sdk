@@ -1233,16 +1233,12 @@ export class GroupCall extends TypedEventEmitter<
             throw new Error("Cannot dispose call without user id");
         }
 
-        // FIXME: We need a queue for onMemberStateEvent as if two events are
-        // received in rapid succession, we get two calls
-        const callHandlers = this.callHandlers.get(opponentMemberId);
-        if (!callHandlers) return;
         const {
             onCallFeedsChanged,
             onCallStateChanged,
             onCallHangup,
             onCallReplaced,
-        } = callHandlers;
+        } = this.callHandlers.get(opponentMemberId);
 
         call.removeListener(CallEvent.FeedsChanged, onCallFeedsChanged);
         call.removeListener(CallEvent.State, onCallStateChanged);
