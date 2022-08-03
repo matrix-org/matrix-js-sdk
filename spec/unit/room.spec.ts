@@ -32,13 +32,14 @@ import {
     RoomEvent,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
-import { IWrappedReceipt, Room } from "../../src/models/room";
+import { Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { Thread, ThreadEvent } from "../../src/models/thread";
+import { WrappedReceipt } from "../../src/models/timeline-receipts";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -2429,7 +2430,7 @@ describe("Room", function() {
 
         it("handles missing receipt type", () => {
             room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
-                return receiptType === ReceiptType.ReadPrivate ? { eventId: "eventId" } as IWrappedReceipt : null;
+                return receiptType === ReceiptType.ReadPrivate ? { eventId: "eventId" } as WrappedReceipt : null;
             };
 
             expect(room.getEventReadUpTo(userA)).toEqual("eventId");
@@ -2440,7 +2441,7 @@ describe("Room", function() {
                 return (receiptType === ReceiptType.Read
                     ? { eventId: "eventId1" }
                     : { eventId: "eventId2" }
-                    ) as IWrappedReceipt;
+                    ) as WrappedReceipt;
             };
             room.getUnfilteredTimelineSet = () => ({ compareEventOrdering: (event1, event2) => 1 } as EventTimelineSet);
 
