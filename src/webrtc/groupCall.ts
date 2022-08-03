@@ -429,6 +429,52 @@ export class GroupCall extends TypedEventEmitter<
         this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
 
         this.onActiveSpeakerLoop();
+
+        if (this.client.localSfu) {
+            const opponentDevice = {
+                "device_id": this.client.localSfuDeviceId,
+                // XXX: the SFU might need to specify a session_id so that if it
+                // restarts and starts sending invites to us, we know that it's
+                // forgotten who we were?  But then we need a way to communicate
+                // the session_id to the clients, which is tough if the SFU is
+                // not in the right room.
+                "session_id": "sfu",
+                "feeds": [],
+            };
+
+            const newCall = createNewMatrixCall(
+                this.client,
+                this.room.roomId,
+                {
+                    invitee: this.client.localSfu,
+                    opponentDeviceId: opponentDevice.device_id,
+                    opponentSessionId: opponentDevice.session_id,
+                    groupCallId: this.groupCallId,
+                    initialRemoteSDPStreamMetadata: this.client.localSfu
+                        ? this.getRemoteSDPStreamMetadataForCall()
+                        : undefined,
+                },
+            );
+
+            newCall.isPtt = this.isPtt;
+
+            try {
+                await newCall.placeCallWithCallFeeds(this.getLocalFeeds());  // TODO: We should just setup the datachannel
+                newCall.createDataChannel("datachannel", this.dataChannelOptions);
+            } catch (e) {
+                logger.warn(`Failed to place call to ${this.client.localSfu}!`, e);
+                this.emit(
+                    GroupCallEvent.Error,
+                    new GroupCallError(
+                        GroupCallErrorCode.PlaceCallFailed,
+                        `Failed to place call to ${this.client.localSfu}.`,
+                    ),
+                );
+                return;
+            }
+
+            this.addCall(newCall);
+        }
     }
 
     private dispose() {
@@ -883,6 +929,17 @@ export class GroupCall extends TypedEventEmitter<
         const member = this.room.getMember(event.getStateKey());
         if (!member) return;
 
+        if (this.client.localSfu) {
+            const sfuCall = this.getCallByUserId(this.client.localSfu);
+            if (!sfuCall) return;
+            // subscribe if we already had an existing call (otherwise
+            // we'll subscribe on the new call being set up)
+            sfuCall.updateRemoteSDPStreamMetadata(this.getRemoteSDPStreamMetadataForCall());
+            this.subscribeToSFU(sfuCall, this.getRemoteFeedsFromState());
+
+            return;
+        }
+
         const ignore = () => {
             this.removeParticipant(member);
             clearTimeout(this.memberStateExpirationTimers.get(member.userId));
@@ -935,111 +992,80 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        let opponentDevice: IGroupCallMemberDevice;
-        let peerUserId: string;
-        let existingCall: MatrixCall;
-
-        if (this.client.localSfu) {
-            peerUserId = this.client.localSfu;
-            opponentDevice = {
-                "device_id": this.client.localSfuDeviceId,
-                // XXX: the SFU might need to specify a session_id so that if it
-                // restarts and starts sending invites to us, we know that it's
-                // forgotten who we were?  But then we need a way to communicate
-                // the session_id to the clients, which is tough if the SFU is
-                // not in the right room.
-                "session_id": "sfu",
-                "feeds": [],
-            };
-            existingCall = this.getCallByUserId(peerUserId);
-        } else {
-            // Only initiate a call with a user who has a userId that is
-            // lexicographically less than your own. Otherwise, that user will
-            // call you.
-            if (member.userId < localUserId) {
-                logger.log(`Waiting for ${member.userId} to send call invite.`);
-                return;
-            }
-
-            opponentDevice = this.getDeviceForMember(member.userId);
-            if (!opponentDevice) {
-                logger.warn(`No opponent device found for ${member.userId}, ignoring.`);
-                this.emit(
-                    GroupCallEvent.Error,
-                    new GroupCallUnknownDeviceError(member.userId),
-                );
-                return;
-            }
-
-            peerUserId = member.userId;
-            existingCall = this.getCallByUserId(peerUserId);
-
-            // if we already have an existing call to the same session on the
-            // other side, then use it - it must have already called us first.
-            if (
-                existingCall &&
-                existingCall.getOpponentSessionId() === opponentDevice.session_id
-            ) {
-                return;
-            }
+        // Only initiate a call with a user who has a userId that is
+        // lexicographically less than your own. Otherwise, that user will
+        // call you.
+        if (member.userId < localUserId) {
+            logger.log(`Waiting for ${member.userId} to send call invite.`);
+            return;
         }
 
-        if (
-            !this.client.localSfu ||
-            (this.client.localSfu && !existingCall)
-        ) {
-            const newCall = createNewMatrixCall(
-                this.client,
-                this.room.roomId,
-                {
-                    invitee: peerUserId,
-                    opponentDeviceId: opponentDevice.device_id,
-                    opponentSessionId: opponentDevice.session_id,
-                    groupCallId: this.groupCallId,
-                    initialRemoteSDPStreamMetadata: this.client.localSfu
-                        ? this.getRemoteSDPStreamMetadataForCall()
-                        : undefined,
-                },
+        const opponentDevice = this.getDeviceForMember(member.userId);
+
+        if (!opponentDevice) {
+            logger.warn(`No opponent device found for ${member.userId}, ignoring.`);
+            this.emit(
+                GroupCallEvent.Error,
+                new GroupCallUnknownDeviceError(member.userId),
             );
+            return;
+        }
 
-            newCall.isPtt = this.isPtt;
+        const existingCall = this.getCallByUserId(member.userId);
 
-            const requestScreenshareFeed = opponentDevice.feeds.some(
-                (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+        // if we already have an existing call to the same session on the
+        // other side, then use it - it must have already called us first.
+        if (
+            existingCall &&
+            existingCall.getOpponentSessionId() === opponentDevice.session_id
+        ) {
+            return;
+        }
 
-            try {
-                await newCall.placeCallWithCallFeeds(
-                    this.client.localSfu === peerUserId
-                        ? this.getLocalFeeds() // TODO: We should just setup the datachannel
-                        : this.getLocalFeeds().map(feed => feed.clone()), // Safari can't send a MediaStream to multiple sources, so clone it
-                    requestScreenshareFeed,
-                );
-            } catch (e) {
-                logger.warn(`Failed to place call to ${member.userId}!`, e);
-                this.emit(
-                    GroupCallEvent.Error,
-                    new GroupCallError(
-                        GroupCallErrorCode.PlaceCallFailed,
-                        `Failed to place call to ${member.userId}.`,
-                    ),
-                );
-                return;
-            }
+        const newCall = createNewMatrixCall(
+            this.client,
+            this.room.roomId,
+            {
+                invitee: member.userId,
+                opponentDeviceId: opponentDevice.device_id,
+                opponentSessionId: opponentDevice.session_id,
+                groupCallId: this.groupCallId,
+                initialRemoteSDPStreamMetadata: this.client.localSfu
+                    ? this.getRemoteSDPStreamMetadataForCall()
+                    : undefined,
+            },
+        );
 
-            if (this.dataChannelsEnabled) {
-                newCall.createDataChannel("datachannel", this.dataChannelOptions);
-            }
+        newCall.isPtt = this.isPtt;
 
-            if (existingCall) {
-                this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
-            } else {
-                this.addCall(newCall);
-            }
-        } else if (this.client.localSfu && existingCall) {
-            // subscribe if we already had an existing call (otherwise
-            // we'll subscribe on the new call being set up)
-            existingCall.updateRemoteSDPStreamMetadata(this.getRemoteSDPStreamMetadataForCall());
-            this.subscribeToSFU(existingCall, this.getRemoteFeedsFromState());
+        const requestScreenshareFeed = opponentDevice.feeds.some(
+            (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+
+        try {
+            await newCall.placeCallWithCallFeeds(
+                this.getLocalFeeds().map(feed => feed.clone()),
+                requestScreenshareFeed,
+            );
+        } catch (e) {
+            logger.warn(`Failed to place call to ${member.userId}!`, e);
+            this.emit(
+                GroupCallEvent.Error,
+                new GroupCallError(
+                    GroupCallErrorCode.PlaceCallFailed,
+                    `Failed to place call to ${member.userId}.`,
+                ),
+            );
+            return;
+        }
+
+        if (this.dataChannelsEnabled) {
+            newCall.createDataChannel("datachannel", this.dataChannelOptions);
+        }
+
+        if (existingCall) {
+            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
+        } else {
+            this.addCall(newCall);
         }
     };
 
