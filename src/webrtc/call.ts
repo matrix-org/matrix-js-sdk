@@ -50,8 +50,13 @@ import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
-import { GroupCallUnknownDeviceError, IGroupCallMemberFeed, ISfuDataChannelMessage, ISfuTrackDesc } from './groupCall';
 import { IScreensharingOpts } from "./mediaHandler";
+import {
+    GroupCallUnknownDeviceError,
+    IGroupCallRoomMemberFeed,
+    ISfuDataChannelMessage,
+    ISfuTrackDesc,
+} from "./groupCall";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -1885,7 +1890,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return;
     }
 
-    public async subscribeToSFU(feeds: IGroupCallMemberFeed[]): Promise<void> {
+    public async subscribeToSFU(feeds: IGroupCallRoomMemberFeed[]): Promise<void> {
         await this.waitForDatachannelToBeOpen();
         if (this.dataChannel.readyState !== "open") {
             logger.warn("Can't sent to DC in state:", this.dataChannel.readyState);

@@ -112,7 +112,7 @@ export interface IGroupCallMemberTrack {
     settings: MediaTrackSettings;
 }
 
-export interface IGroupCallMemberFeed {
+export interface IGroupCallRoomMemberFeed {
     id: string;
     purpose: SDPStreamMetadataPurpose;
     tracks: IGroupCallMemberTrack[];
@@ -121,7 +121,7 @@ export interface IGroupCallMemberFeed {
 export interface IGroupCallRoomMemberDevice {
     "device_id": string;
     "session_id": string;
-    "feeds": IGroupCallMemberFeed[];
+    "feeds": IGroupCallRoomMemberFeed[];
 }
 
 export interface IGroupCallRoomMemberCallState {
@@ -892,7 +892,7 @@ export class GroupCall extends TypedEventEmitter<
         return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId);
     }
 
-    private getRemoteFeedsFromState(): IGroupCallMemberFeed[] {
+    private getRemoteFeedsFromState(): IGroupCallRoomMemberFeed[] {
         return this.getMemberStateEvents()?.reduce((feeds, event) => {
             if (event.getSender() === this.client.getUserId()) return feeds; // Ignore local
             const newFeeds = event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.feeds;
@@ -906,7 +906,7 @@ export class GroupCall extends TypedEventEmitter<
             if (event.getSender() === this.client.getUserId()) return metaAcc; // Ignore local
             const feeds = event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.feeds;
             if (!feeds) return metaAcc;
-            const metadata = feeds.reduce((feedAcc: SDPStreamMetadata, feed: IGroupCallMemberFeed) => {
+            const metadata = feeds.reduce((feedAcc: SDPStreamMetadata, feed: IGroupCallRoomMemberFeed) => {
                 if (!feed?.id) return feedAcc;
                 return recursivelyAssign(feedAcc, {
                     [feed.id]: {
