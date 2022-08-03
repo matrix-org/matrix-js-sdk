@@ -48,7 +48,6 @@ import {
     ISfuBaseDataChannelMessage,
     ISfuSelectDataChannelMessage,
     ISfuAnswerDataChannelMessage,
-    ISfuPublishDataChannelMessage,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
