@@ -124,7 +124,7 @@ export interface IGroupCallRoomMemberDevice {
     "feeds": IGroupCallMemberFeed[];
 }
 
-export interface IGroupRoomCallMemberCallState {
+export interface IGroupCallRoomMemberCallState {
     "m.call_id": string;
     "m.foci"?: string[];
     "m.devices": IGroupCallRoomMemberDevice[];
@@ -146,7 +146,7 @@ export interface ISfuDataChannelMessage {
 }
 
 export interface IGroupCallRoomMemberState {
-    "m.calls": IGroupRoomCallMemberCallState[];
+    "m.calls": IGroupCallRoomMemberCallState[];
     "m.expires_ts": number;
 }
 
@@ -860,12 +860,12 @@ export class GroupCall extends TypedEventEmitter<
         return await this.updateMemberCallState(undefined);
     }
 
-    private async updateMemberCallState(memberCallState?: IGroupRoomCallMemberCallState): Promise<ISendEventResponse> {
+    private async updateMemberCallState(memberCallState?: IGroupCallRoomMemberCallState): Promise<ISendEventResponse> {
         const localUserId = this.client.getUserId();
 
         const memberState = this.getMemberStateEvents(localUserId)?.getContent<IGroupCallRoomMemberState>();
 
-        let calls: IGroupRoomCallMemberCallState[] = [];
+        let calls: IGroupCallRoomMemberCallState[] = [];
 
         // Sanitize existing member state event
         if (memberState && Array.isArray(memberState["m.calls"])) {
