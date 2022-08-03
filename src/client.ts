@@ -365,11 +365,6 @@ export interface ICreateClientOpts {
      * The device ID for the local SFU to use for group calling, if any
      */
     localSfuDeviceId?: string;
-
-    /**
-     * False to disable E2EE for to-device calls. Default true.
-     */
-    encryptedCalls?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -978,7 +973,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     public localSfu: string;
     public localSfuDeviceId: string;
-    public encryptedCalls: boolean;
     private useE2eForGroupCall = true;
 
     constructor(opts: IMatrixClientCreateOpts) {
@@ -1051,7 +1045,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         }
 
-        this.encryptedCalls = opts.encryptedCalls;
         this.localSfu = opts.localSfu;
         this.localSfuDeviceId = opts.localSfuDeviceId;
 
