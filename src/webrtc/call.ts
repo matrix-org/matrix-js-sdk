@@ -1906,9 +1906,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             logger.warn("Subscribing to:", streams);
         }
 
-        // TODO: rather than gutwrenching into our MatrixCall's peerConnection,
-        // should this be handled inside MatrixCall instead?
-        //
         // FIXME: RPC reliability over DC
         const msg: ISfuDataChannelMessage = {
             "op": "select",
