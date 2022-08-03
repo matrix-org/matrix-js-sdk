@@ -612,17 +612,15 @@ class MegolmEncryption extends EncryptionAlgorithm {
         return this.crypto.encryptAndSendToDevices(
             userDeviceMap,
             payload,
-        ).then(({ contentMap, deviceInfoByUserIdAndDeviceId }) => {
+        ).then(({ toDeviceBatch, deviceInfoByUserIdAndDeviceId }) => {
             // store that we successfully uploaded the keys of the current slice
-            for (const userId of Object.keys(contentMap)) {
-                for (const deviceId of Object.keys(contentMap[userId])) {
-                    session.markSharedWithDevice(
-                        userId,
-                        deviceId,
-                        deviceInfoByUserIdAndDeviceId.get(userId).get(deviceId).getIdentityKey(),
-                        chainIndex,
-                    );
-                }
+            for (const msg of toDeviceBatch.batch) {
+                session.markSharedWithDevice(
+                    msg.userId,
+                    msg.deviceId,
+                    deviceInfoByUserIdAndDeviceId.get(msg.userId).get(msg.deviceId).getIdentityKey(),
+                    chainIndex,
+                );
             }
         }).catch((error) => {
             logger.error("failed to encryptAndSendToDevices", error);
