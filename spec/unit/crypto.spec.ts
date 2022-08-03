@@ -65,6 +65,10 @@ describe("Crypto", function() {
         return Olm.init();
     });
 
+    afterEach(() => {
+        jest.useRealTimers();
+    });
+
     it("Crypto exposes the correct olm library version", function() {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
@@ -456,8 +460,6 @@ describe("Crypto", function() {
             // the second call to sendToDevice will be the key request
             expect(aliceSendToDevice).toBeCalledTimes(3);
             expect(aliceSendToDevice.mock.calls[2][2]).not.toBe(txnId);
-
-            jest.useRealTimers();
         });
     });
 
