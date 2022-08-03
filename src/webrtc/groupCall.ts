@@ -993,8 +993,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         // Only initiate a call with a user who has a userId that is lexicographically
-        // less than your own. Otherwise, that user will
-        // call you.
+        // less than your own. Otherwise, that user will call you.
         if (member.userId < localUserId) {
             logger.log(`Waiting for ${member.userId} to send call invite.`);
             return;
@@ -1013,8 +1012,6 @@ export class GroupCall extends TypedEventEmitter<
 
         const existingCall = this.getCallByUserId(member.userId);
 
-        // if we already have an existing call to the same session on the
-        // other side, then use it - it must have already called us first.
         if (
             existingCall &&
             existingCall.getOpponentSessionId() === opponentDevice.session_id
