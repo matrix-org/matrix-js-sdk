@@ -59,6 +59,7 @@ describe("MegolmDecryption", function() {
         mockBaseApis = {
             claimOneTimeKeys: jest.fn(),
             sendToDevice: jest.fn(),
+            queueToDevice: jest.fn(),
         } as unknown as MockedObject<MatrixClient>;
 
         const cryptoStore = new MemoryCryptoStore();
@@ -179,6 +180,7 @@ describe("MegolmDecryption", function() {
                 });
 
                 mockBaseApis.sendToDevice.mockReset();
+                mockBaseApis.queueToDevice.mockReset();
 
                 // do the share
                 megolmDecryption.shareKeysWithDevice(keyRequest);
@@ -324,6 +326,7 @@ describe("MegolmDecryption", function() {
                     },
                 });
                 mockBaseApis.sendToDevice.mockResolvedValue(undefined);
+                mockBaseApis.queueToDevice.mockResolvedValue(undefined);
 
                 aliceDeviceInfo = {
                     deviceId: 'aliceDevice',
@@ -357,6 +360,16 @@ describe("MegolmDecryption", function() {
                         rotation_period_ms: rotationPeriodMs,
                     },
                 });
+
+                // Splice the real method onto the mock object as megolm uses this method
+                // on the crypto class in order to encrypt / start sessions
+                // @ts-ignore Mock
+                mockCrypto.encryptAndSendToDevices = Crypto.prototype.encryptAndSendToDevices;
+                // @ts-ignore Mock
+                mockCrypto.olmDevice = olmDevice;
+                // @ts-ignore Mock
+                mockCrypto.baseApis = mockBaseApis;
+
                 mockRoom = {
                     getEncryptionTargetMembers: jest.fn().mockReturnValue(
                         [{ userId: "@alice:home.server" }],
@@ -403,7 +416,7 @@ describe("MegolmDecryption", function() {
                 expect(mockCrypto.downloadKeys).toHaveBeenCalledWith(
                     ['@alice:home.server'], false,
                 );
-                expect(mockBaseApis.sendToDevice).toHaveBeenCalled();
+                expect(mockBaseApis.queueToDevice).toHaveBeenCalled();
                 expect(mockBaseApis.claimOneTimeKeys).toHaveBeenCalledWith(
                     [['@alice:home.server', 'aliceDevice']], 'signed_curve25519', 2000,
                 );
@@ -446,7 +459,7 @@ describe("MegolmDecryption", function() {
                     'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWI',
                 );
 
-                mockBaseApis.sendToDevice.mockClear();
+                mockBaseApis.queueToDevice.mockClear();
                 await megolmEncryption.reshareKeyWithDevice(
                     olmDevice.deviceCurve25519Key,
                     ct1.session_id,
@@ -454,7 +467,7 @@ describe("MegolmDecryption", function() {
                     aliceDeviceInfo,
                 );
 
-                expect(mockBaseApis.sendToDevice).not.toHaveBeenCalled();
+                expect(mockBaseApis.queueToDevice).not.toHaveBeenCalled();
             });
         });
     });

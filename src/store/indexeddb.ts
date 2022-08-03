@@ -27,6 +27,7 @@ import { IIndexedDBBackend } from "./indexeddb-backend";
 import { ISyncResponse } from "../sync-accumulator";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IStateEventWithRoomId } from "../@types/search";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -350,6 +351,18 @@ export class IndexedDBStore extends MemoryStore {
         } else {
             this.localStorage.removeItem(pendingEventsKey(roomId));
         }
+    }
+
+    public saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void> {
+        return this.backend.saveToDeviceBatches(batches);
+    }
+
+    public getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+        return this.backend.getOldestToDeviceBatch();
+    }
+
+    public removeToDeviceBatch(id: number): Promise<void> {
+        return this.backend.removeToDeviceBatch(id);
     }
 }
 
