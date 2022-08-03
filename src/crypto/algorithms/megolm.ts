@@ -589,8 +589,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      *
      * @param {number} chainIndex current chain index
      *
-     * @param {object<userId, deviceInfo>} userDeviceMap
-     *   mapping from userId to deviceInfo
+     * @param {IOlmDevice[]} devices Array of DeviceInfo structs for each device to send to
      *
      * @param {object} payload fields to include in the encrypted payload
      *
@@ -600,23 +599,21 @@ class MegolmEncryption extends EncryptionAlgorithm {
     private encryptAndSendKeysToDevices(
         session: OutboundSessionInfo,
         chainIndex: number,
-        userDeviceMap: IOlmDevice[],
+        devices: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
         return this.crypto.encryptAndSendToDevices(
-            userDeviceMap,
+            devices,
             payload,
-        ).then(({ contentMap, deviceInfoByUserIdAndDeviceId }) => {
+        ).then(() => {
             // store that we successfully uploaded the keys of the current slice
-            for (const userId of Object.keys(contentMap)) {
-                for (const deviceId of Object.keys(contentMap[userId])) {
-                    session.markSharedWithDevice(
-                        userId,
-                        deviceId,
-                        deviceInfoByUserIdAndDeviceId.get(userId).get(deviceId).getIdentityKey(),
-                        chainIndex,
-                    );
-                }
+            for (const device of devices) {
+                session.markSharedWithDevice(
+                    device.userId,
+                    device.deviceInfo.deviceId,
+                    device.deviceInfo.getIdentityKey(),
+                    chainIndex,
+                );
             }
         }).catch((error) => {
             logger.error("failed to encryptAndSendToDevices", error);
