@@ -992,8 +992,8 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        // Only initiate a call with a user who has a userId that is
-        // lexicographically less than your own. Otherwise, that user will
+        // Only initiate a call with a user who has a userId that is lexicographically
+        // less than your own. Otherwise, that user will
         // call you.
         if (member.userId < localUserId) {
             logger.log(`Waiting for ${member.userId} to send call invite.`);
