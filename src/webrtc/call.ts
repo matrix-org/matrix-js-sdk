@@ -357,7 +357,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private feeds: Array<CallFeed> = [];
     private usermediaSenders: Array<RTCRtpSender> = [];
     private screensharingSenders: Array<RTCRtpSender> = [];
-    private subscribedStreams: ISfuTrackDesc[] = [];
+    private subscribedTracks: ISfuTrackDesc[] = [];
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream: boolean;
     private successor: MatrixCall;
@@ -1895,23 +1895,22 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        // Only subscribe to streams we aren't already subscribed to
-        const streams: ISfuTrackDesc[] = feeds.filter((feed) => {
-            if (!feed.tracks) return false; // If we don't have info about tracks, the SFU won't have them either
-            return !this.subscribedStreams.find((stream) => stream.stream_id === feed.id);
-        }).map((feed) => ({ stream_id: feed.id }));
+        const tracks: ISfuTrackDesc[] = feeds
+            .filter((feed) => feed.tracks) // Skip trackless feeds
+            .reduce((tracks, f) => [...tracks, ...f.tracks.map((t) => ({ stream_id: f.id, track_id: t.id }))], []) // Get array of tracks from feeds
+            .filter((track) => !this.subscribedTracks.find((subscribed) => utils.deepCompare(track, subscribed))); // Filter out already subscribed tracks
 
-        if (streams.length === 0) {
+        if (tracks.length === 0) {
             logger.warn("Failed to find any new streams to subscribe to");
             return;
         } else {
-            this.subscribedStreams.push(...streams);
-            logger.warn("Subscribing to:", streams);
+            this.subscribedTracks.push(...tracks);
+            logger.warn("Subscribing to:", tracks);
         }
 
         this.sendSFUDataChannelMessage({
             op: "select",
-            start: streams,
+            start: tracks,
         } as ISfuSelectDataChannelMessage);
     }
 
@@ -2515,7 +2514,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
         this.stopAllMedia();
         this.deleteAllFeeds();
-        this.subscribedStreams = [];
+        this.subscribedTracks = [];
 
         if (this.peerConn && this.peerConn.signalingState !== 'closed') {
             this.peerConn.close();

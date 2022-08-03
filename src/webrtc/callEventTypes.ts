@@ -92,7 +92,7 @@ export interface MCallHangupReject extends MCallBase {
 
 export interface ISfuTrackDesc {
     stream_id: string;
-    track_id?: string;
+    track_id: string;
 }
 
 export interface ISfuBaseDataChannelMessage {
