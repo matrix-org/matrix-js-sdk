@@ -14,7 +14,7 @@ import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
-import { SDPStreamMetadata, SDPStreamMetadataPurpose } from "./callEventTypes";
+import { ISfuTrackDesc, SDPStreamMetadata, SDPStreamMetadataPurpose } from "./callEventTypes";
 import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
@@ -128,21 +128,6 @@ export interface IGroupCallRoomMemberCallState {
     "m.call_id": string;
     "m.foci"?: string[];
     "m.devices": IGroupCallRoomMemberDevice[];
-}
-
-export interface ISfuTrackDesc {
-    "stream_id": string;
-    "track_id"?: string;
-}
-
-export interface ISfuDataChannelMessage {
-    "op": string;
-    "id": string;
-    "conf_id"?: string;
-    "sdp"?: string;
-    "message"?: string;
-    "start"?: ISfuTrackDesc[];
-    "stop"?: ISfuTrackDesc[];
 }
 
 export interface IGroupCallRoomMemberState {

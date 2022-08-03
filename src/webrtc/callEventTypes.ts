@@ -90,4 +90,34 @@ export interface MCallHangupReject extends MCallBase {
     reason?: CallErrorCode;
 }
 
+export interface ISfuTrackDesc {
+    stream_id: string;
+    track_id?: string;
+}
+
+export interface ISfuBaseDataChannelMessage {
+    op: string;
+    id: string;
+    conf_id: string;
+    sdp?: string;
+    message?: string;
+    start?: ISfuTrackDesc[];
+    stop?: ISfuTrackDesc[];
+}
+
+export interface ISfuSelectDataChannelMessage extends ISfuBaseDataChannelMessage {
+    op: "select";
+    start: ISfuTrackDesc[];
+}
+
+export interface ISfuAnswerDataChannelMessage extends ISfuBaseDataChannelMessage {
+    op: "answer";
+    sdp: string;
+}
+
+export interface ISfuPublishDataChannelMessage extends ISfuBaseDataChannelMessage {
+    op: "publish";
+    sdp: string;
+}
+
 /* eslint-enable camelcase */

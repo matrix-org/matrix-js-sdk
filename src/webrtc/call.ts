@@ -44,6 +44,11 @@ import {
     MCallCandidates,
     MCallBase,
     MCallHangupReject,
+    ISfuTrackDesc,
+    ISfuBaseDataChannelMessage,
+    ISfuSelectDataChannelMessage,
+    ISfuAnswerDataChannelMessage,
+    ISfuPublishDataChannelMessage,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
@@ -54,8 +59,6 @@ import { IScreensharingOpts } from "./mediaHandler";
 import {
     GroupCallUnknownDeviceError,
     IGroupCallRoomMemberFeed,
-    ISfuDataChannelMessage,
-    ISfuTrackDesc,
 } from "./groupCall";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
@@ -1827,7 +1830,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private onDataChannelMessage = async (event: MessageEvent): Promise<void> => {
         // TODO: play nice with application layer DC listeners
 
-        let json: ISfuDataChannelMessage;
+        let json: ISfuBaseDataChannelMessage;
         try {
             json = JSON.parse(event.data);
         } catch (e) {
@@ -1853,15 +1856,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     const answer = await this.peerConn.createAnswer();
                     await this.peerConn.setLocalDescription(answer);
 
-                    const msg: ISfuDataChannelMessage = {
-                        "op": "answer",
-                        "conf_id": this.groupCallId,
-                        "id": Date.now() + randomString(5),
-                        "sdp": answer.sdp,
-                    };
-
-                    this.dataChannel.send(JSON.stringify(msg));
-                    logger.warn("Sent answer message over DC", msg);
+                    this.sendSFUDataChannelMessage({
+                        op: "answer",
+                        sdp: answer.sdp,
+                    } as ISfuAnswerDataChannelMessage);
                 } catch (e) {
                     logger.debug(`Call ${this.callId} Failed to set remote description`, e);
                     this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
@@ -1911,16 +1909,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             logger.warn("Subscribing to:", streams);
         }
 
-        // FIXME: RPC reliability over DC
-        const msg: ISfuDataChannelMessage = {
-            "op": "select",
-            "conf_id": this.groupCallId,
-            "id": Date.now() + randomString(5),
-            "start": streams,
-        };
-
-        this.dataChannel.send(JSON.stringify(msg));
-        logger.warn("Sent select message over DC", msg);
+        this.sendSFUDataChannelMessage({
+            op: "select",
+            start: streams,
+        } as ISfuSelectDataChannelMessage);
     }
 
     public updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
@@ -2367,6 +2359,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             return this.client.sendEvent(this.roomId, eventType, realContent);
         }
+    }
+
+    private sendSFUDataChannelMessage(content: Omit<ISfuBaseDataChannelMessage, "id" | "conf_id">): void {
+        const realContent: ISfuBaseDataChannelMessage = Object.assign(content, {
+            id: randomString(24),
+            conf_id: this.groupCallId,
+        });
+
+        // FIXME: RPC reliability over DC
+        this.dataChannel.send(JSON.stringify(realContent));
+        logger.warn(`Sent ${realContent.op} over DC:`, realContent);
     }
 
     private queueCandidate(content: RTCIceCandidate): void {
