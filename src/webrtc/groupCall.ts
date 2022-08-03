@@ -118,16 +118,16 @@ export interface IGroupCallMemberFeed {
     tracks: IGroupCallMemberTrack[];
 }
 
-export interface IGroupCallMemberDevice {
+export interface IGroupCallRoomMemberDevice {
     "device_id": string;
     "session_id": string;
     "feeds": IGroupCallMemberFeed[];
 }
 
-export interface IGroupCallMemberCallState {
+export interface IGroupRoomCallMemberCallState {
     "m.call_id": string;
     "m.foci"?: string[];
-    "m.devices": IGroupCallMemberDevice[];
+    "m.devices": IGroupCallRoomMemberDevice[];
 }
 
 export interface ISfuTrackDesc {
@@ -146,7 +146,7 @@ export interface ISfuDataChannelMessage {
 }
 
 export interface IGroupCallRoomMemberState {
-    "m.calls": IGroupCallMemberCallState[];
+    "m.calls": IGroupRoomCallMemberCallState[];
     "m.expires_ts": number;
 }
 
@@ -860,12 +860,12 @@ export class GroupCall extends TypedEventEmitter<
         return await this.updateMemberCallState(undefined);
     }
 
-    private async updateMemberCallState(memberCallState?: IGroupCallMemberCallState): Promise<ISendEventResponse> {
+    private async updateMemberCallState(memberCallState?: IGroupRoomCallMemberCallState): Promise<ISendEventResponse> {
         const localUserId = this.client.getUserId();
 
         const memberState = this.getMemberStateEvents(localUserId)?.getContent<IGroupCallRoomMemberState>();
 
-        let calls: IGroupCallMemberCallState[] = [];
+        let calls: IGroupRoomCallMemberCallState[] = [];
 
         // Sanitize existing member state event
         if (memberState && Array.isArray(memberState["m.calls"])) {
@@ -1062,7 +1062,7 @@ export class GroupCall extends TypedEventEmitter<
         }
     };
 
-    public getDeviceForMember(userId: string): IGroupCallMemberDevice {
+    public getDeviceForMember(userId: string): IGroupCallRoomMemberDevice {
         const memberStateEvent = this.getMemberStateEvents(userId);
 
         if (!memberStateEvent) {
