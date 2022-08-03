@@ -115,9 +115,4 @@ export interface ISfuAnswerDataChannelMessage extends ISfuBaseDataChannelMessage
     sdp: string;
 }
 
-export interface ISfuPublishDataChannelMessage extends ISfuBaseDataChannelMessage {
-    op: "publish";
-    sdp: string;
-}
-
 /* eslint-enable camelcase */
