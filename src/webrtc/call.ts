@@ -850,7 +850,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdpStreamMetadata = invite[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
-        } else if (!this.client.localSfu) {
+        } else if (!this.client.getSFU().user_id) {
             logger.debug(`Call ${
                 this.callId} did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
         }
@@ -1701,7 +1701,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdpStreamMetadata = content[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
-        } else if (!this.client.localSfu) {
+        } else if (!this.client.getSFU().user_id) {
             logger.warn(`Call ${this.callId} Did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
         }
 
@@ -2675,7 +2675,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = sender === this.client.localSfu
+        this.opponentMember = sender === this.client.getSFU().user_id
             ? { userId: sender } as RoomMember // FIXME: While we never try to get anything other than the userId, this is WRONG
             : this.client.getRoom(this.roomId).getMember(sender);
     }

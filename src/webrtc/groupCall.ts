@@ -284,7 +284,7 @@ export class GroupCall extends TypedEventEmitter<
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId || genCallID();
 
-        if (this.client.localSfu) {
+        if (this.client.getSFU().user_id) {
             // we have to use DCs to talk to the SFU
             this.dataChannelsEnabled = true;
         }
@@ -430,9 +430,9 @@ export class GroupCall extends TypedEventEmitter<
 
         this.onActiveSpeakerLoop();
 
-        if (this.client.localSfu) {
+        if (this.client.getSFU().user_id) {
             const opponentDevice = {
-                "device_id": this.client.localSfuDeviceId,
+                "device_id": this.client.getSFU().device_id,
                 // XXX: the SFU might need to specify a session_id so that if it
                 // restarts and starts sending invites to us, we know that it's
                 // forgotten who we were?  But then we need a way to communicate
@@ -446,11 +446,11 @@ export class GroupCall extends TypedEventEmitter<
                 this.client,
                 this.room.roomId,
                 {
-                    invitee: this.client.localSfu,
+                    invitee: this.client.getSFU().user_id,
                     opponentDeviceId: opponentDevice.device_id,
                     opponentSessionId: opponentDevice.session_id,
                     groupCallId: this.groupCallId,
-                    initialRemoteSDPStreamMetadata: this.client.localSfu
+                    initialRemoteSDPStreamMetadata: this.client.getSFU().user_id
                         ? this.getRemoteSDPStreamMetadataForCall()
                         : undefined,
                 },
@@ -462,12 +462,12 @@ export class GroupCall extends TypedEventEmitter<
                 await newCall.placeCallWithCallFeeds(this.getLocalFeeds());  // TODO: We should just setup the datachannel
                 newCall.createDataChannel("datachannel", this.dataChannelOptions);
             } catch (e) {
-                logger.warn(`Failed to place call to ${this.client.localSfu}!`, e);
+                logger.warn(`Failed to place call to ${this.client.getSFU().user_id}!`, e);
                 this.emit(
                     GroupCallEvent.Error,
                     new GroupCallError(
                         GroupCallErrorCode.PlaceCallFailed,
-                        `Failed to place call to ${this.client.localSfu}.`,
+                        `Failed to place call to ${this.client.getSFU().user_id}.`,
                     ),
                 );
                 return;
@@ -929,8 +929,8 @@ export class GroupCall extends TypedEventEmitter<
         const member = this.room.getMember(event.getStateKey());
         if (!member) return;
 
-        if (this.client.localSfu) {
-            const sfuCall = this.getCallByUserId(this.client.localSfu);
+        if (this.client.getSFU().user_id) {
+            const sfuCall = this.getCallByUserId(this.client.getSFU().user_id);
             if (!sfuCall) return;
             // subscribe if we already had an existing call (otherwise
             // we'll subscribe on the new call being set up)
@@ -1027,7 +1027,7 @@ export class GroupCall extends TypedEventEmitter<
                 opponentDeviceId: opponentDevice.device_id,
                 opponentSessionId: opponentDevice.session_id,
                 groupCallId: this.groupCallId,
-                initialRemoteSDPStreamMetadata: this.client.localSfu
+                initialRemoteSDPStreamMetadata: this.client.getSFU().user_id
                     ? this.getRemoteSDPStreamMetadataForCall()
                     : undefined,
             },
@@ -1311,7 +1311,7 @@ export class GroupCall extends TypedEventEmitter<
             this.sendMemberStateEvent();
 
             // if we're calling an SFU, subscribe to its feeds
-            if (call.getOpponentMember().userId === this.client.localSfu) {
+            if (call.getOpponentMember().userId === this.client.getSFU().user_id) {
                 this.subscribeToSFU(call, this.getRemoteFeedsFromState());
             }
         }

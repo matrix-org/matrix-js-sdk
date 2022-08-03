@@ -794,6 +794,12 @@ interface ITimestampToEventResponse {
     event_id: string;
     origin_server_ts: string;
 }
+
+interface ISFUInfo {
+    user_id: string;
+    device_id: string;
+}
+
 /* eslint-enable camelcase */
 
 // We're using this constant for methods overloading and inspect whether a variable
@@ -971,8 +977,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected sessionId: string;
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
-    public localSfu: string;
-    public localSfuDeviceId: string;
+    private localSfu: string;
+    private localSfuDeviceId: string;
     private useE2eForGroupCall = true;
 
     constructor(opts: IMatrixClientCreateOpts) {
@@ -1537,8 +1543,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getUseE2eForGroupCall(): boolean {
         // FIXME: SFUs don't support E2E atm
-        if (this.localSfu) return false;
+        if (this.getSFU()) return false;
         return this.useE2eForGroupCall;
+    }
+
+    public getSFU(): ISFUInfo | null {
+        return {
+            user_id: this.localSfu,
+            device_id: this.localSfuDeviceId,
+        };
     }
 
     /**
