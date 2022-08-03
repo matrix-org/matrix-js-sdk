@@ -694,7 +694,7 @@ describe('Call', function() {
         });
     });
 
-    describe("should ignore streams with ids for which we already have a feed", () => {
+    describe("ignoring streams with ids for which we already have a feed", () => {
         const STREAM_ID = "stream_id";
         const FEEDS_CHANGED_CALLBACK = jest.fn();
 
@@ -708,7 +708,7 @@ describe('Call', function() {
             FEEDS_CHANGED_CALLBACK.mockReset();
         });
 
-        it("pushRemoteFeed()", async () => {
+        it("should ignore stream passed to pushRemoteFeed()", async () => {
             await call.onAnswerReceived({
                 getContent: () => {
                     return {
@@ -734,7 +734,7 @@ describe('Call', function() {
             expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
         });
 
-        it("pushRemoteFeedWithoutMetadata()", async () => {
+        it("should ignore stream passed to pushRemoteFeedWithoutMetadata()", async () => {
             call.pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
             call.pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
 
@@ -742,7 +742,7 @@ describe('Call', function() {
             expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
         });
 
-        it("pushNewLocalFeed()", async () => {
+        it("should ignore stream passed to pushNewLocalFeed()", async () => {
             call.pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
             call.pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
 
