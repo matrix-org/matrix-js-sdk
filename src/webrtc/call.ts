@@ -50,7 +50,7 @@ import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
-import { GroupCallUnknownDeviceError, ISfuDataChannelMessage } from './groupCall';
+import { GroupCallUnknownDeviceError, IGroupCallMemberFeed, ISfuDataChannelMessage, ISfuTrackDesc } from './groupCall';
 import { IScreensharingOpts } from "./mediaHandler";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
@@ -349,6 +349,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private feeds: Array<CallFeed> = [];
     private usermediaSenders: Array<RTCRtpSender> = [];
     private screensharingSenders: Array<RTCRtpSender> = [];
+    private subscribedStreams: ISfuTrackDesc[] = [];
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream: boolean;
     private successor: MatrixCall;
@@ -1873,6 +1874,53 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     };
 
+    private async waitForDatachannelToBeOpen(): Promise<void> {
+        if (this.dataChannel.readyState === 'connecting') {
+            const p = new Promise<void>(resolve => {
+                this.dataChannel.onopen = () => resolve();
+                this.dataChannel.onclose = () => resolve();
+            });
+            await p;
+        }
+        return;
+    }
+
+    public async subscribeToSFU(feeds: IGroupCallMemberFeed[]): Promise<void> {
+        await this.waitForDatachannelToBeOpen();
+        if (this.dataChannel.readyState !== "open") {
+            logger.warn("Can't sent to DC in state:", this.dataChannel.readyState);
+            return;
+        }
+
+        // Only subscribe to streams we aren't already subscribed to
+        const streams: ISfuTrackDesc[] = feeds.filter((feed) => {
+            if (!feed.tracks) return false; // If we don't have info about tracks, the SFU won't have them either
+            return !this.subscribedStreams.find((stream) => stream.stream_id === feed.id);
+        }).map((feed) => ({ stream_id: feed.id }));
+
+        if (streams.length === 0) {
+            logger.warn("Failed to find any new streams to subscribe to");
+            return;
+        } else {
+            this.subscribedStreams.push(...streams);
+            logger.warn("Subscribing to:", streams);
+        }
+
+        // TODO: rather than gutwrenching into our MatrixCall's peerConnection,
+        // should this be handled inside MatrixCall instead?
+        //
+        // FIXME: RPC reliability over DC
+        const msg: ISfuDataChannelMessage = {
+            "op": "select",
+            "conf_id": this.groupCallId,
+            "id": Date.now() + randomString(5),
+            "start": streams,
+        };
+
+        this.dataChannel.send(JSON.stringify(msg));
+        logger.warn("Sent select message over DC", msg);
+    }
+
     public updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
         this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
@@ -2462,6 +2510,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
         this.stopAllMedia();
         this.deleteAllFeeds();
+        this.subscribedStreams = [];
 
         if (this.peerConn && this.peerConn.signalingState !== 'closed') {
             this.peerConn.close();

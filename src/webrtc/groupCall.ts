@@ -21,7 +21,6 @@ import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
 import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
-import { randomString } from "../randomstring";
 import { IScreensharingOpts } from "./mediaHandler";
 import { recursivelyAssign } from "../utils";
 
@@ -268,7 +267,6 @@ export class GroupCall extends TypedEventEmitter<
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
     private memberStateExpirationTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private resendMemberStateTimer: ReturnType<typeof setTimeout> | null = null;
-    private subscribedStreams: ISfuTrackDesc[] = [];
 
     constructor(
         private client: MatrixClient,
@@ -491,7 +489,6 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         this.client.getMediaHandler().stopAllStreams();
-        this.subscribedStreams = [];
 
         if (this.state !== GroupCallState.Entered) {
             return;
@@ -932,10 +929,9 @@ export class GroupCall extends TypedEventEmitter<
         if (this.client.getSFU().user_id) {
             const sfuCall = this.getCallByUserId(this.client.getSFU().user_id);
             if (!sfuCall) return;
-            // subscribe if we already had an existing call (otherwise
-            // we'll subscribe on the new call being set up)
+
             sfuCall.updateRemoteSDPStreamMetadata(this.getRemoteSDPStreamMetadataForCall());
-            this.subscribeToSFU(sfuCall, this.getRemoteFeedsFromState());
+            sfuCall.subscribeToSFU(this.getRemoteFeedsFromState());
 
             return;
         }
@@ -1065,53 +1061,6 @@ export class GroupCall extends TypedEventEmitter<
             this.addCall(newCall);
         }
     };
-
-    private async waitForDatachannelToBeOpen(call: MatrixCall): Promise<void> {
-        if (call.dataChannel.readyState === 'connecting') {
-            const p = new Promise<void>(resolve => {
-                call.dataChannel.onopen = () => resolve();
-                call.dataChannel.onclose = () => resolve();
-            });
-            await p;
-        }
-        return;
-    }
-
-    private async subscribeToSFU(call: MatrixCall, feeds: IGroupCallMemberFeed[]) {
-        await this.waitForDatachannelToBeOpen(call);
-        if (call.dataChannel.readyState !== "open") {
-            logger.warn("Can't sent to DC in state:", call.dataChannel.readyState);
-            return;
-        }
-
-        // Only subscribe to streams we aren't already subscribed to
-        const streams: ISfuTrackDesc[] = feeds.filter((feed) => {
-            if (!feed.tracks) return false; // If we don't have info about tracks, the SFU won't have them either
-            return !this.subscribedStreams.find((stream) => stream.stream_id === feed.id);
-        }).map((feed) => ({ stream_id: feed.id }));
-
-        if (streams.length === 0) {
-            logger.warn("Failed to find any new streams to subscribe to");
-            return;
-        } else {
-            this.subscribedStreams.push(...streams);
-            logger.warn("Subscribing to:", streams);
-        }
-
-        // TODO: rather than gutwrenching into our MatrixCall's peerConnection,
-        // should this be handled inside MatrixCall instead?
-        //
-        // FIXME: RPC reliability over DC
-        const msg: ISfuDataChannelMessage = {
-            "op": "select",
-            "conf_id": this.groupCallId,
-            "id": Date.now() + randomString(5),
-            "start": streams,
-        };
-
-        call.dataChannel.send(JSON.stringify(msg));
-        logger.warn("Sent select message over DC", msg);
-    }
 
     public getDeviceForMember(userId: string): IGroupCallMemberDevice {
         const memberStateEvent = this.getMemberStateEvents(userId);
@@ -1312,7 +1261,7 @@ export class GroupCall extends TypedEventEmitter<
 
             // if we're calling an SFU, subscribe to its feeds
             if (call.getOpponentMember().userId === this.client.getSFU().user_id) {
-                this.subscribeToSFU(call, this.getRemoteFeedsFromState());
+                call.subscribeToSFU(this.getRemoteFeedsFromState());
             }
         }
     };
