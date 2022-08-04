@@ -807,10 +807,10 @@ export class GroupCall extends TypedEventEmitter<
             // TODO: correctly track which rtpSenders are associated with which feed
             // rather than assuming that all our senders are from this feed.
             tracks: this.calls[0]
-                ? this.calls[0].peerConn.getTransceivers().map(transceiver => ({
-                    "id": getTrackDesc(this.calls[0].peerConn.localDescription?.sdp, transceiver.mid)?.track_id,
-                    "kind": transceiver.sender.track.kind,
-                    "settings": defloat(transceiver.sender.track.getSettings()),
+                ? this.calls[0].peerConn.getTransceivers().filter((t) => t.sender.track).map(t => ({
+                    "id": getTrackDesc(this.calls[0].peerConn.localDescription?.sdp, t.mid)?.track_id,
+                    "kind": t.sender.track.kind,
+                    "settings": defloat(t.sender.track.getSettings()),
                 }))
                 : undefined,
         }));
