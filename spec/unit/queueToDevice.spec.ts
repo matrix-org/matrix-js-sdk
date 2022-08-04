@@ -114,6 +114,10 @@ describe.each([
         });
 
         await httpBackend.flushAllExpected();
+        // let the code handle the response to the request so we don't get
+        // log output after the test has finished (apparently stopping the
+        // client in aftereach is not sufficient.)
+        await flushPromises();
     });
 
     it("retries on error", async function() {
