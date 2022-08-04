@@ -761,6 +761,7 @@ describe('Call', function() {
                         },
                     };
                 },
+                getSender: () => "@test:foo",
             });
 
             call.pushRemoteFeed(new MockMediaStream(STREAM_ID));

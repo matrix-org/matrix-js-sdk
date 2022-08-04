@@ -180,6 +180,17 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     }
 
     /**
+     * Replaces the current MediaStream with a new one.
+     * The stream will be different and new stream as remore parties are
+     * concerned, but this can be used for convenience locally to set up
+     * volume listeners automatically on the new stream etc.
+     * @param newStream new stream with which to replace the current one
+     */
+    public setNewStream(newStream: MediaStream): void {
+        this.updateStream(this.stream, newStream);
+    }
+
+    /**
      * Set one or both of feed's internal audio and video video mute state
      * Either value may be null to leave it as-is
      * @param muted is the feed's video muted?
