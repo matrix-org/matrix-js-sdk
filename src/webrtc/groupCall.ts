@@ -14,7 +14,7 @@ import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
-import { ISfuTrackDesc, SDPStreamMetadata, SDPStreamMetadataPurpose } from "./callEventTypes";
+import { SDPStreamMetadata, SDPStreamMetadataPurpose } from "./callEventTypes";
 import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
@@ -107,9 +107,6 @@ export interface IGroupCallDataChannelOptions {
 
 export interface IGroupCallMemberTrack {
     id: string;
-    kind: string; // TODO: use an enum
-    // label: string; // removing as too privacy invasive
-    settings: MediaTrackSettings;
 }
 
 export interface IGroupCallRoomMemberFeed {
@@ -162,65 +159,6 @@ const callMemberStateIsExpired = (event: MatrixEvent): boolean => {
 
 function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
-}
-
-function defloat(json: Object): Object {
-    for (const key of Object.keys(json)) {
-        if (isFloat(json[key])) {
-            json[key] = "" + json[key];
-        }
-    }
-    return json;
-}
-
-function isFloat(value) {
-    return (
-        typeof value === 'number' &&
-        !Number.isNaN(value) &&
-        !Number.isInteger(value)
-    );
-}
-
-interface IMediaBlock {
-    mid?: string;
-    trackDesc?: ISfuTrackDesc;
-}
-
-function getTrackDesc(sdp: string, mid: string): ISfuTrackDesc | undefined {
-    // sdp mangling to grab the a=msid: line out of SDP for a given mid
-    if (!sdp) return;
-
-    const mediaByMids: Map<string, IMediaBlock> = new Map();
-    let mediaBlock: IMediaBlock = {};
-    let matches;
-    for (const line of sdp.split(/\r?\n/)) {
-        if (line.match(/^m=/)) {
-            if (mediaBlock.mid !== undefined) {
-                mediaByMids.set(mediaBlock.mid, mediaBlock);
-            }
-            mediaBlock = {};
-        }
-        matches = line.match(/^a=mid:(.*?)$/);
-        if (matches) {
-            mediaBlock.mid = matches[1];
-        }
-        matches = line.match(/^a=msid:(.*?) (.*?)$/);
-        if (matches) {
-            mediaBlock.trackDesc = {
-                stream_id: matches[1],
-                track_id: matches[2],
-            };
-        }
-    }
-    if (mediaBlock.mid) {
-        mediaByMids.set(mediaBlock.mid, mediaBlock);
-    }
-
-    if (mediaByMids.get(mid)) {
-        return mediaByMids.get(mid).trackDesc;
-    } else {
-        return;
-    }
 }
 
 export class GroupCall extends TypedEventEmitter<
@@ -807,10 +745,8 @@ export class GroupCall extends TypedEventEmitter<
             // TODO: correctly track which rtpSenders are associated with which feed
             // rather than assuming that all our senders are from this feed.
             tracks: this.calls[0]
-                ? this.calls[0].peerConn.getTransceivers().filter((t) => t.sender.track).map(t => ({
-                    "id": getTrackDesc(this.calls[0].peerConn.localDescription?.sdp, t.mid)?.track_id,
-                    "kind": t.sender.track.kind,
-                    "settings": defloat(t.sender.track.getSettings()),
+                ? this.calls[0].peerConn.getSenders().filter((s) => s.track).map(s => ({
+                    "id": s.track.id,
                 }))
                 : undefined,
         }));
