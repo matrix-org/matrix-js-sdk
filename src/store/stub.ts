@@ -28,6 +28,7 @@ import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
 import { IStateEventWithRoomId } from "../@types/search";
+import { IndexedToDeviceBatch, ToDeviceBatch } from "../models/ToDeviceMessage";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
@@ -268,6 +269,18 @@ export class StubStore implements IStore {
     }
 
     public setPendingEvents(roomId: string, events: Partial<IEvent>[]): Promise<void> {
+        return Promise.resolve();
+    }
+
+    public async saveToDeviceBatches(batch: ToDeviceBatch[]): Promise<void> {
+        return Promise.resolve();
+    }
+
+    public getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
+        return Promise.resolve(null);
+    }
+
+    public async removeToDeviceBatch(id: number): Promise<void> {
         return Promise.resolve();
     }
 }
