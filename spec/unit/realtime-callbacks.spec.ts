@@ -1,21 +1,13 @@
 import * as callbacks from "../../src/realtime-callbacks";
 
 let wallTime = 1234567890;
-jest.useFakeTimers();
+jest.useFakeTimers().setSystemTime(wallTime);
 
 describe("realtime-callbacks", function() {
     function tick(millis) {
         wallTime += millis;
         jest.advanceTimersByTime(millis);
     }
-
-    beforeEach(function() {
-        callbacks.setNow(() => wallTime);
-    });
-
-    afterEach(function() {
-        callbacks.setNow();
-    });
 
     describe("setTimeout", function() {
         it("should call the callback after the timeout", function() {
@@ -29,7 +21,7 @@ describe("realtime-callbacks", function() {
 
         it("should default to a zero timeout", function() {
             const callback = jest.fn();
-            callbacks.setTimeout(callback);
+            callbacks.setTimeout(callback, 0);
 
             expect(callback).not.toHaveBeenCalled();
             tick(0);
@@ -46,11 +38,11 @@ describe("realtime-callbacks", function() {
         it("should set 'this' to the global object", function() {
             let passed = false;
             const callback = function() {
-                expect(this).toBe(global); // eslint-disable-line @babel/no-invalid-this
-                expect(this.console).toBeTruthy(); // eslint-disable-line @babel/no-invalid-this
+                expect(this).toBe(global); // eslint-disable-line @typescript-eslint/no-invalid-this
+                expect(this.console).toBeTruthy(); // eslint-disable-line @typescript-eslint/no-invalid-this
                 passed = true;
             };
-            callbacks.setTimeout(callback);
+            callbacks.setTimeout(callback, 0);
             tick(0);
             expect(passed).toBe(true);
         });
@@ -100,7 +92,7 @@ describe("realtime-callbacks", function() {
                 expect(callback2).not.toHaveBeenCalled();
             });
 
-            callbacks.setTimeout(callback1);
+            callbacks.setTimeout(callback1, 0);
             callbacks.setTimeout(callback2, -100);
 
             expect(callback1).not.toHaveBeenCalled();
@@ -117,14 +109,14 @@ describe("realtime-callbacks", function() {
                 expect(callback2).not.toHaveBeenCalled();
             });
 
-            callbacks.setTimeout(callback1);
+            callbacks.setTimeout(callback1, 1);
             expect(callback1).not.toHaveBeenCalled();
             expect(callback2).not.toHaveBeenCalled();
-            tick(0);
+            tick(1);
             expect(callback1).toHaveBeenCalled();
             // the fake timer won't actually run callbacks registered during
             // one tick until the next tick.
-            tick(1);
+            tick(2);
             expect(callback2).toHaveBeenCalled();
         });
 
@@ -147,9 +139,9 @@ describe("realtime-callbacks", function() {
     describe("cancelTimeout", function() {
         it("should cancel a pending timeout", function() {
             const callback = jest.fn();
-            const k = callbacks.setTimeout(callback);
+            const k = callbacks.setTimeout(callback, 10);
             callbacks.clearTimeout(k);
-            tick(0);
+            tick(11);
             expect(callback).not.toHaveBeenCalled();
         });
 

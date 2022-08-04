@@ -1,3 +1,33 @@
+Changes in [19.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.2.0) (2022-08-02)
+==================================================================================================
+
+## 🦖 Deprecations
+ * Remove unstable support for `m.room_key.withheld` ([\#2512](https://github.com/matrix-org/matrix-js-sdk/pull/2512)). Fixes #2233.
+
+## ✨ Features
+ * Sliding sync: add missing filters from latest MSC ([\#2555](https://github.com/matrix-org/matrix-js-sdk/pull/2555)).
+ * Use stable prefixes for MSC3827 ([\#2537](https://github.com/matrix-org/matrix-js-sdk/pull/2537)).
+ * Add support for MSC3575: Sliding Sync ([\#2242](https://github.com/matrix-org/matrix-js-sdk/pull/2242)).
+
+## 🐛 Bug Fixes
+ * Correct the units in TURN servers expiry documentation ([\#2520](https://github.com/matrix-org/matrix-js-sdk/pull/2520)).
+ * Re-insert room IDs when decrypting bundled redaction events returned by `/sync` ([\#2531](https://github.com/matrix-org/matrix-js-sdk/pull/2531)). Contributed by @duxovni.
+
+Changes in [19.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.1.0) (2022-07-26)
+==================================================================================================
+
+## 🦖 Deprecations
+ * Remove MSC3244 support ([\#2504](https://github.com/matrix-org/matrix-js-sdk/pull/2504)).
+
+## ✨ Features
+ * `room` now exports `KNOWN_SAFE_ROOM_VERSION` ([\#2474](https://github.com/matrix-org/matrix-js-sdk/pull/2474)).
+
+## 🐛 Bug Fixes
+ * Don't crash with undefined room in `processBeaconEvents()` ([\#2500](https://github.com/matrix-org/matrix-js-sdk/pull/2500)). Fixes #2494.
+ * Properly re-insert room ID in bundled thread relation messages from sync ([\#2505](https://github.com/matrix-org/matrix-js-sdk/pull/2505)). Fixes vector-im/element-web#22094. Contributed by @duxovni.
+ * Actually store the identity server in the client when given as an option ([\#2503](https://github.com/matrix-org/matrix-js-sdk/pull/2503)). Fixes vector-im/element-web#22757.
+ * Fix call.collectCallStats() ([\#2480](https://github.com/matrix-org/matrix-js-sdk/pull/2480)).
+
 Changes in [19.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.0.0) (2022-07-05)
 ==================================================================================================
 

@@ -36,9 +36,9 @@ import * as utils from "./utils";
 export function getHttpUriForMxc(
     baseUrl: string,
     mxc: string,
-    width: number,
-    height: number,
-    resizeMethod: string,
+    width?: number,
+    height?: number,
+    resizeMethod?: string,
     allowDirectLinks = false,
 ): string {
     if (typeof mxc !== "string" || !mxc) {

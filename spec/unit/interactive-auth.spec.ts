@@ -15,8 +15,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { MatrixClient } from "../../src/client";
 import { logger } from "../../src/logger";
-import { InteractiveAuth } from "../../src/interactive-auth";
+import { InteractiveAuth, AuthType } from "../../src/interactive-auth";
 import { MatrixError } from "../../src/http-api";
 import { sleep } from "../../src/utils";
 import { randomString } from "../../src/randomstring";
@@ -29,38 +30,40 @@ class FakeClient {
     }
 }
 
+const getFakeClient = (): MatrixClient => new FakeClient() as unknown as MatrixClient;
+
 describe("InteractiveAuth", function() {
     it("should start an auth stage and complete it", function() {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
 
         const ia = new InteractiveAuth({
-            matrixClient: new FakeClient(),
+            matrixClient: getFakeClient(),
             doRequest: doRequest,
             stateUpdated: stateUpdated,
+            requestEmailToken: jest.fn(),
             authData: {
                 session: "sessionId",
                 flows: [
-                    { stages: ["logintype"] },
+                    { stages: [AuthType.Password] },
                 ],
                 params: {
-                    "logintype": { param: "aa" },
+                    [AuthType.Password]: { param: "aa" },
                 },
             },
         });
 
         expect(ia.getSessionId()).toEqual("sessionId");
-        expect(ia.getStageParams("logintype")).toEqual({
+        expect(ia.getStageParams(AuthType.Password)).toEqual({
             param: "aa",
         });
 
         // first we expect a call here
         stateUpdated.mockImplementation(function(stage) {
             logger.log('aaaa');
-            expect(stage).toEqual("logintype");
+            expect(stage).toEqual(AuthType.Password);
             ia.submitAuthDict({
-                type: "logintype",
-                foo: "bar",
+                type: AuthType.Password,
             });
         });
 
@@ -70,8 +73,7 @@ describe("InteractiveAuth", function() {
             logger.log('cccc');
             expect(authData).toEqual({
                 session: "sessionId",
-                type: "logintype",
-                foo: "bar",
+                type: AuthType.Password,
             });
             return Promise.resolve(requestRes);
         });
@@ -86,15 +88,17 @@ describe("InteractiveAuth", function() {
     it("should make a request if no authdata is provided", function() {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
+        const requestEmailToken = jest.fn();
 
         const ia = new InteractiveAuth({
-            matrixClient: new FakeClient(),
-            stateUpdated: stateUpdated,
-            doRequest: doRequest,
+            matrixClient: getFakeClient(),
+            stateUpdated,
+            doRequest,
+            requestEmailToken,
         });
 
         expect(ia.getSessionId()).toBe(undefined);
-        expect(ia.getStageParams("logintype")).toBe(undefined);
+        expect(ia.getStageParams(AuthType.Password)).toBe(undefined);
 
         // first we expect a call to doRequest
         doRequest.mockImplementation(function(authData) {
@@ -103,10 +107,10 @@ describe("InteractiveAuth", function() {
             const err = new MatrixError({
                 session: "sessionId",
                 flows: [
-                    { stages: ["logintype"] },
+                    { stages: [AuthType.Password] },
                 ],
                 params: {
-                    "logintype": { param: "aa" },
+                    [AuthType.Password]: { param: "aa" },
                 },
             });
             err.httpStatus = 401;
@@ -116,9 +120,9 @@ describe("InteractiveAuth", function() {
         // .. which should be followed by a call to stateUpdated
         const requestRes = { "a": "b" };
         stateUpdated.mockImplementation(function(stage) {
-            expect(stage).toEqual("logintype");
+            expect(stage).toEqual(AuthType.Password);
             expect(ia.getSessionId()).toEqual("sessionId");
-            expect(ia.getStageParams("logintype")).toEqual({
+            expect(ia.getStageParams(AuthType.Password)).toEqual({
                 param: "aa",
             });
 
@@ -127,15 +131,13 @@ describe("InteractiveAuth", function() {
                 logger.log("request2", authData);
                 expect(authData).toEqual({
                     session: "sessionId",
-                    type: "logintype",
-                    foo: "bar",
+                    type: AuthType.Password,
                 });
                 return Promise.resolve(requestRes);
             });
 
             ia.submitAuthDict({
-                type: "logintype",
-                foo: "bar",
+                type: AuthType.Password,
             });
         });
 
@@ -149,11 +151,13 @@ describe("InteractiveAuth", function() {
     it("should start an auth stage and reject if no auth flow", function() {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
+        const requestEmailToken = jest.fn();
 
         const ia = new InteractiveAuth({
-            matrixClient: new FakeClient(),
-            doRequest: doRequest,
-            stateUpdated: stateUpdated,
+            matrixClient: getFakeClient(),
+            doRequest,
+            stateUpdated,
+            requestEmailToken,
         });
 
         doRequest.mockImplementation(function(authData) {
@@ -163,7 +167,7 @@ describe("InteractiveAuth", function() {
                 session: "sessionId",
                 flows: [],
                 params: {
-                    "logintype": { param: "aa" },
+                    [AuthType.Password]: { param: "aa" },
                 },
             });
             err.httpStatus = 401;
@@ -183,7 +187,7 @@ describe("InteractiveAuth", function() {
             requestEmailToken.mockImplementation(async () => ({ sid: "" }));
 
             const ia = new InteractiveAuth({
-                matrixClient: new FakeClient(),
+                matrixClient: getFakeClient(),
                 doRequest, stateUpdated, requestEmailToken,
             });
 
@@ -210,7 +214,7 @@ describe("InteractiveAuth", function() {
             requestEmailToken.mockImplementation(async () => ({ sid: "" }));
 
             const ia = new InteractiveAuth({
-                matrixClient: new FakeClient(),
+                matrixClient: getFakeClient(),
                 doRequest, stateUpdated, requestEmailToken,
             });
 
@@ -239,7 +243,7 @@ describe("InteractiveAuth", function() {
             });
 
             const ia = new InteractiveAuth({
-                matrixClient: new FakeClient(),
+                matrixClient: getFakeClient(),
                 doRequest, stateUpdated, requestEmailToken,
             });
 
@@ -253,7 +257,7 @@ describe("InteractiveAuth", function() {
             requestEmailToken.mockImplementation(() => sleep(500, { sid: "" }));
 
             const ia = new InteractiveAuth({
-                matrixClient: new FakeClient(),
+                matrixClient: getFakeClient(),
                 doRequest, stateUpdated, requestEmailToken,
             });
 
@@ -269,7 +273,7 @@ describe("InteractiveAuth", function() {
             requestEmailToken.mockImplementation(() => sleep(500, { sid }));
 
             const ia = new InteractiveAuth({
-                matrixClient: new FakeClient(),
+                matrixClient: getFakeClient(),
                 doRequest, stateUpdated, requestEmailToken,
             });
 

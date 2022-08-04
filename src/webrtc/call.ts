@@ -523,23 +523,21 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        // Try to find a feed with the same purpose as the new stream,
-        // if we find it replace the old stream with the new one
-        const existingFeed = this.getRemoteFeeds().find((feed) => feed.purpose === purpose);
-        if (existingFeed) {
-            existingFeed.setNewStream(stream);
-        } else {
-            this.feeds.push(new CallFeed({
-                client: this.client,
-                roomId: this.roomId,
-                userId,
-                stream,
-                purpose,
-                audioMuted,
-                videoMuted,
-            }));
-            this.emit(CallEvent.FeedsChanged, this.feeds);
+        if (this.getFeedByStreamId(stream.id)) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we already have a feed for it`);
+            return;
         }
+
+        this.feeds.push(new CallFeed({
+            client: this.client,
+            roomId: this.roomId,
+            userId,
+            stream,
+            purpose,
+            audioMuted,
+            videoMuted,
+        }));
+        this.emit(CallEvent.FeedsChanged, this.feeds);
 
         logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}", purpose=${purpose})`);
     }
@@ -562,23 +560,21 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        // Try to find a feed with the same stream id as the new stream,
-        // if we find it replace the old stream with the new one
-        const feed = this.getFeedByStreamId(stream.id);
-        if (feed) {
-            feed.setNewStream(stream);
-        } else {
-            this.feeds.push(new CallFeed({
-                client: this.client,
-                roomId: this.roomId,
-                audioMuted: false,
-                videoMuted: false,
-                userId,
-                stream,
-                purpose,
-            }));
-            this.emit(CallEvent.FeedsChanged, this.feeds);
+        if (this.getFeedByStreamId(stream.id)) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we already have a feed for it`);
+            return;
         }
+
+        this.feeds.push(new CallFeed({
+            client: this.client,
+            roomId: this.roomId,
+            audioMuted: false,
+            videoMuted: false,
+            userId,
+            stream,
+            purpose,
+        }));
+        this.emit(CallEvent.FeedsChanged, this.feeds);
 
         logger.info(`Pushed remote stream (id="${stream.id}", active="${stream.active}")`);
     }
@@ -592,25 +588,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         setTracksEnabled(stream.getAudioTracks(), true);
         setTracksEnabled(stream.getVideoTracks(), true);
 
-        // We try to replace an existing feed if there already is one with the same purpose
-        const existingFeed = this.getLocalFeeds().find((feed) => feed.purpose === purpose);
-        if (existingFeed) {
-            existingFeed.setNewStream(stream);
-        } else {
-            this.pushLocalFeed(
-                new CallFeed({
-                    client: this.client,
-                    roomId: this.roomId,
-                    audioMuted: false,
-                    videoMuted: false,
-                    userId,
-                    stream,
-                    purpose,
-                }),
-                addToPeerConnection,
-            );
-            this.emit(CallEvent.FeedsChanged, this.feeds);
+        if (this.getFeedByStreamId(stream.id)) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we already have a feed for it`);
+            return;
         }
+
+        this.pushLocalFeed(
+            new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                audioMuted: false,
+                videoMuted: false,
+                userId,
+                stream,
+                purpose,
+            }),
+            addToPeerConnection,
+        );
     }
 
     /**
@@ -1142,7 +1136,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
-        this.localUsermediaFeed?.setVideoMuted(muted);
+        this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
         this.updateMuteStatus();
         return this.isLocalVideoMuted();
     }
@@ -1174,7 +1168,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
-        this.localUsermediaFeed?.setAudioMuted(muted);
+        this.localUsermediaFeed?.setAudioVideoMuted(muted, null);
         this.updateMuteStatus();
         return this.isMicrophoneMuted();
     }
@@ -1585,8 +1579,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
-            feed.setAudioMuted(this.remoteSDPStreamMetadata[streamId]?.audio_muted);
-            feed.setVideoMuted(this.remoteSDPStreamMetadata[streamId]?.video_muted);
+            const metadata = this.remoteSDPStreamMetadata[streamId];
+
+            feed.setAudioVideoMuted(metadata?.audio_muted, metadata?.video_muted);
             feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
         }
     }

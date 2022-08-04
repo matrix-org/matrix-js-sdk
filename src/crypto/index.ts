@@ -23,9 +23,11 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
+import { EventType } from "../@types/event";
 import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
+import { IOlmDevice } from "./algorithms/megolm";
 import * as olmlib from "./olmlib";
 import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
@@ -68,6 +70,7 @@ import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
 import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
+import { ToDeviceBatch } from "../models/ToDeviceMessage";
 import {
     ClientEvent,
     ICrossSigningKey,
@@ -199,6 +202,19 @@ export interface IRequestsMap {
     getRequestByChannel(channel: IVerificationChannel): VerificationRequest;
     setRequest(event: MatrixEvent, request: VerificationRequest): void;
     setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void;
+}
+
+/* eslint-disable camelcase */
+export interface IEncryptedContent {
+    algorithm: string;
+    sender_key: string;
+    ciphertext: Record<string, string>;
+}
+/* eslint-enable camelcase */
+
+export interface IEncryptAndSendToDevicesResult {
+    toDeviceBatch: ToDeviceBatch;
+    deviceInfoByUserIdAndDeviceId: Map<string, Map<string, DeviceInfo>>;
 }
 
 export enum CryptoEvent {
@@ -2859,7 +2875,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         if (event.isRedacted()) {
-            const redactionEvent = new MatrixEvent(event.getUnsigned().redacted_because);
+            const redactionEvent = new MatrixEvent({
+                room_id: event.getRoomId(),
+                ...event.getUnsigned().redacted_because,
+            });
             const decryptedEvent = await this.decryptEvent(redactionEvent);
 
             return {
@@ -3097,6 +3116,94 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         });
     }
 
+    /**
+     * Encrypts and sends a given object via Olm to-device messages to a given
+     * set of devices.
+     * @param {object[]} userDeviceInfoArr the devices to send to
+     * @param {object} payload fields to include in the encrypted payload
+     * @return {Promise<{contentMap, deviceInfoByDeviceId}>} Promise which
+     *     resolves once the message has been encrypted and sent to the given
+     *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
+     *     of the successfully sent messages.
+     */
+    public async encryptAndSendToDevices(
+        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
+        payload: object,
+    ): Promise<IEncryptAndSendToDevicesResult> {
+        const toDeviceBatch: ToDeviceBatch = {
+            eventType: EventType.RoomMessageEncrypted,
+            batch: [],
+        };
+        const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
+
+        try {
+            await Promise.all(userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
+                const deviceId = deviceInfo.deviceId;
+                const encryptedContent: IEncryptedContent = {
+                    algorithm: olmlib.OLM_ALGORITHM,
+                    sender_key: this.olmDevice.deviceCurve25519Key,
+                    ciphertext: {},
+                };
+
+                // Assign to temp value to make type-checking happy
+                let userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
+
+                if (userIdDeviceInfo === undefined) {
+                    userIdDeviceInfo = new Map<string, DeviceInfo>();
+                    deviceInfoByUserIdAndDeviceId.set(userId, userIdDeviceInfo);
+                }
+
+                // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
+                userIdDeviceInfo.set(deviceId, deviceInfo);
+
+                toDeviceBatch.batch.push({
+                    userId,
+                    deviceId,
+                    payload: encryptedContent,
+                });
+
+                await olmlib.ensureOlmSessionsForDevices(
+                    this.olmDevice,
+                    this.baseApis,
+                    { [userId]: [deviceInfo] },
+                );
+                await olmlib.encryptMessageForDevice(
+                    encryptedContent.ciphertext,
+                    this.userId,
+                    this.deviceId,
+                    this.olmDevice,
+                    userId,
+                    deviceInfo,
+                    payload,
+                );
+            }));
+
+            // prune out any devices that encryptMessageForDevice could not encrypt for,
+            // in which case it will have just not added anything to the ciphertext object.
+            // There's no point sending messages to devices if we couldn't encrypt to them,
+            // since that's effectively a blank message.
+            toDeviceBatch.batch = toDeviceBatch.batch.filter(msg => {
+                if (Object.keys(msg.payload.ciphertext).length > 0) {
+                    return true;
+                } else {
+                    logger.log(`No ciphertext for device ${msg.userId}:${msg.deviceId}: pruning`);
+                    return false;
+                }
+            });
+
+            try {
+                await this.baseApis.queueToDevice(toDeviceBatch);
+                return { toDeviceBatch, deviceInfoByUserIdAndDeviceId };
+            } catch (e) {
+                logger.error("sendToDevice failed", e);
+                throw e;
+            }
+        } catch (e) {
+            logger.error("encryptAndSendToDevices promises failed", e);
+            throw e;
+        }
+    }
+
     private onMembership = (event: MatrixEvent, member: RoomMember, oldMembership?: string) => {
         try {
             this.onRoomMembership(event, member, oldMembership);
@@ -3119,8 +3226,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 this.secretStorage.onRequestReceived(event);
             } else if (event.getType() === "m.secret.send") {
                 this.secretStorage.onSecretReceived(event);
-            } else if (event.getType() === "m.room_key.withheld"
-                || event.getType() === "org.matrix.room_key.withheld") {
+            } else if (event.getType() === "m.room_key.withheld") {
                 this.onRoomKeyWithheldEvent(event);
             } else if (event.getContent().transaction_id) {
                 this.onKeyVerificationMessage(event);

@@ -121,14 +121,16 @@ echo $release | grep -q '-' && prerelease=1
 
 if [ $prerelease -eq 1 ]; then
     echo Making a PRE-RELEASE
+else
+    read -p "Making a FINAL RELEASE, press enter to continue " REPLY
 fi
 
-# we might already be on the release branch, in which case, yay
-# If we're on any branch starting with 'release', we don't create
-# a separate release branch (this allows us to use the same
+# We might already be on the release branch, in which case, yay
+# If we're on any branch starting with 'release', or the staging branch
+# we don't create a separate release branch (this allows us to use the same
 # release branch for releases and release candidates).
 curbranch=$(git symbolic-ref --short HEAD)
-if [[ "$curbranch" != release* ]]; then
+if [[ "$curbranch" != release* && "$curbranch" != "staging" ]]; then
     echo "Creating release branch"
     git checkout -b "$rel_branch"
 else

@@ -39,8 +39,8 @@ import { IKeysUploadResponse, IUploadKeysRequest } from '../src/client';
 export class TestClient {
     public readonly httpBackend: MockHttpBackend;
     public readonly client: MatrixClient;
-    private deviceKeys: IDeviceKeys;
-    private oneTimeKeys: Record<string, IOneTimeKey>;
+    public deviceKeys: IDeviceKeys;
+    public oneTimeKeys: Record<string, IOneTimeKey>;
 
     constructor(
         public readonly userId?: string,

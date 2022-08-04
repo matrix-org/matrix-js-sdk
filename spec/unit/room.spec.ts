@@ -361,6 +361,71 @@ describe("Room", function() {
 
             expect(callCount).toEqual(2);
         });
+
+        it("should be able to update local echo without a txn ID (/send then /sync)", function() {
+            const eventJson = utils.mkMessage({
+                room: roomId, user: userA, event: false,
+            }) as object;
+            delete eventJson["txn_id"];
+            delete eventJson["event_id"];
+            const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp" }, eventJson));
+            localEvent.status = EventStatus.SENDING;
+            expect(localEvent.getTxnId()).toBeNull();
+            expect(room.timeline.length).toEqual(0);
+
+            // first add the local echo. This is done before the /send request is even sent.
+            const txnId = "My_txn_id";
+            room.addPendingEvent(localEvent, txnId);
+            expect(room.getEventForTxnId(txnId)).toEqual(localEvent);
+            expect(room.timeline.length).toEqual(1);
+
+            // now the /send request returns the true event ID.
+            const realEventId = "$real-event-id";
+            room.updatePendingEvent(localEvent, EventStatus.SENT, realEventId);
+
+            // then /sync returns the remoteEvent, it should de-dupe based on the event ID.
+            const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
+            expect(remoteEvent.getTxnId()).toBeNull();
+            room.addLiveEvents([remoteEvent]);
+            // the duplicate strategy code should ensure we don't add a 2nd event to the live timeline
+            expect(room.timeline.length).toEqual(1);
+            // but without the event ID matching we will still have the local event in pending events
+            expect(room.getEventForTxnId(txnId)).toBeUndefined();
+        });
+
+        it("should be able to update local echo without a txn ID (/sync then /send)", function() {
+            const eventJson = utils.mkMessage({
+                room: roomId, user: userA, event: false,
+            }) as object;
+            delete eventJson["txn_id"];
+            delete eventJson["event_id"];
+            const txnId = "My_txn_id";
+            const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp", txn_id: txnId }, eventJson));
+            localEvent.status = EventStatus.SENDING;
+            expect(localEvent.getTxnId()).toEqual(txnId);
+            expect(room.timeline.length).toEqual(0);
+
+            // first add the local echo. This is done before the /send request is even sent.
+            room.addPendingEvent(localEvent, txnId);
+            expect(room.getEventForTxnId(txnId)).toEqual(localEvent);
+            expect(room.timeline.length).toEqual(1);
+
+            // now the /sync returns the remoteEvent, it is impossible for the JS SDK to de-dupe this.
+            const realEventId = "$real-event-id";
+            const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
+            expect(remoteEvent.getUnsigned().transaction_id).toBeUndefined();
+            room.addLiveEvents([remoteEvent]);
+            expect(room.timeline.length).toEqual(2); // impossible to de-dupe as no txn ID or matching event ID
+
+            // then the /send request returns the real event ID.
+            // Now it is possible for the JS SDK to de-dupe this.
+            room.updatePendingEvent(localEvent, EventStatus.SENT, realEventId);
+
+            // the 2nd event should be removed from the timeline.
+            expect(room.timeline.length).toEqual(1);
+            // but without the event ID matching we will still have the local event in pending events
+            expect(room.getEventForTxnId(txnId)).toBeUndefined();
+        });
     });
 
     describe('addEphemeralEvents', () => {

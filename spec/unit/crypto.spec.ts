@@ -2,6 +2,7 @@ import '../olm-loader';
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
+import { MatrixClient } from "../../src/client";
 import { Crypto } from "../../src/crypto";
 import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
 import { MockStorageApi } from "../MockStorageApi";
@@ -25,7 +26,7 @@ function awaitEvent(emitter, event) {
     });
 }
 
-async function keyshareEventForEvent(client, event, index) {
+async function keyshareEventForEvent(client, event, index): Promise<MatrixEvent> {
     const roomId = event.getRoomId();
     const eventContent = event.getWireContent();
     const key = await client.crypto.olmDevice.getInboundGroupSessionKey(
@@ -50,6 +51,7 @@ async function keyshareEventForEvent(client, event, index) {
         },
     });
     // make onRoomKeyEvent think this was an encrypted event
+    // @ts-ignore private property
     ksEvent.senderCurve25519Key = "akey";
     return ksEvent;
 }
@@ -61,6 +63,10 @@ describe("Crypto", function() {
 
     beforeAll(function() {
         return Olm.init();
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
     });
 
     it("Crypto exposes the correct olm library version", function() {
@@ -79,7 +85,7 @@ describe("Crypto", function() {
                 getId: () => "$event_id",
                 getSenderKey: () => null,
                 getWireContent: () => {return {};},
-            };
+            } as unknown as MatrixEvent;
 
             let encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeFalsy();
@@ -154,12 +160,15 @@ describe("Crypto", function() {
         beforeEach(async function() {
             const mockStorage = new MockStorageApi();
             const clientStore = new MemoryStore({ localStorage: mockStorage });
-            const cryptoStore = new MemoryCryptoStore(mockStorage);
+            const cryptoStore = new MemoryCryptoStore();
 
             cryptoStore.storeEndToEndDeviceData({
                 devices: {
                     '@bob:home.server': {
                         'BOBDEVICE': {
+                            algorithms: [],
+                            verified: 1,
+                            known: false,
                             keys: {
                                 'curve25519:BOBDEVICE': 'this is a key',
                             },
@@ -167,7 +176,7 @@ describe("Crypto", function() {
                     },
                 },
                 trackingStatus: {},
-            });
+            }, {});
 
             mockBaseApis = {
                 sendToDevice: jest.fn(),
@@ -185,6 +194,7 @@ describe("Crypto", function() {
                 clientStore,
                 cryptoStore,
                 mockRoomList,
+                [],
             );
             crypto.registerEventHandlers(fakeEmitter);
             await crypto.init();
@@ -195,7 +205,7 @@ describe("Crypto", function() {
         });
 
         it("restarts wedged Olm sessions", async function() {
-            const prom = new Promise((resolve) => {
+            const prom = new Promise<void>((resolve) => {
                 mockBaseApis.claimOneTimeKeys = function() {
                     resolve();
                     return otkResponse;
@@ -220,8 +230,8 @@ describe("Crypto", function() {
     });
 
     describe('Key requests', function() {
-        let aliceClient;
-        let bobClient;
+        let aliceClient: MatrixClient;
+        let bobClient: MatrixClient;
 
         beforeEach(async function() {
             aliceClient = (new TestClient(
@@ -276,8 +286,12 @@ describe("Crypto", function() {
                 // alice encrypts each event, and then bob tries to decrypt
                 // them without any keys, so that they'll be in pending
                 await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                // remove keys from the event
+                // @ts-ignore private properties
                 event.clearEvent = undefined;
+                // @ts-ignore private properties
                 event.senderCurve25519Key = null;
+                // @ts-ignore private properties
                 event.claimedEd25519Key = null;
                 try {
                     await bobClient.crypto.decryptEvent(event);
@@ -291,7 +305,7 @@ describe("Crypto", function() {
                 roomId, olmlib.MEGOLM_ALGORITHM,
             );
 
-            let eventPromise = Promise.all(events.map((ev) => {
+            const decryptEventsPromise = Promise.all(events.map((ev) => {
                 return awaitEvent(ev, "Event.decrypted");
             }));
 
@@ -300,11 +314,11 @@ describe("Crypto", function() {
             // can
             let ksEvent = await keyshareEventForEvent(aliceClient, events[1], 1);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
-            await eventPromise;
+            await decryptEventsPromise;
             expect(events[0].getContent().msgtype).toBe("m.bad.encrypted");
             expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
 
-            const cryptoStore = bobClient.cryptoStore;
+            const cryptoStore = bobClient.crypto.cryptoStore;
             const eventContent = events[0].getWireContent();
             const senderKey = eventContent.sender_key;
             const sessionId = eventContent.session_id;
@@ -320,10 +334,10 @@ describe("Crypto", function() {
 
             // keyshare the session key starting at the first message, so
             // that it can now be decrypted
-            eventPromise = awaitEvent(events[0], "Event.decrypted");
+            const decryptEventPromise = awaitEvent(events[0], "Event.decrypted");
             ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
-            await eventPromise;
+            await decryptEventPromise;
             expect(events[0].getContent().msgtype).not.toBe("m.bad.encrypted");
             await sleep(1);
             // the room key request should be gone since we've now decrypted everything
@@ -354,8 +368,12 @@ describe("Crypto", function() {
             // alice encrypts each event, and then bob tries to decrypt
             // them without any keys, so that they'll be in pending
             await aliceClient.crypto.encryptEvent(event, aliceRoom);
+            // remove keys from the event
+            // @ts-ignore private property
             event.clearEvent = undefined;
+            // @ts-ignore private property
             event.senderCurve25519Key = null;
+            // @ts-ignore private property
             event.claimedEd25519Key = null;
             try {
                 await bobClient.crypto.decryptEvent(event);
@@ -370,9 +388,9 @@ describe("Crypto", function() {
 
             const ksEvent = await keyshareEventForEvent(aliceClient, event, 1);
             ksEvent.getContent().sender_key = undefined; // test
-            bobClient.crypto.addInboundGroupSession = jest.fn();
+            bobClient.crypto.olmDevice.addInboundGroupSession = jest.fn();
             await bobDecryptor.onRoomKeyEvent(ksEvent);
-            expect(bobClient.crypto.addInboundGroupSession).not.toHaveBeenCalled();
+            expect(bobClient.crypto.olmDevice.addInboundGroupSession).not.toHaveBeenCalled();
         });
 
         it("creates a new keyshare request if we request a keyshare", async function() {
@@ -388,7 +406,7 @@ describe("Crypto", function() {
                 },
             });
             await aliceClient.cancelAndResendEventRoomKeyRequest(event);
-            const cryptoStore = aliceClient.cryptoStore;
+            const cryptoStore = aliceClient.crypto.cryptoStore;
             const roomKeyRequestBody = {
                 algorithm: olmlib.MEGOLM_ALGORITHM,
                 room_id: "!someroom",
@@ -412,7 +430,8 @@ describe("Crypto", function() {
                 },
             });
             // replace Alice's sendToDevice function with a mock
-            aliceClient.sendToDevice = jest.fn().mockResolvedValue(undefined);
+            const aliceSendToDevice = jest.fn().mockResolvedValue(undefined);
+            aliceClient.sendToDevice = aliceSendToDevice;
             aliceClient.startClient();
 
             // make a room key request, and record the transaction ID for the
@@ -421,11 +440,12 @@ describe("Crypto", function() {
             // key requests get queued until the sync has finished, but we don't
             // let the client set up enough for that to happen, so gut-wrench a bit
             // to force it to send now.
+            // @ts-ignore
             aliceClient.crypto.outgoingRoomKeyRequestManager.sendQueuedRequests();
             jest.runAllTimers();
             await Promise.resolve();
-            expect(aliceClient.sendToDevice).toBeCalledTimes(1);
-            const txnId = aliceClient.sendToDevice.mock.calls[0][2];
+            expect(aliceSendToDevice).toBeCalledTimes(1);
+            const txnId = aliceSendToDevice.mock.calls[0][2];
 
             // give the room key request manager time to update the state
             // of the request
@@ -438,8 +458,8 @@ describe("Crypto", function() {
             // cancelAndResend will call sendToDevice twice:
             // the first call to sendToDevice will be the cancellation
             // the second call to sendToDevice will be the key request
-            expect(aliceClient.sendToDevice).toBeCalledTimes(3);
-            expect(aliceClient.sendToDevice.mock.calls[2][2]).not.toBe(txnId);
+            expect(aliceSendToDevice).toBeCalledTimes(3);
+            expect(aliceSendToDevice.mock.calls[2][2]).not.toBe(txnId);
         });
     });
 
@@ -451,7 +471,7 @@ describe("Crypto", function() {
             await client.initCrypto();
             client.crypto.getSecretStorageKey = async () => null;
             client.crypto.isCrossSigningReady = async () => false;
-            client.crypto.baseApis.uploadDeviceSigningKeys = () => null;
+            client.crypto.baseApis.uploadDeviceSigningKeys = jest.fn().mockResolvedValue(null);
             client.crypto.baseApis.setAccountData = () => null;
             client.crypto.baseApis.uploadKeySignatures = () => null;
             client.crypto.baseApis.http.authedRequest = () => null;
@@ -465,6 +485,107 @@ describe("Crypto", function() {
                 createSecretStorageKey,
             });
             client.stopClient();
+        });
+    });
+
+    describe("encryptAndSendToDevices", () => {
+        let client: TestClient;
+        let ensureOlmSessionsForDevices: jest.SpiedFunction<typeof olmlib.ensureOlmSessionsForDevices>;
+        let encryptMessageForDevice: jest.SpiedFunction<typeof olmlib.encryptMessageForDevice>;
+        const payload = { hello: "world" };
+        let encryptedPayload: object;
+
+        beforeEach(async () => {
+            ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
+            ensureOlmSessionsForDevices.mockResolvedValue({});
+            encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
+            encryptMessageForDevice.mockImplementation(async (...[result,,,,,, payload]) => {
+                result.plaintext = JSON.stringify(payload);
+            });
+
+            client = new TestClient("@alice:example.org", "aliceweb");
+            await client.client.initCrypto();
+
+            encryptedPayload = {
+                algorithm: "m.olm.v1.curve25519-aes-sha2",
+                sender_key: client.client.crypto.olmDevice.deviceCurve25519Key,
+                ciphertext: { plaintext: JSON.stringify(payload) },
+            };
+        });
+
+        afterEach(async () => {
+            ensureOlmSessionsForDevices.mockRestore();
+            encryptMessageForDevice.mockRestore();
+            await client.stop();
+        });
+
+        it("encrypts and sends to devices", async () => {
+            client.httpBackend
+                .when("PUT", "/sendToDevice/m.room.encrypted", {
+                    messages: {
+                        "@bob:example.org": {
+                            bobweb: encryptedPayload,
+                            bobmobile: encryptedPayload,
+                        },
+                        "@carol:example.org": {
+                            caroldesktop: encryptedPayload,
+                        },
+                    },
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.client.encryptAndSendToDevices(
+                    [
+                        { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobweb") },
+                        { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobmobile") },
+                        { userId: "@carol:example.org", deviceInfo: new DeviceInfo("caroldesktop") },
+                    ],
+                    payload,
+                ),
+                client.httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("sends nothing to devices that couldn't be encrypted to", async () => {
+            encryptMessageForDevice.mockImplementation(async (...[result,,,, userId, device, payload]) => {
+                // Refuse to encrypt to Carol's desktop device
+                if (userId === "@carol:example.org" && device.deviceId === "caroldesktop") return;
+                result.plaintext = JSON.stringify(payload);
+            });
+
+            client.httpBackend
+                .when("PUT", "/sendToDevice/m.room.encrypted", {
+                    // Carol is nowhere to be seen
+                    messages: { "@bob:example.org": { bobweb: encryptedPayload } },
+                })
+                .respond(200, {});
+
+            await Promise.all([
+                client.client.encryptAndSendToDevices(
+                    [
+                        { userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobweb") },
+                        { userId: "@carol:example.org", deviceInfo: new DeviceInfo("caroldesktop") },
+                    ],
+                    payload,
+                ),
+                client.httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("no-ops if no devices can be encrypted to", async () => {
+            // Refuse to encrypt to anybody
+            encryptMessageForDevice.mockResolvedValue(undefined);
+
+            // Get the room keys version request out of the way
+            client.httpBackend.when("GET", "/room_keys/version").respond(404, {});
+            await client.httpBackend.flush("/room_keys/version", 1);
+
+            await client.client.encryptAndSendToDevices(
+                [{ userId: "@bob:example.org", deviceInfo: new DeviceInfo("bobweb") }],
+                payload,
+            );
+            client.httpBackend.verifyNoOutstandingRequests();
         });
     });
 });

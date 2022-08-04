@@ -391,71 +391,6 @@ describe('Call', function() {
         }).track.id).toBe("video_track");
     });
 
-    describe("should handle stream replacement", () => {
-        it("with both purpose and id", async () => {
-            await startVoiceCall(client, call);
-
-            call.updateRemoteSDPStreamMetadata({
-                "remote_stream1": {
-                    purpose: SDPStreamMetadataPurpose.Usermedia,
-                },
-            });
-            call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
-            const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream1");
-
-            call.updateRemoteSDPStreamMetadata({
-                "remote_stream2": {
-                    purpose: SDPStreamMetadataPurpose.Usermedia,
-                },
-            });
-            call.pushRemoteFeed(new MockMediaStream("remote_stream2", []));
-
-            expect(feed?.stream?.id).toBe("remote_stream2");
-        });
-
-        it("with just purpose", async () => {
-            await startVoiceCall(client, call);
-
-            call.updateRemoteSDPStreamMetadata({
-                "remote_stream1": {
-                    purpose: SDPStreamMetadataPurpose.Usermedia,
-                },
-            });
-            call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
-            const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream1");
-
-            call.updateRemoteSDPStreamMetadata({
-                "remote_stream2": {
-                    purpose: SDPStreamMetadataPurpose.Usermedia,
-                },
-            });
-            call.pushRemoteFeed(new MockMediaStream("remote_stream2", []));
-
-            expect(feed?.stream?.id).toBe("remote_stream2");
-        });
-
-        it("should not replace purpose is different", async () => {
-            await startVoiceCall(client, call);
-
-            call.updateRemoteSDPStreamMetadata({
-                "remote_stream1": {
-                    purpose: SDPStreamMetadataPurpose.Usermedia,
-                },
-            });
-            call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
-            const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream1");
-
-            call.updateRemoteSDPStreamMetadata({
-                "remote_stream2": {
-                    purpose: SDPStreamMetadataPurpose.Screenshare,
-                },
-            });
-            call.pushRemoteFeed(new MockMediaStream("remote_stream2", []));
-
-            expect(feed?.stream?.id).toBe("remote_stream1");
-        });
-    });
-
     it("should handle SDPStreamMetadata changes", async () => {
         await startVoiceCall(client, call);
 
@@ -756,6 +691,65 @@ describe('Call', function() {
             // @ts-ignore - writing to a read-only property as we are simulating faulty browsers
             global.navigator.mediaDevices = undefined;
             expect(supportsMatrixCall()).toBe(false);
+        });
+    });
+
+    describe("ignoring streams with ids for which we already have a feed", () => {
+        const STREAM_ID = "stream_id";
+        const FEEDS_CHANGED_CALLBACK = jest.fn();
+
+        beforeEach(async () => {
+            await startVoiceCall(client, call);
+            call.on(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
+            jest.spyOn(call, "pushLocalFeed");
+        });
+
+        afterEach(() => {
+            FEEDS_CHANGED_CALLBACK.mockReset();
+        });
+
+        it("should ignore stream passed to pushRemoteFeed()", async () => {
+            await call.onAnswerReceived({
+                getContent: () => {
+                    return {
+                        version: 1,
+                        call_id: call.callId,
+                        party_id: 'party_id',
+                        answer: {
+                            sdp: DUMMY_SDP,
+                        },
+                        [SDPStreamMetadataKey]: {
+                            [STREAM_ID]: {
+                                purpose: SDPStreamMetadataPurpose.Usermedia,
+                            },
+                        },
+                    };
+                },
+            });
+
+            call.pushRemoteFeed(new MockMediaStream(STREAM_ID));
+            call.pushRemoteFeed(new MockMediaStream(STREAM_ID));
+
+            expect(call.getRemoteFeeds().length).toBe(1);
+            expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
+        });
+
+        it("should ignore stream passed to pushRemoteFeedWithoutMetadata()", async () => {
+            call.pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
+            call.pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
+
+            expect(call.getRemoteFeeds().length).toBe(1);
+            expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
+        });
+
+        it("should ignore stream passed to pushNewLocalFeed()", async () => {
+            call.pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
+            call.pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
+
+            // We already have one local feed from placeVoiceCall()
+            expect(call.getLocalFeeds().length).toBe(2);
+            expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
+            expect(call.pushLocalFeed).toHaveBeenCalled();
         });
     });
 });
