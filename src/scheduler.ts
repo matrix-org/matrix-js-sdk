@@ -57,7 +57,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * failure was due to a rate limited request, the time specified in the error is
      * waited before being retried.
      * @param {MatrixEvent} event
-     * @param {Number} attempts
+     * @param {Number} attempts Number of attempts that have been made, including the one that just failed (ie. starting at 1)
      * @param {MatrixError} err
      * @return {Number}
      * @see module:scheduler~retryAlgorithm
