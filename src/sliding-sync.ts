@@ -44,6 +44,9 @@ export interface MSC3575Filter {
     is_invite?: boolean;
     is_tombstoned?: boolean;
     room_name_like?: string;
+    room_types?: string[];
+    not_room_types?: string[];
+    spaces?: string[];
 }
 
 /**
@@ -602,7 +605,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         listIndex,
                         op.range[0],
                         op.range[1],
-                        op.room_ids.join(" "),
+                        (op.room_ids || []).join(" "),
                         ";",
                     );
                     break;

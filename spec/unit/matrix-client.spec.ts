@@ -27,6 +27,7 @@ import {
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
+import { Crypto } from "../../src/crypto";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
@@ -1295,6 +1296,21 @@ describe("MatrixClient", function() {
             expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
             expect(queryParams).toBeFalsy();
             expect(result!.aliases).toEqual(response.aliases);
+        });
+    });
+
+    describe("encryptAndSendToDevices", () => {
+        it("throws an error if crypto is unavailable", () => {
+            client.crypto = undefined;
+            expect(() => client.encryptAndSendToDevices([], {})).toThrow();
+        });
+
+        it("is an alias for the crypto method", async () => {
+            client.crypto = testUtils.mock(Crypto, "Crypto");
+            const deviceInfos = [];
+            const payload = {};
+            await client.encryptAndSendToDevices(deviceInfos, payload);
+            expect(client.crypto.encryptAndSendToDevices).toHaveBeenLastCalledWith(deviceInfos, payload);
         });
     });
 });
