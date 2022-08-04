@@ -145,6 +145,9 @@ describe.each([
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
 
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
+
+        // flush, as per comment in first test
+        await flushPromises();
     });
 
     it("stops retrying on 4xx errors", async function() {
@@ -338,5 +341,8 @@ describe.each([
 
         await client.queueToDevice(batch);
         await httpBackend.flushAllExpected();
+
+        // flush, as per comment in first test
+        await flushPromises();
     });
 });
