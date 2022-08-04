@@ -17,5 +17,6 @@ limitations under the License.
 export enum ReceiptType {
     Read = "m.read",
     FullyRead = "m.fully_read",
-    ReadPrivate = "m.read.private"
+    ReadPrivate = "m.read.private",
+    UnstableReadPrivate = "org.matrix.msc2285.read.private",
 }

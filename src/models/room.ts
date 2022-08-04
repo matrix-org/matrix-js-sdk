@@ -2514,7 +2514,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public getUsersReadUpTo(event: MatrixEvent): string[] {
         return this.getReceiptsForEvent(event).filter(function(receipt) {
-            return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receipt.type);
+            return utils.isSupportedReceiptType(receipt.type);
         }).map(function(receipt) {
             return receipt.userId;
         });
@@ -2548,25 +2548,64 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @return {String} ID of the latest event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
-        const timelineSet = this.getUnfilteredTimelineSet();
-        const publicReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.Read);
-        const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
+        // XXX: This is very very ugly and I hope I won't have to ever add a new
+        // receipt type here again. IMHO this should be done by the server in
+        // some more intelligent manner or the client should just use timestamps
 
-        // If we have both, compare them
-        let comparison: number | undefined;
-        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
-            comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
+        const timelineSet = this.getUnfilteredTimelineSet();
+        const publicReadReceipt = this.getReadReceiptForUserId(
+            userId,
+            ignoreSynthesized,
+            ReceiptType.Read,
+        );
+        const privateReadReceipt = this.getReadReceiptForUserId(
+            userId,
+            ignoreSynthesized,
+            ReceiptType.ReadPrivate,
+        );
+        const unstablePrivateReadReceipt = this.getReadReceiptForUserId(
+            userId,
+            ignoreSynthesized,
+            ReceiptType.UnstableReadPrivate,
+        );
+
+        // If we have all, compare them
+        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId && unstablePrivateReadReceipt?.eventId) {
+            const comparison1 = timelineSet.compareEventOrdering(
+                publicReadReceipt.eventId,
+                privateReadReceipt.eventId,
+            );
+            const comparison2 = timelineSet.compareEventOrdering(
+                publicReadReceipt.eventId,
+                unstablePrivateReadReceipt.eventId,
+            );
+            const comparison3 = timelineSet.compareEventOrdering(
+                privateReadReceipt.eventId,
+                unstablePrivateReadReceipt.eventId,
+            );
+            if (comparison1 && comparison2 && comparison3) {
+                return (comparison1 > 0)
+                    ? ((comparison2 > 0) ? publicReadReceipt.eventId : unstablePrivateReadReceipt.eventId)
+                    : ((comparison3 > 0) ? privateReadReceipt.eventId : unstablePrivateReadReceipt.eventId);
+            }
         }
 
-        // If we didn't get a comparison try to compare the ts of the receipts
-        if (!comparison) comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
+        let latest = privateReadReceipt;
+        [unstablePrivateReadReceipt, publicReadReceipt].forEach((receipt) => {
+            if (receipt?.data?.ts > latest?.data?.ts) {
+                latest = receipt;
+            }
+        });
+        if (latest?.eventId) return latest?.eventId;
 
-        // The public receipt is more likely to drift out of date so the private
-        // one has precedence
-        if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
-
-        // If public read receipt is older, return the private one
-        return (comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId;
+        // The more less likely it is for a read receipt to drift out of date
+        // the bigger is its precedence
+        return (
+            privateReadReceipt?.eventId ??
+            unstablePrivateReadReceipt?.eventId ??
+            publicReadReceipt?.eventId ??
+            null
+        );
     }
 
     /**

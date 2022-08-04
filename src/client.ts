@@ -1077,11 +1077,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Figure out if we've read something or if it's just informational
                 const content = event.getContent();
                 const isSelf = Object.keys(content).filter(eid => {
-                    const read = content[eid][ReceiptType.Read];
-                    if (read && Object.keys(read).includes(this.getUserId())) return true;
+                    for (const [key, value] of Object.entries(content[eid])) {
+                        if (!utils.isSupportedReceiptType(key)) continue;
+                        if (!value) continue;
 
-                    const readPrivate = content[eid][ReceiptType.ReadPrivate];
-                    if (readPrivate && Object.keys(readPrivate).includes(this.getUserId())) return true;
+                        if (Object.keys(value).includes(this.getUserId())) return true;
+                    }
 
                     return false;
                 }).length > 0;
@@ -4612,7 +4613,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             room?.addLocalEchoReceipt(this.credentials.userId, rpEvent, ReceiptType.ReadPrivate);
         }
 
-        return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
+        return await this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
     }
 
     /**
@@ -7444,7 +7445,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * don't want other users to see the read receipts. This is experimental. Optional.
      * @return {Promise} Resolves: the empty object, {}.
      */
-    public setRoomReadMarkersHttpRequest(
+    public async setRoomReadMarkersHttpRequest(
         roomId: string,
         rmEventId: string,
         rrEventId: string,
@@ -7457,8 +7458,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const content = {
             [ReceiptType.FullyRead]: rmEventId,
             [ReceiptType.Read]: rrEventId,
-            [ReceiptType.ReadPrivate]: rpEventId,
         };
+
+        const privateField = await utils.getPrivateReadReceiptField(this);
+        if (privateField) {
+            content[privateField] = rpEventId;
+        }
 
         return this.http.authedRequest(undefined, Method.Post, path, undefined, content);
     }
