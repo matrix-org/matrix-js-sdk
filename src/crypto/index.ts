@@ -212,11 +212,6 @@ export interface IEncryptedContent {
 }
 /* eslint-enable camelcase */
 
-export interface IEncryptAndSendToDevicesResult {
-    toDeviceBatch: ToDeviceBatch;
-    deviceInfoByUserIdAndDeviceId: Map<string, Map<string, DeviceInfo>>;
-}
-
 export enum CryptoEvent {
     DeviceVerificationChanged = "deviceVerificationChanged",
     UserTrustStatusChanged = "userTrustStatusChanged",
@@ -3129,12 +3124,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async encryptAndSendToDevices(
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<IEncryptAndSendToDevicesResult> {
+    ): Promise<void> {
         const toDeviceBatch: ToDeviceBatch = {
             eventType: EventType.RoomMessageEncrypted,
             batch: [],
         };
-        const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
 
         try {
             await Promise.all(userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
@@ -3144,17 +3138,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     sender_key: this.olmDevice.deviceCurve25519Key,
                     ciphertext: {},
                 };
-
-                // Assign to temp value to make type-checking happy
-                let userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
-
-                if (userIdDeviceInfo === undefined) {
-                    userIdDeviceInfo = new Map<string, DeviceInfo>();
-                    deviceInfoByUserIdAndDeviceId.set(userId, userIdDeviceInfo);
-                }
-
-                // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
-                userIdDeviceInfo.set(deviceId, deviceInfo);
 
                 toDeviceBatch.batch.push({
                     userId,
@@ -3193,7 +3176,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             try {
                 await this.baseApis.queueToDevice(toDeviceBatch);
-                return { toDeviceBatch, deviceInfoByUserIdAndDeviceId };
             } catch (e) {
                 logger.error("sendToDevice failed", e);
                 throw e;
