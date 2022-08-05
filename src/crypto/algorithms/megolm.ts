@@ -1150,10 +1150,16 @@ class MegolmEncryption extends EncryptionAlgorithm {
                     continue;
                 }
 
+                const userTrust = this.crypto.checkUserTrust(userId);
                 const deviceTrust = this.crypto.checkDeviceTrust(userId, deviceId);
 
                 if (userDevices[deviceId].isBlocked() ||
-                    (!deviceTrust.isVerified() && isBlacklisting)
+                    (!deviceTrust.isVerified() && isBlacklisting) ||
+                    // Always withhold keys from unverified devices of verified users
+                    (!deviceTrust.isVerified() &&
+                        userTrust.isVerified() &&
+                        this.crypto.getCryptoTrustCrossSignedDevices()
+                    )
                 ) {
                     if (!blocked[userId]) {
                         blocked[userId] = {};

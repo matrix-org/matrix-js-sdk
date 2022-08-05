@@ -114,6 +114,10 @@ describe.each([
         });
 
         await httpBackend.flushAllExpected();
+        // let the code handle the response to the request so we don't get
+        // log output after the test has finished (apparently stopping the
+        // client in aftereach is not sufficient.)
+        await flushPromises();
     });
 
     it("retries on error", async function() {
@@ -141,6 +145,9 @@ describe.each([
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
 
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
+
+        // flush, as per comment in first test
+        await flushPromises();
     });
 
     it("stops retrying on 4xx errors", async function() {
@@ -334,5 +341,8 @@ describe.each([
 
         await client.queueToDevice(batch);
         await httpBackend.flushAllExpected();
+
+        // flush, as per comment in first test
+        await flushPromises();
     });
 });
