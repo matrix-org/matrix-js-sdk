@@ -15,13 +15,11 @@ limitations under the License.
 */
 
 import { SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
-import { CallFeed, CallFeedEvent } from "../../../src/webrtc/callFeed";
-import { MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
+import { CallFeed } from "../../../src/webrtc/callFeed";
 import { TestClient } from "../../TestClient";
+import { MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
 
 describe("CallFeed", () => {
-    const roomId = "room_id";
-
     let client;
 
     beforeEach(() => {
@@ -32,30 +30,60 @@ describe("CallFeed", () => {
         client.stop();
     });
 
-    it("should handle stream replacement", () => {
-        const feedNewStreamCallback = jest.fn();
-        const feed = new CallFeed({
-            client,
-            roomId,
-            userId: "user1",
-            // @ts-ignore Mock
-            stream: new MockMediaStream("stream1"),
-            id: "id",
-            purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: false,
-            videoMuted: false,
+    describe("muting", () => {
+        let feed: CallFeed;
+
+        beforeEach(() => {
+            feed = new CallFeed({
+                client,
+                roomId: "room1",
+                userId: "user1",
+                // @ts-ignore Mock
+                stream: new MockMediaStream("stream1"),
+                purpose: SDPStreamMetadataPurpose.Usermedia,
+                audioMuted: false,
+                videoMuted: false,
+            });
         });
-        feed.on(CallFeedEvent.NewStream, feedNewStreamCallback);
 
-        const replacementStream = new MockMediaStream("stream2");
-        // @ts-ignore Mock
-        feed.setNewStream(replacementStream);
-        expect(feedNewStreamCallback).toHaveBeenCalledWith(replacementStream);
-        expect(feed.stream).toBe(replacementStream);
+        describe("muting by default", () => {
+            it("should mute audio by default", () => {
+                expect(feed.isAudioMuted()).toBeTruthy();
+            });
 
-        feedNewStreamCallback.mockReset();
+            it("should mute video by default", () => {
+                expect(feed.isVideoMuted()).toBeTruthy();
+            });
+        });
 
-        replacementStream.addTrack(new MockMediaStreamTrack("track_id", "audio"));
-        expect(feedNewStreamCallback).toHaveBeenCalledWith(replacementStream);
+        describe("muting after adding a track", () => {
+            it("should un-mute audio", () => {
+                // @ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
+                expect(feed.isAudioMuted()).toBeFalsy();
+            });
+
+            it("should un-mute video", () => {
+                // @ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "video", true));
+                expect(feed.isVideoMuted()).toBeFalsy();
+            });
+        });
+
+        describe("muting after calling setAudioVideoMuted()", () => {
+            it("should mute audio by default ", () => {
+                // @ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
+                feed.setAudioVideoMuted(true, false);
+                expect(feed.isAudioMuted()).toBeTruthy();
+            });
+
+            it("should mute video by default", () => {
+                // @ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "video", true));
+                feed.setAudioVideoMuted(false, true);
+                expect(feed.isVideoMuted()).toBeTruthy();
+            });
+        });
     });
 });

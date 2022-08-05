@@ -102,7 +102,7 @@
     "jest-localstorage-mock": "^2.4.6",
     "jest-sonar-reporter": "^2.0.0",
     "jsdoc": "^3.6.6",
-    "matrix-mock-request": "^2.1.0",
+    "matrix-mock-request": "^2.1.2",
     "rimraf": "^3.0.2",
     "terser": "^5.5.1",
     "tsify": "^5.0.2",
