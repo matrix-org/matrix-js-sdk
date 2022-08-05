@@ -68,6 +68,7 @@ export interface MSC3575SlidingSyncRequest {
     unsubscribe_rooms?: string[];
     room_subscriptions?: Record<string, MSC3575RoomSubscription>;
     extensions?: object;
+    txn_id?: string;
 
     // query params
     pos?: string;
@@ -126,6 +127,7 @@ type Operation = DeleteOperation | InsertOperation | InvalidateOperation | SyncO
  */
 export interface MSC3575SlidingSyncResponse {
     pos: string;
+    txn_id?: string;
     lists: ListResponse[];
     rooms: Record<string, MSC3575RoomData>;
     extensions: object;
@@ -334,6 +336,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private terminated = false;
     // flag set when resend() is called because we cannot rely on detecting AbortError in JS SDK :(
     private needsResend = false;
+    // the txn_id to send with the next request.
+    private txnId?: string = null;
+    // a list (in chronological order of when they were sent) of objects containing the txn ID and
+    // a defer to resolve/reject depending on whether they were successfully sent or not.
+    private txnIdDefers: {txnId: string, resolve: Function, reject: Function}[] = [];
     // map of extension name to req/resp handler
     private extensions: Record<string, Extension> = {};
 
@@ -404,9 +411,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The list index to modify
      * @param ranges The new ranges to apply.
      */
-    public setListRanges(index: number, ranges: number[][]): void {
+    public setListRanges(index: number, ranges: number[][]): Promise<string> {
         this.lists[index].updateListRange(ranges);
-        this.resend();
+        return this.resend();
     }
 
     /**
@@ -415,14 +422,14 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The index to modify
      * @param list The new list parameters.
      */
-    public setList(index: number, list: MSC3575List): void {
+    public setList(index: number, list: MSC3575List): Promise<string> {
         if (this.lists[index]) {
             this.lists[index].replaceList(list);
         } else {
             this.lists[index] = new SlidingList(list);
         }
         this.listModifiedCount += 1;
-        this.resend();
+        return this.resend();
     }
 
     /**
@@ -439,9 +446,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * prepare the room subscriptions for when start() is called.
      * @param s The new desired room subscriptions.
      */
-    public modifyRoomSubscriptions(s: Set<string>) {
+    public modifyRoomSubscriptions(s: Set<string>): Promise<string> {
         this.desiredRoomSubscriptions = s;
-        this.resend();
+        return this.resend();
     }
 
     /**
@@ -449,10 +456,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * such that they will be sent up afresh.
      * @param rs The new room subscription fields to fetch.
      */
-    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription): void {
+    public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription): Promise<string> {
         this.roomSubscriptionInfo = rs;
         this.confirmedRoomSubscriptions = new Set<string>();
-        this.resend();
+        return this.resend();
     }
 
     /**
@@ -615,11 +622,52 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
-     * Resend a Sliding Sync request. Used when something has changed in the request.
+     * Resend a Sliding Sync request. Used when something has changed in the request. Resolves with
+     * the transaction ID of this request on success. Rejects with the transaction ID of this request
+     * on failure.
      */
-    public resend(): void {
+    public resend(): Promise<string> {
         this.needsResend = true;
+        this.txnId = ""+Math.random();
+        const p: Promise<string> = new Promise((resolve, reject) => {
+            this.txnIdDefers.push({
+                txnId: this.txnId,
+                resolve: resolve,
+                reject: reject,
+            });
+        });
         this.pendingReq?.abort();
+        return p;
+    }
+
+    private resolveTransactionDefers(txnId?: string) {
+        if (!txnId) {
+            return;
+        }
+        // find the matching index
+        let txnIndex = -1;
+        for (let i = 0; i < this.txnIdDefers.length; i++) {
+            if (this.txnIdDefers[i].txnId === txnId) {
+                txnIndex = i;
+                break;
+            }
+        }
+        if (txnIndex === -1) {
+            // this shouldn't happen; we shouldn't be seeing txn_ids for things we don't know about,
+            // whine about it.
+            logger.warn(`resolveTransactionDefers: seen ${txnId} but it isn't a pending txn, ignoring.`);
+            return;
+        }
+        // This list is sorted in time, so if the input txnId ACKs in the middle of this array,
+        // then everything before it that hasn't been ACKed yet never will and we should reject them.
+        for (let i = 0; i < txnIndex; i++) {
+            if (i < txnIndex) {
+                this.txnIdDefers[i].reject(this.txnIdDefers[i].txnId);
+            }
+        }
+        this.txnIdDefers[txnIndex].resolve(txnId);
+        // clear out settled promises, incuding the one we resolved.
+        this.txnIdDefers = this.txnIdDefers.slice(txnIndex+1);
     }
 
     /**
@@ -665,6 +713,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     for (const roomId of newSubscriptions) {
                         reqBody.room_subscriptions[roomId] = this.roomSubscriptionInfo;
                     }
+                }
+                if (this.txnId) {
+                    reqBody.txn_id = this.txnId;
+                    this.txnId = null;
                 }
                 this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl);
                 resp = await this.pendingReq;
@@ -747,6 +799,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     i, this.lists[i].joinedCount, Object.assign({}, this.lists[i].roomIndexToRoomId),
                 );
             });
+
+            this.resolveTransactionDefers(resp.txn_id);
         }
     }
 }
