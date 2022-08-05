@@ -244,7 +244,8 @@ describe.each([
 
         client.retryImmediately();
 
-        expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
+        // longer timeout here to try & avoid flakiness
+        expect(await httpBackend.flush(null, 1, 3000)).toEqual(1);
     });
 
     it("retries on when client is started", async function() {

@@ -41,7 +41,6 @@ import { sleep } from './utils';
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
-import { IEncryptAndSendToDevicesResult } from "./crypto";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
@@ -2673,7 +2672,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public encryptAndSendToDevices(
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<IEncryptAndSendToDevicesResult> {
+    ): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-End encryption disabled");
         }
