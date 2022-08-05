@@ -877,7 +877,7 @@ export type ClientEventHandlerMap = {
     & HttpApiEventHandlerMap
     & BeaconEventHandlerMap;
 
-const UNSTABLE_MSC3824_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action");
+const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action");
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
@@ -7161,7 +7161,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const params = { redirectUrl };
-        params[UNSTABLE_MSC3824_ACTION_PARAM.unstable] = action;
+        params[SSO_ACTION_PARAM.unstable] = action;
 
         return this.http.getUrl(url, params, PREFIX_R0);
     }
