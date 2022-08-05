@@ -14,8 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { mocked } from "jest-mock";
+
 import { logger } from "../../src/logger";
-import { MatrixClient } from "../../src/client";
+import { MatrixClient, ClientEvent } from "../../src/client";
 import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
@@ -27,6 +29,7 @@ import {
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
+import { Crypto } from "../../src/crypto";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
@@ -34,9 +37,15 @@ import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import { ContentHelpers, Room } from "../../src";
+import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
 
 jest.useFakeTimers();
+
+jest.mock("../../src/webrtc/call", () => ({
+    ...jest.requireActual("../../src/webrtc/call"),
+    supportsMatrixCall: jest.fn(() => false),
+}));
 
 describe("MatrixClient", function() {
     const userId = "@alice:bar";
@@ -159,6 +168,24 @@ describe("MatrixClient", function() {
         return new Promise(() => {});
     }
 
+    function makeClient() {
+        client = new MatrixClient({
+            baseUrl: "https://my.home.server",
+            idBaseUrl: identityServerUrl,
+            accessToken: "my.access.token",
+            request: function() {} as any, // NOP
+            store: store,
+            scheduler: scheduler,
+            userId: userId,
+        });
+        // FIXME: We shouldn't be yanking http like this.
+        client.http = [
+            "authedRequest", "getContentUri", "request", "uploadContent",
+        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
+        client.http.authedRequest.mockImplementation(httpReq);
+        client.http.request.mockImplementation(httpReq);
+    }
+
     beforeEach(function() {
         scheduler = [
             "getQueueForEvent", "queueEvent", "removeEventFromQueue",
@@ -176,21 +203,7 @@ describe("MatrixClient", function() {
         store.getClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
         store.storeClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
         store.isNewlyCreated = jest.fn().mockReturnValue(Promise.resolve(true));
-        client = new MatrixClient({
-            baseUrl: "https://my.home.server",
-            idBaseUrl: identityServerUrl,
-            accessToken: "my.access.token",
-            request: function() {} as any, // NOP
-            store: store,
-            scheduler: scheduler,
-            userId: userId,
-        });
-        // FIXME: We shouldn't be yanking http like this.
-        client.http = [
-            "authedRequest", "getContentUri", "request", "uploadContent",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
-        client.http.authedRequest.mockImplementation(httpReq);
-        client.http.request.mockImplementation(httpReq);
+        makeClient();
 
         // set reasonable working defaults
         acceptKeepalives = true;
@@ -1295,6 +1308,108 @@ describe("MatrixClient", function() {
             expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
             expect(queryParams).toBeFalsy();
             expect(result!.aliases).toEqual(response.aliases);
+        });
+    });
+
+    describe("pollingTurnServers", () => {
+        afterEach(() => {
+            mocked(supportsMatrixCall).mockReset();
+        });
+
+        it("is false if the client isn't started", () => {
+            expect(client.clientRunning).toBe(false);
+            expect(client.pollingTurnServers).toBe(false);
+        });
+
+        it("is false if VoIP is not supported", async () => {
+            mocked(supportsMatrixCall).mockReturnValue(false);
+            makeClient(); // create the client a second time so it picks up the supportsMatrixCall mock
+            await client.startClient();
+            expect(client.pollingTurnServers).toBe(false);
+        });
+
+        it("is true if VoIP is supported", async () => {
+            mocked(supportsMatrixCall).mockReturnValue(true);
+            makeClient(); // create the client a second time so it picks up the supportsMatrixCall mock
+            await client.startClient();
+            expect(client.pollingTurnServers).toBe(true);
+        });
+    });
+
+    describe("checkTurnServers", () => {
+        beforeAll(() => {
+            mocked(supportsMatrixCall).mockReturnValue(true);
+        });
+
+        beforeEach(() => {
+            makeClient(); // create the client a second time so it picks up the supportsMatrixCall mock
+        });
+
+        afterAll(() => {
+            mocked(supportsMatrixCall).mockReset();
+        });
+
+        it("emits an event when new TURN creds are found", async () => {
+            const turnServer = {
+                uris: [
+                    "turn:turn.example.com:3478?transport=udp",
+                    "turn:10.20.30.40:3478?transport=tcp",
+                    "turns:10.20.30.40:443?transport=tcp",
+                ],
+                username: "1443779631:@user:example.com",
+                password: "JlKfBy1QwLrO20385QyAtEyIv0=",
+            };
+            jest.spyOn(client, "turnServer").mockResolvedValue(turnServer);
+
+            const events: any[][] = [];
+            const onTurnServers = (...args) => events.push(args);
+            client.on(ClientEvent.TurnServers, onTurnServers);
+            expect(await client.checkTurnServers()).toBe(true);
+            client.off(ClientEvent.TurnServers, onTurnServers);
+            expect(events).toEqual([[[{
+                urls: turnServer.uris,
+                username: turnServer.username,
+                credential: turnServer.password,
+            }]]]);
+        });
+
+        it("emits an event when an error occurs", async () => {
+            const error = new Error(":(");
+            jest.spyOn(client, "turnServer").mockRejectedValue(error);
+
+            const events: any[][] = [];
+            const onTurnServersError = (...args) => events.push(args);
+            client.on(ClientEvent.TurnServersError, onTurnServersError);
+            expect(await client.checkTurnServers()).toBe(false);
+            client.off(ClientEvent.TurnServersError, onTurnServersError);
+            expect(events).toEqual([[error, false]]); // non-fatal
+        });
+
+        it("considers 403 errors fatal", async () => {
+            const error = { httpStatus: 403 };
+            jest.spyOn(client, "turnServer").mockRejectedValue(error);
+
+            const events: any[][] = [];
+            const onTurnServersError = (...args) => events.push(args);
+            client.on(ClientEvent.TurnServersError, onTurnServersError);
+            expect(await client.checkTurnServers()).toBe(false);
+            client.off(ClientEvent.TurnServersError, onTurnServersError);
+            expect(events).toEqual([[error, true]]); // fatal
+        });
+    });
+
+    describe("encryptAndSendToDevices", () => {
+        it("throws an error if crypto is unavailable", () => {
+            client.crypto = undefined;
+            expect(() => client.encryptAndSendToDevices([], {})).toThrow();
+        });
+
+        it("is an alias for the crypto method", async () => {
+            client.crypto = testUtils.mock(Crypto, "Crypto");
+            const deviceInfos = [];
+            const payload = {};
+            await client.encryptAndSendToDevices(deviceInfos, payload);
+            expect(client.crypto.encryptAndSendToDevices).toHaveBeenLastCalledWith(deviceInfos, payload);
         });
     });
 });

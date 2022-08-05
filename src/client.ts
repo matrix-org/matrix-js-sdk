@@ -41,7 +41,6 @@ import { sleep } from './utils';
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
-import { IEncryptAndSendToDevicesResult } from "./crypto";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
@@ -204,6 +203,8 @@ import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } fr
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
+import { ToDeviceBatch } from "./models/ToDeviceMessage";
 
 export type Store = IStore;
 
@@ -968,6 +969,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
     private useE2eForGroupCall = true;
+    private toDeviceMessageQueue: ToDeviceMessageQueue;
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1066,6 +1068,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we still want to know which rooms are encrypted even if crypto is disabled:
         // we don't want to start sending unencrypted events to them.
         this.roomList = new RoomList(this.cryptoStore);
+
+        this.toDeviceMessageQueue = new ToDeviceMessageQueue(this);
 
         // The SDK doesn't really provide a clean way for events to recalculate the push
         // actions for themselves, so we have to kinda help them out when they are encrypted.
@@ -1230,6 +1234,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
             this.fetchClientWellKnown();
         }
+
+        this.toDeviceMessageQueue.start();
     }
 
     /**
@@ -1259,6 +1265,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.clientWellKnownIntervalID !== undefined) {
             global.clearInterval(this.clientWellKnownIntervalID);
         }
+
+        this.toDeviceMessageQueue.stop();
     }
 
     /**
@@ -1660,9 +1668,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Retry a backed off syncing request immediately. This should only be used when
      * the user <b>explicitly</b> attempts to retry their lost connection.
+     * Will also retry any outbound to-device messages currently in the queue to be sent
+     * (retries of regular outgoing events are handled separately, per-event).
      * @return {boolean} True if this resulted in a request being retried.
      */
     public retryImmediately(): boolean {
+        // don't await for this promise: we just want to kick it off
+        this.toDeviceMessageQueue.sendQueue();
         return this.syncApi.retryImmediately();
     }
 
@@ -2660,7 +2672,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public encryptAndSendToDevices(
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<IEncryptAndSendToDevicesResult> {
+    ): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-End encryption disabled");
         }
@@ -3623,7 +3635,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Resend an event.
+     * Resend an event. Will also retry any to-device messages waiting to be sent.
      * @param {MatrixEvent} event The event to resend.
      * @param {Room} room Optional. The room the event is in. Will update the
      * timeline entry if provided.
@@ -3631,6 +3643,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public resendEvent(event: MatrixEvent, room: Room): Promise<ISendEventResponse> {
+        // also kick the to-device queue to retry
+        this.toDeviceMessageQueue.sendQueue();
+
         this.updatePendingEventStatus(room, event, EventStatus.SENDING);
         return this.encryptAndSendEvent(room, event);
     }
@@ -8826,7 +8841,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Send an event to a specific list of devices
+     * Send an event to a specific list of devices.
+     * This is a low-level API that simply wraps the HTTP API
+     * call to send to-device messages. We recommend using
+     * queueToDevice() which is a higher level API.
      *
      * @param {string} eventType  type of event to send
      * @param {Object.<string, Object<string, Object>>} contentMap
@@ -8856,6 +8874,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         logger.log(`PUT ${path}`, targets);
 
         return this.http.authedRequest(undefined, Method.Put, path, undefined, body);
+    }
+
+    /**
+     * Sends events directly to specific devices using Matrix's to-device
+     * messaging system. The batch will be split up into appropriately sized
+     * batches for sending and stored in the store so they can be retried
+     * later if they fail to send. Retries will happen automatically.
+     * @param batch The to-device messages to send
+     */
+    public queueToDevice(batch: ToDeviceBatch): Promise<void> {
+        return this.toDeviceMessageQueue.queueBatch(batch);
     }
 
     /**

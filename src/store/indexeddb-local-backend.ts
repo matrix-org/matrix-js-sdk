@@ -21,8 +21,9 @@ import { logger } from '../logger';
 import { IStartClientOpts, IStateEventWithRoomId } from "..";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
-const VERSION = 3;
+const VERSION = 4;
 
 function createDatabase(db: IDBDatabase): void {
     // Make user store, clobber based on user ID. (userId property of User objects)
@@ -47,6 +48,10 @@ function upgradeSchemaV2(db: IDBDatabase): void {
 function upgradeSchemaV3(db: IDBDatabase): void {
     db.createObjectStore("client_options",
         { keyPath: ["clobber"] });
+}
+
+function upgradeSchemaV4(db: IDBDatabase): void {
+    db.createObjectStore("to_device_queue", { autoIncrement: true });
 }
 
 /**
@@ -112,7 +117,7 @@ function reqAsPromise(req: IDBRequest): Promise<IDBRequest> {
     });
 }
 
-function reqAsCursorPromise(req: IDBRequest<IDBCursor | null>): Promise<IDBCursor> {
+function reqAsCursorPromise<T>(req: IDBRequest<T>): Promise<T> {
     return reqAsEventPromise(req).then((event) => req.result);
 }
 
@@ -176,6 +181,9 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             }
             if (oldVersion < 3) {
                 upgradeSchemaV3(db);
+            }
+            if (oldVersion < 4) {
+                upgradeSchemaV4(db);
             }
             // Expand as needed.
         };
@@ -559,6 +567,38 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             clobber: "-", // constant key so will always clobber
             options: options,
         }); // put == UPSERT
+        await txnAsPromise(txn);
+    }
+
+    public async saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void> {
+        const txn = this.db.transaction(["to_device_queue"], "readwrite");
+        const store = txn.objectStore("to_device_queue");
+        for (const batch of batches) {
+            store.add(batch);
+        }
+        await txnAsPromise(txn);
+    }
+
+    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
+        const txn = this.db.transaction(["to_device_queue"], "readonly");
+        const store = txn.objectStore("to_device_queue");
+        const cursor = await reqAsCursorPromise(store.openCursor());
+        if (!cursor) return null;
+
+        const resultBatch = cursor.value as ToDeviceBatchWithTxnId;
+
+        return {
+            id: cursor.key as number,
+            txnId: resultBatch.txnId,
+            eventType: resultBatch.eventType,
+            batch: resultBatch.batch,
+        };
+    }
+
+    public async removeToDeviceBatch(id: number): Promise<void> {
+        const txn = this.db.transaction(["to_device_queue"], "readwrite");
+        const store = txn.objectStore("to_device_queue");
+        store.delete(id);
         await txnAsPromise(txn);
     }
 }

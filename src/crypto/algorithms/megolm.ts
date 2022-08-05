@@ -600,23 +600,21 @@ class MegolmEncryption extends EncryptionAlgorithm {
     private encryptAndSendKeysToDevices(
         session: OutboundSessionInfo,
         chainIndex: number,
-        userDeviceMap: IOlmDevice[],
+        devices: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
         return this.crypto.encryptAndSendToDevices(
-            userDeviceMap,
+            devices,
             payload,
-        ).then(({ contentMap, deviceInfoByUserIdAndDeviceId }) => {
+        ).then(() => {
             // store that we successfully uploaded the keys of the current slice
-            for (const userId of Object.keys(contentMap)) {
-                for (const deviceId of Object.keys(contentMap[userId])) {
-                    session.markSharedWithDevice(
-                        userId,
-                        deviceId,
-                        deviceInfoByUserIdAndDeviceId.get(userId).get(deviceId).getIdentityKey(),
-                        chainIndex,
-                    );
-                }
+            for (const device of devices) {
+                session.markSharedWithDevice(
+                    device.userId,
+                    device.deviceInfo.deviceId,
+                    device.deviceInfo.getIdentityKey(),
+                    chainIndex,
+                );
             }
         }).catch((error) => {
             logger.error("failed to encryptAndSendToDevices", error);
@@ -1152,10 +1150,16 @@ class MegolmEncryption extends EncryptionAlgorithm {
                     continue;
                 }
 
+                const userTrust = this.crypto.checkUserTrust(userId);
                 const deviceTrust = this.crypto.checkDeviceTrust(userId, deviceId);
 
                 if (userDevices[deviceId].isBlocked() ||
-                    (!deviceTrust.isVerified() && isBlacklisting)
+                    (!deviceTrust.isVerified() && isBlacklisting) ||
+                    // Always withhold keys from unverified devices of verified users
+                    (!deviceTrust.isVerified() &&
+                        userTrust.isVerified() &&
+                        this.crypto.getCryptoTrustCrossSignedDevices()
+                    )
                 ) {
                     if (!blocked[userId]) {
                         blocked[userId] = {};

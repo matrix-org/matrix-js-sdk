@@ -47,7 +47,6 @@ import {
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
-import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
 import { GroupCallUnknownDeviceError } from './groupCall';
@@ -621,26 +620,26 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        // Try to find a feed with the same purpose as the new stream,
-        // if we find it replace the old stream with the new one
-        const existingFeed = this.getRemoteFeeds().find((feed) => feed.purpose === purpose);
-        if (existingFeed) {
-            existingFeed.setNewStream(stream);
-        } else {
-            this.feeds.push(new CallFeed({
-                client: this.client,
-                roomId: this.roomId,
-                userId,
-                stream,
-                purpose,
-                audioMuted,
-                videoMuted,
-            }));
-            this.emit(CallEvent.FeedsChanged, this.feeds);
+        if (this.getFeedByStreamId(stream.id)) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we already have a feed for it`);
+            return;
         }
 
-        logger.info(`Call ${this.callId} Pushed remote stream (id="${
-            stream.id}", active="${stream.active}", purpose=${purpose})`);
+        this.feeds.push(new CallFeed({
+            client: this.client,
+            roomId: this.roomId,
+            userId,
+            stream,
+            purpose,
+            audioMuted,
+            videoMuted,
+        }));
+        this.emit(CallEvent.FeedsChanged, this.feeds);
+
+        logger.info(
+            `Call ${this.callId} pushed remote stream (id="${stream.id}", ` +
+            `active="${stream.active}", purpose=${purpose})`,
+        );
     }
 
     /**
@@ -662,25 +661,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        // Try to find a feed with the same stream id as the new stream,
-        // if we find it replace the old stream with the new one
-        const feed = this.getFeedByStreamId(stream.id);
-        if (feed) {
-            feed.setNewStream(stream);
-        } else {
-            this.feeds.push(new CallFeed({
-                client: this.client,
-                roomId: this.roomId,
-                audioMuted: false,
-                videoMuted: false,
-                userId,
-                stream,
-                purpose,
-            }));
-            this.emit(CallEvent.FeedsChanged, this.feeds);
+        if (this.getFeedByStreamId(stream.id)) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we already have a feed for it`);
+            return;
         }
 
-        logger.info(`Call ${this.callId} Pushed remote stream (id="${stream.id}", active="${stream.active}")`);
+        this.feeds.push(new CallFeed({
+            client: this.client,
+            roomId: this.roomId,
+            audioMuted: false,
+            videoMuted: false,
+            userId,
+            stream,
+            purpose,
+        }));
+        this.emit(CallEvent.FeedsChanged, this.feeds);
+
+        logger.info(`Call ${this.callId} pushed remote stream (id="${stream.id}", active="${stream.active}")`);
     }
 
     private pushNewLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
@@ -692,25 +689,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         setTracksEnabled(stream.getAudioTracks(), true);
         setTracksEnabled(stream.getVideoTracks(), true);
 
-        // We try to replace an existing feed if there already is one with the same purpose
-        const existingFeed = this.getLocalFeeds().find((feed) => feed.purpose === purpose);
-        if (existingFeed) {
-            existingFeed.setNewStream(stream);
-        } else {
-            this.pushLocalFeed(
-                new CallFeed({
-                    client: this.client,
-                    roomId: this.roomId,
-                    audioMuted: false,
-                    videoMuted: false,
-                    userId,
-                    stream,
-                    purpose,
-                }),
-                addToPeerConnection,
-            );
-            this.emit(CallEvent.FeedsChanged, this.feeds);
+        if (this.getFeedByStreamId(stream.id)) {
+            logger.warn(`Ignoring stream with id ${stream.id} because we already have a feed for it`);
+            return;
         }
+
+        this.pushLocalFeed(
+            new CallFeed({
+                client: this.client,
+                roomId: this.roomId,
+                audioMuted: false,
+                videoMuted: false,
+                userId,
+                stream,
+                purpose,
+            }),
+            addToPeerConnection,
+        );
     }
 
     /**
@@ -2192,7 +2187,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param {Object} content
      * @return {Promise}
      */
-    private async sendVoipEvent(eventType: string, content: object): Promise<ISendEventResponse | {}> {
+    private async sendVoipEvent(eventType: string, content: object): Promise<void> {
         const realContent = Object.assign({}, content, {
             version: VOIP_PROTO_VERSION,
             call_id: this.callId,
@@ -2220,7 +2215,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             const userId = this.invitee || this.getOpponentMember().userId;
             if (this.client.getUseE2eForGroupCall()) {
-                return this.client.encryptAndSendToDevices([{
+                await this.client.encryptAndSendToDevices([{
                     userId,
                     deviceInfo: this.opponentDeviceInfo,
                 }], {
@@ -2228,7 +2223,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     content,
                 });
             } else {
-                return this.client.sendToDevice(eventType, {
+                await this.client.sendToDevice(eventType, {
                     [userId]: {
                         [this.opponentDeviceId]: content,
                     },
@@ -2243,7 +2238,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 userId: this.invitee || this.getOpponentMember().userId,
             });
 
-            return this.client.sendEvent(this.roomId, eventType, realContent);
+            await this.client.sendEvent(this.roomId, eventType, realContent);
         }
     }
 

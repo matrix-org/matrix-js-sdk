@@ -30,6 +30,7 @@ import { ISavedSync, IStore } from "./index";
 import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
 import { IStateEventWithRoomId } from "../@types/search";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 function isValidFilterId(filterId: string): boolean {
     const isValidStr = typeof filterId === "string" &&
@@ -64,6 +65,8 @@ export class MemoryStore implements IStore {
     private oobMembers: Record<string, IStateEventWithRoomId[]> = {}; // roomId: [member events]
     private pendingEvents: { [roomId: string]: Partial<IEvent>[] } = {};
     private clientOptions = {};
+    private pendingToDeviceBatches: IndexedToDeviceBatch[] = [];
+    private nextToDeviceBatchId = 0;
 
     constructor(opts: IOpts = {}) {
         this.localStorage = opts.localStorage;
@@ -428,5 +431,27 @@ export class MemoryStore implements IStore {
 
     public async setPendingEvents(roomId: string, events: Partial<IEvent>[]): Promise<void> {
         this.pendingEvents[roomId] = events;
+    }
+
+    public saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void> {
+        for (const batch of batches) {
+            this.pendingToDeviceBatches.push({
+                id: this.nextToDeviceBatchId++,
+                eventType: batch.eventType,
+                txnId: batch.txnId,
+                batch: batch.batch,
+            });
+        }
+        return Promise.resolve();
+    }
+
+    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
+        if (this.pendingToDeviceBatches.length === 0) return null;
+        return this.pendingToDeviceBatches[0];
+    }
+
+    public removeToDeviceBatch(id: number): Promise<void> {
+        this.pendingToDeviceBatches = this.pendingToDeviceBatches.filter(batch => batch.id !== id);
+        return Promise.resolve();
     }
 }

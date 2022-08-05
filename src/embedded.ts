@@ -32,7 +32,6 @@ import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { MatrixEvent } from "./models/event";
 import { User } from "./models/user";
 import { Room } from "./models/room";
-import { IEncryptAndSendToDevicesResult } from "./crypto";
 import { DeviceInfo } from "./crypto/deviceinfo";
 import { IOlmDevice } from "./crypto/algorithms/megolm";
 
@@ -166,17 +165,14 @@ export class RoomWidgetClient extends MatrixClient {
     public async encryptAndSendToDevices(
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<IEncryptAndSendToDevicesResult> {
-        const contentMap: { [userId: string]: { [deviceId: string]: unknown } } = {};
+    ): Promise<void> {
+        const contentMap: { [userId: string]: { [deviceId: string]: object } } = {};
         for (const { userId, deviceInfo: { deviceId } } of userDeviceInfoArr) {
             if (!contentMap[userId]) contentMap[userId] = {};
             contentMap[userId][deviceId] = payload;
         }
 
-        // Since encryption is handled entirely on the other side of the widget
-        // API, we can't actually return anything useful
         await this.widgetApi.sendToDevice((payload as { type: string }).type, true, contentMap);
-        return { contentMap: {}, deviceInfoByUserIdAndDeviceId: new Map() };
     }
 
     // Overridden since we get TURN servers automatically over the widget API,

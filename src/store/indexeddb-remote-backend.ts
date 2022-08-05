@@ -20,6 +20,7 @@ import { ISavedSync } from "./index";
 import { IStartClientOpts } from "../client";
 import { IStateEventWithRoomId, ISyncResponse } from "..";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private worker: Worker;
@@ -131,6 +132,18 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     public getUserPresenceEvents(): Promise<UserTuple[]> {
         return this.doCmd('getUserPresenceEvents');
+    }
+
+    public async saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void> {
+        return this.doCmd('saveToDeviceBatches', [batches]);
+    }
+
+    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+        return this.doCmd('getOldestToDeviceBatch');
+    }
+
+    public async removeToDeviceBatch(id: number): Promise<void> {
+        return this.doCmd('removeToDeviceBatch', [id]);
     }
 
     private ensureStarted(): Promise<void> {

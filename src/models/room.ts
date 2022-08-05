@@ -72,7 +72,7 @@ function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: Rece
                 },
             },
         },
-        type: "m.receipt",
+        type: EventType.Receipt,
         room_id: event.getRoomId(),
     });
 }
@@ -2423,9 +2423,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public addEphemeralEvents(events: MatrixEvent[]): void {
         for (const event of events) {
-            if (event.getType() === 'm.typing') {
+            if (event.getType() === EventType.Typing) {
                 this.currentState.setTypingEvent(event);
-            } else if (event.getType() === 'm.receipt') {
+            } else if (event.getType() === EventType.Receipt) {
                 this.addReceipt(event);
             } // else ignore - life is too short for us to care about these events
         }
