@@ -619,6 +619,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             feeds.push({
                 id: feed.stream.id,
                 purpose: feed.purpose,
+                // FIXME: This is very ineffective as state is slow, we should really be sending this over DC
+                audio_muted: feed.isAudioMuted(),
+                video_muted: feed.isVideoMuted(),
                 tracks: transceivers.map((transceiver) => ({
                     id: transceiver.sender.track.id,
                 })),

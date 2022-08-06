@@ -112,7 +112,9 @@ export interface IGroupCallMemberTrack {
 export interface IGroupCallRoomMemberFeed {
     id: string;
     purpose: SDPStreamMetadataPurpose;
-    tracks: IGroupCallMemberTrack[];
+    audio_muted?: boolean;
+    video_muted?: boolean;
+    tracks?: IGroupCallMemberTrack[];
 }
 
 export interface IGroupCallRoomMemberDevice {
@@ -560,6 +562,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
+        this.sendMemberStateEvent();
         return true;
     }
 
@@ -588,6 +591,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, this.isMicrophoneMuted(), muted);
+        this.sendMemberStateEvent();
         return true;
     }
 
@@ -814,6 +818,8 @@ export class GroupCall extends TypedEventEmitter<
                 return recursivelyAssign(feedAcc, {
                     [feed.id]: {
                         purpose: feed.purpose,
+                        audio_muted: feed.audio_muted,
+                        video_muted: feed.video_muted,
                         userId: event.getSender(),
                     },
                 }, true);
