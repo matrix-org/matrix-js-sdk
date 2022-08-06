@@ -639,7 +639,9 @@ export class GroupCall extends TypedEventEmitter<
 
                 // TODO: handle errors
                 await Promise.all(this.calls.map(call => call.pushLocalFeed(
-                    this.localScreenshareFeed.clone(),
+                    this.client.getSFU().user_id
+                        ? this.localScreenshareFeed
+                        : this.localScreenshareFeed.clone(),
                 )));
 
                 return true;
@@ -653,7 +655,11 @@ export class GroupCall extends TypedEventEmitter<
         } else {
             await Promise.all(this.calls.map(call => call.removeLocalFeed(call.localScreensharingFeed)));
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
-            this.removeScreenshareFeed(this.localScreenshareFeed);
+            // We have to remove the feed manually as MatrixCall has its clone,
+            // so it won't be removed automatically
+            if (!this.client.getSFU().user_id) {
+                this.removeScreenshareFeed(this.localScreenshareFeed);
+            }
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
             this.emit(GroupCallEvent.LocalScreenshareStateChanged, false, undefined, undefined);

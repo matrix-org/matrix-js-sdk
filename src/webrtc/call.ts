@@ -48,6 +48,9 @@ import {
     ISfuBaseDataChannelMessage,
     ISfuSelectDataChannelMessage,
     ISfuAnswerDataChannelMessage,
+    ISfuPublishDataChannelMessage,
+    ISfuUnpublishDataChannelMessage,
+    ISfuOfferDataChannelMessage,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
@@ -789,7 +792,21 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             `purpose="${callFeed.purpose}")`,
         );
 
-        this.emit(CallEvent.FeedsChanged, this.feeds);
+        // If we're calling with an SFU and we aren't setting up the call, we
+        // send the offer manually
+        if (this.client.getSFU() && this.state !== CallState.Fledgling) {
+            this.peerConn.createOffer().then((offer) => {
+                this.peerConn.setLocalDescription(offer);
+
+                this.sendSFUDataChannelMessage({
+                    op: "publish",
+                    sdp: offer.sdp,
+                } as ISfuPublishDataChannelMessage);
+                this.emit(CallEvent.FeedsChanged, this.feeds);
+            });
+        } else {
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
     }
 
     /**
@@ -818,6 +835,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // Empty the array
         transceiversArray.splice(0, transceiversArray.length);
         this.deleteFeed(callFeed);
+
+        if (this.client.getSFU()) {
+            this.peerConn.createOffer().then((offer) => {
+                this.peerConn.setLocalDescription(offer);
+
+                this.sendSFUDataChannelMessage({
+                    op: "unpublish",
+                    sdp: offer.sdp,
+                    stop: tracksToUnpublish,
+                } as ISfuUnpublishDataChannelMessage);
+            });
+        }
     }
 
     private deleteAllFeeds(): void {
@@ -1876,11 +1905,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         logger.warn(`Received DC ${json.op} event`, json);
 
         switch (json.op) {
-            case "offer":
+            case "offer": {
                 try {
+                    const offer = json as ISfuOfferDataChannelMessage;
                     await this.peerConn.setRemoteDescription({
                         "type": "offer",
-                        "sdp": json.sdp,
+                        "sdp": offer.sdp,
                     });
 
                     const answer = await this.peerConn.createAnswer();
@@ -1895,10 +1925,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
                     return;
                 }
+            }
                 break;
-            case "error":
-                logger.error("Received DC error event", json.message);
-
+            case "answer": {
+                const answer = json as ISfuAnswerDataChannelMessage;
+                await this.peerConn.setRemoteDescription({
+                    type: "answer",
+                    sdp: answer.sdp,
+                });
+            }
                 break;
             default:
                 logger.warn("Ignoring unrecognized DC event op ", json.op);
@@ -2262,6 +2297,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private onNegotiationNeeded = async (): Promise<void> => {
+        // Other than the initial offer, we handle negotiation manually when calling with an SFU
+        if (this.client.getSFU() && this.state !== CallState.CreateOffer) return;
+
         logger.info(`Call ${this.callId} Negotiation is needed!`);
 
         if (this.state !== CallState.CreateOffer && this.opponentVersion === 0) {

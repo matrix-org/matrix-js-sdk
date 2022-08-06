@@ -99,10 +99,6 @@ export interface ISfuBaseDataChannelMessage {
     op: string;
     id: string;
     conf_id: string;
-    sdp?: string;
-    message?: string;
-    start?: ISfuTrackDesc[];
-    stop?: ISfuTrackDesc[];
 }
 
 export interface ISfuSelectDataChannelMessage extends ISfuBaseDataChannelMessage {
@@ -110,9 +106,25 @@ export interface ISfuSelectDataChannelMessage extends ISfuBaseDataChannelMessage
     start: ISfuTrackDesc[];
 }
 
+export interface ISfuOfferDataChannelMessage extends ISfuBaseDataChannelMessage {
+    op: "offer";
+    sdp: string;
+}
+
 export interface ISfuAnswerDataChannelMessage extends ISfuBaseDataChannelMessage {
     op: "answer";
     sdp: string;
+}
+
+export interface ISfuPublishDataChannelMessage extends ISfuBaseDataChannelMessage {
+    op: "publish";
+    sdp: string;
+}
+
+export interface ISfuUnpublishDataChannelMessage extends ISfuBaseDataChannelMessage {
+    op: "unpublish";
+    sdp: string;
+    stop: ISfuTrackDesc[];
 }
 
 /* eslint-enable camelcase */
