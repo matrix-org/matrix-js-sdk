@@ -363,7 +363,7 @@ export class GroupCall extends TypedEventEmitter<
                 "feeds": [],
             };
 
-            const newCall = createNewMatrixCall(
+            const sfuCall = createNewMatrixCall(
                 this.client,
                 this.room.roomId,
                 {
@@ -377,11 +377,11 @@ export class GroupCall extends TypedEventEmitter<
                 },
             );
 
-            newCall.isPtt = this.isPtt;
+            sfuCall.isPtt = this.isPtt;
 
             try {
-                await newCall.placeCallWithCallFeeds(this.getLocalFeeds());  // TODO: We should just setup the datachannel
-                newCall.createDataChannel("datachannel", this.dataChannelOptions);
+                await sfuCall.placeCallWithCallFeeds(this.getLocalFeeds()); // TODO: We should just setup the datachannel
+                sfuCall.createDataChannel("datachannel", this.dataChannelOptions);
             } catch (e) {
                 logger.warn(`Failed to place call to ${this.client.getSFU().user_id}!`, e);
                 this.emit(
@@ -394,7 +394,7 @@ export class GroupCall extends TypedEventEmitter<
                 return;
             }
 
-            this.addCall(newCall);
+            this.addCall(sfuCall);
         }
     }
 
