@@ -1,6 +1,6 @@
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
-import { MatrixClient } from "../client";
+import { ISfuInfo, MatrixClient } from "../client";
 import {
     CallErrorCode,
     CallEvent,
@@ -190,6 +190,7 @@ export class GroupCall extends TypedEventEmitter<
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
     private memberStateExpirationTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private resendMemberStateTimer: ReturnType<typeof setTimeout> | null = null;
+    private sfu: ISfuInfo | null = null;
 
     constructor(
         private client: MatrixClient,
@@ -204,11 +205,6 @@ export class GroupCall extends TypedEventEmitter<
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId || genCallID();
-
-        if (this.client.getSFU().user_id) {
-            // we have to use DCs to talk to the SFU
-            this.dataChannelsEnabled = true;
-        }
 
         for (const stateEvent of this.getMemberStateEvents()) {
             this.onMemberStateChanged(stateEvent);
@@ -351,9 +347,10 @@ export class GroupCall extends TypedEventEmitter<
 
         this.onActiveSpeakerLoop();
 
-        if (this.client.getSFU().user_id) {
+        this.sfu = this.client.getSfu();
+        if (this.sfu) {
             const opponentDevice = {
-                "device_id": this.client.getSFU().device_id,
+                "device_id": this.sfu.device_id,
                 // XXX: the SFU might need to specify a session_id so that if it
                 // restarts and starts sending invites to us, we know that it's
                 // forgotten who we were?  But then we need a way to communicate
@@ -367,13 +364,12 @@ export class GroupCall extends TypedEventEmitter<
                 this.client,
                 this.room.roomId,
                 {
-                    invitee: this.client.getSFU().user_id,
+                    invitee: this.sfu.user_id,
                     opponentDeviceId: opponentDevice.device_id,
                     opponentSessionId: opponentDevice.session_id,
                     groupCallId: this.groupCallId,
-                    initialRemoteSDPStreamMetadata: this.client.getSFU().user_id
-                        ? this.getRemoteSDPStreamMetadataForCall()
-                        : undefined,
+                    initialRemoteSDPStreamMetadata: this.getRemoteSDPStreamMetadataForCall(),
+                    isSfu: true,
                 },
             );
 
@@ -383,12 +379,12 @@ export class GroupCall extends TypedEventEmitter<
                 await sfuCall.placeCallWithCallFeeds(this.getLocalFeeds()); // TODO: We should just setup the datachannel
                 sfuCall.createDataChannel("datachannel", this.dataChannelOptions);
             } catch (e) {
-                logger.warn(`Failed to place call to ${this.client.getSFU().user_id}!`, e);
+                logger.warn(`Failed to place call to ${this.sfu.user_id}!`, e);
                 this.emit(
                     GroupCallEvent.Error,
                     new GroupCallError(
                         GroupCallErrorCode.PlaceCallFailed,
-                        `Failed to place call to ${this.client.getSFU().user_id}.`,
+                        `Failed to place call to ${this.sfu.user_id}.`,
                     ),
                 );
                 return;
@@ -638,10 +634,9 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map(call => call.pushLocalFeed(
-                    this.client.getSFU().user_id
-                        ? this.localScreenshareFeed
-                        : this.localScreenshareFeed.clone(),
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(call.isSfu
+                    ? this.localScreenshareFeed
+                    : this.localScreenshareFeed.clone(),
                 )));
 
                 return true;
@@ -657,7 +652,7 @@ export class GroupCall extends TypedEventEmitter<
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
             // We have to remove the feed manually as MatrixCall has its clone,
             // so it won't be removed automatically
-            if (!this.client.getSFU().user_id) {
+            if (!this.sfu) {
                 this.removeScreenshareFeed(this.localScreenshareFeed);
             }
             this.localScreenshareFeed = undefined;
@@ -834,8 +829,8 @@ export class GroupCall extends TypedEventEmitter<
         const member = this.room.getMember(event.getStateKey());
         if (!member) return;
 
-        if (this.client.getSFU().user_id) {
-            const sfuCall = this.getCallByUserId(this.client.getSFU().user_id);
+        if (this.sfu) {
+            const sfuCall = this.getCallByUserId(this.sfu.user_id);
             if (!sfuCall) return;
 
             sfuCall.updateRemoteSDPStreamMetadata(this.getRemoteSDPStreamMetadataForCall());
@@ -931,9 +926,6 @@ export class GroupCall extends TypedEventEmitter<
                 opponentDeviceId: opponentDevice.device_id,
                 opponentSessionId: opponentDevice.session_id,
                 groupCallId: this.groupCallId,
-                initialRemoteSDPStreamMetadata: this.client.getSFU().user_id
-                    ? this.getRemoteSDPStreamMetadataForCall()
-                    : undefined,
             },
         );
 
@@ -1166,7 +1158,7 @@ export class GroupCall extends TypedEventEmitter<
             this.retryCallCounts.delete(getCallUserId(call));
 
             // if we're calling an SFU, subscribe to its feeds
-            if (call.getOpponentMember().userId === this.client.getSFU().user_id) {
+            if (call.getOpponentMember().userId === this.sfu.user_id) {
                 call.subscribeToSFU(this.getRemoteFeedsFromState());
             }
         }

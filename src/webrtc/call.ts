@@ -91,6 +91,7 @@ interface CallOpts {
     opponentSessionId?: string;
     groupCallId?: string;
     initialRemoteSDPStreamMetadata?: SDPStreamMetadata;
+    isSfu?: boolean;
 }
 
 interface TurnServer {
@@ -346,6 +347,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // whether this call should have push-to-talk semantics
     // This should be set by the consumer on incoming & outgoing calls.
     public isPtt = false;
+    public isSfu = false;
 
     private client: MatrixClient;
     private forceTURN: boolean;
@@ -417,6 +419,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.opponentSessionId = opts.opponentSessionId;
         this.groupCallId = opts.groupCallId;
         this.remoteSDPStreamMetadata = opts.initialRemoteSDPStreamMetadata;
+        this.isSfu = opts.isSfu;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -794,7 +797,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // If we're calling with an SFU and we aren't setting up the call, we
         // send the offer manually
-        if (this.client.getSFU() && this.state !== CallState.Fledgling) {
+        if (this.isSfu && this.state !== CallState.Fledgling) {
             this.peerConn.createOffer().then((offer) => {
                 this.peerConn.setLocalDescription(offer);
 
@@ -836,7 +839,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         transceiversArray.splice(0, transceiversArray.length);
         this.deleteFeed(callFeed);
 
-        if (this.client.getSFU()) {
+        if (this.isSfu) {
             this.peerConn.createOffer().then((offer) => {
                 this.peerConn.setLocalDescription(offer);
 
@@ -916,7 +919,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdpStreamMetadata = invite[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
-        } else if (!this.client.getSFU().user_id) {
+        } else if (!this.isSfu) {
             logger.debug(`Call ${
                 this.callId} did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
         }
@@ -1769,7 +1772,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdpStreamMetadata = content[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
-        } else if (!this.client.getSFU().user_id) {
+        } else if (!this.isSfu) {
             logger.warn(`Call ${this.callId} Did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
         }
 
@@ -2298,7 +2301,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private onNegotiationNeeded = async (): Promise<void> => {
         // Other than the initial offer, we handle negotiation manually when calling with an SFU
-        if (this.client.getSFU() && this.state !== CallState.CreateOffer) return;
+        if (this.isSfu && this.state !== CallState.CreateOffer) return;
 
         logger.info(`Call ${this.callId} Negotiation is needed!`);
 
@@ -2796,9 +2799,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = sender === this.client.getSFU().user_id
-            ? { userId: sender } as RoomMember // FIXME: While we never try to get anything other than the userId, this is WRONG
-            : this.client.getRoom(this.roomId).getMember(sender);
+        this.opponentMember = (
+            this.client.getRoom(this.roomId)?.getMember(sender)
+            // FIXME: While we never try to get anything other than the userId,
+            // this is WRONG. This is here for SFUs
+            || { userId: sender } as RoomMember
+        );
     }
 
     private async addBufferedIceCandidates(): Promise<void> {
@@ -2904,6 +2910,7 @@ export function createNewMatrixCall(client: any, roomId: string, options?: CallO
         opponentSessionId: options?.opponentSessionId,
         groupCallId: options?.groupCallId,
         initialRemoteSDPStreamMetadata: options?.initialRemoteSDPStreamMetadata,
+        isSfu: options.isSfu,
     };
     const call = new MatrixCall(opts);
 

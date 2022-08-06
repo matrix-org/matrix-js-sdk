@@ -795,7 +795,7 @@ interface ITimestampToEventResponse {
     origin_server_ts: string;
 }
 
-interface ISFUInfo {
+export interface ISfuInfo {
     user_id: string;
     device_id: string;
 }
@@ -1543,11 +1543,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getUseE2eForGroupCall(): boolean {
         // FIXME: SFUs don't support E2E atm
-        if (this.getSFU()) return false;
+        if (this.getSfu()) return false;
         return this.useE2eForGroupCall;
     }
 
-    public getSFU(): ISFUInfo | null {
+    public getSfu(): ISfuInfo | null {
+        if (!this.localSfu || !this.localSfuDeviceId) return null;
+
         return {
             user_id: this.localSfu,
             device_id: this.localSfuDeviceId,
