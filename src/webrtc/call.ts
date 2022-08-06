@@ -599,6 +599,28 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return metadata;
     }
 
+    public getGroupCallRoomMemberFeeds(): IGroupCallRoomMemberFeed[] {
+        const feeds: IGroupCallRoomMemberFeed[] = [];
+        for (const feed of this.getLocalFeeds()) {
+            // We use transceivers here because we need to send the actual
+            // trackIds which the SFU will see which will probably differ from
+            // the local trackIds on MediaStreams
+            const transceivers = feed.purpose === SDPStreamMetadataPurpose.Usermedia
+                ? this.usermediaTransceivers
+                : this.screensharingTransceivers;
+            if (!transceivers.length) continue;
+
+            feeds.push({
+                id: feed.stream.id,
+                purpose: feed.purpose,
+                tracks: transceivers.map((transceiver) => ({
+                    id: transceiver.sender.track.id,
+                })),
+            });
+        }
+        return feeds;
+    }
+
     /**
      * Returns true if there are no incoming feeds,
      * otherwise returns false

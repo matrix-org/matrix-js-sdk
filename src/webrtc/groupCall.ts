@@ -740,22 +740,8 @@ export class GroupCall extends TypedEventEmitter<
                 {
                     "device_id": this.client.getDeviceId(),
                     "session_id": this.client.getSessionId(),
-                    "feeds": this.getLocalFeeds().map((feed) => ({
-                        purpose: feed.purpose,
-                        id: feed.stream.id,
-
-                        // we have to advertise the actual tracks we're sending to the SFU from the PC
-                        // we can't use the feeds' mediaStream IDs, as they are local rather than the copy
-                        // sent over WebRTC
-                        //
-                        // TODO: correctly track which rtpSenders are associated with which feed
-                        // rather than assuming that all our senders are from this feed.
-                        tracks: this.calls[0]
-                            ? this.calls[0].peerConn.getSenders().filter((s) => s.track).map(s => ({
-                                "id": s.track.id,
-                            }))
-                            : undefined,
-                    })),
+                    // We assume that all calls are sending the same feeds
+                    "feeds": this.calls[0]?.getGroupCallRoomMemberFeeds(),
                     // TODO: Add data channels
                 },
             ],
