@@ -642,8 +642,6 @@ export class GroupCall extends TypedEventEmitter<
                     this.localScreenshareFeed.clone(),
                 )));
 
-                await this.sendMemberStateEvent();
-
                 return true;
             } catch (error) {
                 logger.error("Enabling screensharing error", error);
@@ -658,7 +656,6 @@ export class GroupCall extends TypedEventEmitter<
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
-            await this.sendMemberStateEvent();
             this.emit(GroupCallEvent.LocalScreenshareStateChanged, false, undefined, undefined);
             return false;
         }
@@ -1123,6 +1120,8 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onCallFeedsChanged = (call: MatrixCall) => {
+        this.sendMemberStateEvent();
+
         // Find removed feeds
         [...this.userMediaFeeds, ...this.screenshareFeeds].filter((gf) => gf.isDisposed()).forEach((feed) => {
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
@@ -1159,10 +1158,6 @@ export class GroupCall extends TypedEventEmitter<
 
         if (state === CallState.Connected) {
             this.retryCallCounts.delete(getCallUserId(call));
-
-            // Now we know what our track IDs are, we can publish them so others
-            // can subscribe to us...
-            this.sendMemberStateEvent();
 
             // if we're calling an SFU, subscribe to its feeds
             if (call.getOpponentMember().userId === this.client.getSFU().user_id) {
