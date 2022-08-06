@@ -208,6 +208,7 @@ export class RoomWidgetClient extends MatrixClient {
 
     private onToDevice = async (ev: CustomEvent<ISendToDeviceToWidgetActionRequest>) => {
         ev.preventDefault();
+        // TODO: Mark the event as encrypted if it was!
         this.emit(ClientEvent.ToDeviceEvent, new MatrixEvent(ev.detail.data));
         this.setSyncState(SyncState.Syncing);
         await this.ack(ev);
