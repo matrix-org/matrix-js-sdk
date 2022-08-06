@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MatrixEvent } from '../models/event';
 import { RoomStateEvent } from '../models/room-state';
-import { MatrixClient } from '../client';
+import { MatrixClient, ClientEvent } from '../client';
 import {
     GroupCall,
     GroupCallIntent,
@@ -25,9 +25,9 @@ import {
 } from "./groupCall";
 import { Room } from "../models/room";
 import { RoomState } from "../models/room-state";
+import { RoomMember } from "../models/room-member";
 import { logger } from '../logger';
 import { EventType } from "../@types/event";
-import { ClientEvent, RoomMember } from '../matrix';
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",

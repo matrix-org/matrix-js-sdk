@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { logger } from "./logger";
-import { MatrixClient } from "./matrix";
+import { MatrixClient } from "./client";
 import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage";
 import { MatrixScheduler } from "./scheduler";
 

@@ -35,7 +35,8 @@ import {
     SlidingSyncEvent,
     SlidingSyncState,
 } from "./sliding-sync";
-import { EventType, IPushRules } from "./matrix";
+import { EventType } from "./@types/event";
+import { IPushRules } from "./@types/PushRules";
 import { PushProcessor } from "./pushprocessor";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
