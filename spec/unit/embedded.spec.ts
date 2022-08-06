@@ -44,6 +44,8 @@ class MockWidgetApi extends EventEmitter {
     public sendToDevice = jest.fn();
     public readStateEvents = jest.fn(() => []);
     public getTurnServers = jest.fn(() => []);
+
+    public transport = { reply: jest.fn() };
 }
 
 describe("RoomWidgetClient", () => {
