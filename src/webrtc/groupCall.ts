@@ -353,11 +353,7 @@ export class GroupCall extends TypedEventEmitter<
         if (this.sfu) {
             const opponentDevice = {
                 "device_id": this.sfu.device_id,
-                // XXX: the SFU might need to specify a session_id so that if it
-                // restarts and starts sending invites to us, we know that it's
-                // forgotten who we were?  But then we need a way to communicate
-                // the session_id to the clients, which is tough if the SFU is
-                // not in the right room.
+                // XXX: What if an SFU gets restarted?
                 "session_id": "sfu",
                 "feeds": [],
             };
