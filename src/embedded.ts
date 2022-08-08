@@ -25,6 +25,7 @@ import {
 } from "matrix-widget-api";
 
 import { ISendEventResponse } from "./@types/requests";
+import { EventType } from "./@types/event";
 import { logger } from "./logger";
 import { MatrixClient, ClientEvent, IMatrixClientCreateOpts, IStartClientOpts } from "./client";
 import { SyncApi, SyncState } from "./sync";
@@ -67,7 +68,6 @@ export class RoomWidgetClient extends MatrixClient {
         super(opts);
 
         // Request capabilities for the functionality this client needs to support
-        // TODO: Check widget API versions before doing any of this!
         this.capabilities.sendState?.forEach(({ eventType, stateKey }) =>
             this.widgetApi.requestCapabilityToSendState(eventType, stateKey),
         );
@@ -209,8 +209,16 @@ export class RoomWidgetClient extends MatrixClient {
 
     private onToDevice = async (ev: CustomEvent<ISendToDeviceToWidgetActionRequest>) => {
         ev.preventDefault();
-        // TODO: Mark the event as encrypted if it was!
-        this.emit(ClientEvent.ToDeviceEvent, new MatrixEvent(ev.detail.data));
+
+        const event = new MatrixEvent({
+            type: ev.detail.data.type,
+            sender: ev.detail.data.sender,
+            content: ev.detail.data.content,
+        });
+        // Mark the event as encrypted if it was, using fake contents and keys since those are unknown to us
+        if (ev.detail.data.encrypted) event.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
+
+        this.emit(ClientEvent.ToDeviceEvent, event);
         this.setSyncState(SyncState.Syncing);
         await this.ack(ev);
     };

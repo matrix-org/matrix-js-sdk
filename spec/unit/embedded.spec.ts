@@ -162,14 +162,17 @@ describe("RoomWidgetClient", () => {
             });
         });
 
-        it("receives", async () => {
+        it.each([
+            { encrypted: false, title: "unencrypted" },
+            { encrypted: true, title: "encrypted" },
+        ])("receives $title", async ({ encrypted }) => {
             await makeClient({ receiveToDevice: ["org.example.foo"] });
             expect(widgetApi.requestCapabilityToReceiveToDevice).toHaveBeenCalledWith("org.example.foo");
 
             const event = {
                 type: "org.example.foo",
                 sender: "@alice:example.org",
-                encrypted: false,
+                encrypted,
                 content: { hello: "world" },
             };
 
@@ -180,7 +183,12 @@ describe("RoomWidgetClient", () => {
                 new CustomEvent(`action:${WidgetApiToWidgetAction.SendToDevice}`, { detail: { data: event } }),
             );
 
-            expect((await emittedEvent).getEffectiveEvent()).toEqual(event);
+            expect((await emittedEvent).getEffectiveEvent()).toEqual({
+                type: event.type,
+                sender: event.sender,
+                content: event.content,
+            });
+            expect((await emittedEvent).isEncrypted()).toEqual(encrypted);
             expect(await emittedSync).toEqual(SyncState.Syncing);
         });
     });
