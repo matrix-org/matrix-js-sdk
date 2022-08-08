@@ -23,10 +23,15 @@ limitations under the License.
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 import { MockedObject } from "jest-mock";
-import { WidgetApi, WidgetApiToWidgetAction } from "matrix-widget-api";
+import {
+    WidgetApi,
+    WidgetApiToWidgetAction,
+    MatrixCapabilities,
+    ITurnServer,
+} from "matrix-widget-api";
 
 import { createRoomWidgetClient } from "../../src/matrix";
-import { MatrixClient, ClientEvent } from "../../src/client";
+import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
 import { SyncState } from "../../src/sync";
 import { ICapabilities } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
@@ -63,6 +68,7 @@ describe("RoomWidgetClient", () => {
     const makeClient = async (capabilities: ICapabilities): Promise<void> => {
         const baseUrl = "https://example.org";
         client = createRoomWidgetClient(widgetApi, capabilities, "!1:example.org", { baseUrl });
+        expect(widgetApi.start).toHaveBeenCalled(); // needs to have been called early in order to not miss messages
         widgetApi.emit("ready");
         await client.startClient();
     };
@@ -156,8 +162,78 @@ describe("RoomWidgetClient", () => {
             });
         });
 
-        it.todo("receives");
+        it("receives", async () => {
+            await makeClient({ receiveToDevice: ["org.example.foo"] });
+            expect(widgetApi.requestCapabilityToReceiveToDevice).toHaveBeenCalledWith("org.example.foo");
+
+            const event = {
+                type: "org.example.foo",
+                sender: "@alice:example.org",
+                encrypted: false,
+                content: { hello: "world" },
+            };
+
+            const emittedEvent = new Promise<MatrixEvent>(resolve => client.once(ClientEvent.ToDeviceEvent, resolve));
+            const emittedSync = new Promise<SyncState>(resolve => client.once(ClientEvent.Sync, resolve));
+            widgetApi.emit(
+                `action:${WidgetApiToWidgetAction.SendToDevice}`,
+                new CustomEvent(`action:${WidgetApiToWidgetAction.SendToDevice}`, { detail: { data: event } }),
+            );
+
+            expect((await emittedEvent).getEffectiveEvent()).toEqual(event);
+            expect(await emittedSync).toEqual(SyncState.Syncing);
+        });
     });
 
-    it.todo("gets TURN servers");
+    it("gets TURN servers", async () => {
+        const server1: ITurnServer = {
+            uris: [
+                "turn:turn.example.com:3478?transport=udp",
+                "turn:10.20.30.40:3478?transport=tcp",
+                "turns:10.20.30.40:443?transport=tcp",
+            ],
+            username: "1443779631:@user:example.com",
+            password: "JlKfBy1QwLrO20385QyAtEyIv0=",
+        };
+        const server2: ITurnServer = {
+            uris: [
+                "turn:turn.example.com:3478?transport=udp",
+                "turn:10.20.30.40:3478?transport=tcp",
+                "turns:10.20.30.40:443?transport=tcp",
+            ],
+            username: "1448999322:@user:example.com",
+            password: "hunter2",
+        };
+        const clientServer1: IClientTurnServer = {
+            urls: server1.uris,
+            username: server1.username,
+            credential: server1.password,
+        };
+        const clientServer2: IClientTurnServer = {
+            urls: server2.uris,
+            username: server2.username,
+            credential: server2.password,
+        };
+
+        let emitServer2: () => void;
+        const getServer2 = new Promise<ITurnServer>(resolve => emitServer2 = () => resolve(server2));
+        widgetApi.getTurnServers.mockImplementation(async function* () {
+            yield server1;
+            yield await getServer2;
+        });
+
+        await makeClient({ turnServers: true });
+        expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC3846TurnServers);
+
+        // The first server should've arrived immediately
+        expect(client.getTurnServers()).toEqual([clientServer1]);
+
+        // Subsequent servers arrive asynchronously and should emit an event
+        const emittedServer = new Promise<IClientTurnServer[]>(resolve =>
+            client.once(ClientEvent.TurnServers, resolve),
+        );
+        emitServer2();
+        expect(await emittedServer).toEqual([clientServer2]);
+        expect(client.getTurnServers()).toEqual([clientServer2]);
+    });
 });

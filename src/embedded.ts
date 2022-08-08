@@ -67,6 +67,7 @@ export class RoomWidgetClient extends MatrixClient {
         super(opts);
 
         // Request capabilities for the functionality this client needs to support
+        // TODO: Check widget API versions before doing any of this!
         this.capabilities.sendState?.forEach(({ eventType, stateKey }) =>
             this.widgetApi.requestCapabilityToSendState(eventType, stateKey),
         );
