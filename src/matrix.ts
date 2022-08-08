@@ -53,7 +53,7 @@ export * from './@types/requests';
 export * from './@types/search';
 export * from './models/room-summary';
 export * as ContentHelpers from "./content-helpers";
-export { ICryptoCallbacks } from "./crypto"; // used to be located here
+export type { ICryptoCallbacks } from "./crypto"; // used to be located here
 export { createNewMatrixCall } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
 export {
