@@ -19,7 +19,7 @@ import { IAbortablePromise } from "./@types/partials";
 import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { TypedEventEmitter } from "./models//typed-event-emitter";
-import { sleep } from "./utils";
+import { sleep, IDeferred, defer } from "./utils";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -340,7 +340,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private txnId?: string = null;
     // a list (in chronological order of when they were sent) of objects containing the txn ID and
     // a defer to resolve/reject depending on whether they were successfully sent or not.
-    private txnIdDefers: {txnId: string, resolve: Function, reject: Function}[] = [];
+    private txnIdDefers: (IDeferred<string> & { txnId: string})[] = [];
     // map of extension name to req/resp handler
     private extensions: Record<string, Extension> = {};
 
@@ -410,6 +410,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * whereas setList always will.
      * @param index The list index to modify
      * @param ranges The new ranges to apply.
+     * @return A promise which resolves to the transaction ID when it has been received down sync
+     * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
+     * immediately after sending, in which case the action will be applied in the subsequent request)
      */
     public setListRanges(index: number, ranges: number[][]): Promise<string> {
         this.lists[index].updateListRange(ranges);
@@ -421,6 +424,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * lists.
      * @param index The index to modify
      * @param list The new list parameters.
+     * @return A promise which resolves to the transaction ID when it has been received down sync
+     * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
+     * immediately after sending, in which case the action will be applied in the subsequent request)
      */
     public setList(index: number, list: MSC3575List): Promise<string> {
         if (this.lists[index]) {
@@ -445,6 +451,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * /sync request to resend new subscriptions. If the /sync stream has not started, this will
      * prepare the room subscriptions for when start() is called.
      * @param s The new desired room subscriptions.
+     * @return A promise which resolves to the transaction ID when it has been received down sync
+     * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
+     * immediately after sending, in which case the action will be applied in the subsequent request)
      */
     public modifyRoomSubscriptions(s: Set<string>): Promise<string> {
         this.desiredRoomSubscriptions = s;
@@ -455,6 +464,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Modify which events to retrieve for room subscriptions. Invalidates all room subscriptions
      * such that they will be sent up afresh.
      * @param rs The new room subscription fields to fetch.
+     * @return A promise which resolves to the transaction ID when it has been received down sync
+     * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
+     * immediately after sending, in which case the action will be applied in the subsequent request)
      */
     public modifyRoomSubscriptionInfo(rs: MSC3575RoomSubscription): Promise<string> {
         this.roomSubscriptionInfo = rs;
@@ -628,16 +640,14 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      */
     public resend(): Promise<string> {
         this.needsResend = true;
-        this.txnId = ""+Math.random();
-        const p: Promise<string> = new Promise((resolve, reject) => {
-            this.txnIdDefers.push({
-                txnId: this.txnId,
-                resolve: resolve,
-                reject: reject,
-            });
+        this.txnId = this.client.makeTxnId();
+        const d = defer<string>();
+        this.txnIdDefers.push({
+            ...d,
+            txnId: this.txnId,
         });
         this.pendingReq?.abort();
-        return p;
+        return d.promise;
     }
 
     private resolveTransactionDefers(txnId?: string) {
