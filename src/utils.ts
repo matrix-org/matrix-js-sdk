@@ -24,8 +24,9 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
 import type * as NodeCrypto from "crypto";
-import { MatrixEvent } from ".";
+import { MatrixClient, MatrixEvent } from ".";
 import { M_TIMESTAMP } from "./@types/location";
+import { ReceiptType } from "./@types/read_receipts";
 
 /**
  * Encode a dictionary of query parameters.
@@ -648,3 +649,18 @@ function getContentTimestampWithFallback(event: MatrixEvent): number {
 export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: MatrixEvent): number {
     return getContentTimestampWithFallback(right) - getContentTimestampWithFallback(left);
 }
+
+export async function getPrivateReadReceiptField(client: MatrixClient): Promise<ReceiptType | null> {
+    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) return ReceiptType.ReadPrivate;
+    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285")) return ReceiptType.UnstableReadPrivate;
+    return null;
+}
+
+export function isSupportedReceiptType(receiptType: string): boolean {
+    return [
+        ReceiptType.Read,
+        ReceiptType.ReadPrivate,
+        ReceiptType.UnstableReadPrivate,
+    ].includes(receiptType as ReceiptType);
+}
+

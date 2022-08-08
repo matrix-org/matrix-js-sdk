@@ -606,19 +606,19 @@ class MegolmEncryption extends EncryptionAlgorithm {
     private encryptAndSendKeysToDevices(
         session: OutboundSessionInfo,
         chainIndex: number,
-        userDeviceMap: IOlmDevice[],
+        devices: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
         return this.crypto.encryptAndSendToDevices(
-            userDeviceMap,
+            devices,
             payload,
-        ).then(({ toDeviceBatch, deviceInfoByUserIdAndDeviceId }) => {
+        ).then(() => {
             // store that we successfully uploaded the keys of the current slice
-            for (const msg of toDeviceBatch.batch) {
+            for (const device of devices) {
                 session.markSharedWithDevice(
-                    msg.userId,
-                    msg.deviceId,
-                    deviceInfoByUserIdAndDeviceId.get(msg.userId).get(msg.deviceId).getIdentityKey(),
+                    device.userId,
+                    device.deviceInfo.deviceId,
+                    device.deviceInfo.getIdentityKey(),
                     chainIndex,
                 );
             }

@@ -409,8 +409,6 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async syncToDatabase(userTuples: UserTuple[]): Promise<void> {
-        const syncData = this.syncAccumulator.getJSON(true);
-
         if (this.isPersisting) {
             logger.warn("Skipping syncToDatabase() as persist already in flight");
             this.pendingUserPresenceData.push(...userTuples);
@@ -421,6 +419,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         }
 
         try {
+            const syncData = this.syncAccumulator.getJSON(true);
+
             await Promise.all([
                 this.persistUserPresenceEvents(userTuples),
                 this.persistAccountData(syncData.accountData),
