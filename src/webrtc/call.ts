@@ -626,8 +626,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 tracks: transceivers.map((transceiver) => {
                     const splitMsid = sdp?.media?.find((m) => m.mid === transceiver.mid)?.msid?.split(" ");
                     if (splitMsid?.[1]) {
+                        logger.warn("Using msid to get trackId", splitMsid);
                         return { id: splitMsid[1] };
                     } else {
+                        logger.warn("Using transceiver to get trackId", splitMsid);
                         return { id: transceiver.sender.track.id };
                     }
                 }),
