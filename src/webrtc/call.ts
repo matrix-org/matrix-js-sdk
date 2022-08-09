@@ -2071,6 +2071,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         try {
             await this.peerConn.setLocalDescription(offer);
+            this.emit(CallEvent.FeedsChanged, this.feeds);
         } catch (err) {
             logger.debug(`Call ${this.callId} Error setting local description!`, err);
             this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, true);
