@@ -47,7 +47,6 @@ import {
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
-import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from '../crypto/deviceinfo';
 import { GroupCallUnknownDeviceError } from './groupCall';
@@ -2181,7 +2180,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param {Object} content
      * @return {Promise}
      */
-    private async sendVoipEvent(eventType: string, content: object): Promise<ISendEventResponse | {}> {
+    private async sendVoipEvent(eventType: string, content: object): Promise<void> {
         const realContent = Object.assign({}, content, {
             version: VOIP_PROTO_VERSION,
             call_id: this.callId,
@@ -2224,7 +2223,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     content,
                 });
             } else {
-                return this.client.sendToDevice(eventType, {
+                await this.client.sendToDevice(eventType, {
                     [userId]: {
                         [this.opponentDeviceId]: content,
                     },
@@ -2239,7 +2238,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 userId: this.invitee || this.getOpponentMember().userId,
             });
 
-            return this.client.sendEvent(this.roomId, eventType, realContent);
+            await this.client.sendEvent(this.roomId, eventType, realContent);
         }
     }
 
