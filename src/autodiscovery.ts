@@ -410,38 +410,40 @@ export class AutoDiscovery {
      * @private
      */
     private static fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
-        return new Promise(function(resolve) {
+        return new Promise((resolve) => {
             // eslint-disable-next-line
             const request = require("./matrix").getRequest();
             if (!request) throw new Error("No request library available");
             request(
                 { method: "GET", uri: url, timeout: 5000 },
-                (err, response, body) => {
-                    if (err || response &&
-                        (response.statusCode < 200 || response.statusCode >= 300)
-                    ) {
-                        let action = AutoDiscoveryAction.FAIL_PROMPT;
-                        let reason = (err ? err.message : null) || "General failure";
-                        if (response && response.statusCode === 404) {
-                            action = AutoDiscoveryAction.IGNORE;
-                            reason = AutoDiscovery.ERROR_MISSING_WELLKNOWN;
-                        }
-                        resolve({ raw: {}, action: action, reason: reason, error: err });
-                        return;
+                (error, response, body) => {
+                    if (error || response?.statusCode < 200 || response?.statusCode >= 300) {
+                        const result = { error, raw: {} };
+                        return resolve(response?.statusCode === 404
+                            ? {
+                                ...result,
+                                action: AutoDiscoveryAction.IGNORE,
+                                reason: AutoDiscovery.ERROR_MISSING_WELLKNOWN,
+                            } : {
+                                ...result,
+                                action: AutoDiscoveryAction.FAIL_PROMPT,
+                                reason: error?.message || "General failure",
+                            });
                     }
 
                     try {
-                        resolve({ raw: JSON.parse(body), action: AutoDiscoveryAction.SUCCESS });
-                    } catch (e) {
-                        let reason = AutoDiscovery.ERROR_INVALID;
-                        if (e.name === "SyntaxError") {
-                            reason = AutoDiscovery.ERROR_INVALID_JSON;
-                        }
-                        resolve({
+                        return resolve({
+                            raw: JSON.parse(body),
+                            action: AutoDiscoveryAction.SUCCESS,
+                        });
+                    } catch (error) {
+                        return resolve({
+                            error,
                             raw: {},
                             action: AutoDiscoveryAction.FAIL_PROMPT,
-                            reason: reason,
-                            error: e,
+                            reason: error?.name === "SyntaxError"
+                                ? AutoDiscovery.ERROR_INVALID_JSON
+                                : AutoDiscovery.ERROR_INVALID,
                         });
                     }
                 },

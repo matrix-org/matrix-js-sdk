@@ -337,11 +337,12 @@ export function globToRegexp(glob: string, extended?: any): string {
     pat = pat.replace(/\\\*/g, '.*');
     pat = pat.replace(/\?/g, '.');
     if (extended) {
-        pat = pat.replace(/\\\[(!|)(.*)\\]/g, function(match, p1, p2, offset, string) {
-            const first = p1 && '^' || '';
-            const second = p2.replace(/\\-/, '-');
-            return '[' + first + second + ']';
-        });
+        pat = pat.replace(/\\\[(!|)(.*)\\]/g, (match, p1, p2, offset, string) => [
+            '[',
+            p1 ? '^' : '',
+            p2.replace(/\\-/, '-'),
+            ']',
+        ].join(''));
     }
     return pat;
 }
