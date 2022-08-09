@@ -20,7 +20,7 @@ limitations under the License.
  */
 
 import { logger } from './logger';
-import { deepCopy } from "./utils";
+import { deepCopy, isSupportedReceiptType } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
@@ -417,31 +417,18 @@ export class SyncAccumulator {
                 // of a hassle to work with. We'll inflate this back out when
                 // getJSON() is called.
                 Object.keys(e.content).forEach((eventId) => {
-                    if (!e.content[eventId][ReceiptType.Read] && !e.content[eventId][ReceiptType.ReadPrivate]) {
-                        return;
-                    }
-                    const read = e.content[eventId][ReceiptType.Read];
-                    if (read) {
-                        Object.keys(read).forEach((userId) => {
+                    Object.entries(e.content[eventId]).forEach(([key, value]) => {
+                        if (!isSupportedReceiptType(key)) return;
+
+                        Object.keys(value).forEach((userId) => {
                             // clobber on user ID
                             currentData._readReceipts[userId] = {
-                                data: e.content[eventId][ReceiptType.Read][userId],
-                                type: ReceiptType.Read,
+                                data: e.content[eventId][key][userId],
+                                type: key as ReceiptType,
                                 eventId: eventId,
                             };
                         });
-                    }
-                    const readPrivate = e.content[eventId][ReceiptType.ReadPrivate];
-                    if (readPrivate) {
-                        Object.keys(readPrivate).forEach((userId) => {
-                            // clobber on user ID
-                            currentData._readReceipts[userId] = {
-                                data: e.content[eventId][ReceiptType.ReadPrivate][userId],
-                                type: ReceiptType.ReadPrivate,
-                                eventId: eventId,
-                            };
-                        });
-                    }
+                    });
                 });
             });
         }
