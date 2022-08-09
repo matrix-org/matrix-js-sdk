@@ -800,7 +800,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // If we're calling with an SFU and we aren't setting up the call, we
         // send the offer manually
-        if (this.isSfu && this.state !== CallState.Fledgling) {
+        if (this.isSfu && this.state !== CallState.Fledgling && addToPeerConnection) {
             this.peerConn.createOffer().then((offer) => {
                 this.peerConn.setLocalDescription(offer);
 
@@ -2304,7 +2304,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private onNegotiationNeeded = async (): Promise<void> => {
         // Other than the initial offer, we handle negotiation manually when calling with an SFU
-        if (this.isSfu && this.state !== CallState.CreateOffer) return;
+        if (this.isSfu && ![CallState.Fledgling, CallState.CreateOffer].includes(this.state)) return;
 
         logger.info(`Call ${this.callId} Negotiation is needed!`);
 
