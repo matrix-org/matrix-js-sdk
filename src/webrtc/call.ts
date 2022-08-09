@@ -624,6 +624,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 audio_muted: feed.isAudioMuted(),
                 video_muted: feed.isVideoMuted(),
                 tracks: transceivers.map((transceiver) => {
+                    logger.warn("Parsed SDP here:", sdp);
                     const splitMsid = sdp?.media?.find((m) => m.mid === transceiver.mid)?.msid?.split(" ");
                     if (splitMsid?.[1]) {
                         logger.warn("Using msid to get trackId", splitMsid);
