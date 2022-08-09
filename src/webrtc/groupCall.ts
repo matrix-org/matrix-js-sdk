@@ -327,6 +327,11 @@ export class GroupCall extends TypedEventEmitter<
 
         this.activeSpeaker = null;
 
+        // This needs to be done before we set the state to entered. With the
+        // state set to entered, we'll start calling other participants full-mesh
+        // which we don't want, if we have an SFU
+        this.sfu = this.client.getSfu();
+
         this.setState(GroupCallState.Entered);
 
         logger.log(`Entered group call ${this.groupCallId}`);
@@ -349,7 +354,6 @@ export class GroupCall extends TypedEventEmitter<
 
         this.onActiveSpeakerLoop();
 
-        this.sfu = this.client.getSfu();
         if (this.sfu) {
             const opponentDevice = {
                 "device_id": this.sfu.device_id,
