@@ -17,6 +17,9 @@ module.exports = {
         "padded-blocks": ["warn"],
         "no-extend-native": ["warn"],
         "camelcase": ["warn"],
+        "no-mixed-operators": ["error", {
+            "groups": [["&&", "||"]],
+        }],
         "no-multi-spaces": ["error", { "ignoreEOLComments": true }],
         "space-before-function-paren": ["error", {
             "anonymous": "never",
