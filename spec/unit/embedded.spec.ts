@@ -35,6 +35,7 @@ import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../
 import { SyncState } from "../../src/sync";
 import { ICapabilities } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
+import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 
 class MockWidgetApi extends EventEmitter {
@@ -132,19 +133,35 @@ describe("RoomWidgetClient", () => {
     });
 
     describe("to-device messages", () => {
-        it("sends unencrypted", async () => {
+        const unencryptedContentMap = {
+            "@alice:example.org": { "*": { hello: "alice!" } },
+            "@bob:example.org": { bobDesktop: { hello: "bob!" } },
+        };
+
+        it("sends unencrypted (sendToDevice)", async () => {
             await makeClient({ sendToDevice: ["org.example.foo"] });
             expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
 
-            const contentMap = {
-                "@alice:example.org": { "*": { hello: "alice!" } },
-                "@bob:example.org": { bobDesktop: { hello: "bob!" } },
-            };
-            await client.sendToDevice("org.example.foo", contentMap);
-            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", false, contentMap);
+            await client.sendToDevice("org.example.foo", unencryptedContentMap);
+            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", false, unencryptedContentMap);
         });
 
-        it("sends encrypted", async () => {
+        it("sends unencrypted (queueToDevice)", async () => {
+            await makeClient({ sendToDevice: ["org.example.foo"] });
+            expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
+
+            const batch: ToDeviceBatch = {
+                eventType: "org.example.foo",
+                batch: [
+                    { userId: "@alice:example.org", deviceId: "*", payload: { hello: "alice!" } },
+                    { userId: "@bob:example.org", deviceId: "bobDesktop", payload: { hello: "bob!" } },
+                ],
+            };
+            await client.queueToDevice(batch);
+            expect(widgetApi.sendToDevice).toHaveBeenCalledWith("org.example.foo", false, unencryptedContentMap);
+        });
+
+        it("sends encrypted (encryptAndSendToDevices)", async () => {
             await makeClient({ sendToDevice: ["org.example.foo"] });
             expect(widgetApi.requestCapabilityToSendToDevice).toHaveBeenCalledWith("org.example.foo");
 

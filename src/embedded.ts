@@ -33,6 +33,7 @@ import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { MatrixEvent } from "./models/event";
 import { User } from "./models/user";
 import { Room } from "./models/room";
+import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { DeviceInfo } from "./crypto/deviceinfo";
 import { IOlmDevice } from "./crypto/algorithms/megolm";
 
@@ -161,6 +162,16 @@ export class RoomWidgetClient extends MatrixClient {
     ): Promise<{}> {
         await this.widgetApi.sendToDevice(eventType, false, contentMap);
         return {};
+    }
+
+    public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
+        const contentMap: { [userId: string]: { [deviceId: string]: object } } = {};
+        for (const { userId, deviceId, payload } of batch) {
+            if (!contentMap[userId]) contentMap[userId] = {};
+            contentMap[userId][deviceId] = payload;
+        }
+
+        await this.widgetApi.sendToDevice(eventType, false, contentMap);
     }
 
     public async encryptAndSendToDevices(
