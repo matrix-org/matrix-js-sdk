@@ -78,7 +78,7 @@ describe('Group Call', function() {
 
         room.currentState.members[FAKE_SELF_USER_ID] = {
             userId: FAKE_SELF_USER_ID,
-        }as unknown as RoomMember;
+        } as unknown as RoomMember;
 
         await groupCall.create();
 
