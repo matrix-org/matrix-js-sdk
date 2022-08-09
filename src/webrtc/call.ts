@@ -607,6 +607,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public getGroupCallRoomMemberFeeds(): IGroupCallRoomMemberFeed[] {
         const sdp = this.peerConn?.localDescription?.sdp ? parseSdp(this.peerConn.localDescription.sdp) : null;
+
+        logger.warn("Original SDP here:", this.peerConn.localDescription?.sdp);
+        logger.warn("Parsed SDP here:", sdp);
+
         const feeds: IGroupCallRoomMemberFeed[] = [];
         for (const feed of this.getLocalFeeds()) {
             // We use transceivers here because we need to send the actual
@@ -624,14 +628,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 audio_muted: feed.isAudioMuted(),
                 video_muted: feed.isVideoMuted(),
                 tracks: transceivers.map((transceiver) => {
-                    logger.warn("Original SDP here:", this.peerConn.localDescription.sdp);
-                    logger.warn("Parsed SDP here:", sdp);
                     const splitMsid = sdp?.media?.find((m) => m.mid === transceiver.mid)?.msid?.split(" ");
                     if (splitMsid?.[1]) {
-                        logger.warn("Using msid to get trackId", splitMsid);
+                        logger.warn("Using msid to get trackId", splitMsid, transceiver.mid);
                         return { id: splitMsid[1] };
                     } else {
-                        logger.warn("Using transceiver to get trackId", splitMsid);
+                        logger.warn("Using transceiver to get trackId", splitMsid, transceiver.mid);
                         return { id: transceiver.sender.track.id };
                     }
                 }),
