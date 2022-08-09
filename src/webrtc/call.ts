@@ -606,7 +606,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public getGroupCallRoomMemberFeeds(): IGroupCallRoomMemberFeed[] {
-        const sdp = parseSdp(this.peerConn.localDescription.sdp);
+        const sdp = this.peerConn?.localDescription?.sdp ? parseSdp(this.peerConn.localDescription.sdp) : null;
         const feeds: IGroupCallRoomMemberFeed[] = [];
         for (const feed of this.getLocalFeeds()) {
             // We use transceivers here because we need to send the actual
@@ -624,9 +624,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 audio_muted: feed.isAudioMuted(),
                 video_muted: feed.isVideoMuted(),
                 tracks: transceivers.map((transceiver) => {
-                    const media = sdp.media.find((m) => m.mid === transceiver.mid);
-                    if (media) {
-                        return { id: media.msid.split(" ")[1] };
+                    const splitMsid = sdp?.media?.find((m) => m.mid === transceiver.mid)?.msid?.split(" ");
+                    if (splitMsid?.[1]) {
+                        return { id: splitMsid[1] };
                     } else {
                         return { id: transceiver.sender.track.id };
                     }
