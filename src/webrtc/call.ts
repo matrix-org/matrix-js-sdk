@@ -606,7 +606,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public getGroupCallRoomMemberFeeds(): IGroupCallRoomMemberFeed[] {
-        const sdp = parseSdp(this.peerConn.localDescription);
+        const sdp = parseSdp(this.peerConn.localDescription.sdp);
         const feeds: IGroupCallRoomMemberFeed[] = [];
         for (const feed of this.getLocalFeeds()) {
             // We use transceivers here because we need to send the actual
