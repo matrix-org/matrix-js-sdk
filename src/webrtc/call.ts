@@ -628,7 +628,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 audio_muted: feed.isAudioMuted(),
                 video_muted: feed.isVideoMuted(),
                 tracks: transceivers.map((transceiver) => {
-                    const media = sdp?.media?.find((m) => m.mid === transceiver.mid);
+                    const media = sdp?.media?.find((m) => m.mid == transceiver.mid);
                     const splitMsid = media?.msid?.split(" ");
                     logger.warn("Media with matching mid", media);
                     if (splitMsid?.[1]) {
