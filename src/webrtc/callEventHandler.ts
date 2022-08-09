@@ -269,6 +269,8 @@ export class CallEventHandler {
             } catch (e) {
                 if (e.code === GroupCallErrorCode.UnknownDevice) {
                     groupCall?.emit(GroupCallEvent.Error, e);
+                } else {
+                    logger.error(e);
                 }
             }
             this.calls.set(call.callId, call);

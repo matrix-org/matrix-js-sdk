@@ -557,6 +557,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private async initOpponentCrypto() {
         if (!this.opponentDeviceId) return;
         if (!this.client.getUseE2eForGroupCall()) return;
+        // It's possible to want E2EE and yet not have the means to manage E2EE
+        // ourselves (for example if the client is a RoomWidgetClient)
+        if (!this.client.isCryptoEnabled()) {
+            // All we know is the device ID
+            this.opponentDeviceInfo = new DeviceInfo(this.opponentDeviceId);
+            return;
+        }
 
         const userId = this.invitee || this.getOpponentMember().userId;
         const deviceInfoMap = await this.client.crypto.deviceList.downloadKeys([userId], false);
@@ -1788,7 +1795,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 await this.peerConn.setLocalDescription(answer);
 
                 this.sendVoipEvent(EventType.CallNegotiate, {
-                    description: this.peerConn.localDescription,
+                    description: this.peerConn.localDescription?.toJSON(),
                     [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
                 });
             }
@@ -1909,9 +1916,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // clunky because TypeScript can't follow the types through if we use an expression as the key
         if (this.state === CallState.CreateOffer) {
-            content.offer = this.peerConn.localDescription;
+            content.offer = this.peerConn.localDescription?.toJSON();
         } else {
-            content.description = this.peerConn.localDescription;
+            content.description = this.peerConn.localDescription?.toJSON();
         }
 
         content.capabilities = {
@@ -2190,21 +2197,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         if (this.opponentDeviceId) {
             const toDeviceSeq = this.toDeviceSeq++;
-
-            this.emit(CallEvent.SendVoipEvent, {
-                type: "toDevice",
-                eventType,
-                userId: this.invitee || this.getOpponentMember().userId,
-                opponentDeviceId: this.opponentDeviceId,
-                content: {
-                    ...realContent,
-                    device_id: this.client.deviceId,
-                    sender_session_id: this.client.getSessionId(),
-                    dest_session_id: this.opponentSessionId,
-                    seq: toDeviceSeq,
-                },
-            });
-
             const content = {
                 ...realContent,
                 device_id: this.client.deviceId,
@@ -2213,9 +2205,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 seq: toDeviceSeq,
             };
 
+            this.emit(CallEvent.SendVoipEvent, {
+                type: "toDevice",
+                eventType,
+                userId: this.invitee || this.getOpponentMember().userId,
+                opponentDeviceId: this.opponentDeviceId,
+                content,
+            });
+
             const userId = this.invitee || this.getOpponentMember().userId;
             if (this.client.getUseE2eForGroupCall()) {
-                return this.client.crypto.encryptAndSendToDevices([{
+                await this.client.encryptAndSendToDevices([{
                     userId,
                     deviceInfo: this.opponentDeviceInfo,
                 }], {
@@ -2440,9 +2440,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const candidates = this.candidateSendQueue;
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
-        const content = {
-            candidates: candidates,
-        };
+        const content = { candidates: candidates.map(candidate => candidate.toJSON()) };
         logger.debug(`Call ${this.callId} attempting to send ${candidates.length} candidates`);
         try {
             await this.sendVoipEvent(EventType.CallCandidates, content);

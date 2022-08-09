@@ -72,6 +72,7 @@ import {
     CryptoEvent,
     CryptoEventHandlerMap,
     fixBackupKey,
+    ICryptoCallbacks,
     IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
     IMegolmSessionData,
@@ -101,29 +102,9 @@ import {
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import { MatrixScheduler } from "./scheduler";
-import {
-    IAuthData,
-    ICryptoCallbacks,
-    IMinimalEvent,
-    IRoomEvent,
-    IStateEvent,
-    NotificationCountType,
-    BeaconEvent,
-    BeaconEventHandlerMap,
-    RoomEvent,
-    RoomEventHandlerMap,
-    RoomMemberEvent,
-    RoomMemberEventHandlerMap,
-    RoomStateEvent,
-    RoomStateEventHandlerMap,
-    INotificationsResponse,
-    IFilterResponse,
-    ITagsResponse,
-    IStatusResponse,
-    IPushRule,
-    PushRuleActionName,
-    IAuthDict,
-} from "./matrix";
+import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon";
+import { IAuthData, IAuthDict } from "./interactive-auth";
+import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -138,7 +119,9 @@ import { VerificationRequest } from "./crypto/verification/request/VerificationR
 import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
 import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
-import { Room } from "./models/room";
+import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap } from "./models/room";
+import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
+import { RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
 import {
     IAddThreePidOnlyBody,
     IBindThreePidBody,
@@ -156,6 +139,10 @@ import {
     ISearchOpts,
     ISendEventResponse,
     IUploadOpts,
+    INotificationsResponse,
+    IFilterResponse,
+    ITagsResponse,
+    IStatusResponse,
 } from "./@types/requests";
 import {
     EventType,
@@ -185,7 +172,16 @@ import {
 } from "./@types/search";
 import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse";
 import { IHierarchyRoom } from "./@types/spaces";
-import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
+import {
+    IPusher,
+    IPusherRequest,
+    IPushRule,
+    IPushRules,
+    PushRuleAction,
+    PushRuleActionName,
+    PushRuleKind,
+    RuleId,
+} from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import {
