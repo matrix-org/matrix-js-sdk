@@ -82,11 +82,17 @@ describe('Group Call', function() {
 
         await groupCall.create();
 
-        await groupCall.enter();
+        try {
+            await groupCall.enter();
 
-        expect(mockSendState.mock.lastCall[0]).toEqual(FAKE_ROOM_ID);
-        expect(mockSendState.mock.lastCall[1]).toEqual(EventType.GroupCallMemberPrefix);
-
-        groupCall.leave();
+            expect(mockSendState.mock.lastCall[0]).toEqual(FAKE_ROOM_ID);
+            expect(mockSendState.mock.lastCall[1]).toEqual(EventType.GroupCallMemberPrefix);
+            expect(mockSendState.mock.lastCall[2]['m.calls'].length).toEqual(1);
+            expect(mockSendState.mock.lastCall[2]['m.calls'][0]["m.call_id"]).toEqual(groupCall.groupCallId);
+            expect(mockSendState.mock.lastCall[2]['m.calls'][0]['m.devices'].length).toEqual(1);
+            expect(mockSendState.mock.lastCall[2]['m.calls'][0]['m.devices'][0].device_id).toEqual(FAKE_SELF_DEVICE_ID);
+        } finally {
+            groupCall.leave();
+        }
     });
 });
