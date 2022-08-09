@@ -250,12 +250,9 @@ export class InteractiveAuth {
         if (!this.data?.flows) {
             this.busyChangedCallback?.(true);
             // use the existing sessionId, if one is present.
-            let auth = null;
-            if (this.data.session) {
-                auth = {
-                    session: this.data.session,
-                };
-            }
+            const auth = this.data.session
+                ? { session: this.data.session }
+                : null;
             this.doRequest(auth).finally(() => {
                 this.busyChangedCallback?.(false);
             });
@@ -312,7 +309,7 @@ export class InteractiveAuth {
      * @return {string} session id
      */
     public getSessionId(): string {
-        return this.data ? this.data.session : undefined;
+        return this.data?.session;
     }
 
     /**
@@ -539,19 +536,17 @@ export class InteractiveAuth {
             return;
         }
 
-        if (this.data && this.data.errcode || this.data.error) {
+        if (this.data?.errcode || this.data?.error) {
             this.stateUpdatedCallback(nextStage, {
-                errcode: this.data.errcode || "",
-                error: this.data.error || "",
+                errcode: this.data?.errcode || "",
+                error: this.data?.error || "",
             });
             return;
         }
 
-        const stageStatus: IStageStatus = {};
-        if (nextStage == EMAIL_STAGE_TYPE) {
-            stageStatus.emailSid = this.emailSid;
-        }
-        this.stateUpdatedCallback(nextStage, stageStatus);
+        this.stateUpdatedCallback(nextStage, nextStage === EMAIL_STAGE_TYPE
+            ? { emailSid: this.emailSid }
+            : {});
     }
 
     /**
