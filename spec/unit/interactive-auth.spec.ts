@@ -32,8 +32,8 @@ class FakeClient {
 
 const getFakeClient = (): MatrixClient => new FakeClient() as unknown as MatrixClient;
 
-describe("InteractiveAuth", function() {
-    it("should start an auth stage and complete it", function() {
+describe("InteractiveAuth", () => {
+    it("should start an auth stage and complete it", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
 
@@ -59,7 +59,7 @@ describe("InteractiveAuth", function() {
         });
 
         // first we expect a call here
-        stateUpdated.mockImplementation(function(stage) {
+        stateUpdated.mockImplementation((stage) => {
             logger.log('aaaa');
             expect(stage).toEqual(AuthType.Password);
             ia.submitAuthDict({
@@ -69,7 +69,7 @@ describe("InteractiveAuth", function() {
 
         // .. which should trigger a call here
         const requestRes = { "a": "b" };
-        doRequest.mockImplementation(function(authData) {
+        doRequest.mockImplementation((authData) => {
             logger.log('cccc');
             expect(authData).toEqual({
                 session: "sessionId",
@@ -78,14 +78,13 @@ describe("InteractiveAuth", function() {
             return Promise.resolve(requestRes);
         });
 
-        return ia.attemptAuth().then(function(res) {
-            expect(res).toBe(requestRes);
-            expect(doRequest).toBeCalledTimes(1);
-            expect(stateUpdated).toBeCalledTimes(1);
-        });
+        const res = await ia.attemptAuth();
+        expect(res).toBe(requestRes);
+        expect(doRequest).toBeCalledTimes(1);
+        expect(stateUpdated).toBeCalledTimes(1);
     });
 
-    it("should make a request if no authdata is provided", function() {
+    it("should make a request if no authdata is provided", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
         const requestEmailToken = jest.fn();
@@ -97,11 +96,12 @@ describe("InteractiveAuth", function() {
             requestEmailToken,
         });
 
+
         expect(ia.getSessionId()).toBe(undefined);
         expect(ia.getStageParams(AuthType.Password)).toBe(undefined);
 
         // first we expect a call to doRequest
-        doRequest.mockImplementation(function(authData) {
+        doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual(null); // first request should be null
             const err = new MatrixError({
@@ -119,7 +119,7 @@ describe("InteractiveAuth", function() {
 
         // .. which should be followed by a call to stateUpdated
         const requestRes = { "a": "b" };
-        stateUpdated.mockImplementation(function(stage) {
+        stateUpdated.mockImplementation((stage) => {
             expect(stage).toEqual(AuthType.Password);
             expect(ia.getSessionId()).toEqual("sessionId");
             expect(ia.getStageParams(AuthType.Password)).toEqual({
@@ -127,7 +127,7 @@ describe("InteractiveAuth", function() {
             });
 
             // submitAuthDict should trigger another call to doRequest
-            doRequest.mockImplementation(function(authData) {
+            doRequest.mockImplementation((authData) => {
                 logger.log("request2", authData);
                 expect(authData).toEqual({
                     session: "sessionId",
@@ -141,14 +141,141 @@ describe("InteractiveAuth", function() {
             });
         });
 
-        return ia.attemptAuth().then(function(res) {
-            expect(res).toBe(requestRes);
-            expect(doRequest).toBeCalledTimes(2);
-            expect(stateUpdated).toBeCalledTimes(1);
-        });
+        const res = await ia.attemptAuth();
+        expect(res).toBe(requestRes);
+        expect(doRequest).toBeCalledTimes(2);
+        expect(stateUpdated).toBeCalledTimes(1);
     });
 
-    it("should start an auth stage and reject if no auth flow", function() {
+    it("should make a request if no authdata is provided", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+        const requestEmailToken = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            stateUpdated,
+            doRequest,
+            requestEmailToken,
+        });
+
+
+        expect(ia.getSessionId()).toBe(undefined);
+        expect(ia.getStageParams(AuthType.Password)).toBe(undefined);
+
+        // first we expect a call to doRequest
+        doRequest.mockImplementation((authData) => {
+            logger.log("request1", authData);
+            expect(authData).toEqual(null); // first request should be null
+            const err = new MatrixError({
+                session: "sessionId",
+                flows: [
+                    { stages: [AuthType.Password] },
+                ],
+                params: {
+                    [AuthType.Password]: { param: "aa" },
+                },
+            });
+            err.httpStatus = 401;
+            throw err;
+        });
+
+        // .. which should be followed by a call to stateUpdated
+        const requestRes = { "a": "b" };
+        stateUpdated.mockImplementation((stage) => {
+            expect(stage).toEqual(AuthType.Password);
+            expect(ia.getSessionId()).toEqual("sessionId");
+            expect(ia.getStageParams(AuthType.Password)).toEqual({
+                param: "aa",
+            });
+
+            // submitAuthDict should trigger another call to doRequest
+            doRequest.mockImplementation((authData) => {
+                logger.log("request2", authData);
+                expect(authData).toEqual({
+                    session: "sessionId",
+                    type: AuthType.Password,
+                });
+                return Promise.resolve(requestRes);
+            });
+
+            ia.submitAuthDict({
+                type: AuthType.Password,
+            });
+        });
+
+        const res = await ia.attemptAuth();
+        expect(res).toBe(requestRes);
+        expect(doRequest).toBeCalledTimes(2);
+        expect(stateUpdated).toBeCalledTimes(1);
+    });
+
+    it("should make a request if authdata is null", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+        const requestEmailToken = jest.fn();
+
+        const ia = new InteractiveAuth({
+            authData: null,
+            matrixClient: getFakeClient(),
+            stateUpdated,
+            doRequest,
+            requestEmailToken,
+        });
+
+
+        expect(ia.getSessionId()).toBe(undefined);
+        expect(ia.getStageParams(AuthType.Password)).toBe(undefined);
+
+        // first we expect a call to doRequest
+        doRequest.mockImplementation((authData) => {
+            logger.log("request1", authData);
+            expect(authData).toEqual(null); // first request should be null
+            const err = new MatrixError({
+                session: "sessionId",
+                flows: [
+                    { stages: [AuthType.Password] },
+                ],
+                params: {
+                    [AuthType.Password]: { param: "aa" },
+                },
+            });
+            err.httpStatus = 401;
+            throw err;
+        });
+
+        // .. which should be followed by a call to stateUpdated
+        const requestRes = { "a": "b" };
+        stateUpdated.mockImplementation((stage) => {
+            expect(stage).toEqual(AuthType.Password);
+            expect(ia.getSessionId()).toEqual("sessionId");
+            expect(ia.getStageParams(AuthType.Password)).toEqual({
+                param: "aa",
+            });
+
+            // submitAuthDict should trigger another call to doRequest
+            doRequest.mockImplementation((authData) => {
+                logger.log("request2", authData);
+                expect(authData).toEqual({
+                    session: "sessionId",
+                    type: AuthType.Password,
+                });
+                return Promise.resolve(requestRes);
+            });
+
+            ia.submitAuthDict({
+                type: AuthType.Password,
+            });
+        });
+
+        const res = await ia.attemptAuth();
+        expect(res).toBe(requestRes);
+        expect(doRequest).toBeCalledTimes(2);
+        expect(stateUpdated).toBeCalledTimes(1);
+    });
+
+
+    it("should start an auth stage and reject if no auth flow", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
         const requestEmailToken = jest.fn();
@@ -160,7 +287,7 @@ describe("InteractiveAuth", function() {
             requestEmailToken,
         });
 
-        doRequest.mockImplementation(function(authData) {
+        doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual(null); // first request should be null
             const err = new MatrixError({
@@ -174,9 +301,9 @@ describe("InteractiveAuth", function() {
             throw err;
         });
 
-        return ia.attemptAuth().catch(function(error) {
-            expect(error.message).toBe('No appropriate authentication flow found');
-        });
+        await expect(ia.attemptAuth()).rejects.toThrow(
+            new Error('No appropriate authentication flow found')
+        );
     });
 
     describe("requestEmailToken", () => {
