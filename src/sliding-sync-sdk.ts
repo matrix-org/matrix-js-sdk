@@ -406,8 +406,48 @@ export class SlidingSyncSdk {
         // this helps large account to speed up faster
         // room::decryptCriticalEvent is in charge of decrypting all the events
         // required for a client to function properly
-        const timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false);
+        let timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false);
         const ephemeralEvents = []; // TODO this.mapSyncEventsFormat(joinObj.ephemeral);
+
+        // TODO: handle threaded / beacon events
+
+        if (roomData.initial) {
+            // we should not know about any of these timeline entries if this is a genuinely new room.
+            // If we do, then we've effectively done scrollback (e.g requesting timeline_limit: 1 for
+            // this room, then timeline_limit: 50).
+            const knownEvents: Record<string, boolean> = {};
+            room.getLiveTimeline().getEvents().forEach((e) => {
+                knownEvents[e.getId()] = true;
+            });
+            // all unknown events BEFORE a known event must be scrollback e.g:
+            //       D E   <-- what we know
+            // A B C D E F <-- what we just received
+            // means:
+            // A B C       <-- scrollback
+            //       D E   <-- dupes
+            //           F <-- new event
+            // We bucket events based on if we have seen a known event yet.
+            const oldEvents: MatrixEvent[] = [];
+            const newEvents: MatrixEvent[] = [];
+            let seenKnownEvent = false;
+            for (let i = timelineEvents.length-1; i >= 0; i--) {
+                const recvEvent = timelineEvents[i];
+                if (knownEvents[recvEvent.getId()]) {
+                    seenKnownEvent = true;
+                    continue; // don't include this event, it's a dupe
+                }
+                if (seenKnownEvent) {
+                    // old -> new
+                    oldEvents.push(recvEvent);
+                } else {
+                    // old -> new
+                    newEvents.unshift(recvEvent);
+                }
+            }
+            timelineEvents = newEvents;
+            // old events are scrollback, insert them now
+            room.addEventsToTimeline(oldEvents, true, room.getLiveTimeline());
+        }
 
         const encrypted = this.client.isRoomEncrypted(room.roomId);
         // we do this first so it's correct when any of the events fire
