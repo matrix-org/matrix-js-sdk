@@ -4,8 +4,8 @@ on:
     types:
       - closed
       - labeled
-  branches:
-    - develop
+    branches:
+      - develop
 
 jobs:
   backport:
