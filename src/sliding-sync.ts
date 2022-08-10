@@ -639,6 +639,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * on failure.
      */
     public resend(): Promise<string> {
+        if (this.needsResend && this.txnIdDefers.length > 0) {
+            // we already have a resend queued, so just return the same promise
+            return this.txnIdDefers[this.txnIdDefers.length-1].promise;
+        }
         this.needsResend = true;
         this.txnId = this.client.makeTxnId();
         const d = defer<string>();
@@ -671,9 +675,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         // This list is sorted in time, so if the input txnId ACKs in the middle of this array,
         // then everything before it that hasn't been ACKed yet never will and we should reject them.
         for (let i = 0; i < txnIndex; i++) {
-            if (i < txnIndex) {
-                this.txnIdDefers[i].reject(this.txnIdDefers[i].txnId);
-            }
+            this.txnIdDefers[i].reject(this.txnIdDefers[i].txnId);
         }
         this.txnIdDefers[txnIndex].resolve(txnId);
         // clear out settled promises, incuding the one we resolved.

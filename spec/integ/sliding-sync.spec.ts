@@ -584,7 +584,7 @@ describe("SlidingSync", () => {
             let txnId;
             httpBackend.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
-                logger.log("txn got ", body);
+                logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeTruthy();
                 expect(body.room_subscriptions[roomId]).toEqual(roomSubInfo);
                 expect(body.txn_id).toBeTruthy();
@@ -616,7 +616,7 @@ describe("SlidingSync", () => {
             let txnId;
             httpBackend.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
-                logger.log("txn got ", body);
+                logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
                 expect(body.lists[0]).toEqual(newList);
                 expect(body.txn_id).toBeTruthy();
@@ -638,7 +638,7 @@ describe("SlidingSync", () => {
             let txnId;
             httpBackend.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
-                logger.log("txn got ", body);
+                logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
                 expect(body.lists[0]).toEqual({
                     ranges: [[20, 40]],
@@ -664,7 +664,7 @@ describe("SlidingSync", () => {
             let txnId;
             httpBackend.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
-                logger.log("txn got ", body);
+                logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeTruthy();
                 expect(body.room_subscriptions[roomId]).toEqual({
                     timeline_limit: 99,
@@ -759,7 +759,7 @@ describe("SlidingSync", () => {
             let txnId;
             httpBackend.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
-                logger.log("txn got ", body);
+                logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
                 expect(body.lists[0]).toEqual({
                     ranges: [[20, 40]],
