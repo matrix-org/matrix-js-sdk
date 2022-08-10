@@ -8,13 +8,13 @@ import { CallErrorCode,
     genCallID,
     MatrixCall,
     setTracksEnabled,
+    createNewMatrixCall,
 } from "./call";
 import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
-import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
