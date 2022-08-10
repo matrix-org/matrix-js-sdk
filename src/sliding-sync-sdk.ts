@@ -445,8 +445,10 @@ export class SlidingSyncSdk {
                 }
             }
             timelineEvents = newEvents;
-            // old events are scrollback, insert them now
-            room.addEventsToTimeline(oldEvents, true, room.getLiveTimeline());
+            if (oldEvents.length > 0) {
+                // old events are scrollback, insert them now
+                room.addEventsToTimeline(oldEvents, true, room.getLiveTimeline(), roomData.prev_batch);
+            }
         }
 
         const encrypted = this.client.isRoomEncrypted(room.roomId);
