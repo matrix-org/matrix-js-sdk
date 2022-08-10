@@ -9,6 +9,8 @@ module.exports = {
         browser: true,
         node: true,
     },
+    // NOTE: These rules are frozen and new rules should not be added here.
+    // New changes belong in https://github.com/matrix-org/eslint-plugin-matrix-org/
     rules: {
         "no-var": ["warn"],
         "prefer-rest-params": ["warn"],
