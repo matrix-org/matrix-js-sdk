@@ -415,9 +415,9 @@ export class SlidingSyncSdk {
             // we should not know about any of these timeline entries if this is a genuinely new room.
             // If we do, then we've effectively done scrollback (e.g requesting timeline_limit: 1 for
             // this room, then timeline_limit: 50).
-            const knownEvents: Record<string, boolean> = {};
+            const knownEvents = new Set<string>();
             room.getLiveTimeline().getEvents().forEach((e) => {
-                knownEvents[e.getId()] = true;
+                knownEvents.add(e.getId());
             });
             // all unknown events BEFORE a known event must be scrollback e.g:
             //       D E   <-- what we know
@@ -432,7 +432,7 @@ export class SlidingSyncSdk {
             let seenKnownEvent = false;
             for (let i = timelineEvents.length-1; i >= 0; i--) {
                 const recvEvent = timelineEvents[i];
-                if (knownEvents[recvEvent.getId()]) {
+                if (knownEvents.has(recvEvent.getId())) {
                     seenKnownEvent = true;
                     continue; // don't include this event, it's a dupe
                 }
