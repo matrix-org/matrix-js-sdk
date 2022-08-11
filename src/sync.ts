@@ -859,7 +859,90 @@ export class SyncApi {
      * @param {boolean} syncOptions.hasSyncedBefore
      */
     private async doSync(syncOptions: ISyncOptions): Promise<void> {
-        const client = this.client;
+        while (this.running) {
+            const syncToken = this.client.store.getSyncToken();
+
+            let data: ISyncResponse;
+            try {
+                //debuglog('Starting sync since=' + syncToken);
+                if (this.currentSyncRequest === null) {
+                    this.currentSyncRequest = this.doSyncRequest(syncOptions, syncToken);
+                }
+                data = await this.currentSyncRequest;
+            } catch (e) {
+                this.onSyncError(e, syncOptions);
+                break;
+            } finally {
+                this.currentSyncRequest = null;
+            }
+
+            //debuglog('Completed sync, next_batch=' + data.next_batch);
+
+            // set the sync token NOW *before* processing the events. We do this so
+            // if something barfs on an event we can skip it rather than constantly
+            // polling with the same token.
+            this.client.store.setSyncToken(data.next_batch);
+
+            // Reset after a successful sync
+            this.failedSyncCount = 0;
+
+            await this.client.store.setSyncData(data);
+
+            const syncEventData = {
+                oldSyncToken: syncToken,
+                nextSyncToken: data.next_batch,
+                catchingUp: this.catchingUp,
+            };
+
+            if (this.opts.crypto) {
+                // tell the crypto module we're about to process a sync
+                // response
+                await this.opts.crypto.onSyncWillProcess(syncEventData);
+            }
+
+            try {
+                await this.processSyncResponse(syncEventData, data);
+            } catch (e) {
+                // log the exception with stack if we have it, else fall back
+                // to the plain description
+                logger.error("Caught /sync error", e);
+
+                // Emit the exception for client handling
+                this.client.emit(ClientEvent.SyncUnexpectedError, e);
+            }
+
+            // update this as it may have changed
+            syncEventData.catchingUp = this.catchingUp;
+
+            // emit synced events
+            if (!syncOptions.hasSyncedBefore) {
+                this.updateSyncState(SyncState.Prepared, syncEventData);
+                syncOptions.hasSyncedBefore = true;
+            }
+
+            // tell the crypto module to do its processing. It may block (to do a
+            // /keys/changes request).
+            if (this.opts.crypto) {
+                await this.opts.crypto.onSyncCompleted(syncEventData);
+            }
+
+            // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
+            this.updateSyncState(SyncState.Syncing, syncEventData);
+
+            if (this.client.store.wantsSave()) {
+                // We always save the device list (if it's dirty) before saving the sync data:
+                // this means we know the saved device list data is at least as fresh as the
+                // stored sync data which means we don't have to worry that we may have missed
+                // device changes. We can also skip the delay since we're not calling this very
+                // frequently (and we don't really want to delay the sync for it).
+                if (this.opts.crypto) {
+                    await this.opts.crypto.saveDeviceList(0);
+                }
+
+                // tell databases that everything is now in a consistent state and can be saved.
+                this.client.store.save();
+            }
+        }
 
         if (!this.running) {
             debuglog("Sync no longer running: exiting.");
@@ -868,94 +951,7 @@ export class SyncApi {
                 this.connectionReturnedDefer = null;
             }
             this.updateSyncState(SyncState.Stopped);
-            return;
         }
-
-        const syncToken = client.store.getSyncToken();
-
-        let data: ISyncResponse;
-        try {
-            //debuglog('Starting sync since=' + syncToken);
-            if (this.currentSyncRequest === null) {
-                this.currentSyncRequest = this.doSyncRequest(syncOptions, syncToken);
-            }
-            data = await this.currentSyncRequest;
-        } catch (e) {
-            this.onSyncError(e, syncOptions);
-            return;
-        } finally {
-            this.currentSyncRequest = null;
-        }
-
-        //debuglog('Completed sync, next_batch=' + data.next_batch);
-
-        // set the sync token NOW *before* processing the events. We do this so
-        // if something barfs on an event we can skip it rather than constantly
-        // polling with the same token.
-        client.store.setSyncToken(data.next_batch);
-
-        // Reset after a successful sync
-        this.failedSyncCount = 0;
-
-        await client.store.setSyncData(data);
-
-        const syncEventData = {
-            oldSyncToken: syncToken,
-            nextSyncToken: data.next_batch,
-            catchingUp: this.catchingUp,
-        };
-
-        if (this.opts.crypto) {
-            // tell the crypto module we're about to process a sync
-            // response
-            await this.opts.crypto.onSyncWillProcess(syncEventData);
-        }
-
-        try {
-            await this.processSyncResponse(syncEventData, data);
-        } catch (e) {
-            // log the exception with stack if we have it, else fall back
-            // to the plain description
-            logger.error("Caught /sync error", e);
-
-            // Emit the exception for client handling
-            this.client.emit(ClientEvent.SyncUnexpectedError, e);
-        }
-
-        // update this as it may have changed
-        syncEventData.catchingUp = this.catchingUp;
-
-        // emit synced events
-        if (!syncOptions.hasSyncedBefore) {
-            this.updateSyncState(SyncState.Prepared, syncEventData);
-            syncOptions.hasSyncedBefore = true;
-        }
-
-        // tell the crypto module to do its processing. It may block (to do a
-        // /keys/changes request).
-        if (this.opts.crypto) {
-            await this.opts.crypto.onSyncCompleted(syncEventData);
-        }
-
-        // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
-        this.updateSyncState(SyncState.Syncing, syncEventData);
-
-        if (client.store.wantsSave()) {
-            // We always save the device list (if it's dirty) before saving the sync data:
-            // this means we know the saved device list data is at least as fresh as the
-            // stored sync data which means we don't have to worry that we may have missed
-            // device changes. We can also skip the delay since we're not calling this very
-            // frequently (and we don't really want to delay the sync for it).
-            if (this.opts.crypto) {
-                await this.opts.crypto.saveDeviceList(0);
-            }
-
-            // tell databases that everything is now in a consistent state and can be saved.
-            client.store.save();
-        }
-
-        // Begin next sync
-        this.doSync(syncOptions);
     }
 
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IAbortablePromise<ISyncResponse> {
