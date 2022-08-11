@@ -235,7 +235,7 @@ describe("InteractiveAuth", () => {
             throw err;
         });
 
-        await expect(ia.attemptAuth()).rejects.toThrow(
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
             new Error('No appropriate authentication flow found'),
         );
     });
@@ -269,7 +269,7 @@ describe("InteractiveAuth", () => {
             throw err;
         });
 
-        await expect(ia.attemptAuth()).rejects.toThrow(
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
             new Error('No appropriate authentication flow found'),
         );
     });
@@ -342,7 +342,7 @@ describe("InteractiveAuth", () => {
                 doRequest, stateUpdated, requestEmailToken,
             });
 
-            expect(async () => await ia.requestEmailToken()).rejects.toThrowError("unspecific network error");
+            await expect(ia.requestEmailToken.bind(ia)).rejects.toThrowError("unspecific network error");
         });
 
         it("only starts one request at a time", async () => {
