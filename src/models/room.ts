@@ -2592,7 +2592,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         let latest = privateReadReceipt;
         [unstablePrivateReadReceipt, publicReadReceipt].forEach((receipt) => {
-            if (receipt?.data?.ts > latest?.data?.ts) {
+            if (receipt?.data?.ts > latest?.data?.ts || !latest) {
                 latest = receipt;
             }
         });
