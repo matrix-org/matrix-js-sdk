@@ -190,6 +190,41 @@ describe("MatrixClient syncing", () => {
         });
     });
 
+    describe("initial sync", () => {
+        const syncData = {
+            next_batch: "batch_token",
+            rooms: {},
+            presence: {},
+        };
+
+        it("should only apply initialSyncLimit to the initial sync", () => {
+            // 1st request
+            httpBackend.when("GET", "/sync").check((req) => {
+                expect(JSON.parse(req.queryParams.filter).room.timeline.limit).toEqual(1);
+            }).respond(200, syncData);
+            // 2nd request
+            httpBackend.when("GET", "/sync").check((req) => {
+                expect(req.queryParams.filter).toEqual("a filter id");
+            }).respond(200, syncData);
+
+            client.startClient({ initialSyncLimit: 1 });
+
+            httpBackend.flushSync();
+            return httpBackend.flushAllExpected();
+        });
+
+        it("should not apply initialSyncLimit to a first sync if we have a stored token", () => {
+            httpBackend.when("GET", "/sync").check((req) => {
+                expect(req.queryParams.filter).toEqual("a filter id");
+            }).respond(200, syncData);
+
+            client.store.getSavedSyncToken = jest.fn().mockResolvedValue("this-is-a-token");
+            client.startClient({ initialSyncLimit: 1 });
+
+            return httpBackend.flushAllExpected();
+        });
+    });
+
     describe("resolving invites to profile info", () => {
         const syncData = {
             next_batch: "s_5_3",
