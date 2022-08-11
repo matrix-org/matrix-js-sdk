@@ -240,6 +240,40 @@ describe("InteractiveAuth", () => {
         );
     });
 
+    it("should start an auth stage and reject if no auth flow but has session", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+        const requestEmailToken = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest,
+            stateUpdated,
+            requestEmailToken,
+            authData: {
+                session: "sessionId",
+            },
+        });
+
+        doRequest.mockImplementation((authData) => {
+            logger.log("request1", authData);
+            expect(authData).toEqual({ "session": "sessionId" }); // has existing sessionId
+            const err = new MatrixError({
+                session: "sessionId",
+                flows: [],
+                params: {
+                    [AuthType.Password]: { param: "aa" },
+                },
+            });
+            err.httpStatus = 401;
+            throw err;
+        });
+
+        await expect(ia.attemptAuth()).rejects.toThrow(
+            new Error('No appropriate authentication flow found'),
+        );
+    });
+
     describe("requestEmailToken", () => {
         it("increases auth attempts", async () => {
             const doRequest = jest.fn();
