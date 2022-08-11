@@ -264,6 +264,8 @@ describe("InteractiveAuth", () => {
                 params: {
                     [AuthType.Password]: { param: "aa" },
                 },
+                error: 'Mock Error 1',
+                errcode: 'MOCKERR1',
             });
             err.httpStatus = 401;
             throw err;
