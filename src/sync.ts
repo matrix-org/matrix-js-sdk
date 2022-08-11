@@ -109,7 +109,7 @@ function debuglog(...params) {
 }
 
 interface ISyncOptions {
-    filterId?: string;
+    filter?: string;
     hasSyncedBefore?: boolean;
 }
 
@@ -780,14 +780,14 @@ export class SyncApi {
 
             // Send this first sync request here so we can then wait for the saved
             // sync data to finish processing before we process the results of this one.
-            this.currentSyncRequest = this.doSyncRequest({ filterId: firstSyncFilter }, savedSyncToken);
+            this.currentSyncRequest = this.doSyncRequest({ filter: firstSyncFilter }, savedSyncToken);
         }
 
         // Now wait for the saved sync to finish...
         debuglog("Waiting for saved sync before starting sync processing...");
         await this.savedSyncPromise;
         // process the first sync request and continue syncing with the normal filterId
-        return this.doSync({ filterId });
+        return this.doSync({ filter: filterId });
     }
 
     /**
@@ -992,13 +992,13 @@ export class SyncApi {
             pollTimeout = 0;
         }
 
-        let filterId = syncOptions.filterId;
-        if (this.client.isGuest() && !filterId) {
-            filterId = this.getGuestFilter();
+        let filter = syncOptions.filter;
+        if (this.client.isGuest() && !filter) {
+            filter = this.getGuestFilter();
         }
 
         const qps: ISyncParams = {
-            filter: filterId,
+            filter,
             timeout: pollTimeout,
         };
 
