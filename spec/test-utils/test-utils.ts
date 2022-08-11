@@ -147,9 +147,9 @@ export function mkEventCustom<T>(base: T): T & GeneratedMetadata {
 interface IPresenceOpts {
     user?: string;
     sender?: string;
-    url: string;
-    name: string;
-    ago: number;
+    url?: string;
+    name?: string;
+    ago?: number;
     presence?: string;
     event?: boolean;
 }
