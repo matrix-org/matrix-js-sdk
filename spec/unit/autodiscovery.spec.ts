@@ -171,8 +171,8 @@ describe("AutoDiscovery", function() {
         return Promise.all([
             httpBackend.flushAllExpected(),
             AutoDiscovery.findClientConfig("example.org").then(
-              expect(expected).toEqual
-            )
+                expect(expected).toEqual,
+            ),
         ]);
     });
 

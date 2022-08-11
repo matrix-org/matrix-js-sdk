@@ -96,7 +96,6 @@ describe("InteractiveAuth", () => {
             requestEmailToken,
         });
 
-
         expect(ia.getSessionId()).toBe(undefined);
         expect(ia.getStageParams(AuthType.Password)).toBe(undefined);
 
@@ -158,7 +157,6 @@ describe("InteractiveAuth", () => {
             doRequest,
             requestEmailToken,
         });
-
 
         expect(ia.getSessionId()).toBe(undefined);
         expect(ia.getStageParams(AuthType.Password)).toBe(undefined);
@@ -223,7 +221,6 @@ describe("InteractiveAuth", () => {
             requestEmailToken,
         });
 
-
         expect(ia.getSessionId()).toBe(undefined);
         expect(ia.getStageParams(AuthType.Password)).toBe(undefined);
 
@@ -274,7 +271,6 @@ describe("InteractiveAuth", () => {
         expect(stateUpdated).toBeCalledTimes(1);
     });
 
-
     it("should start an auth stage and reject if no auth flow", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
@@ -302,7 +298,7 @@ describe("InteractiveAuth", () => {
         });
 
         await expect(ia.attemptAuth()).rejects.toThrow(
-            new Error('No appropriate authentication flow found')
+            new Error('No appropriate authentication flow found'),
         );
     });
 
