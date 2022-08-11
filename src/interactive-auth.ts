@@ -250,12 +250,9 @@ export class InteractiveAuth {
         if (!this.data?.flows) {
             this.busyChangedCallback?.(true);
             // use the existing sessionId, if one is present.
-            let auth = null;
-            if (this.data.session) {
-                auth = {
-                    session: this.data.session,
-                };
-            }
+            const auth = this.data.session
+                ? { session: this.data.session }
+                : null;
             this.doRequest(auth).finally(() => {
                 this.busyChangedCallback?.(false);
             });
@@ -312,7 +309,7 @@ export class InteractiveAuth {
      * @return {string} session id
      */
     public getSessionId(): string {
-        return this.data ? this.data.session : undefined;
+        return this.data?.session;
     }
 
     /**
@@ -477,6 +474,9 @@ export class InteractiveAuth {
                     logger.log("Background poll request failed doing UI auth: ignoring", error);
                 }
             }
+            if (!error.data) {
+                error.data = {};
+            }
             // if the error didn't come with flows, completed flows or session ID,
             // copy over the ones we have. Synapse sometimes sends responses without
             // any UI auth data (eg. when polling for email validation, if the email
@@ -539,19 +539,17 @@ export class InteractiveAuth {
             return;
         }
 
-        if (this.data && this.data.errcode || this.data.error) {
+        if (this.data?.errcode || this.data?.error) {
             this.stateUpdatedCallback(nextStage, {
-                errcode: this.data.errcode || "",
-                error: this.data.error || "",
+                errcode: this.data?.errcode || "",
+                error: this.data?.error || "",
             });
             return;
         }
 
-        const stageStatus: IStageStatus = {};
-        if (nextStage == EMAIL_STAGE_TYPE) {
-            stageStatus.emailSid = this.emailSid;
-        }
-        this.stateUpdatedCallback(nextStage, stageStatus);
+        this.stateUpdatedCallback(nextStage, nextStage === EMAIL_STAGE_TYPE
+            ? { emailSid: this.emailSid }
+            : {});
     }
 
     /**
