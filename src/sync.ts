@@ -437,7 +437,7 @@ export class SyncApi {
 
             // XXX: copypasted from /sync until we kill off this minging v1 API stuff)
             // handle presence events (User objects)
-            if (response.presence && Array.isArray(response.presence)) {
+            if (Array.isArray(response.presence)) {
                 response.presence.map(client.getEventMapper()).forEach(
                     function(presenceEvent) {
                         let user = client.store.getUser(presenceEvent.getContent().user_id);
@@ -612,24 +612,135 @@ export class SyncApi {
         return false;
     }
 
+    private getPushRules = async () => {
+        try {
+            debuglog("Getting push rules...");
+            const result = await this.client.getPushRules();
+            debuglog("Got push rules");
+
+            this.client.pushRules = result;
+        } catch (err) {
+            logger.error("Getting push rules failed", err);
+            if (this.shouldAbortSync(err)) return;
+            // wait for saved sync to complete before doing anything else,
+            // otherwise the sync state will end up being incorrect
+            debuglog("Waiting for saved sync before retrying push rules...");
+            await this.recoverFromSyncStartupError(this.savedSyncPromise, err);
+            return this.getPushRules(); // try again
+        }
+    };
+
+    private buildDefaultFilter = () => {
+        return new Filter(this.client.credentials.userId);
+    };
+
+    private checkLazyLoadStatus = async () => {
+        debuglog("Checking lazy load status...");
+        if (this.opts.lazyLoadMembers && this.client.isGuest()) {
+            this.opts.lazyLoadMembers = false;
+        }
+        if (this.opts.lazyLoadMembers) {
+            debuglog("Checking server lazy load support...");
+            const supported = await this.client.doesServerSupportLazyLoading();
+            if (supported) {
+                debuglog("Enabling lazy load on sync filter...");
+                if (!this.opts.filter) {
+                    this.opts.filter = this.buildDefaultFilter();
+                }
+                this.opts.filter.setLazyLoadMembers(true);
+            } else {
+                debuglog("LL: lazy loading requested but not supported " +
+                    "by server, so disabling");
+                this.opts.lazyLoadMembers = false;
+            }
+        }
+        // need to vape the store when enabling LL and wasn't enabled before
+        debuglog("Checking whether lazy loading has changed in store...");
+        const shouldClear = await this.wasLazyLoadingToggled(this.opts.lazyLoadMembers);
+        if (shouldClear) {
+            this.storeIsInvalid = true;
+            const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
+            const error = new InvalidStoreError(reason, !!this.opts.lazyLoadMembers);
+            this.updateSyncState(SyncState.Error, { error });
+            // bail out of the sync loop now: the app needs to respond to this error.
+            // we leave the state as 'ERROR' which isn't great since this normally means
+            // we're retrying. The client must be stopped before clearing the stores anyway
+            // so the app should stop the client, clear the store and start it again.
+            logger.warn("InvalidStoreError: store is not usable: stopping sync.");
+            return;
+        }
+        if (this.opts.lazyLoadMembers) {
+            this.opts.crypto?.enableLazyLoading();
+        }
+        try {
+            debuglog("Storing client options...");
+            await this.client.storeClientOptions();
+            debuglog("Stored client options");
+        } catch (err) {
+            logger.error("Storing client options failed", err);
+            throw err;
+        }
+    };
+
+    private getFilter = async (): Promise<{
+        filterId: string;
+        filter: Filter;
+    }> => {
+        debuglog("Getting filter...");
+        let filter: Filter;
+        if (this.opts.filter) {
+            filter = this.opts.filter;
+        } else {
+            filter = this.buildDefaultFilter();
+        }
+
+        let filterId: string;
+        try {
+            filterId = await this.client.getOrCreateFilter(getFilterName(this.client.credentials.userId), filter);
+        } catch (err) {
+            logger.error("Getting filter failed", err);
+            if (this.shouldAbortSync(err)) return;
+            // wait for saved sync to complete before doing anything else,
+            // otherwise the sync state will end up being incorrect
+            debuglog("Waiting for saved sync before retrying filter...");
+            await this.recoverFromSyncStartupError(this.savedSyncPromise, err);
+            return this.getFilter(); // try again
+        }
+        return { filter, filterId };
+    };
+
+    private savedSyncPromise: Promise<void>;
+
     /**
      * Main entry point
      */
-    public sync(): void {
-        const client = this.client;
-
+    public async sync(): Promise<void> {
         this.running = true;
 
         global.window?.addEventListener?.("online", this.onOnline, false);
 
-        if (client.isGuest()) {
+        if (this.client.isGuest()) {
             // no push rules for guests, no access to POST filter for guests.
-            this.doSync({});
-            return;
+            return this.doSync({});
         }
 
-        let savedSyncPromise = Promise.resolve();
-        let savedSyncToken = null;
+        // Pull the saved sync token out first, before the worker starts sending
+        // all the sync data which could take a while. This will let us send our
+        // first incremental sync request before we've processed our saved data.
+        debuglog("Getting saved sync token...");
+        const savedSyncTokenPromise = this.client.store.getSavedSyncToken().then(tok => {
+            debuglog("Got saved sync token");
+            return tok;
+        });
+
+        this.savedSyncPromise = this.client.store.getSavedSync().then((savedSync) => {
+            debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
+            if (savedSync) {
+                return this.syncFromCache(savedSync);
+            }
+        }).catch(err => {
+            logger.error("Getting saved sync failed", err);
+        });
 
         // We need to do one-off checks before we can begin the /sync loop.
         // These are:
@@ -639,144 +750,44 @@ export class SyncApi {
         //   3) We need to check the lazy loading option matches what was used in the
         //       stored sync. If it doesn't, we can't use the stored sync.
 
-        const getPushRules = async () => {
-            try {
-                debuglog("Getting push rules...");
-                const result = await client.getPushRules();
-                debuglog("Got push rules");
-
-                client.pushRules = result;
-            } catch (err) {
-                logger.error("Getting push rules failed", err);
-                if (this.shouldAbortSync(err)) return;
-                // wait for saved sync to complete before doing anything else,
-                // otherwise the sync state will end up being incorrect
-                debuglog("Waiting for saved sync before retrying push rules...");
-                await this.recoverFromSyncStartupError(savedSyncPromise, err);
-                getPushRules();
-                return;
-            }
-            checkLazyLoadStatus(); // advance to the next stage
-        };
-
-        const buildDefaultFilter = () => {
-            const filter = new Filter(client.credentials.userId);
-            filter.setTimelineLimit(this.opts.initialSyncLimit);
-            return filter;
-        };
-
-        const checkLazyLoadStatus = async () => {
-            debuglog("Checking lazy load status...");
-            if (this.opts.lazyLoadMembers && client.isGuest()) {
-                this.opts.lazyLoadMembers = false;
-            }
-            if (this.opts.lazyLoadMembers) {
-                debuglog("Checking server lazy load support...");
-                const supported = await client.doesServerSupportLazyLoading();
-                if (supported) {
-                    debuglog("Enabling lazy load on sync filter...");
-                    if (!this.opts.filter) {
-                        this.opts.filter = buildDefaultFilter();
-                    }
-                    this.opts.filter.setLazyLoadMembers(true);
-                } else {
-                    debuglog("LL: lazy loading requested but not supported " +
-                        "by server, so disabling");
-                    this.opts.lazyLoadMembers = false;
-                }
-            }
-            // need to vape the store when enabling LL and wasn't enabled before
-            debuglog("Checking whether lazy loading has changed in store...");
-            const shouldClear = await this.wasLazyLoadingToggled(this.opts.lazyLoadMembers);
-            if (shouldClear) {
-                this.storeIsInvalid = true;
-                const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
-                const error = new InvalidStoreError(reason, !!this.opts.lazyLoadMembers);
-                this.updateSyncState(SyncState.Error, { error });
-                // bail out of the sync loop now: the app needs to respond to this error.
-                // we leave the state as 'ERROR' which isn't great since this normally means
-                // we're retrying. The client must be stopped before clearing the stores anyway
-                // so the app should stop the client, clear the store and start it again.
-                logger.warn("InvalidStoreError: store is not usable: stopping sync.");
-                return;
-            }
-            if (this.opts.lazyLoadMembers && this.opts.crypto) {
-                this.opts.crypto.enableLazyLoading();
-            }
-            try {
-                debuglog("Storing client options...");
-                await this.client.storeClientOptions();
-                debuglog("Stored client options");
-            } catch (err) {
-                logger.error("Storing client options failed", err);
-                throw err;
-            }
-
-            getFilter(); // Now get the filter and start syncing
-        };
-
-        const getFilter = async () => {
-            debuglog("Getting filter...");
-            let filter: Filter;
-            if (this.opts.filter) {
-                filter = this.opts.filter;
-            } else {
-                filter = buildDefaultFilter();
-            }
-
-            let filterId: string;
-            try {
-                filterId = await client.getOrCreateFilter(getFilterName(client.credentials.userId), filter);
-            } catch (err) {
-                logger.error("Getting filter failed", err);
-                if (this.shouldAbortSync(err)) return;
-                // wait for saved sync to complete before doing anything else,
-                // otherwise the sync state will end up being incorrect
-                debuglog("Waiting for saved sync before retrying filter...");
-                await this.recoverFromSyncStartupError(savedSyncPromise, err);
-                getFilter();
-                return;
-            }
-            // reset the notifications timeline to prepare it to paginate from
-            // the current point in time.
-            // The right solution would be to tie /sync pagination tokens into
-            // /notifications API somehow.
-            client.resetNotifTimelineSet();
-
-            if (this.currentSyncRequest === null) {
-                // Send this first sync request here so we can then wait for the saved
-                // sync data to finish processing before we process the results of this one.
-                debuglog("Sending first sync request...");
-                this.currentSyncRequest = this.doSyncRequest({ filterId }, savedSyncToken);
-            }
-
-            // Now wait for the saved sync to finish...
-            debuglog("Waiting for saved sync before starting sync processing...");
-            await savedSyncPromise;
-            this.doSync({ filterId });
-        };
-
-        // Pull the saved sync token out first, before the worker starts sending
-        // all the sync data which could take a while. This will let us send our
-        // first incremental sync request before we've processed our saved data.
-        debuglog("Getting saved sync token...");
-        savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
-            debuglog("Got saved sync token");
-            savedSyncToken = tok;
-            debuglog("Getting saved sync...");
-            return client.store.getSavedSync();
-        }).then((savedSync) => {
-            debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
-            if (savedSync) {
-                return this.syncFromCache(savedSync);
-            }
-        }).catch(err => {
-            logger.error("Getting saved sync failed", err);
-        });
         // Now start the first incremental sync request: this can also
         // take a while so if we set it going now, we can wait for it
         // to finish while we process our saved sync data.
-        getPushRules();
+        await this.getPushRules();
+        await this.checkLazyLoadStatus();
+        const { filterId, filter } = await this.getFilter();
+
+        // reset the notifications timeline to prepare it to paginate from
+        // the current point in time.
+        // The right solution would be to tie /sync pagination tokens into
+        // /notifications API somehow.
+        this.client.resetNotifTimelineSet();
+
+        if (this.currentSyncRequest === null) {
+            let firstSyncFilter = filterId;
+            const savedSyncToken = await savedSyncTokenPromise;
+
+            if (savedSyncToken) {
+                debuglog("Sending first sync request...");
+            } else {
+                debuglog("Sending initial sync request...");
+                const initialFilter = this.buildDefaultFilter();
+                initialFilter.setDefinition(filter.getDefinition());
+                initialFilter.setTimelineLimit(this.opts.initialSyncLimit);
+                // Use an inline filter, no point uploading it for a single usage
+                firstSyncFilter = JSON.stringify(initialFilter.getDefinition());
+            }
+
+            // Send this first sync request here so we can then wait for the saved
+            // sync data to finish processing before we process the results of this one.
+            this.currentSyncRequest = this.doSyncRequest({ filterId: firstSyncFilter }, savedSyncToken);
+        }
+
+        // Now wait for the saved sync to finish...
+        debuglog("Waiting for saved sync before starting sync processing...");
+        await this.savedSyncPromise;
+        // process the first sync request and continue syncing with the normal filterId
+        return this.doSync({ filterId });
     }
 
     /**
