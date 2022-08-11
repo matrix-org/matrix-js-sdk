@@ -474,6 +474,9 @@ export class InteractiveAuth {
                     logger.log("Background poll request failed doing UI auth: ignoring", error);
                 }
             }
+            if (!error.data) {
+                error.data = {};
+            }
             // if the error didn't come with flows, completed flows or session ID,
             // copy over the ones we have. Synapse sometimes sends responses without
             // any UI auth data (eg. when polling for email validation, if the email
