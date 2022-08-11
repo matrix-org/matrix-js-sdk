@@ -362,9 +362,13 @@ export class PushProcessor {
             return false;
         }
 
-        const regex = cond.key === 'content.body'
-            ? this.createCachedRegex('(^|\\W)', cond.pattern, '(\\W|$)')
-            : this.createCachedRegex('^', cond.pattern, '$');
+        let regex;
+
+        if (cond.key == 'content.body') {
+            regex = this.createCachedRegex('(^|\\W)', cond.pattern, '(\\W|$)');
+        } else {
+            regex = this.createCachedRegex('^', cond.pattern, '$');
+        }
 
         return !!val.match(regex);
     }
