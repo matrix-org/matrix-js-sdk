@@ -69,13 +69,13 @@ describe("InteractiveAuth", () => {
 
         // .. which should trigger a call here
         const requestRes = { "a": "b" };
-        doRequest.mockImplementation((authData) => {
+        doRequest.mockImplementation(async (authData) => {
             logger.log('cccc');
             expect(authData).toEqual({
                 session: "sessionId",
                 type: AuthType.Password,
             });
-            return Promise.resolve(requestRes);
+            return requestRes;
         });
 
         const res = await ia.attemptAuth();
@@ -127,13 +127,13 @@ describe("InteractiveAuth", () => {
             });
 
             // submitAuthDict should trigger another call to doRequest
-            doRequest.mockImplementation((authData) => {
+            doRequest.mockImplementation(async (authData) => {
                 logger.log("request2", authData);
                 expect(authData).toEqual({
                     session: "sessionId",
                     type: AuthType.Password,
                 });
-                return Promise.resolve(requestRes);
+                return requestRes;
             });
 
             ia.submitAuthDict({
@@ -190,13 +190,13 @@ describe("InteractiveAuth", () => {
             });
 
             // submitAuthDict should trigger another call to doRequest
-            doRequest.mockImplementation((authData) => {
+            doRequest.mockImplementation(async (authData) => {
                 logger.log("request2", authData);
                 expect(authData).toEqual({
                     session: "sessionId",
                     type: AuthType.Password,
                 });
-                return Promise.resolve(requestRes);
+                return requestRes;
             });
 
             ia.submitAuthDict({
@@ -254,13 +254,13 @@ describe("InteractiveAuth", () => {
             });
 
             // submitAuthDict should trigger another call to doRequest
-            doRequest.mockImplementation((authData) => {
+            doRequest.mockImplementation(async (authData) => {
                 logger.log("request2", authData);
                 expect(authData).toEqual({
                     session: "sessionId",
                     type: AuthType.Password,
                 });
-                return Promise.resolve(requestRes);
+                return requestRes;
             });
 
             ia.submitAuthDict({
