@@ -274,6 +274,41 @@ describe("InteractiveAuth", () => {
         );
     });
 
+    it("should allow dummy auth", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+        const requestEmailToken = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest,
+            stateUpdated,
+            requestEmailToken,
+            authData: {
+                session: 'sessionId',
+                flows: [
+                    { stages: [AuthType.Dummy] },
+                ],
+                params: {},
+            },
+        });
+
+        const requestRes = { "a": "b" };
+        doRequest.mockImplementation((authData) => {
+            logger.log("request1", authData);
+            expect(authData).toEqual({
+                session: "sessionId",
+                type: AuthType.Dummy,
+            });
+            return requestRes;
+        });
+
+        const res = await ia.attemptAuth();
+        expect(res).toBe(requestRes);
+        expect(doRequest).toBeCalledTimes(1);
+        expect(stateUpdated).toBeCalledTimes(0);
+    });
+
     describe("requestEmailToken", () => {
         it("increases auth attempts", async () => {
             const doRequest = jest.fn();
