@@ -276,6 +276,34 @@ describe("InteractiveAuth", () => {
         );
     });
 
+    it("should handle unexpected error types without data propery set", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+        const requestEmailToken = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest,
+            stateUpdated,
+            requestEmailToken,
+            authData: {
+                session: "sessionId",
+            },
+        });
+
+        doRequest.mockImplementation((authData) => {
+            logger.log("request1", authData);
+            expect(authData).toEqual({ "session": "sessionId" }); // has existing sessionId
+            const err = new Error('myerror');
+            (err as any).httpStatus = 401;
+            throw err;
+        });
+
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
+            new Error('myerror'),
+        );
+    });
+
     it("should allow dummy auth", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
