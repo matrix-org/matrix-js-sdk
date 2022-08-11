@@ -51,6 +51,7 @@ import {
     ISfuPublishDataChannelMessage,
     ISfuUnpublishDataChannelMessage,
     ISfuOfferDataChannelMessage,
+    ISfuKeepAliveDataChannelMessage,
 } from './callEventTypes';
 import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
@@ -277,6 +278,9 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 /** The length of time a call can be ringing for. */
 const CALL_TIMEOUT_MS = 60000;
 
+const CALL_LENGTH_INTERVAL = 1000; // 1 second
+const SFU_KEEP_ALIVE_INTERVAL = 30 * 1000; // 30 seconds
+
 export class CallError extends Error {
     code: string;
 
@@ -399,6 +403,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private remoteSDPStreamMetadata: SDPStreamMetadata;
 
+    private sfuKeepAliveInterval: ReturnType<typeof setInterval>;
     private callLengthInterval: ReturnType<typeof setInterval>;
     private callLength = 0;
 
@@ -2203,7 +2208,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.callLengthInterval = setInterval(() => {
                     this.callLength++;
                     this.emit(CallEvent.LengthChanged, this.callLength);
-                }, 1000);
+                }, CALL_LENGTH_INTERVAL);
+            }
+            if (!this.sfuKeepAliveInterval) {
+                this.sfuKeepAliveInterval = setInterval(() => {
+                    this.sendSFUDataChannelMessage({
+                        op: "alive",
+                        ts: Date.now(),
+                    } as ISfuKeepAliveDataChannelMessage);
+                }, SFU_KEEP_ALIVE_INTERVAL);
             }
         } else if (this.peerConn.iceConnectionState == 'failed') {
             // Firefox for Android does not yet have support for restartIce()
@@ -2584,6 +2597,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
             this.callLengthInterval = null;
+        }
+        if (this.sfuKeepAliveInterval) {
+            clearInterval(this.sfuKeepAliveInterval);
+            this.sfuKeepAliveInterval = null;
         }
 
         for (const [stream, listener] of this.removeTrackListeners) {

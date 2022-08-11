@@ -127,4 +127,9 @@ export interface ISfuUnpublishDataChannelMessage extends ISfuBaseDataChannelMess
     stop: ISfuTrackDesc[];
 }
 
+export interface ISfuKeepAliveDataChannelMessage extends ISfuBaseDataChannelMessage {
+    op: "alive";
+    ts: number;
+}
+
 /* eslint-enable camelcase */
