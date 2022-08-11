@@ -146,68 +146,6 @@ describe("InteractiveAuth", () => {
         expect(stateUpdated).toBeCalledTimes(1);
     });
 
-    it("should make a request if no authdata is provided", async () => {
-        const doRequest = jest.fn();
-        const stateUpdated = jest.fn();
-        const requestEmailToken = jest.fn();
-
-        const ia = new InteractiveAuth({
-            matrixClient: getFakeClient(),
-            stateUpdated,
-            doRequest,
-            requestEmailToken,
-        });
-
-        expect(ia.getSessionId()).toBe(undefined);
-        expect(ia.getStageParams(AuthType.Password)).toBe(undefined);
-
-        // first we expect a call to doRequest
-        doRequest.mockImplementation((authData) => {
-            logger.log("request1", authData);
-            expect(authData).toEqual(null); // first request should be null
-            const err = new MatrixError({
-                session: "sessionId",
-                flows: [
-                    { stages: [AuthType.Password] },
-                ],
-                params: {
-                    [AuthType.Password]: { param: "aa" },
-                },
-            });
-            err.httpStatus = 401;
-            throw err;
-        });
-
-        // .. which should be followed by a call to stateUpdated
-        const requestRes = { "a": "b" };
-        stateUpdated.mockImplementation((stage) => {
-            expect(stage).toEqual(AuthType.Password);
-            expect(ia.getSessionId()).toEqual("sessionId");
-            expect(ia.getStageParams(AuthType.Password)).toEqual({
-                param: "aa",
-            });
-
-            // submitAuthDict should trigger another call to doRequest
-            doRequest.mockImplementation(async (authData) => {
-                logger.log("request2", authData);
-                expect(authData).toEqual({
-                    session: "sessionId",
-                    type: AuthType.Password,
-                });
-                return requestRes;
-            });
-
-            ia.submitAuthDict({
-                type: AuthType.Password,
-            });
-        });
-
-        const res = await ia.attemptAuth();
-        expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(2);
-        expect(stateUpdated).toBeCalledTimes(1);
-    });
-
     it("should make a request if authdata is null", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
