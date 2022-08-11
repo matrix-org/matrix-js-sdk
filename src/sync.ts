@@ -100,13 +100,11 @@ const MSC2716_ROOM_VERSIONS = [
 function getFilterName(userId: string, suffix?: string): string {
     // scope this on the user ID because people may login on many accounts
     // and they all need to be stored!
-    return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
+    return `FILTER_SYNC_${userId}${suffix ? "_" + suffix : ""}`;
 }
 
 function debuglog(...params) {
-    if (!DEBUG) {
-        return;
-    }
+    if (!DEBUG) return;
     logger.log(...params);
 }
 
@@ -286,7 +284,7 @@ export class SyncApi {
      * historical messages are shown when we paginate `/messages` again.
      * @param {Room} room The room where the marker event was sent
      * @param {MatrixEvent} markerEvent The new marker event
-     * @param {ISetStateOptions} setStateOptions When `timelineWasEmpty` is set
+     * @param {IMarkerFoundOptions} setStateOptions When `timelineWasEmpty` is set
      * as `true`, the given marker event will be ignored
     */
     private onMarkerStateEvent(
@@ -622,8 +620,12 @@ export class SyncApi {
 
         this.running = true;
 
-        if (global.window && global.window.addEventListener) {
-            global.window.addEventListener("online", this.onOnline, false);
+        global.window?.addEventListener?.("online", this.onOnline, false);
+
+        if (client.isGuest()) {
+            // no push rules for guests, no access to POST filter for guests.
+            this.doSync({});
+            return;
         }
 
         let savedSyncPromise = Promise.resolve();
@@ -715,14 +717,14 @@ export class SyncApi {
 
         const getFilter = async () => {
             debuglog("Getting filter...");
-            let filter;
+            let filter: Filter;
             if (this.opts.filter) {
                 filter = this.opts.filter;
             } else {
                 filter = buildDefaultFilter();
             }
 
-            let filterId;
+            let filterId: string;
             try {
                 filterId = await client.getOrCreateFilter(getFilterName(client.credentials.userId), filter);
             } catch (err) {
@@ -754,32 +756,27 @@ export class SyncApi {
             this.doSync({ filterId });
         };
 
-        if (client.isGuest()) {
-            // no push rules for guests, no access to POST filter for guests.
-            this.doSync({});
-        } else {
-            // Pull the saved sync token out first, before the worker starts sending
-            // all the sync data which could take a while. This will let us send our
-            // first incremental sync request before we've processed our saved data.
-            debuglog("Getting saved sync token...");
-            savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
-                debuglog("Got saved sync token");
-                savedSyncToken = tok;
-                debuglog("Getting saved sync...");
-                return client.store.getSavedSync();
-            }).then((savedSync) => {
-                debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
-                if (savedSync) {
-                    return this.syncFromCache(savedSync);
-                }
-            }).catch(err => {
-                logger.error("Getting saved sync failed", err);
-            });
-            // Now start the first incremental sync request: this can also
-            // take a while so if we set it going now, we can wait for it
-            // to finish while we process our saved sync data.
-            getPushRules();
-        }
+        // Pull the saved sync token out first, before the worker starts sending
+        // all the sync data which could take a while. This will let us send our
+        // first incremental sync request before we've processed our saved data.
+        debuglog("Getting saved sync token...");
+        savedSyncPromise = client.store.getSavedSyncToken().then((tok) => {
+            debuglog("Got saved sync token");
+            savedSyncToken = tok;
+            debuglog("Getting saved sync...");
+            return client.store.getSavedSync();
+        }).then((savedSync) => {
+            debuglog(`Got reply from saved sync, exists? ${!!savedSync}`);
+            if (savedSync) {
+                return this.syncFromCache(savedSync);
+            }
+        }).catch(err => {
+            logger.error("Getting saved sync failed", err);
+        });
+        // Now start the first incremental sync request: this can also
+        // take a while so if we set it going now, we can wait for it
+        // to finish while we process our saved sync data.
+        getPushRules();
     }
 
     /**
@@ -791,9 +788,7 @@ export class SyncApi {
         // global.window AND global.window.removeEventListener.
         // Some platforms (e.g. React Native) register global.window,
         // but do not have global.window.removeEventListener.
-        if (global.window && global.window.removeEventListener) {
-            global.window.removeEventListener("online", this.onOnline, false);
-        }
+        global.window?.removeEventListener?.("online", this.onOnline, false);
         this.running = false;
         this.currentSyncRequest?.abort();
         if (this.keepAliveTimer) {
@@ -878,7 +873,7 @@ export class SyncApi {
 
         const syncToken = client.store.getSyncToken();
 
-        let data;
+        let data: ISyncResponse;
         try {
             //debuglog('Starting sync since=' + syncToken);
             if (this.currentSyncRequest === null) {
@@ -974,7 +969,7 @@ export class SyncApi {
     private getSyncParams(syncOptions: ISyncOptions, syncToken: string): ISyncParams {
         let pollTimeout = this.opts.pollTimeout;
 
-        if (this.getSyncState() !== 'SYNCING' || this.catchingUp) {
+        if (this.getSyncState() !== SyncState.Syncing || this.catchingUp) {
             // unless we are happily syncing already, we want the server to return
             // as quickly as possible, even if there are no events queued. This
             // serves two purposes:
@@ -1013,7 +1008,7 @@ export class SyncApi {
             qps._cacheBuster = Date.now();
         }
 
-        if (this.getSyncState() == 'ERROR' || this.getSyncState() == 'RECONNECTING') {
+        if (this.getSyncState() == SyncState.Error || this.getSyncState() == SyncState.Reconnecting) {
             // we think the connection is dead. If it comes back up, we won't know
             // about it till /sync returns. If the timeout= is high, this could
             // be a long time. Set it to 0 when doing retries so we don't have to wait
@@ -1133,7 +1128,7 @@ export class SyncApi {
         // - The isBrandNewRoom boilerplate is boilerplatey.
 
         // handle presence events (User objects)
-        if (data.presence && Array.isArray(data.presence.events)) {
+        if (Array.isArray(data.presence?.events)) {
             data.presence.events.map(client.getEventMapper()).forEach(
                 function(presenceEvent) {
                     let user = client.store.getUser(presenceEvent.getSender());
@@ -1149,7 +1144,7 @@ export class SyncApi {
         }
 
         // handle non-room account_data
-        if (data.account_data && Array.isArray(data.account_data.events)) {
+        if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.map(client.getEventMapper());
             const prevEventsMap = events.reduce((m, c) => {
                 m[c.getId()] = client.store.getAccountData(c.getType());
@@ -1290,8 +1285,7 @@ export class SyncApi {
                 // bother setting it here. We trust our calculations better than the
                 // server's for this case, and therefore will assume that our non-zero
                 // count is accurate.
-                if (!encrypted
-                    || (encrypted && room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0)) {
+                if (!encrypted || room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0) {
                     room.setUnreadNotificationCount(
                         NotificationCountType.Highlight,
                         joinObj.unread_notifications.highlight_count,
@@ -1304,8 +1298,7 @@ export class SyncApi {
             if (joinObj.isBrandNewRoom) {
                 // set the back-pagination token. Do this *before* adding any
                 // events so that clients can start back-paginating.
-                room.getLiveTimeline().setPaginationToken(
-                    joinObj.timeline.prev_batch, EventTimeline.BACKWARDS);
+                room.getLiveTimeline().setPaginationToken(joinObj.timeline.prev_batch, EventTimeline.BACKWARDS);
             } else if (joinObj.timeline.limited) {
                 let limited = true;
 
