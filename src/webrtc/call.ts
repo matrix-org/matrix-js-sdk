@@ -2214,9 +2214,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.sfuKeepAliveInterval = setInterval(() => {
                     this.sendSFUDataChannelMessage({
                         op: "alive",
-                        ts: Date.now(),
                     } as ISfuKeepAliveDataChannelMessage);
-                }, SFU_KEEP_ALIVE_INTERVAL);
+                }, SFU_KEEP_ALIVE_INTERVAL * 3 / 4);
             }
         } else if (this.peerConn.iceConnectionState == 'failed') {
             // Firefox for Android does not yet have support for restartIce()
