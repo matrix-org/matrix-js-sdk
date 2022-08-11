@@ -84,6 +84,114 @@ describe("InteractiveAuth", () => {
         expect(stateUpdated).toBeCalledTimes(1);
     });
 
+    it("should handle auth errcode presence ", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+
+        const ia = new InteractiveAuth({
+            matrixClient: getFakeClient(),
+            doRequest: doRequest,
+            stateUpdated: stateUpdated,
+            requestEmailToken: jest.fn(),
+            authData: {
+                session: "sessionId",
+                flows: [
+                    { stages: [AuthType.Password] },
+                ],
+                errcode: "MockError0",
+                params: {
+                    [AuthType.Password]: { param: "aa" },
+                },
+            },
+        });
+
+        expect(ia.getSessionId()).toEqual("sessionId");
+        expect(ia.getStageParams(AuthType.Password)).toEqual({
+            param: "aa",
+        });
+
+        // first we expect a call here
+        stateUpdated.mockImplementation((stage) => {
+            logger.log('aaaa');
+            expect(stage).toEqual(AuthType.Password);
+            ia.submitAuthDict({
+                type: AuthType.Password,
+            });
+        });
+
+        // .. which should trigger a call here
+        const requestRes = { "a": "b" };
+        doRequest.mockImplementation(async (authData) => {
+            logger.log('cccc');
+            expect(authData).toEqual({
+                session: "sessionId",
+                type: AuthType.Password,
+            });
+            return requestRes;
+        });
+
+        const res = await ia.attemptAuth();
+        expect(res).toBe(requestRes);
+        expect(doRequest).toBeCalledTimes(1);
+        expect(stateUpdated).toBeCalledTimes(1);
+    });
+
+    it("should handle set emailSid for email flow", async () => {
+        const doRequest = jest.fn();
+        const stateUpdated = jest.fn();
+        const requestEmailToken = jest.fn();
+
+        const ia = new InteractiveAuth({
+            doRequest,
+            stateUpdated,
+            requestEmailToken,
+            matrixClient: getFakeClient(),
+            emailSid: 'myEmailSid',
+            authData: {
+                session: "sessionId",
+                flows: [
+                    { stages: [AuthType.Email, AuthType.Password] },
+                ],
+                params: {
+                    [AuthType.Email]: { param: "aa" },
+                    [AuthType.Password]: { param: "bb" },
+                },
+            },
+        });
+
+        expect(ia.getSessionId()).toEqual("sessionId");
+        expect(ia.getStageParams(AuthType.Email)).toEqual({
+            param: "aa",
+        });
+
+        // first we expect a call here
+        stateUpdated.mockImplementation((stage) => {
+            logger.log('husky');
+            expect(stage).toEqual(AuthType.Email);
+            ia.submitAuthDict({
+                type: AuthType.Email,
+            });
+        });
+
+        // .. which should trigger a call here
+        const requestRes = { "a": "b" };
+        doRequest.mockImplementation(async (authData) => {
+            logger.log('barfoo');
+            expect(authData).toEqual({
+                session: "sessionId",
+                type: AuthType.Email,
+            });
+            return requestRes;
+        });
+
+        const res = await ia.attemptAuth();
+        expect(res).toBe(requestRes);
+        expect(doRequest).toBeCalledTimes(1);
+        expect(stateUpdated).toBeCalledTimes(1);
+        expect(requestEmailToken).toBeCalledTimes(0);
+        expect(ia.getEmailSid()).toBe("myEmailSid");
+    });
+
     it("should make a request if no authdata is provided", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
@@ -264,8 +372,8 @@ describe("InteractiveAuth", () => {
                 params: {
                     [AuthType.Password]: { param: "aa" },
                 },
-                error: 'Mock Error 1',
-                errcode: 'MOCKERR1',
+                error: "Mock Error 1",
+                errcode: "MOCKERR1",
             });
             err.httpStatus = 401;
             throw err;
@@ -300,7 +408,7 @@ describe("InteractiveAuth", () => {
         });
 
         await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
-            new Error('myerror'),
+            new Error("myerror"),
         );
     });
 
