@@ -881,8 +881,9 @@ export class SyncApi {
                 }
                 data = await this.currentSyncRequest;
             } catch (e) {
-                this.onSyncError(e, syncOptions);
-                break;
+                const abort = await this.onSyncError(e);
+                if (abort) return;
+                continue;
             } finally {
                 this.currentSyncRequest = null;
             }
@@ -1026,7 +1027,7 @@ export class SyncApi {
         return qps;
     }
 
-    private onSyncError(err: MatrixError, syncOptions: ISyncOptions): void {
+    private async onSyncError(err: MatrixError): Promise<boolean> {
         if (!this.running) {
             debuglog("Sync no longer running: exiting");
             if (this.connectionReturnedDefer) {
@@ -1034,18 +1035,24 @@ export class SyncApi {
                 this.connectionReturnedDefer = null;
             }
             this.updateSyncState(SyncState.Stopped);
-            return;
+            return true; // abort
         }
 
         logger.error("/sync error %s", err);
-        logger.error(err);
 
         if (this.shouldAbortSync(err)) {
-            return;
+            return true; // abort
         }
 
         this.failedSyncCount++;
         logger.log('Number of consecutive failed sync requests:', this.failedSyncCount);
+
+        // Transition from RECONNECTING to ERROR after a given number of failed syncs
+        this.updateSyncState(
+            this.failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
+                SyncState.Error : SyncState.Reconnecting,
+            { error: err },
+        );
 
         debuglog("Starting keep-alive");
         // Note that we do *not* mark the sync connection as
@@ -1055,28 +1062,19 @@ export class SyncApi {
         // erroneous. We set the state to 'reconnecting'
         // instead, so that clients can observe this state
         // if they wish.
-        this.startKeepAlives().then((connDidFail) => {
-            // Only emit CATCHUP if we detected a connectivity error: if we didn't,
-            // it's quite likely the sync will fail again for the same reason and we
-            // want to stay in ERROR rather than keep flip-flopping between ERROR
-            // and CATCHUP.
-            if (connDidFail && this.getSyncState() === SyncState.Error) {
-                this.updateSyncState(SyncState.Catchup, {
-                    oldSyncToken: null,
-                    nextSyncToken: null,
-                    catchingUp: true,
-                });
-            }
-            this.doSync(syncOptions);
-        });
-
-        this.currentSyncRequest = null;
-        // Transition from RECONNECTING to ERROR after a given number of failed syncs
-        this.updateSyncState(
-            this.failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
-                SyncState.Error : SyncState.Reconnecting,
-            { error: err },
-        );
+        const connDidFail = await this.startKeepAlives();
+        // Only emit CATCHUP if we detected a connectivity error: if we didn't,
+        // it's quite likely the sync will fail again for the same reason and we
+        // want to stay in ERROR rather than keep flip-flopping between ERROR
+        // and CATCHUP.
+        if (connDidFail && this.getSyncState() === SyncState.Error) {
+            this.updateSyncState(SyncState.Catchup, {
+                oldSyncToken: null,
+                nextSyncToken: null,
+                catchingUp: true,
+            });
+        }
+        return false;
     }
 
     /**
