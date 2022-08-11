@@ -251,8 +251,8 @@ describe("InteractiveAuth", () => {
             stateUpdated,
             requestEmailToken,
             authData: {
-                session: "sessionId",
             },
+            sessionId: "sessionId",
         });
 
         doRequest.mockImplementation((authData) => {
