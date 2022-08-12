@@ -623,10 +623,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             // We use transceivers here because we need to send the actual
             // trackIds which the SFU will see which will probably differ from
             // the local trackIds on MediaStreams
-            const transceivers = feed.purpose === SDPStreamMetadataPurpose.Usermedia
+            const tracks = (feed.purpose === SDPStreamMetadataPurpose.Usermedia
                 ? this.usermediaTransceivers
-                : this.screensharingTransceivers;
-            if (!transceivers.length) continue;
+                : this.screensharingTransceivers).map((transceiver) => {
+                // XXX: We only use double equals because MediaDescription::mid is in fact a number
+                const trackId = sdp?.media?.find((m) => m.mid == transceiver.mid)?.msid?.split(" ")?.[1];
+                return trackId ? { id: trackId } : undefined;
+            }).filter((t) => Boolean(t));
 
             feeds.push({
                 id: feed.stream.id,
@@ -634,15 +637,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 // FIXME: This is very ineffective as state is slow, we should really be sending this over DC
                 audio_muted: feed.isAudioMuted(),
                 video_muted: feed.isVideoMuted(),
-                tracks: transceivers.map((transceiver) => {
-                    // XXX: We only use double equals because MediaDescription::mid is in fact a number
-                    const trackId = sdp?.media?.find((m) => m.mid == transceiver.mid)?.msid?.split(" ")?.[1];
-                    if (trackId) {
-                        return { id: trackId };
-                    } else {
-                        return { id: transceiver.sender.track.id };
-                    }
-                }),
+                tracks: tracks.length ? tracks : undefined,
             });
         }
         return feeds;
