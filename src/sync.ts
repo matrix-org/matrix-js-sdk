@@ -1047,13 +1047,6 @@ export class SyncApi {
         this.failedSyncCount++;
         logger.log('Number of consecutive failed sync requests:', this.failedSyncCount);
 
-        // Transition from RECONNECTING to ERROR after a given number of failed syncs
-        this.updateSyncState(
-            this.failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
-                SyncState.Error : SyncState.Reconnecting,
-            { error: err },
-        );
-
         debuglog("Starting keep-alive");
         // Note that we do *not* mark the sync connection as
         // lost yet: we only do this if a keepalive poke
@@ -1062,7 +1055,18 @@ export class SyncApi {
         // erroneous. We set the state to 'reconnecting'
         // instead, so that clients can observe this state
         // if they wish.
-        const connDidFail = await this.startKeepAlives();
+        const keepAlivePromise = this.startKeepAlives();
+
+        this.currentSyncRequest = null;
+        // Transition from RECONNECTING to ERROR after a given number of failed syncs
+        this.updateSyncState(
+            this.failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
+                SyncState.Error : SyncState.Reconnecting,
+            { error: err },
+        );
+
+        const connDidFail = await keepAlivePromise;
+
         // Only emit CATCHUP if we detected a connectivity error: if we didn't,
         // it's quite likely the sync will fail again for the same reason and we
         // want to stay in ERROR rather than keep flip-flopping between ERROR
