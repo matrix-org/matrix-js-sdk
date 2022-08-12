@@ -188,6 +188,34 @@ describe("MatrixClient syncing", () => {
 
             expect(fires).toBe(3);
         });
+
+        it("should honour lazyLoadMembers if user is not a guest", () => {
+            client.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
+
+            httpBackend.when("GET", "/sync").check((req) => {
+                expect(JSON.parse(req.queryParams.filter).room.state.lazy_load_members).toBeTruthy();
+            }).respond(200, syncData);
+
+            client.setGuest(false);
+            client.startClient({ lazyLoadMembers: true });
+
+            return httpBackend.flushAllExpected();
+        });
+
+        it("should not honour lazyLoadMembers if user is a guest", () => {
+            httpBackend.expectedRequests = [];
+            httpBackend.when("GET", "/versions").respond(200, {});
+            client.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
+
+            httpBackend.when("GET", "/sync").check((req) => {
+                expect(JSON.parse(req.queryParams.filter).room?.state?.lazy_load_members).toBeFalsy();
+            }).respond(200, syncData);
+
+            client.setGuest(true);
+            client.startClient({ lazyLoadMembers: true });
+
+            return httpBackend.flushAllExpected();
+        });
     });
 
     describe("initial sync", () => {
