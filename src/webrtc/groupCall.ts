@@ -16,7 +16,6 @@ import { Room } from "../models/room";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
 import { SDPStreamMetadata, SDPStreamMetadataPurpose } from "./callEventTypes";
-import { createNewMatrixCall } from "./call";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
