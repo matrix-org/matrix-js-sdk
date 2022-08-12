@@ -1979,7 +1979,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         const tracks: ISfuTrackDesc[] = feeds
-            .filter((feed) => feed.tracks) // Skip trackless feeds
+            .filter((feed) => feed.tracks?.length) // Skip trackless feeds
             .reduce((tracks, f) => [...tracks, ...f.tracks.map((t) => ({ stream_id: f.id, track_id: t.id }))], []) // Get array of tracks from feeds
             .filter((track) => !this.subscribedTracks.find((subscribed) => utils.deepCompare(track, subscribed))); // Filter out already subscribed tracks
 
