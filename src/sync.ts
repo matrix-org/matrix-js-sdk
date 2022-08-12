@@ -1016,7 +1016,7 @@ export class SyncApi {
             qps._cacheBuster = Date.now();
         }
 
-        if (this.getSyncState() == SyncState.Error || this.getSyncState() == SyncState.Reconnecting) {
+        if ([SyncState.Reconnecting, SyncState.Error].includes(this.getSyncState())) {
             // we think the connection is dead. If it comes back up, we won't know
             // about it till /sync returns. If the timeout= is high, this could
             // be a long time. Set it to 0 when doing retries so we don't have to wait
