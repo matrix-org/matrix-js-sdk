@@ -1,3 +1,9 @@
+Changes in [19.3.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.3.0-rc.2) (2022-08-12)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix finding event read up to if stable private read receipts is missing ([\#2585](https://github.com/matrix-org/matrix-js-sdk/pull/2585)). Fixes vector-im/element-web#23027.
+
 Changes in [19.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.3.0-rc.1) (2022-08-09)
 ============================================================================================================
 
