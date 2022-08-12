@@ -1493,6 +1493,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public async sendMetadataUpdate(): Promise<void> {
+        // We send metadata over state in SFU calls
+        if (this.isSfu) return;
+
         await this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
             [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
         });
