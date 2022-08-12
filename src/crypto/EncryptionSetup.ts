@@ -19,16 +19,15 @@ import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { Method, PREFIX_UNSTABLE } from "../http-api";
-import { Crypto, IBootstrapCrossSigningOpts } from "./index";
+import { Crypto, ICryptoCallbacks, IBootstrapCrossSigningOpts } from "./index";
 import {
     ClientEvent,
-    CrossSigningKeys,
     ClientEventHandlerMap,
+    CrossSigningKeys,
     ICrossSigningKey,
-    ICryptoCallbacks,
     ISignedKey,
     KeySignatures,
-} from "../matrix";
+} from "../client";
 import { ISecretStorageKeyInfo } from "./api";
 import { IKeyBackupInfo } from "./keybackup";
 import { TypedEventEmitter } from "../models/typed-event-emitter";

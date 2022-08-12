@@ -58,9 +58,13 @@ class MockMediaStreamAudioSourceNode {
     connect() {}
 }
 
+class MockAnalyser {
+    getFloatFrequencyData() { return 0.0; }
+}
+
 export class MockAudioContext {
     constructor() {}
-    createAnalyser() { return {}; }
+    createAnalyser() { return new MockAnalyser(); }
     createMediaStreamSource() { return new MockMediaStreamAudioSourceNode(); }
     close() {}
 }
@@ -154,4 +158,5 @@ export class MockMediaHandler {
     }
     stopUserMediaStream() { }
     hasAudioDevice() { return true; }
+    stopAllStreams() {}
 }

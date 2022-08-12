@@ -182,7 +182,9 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     /**
      * Replaces the current MediaStream with a new one.
-     * This method should be only used by MatrixCall.
+     * The stream will be different and new stream as remore parties are
+     * concerned, but this can be used for convenience locally to set up
+     * volume listeners automatically on the new stream etc.
      * @param newStream new stream with which to replace the current one
      */
     public setNewStream(newStream: MediaStream): void {

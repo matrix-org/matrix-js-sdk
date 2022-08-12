@@ -1,5 +1,5 @@
 /*
-Copyright 2015-2021 The Matrix.org Foundation C.I.C.
+Copyright 2015-2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { WidgetApi } from "matrix-widget-api";
+
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { MemoryStore } from "./store/memory";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient, ICreateClientOpts } from "./client";
-import { DeviceTrustLevel } from "./crypto/CrossSigning";
-import { ISecretStorageKeyInfo } from "./crypto/api";
+import { RoomWidgetClient, ICapabilities } from "./embedded";
 
 export * from "./client";
+export * from "./embedded";
 export * from "./http-api";
 export * from "./autodiscovery";
 export * from "./sync-accumulator";
@@ -51,6 +53,7 @@ export * from './@types/requests';
 export * from './@types/search';
 export * from './models/room-summary';
 export * as ContentHelpers from "./content-helpers";
+export type { ICryptoCallbacks } from "./crypto"; // used to be located here
 export { createNewMatrixCall } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
 export {
@@ -108,27 +111,17 @@ export function setCryptoStoreFactory(fac) {
     cryptoStoreFactory = fac;
 }
 
-export interface ICryptoCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array>;
-    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
-    shouldUpgradeDeviceVerifications?: (
-        users: Record<string, any>
-    ) => Promise<string[]>;
-    getSecretStorageKey?: (
-        keys: {keys: Record<string, ISecretStorageKeyInfo>}, name: string
-    ) => Promise<[string, Uint8Array] | null>;
-    cacheSecretStorageKey?: (
-        keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array
-    ) => void;
-    onSecretRequested?: (
-        userId: string, deviceId: string,
-        requestId: string, secretName: string, deviceTrust: DeviceTrustLevel
-    ) => Promise<string>;
-    getDehydrationKey?: (
-        keyInfo: ISecretStorageKeyInfo,
-        checkFunc: (key: Uint8Array) => void,
-    ) => Promise<Uint8Array>;
-    getBackupKey?: () => Promise<Uint8Array>;
+function amendClientOpts(opts: ICreateClientOpts | string): ICreateClientOpts {
+    if (typeof opts === "string") opts = { baseUrl: opts };
+
+    opts.request = opts.request ?? requestInstance;
+    opts.store = opts.store ?? new MemoryStore({
+        localStorage: global.localStorage,
+    });
+    opts.scheduler = opts.scheduler ?? new MatrixScheduler();
+    opts.cryptoStore = opts.cryptoStore ?? cryptoStoreFactory();
+
+    return opts;
 }
 
 /**
@@ -154,19 +147,17 @@ export interface ICryptoCallbacks {
  * @see {@link module:client.MatrixClient} for the full list of options for
  * <code>opts</code>.
  */
-export function createClient(opts: ICreateClientOpts | string) {
-    if (typeof opts === "string") {
-        opts = {
-            "baseUrl": opts,
-        };
-    }
-    opts.request = opts.request || requestInstance;
-    opts.store = opts.store || new MemoryStore({
-        localStorage: global.localStorage,
-    });
-    opts.scheduler = opts.scheduler || new MatrixScheduler();
-    opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
-    return new MatrixClient(opts);
+export function createClient(opts: ICreateClientOpts | string): MatrixClient {
+    return new MatrixClient(amendClientOpts(opts));
+}
+
+export function createRoomWidgetClient(
+    widgetApi: WidgetApi,
+    capabilities: ICapabilities,
+    roomId: string,
+    opts: ICreateClientOpts | string,
+): MatrixClient {
+    return new RoomWidgetClient(widgetApi, capabilities, roomId, amendClientOpts(opts));
 }
 
 /**

@@ -9,6 +9,7 @@ import {
     genCallID,
     MatrixCall,
     setTracksEnabled,
+    createNewMatrixCall,
 } from "./call";
 import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";

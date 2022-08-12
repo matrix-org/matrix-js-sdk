@@ -23,6 +23,7 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
+import { EventType } from "../@types/event";
 import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
@@ -69,6 +70,7 @@ import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
 import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
+import { ToDeviceBatch } from "../models/ToDeviceMessage";
 import {
     ClientEvent,
     ICrossSigningKey,
@@ -122,6 +124,29 @@ interface IInitOpts {
 export interface IBootstrapCrossSigningOpts {
     setupNewCrossSigning?: boolean;
     authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
+}
+
+export interface ICryptoCallbacks {
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array>;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    shouldUpgradeDeviceVerifications?: (
+        users: Record<string, any>
+    ) => Promise<string[]>;
+    getSecretStorageKey?: (
+        keys: {keys: Record<string, ISecretStorageKeyInfo>}, name: string
+    ) => Promise<[string, Uint8Array] | null>;
+    cacheSecretStorageKey?: (
+        keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array
+    ) => void;
+    onSecretRequested?: (
+        userId: string, deviceId: string,
+        requestId: string, secretName: string, deviceTrust: DeviceTrustLevel
+    ) => Promise<string>;
+    getDehydrationKey?: (
+        keyInfo: ISecretStorageKeyInfo,
+        checkFunc: (key: Uint8Array) => void,
+    ) => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array>;
 }
 
 /* eslint-disable camelcase */
@@ -209,11 +234,6 @@ export interface IEncryptedContent {
     ciphertext: Record<string, string>;
 }
 /* eslint-enable camelcase */
-
-interface IEncryptAndSendToDevicesResult {
-    contentMap: Record<string, Record<string, IEncryptedContent>>;
-    deviceInfoByUserIdAndDeviceId: Map<string, Map<string, DeviceInfo>>;
-}
 
 export enum CryptoEvent {
     DeviceVerificationChanged = "deviceVerificationChanged",
@@ -3115,106 +3135,78 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * Encrypts and sends a given object via Olm to-device message to a given
-     * set of devices.  Factored out from encryptAndSendKeysToDevices in
-     * megolm.ts.
-     *
-     * @param {object[]} userDeviceInfoArr
-     *   mapping from userId to deviceInfo
-     *
+     * Encrypts and sends a given object via Olm to-device messages to a given
+     * set of devices.
+     * @param {object[]} userDeviceInfoArr the devices to send to
      * @param {object} payload fields to include in the encrypted payload
-     *      *
      * @return {Promise<{contentMap, deviceInfoByDeviceId}>} Promise which
      *     resolves once the message has been encrypted and sent to the given
      *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
      *     of the successfully sent messages.
      */
-    public encryptAndSendToDevices(
+    public async encryptAndSendToDevices(
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<IEncryptAndSendToDevicesResult> {
-        const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
-        const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
+    ): Promise<void> {
+        const toDeviceBatch: ToDeviceBatch = {
+            eventType: EventType.RoomMessageEncrypted,
+            batch: [],
+        };
 
-        const promises: Promise<unknown>[] = [];
-        for (const { userId, deviceInfo } of userDeviceInfoArr) {
-            const deviceId = deviceInfo.deviceId;
-            const encryptedContent: IEncryptedContent = {
-                algorithm: olmlib.OLM_ALGORITHM,
-                sender_key: this.olmDevice.deviceCurve25519Key,
-                ciphertext: {},
-            };
+        try {
+            await Promise.all(userDeviceInfoArr.map(async ({ userId, deviceInfo }) => {
+                const deviceId = deviceInfo.deviceId;
+                const encryptedContent: IEncryptedContent = {
+                    algorithm: olmlib.OLM_ALGORITHM,
+                    sender_key: this.olmDevice.deviceCurve25519Key,
+                    ciphertext: {},
+                };
 
-            // Assign to temp value to make type-checking happy
-            let userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
+                toDeviceBatch.batch.push({
+                    userId,
+                    deviceId,
+                    payload: encryptedContent,
+                });
 
-            if (userIdDeviceInfo === undefined) {
-                userIdDeviceInfo = new Map<string, DeviceInfo>();
-                deviceInfoByUserIdAndDeviceId.set(userId, userIdDeviceInfo);
-            }
-
-            // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
-            userIdDeviceInfo.set(deviceId, deviceInfo);
-
-            if (!contentMap[userId]) {
-                contentMap[userId] = {};
-            }
-            contentMap[userId][deviceId] = encryptedContent;
-
-            promises.push(
-                olmlib.ensureOlmSessionsForDevices(
+                await olmlib.ensureOlmSessionsForDevices(
                     this.olmDevice,
                     this.baseApis,
                     { [userId]: [deviceInfo] },
-                ).then(() =>
-                    olmlib.encryptMessageForDevice(
-                        encryptedContent.ciphertext,
-                        this.userId,
-                        this.deviceId,
-                        this.olmDevice,
-                        userId,
-                        deviceInfo,
-                        payload,
-                    ),
-                ),
-            );
-        }
+                );
+                await olmlib.encryptMessageForDevice(
+                    encryptedContent.ciphertext,
+                    this.userId,
+                    this.deviceId,
+                    this.olmDevice,
+                    userId,
+                    deviceInfo,
+                    payload,
+                );
+            }));
 
-        return Promise.all(promises).then(() => {
             // prune out any devices that encryptMessageForDevice could not encrypt for,
             // in which case it will have just not added anything to the ciphertext object.
             // There's no point sending messages to devices if we couldn't encrypt to them,
             // since that's effectively a blank message.
-            for (const userId of Object.keys(contentMap)) {
-                for (const deviceId of Object.keys(contentMap[userId])) {
-                    if (Object.keys(contentMap[userId][deviceId].ciphertext).length === 0) {
-                        logger.log(`No ciphertext for device ${userId}:${deviceId}: pruning`);
-                        delete contentMap[userId][deviceId];
-                    }
+            toDeviceBatch.batch = toDeviceBatch.batch.filter(msg => {
+                if (Object.keys(msg.payload.ciphertext).length > 0) {
+                    return true;
+                } else {
+                    logger.log(`No ciphertext for device ${msg.userId}:${msg.deviceId}: pruning`);
+                    return false;
                 }
-                // No devices left for that user? Strip that too.
-                if (Object.keys(contentMap[userId]).length === 0) {
-                    logger.log(`Pruned all devices for user ${userId}`);
-                    delete contentMap[userId];
-                }
-            }
-
-            // Is there anything left?
-            if (Object.keys(contentMap).length === 0) {
-                logger.log("No users left to send to: aborting");
-                return;
-            }
-
-            return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(
-                (response) => ({ contentMap, deviceInfoByUserIdAndDeviceId }),
-            ).catch(error => {
-                logger.error("sendToDevice failed", error);
-                throw error;
             });
-        }).catch(error => {
-            logger.error("encryptAndSendToDevices promises failed", error);
-            throw error;
-        });
+
+            try {
+                await this.baseApis.queueToDevice(toDeviceBatch);
+            } catch (e) {
+                logger.error("sendToDevice failed", e);
+                throw e;
+            }
+        } catch (e) {
+            logger.error("encryptAndSendToDevices promises failed", e);
+            throw e;
+        }
     }
 
     private onMembership = (event: MatrixEvent, member: RoomMember, oldMembership?: string) => {
