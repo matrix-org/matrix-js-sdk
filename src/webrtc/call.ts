@@ -2443,8 +2443,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private sendSFUDataChannelMessage(op: SFUDataChannelMessageOp, content: object = {}): void {
         const realContent: ISfuBaseDataChannelMessage = Object.assign(content, {
             op: op,
-            id: randomString(24),
-            conf_id: this.groupCallId,
         });
 
         if (![SFUDataChannelMessageOp.Select, SFUDataChannelMessageOp.Alive].includes(op)) {

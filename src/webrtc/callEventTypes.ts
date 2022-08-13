@@ -115,8 +115,6 @@ export enum SFUDataChannelMessageOp {
 
 export interface ISfuBaseDataChannelMessage {
     op: SFUDataChannelMessageOp;
-    id: string;
-    conf_id: string;
     metadata?: SDPStreamMetadata;
 }
 
