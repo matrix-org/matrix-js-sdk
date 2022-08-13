@@ -80,6 +80,7 @@ export class CallFeed extends TypedEventEmitter<
     public voiceActivityTreshold: number;
     public setVADMute: (muted: boolean) => void;
     public VADEnabled = true;
+    public maxCurrentVolume = -Infinity;
 
     private client: MatrixClient;
     private roomId: string;
@@ -94,6 +95,12 @@ export class CallFeed extends TypedEventEmitter<
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
     private volumeLooperTimeout: ReturnType<typeof setTimeout>;
+    /**
+     * Cooldown for voice activity detection, so that we don't mute immediately when the user stops speaking
+     * But when he has been silent 100ms
+     */
+    private VADCooldownStarted = new Date();
+    private VADCooldownMs = 200;
 
     constructor(opts: ICallFeedOpts) {
         super();
@@ -338,17 +345,17 @@ export class CallFeed extends TypedEventEmitter<
 
         this.analyser.getFloatFrequencyData(this.frequencyBinCount);
 
-        let maxVolume = -Infinity;
+        this.maxCurrentVolume = -Infinity;
         for (let i = 0; i < this.frequencyBinCount.length; i++) {
-            if (this.frequencyBinCount[i] > maxVolume) {
-                maxVolume = this.frequencyBinCount[i];
+            if (this.frequencyBinCount[i] > this.maxCurrentVolume) {
+                this.maxCurrentVolume = this.frequencyBinCount[i];
             }
         }
 
         this.speakingVolumeSamples.shift();
-        this.speakingVolumeSamples.push(maxVolume);
+        this.speakingVolumeSamples.push(this.maxCurrentVolume);
 
-        this.emit(CallFeedEvent.VolumeChanged, maxVolume);
+        this.emit(CallFeedEvent.VolumeChanged, this.maxCurrentVolume);
 
         let newSpeaking = false;
 
@@ -370,17 +377,22 @@ export class CallFeed extends TypedEventEmitter<
             this.emit(CallFeedEvent.Speaking, this.speaking);
         }
 
-        // const total = this.speakingVolumeSamples.reduce((a, b) => a + b, 0);
-        // const avg = total / this.speakingVolumeSamples.length;
-        // console.log({ maxVolume });
-
+        // Handle voice activity detection only if it is enabled and user has not manually muted themselves
         if (this.VADEnabled && !this.audioMuted) {
-            if (maxVolume > this.voiceActivityTreshold && this.vadAudioMuted) {
-                console.log("MUTE FALSE");
-                this.setVADMute(false);
+            // If the user is speaking
+            if (this.maxCurrentVolume > this.voiceActivityTreshold) {
+                this.VADCooldownStarted = new Date();
+
+                if (this.vadAudioMuted) {
+                    this.setVADMute(false);
+                }
             } else if (!this.vadAudioMuted) {
-                console.log("MUTE TRUE");
-                this.setVADMute(true);
+                // User stops speaking
+
+                if (!this.isVADinCooldown()) {
+                    // user has been silent for X milliseconds
+                    this.setVADMute(true);
+                }
             }
         }
 
@@ -389,6 +401,13 @@ export class CallFeed extends TypedEventEmitter<
             POLLING_INTERVAL
         );
     };
+
+    private isVADinCooldown(): boolean {
+        return (
+            new Date().getTime() - this.VADCooldownStarted.getTime() <
+            this.VADCooldownMs
+        );
+    }
 
     public clone(): CallFeed {
         const mediaHandler = this.client.getMediaHandler();
