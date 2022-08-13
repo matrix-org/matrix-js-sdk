@@ -11,11 +11,19 @@ export enum SDPStreamMetadataPurpose {
     Screenshare = "m.screenshare",
 }
 
+export interface SDPStreamMetadataTrack {}
+
+export interface SDPStreamMetadataTracks {
+    [key: string]: SDPStreamMetadataTrack;
+}
+
 export interface SDPStreamMetadataObject {
-    userId?: string;
+    user_id: string;
+    device_id: string;
     purpose: SDPStreamMetadataPurpose;
     audio_muted: boolean;
     video_muted: boolean;
+    tracks: SDPStreamMetadataTracks;
 }
 
 export interface SDPStreamMetadata {
@@ -95,40 +103,55 @@ export interface ISfuTrackDesc {
     track_id: string;
 }
 
+export enum SFUDataChannelMessageOp {
+    Select = "select",
+    Offer = "offer",
+    Answer = "answer",
+    Publish = "publish",
+    Unpublish = "unpublish",
+    Metadata = "metadata",
+    Alive = "alive",
+}
+
 export interface ISfuBaseDataChannelMessage {
-    op: string;
+    op: SFUDataChannelMessageOp;
     id: string;
     conf_id: string;
+    metadata?: SDPStreamMetadata;
 }
 
 export interface ISfuSelectDataChannelMessage extends ISfuBaseDataChannelMessage {
-    op: "select";
+    op: SFUDataChannelMessageOp.Select;
     start: ISfuTrackDesc[];
 }
 
 export interface ISfuOfferDataChannelMessage extends ISfuBaseDataChannelMessage {
-    op: "offer";
+    op: SFUDataChannelMessageOp.Offer;
     sdp: string;
 }
 
 export interface ISfuAnswerDataChannelMessage extends ISfuBaseDataChannelMessage {
-    op: "answer";
+    op: SFUDataChannelMessageOp.Answer;
     sdp: string;
 }
 
 export interface ISfuPublishDataChannelMessage extends ISfuBaseDataChannelMessage {
-    op: "publish";
+    op: SFUDataChannelMessageOp.Publish;
     sdp: string;
 }
 
 export interface ISfuUnpublishDataChannelMessage extends ISfuBaseDataChannelMessage {
-    op: "unpublish";
+    op: SFUDataChannelMessageOp.Unpublish;
     sdp: string;
     stop: ISfuTrackDesc[];
 }
 
+export interface ISfuMetadataDataChannelMessage extends ISfuBaseDataChannelMessage {
+    op: SFUDataChannelMessageOp.Metadata;
+}
+
 export interface ISfuKeepAliveDataChannelMessage extends ISfuBaseDataChannelMessage {
-    op: "alive";
+    op: SFUDataChannelMessageOp.Alive;
 }
 
 /* eslint-enable camelcase */

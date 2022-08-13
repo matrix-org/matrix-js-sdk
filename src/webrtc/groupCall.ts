@@ -15,14 +15,13 @@ import { RoomMember } from "../models/room-member";
 import { Room } from "../models/room";
 import { logger } from "../logger";
 import { ReEmitter } from "../ReEmitter";
-import { SDPStreamMetadata, SDPStreamMetadataPurpose } from "./callEventTypes";
+import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { ISendEventResponse } from "../@types/requests";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
 import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
-import { recursivelyAssign } from "../utils";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -105,16 +104,8 @@ export interface IGroupCallDataChannelOptions {
     protocol: string;
 }
 
-export interface IGroupCallMemberTrack {
-    id: string;
-}
-
 export interface IGroupCallRoomMemberFeed {
-    id: string;
     purpose: SDPStreamMetadataPurpose;
-    audio_muted?: boolean;
-    video_muted?: boolean;
-    tracks?: IGroupCallMemberTrack[];
 }
 
 export interface IGroupCallRoomMemberDevice {
@@ -370,7 +361,6 @@ export class GroupCall extends TypedEventEmitter<
                     opponentDeviceId: opponentDevice.device_id,
                     opponentSessionId: opponentDevice.session_id,
                     groupCallId: this.groupCallId,
-                    initialRemoteSDPStreamMetadata: this.getRemoteSDPStreamMetadataForCall(),
                     isSfu: true,
                 },
             );
@@ -742,8 +732,9 @@ export class GroupCall extends TypedEventEmitter<
                 {
                     "device_id": this.client.getDeviceId(),
                     "session_id": this.client.getSessionId(),
-                    // We assume that all calls are sending the same feeds
-                    "feeds": this.calls[0]?.getGroupCallRoomMemberFeeds(),
+                    "feeds": this.getLocalFeeds().map((feed) => ({
+                        purpose: feed.purpose,
+                    })),
                     // TODO: Add data channels
                 },
             ],
@@ -799,51 +790,14 @@ export class GroupCall extends TypedEventEmitter<
         return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId);
     }
 
-    private getRemoteFeedsFromState(): IGroupCallRoomMemberFeed[] {
-        return this.getMemberStateEvents()?.reduce((feeds, event) => {
-            if (event.getSender() === this.client.getUserId()) return feeds; // Ignore local
-            const newFeeds = event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.feeds;
-            if (!newFeeds) return feeds;
-            return [...feeds, ...newFeeds];
-        }, []) ?? [];
-    }
-
-    private getRemoteSDPStreamMetadataForCall(): SDPStreamMetadata {
-        return this.getMemberStateEvents().reduce((metaAcc: SDPStreamMetadata, event: MatrixEvent) => {
-            if (event.getSender() === this.client.getUserId()) return metaAcc; // Ignore local
-            const feeds = event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.feeds;
-            if (!feeds) return metaAcc;
-            const metadata = feeds.reduce((feedAcc: SDPStreamMetadata, feed: IGroupCallRoomMemberFeed) => {
-                if (!feed?.id) return feedAcc;
-                return recursivelyAssign(feedAcc, {
-                    [feed.id]: {
-                        purpose: feed.purpose,
-                        audio_muted: feed.audio_muted,
-                        video_muted: feed.video_muted,
-                        userId: event.getSender(),
-                    },
-                }, true);
-            }, {});
-            return recursivelyAssign(metaAcc, metadata, true);
-        }, {});
-    }
-
     public onMemberStateChanged = async (event: MatrixEvent) => {
+        if (this.sfu) return;
+
         // The member events may be received for another room, which we will ignore.
         if (event.getRoomId() !== this.room.roomId) return;
 
         const member = this.room.getMember(event.getStateKey());
         if (!member) return;
-
-        if (this.sfu) {
-            const sfuCall = this.getCallByUserId(this.sfu.user_id);
-            if (!sfuCall) return;
-
-            sfuCall.updateRemoteSDPStreamMetadata(this.getRemoteSDPStreamMetadataForCall());
-            sfuCall.subscribeToSFU(this.getRemoteFeedsFromState());
-
-            return;
-        }
 
         const ignore = () => {
             this.removeParticipant(member);
@@ -1164,8 +1118,8 @@ export class GroupCall extends TypedEventEmitter<
             this.retryCallCounts.delete(getCallUserId(call));
 
             // if we're calling an SFU, subscribe to its feeds
-            if (call.getOpponentMember().userId === this.sfu.user_id) {
-                call.subscribeToSFU(this.getRemoteFeedsFromState());
+            if (call.isSfu) {
+                call.subscribeToSFU();
             }
         }
     };
