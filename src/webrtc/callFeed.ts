@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Stream } from "stream";
-import { setMaxListeners } from "process";
-
 import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { acquireContext, releaseContext } from "./audioContext";
 import { MatrixClient } from "../client";
@@ -60,7 +57,7 @@ type EventHandlerMap = {
     [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.MuteStateChanged]: (
         audioMuted: boolean,
-        videoMuted: boolean
+        videoMuted: boolean,
     ) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
@@ -80,7 +77,6 @@ export class CallFeed extends TypedEventEmitter<
     public setVADMute: (muted: boolean) => void;
     public VADEnabled = true;
     public maxCurrentVolume = -Infinity;
-
 
     private client: MatrixClient;
     private roomId: string;
@@ -112,7 +108,7 @@ export class CallFeed extends TypedEventEmitter<
         this.audioMuted = opts.audioMuted;
         this.videoMuted = opts.videoMuted;
         this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(
-            -Infinity
+            -Infinity,
         );
         this.sdpMetadataStreamId = opts.stream.id;
         this.voiceActivityTreshold = -55;
@@ -126,7 +122,6 @@ export class CallFeed extends TypedEventEmitter<
     }
 
     public setVoiceActivityTreshold(treshold: number): void {
-        console.log("SET VOICE ACTIVITY TRESHOLD", treshold);
         this.voiceActivityTreshold = treshold;
     }
 
@@ -155,26 +150,6 @@ export class CallFeed extends TypedEventEmitter<
         this.emit(CallFeedEvent.NewStream, this.stream);
     }
 
-    public swapStream(): void {
-        if (this.stream) {
-            this.stream.removeEventListener("addtrack", this.onAddTrack);
-            this.measureVolumeActivity(false);
-        }
-        const bufferStream = this.stream;
-        this.stream = this.secondStream;
-        this.secondStream = bufferStream;
-        if (this.stream) {
-            this.stream.addEventListener("addtrack", this.onAddTrack);
-
-            if (this.hasAudioTrack) {
-                this.initVolumeMeasuring();
-            } else {
-                this.measureVolumeActivity(false);
-            }
-        }
-        this.emit(CallFeedEvent.NewStream, this.stream);
-    }
-
     private initVolumeMeasuring(): void {
         if (!this.hasAudioTrack) return;
         if (!this.audioContext) this.audioContext = acquireContext();
@@ -189,7 +164,7 @@ export class CallFeed extends TypedEventEmitter<
         mediaStreamAudioSourceNode.connect(this.analyser);
 
         this.frequencyBinCount = new Float32Array(
-            this.analyser.frequencyBinCount
+            this.analyser.frequencyBinCount,
         );
     }
 
@@ -256,11 +231,11 @@ export class CallFeed extends TypedEventEmitter<
      */
     public setAudioVideoMuted(
         audioMuted: boolean | null,
-        videoMuted: boolean | null
+        videoMuted: boolean | null,
     ): void {
         if (audioMuted !== null) {
             if (this.audioMuted !== audioMuted) {
-                //this.speakingVolumeSamples.fill(-Infinity);
+                this.speakingVolumeSamples.fill(-Infinity);
             }
             this.audioMuted = audioMuted;
         }
@@ -268,48 +243,17 @@ export class CallFeed extends TypedEventEmitter<
         this.emit(
             CallFeedEvent.MuteStateChanged,
             this.audioMuted,
-            this.videoMuted
+            this.videoMuted,
         );
     }
 
     public setVadMuted(
         audioMuted: boolean | null,
-        videoMuted: boolean | null
+        videoMuted: boolean | null,
     ): void {
         if (audioMuted !== null) {
-            if (this.vadAudioMuted !== audioMuted) {
-                //this.speakingVolumeSamples.fill(-Infinity);
-            }
             this.vadAudioMuted = audioMuted;
         }
-        // console.log("setVadMuted", this.audioMuted, this.videoMuted);
-        // if (videoMuted !== null) this.videoMuted = videoMuted;
-        // this.emit(
-        //     CallFeedEvent.MuteStateChanged,
-        //     this.vadAudioMuted,
-        //     this.videoMuted,
-        // );
-    }
-
-    /**
-     * Set one or both of feed's internal audio and video video mute state
-     * Either value may be null to leave it as-is
-     * @param muted is the feed's video muted?
-     */
-    public setAudioVideoBelowTreshold(
-        audioMuted: boolean,
-        videoMuted: boolean
-    ): void {
-        if (audioMuted !== null) {
-            if (this.audioMuted !== audioMuted) {
-            }
-            this.audioMuted = audioMuted;
-        }
-        this.emit(
-            CallFeedEvent.MuteStateChanged,
-            this.audioMuted,
-            this.videoMuted
-        );
     }
 
     /**
@@ -398,7 +342,7 @@ export class CallFeed extends TypedEventEmitter<
 
         this.volumeLooperTimeout = setTimeout(
             this.volumeLooper,
-            POLLING_INTERVAL
+            POLLING_INTERVAL,
         );
     };
 
@@ -413,7 +357,7 @@ export class CallFeed extends TypedEventEmitter<
         const mediaHandler = this.client.getMediaHandler();
         const stream = this.stream.clone();
         logger.log(
-            `callFeed cloning stream ${this.stream.id} newStream ${stream.id}`
+            `callFeed cloning stream ${this.stream.id} newStream ${stream.id}`,
         );
 
         if (this.purpose === SDPStreamMetadataPurpose.Usermedia) {
