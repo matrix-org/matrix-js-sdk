@@ -255,14 +255,14 @@ export type BeaconInfoState = MBeaconInfoContent & {
  */
 export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
     const { description, timeout, live } = content;
-    const { type: assetType } = M_ASSET.findIn<MAssetContent>(content);
+    const asset = M_ASSET.findIn<MAssetContent>(content);
     const timestamp = M_TIMESTAMP.findIn<number>(content);
 
     return {
         description,
         timeout,
         live,
-        assetType,
+        assetType: asset?.type,
         timestamp,
     };
 };
