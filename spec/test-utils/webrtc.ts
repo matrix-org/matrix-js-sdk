@@ -144,7 +144,7 @@ export class MockMediaStream {
 
 export class MockMediaDeviceInfo {
     constructor(
-        public kind: "audio" | "video",
+        public kind: "audioinput" | "videoinput" | "audiooutput",
     ) { }
 }
 
@@ -158,5 +158,6 @@ export class MockMediaHandler {
     }
     stopUserMediaStream() { }
     hasAudioDevice() { return true; }
+    hasVideoDevice() { return true; }
     stopAllStreams() {}
 }
