@@ -161,7 +161,7 @@ describe('Group Call', function() {
             }
         });
 
-        it("unmutes audio", async () => {
+        it("disables audio stream when audio is set to muted", async () => {
             try {
                 await groupCall.create();
 
@@ -189,7 +189,7 @@ describe('Group Call', function() {
             }
         });
 
-        it("unmutes video", async () => {
+        it("disables video stream when video is set to muted", async () => {
             try {
                 await groupCall.create();
 
