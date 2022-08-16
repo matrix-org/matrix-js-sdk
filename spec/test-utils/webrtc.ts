@@ -70,7 +70,21 @@ export class MockAudioContext {
 }
 
 export class MockRTCPeerConnection {
+    private static instances: MockRTCPeerConnection[] = [];
+
+    private negotiationNeededListener: () => void;
+    private needsNegotiation = false;
     localDescription: RTCSessionDescription;
+
+    public static triggerAllNegotiations() {
+        for (const inst of this.instances) {
+            inst.doNegotiation();
+        }
+    }
+
+    public static resetInstances() {
+        this.instances = [];
+    }
 
     constructor() {
         this.localDescription = {
@@ -78,12 +92,19 @@ export class MockRTCPeerConnection {
             type: 'offer',
             toJSON: function() { },
         };
+
+        MockRTCPeerConnection.instances.push(this);
     }
 
-    addEventListener() { }
+    addEventListener(type: string, listener: () => void) {
+        if (type === 'negotiationneeded') this.negotiationNeededListener = listener;
+    }
     createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
     createOffer() {
-        return Promise.resolve({});
+        return Promise.resolve({
+            type: 'offer',
+            sdp: DUMMY_SDP,
+        });
     }
     setRemoteDescription() {
         return Promise.resolve();
@@ -93,7 +114,17 @@ export class MockRTCPeerConnection {
     }
     close() { }
     getStats() { return []; }
-    addTrack(track: MockMediaStreamTrack) { return new MockRTCRtpSender(track); }
+    addTrack(track: MockMediaStreamTrack) {
+        this.needsNegotiation = true;
+        return new MockRTCRtpSender(track);
+    }
+
+    doNegotiation() {
+        if (this.needsNegotiation && this.negotiationNeededListener) {
+            this.needsNegotiation = false;
+            this.negotiationNeededListener();
+        }
+    }
 }
 
 export class MockRTCRtpSender {
@@ -140,7 +171,10 @@ export class MockMediaStream {
         this.dispatchEvent("addtrack");
     }
     removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
-    clone() {return this; }
+
+    clone() {
+        return new MockMediaStream(this.id, this.tracks);
+    }
 }
 
 export class MockMediaDeviceInfo {
@@ -166,4 +200,33 @@ export class MockMediaHandler {
     hasAudioDevice() { return true; }
     hasVideoDevice() { return true; }
     stopAllStreams() {}
+}
+
+export function installWebRTCMocks() {
+    global.navigator = {
+        mediaDevices: {
+            // @ts-ignore Mock
+            getUserMedia: () => new MockMediaStream("local_stream"),
+            // @ts-ignore Mock
+            enumerateDevices: async () => [new MockMediaDeviceInfo("audio"), new MockMediaDeviceInfo("video")],
+        },
+    };
+
+    global.window = {
+        // @ts-ignore Mock
+        RTCPeerConnection: MockRTCPeerConnection,
+        // @ts-ignore Mock
+        RTCSessionDescription: {},
+        // @ts-ignore Mock
+        RTCIceCandidate: {},
+        getUserMedia: () => new MockMediaStream("local_stream"),
+    };
+    // @ts-ignore Mock
+    global.document = {};
+
+    // @ts-ignore Mock
+    global.AudioContext = MockAudioContext;
+
+    // @ts-ignore Mock
+    global.RTCRtpReceiver = {};
 }
