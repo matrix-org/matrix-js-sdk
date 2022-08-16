@@ -283,6 +283,8 @@ describe('Group Call', function() {
             await groupCall1.create();
 
             try {
+                // keep this as its own variable so we have it typed as a mock
+                // rather than its type in the client object
                 const mockSendToDevice = jest.fn();
 
                 const toDeviceProm = new Promise(resolve => {
