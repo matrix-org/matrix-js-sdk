@@ -282,10 +282,17 @@ describe('Group Call', function() {
             try {
                 // keep this as its own variable so we have it typed as a mock
                 // rather than its type in the client object
-                const mockSendToDevice = jest.fn();
+                const mockSendToDevice = jest.fn<Promise<{}>, [
+                    eventType: string,
+                    contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
+                    txnId?: string,
+                ]>();
 
-                const toDeviceProm = new Promise(resolve => {
-                    mockSendToDevice.mockImplementation(resolve);
+                const toDeviceProm = new Promise<void>(resolve => {
+                    mockSendToDevice.mockImplementation(() => {
+                        resolve();
+                        return Promise.resolve({});
+                    });
                 });
 
                 client1.sendToDevice = mockSendToDevice;
