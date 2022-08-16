@@ -25,20 +25,54 @@ const FAKE_SELF_SESSION_ID = "1";
 const FAKE_ROOM_ID = "!fake:test.dummy";
 
 describe('Group Call', function() {
+    let mockClient: MatrixClient;
+
     beforeEach(function() {
         // @ts-ignore Mock
         global.AudioContext = MockAudioContext;
-    });
 
-    it("sends state event to room when creating", async () => {
-        const mockSendState = jest.fn();
+        global.window = {
+            // @ts-ignore Mock
+            RTCPeerConnection: MockRTCPeerConnection,
+            // @ts-ignore Mock
+            RTCSessionDescription: {},
+            // @ts-ignore Mock
+            RTCIceCandidate: {},
+        };
 
-        const mockClient = {
-            sendStateEvent: mockSendState,
+        // @ts-ignore Mock
+        global.document = {};
+
+        const mockMediaHandler = new MockMediaHandler();
+
+        mockClient = {
+            sendStateEvent: jest.fn(),
             groupCallEventHandler: {
                 groupCalls: new Map(),
             },
+            callEventHandler: {
+                calls: new Map(),
+            },
+            mediaHandler: mockMediaHandler,
+            getMediaHandler: () => mockMediaHandler,
+            getUserId: () => FAKE_SELF_USER_ID,
+            getDeviceId: () => FAKE_SELF_DEVICE_ID,
+            getSessionId: () => FAKE_SELF_SESSION_ID,
+            getTurnServers: () => [],
+            isFallbackICEServerAllowed: () => true,
+            getUseE2eForGroupCall: () => false,
+            checkTurnServers: () => true,
+            reEmitter: {
+                reEmit: jest.fn(),
+            },
+            emit: jest.fn(),
+            on: jest.fn(),
+            removeListener: jest.fn(),
         } as unknown as MatrixClient;
+    });
+
+    it("sends state event to room when creating", async () => {
+        const mockSendState = mockClient.sendStateEvent as jest.Mock;
 
         const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_SELF_USER_ID);
         const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
@@ -52,27 +86,6 @@ describe('Group Call', function() {
     });
 
     it("sends member state event to room on enter", async () => {
-        const mockSendState = jest.fn();
-        const mockMediaHandler = new MockMediaHandler();
-
-        const mockClient = {
-            sendStateEvent: mockSendState,
-            groupCallEventHandler: {
-                groupCalls: new Map(),
-            },
-            callEventHandler: {
-                calls: new Map(),
-            },
-            mediaHandler: mockMediaHandler,
-            getMediaHandler: () => mockMediaHandler,
-            getUserId: () => FAKE_SELF_USER_ID,
-            getDeviceId: () => FAKE_SELF_DEVICE_ID,
-            getSessionId: () => FAKE_SELF_SESSION_ID,
-            emit: jest.fn(),
-            on: jest.fn(),
-            removeListener: jest.fn(),
-        } as unknown as MatrixClient;
-
         const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_SELF_USER_ID);
         const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
 
@@ -84,6 +97,8 @@ describe('Group Call', function() {
 
         try {
             await groupCall.enter();
+
+            const mockSendState = mockClient.sendStateEvent as jest.Mock;
 
             expect(mockSendState.mock.lastCall[0]).toEqual(FAKE_ROOM_ID);
             expect(mockSendState.mock.lastCall[1]).toEqual(EventType.GroupCallMemberPrefix);
