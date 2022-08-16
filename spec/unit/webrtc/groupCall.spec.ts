@@ -297,9 +297,7 @@ describe('Group Call', function() {
 
                 client1.sendToDevice = mockSendToDevice;
 
-                await groupCall1.enter();
-
-                await groupCall2.enter();
+                await Promise.all([groupCall1.enter(), groupCall2.enter()]);
 
                 MockRTCPeerConnection.triggerAllNegotiations();
 
@@ -318,9 +316,7 @@ describe('Group Call', function() {
                 const bobDeviceMessage = toDeviceBobDevices[FAKE_DEVICE_ID_2];
                 expect(bobDeviceMessage.conf_id).toBe(FAKE_CONF_ID);
             } finally {
-                await groupCall1.leave();
-
-                await groupCall2.leave();
+                await Promise.all([groupCall1.leave(), groupCall2.leave()]);
             }
         });
     });
