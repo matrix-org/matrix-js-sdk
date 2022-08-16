@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { MatrixEvent } from "../../../src";
+import { M_BEACON_INFO } from "../../../src/@types/beacon";
 import {
     isTimestampInDuration,
     Beacon,
@@ -123,6 +124,24 @@ describe('Beacon', () => {
             expect(beacon.beaconInfoId).toEqual(liveBeaconEvent.getId());
             expect(beacon.roomId).toEqual(roomId);
             expect(beacon.isLive).toEqual(true);
+            expect(beacon.beaconInfoOwner).toEqual(userId);
+            expect(beacon.beaconInfoEventType).toEqual(liveBeaconEvent.getType());
+            expect(beacon.identifier).toEqual(`${roomId}_${userId}`);
+            expect(beacon.beaconInfo).toBeTruthy();
+        });
+
+        it('creates beacon without error from a malformed event', () => {
+            const event = new MatrixEvent({
+                type: M_BEACON_INFO.name,
+                room_id: roomId,
+                state_key: userId,
+                content: {},
+            });
+            const beacon = new Beacon(event);
+
+            expect(beacon.beaconInfoId).toEqual(event.getId());
+            expect(beacon.roomId).toEqual(roomId);
+            expect(beacon.isLive).toEqual(false);
             expect(beacon.beaconInfoOwner).toEqual(userId);
             expect(beacon.beaconInfoEventType).toEqual(liveBeaconEvent.getType());
             expect(beacon.identifier).toEqual(`${roomId}_${userId}`);
