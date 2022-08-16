@@ -25,6 +25,7 @@ import {
     MockMediaDeviceInfo,
     MockRTCPeerConnection,
     MockAudioContext,
+    installWebRTCMocks,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 
@@ -48,29 +49,7 @@ describe('Call', function() {
         prevDocument = global.document;
         prevWindow = global.window;
 
-        global.navigator = {
-            mediaDevices: {
-                // @ts-ignore Mock
-                getUserMedia: () => new MockMediaStream("local_stream"),
-                // @ts-ignore Mock
-                enumerateDevices: async () => [new MockMediaDeviceInfo("audio"), new MockMediaDeviceInfo("video")],
-            },
-        };
-
-        global.window = {
-            // @ts-ignore Mock
-            RTCPeerConnection: MockRTCPeerConnection,
-            // @ts-ignore Mock
-            RTCSessionDescription: {},
-            // @ts-ignore Mock
-            RTCIceCandidate: {},
-            getUserMedia: () => new MockMediaStream("local_stream"),
-        };
-        // @ts-ignore Mock
-        global.document = {};
-
-        // @ts-ignore Mock
-        global.AudioContext = MockAudioContext;
+        installWebRTCMocks();
 
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
         // We just stub out sendEvent: we're not interested in testing the client's
