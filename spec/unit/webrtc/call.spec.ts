@@ -22,9 +22,6 @@ import {
     MockMediaHandler,
     MockMediaStream,
     MockMediaStreamTrack,
-    MockMediaDeviceInfo,
-    MockRTCPeerConnection,
-    MockAudioContext,
     installWebRTCMocks,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
