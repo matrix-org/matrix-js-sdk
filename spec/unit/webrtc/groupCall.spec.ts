@@ -233,10 +233,10 @@ describe('Group Call', function() {
                     if (!subMap) {
                         subMap = new Map<string, MatrixEvent>();
                         client1Room.currentState.events.set(eventType, subMap);
-                        // since we cheat & use the same maps for each, we can
-                        // just add it once.
                         client2Room.currentState.events.set(eventType, subMap);
                     }
+                    // since we cheat & use the same maps for each, we can
+                    // just add it once.
                     subMap.set(statekey, fakeEvent);
 
                     groupCall1.onMemberStateChanged(fakeEvent);
