@@ -72,8 +72,8 @@ describe('Group Call', function() {
     });
 
     describe('Basic functionality', function() {
-        let mockSendState;
-        let mockClient;
+        let mockSendState: jest.Mock;
+        let mockClient: MatrixClient;
 
         beforeEach(function() {
             const typedMockClient = new MockCallMatrixClient(
