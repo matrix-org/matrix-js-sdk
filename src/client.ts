@@ -4614,6 +4614,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public async sendReadReceipt(event: MatrixEvent, receiptType = ReceiptType.Read, callback?: Callback): Promise<{}> {
+        if (!event) return;
         const eventId = event.getId();
         const room = this.getRoom(event.getRoomId());
         if (room && room.hasPendingEvent(eventId)) {

@@ -176,7 +176,7 @@ export class SyncApi {
     constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
-        this.opts.pollTimeout = this.opts.pollTimeout || (30 * 1000);
+        this.opts.pollTimeout = this.opts.pollTimeout || (60 * 1000);
         this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
         this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
@@ -505,7 +505,7 @@ export class SyncApi {
         // FIXME: gut wrenching; hard-coded timeout values
         this.client.http.authedRequest<IEventsResponse>(undefined, Method.Get, "/events", {
             room_id: peekRoom.roomId,
-            timeout: String(30 * 1000),
+            timeout: String(60 * 1000),
             from: token,
         }, undefined, 50 * 1000).then((res) => {
             if (this._peekRoom !== peekRoom) {

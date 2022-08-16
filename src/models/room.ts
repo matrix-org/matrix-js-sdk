@@ -2460,9 +2460,10 @@ export class Room extends TimelineReceipts<EmittedEvents, RoomEventHandlerMap> {
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
-                    const receipt = content[eventId][receiptType][userId];
+                    // hack, threadId should be thread_id
+                    const receipt = content[eventId][receiptType][userId] as any;
 
-                    const receiptDestination = this.threads.get(event.threadRootId) ?? this;
+                    const receiptDestination = this.threads.get(receipt.threadId) ?? this;
                     receiptDestination.addReceiptToStructure(
                         eventId,
                         receiptType,
