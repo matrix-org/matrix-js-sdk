@@ -32,6 +32,7 @@ import { MediaHandler } from '../../../src/webrtc/mediaHandler';
 
 const FAKE_ROOM_ID = "!fake:test.dummy";
 const FAKE_CONF_ID = "fakegroupcallid";
+
 const FAKE_USER_ID_1 = "@alice:test.dummy";
 const FAKE_DEVICE_ID_1 = "@AAAAAA";
 const FAKE_SESSION_ID_1 = "alice1";
