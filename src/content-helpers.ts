@@ -247,7 +247,7 @@ export const makeBeaconInfoContent: MakeBeaconInfoContent = (
 });
 
 export type BeaconInfoState = MBeaconInfoContent & {
-    assetType: LocationAssetType;
+    assetType?: LocationAssetType;
     timestamp: number;
 };
 /**
@@ -257,14 +257,12 @@ export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): Beacon
     const { description, timeout, live } = content;
     const timestamp = M_TIMESTAMP.findIn<number>(content);
     const asset = M_ASSET.findIn<MAssetContent>(content);
-    // default asset type to self, as with location events
-    const assetType = asset?.type ?? LocationAssetType.Self;
 
     return {
         description,
         timeout,
         live,
-        assetType,
+        assetType: asset?.type,
         timestamp,
     };
 };
