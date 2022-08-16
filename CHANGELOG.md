@@ -1,16 +1,10 @@
-Changes in [19.3.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.3.0-rc.2) (2022-08-12)
-============================================================================================================
-
-## 🐛 Bug Fixes
- * Fix finding event read up to if stable private read receipts is missing ([\#2585](https://github.com/matrix-org/matrix-js-sdk/pull/2585)). Fixes vector-im/element-web#23027.
-
-Changes in [19.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.3.0-rc.1) (2022-08-09)
-============================================================================================================
+Changes in [19.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.3.0) (2022-08-16)
+==================================================================================================
 
 ## ✨ Features
+ * Add txn_id support to sliding sync ([\#2567](https://github.com/matrix-org/matrix-js-sdk/pull/2567)).
  * Emit an event when the client receives TURN servers ([\#2529](https://github.com/matrix-org/matrix-js-sdk/pull/2529)).
  * Add support for stable prefixes for MSC2285 ([\#2524](https://github.com/matrix-org/matrix-js-sdk/pull/2524)).
- * Always block sending keys to unverified devices of verified users ([\#2562](https://github.com/matrix-org/matrix-js-sdk/pull/2562)). Contributed by @duxovni.
  * Remove stream-replacement ([\#2551](https://github.com/matrix-org/matrix-js-sdk/pull/2551)).
  * Add support for sending user-defined encrypted to-device messages ([\#2528](https://github.com/matrix-org/matrix-js-sdk/pull/2528)).
  * Retry to-device messages ([\#2549](https://github.com/matrix-org/matrix-js-sdk/pull/2549)). Fixes vector-im/element-web#12851.
@@ -18,6 +12,9 @@ Changes in [19.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
  * Use stable prefixes for MSC3827 ([\#2537](https://github.com/matrix-org/matrix-js-sdk/pull/2537)).
 
 ## 🐛 Bug Fixes
+ * Fix: Handle parsing of a beacon info event without asset ([\#2591](https://github.com/matrix-org/matrix-js-sdk/pull/2591)). Fixes vector-im/element-web#23078.
+ * Fix finding event read up to if stable private read receipts is missing ([\#2585](https://github.com/matrix-org/matrix-js-sdk/pull/2585)). Fixes vector-im/element-web#23027.
+ * Fixed a sliding sync issue where history could be interpreted as live events. ([\#2583](https://github.com/matrix-org/matrix-js-sdk/pull/2583)).
  * Don't load the sync accumulator if there's already a sync persist in flight ([\#2569](https://github.com/matrix-org/matrix-js-sdk/pull/2569)).
 
 Changes in [19.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.2.0) (2022-08-02)
