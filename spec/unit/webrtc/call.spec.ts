@@ -802,7 +802,7 @@ describe('Call', function() {
         });
     });
 
-    describe.only("muting", () => {
+    describe("muting", () => {
         beforeEach(async () => {
             call.sendVoipEvent = jest.fn();
             await startVideoCall(client, call);
