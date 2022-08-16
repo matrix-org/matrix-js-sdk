@@ -112,14 +112,23 @@ describe('Group Call', function() {
             try {
                 await groupCall.enter();
 
-                expect(mockSendState.mock.lastCall[0]).toEqual(FAKE_ROOM_ID);
-                expect(mockSendState.mock.lastCall[1]).toEqual(EventType.GroupCallMemberPrefix);
-                expect(mockSendState.mock.lastCall[2]['m.calls'].length).toEqual(1);
-                expect(mockSendState.mock.lastCall[2]['m.calls'][0]["m.call_id"]).toEqual(groupCall.groupCallId);
-                expect(mockSendState.mock.lastCall[2]['m.calls'][0]['m.devices'].length).toEqual(1);
-                expect(
-                    mockSendState.mock.lastCall[2]['m.calls'][0]['m.devices'][0].device_id,
-                ).toEqual(FAKE_DEVICE_ID_1);
+                expect(mockSendState).toHaveBeenCalledWith(
+                    FAKE_ROOM_ID,
+                    EventType.GroupCallMemberPrefix,
+                    expect.objectContaining({
+                        "m.calls": [
+                            expect.objectContaining({
+                                "m.call_id": groupCall.groupCallId,
+                                "m.devices": [
+                                    expect.objectContaining({
+                                        device_id: FAKE_DEVICE_ID_1,
+                                    }),
+                                ],
+                            }),
+                        ],
+                    }),
+                    FAKE_USER_ID_1,
+                );
             } finally {
                 groupCall.leave();
             }
