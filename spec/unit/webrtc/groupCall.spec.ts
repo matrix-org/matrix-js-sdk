@@ -170,8 +170,6 @@ describe('Group Call', function() {
                 await groupCall.setMicrophoneMuted(true);
 
                 expect(groupCall.isMicrophoneMuted()).toEqual(true);
-
-                expect(mockSendState.mock.lastCall[0]).toEqual(FAKE_ROOM_ID);
             } finally {
                 groupCall.leave();
             }
