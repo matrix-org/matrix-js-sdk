@@ -90,10 +90,13 @@ describe('Group Call', function() {
 
             await groupCall.create();
 
-            expect(mockSendState.mock.calls[0][0]).toEqual(FAKE_ROOM_ID);
-            expect(mockSendState.mock.calls[0][1]).toEqual(EventType.GroupCallPrefix);
-            expect(mockSendState.mock.calls[0][2]["m.type"]).toEqual(GroupCallType.Video);
-            expect(mockSendState.mock.calls[0][2]["m.intent"]).toEqual(GroupCallIntent.Prompt);
+            expect(mockSendState).toHaveBeenCalledWith(
+                FAKE_ROOM_ID, EventType.GroupCallPrefix, expect.objectContaining({
+                    "m.type": GroupCallType.Video,
+                    "m.intent": GroupCallIntent.Prompt,
+                }),
+                groupCall.groupCallId,
+            );
         });
 
         it("sends member state event to room on enter", async () => {
