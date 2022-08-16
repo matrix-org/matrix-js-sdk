@@ -74,6 +74,8 @@ describe('Group Call', function() {
     describe('Basic functionality', function() {
         let mockSendState: jest.Mock;
         let mockClient: MatrixClient;
+        let room: Room;
+        let groupCall: GroupCall;
 
         beforeEach(function() {
             const typedMockClient = new MockCallMatrixClient(
@@ -82,12 +84,12 @@ describe('Group Call', function() {
             mockSendState = typedMockClient.sendStateEvent;
 
             mockClient = typedMockClient as unknown as MatrixClient;
+
+            room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
+            groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
         });
 
         it("sends state event to room when creating", async () => {
-            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
-
             await groupCall.create();
 
             expect(mockSendState).toHaveBeenCalledWith(
@@ -100,9 +102,6 @@ describe('Group Call', function() {
         });
 
         it("sends member state event to room on enter", async () => {
-            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
-
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
             } as unknown as RoomMember;
@@ -135,9 +134,6 @@ describe('Group Call', function() {
         });
 
         it("starts with mic unmuted in regular calls", async () => {
-            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
-
             try {
                 await groupCall.create();
 
@@ -150,10 +146,12 @@ describe('Group Call', function() {
         });
 
         it("starts with mic muted in PTT calls", async () => {
-            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, true, GroupCallIntent.Prompt);
-
             try {
+                // replace groupcall with a PTT one for this test
+                // we will probably want a dedicated test suite for PTT calls, so when we do,
+                // this can go in there instead.
+                groupCall = new GroupCall(mockClient, room, GroupCallType.Video, true, GroupCallIntent.Prompt);
+
                 await groupCall.create();
 
                 await groupCall.initLocalCallFeed();
@@ -165,9 +163,6 @@ describe('Group Call', function() {
         });
 
         it("unmutes audio", async () => {
-            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
-
             try {
                 await groupCall.create();
 
@@ -184,9 +179,6 @@ describe('Group Call', function() {
         });
 
         it("starts with video unmuted in regular calls", async () => {
-            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
-
             try {
                 await groupCall.create();
 
@@ -199,9 +191,6 @@ describe('Group Call', function() {
         });
 
         it("unmutes video", async () => {
-            const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
-
             try {
                 await groupCall.create();
 
