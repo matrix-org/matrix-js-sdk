@@ -33,10 +33,9 @@ const FAKE_DEVICE_ID_2 = "@BBBBBB";
 const FAKE_SESSION_ID_2 = "bob1";
 
 class MockCallMatrixClient {
-    public mediaHandler: MediaHandler;
+    public mediaHandler: MediaHandler = new MockMediaHandler() as unknown as MediaHandler;
 
     constructor(public userId: string, public deviceId: string, public sessionId: string) {
-        this.mediaHandler = new MockMediaHandler() as unknown as MediaHandler;
     }
 
     groupCallEventHandler = {
