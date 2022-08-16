@@ -26,6 +26,7 @@ const FAKE_ROOM_ID = "!fake:test.dummy";
 
 describe('Group Call', function() {
     let mockClient: MatrixClient;
+    let room: Room;
 
     beforeEach(function() {
         // @ts-ignore Mock
@@ -69,12 +70,18 @@ describe('Group Call', function() {
             on: jest.fn(),
             removeListener: jest.fn(),
         } as unknown as MatrixClient;
+
+        room = new Room(FAKE_ROOM_ID, mockClient, FAKE_SELF_USER_ID);
+        room.currentState.getStateEvents = jest.fn().mockImplementation((_, userId) => {
+            if (userId != null) return FAKE_STATE_EVENTS.find(e => e.getStateKey() === userId) || null;
+            return FAKE_STATE_EVENTS;
+        });
+        room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
     });
 
     it("sends state event to room when creating", async () => {
         const mockSendState = mockClient.sendStateEvent as jest.Mock;
 
-        const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_SELF_USER_ID);
         const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
 
         await groupCall.create();
@@ -86,7 +93,6 @@ describe('Group Call', function() {
     });
 
     it("sends member state event to room on enter", async () => {
-        const room = new Room(FAKE_ROOM_ID, mockClient, FAKE_SELF_USER_ID);
         const groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
 
         room.currentState.members[FAKE_SELF_USER_ID] = {
