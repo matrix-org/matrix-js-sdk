@@ -4590,7 +4590,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId(),
         });
 
-        if (event.threadRootId) {
+        const isThread = !!event.threadRootId;
+        if (isThread) {
             path += utils.encodeUri("/$threadId", {
                 $threadId: event.threadRootId,
             });
