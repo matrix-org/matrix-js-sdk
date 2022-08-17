@@ -136,10 +136,16 @@ class MockCall {
     public state = CallState.Ringing;
     public opponentUserId = FAKE_USER_ID_1;
     public callId = "1";
+    public localUsermediaFeed = {
+        setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
+        stream: new MockMediaStream("stream"),
+    };
 
     public reject = jest.fn<void, []>();
     public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
     public hangup = jest.fn<void, []>();
+
+    public sendMetadataUpdate = jest.fn<void, []>();
 
     on = jest.fn();
     removeListener = jest.fn();
@@ -230,23 +236,6 @@ describe('Group Call', function() {
             }
         });
 
-        it("starts with mic muted in PTT calls", async () => {
-            try {
-                // replace groupcall with a PTT one for this test
-                // we will probably want a dedicated test suite for PTT calls, so when we do,
-                // this can go in there instead.
-                groupCall = new GroupCall(mockClient, room, GroupCallType.Video, true, GroupCallIntent.Prompt);
-
-                await groupCall.create();
-
-                await groupCall.initLocalCallFeed();
-
-                expect(groupCall.isMicrophoneMuted()).toEqual(true);
-            } finally {
-                groupCall.leave();
-            }
-        });
-
         it("disables audio stream when audio is set to muted", async () => {
             try {
                 await groupCall.create();
@@ -312,6 +301,104 @@ describe('Group Call', function() {
             } finally {
                 groupCall.leave();
             }
+        });
+
+        describe("PTT calls", () => {
+            beforeEach(async () => {
+                // replace groupcall with a PTT one
+                groupCall = new GroupCall(mockClient, room, GroupCallType.Video, true, GroupCallIntent.Prompt);
+
+                await groupCall.create();
+
+                await groupCall.initLocalCallFeed();
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+
+                groupCall.leave();
+            });
+
+            it("starts with mic muted in PTT calls", async () => {
+                expect(groupCall.isMicrophoneMuted()).toEqual(true);
+            });
+
+            it("re-mutes microphone after transmit timeout in PTT mode", async () => {
+                jest.useFakeTimers();
+
+                await groupCall.setMicrophoneMuted(false);
+                expect(groupCall.isMicrophoneMuted()).toEqual(false);
+
+                jest.advanceTimersByTime(groupCall.pttMaxTransmitTime + 100);
+
+                expect(groupCall.isMicrophoneMuted()).toEqual(true);
+            });
+
+            it("timer is cleared when mic muted again in PTT mode", async () => {
+                jest.useFakeTimers();
+
+                await groupCall.setMicrophoneMuted(false);
+                expect(groupCall.isMicrophoneMuted()).toEqual(false);
+
+                // 'talk' for half the allowed time
+                jest.advanceTimersByTime(groupCall.pttMaxTransmitTime / 2);
+
+                await groupCall.setMicrophoneMuted(true);
+                await groupCall.setMicrophoneMuted(false);
+
+                // we should still be unmuted after almost the full timeout duration
+                // if not, the timer for the original talking session must have fired
+                jest.advanceTimersByTime(groupCall.pttMaxTransmitTime - 100);
+
+                expect(groupCall.isMicrophoneMuted()).toEqual(false);
+            });
+
+            it("sends metadata updates before unmuting in PTT mode", async () => {
+                const mockCall = new MockCall(FAKE_ROOM_ID, groupCall.groupCallId);
+                groupCall.calls.push(mockCall as unknown as MatrixCall);
+
+                let metadataUpdateResolve: () => void;
+                const metadataUpdatePromise = new Promise<void>(resolve => {
+                    metadataUpdateResolve = resolve;
+                });
+                mockCall.sendMetadataUpdate = jest.fn().mockReturnValue(metadataUpdatePromise);
+
+                const mutePromise = groupCall.setMicrophoneMuted(false);
+                // we should still be muted at this point because the metadata update hasn't sent
+                expect(groupCall.isMicrophoneMuted()).toEqual(true);
+                expect(mockCall.localUsermediaFeed.setAudioVideoMuted).not.toHaveBeenCalled();
+                metadataUpdateResolve();
+
+                await mutePromise;
+
+                expect(mockCall.localUsermediaFeed.setAudioVideoMuted).toHaveBeenCalled();
+                expect(groupCall.isMicrophoneMuted()).toEqual(false);
+            });
+
+            it("sends metadata updates after muting in PTT mode", async () => {
+                const mockCall = new MockCall(FAKE_ROOM_ID, groupCall.groupCallId);
+                groupCall.calls.push(mockCall as unknown as MatrixCall);
+
+                // the call starts muted, so unmute to get in the right state to test
+                await groupCall.setMicrophoneMuted(false);
+                mockCall.localUsermediaFeed.setAudioVideoMuted.mockReset();
+
+                let metadataUpdateResolve: () => void;
+                const metadataUpdatePromise = new Promise<void>(resolve => {
+                    metadataUpdateResolve = resolve;
+                });
+                mockCall.sendMetadataUpdate = jest.fn().mockReturnValue(metadataUpdatePromise);
+
+                const mutePromise = groupCall.setMicrophoneMuted(true);
+                // we should be muted at this point, before the metadata update has been sent
+                expect(groupCall.isMicrophoneMuted()).toEqual(true);
+                expect(mockCall.localUsermediaFeed.setAudioVideoMuted).toHaveBeenCalled();
+                metadataUpdateResolve();
+
+                await mutePromise;
+
+                expect(groupCall.isMicrophoneMuted()).toEqual(true);
+            });
         });
     });
 
