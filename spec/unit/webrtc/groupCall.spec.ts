@@ -620,7 +620,7 @@ describe('Group Call', function() {
             expect(mockCall.answerWithCallFeeds).not.toHaveBeenCalled();
         });
 
-        it("answers calls for the right room & group call ID", async () => { 
+        it("answers calls for the right room & group call ID", async () => {
             const mockCall = new MockCall(room.roomId, groupCall.groupCallId);
 
             mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
