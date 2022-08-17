@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, GroupCallIntent, GroupCallType, MatrixEvent, Room, RoomMember } from '../../../src';
+import { EventType, GroupCallIntent, GroupCallType, MatrixCall, MatrixEvent, Room, RoomMember } from '../../../src';
 import { GroupCall } from "../../../src/webrtc/groupCall";
 import { MatrixClient } from "../../../src/client";
 import {
@@ -29,6 +29,9 @@ import { sleep } from "../../../src/utils";
 import { ReEmitter } from "../../../src/ReEmitter";
 import { TypedEventEmitter } from '../../../src/models/typed-event-emitter';
 import { MediaHandler } from '../../../src/webrtc/mediaHandler';
+import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from '../../../src/webrtc/callEventHandler';
+import { CallFeed } from '../../../src/webrtc/callFeed';
+import { CallState } from '../../../src/webrtc/call';
 
 const FAKE_ROOM_ID = "!fake:test.dummy";
 const FAKE_CONF_ID = "fakegroupcallid";
@@ -94,10 +97,11 @@ const createAndEnterGroupCall = async (cli: MatrixClient, room: Room): Promise<G
     return groupCall;
 };
 
-class MockCallMatrixClient {
+class MockCallMatrixClient extends TypedEventEmitter<CallEventHandlerEvent.Incoming, CallEventHandlerEventHandlerMap> {
     public mediaHandler: MediaHandler = new MockMediaHandler() as unknown as MediaHandler;
 
     constructor(public userId: string, public deviceId: string, public sessionId: string) {
+        super();
     }
 
     groupCallEventHandler = {
@@ -118,14 +122,33 @@ class MockCallMatrixClient {
     getDeviceId() { return this.deviceId; }
     getSessionId() { return this.sessionId; }
 
-    emit = jest.fn();
-    on = jest.fn();
-    removeListener = jest.fn();
     getTurnServers = () => [];
     isFallbackICEServerAllowed = () => false;
     reEmitter = new ReEmitter(new TypedEventEmitter());
     getUseE2eForGroupCall = () => false;
     checkTurnServers = () => null;
+}
+
+class MockCall {
+    constructor(public roomId: string, public groupCallId: string) {
+    }
+
+    public state = CallState.Ringing;
+    public opponentUserId = FAKE_USER_ID_1;
+    public callId = "1";
+
+    public reject = jest.fn<void, []>();
+    public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
+    public hangup = jest.fn<void, []>();
+
+    on = jest.fn();
+    removeListener = jest.fn();
+
+    getOpponentMember() {
+        return {
+            userId: this.opponentUserId,
+        };
+    }
 }
 
 describe('Group Call', function() {
@@ -544,6 +567,80 @@ describe('Group Call', function() {
 
                 groupCall.terminate();
             });
+        });
+    });
+
+    describe("incoming calls", () => {
+        let mockClient: MatrixClient;
+        let room: Room;
+        let groupCall: GroupCall;
+
+        beforeEach(async () => {
+            // we are bob here because we're testing incoming calls, and since alice's user id
+            // is lexicographically before Bob's, the spec requires that she calls Bob.
+            const typedMockClient = new MockCallMatrixClient(
+                FAKE_USER_ID_2, FAKE_DEVICE_ID_2, FAKE_SESSION_ID_2,
+            );
+            mockClient = typedMockClient as unknown as MatrixClient;
+
+            room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_2);
+            room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
+
+            groupCall = await createAndEnterGroupCall(mockClient, room);
+        });
+
+        afterEach(() => {
+            groupCall.leave();
+        });
+
+        it("ignores incoming calls for other rooms", async () => {
+            const mockCall = new MockCall("!someotherroom.fake.dummy", groupCall.groupCallId);
+
+            mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
+
+            expect(mockCall.reject).not.toHaveBeenCalled();
+            expect(mockCall.answerWithCallFeeds).not.toHaveBeenCalled();
+        });
+
+        it("rejects incoming calls for the wrong group call", async () => {
+            const mockCall = new MockCall(room.roomId, "not " + groupCall.groupCallId);
+
+            mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
+
+            expect(mockCall.reject).toHaveBeenCalled();
+        });
+
+        it("ignores incoming calls not in the ringing state", async () => {
+            const mockCall = new MockCall(room.roomId, groupCall.groupCallId);
+            mockCall.state = CallState.Connected;
+
+            mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
+
+            expect(mockCall.reject).not.toHaveBeenCalled();
+            expect(mockCall.answerWithCallFeeds).not.toHaveBeenCalled();
+        });
+
+        it("answers calls for the right room & group call ID", async () => {
+            const mockCall = new MockCall(room.roomId, groupCall.groupCallId);
+
+            mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
+
+            expect(mockCall.reject).not.toHaveBeenCalled();
+            expect(mockCall.answerWithCallFeeds).toHaveBeenCalled();
+            expect(groupCall.calls).toEqual([mockCall]);
+        });
+
+        it("replaces calls if it already has one with the same user", async () => {
+            const oldMockCall = new MockCall(room.roomId, groupCall.groupCallId);
+            const newMockCall = new MockCall(room.roomId, groupCall.groupCallId);
+            newMockCall.callId = "not " + oldMockCall.callId;
+
+            mockClient.emit(CallEventHandlerEvent.Incoming, oldMockCall as unknown as MatrixCall);
+            mockClient.emit(CallEventHandlerEvent.Incoming, newMockCall as unknown as MatrixCall);
+
+            expect(oldMockCall.hangup).toHaveBeenCalled();
+            expect(newMockCall.answerWithCallFeeds).toHaveBeenCalled();
+            expect(groupCall.calls).toEqual([newMockCall]);
         });
     });
 });
