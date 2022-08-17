@@ -263,6 +263,33 @@ describe('Group Call', function() {
                 groupCall.leave();
             }
         });
+
+        it("retains state of local user media stream when updated", async () => {
+            try {
+                await groupCall.create();
+
+                await groupCall.initLocalCallFeed();
+
+                const oldStream = groupCall.localCallFeed.stream as unknown as MockMediaStream;
+
+                // arbitrary values, important part is that they're the same afterwards
+                await groupCall.setLocalVideoMuted(true);
+                await groupCall.setMicrophoneMuted(false);
+
+                const newStream = await mockClient.getMediaHandler().getUserMediaStream(true, true);
+
+                groupCall.updateLocalUsermediaStream(newStream);
+
+                expect(groupCall.localCallFeed.stream).toBe(newStream);
+
+                expect(groupCall.isLocalVideoMuted()).toEqual(true);
+                expect(groupCall.isMicrophoneMuted()).toEqual(false);
+
+                expect(oldStream.isStopped).toEqual(true);
+            } finally {
+                groupCall.leave();
+            }
+        });
     });
 
     describe('Placing calls', function() {

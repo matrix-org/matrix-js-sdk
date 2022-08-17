@@ -148,6 +148,7 @@ export class MockMediaStream {
     ) {}
 
     listeners: [string, (...args: any[]) => any][] = [];
+    public isStopped = false;
 
     dispatchEvent(eventType: string) {
         this.listeners.forEach(([t, c]) => {
@@ -196,7 +197,9 @@ export class MockMediaHandler {
         this.userMediaStreams.push(stream);
         return stream;
     }
-    stopUserMediaStream() { }
+    stopUserMediaStream(stream: MockMediaStream) {
+        stream.isStopped = true;
+    }
     hasAudioDevice() { return true; }
     hasVideoDevice() { return true; }
     stopAllStreams() {}
