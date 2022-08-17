@@ -179,23 +179,26 @@ export class MockMediaStream {
 
 export class MockMediaDeviceInfo {
     constructor(
-        public kind: "audio" | "video",
+        public kind: "audioinput" | "videoinput" | "audiooutput",
     ) { }
 }
 
 export class MockMediaHandler {
-    public userMediaStreams: MediaStream[] = [];
-    public screensharingStreams: MediaStream[] = [];
+    public userMediaStreams: MockMediaStream[] = [];
+    public screensharingStreams: MockMediaStream[] = [];
 
     getUserMediaStream(audio: boolean, video: boolean) {
         const tracks = [];
         if (audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
         if (video) tracks.push(new MockMediaStreamTrack("video_track", "video"));
 
-        return new MockMediaStream("mock_stream_from_media_handler", tracks);
+        const stream = new MockMediaStream("mock_stream_from_media_handler", tracks);
+        this.userMediaStreams.push(stream);
+        return stream;
     }
     stopUserMediaStream() { }
     hasAudioDevice() { return true; }
+    hasVideoDevice() { return true; }
     stopAllStreams() {}
 }
 
