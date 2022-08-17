@@ -134,7 +134,7 @@ class MockCall {
     }
 
     public state = CallState.Ringing;
-    public opponentUserId = FAKE_USER_ID_2;
+    public opponentUserId = FAKE_USER_ID_1;
     public callId = "1";
 
     public reject = jest.fn<void, []>();
@@ -432,7 +432,7 @@ describe('Group Call', function() {
         });
     });
 
-    describe("Events on a single group call", () => {
+    describe("muting", () => {
         let mockClient: MatrixClient;
         let room: Room;
 
@@ -568,87 +568,79 @@ describe('Group Call', function() {
                 groupCall.terminate();
             });
         });
+    });
 
-        describe("Incoming Calls", function() {
-            it("ignores incoming calls for other rooms", async () => {
-                const groupCall = await createAndEnterGroupCall(mockClient, room);
+    describe("incoming calls", () => {
+        let mockClient: MatrixClient;
+        let room: Room;
+        let groupCall: GroupCall;
 
-                try {
-                    const mockCall = new MockCall("!someotherroom.fake.dummy", groupCall.groupCallId);
+        beforeEach(async () => {
+            // we are bob here because we're testing incoming calls, and since alice's user id
+            // is lexicographically before Bob's, the spec requires that she calls Bob.
+            const typedMockClient = new MockCallMatrixClient(
+                FAKE_USER_ID_2, FAKE_DEVICE_ID_2, FAKE_SESSION_ID_2,
+            );
+            mockClient = typedMockClient as unknown as MatrixClient;
 
-                    mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
+            room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_2);
+            room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
 
-                    expect(mockCall.reject).not.toHaveBeenCalled();
-                    expect(mockCall.answerWithCallFeeds).not.toHaveBeenCalled();
-                } finally {
-                    groupCall.leave();
-                }
-            });
+            groupCall = await createAndEnterGroupCall(mockClient, room);
+        });
 
-            it("rejects incoming calls for the wrong group call", async () => {
-                const groupCall = await createAndEnterGroupCall(mockClient, room);
+        afterEach(() => {
+            groupCall.leave();
+        });
 
-                try {
-                    const mockCall = new MockCall(room.roomId, "not " + groupCall.groupCallId);
+        it("ignores incoming calls for other rooms", async () => {
+            const mockCall = new MockCall("!someotherroom.fake.dummy", groupCall.groupCallId);
 
-                    mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
+            mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
 
-                    expect(mockCall.reject).toHaveBeenCalled();
-                } finally {
-                    groupCall.leave();
-                }
-            });
+            expect(mockCall.reject).not.toHaveBeenCalled();
+            expect(mockCall.answerWithCallFeeds).not.toHaveBeenCalled();
+        });
 
-            it("ignores incoming calls not in the ringing state", async () => {
-                const groupCall = await createAndEnterGroupCall(mockClient, room);
+        it("rejects incoming calls for the wrong group call", async () => {
+            const mockCall = new MockCall(room.roomId, "not " + groupCall.groupCallId);
 
-                try {
-                    const mockCall = new MockCall(room.roomId, groupCall.groupCallId);
-                    mockCall.state = CallState.Connected;
+            mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
 
-                    mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
+            expect(mockCall.reject).toHaveBeenCalled();
+        });
 
-                    expect(mockCall.reject).not.toHaveBeenCalled();
-                    expect(mockCall.answerWithCallFeeds).not.toHaveBeenCalled();
-                } finally {
-                    groupCall.leave();
-                }
-            });
+        it("ignores incoming calls not in the ringing state", async () => {
+            const mockCall = new MockCall(room.roomId, groupCall.groupCallId);
+            mockCall.state = CallState.Connected;
 
-            it("answers calls for the right room & group call ID", async () => {
-                const groupCall = await createAndEnterGroupCall(mockClient, room);
+            mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
 
-                try {
-                    const mockCall = new MockCall(room.roomId, groupCall.groupCallId);
+            expect(mockCall.reject).not.toHaveBeenCalled();
+            expect(mockCall.answerWithCallFeeds).not.toHaveBeenCalled();
+        });
 
-                    mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
+        it("answers calls for the right room & group call ID", async () => { 
+            const mockCall = new MockCall(room.roomId, groupCall.groupCallId);
 
-                    expect(mockCall.reject).not.toHaveBeenCalled();
-                    expect(mockCall.answerWithCallFeeds).toHaveBeenCalled();
-                    expect(groupCall.calls).toEqual([mockCall]);
-                } finally {
-                    groupCall.leave();
-                }
-            });
+            mockClient.emit(CallEventHandlerEvent.Incoming, mockCall as unknown as MatrixCall);
 
-            it("replaces calls if it already has one with the same user", async () => {
-                const groupCall = await createAndEnterGroupCall(mockClient, room);
+            expect(mockCall.reject).not.toHaveBeenCalled();
+            expect(mockCall.answerWithCallFeeds).toHaveBeenCalled();
+            expect(groupCall.calls).toEqual([mockCall]);
+        });
 
-                try {
-                    const oldMockCall = new MockCall(room.roomId, groupCall.groupCallId);
-                    const newMockCall = new MockCall(room.roomId, groupCall.groupCallId);
-                    newMockCall.callId = "not " + oldMockCall.callId;
+        it("replaces calls if it already has one with the same user", async () => {
+            const oldMockCall = new MockCall(room.roomId, groupCall.groupCallId);
+            const newMockCall = new MockCall(room.roomId, groupCall.groupCallId);
+            newMockCall.callId = "not " + oldMockCall.callId;
 
-                    mockClient.emit(CallEventHandlerEvent.Incoming, oldMockCall as unknown as MatrixCall);
-                    mockClient.emit(CallEventHandlerEvent.Incoming, newMockCall as unknown as MatrixCall);
+            mockClient.emit(CallEventHandlerEvent.Incoming, oldMockCall as unknown as MatrixCall);
+            mockClient.emit(CallEventHandlerEvent.Incoming, newMockCall as unknown as MatrixCall);
 
-                    expect(oldMockCall.hangup).toHaveBeenCalled();
-                    expect(newMockCall.answerWithCallFeeds).toHaveBeenCalled();
-                    expect(groupCall.calls).toEqual([newMockCall]);
-                } finally {
-                    groupCall.leave();
-                }
-            });
+            expect(oldMockCall.hangup).toHaveBeenCalled();
+            expect(newMockCall.answerWithCallFeeds).toHaveBeenCalled();
+            expect(groupCall.calls).toEqual([newMockCall]);
         });
     });
 });
