@@ -866,8 +866,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public answerWithCallFeeds(callFeeds: CallFeed[]): void {
         if (this.inviteOrAnswerSent) return;
 
-        logger.debug(`Answering call ${this.callId}`);
-
         this.gotCallFeedsForAnswer(callFeeds);
     }
 
