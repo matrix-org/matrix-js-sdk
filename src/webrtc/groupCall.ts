@@ -373,6 +373,11 @@ export class GroupCall extends TypedEventEmitter<
         this.retryCallCounts.clear();
         clearTimeout(this.retryCallLoopTimeout);
 
+        for (const [userId] of this.memberStateExpirationTimers) {
+            clearTimeout(this.memberStateExpirationTimers.get(userId));
+            this.memberStateExpirationTimers.delete(userId);
+        }
+
         if (this.transmitTimer !== null) {
             clearTimeout(this.transmitTimer);
             this.transmitTimer = null;
