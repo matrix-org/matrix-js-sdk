@@ -158,7 +158,7 @@ describe("Crypto", function() {
         let fakeEmitter;
 
         beforeEach(async function() {
-            const mockStorage = new MockStorageApi();
+            const mockStorage = new MockStorageApi() as unknown as Storage;
             const clientStore = new MemoryStore({ localStorage: mockStorage });
             const cryptoStore = new MemoryCryptoStore();
 

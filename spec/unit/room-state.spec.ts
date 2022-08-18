@@ -527,10 +527,10 @@ describe("RoomState", function() {
                     // state_default: 50, "intentionally left blank"
                     events_default: 25,
                     users: {
+                        [userA]: 50,
                     },
                 },
             });
-            powerLevelEvent.event.content.users[userA] = 50;
 
             state.setStateEvents([powerLevelEvent]);
 
@@ -548,11 +548,11 @@ describe("RoomState", function() {
                         state_default: 30,
                         events_default: 25,
                         users: {
+                            [userA]: 30,
+                            [userB]: 29,
                         },
                     },
                 });
-                powerLevelEvent.event.content.users[userA] = 30;
-                powerLevelEvent.event.content.users[userB] = 29;
 
                 state.setStateEvents([powerLevelEvent]);
 
@@ -572,11 +572,11 @@ describe("RoomState", function() {
                         state_default: 50,
                         events_default: 25,
                         users: {
+                            [userA]: 80,
+                            [userB]: 50,
                         },
                     },
                 });
-                powerLevelEvent.event.content.users[userA] = 80;
-                powerLevelEvent.event.content.users[userB] = 50;
 
                 state.setStateEvents([powerLevelEvent]);
 
@@ -715,11 +715,11 @@ describe("RoomState", function() {
                         state_default: 30,
                         events_default: 25,
                         users: {
+                            [userA]: 26,
+                            [userB]: 24,
                         },
                     },
                 });
-                powerLevelEvent.event.content.users[userA] = 26;
-                powerLevelEvent.event.content.users[userB] = 24;
 
                 state.setStateEvents([powerLevelEvent]);
 
@@ -743,11 +743,11 @@ describe("RoomState", function() {
                         state_default: 50,
                         events_default: 25,
                         users: {
+                            [userA]: 40,
+                            [userB]: 30,
                         },
                     },
                 });
-                powerLevelEvent.event.content.users[userA] = 40;
-                powerLevelEvent.event.content.users[userB] = 30;
 
                 state.setStateEvents([powerLevelEvent]);
 
