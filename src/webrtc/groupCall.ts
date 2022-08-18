@@ -182,7 +182,7 @@ export class GroupCall extends TypedEventEmitter<
     private reEmitter: ReEmitter;
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
     private memberStateExpirationTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-    private resendMemberStateTimer: ReturnType<typeof setTimeout> | null = null;
+    private resendMemberStateTimer: ReturnType<typeof setInterval> | null = null;
 
     constructor(
         private client: MatrixClient,
@@ -698,6 +698,8 @@ export class GroupCall extends TypedEventEmitter<
 
         const res = await send();
 
+        // Clear the old interval first, so that it isn't forgot
+        clearInterval(this.resendMemberStateTimer);
         // Resend the state event every so often so it doesn't become stale
         this.resendMemberStateTimer = setInterval(async () => {
             logger.log("Resending call member state");
