@@ -221,7 +221,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @fires module:client~MatrixClient#event:"RoomMember.typing"
      */
     public setTypingEvent(event: MatrixEvent): void {
-        if (event.getType() !== "m.typing") {
+        if (event.getType() !== EventType.Typing) {
             return;
         }
         const oldTyping = this.typing;

@@ -46,10 +46,10 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { TypedEventEmitter } from "./typed-event-emitter";
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
+import { ReceiptContent, synthesizeReceipt, TimelineReceipts } from "./timeline-receipts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -59,23 +59,6 @@ import { RelationsContainer } from "./relations-container";
 // return an m.room_versions capability.
 export const KNOWN_SAFE_ROOM_VERSION = '9';
 const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
-function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
-    // console.log("synthesizing receipt for "+event.getId());
-    return new MatrixEvent({
-        content: {
-            [event.getId()]: {
-                [receiptType]: {
-                    [userId]: {
-                        ts: event.getTs(),
-                    },
-                },
-            },
-        },
-        type: EventType.Receipt,
-        room_id: event.getRoomId(),
-    });
-}
 
 interface IOpts {
     storageToken?: string;
@@ -89,40 +72,6 @@ export interface IRecommendedVersion {
     needsUpgrade: boolean;
     urgent: boolean;
 }
-
-interface IReceipt {
-    ts: number;
-}
-
-export interface IWrappedReceipt {
-    eventId: string;
-    data: IReceipt;
-}
-
-interface ICachedReceipt {
-    type: ReceiptType;
-    userId: string;
-    data: IReceipt;
-}
-
-type ReceiptCache = {[eventId: string]: ICachedReceipt[]};
-
-interface IReceiptContent {
-    [eventId: string]: {
-        [key in ReceiptType]: {
-            [userId: string]: IReceipt;
-        };
-    };
-}
-
-const ReceiptPairRealIndex = 0;
-const ReceiptPairSyntheticIndex = 1;
-// We will only hold a synthetic receipt if we do not have a real receipt or the synthetic is newer.
-type Receipts = {
-    [receiptType: string]: {
-        [userId: string]: [IWrappedReceipt, IWrappedReceipt]; // Pair<real receipt, synthetic receipt> (both nullable)
-    };
-};
 
 // When inserting a visibility event affecting event `eventId`, we
 // need to scan through existing visibility events for `eventId`.
@@ -212,12 +161,6 @@ type NotificationCount = Partial<Record<NotificationCountType, number>>;
 export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
-    // receipts should clobber based on receipt_type and user_id pairs hence
-    // the form of this structure. This is sub-optimal for the exposed APIs
-    // which pass in an event ID and get back some receipts, so we also store
-    // a pre-cached list for this purpose.
-    private receipts: Receipts = {}; // { receipt_type: { user_id: IReceipt } }
-    private receiptCacheByEventId: ReceiptCache = {}; // { event_id: ICachedReceipt[] }
     private notificationCounts: NotificationCount = {};
     private threadNotifications: Record<string, NotificationCount> = {};
     private readonly timelineSets: EventTimelineSet[];
@@ -2622,7 +2565,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         let latest = privateReadReceipt;
         [unstablePrivateReadReceipt, publicReadReceipt].forEach((receipt) => {
-            if (receipt?.data?.ts > latest?.data?.ts || !latest) {
+            if (receipt?.data?.ts > latest?.data?.ts) {
                 latest = receipt;
             }
         });
@@ -2688,123 +2631,28 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @param {Boolean} synthetic True if this event is implicit.
      */
     public addReceipt(event: MatrixEvent, synthetic = false): void {
-        this.addReceiptsToStructure(event, synthetic);
-        // send events after we've regenerated the structure & cache, otherwise things that
-        // listened for the event would read stale data.
-        this.emit(RoomEvent.Receipt, event, this);
-    }
+        const content = event.getContent<ReceiptContent>();
+        Object.keys(content).forEach((eventId: string) => {
+            Object.keys(content[eventId]).forEach((receiptType: ReceiptType) => {
+                Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
+                    // hack, threadId should be thread_id
+                    const receipt = content[eventId][receiptType][userId] as any;
 
-    /**
-     * Add a receipt event to the room.
-     * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} synthetic True if this event is implicit.
-     */
-    private addReceiptsToStructure(event: MatrixEvent, synthetic: boolean): void {
-        const content = event.getContent<IReceiptContent>();
-        Object.keys(content).forEach((eventId) => {
-            Object.keys(content[eventId]).forEach((receiptType) => {
-                Object.keys(content[eventId][receiptType]).forEach((userId) => {
-                    const receipt = content[eventId][receiptType][userId];
-
-                    if (!this.receipts[receiptType]) {
-                        this.receipts[receiptType] = {};
-                    }
-                    if (!this.receipts[receiptType][userId]) {
-                        this.receipts[receiptType][userId] = [null, null];
-                    }
-
-                    const pair = this.receipts[receiptType][userId];
-
-                    let existingReceipt = pair[ReceiptPairRealIndex];
-                    if (synthetic) {
-                        existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
-                    }
-
-                    if (existingReceipt) {
-                        // we only want to add this receipt if we think it is later than the one we already have.
-                        // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
-                        const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            existingReceipt.eventId,
-                            eventId,
-                        );
-                        if (ordering !== null && ordering >= 0) {
-                            return;
-                        }
-                    }
-
-                    const wrappedReceipt: IWrappedReceipt = {
+                    const receiptDestination = this.threads.get(receipt.thread_id) ?? this;
+                    receiptDestination.addReceiptToStructure(
                         eventId,
-                        data: receipt,
-                    };
-
-                    const realReceipt = synthetic ? pair[ReceiptPairRealIndex] : wrappedReceipt;
-                    const syntheticReceipt = synthetic ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
-
-                    let ordering: number | null = null;
-                    if (realReceipt && syntheticReceipt) {
-                        ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            realReceipt.eventId,
-                            syntheticReceipt.eventId,
-                        );
-                    }
-
-                    const preferSynthetic = ordering === null || ordering < 0;
-
-                    // we don't bother caching just real receipts by event ID as there's nothing that would read it.
-                    // Take the current cached receipt before we overwrite the pair elements.
-                    const cachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
-
-                    if (synthetic && preferSynthetic) {
-                        pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
-                    } else if (!synthetic) {
-                        pair[ReceiptPairRealIndex] = wrappedReceipt;
-
-                        if (!preferSynthetic) {
-                            pair[ReceiptPairSyntheticIndex] = null;
-                        }
-                    }
-
-                    const newCachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
-                    if (cachedReceipt === newCachedReceipt) return;
-
-                    // clean up any previous cache entry
-                    if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
-                        const previousEventId = cachedReceipt.eventId;
-                        // Remove the receipt we're about to clobber out of existence from the cache
-                        this.receiptCacheByEventId[previousEventId] = (
-                            this.receiptCacheByEventId[previousEventId].filter(r => {
-                                return r.type !== receiptType || r.userId !== userId;
-                            })
-                        );
-
-                        if (this.receiptCacheByEventId[previousEventId].length < 1) {
-                            delete this.receiptCacheByEventId[previousEventId]; // clean up the cache keys
-                        }
-                    }
-
-                    // cache the new one
-                    if (!this.receiptCacheByEventId[eventId]) {
-                        this.receiptCacheByEventId[eventId] = [];
-                    }
-                    this.receiptCacheByEventId[eventId].push({
-                        userId: userId,
-                        type: receiptType as ReceiptType,
-                        data: receipt,
-                    });
+                        receiptType,
+                        userId,
+                        receipt,
+                        synthetic,
+                    );
                 });
             });
         });
-    }
 
-    /**
-     * Add a temporary local-echo receipt to the room to reflect in the
-     * client the fact that we've sent one.
-     * @param {string} userId The user ID if the receipt sender
-     * @param {MatrixEvent} e The event that is to be acknowledged
-     * @param {ReceiptType} receiptType The type of receipt
-     */
-    public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: ReceiptType): void {
-        this.addReceipt(synthesizeReceipt(userId, e, receiptType), true);
+        // send events after we've regenerated the structure & cache, otherwise things that
+        // listened for the event would read stale data.
+        this.emit(RoomEvent.Receipt, event, this);
     }
 
     /**

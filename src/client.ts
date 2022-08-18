@@ -4584,11 +4584,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return Promise.resolve({}); // guests cannot send receipts so don't bother.
         }
 
-        const path = utils.encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+        let path = utils.encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
             $roomId: event.getRoomId(),
             $receiptType: receiptType,
             $eventId: event.getId(),
         });
+
+        const isThread = !!event.threadRootId;
+        if (isThread) {
+            path += utils.encodeUri("/$threadId", {
+                $threadId: event.threadRootId,
+            });
+        }
+
         const promise = this.http.authedRequest(callback, Method.Post, path, undefined, body || {});
 
         const room = this.getRoom(event.getRoomId());
@@ -4607,6 +4615,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public async sendReadReceipt(event: MatrixEvent, receiptType = ReceiptType.Read, callback?: Callback): Promise<{}> {
+        if (!event) return;
         const eventId = event.getId();
         const room = this.getRoom(event.getRoomId());
         if (room && room.hasPendingEvent(eventId)) {
