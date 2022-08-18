@@ -158,11 +158,11 @@ export type RoomEventHandlerMap = {
 
 type NotificationCount = Partial<Record<NotificationCountType, number>>;
 
-export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
+export class Room extends TimelineReceipts<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
-    private threadNotifications: Record<string, NotificationCount> = {};
+    public threadNotifications: Record<string, NotificationCount> = {};
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -1163,10 +1163,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     public setThreadUnreadNotificationCount(threadId: string, type: NotificationCountType, count: number): void {
-        const notificationCount = this.threadNotifications[threadId];
-        if (notificationCount) {
-            notificationCount[type] = count;
-        }
+        this.threadNotifications[threadId] = {
+            highlight: this.threadNotifications[threadId]?.highlight ?? 0,
+            total: this.threadNotifications[threadId]?.total ?? 0,
+            ...{
+                [type]: count,
+            },
+        };
     }
 
     public setSummary(summary: IRoomSummary): void {
@@ -2494,24 +2497,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
-     * Gets the latest receipt for a given user in the room
-     * @param userId The id of the user for which we want the receipt
-     * @param ignoreSynthesized Whether to ignore synthesized receipts or not
-     * @param receiptType Optional. The type of the receipt we want to get
-     * @returns the latest receipts of the chosen type for the chosen user
-     */
-    public getReadReceiptForUserId(
-        userId: string, ignoreSynthesized = false, receiptType = ReceiptType.Read,
-    ): IWrappedReceipt | null {
-        const [realReceipt, syntheticReceipt] = this.receipts[receiptType]?.[userId] ?? [];
-        if (ignoreSynthesized) {
-            return realReceipt;
-        }
-
-        return syntheticReceipt ?? realReceipt;
-    }
-
-    /**
      * Get the ID of the event that a given user has read up to, or null if we
      * have received no read receipts from them.
      * @param {String} userId The user ID to get read receipt event ID for
@@ -2613,16 +2598,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         // We don't know if the user has read it, so assume not.
         return false;
-    }
-
-    /**
-     * Get a list of receipts for the given event.
-     * @param {MatrixEvent} event the event to get receipts for
-     * @return {Object[]} A list of receipts with a userId, type and data keys or
-     * an empty list.
-     */
-    public getReceiptsForEvent(event: MatrixEvent): ICachedReceipt[] {
-        return this.receiptCacheByEventId[event.getId()] || [];
     }
 
     /**

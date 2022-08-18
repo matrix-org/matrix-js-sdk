@@ -1300,6 +1300,7 @@ export class SyncApi {
                 }
             }
 
+            room.threadNotifications = {};
             const unreadThreadNotifications = joinObj.unread_thread_notifications;
             if (unreadThreadNotifications) {
                 Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
