@@ -2459,25 +2459,43 @@ describe("Room", function() {
                 }
             });
 
-            it("should compare correctly by timestamp", () => {
-                for (let i = 1; i <= 3; i++) {
+            describe("correctly compares by timestamp", () => {
+                it("should correctly compare, if we have all receipts", () => {
+                    for (let i = 1; i <= 3; i++) {
+                        room.getUnfilteredTimelineSet = () => ({
+                            compareEventOrdering: (_1, _2) => null,
+                        } as EventTimelineSet);
+                        room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                            if (receiptType === ReceiptType.ReadPrivate) {
+                                return { eventId: "eventId1", data: { ts: i === 1 ? 1 : 0 } } as IWrappedReceipt;
+                            }
+                            if (receiptType === ReceiptType.UnstableReadPrivate) {
+                                return { eventId: "eventId2", data: { ts: i === 2 ? 1 : 0 } } as IWrappedReceipt;
+                            }
+                            if (receiptType === ReceiptType.Read) {
+                                return { eventId: "eventId3", data: { ts: i === 3 ? 1 : 0 } } as IWrappedReceipt;
+                            }
+                        };
+
+                        expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
+                    }
+                });
+
+                it("should correctly compare, if private read receipt is missing", () => {
                     room.getUnfilteredTimelineSet = () => ({
                         compareEventOrdering: (_1, _2) => null,
                     } as EventTimelineSet);
                     room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
-                        if (receiptType === ReceiptType.ReadPrivate) {
-                            return { eventId: "eventId1", data: { ts: i === 1 ? 1 : 0 } } as IWrappedReceipt;
-                        }
                         if (receiptType === ReceiptType.UnstableReadPrivate) {
-                            return { eventId: "eventId2", data: { ts: i === 2 ? 1 : 0 } } as IWrappedReceipt;
+                            return { eventId: "eventId1", data: { ts: 0 } } as IWrappedReceipt;
                         }
                         if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId3", data: { ts: i === 3 ? 1 : 0 } } as IWrappedReceipt;
+                            return { eventId: "eventId2", data: { ts: 1 } } as IWrappedReceipt;
                         }
                     };
 
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
-                }
+                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
+                });
             });
 
             describe("fallback precedence", () => {
