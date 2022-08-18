@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { IScreensharingOpts } from "../../src/webrtc/mediaHandler";
+
 export const DUMMY_SDP = (
     "v=0\r\n" +
     "o=- 5022425983810148698 2 IN IP4 127.0.0.1\r\n" +
@@ -75,6 +77,7 @@ export class MockRTCPeerConnection {
     private negotiationNeededListener: () => void;
     private needsNegotiation = false;
     localDescription: RTCSessionDescription;
+    signalingState: RTCSignalingState = "stable";
 
     public static triggerAllNegotiations() {
         for (const inst of this.instances) {
@@ -137,6 +140,26 @@ export class MockMediaStreamTrack {
     constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) { }
 
     stop() { }
+
+    listeners: [string, (...args: any[]) => any][] = [];
+    public isStopped = false;
+
+    // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
+    // implementation
+    dispatchEvent(eventType: string) {
+        this.listeners.forEach(([t, c]) => {
+            if (t !== eventType) return;
+            c();
+        });
+    }
+    addEventListener(eventType: string, callback: (...args: any[]) => any) {
+        this.listeners.push([eventType, callback]);
+    }
+    removeEventListener(eventType: string, callback: (...args: any[]) => any) {
+        this.listeners.filter(([t, c]) => {
+            return t !== eventType || c !== callback;
+        });
+    }
 }
 
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
@@ -198,6 +221,17 @@ export class MockMediaHandler {
         return stream;
     }
     stopUserMediaStream(stream: MockMediaStream) {
+        stream.isStopped = true;
+    }
+    getScreensharingStream(opts?: IScreensharingOpts) {
+        const tracks = [new MockMediaStreamTrack("video_track", "video")];
+        if (opts?.audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
+
+        const stream = new MockMediaStream("mock_screen_stream_from_media_handler", tracks);
+        this.screensharingStreams.push(stream);
+        return stream;
+    }
+    stopScreensharingStream(stream: MockMediaStream) {
         stream.isStopped = true;
     }
     hasAudioDevice() { return true; }

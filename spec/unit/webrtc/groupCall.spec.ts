@@ -730,4 +730,77 @@ describe('Group Call', function() {
             expect(groupCall.calls).toEqual([newMockCall]);
         });
     });
+
+    describe("screensharing", () => {
+        let mockClient: MatrixClient;
+        let room: Room;
+        let groupCall: GroupCall;
+
+        beforeEach(async () => {
+            const typedMockClient = new MockCallMatrixClient(
+                FAKE_USER_ID_1, FAKE_DEVICE_ID_1, FAKE_SESSION_ID_1,
+            );
+            mockClient = typedMockClient as unknown as MatrixClient;
+
+            room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
+            room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
+            room.currentState.getStateEvents = jest.fn().mockImplementation((type: EventType, userId: string) => {
+                return type === EventType.GroupCallMemberPrefix
+                    ? FAKE_STATE_EVENTS.find(e => e.getStateKey() === userId) || FAKE_STATE_EVENTS
+                    : { getContent: () => ([]) };
+            });
+
+            groupCall = await createAndEnterGroupCall(mockClient, room);
+        });
+
+        it("sending screensharing stream", async () => {
+            const onNegotiationNeededArray = groupCall.calls.map(call => {
+                // @ts-ignore Mock
+                call.gotLocalOffer = jest.fn();
+                // @ts-ignore Mock
+                return call.gotLocalOffer;
+            });
+
+            await groupCall.setScreensharingEnabled(true);
+            MockRTCPeerConnection.triggerAllNegotiations();
+
+            expect(groupCall.screenshareFeeds).toHaveLength(1);
+            groupCall.calls.forEach(c => {
+                expect(c.getLocalFeeds().find(f => f.purpose === SDPStreamMetadataPurpose.Screenshare)).toBeDefined();
+            });
+            onNegotiationNeededArray.forEach(f => expect(f).toHaveBeenCalled());
+
+            groupCall.terminate();
+        });
+
+        it("receiving screensharing stream", async () => {
+            // It takes a bit of time for the calls to get created
+            await sleep(10);
+
+            const call = groupCall.calls[0];
+            call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
+            call.onNegotiateReceived({
+                getContent: () => ({
+                    [SDPStreamMetadataKey]: {
+                        "screensharing_stream": {
+                            purpose: SDPStreamMetadataPurpose.Screenshare,
+                        },
+                    },
+                    description: {
+                        type: "offer",
+                        sdp: "...",
+                    },
+                }),
+            } as MatrixEvent);
+            // @ts-ignore Mock
+            call.pushRemoteFeed(new MockMediaStream("screensharing_stream", [
+                new MockMediaStreamTrack("video_track", "video"),
+            ]));
+
+            expect(groupCall.screenshareFeeds).toHaveLength(1);
+            expect(groupCall.getScreenshareFeedByUserId(call.invitee)).toBeDefined();
+
+            groupCall.terminate();
+        });
+    });
 });
