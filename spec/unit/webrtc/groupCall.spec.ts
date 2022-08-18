@@ -677,6 +677,7 @@ describe('Group Call', function() {
             await groupCall.setScreensharingEnabled(true);
             MockRTCPeerConnection.triggerAllNegotiations();
 
+            expect(groupCall.screenshareFeeds).toHaveLength(1);
             groupCall.calls.forEach(c => {
                 expect(c.getLocalFeeds().find(f => f.purpose === SDPStreamMetadataPurpose.Screenshare)).toBeDefined();
             });
@@ -686,8 +687,6 @@ describe('Group Call', function() {
         });
 
         it("receiving screensharing stream", async () => {
-            const groupCall = await createAndEnterGroupCall(mockClient, room);
-
             // It takes a bit of time for the calls to get created
             await sleep(10);
 
@@ -711,6 +710,7 @@ describe('Group Call', function() {
                 new MockMediaStreamTrack("video_track", "video"),
             ]));
 
+            expect(groupCall.screenshareFeeds).toHaveLength(1);
             expect(groupCall.getScreenshareFeedByUserId(call.invitee)).toBeDefined();
 
             groupCall.terminate();
