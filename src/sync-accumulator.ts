@@ -76,6 +76,9 @@ export interface IJoinedRoom {
     ephemeral: IEphemeral;
     account_data: IAccountData;
     unread_notifications: IUnreadNotificationCounts;
+    unread_thread_notifications?: {
+        [threadId: string]: IUnreadNotificationCounts;
+    };
 }
 
 export interface IStrippedState {
@@ -154,6 +157,9 @@ interface IRoom {
     _summary: Partial<IRoomSummary>;
     _accountData: { [eventType: string]: IMinimalEvent };
     _unreadNotifications: Partial<IUnreadNotificationCounts>;
+    _unreadThreadNotifications?: {
+        [threadId: string]: Partial<IUnreadNotificationCounts>;
+    };
     _readReceipts: {
         [userId: string]: {
             data: IMinimalEvent;
@@ -358,12 +364,13 @@ export class SyncAccumulator {
             // Create truly empty objects so event types of 'hasOwnProperty' and co
             // don't cause this code to break.
             this.joinRooms[roomId] = {
-                _currentState: Object.create(null),
-                _timeline: [],
-                _accountData: Object.create(null),
-                _unreadNotifications: {},
-                _summary: {},
-                _readReceipts: {},
+                "_currentState": Object.create(null),
+                "_timeline": [],
+                "_accountData": Object.create(null),
+                "_unreadNotifications": {},
+                "_unreadThreadNotifications": {},
+                "_summary": {},
+                "_readReceipts": {},
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -378,6 +385,9 @@ export class SyncAccumulator {
         // these probably clobber, spec is unclear.
         if (data.unread_notifications) {
             currentData._unreadNotifications = data.unread_notifications;
+        }
+        if (data.unread_thread_notifications) {
+            currentData._unreadThreadNotifications = data.unread_thread_notifications;
         }
         if (data.summary) {
             const HEROES_KEY = "m.heroes";
@@ -537,6 +547,7 @@ export class SyncAccumulator {
                     prev_batch: null,
                 },
                 unread_notifications: roomData._unreadNotifications,
+                unread_thread_notifications: roomData._unreadThreadNotifications,
                 summary: roomData._summary as IRoomSummary,
             };
             // Add account data

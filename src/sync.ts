@@ -138,6 +138,8 @@ interface ISyncParams {
     // eslint-disable-next-line camelcase
     set_presence?: SetPresence;
     _cacheBuster?: string | number; // not part of the API itself
+    unread_thread_notifications?: boolean;
+    "org.matrix.msc3773.unread_thread_notifications"?: boolean;
 }
 
 type WrappedRoom<T> = T & {
@@ -996,8 +998,10 @@ export class SyncApi {
         }
 
         const qps: ISyncParams = {
-            filter: filterId,
-            timeout: pollTimeout,
+            "filter": filterId,
+            "timeout": pollTimeout,
+            "unread_thread_notifications": true,
+            "org.matrix.msc3773.unread_thread_notifications": true,
         };
 
         if (this.opts.disablePresence) {
@@ -1297,6 +1301,27 @@ export class SyncApi {
                         joinObj.unread_notifications.highlight_count,
                     );
                 }
+            }
+
+            const unreadThreadNotifications = joinObj.unread_thread_notifications;
+            if (unreadThreadNotifications) {
+                Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
+                    room.setThreadUnreadNotificationCount(
+                        threadId,
+                        NotificationCountType.Total,
+                        unreadNotification.notification_count,
+                    );
+
+                    const hasUnreadNotification =
+                        room.getThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight) <= 0;
+                    if (!encrypted || (encrypted && hasUnreadNotification)) {
+                        room.setThreadUnreadNotificationCount(
+                            threadId,
+                            NotificationCountType.Highlight,
+                            unreadNotification.highlight_count,
+                        );
+                    }
+                });
             }
 
             joinObj.timeline = joinObj.timeline || {} as ITimeline;

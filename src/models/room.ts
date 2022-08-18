@@ -207,6 +207,8 @@ export type RoomEventHandlerMap = {
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & ThreadHandlerMap & MatrixEventHandlerMap;
 
+type NotificationCount = Partial<Record<NotificationCountType, number>>;
+
 export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
@@ -216,7 +218,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     // a pre-cached list for this purpose.
     private receipts: Receipts = {}; // { receipt_type: { user_id: IReceipt } }
     private receiptCacheByEventId: ReceiptCache = {}; // { event_id: ICachedReceipt[] }
-    private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
+    private notificationCounts: NotificationCount = {};
+    private threadNotifications: Record<string, NotificationCount> = {};
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -1178,13 +1181,29 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     }
 
     /**
+     * Get sum of threads and roon notification counts
+     * @param {String} type The type of notification count to get. default: 'total'
+     * @return {Number} The notification count.
+     */
+    public getTotalUnreadNotificationCount(type = NotificationCountType.Total): number {
+        return (this.getUnreadNotificationCount(type) ?? 0) +
+            this.getTotalThreadsUnreadNotificationCount(type);
+    }
+
+    public getTotalThreadsUnreadNotificationCount(type = NotificationCountType.Total): number {
+        return Object.keys(this.threadNotifications).reduce((total: number, threadId: string) => {
+            return total + (this.getThreadUnreadNotificationCount(threadId, type) ?? 0);
+        }, 0);
+    }
+
+    /**
      * Get one of the notification counts for this room
      * @param {String} type The type of notification count to get. default: 'total'
      * @return {Number} The notification count, or undefined if there is no count
      *                  for this type.
      */
     public getUnreadNotificationCount(type = NotificationCountType.Total): number | undefined {
-        return this.notificationCounts[type];
+        return this.notificationCounts[type] ?? 0;
     }
 
     /**
@@ -1194,6 +1213,17 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public setUnreadNotificationCount(type: NotificationCountType, count: number): void {
         this.notificationCounts[type] = count;
+    }
+
+    public getThreadUnreadNotificationCount(threadId: string, type = NotificationCountType.Total): number | undefined {
+        return this.threadNotifications[threadId]?.[type];
+    }
+
+    public setThreadUnreadNotificationCount(threadId: string, type: NotificationCountType, count: number): void {
+        const notificationCount = this.threadNotifications[threadId];
+        if (notificationCount) {
+            notificationCount[type] = count;
+        }
     }
 
     public setSummary(summary: IRoomSummary): void {
