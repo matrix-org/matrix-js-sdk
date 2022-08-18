@@ -138,8 +138,6 @@ interface ISyncParams {
     // eslint-disable-next-line camelcase
     set_presence?: SetPresence;
     _cacheBuster?: string | number; // not part of the API itself
-    unread_thread_notifications?: boolean;
-    "org.matrix.msc3773.unread_thread_notifications"?: boolean;
 }
 
 type WrappedRoom<T> = T & {
@@ -662,6 +660,7 @@ export class SyncApi {
         const buildDefaultFilter = () => {
             const filter = new Filter(client.credentials.userId);
             filter.setTimelineLimit(this.opts.initialSyncLimit);
+            filter.setUnreadThreadNotifications(true);
             return filter;
         };
 
@@ -1000,8 +999,6 @@ export class SyncApi {
         const qps: ISyncParams = {
             "filter": filterId,
             "timeout": pollTimeout,
-            "unread_thread_notifications": true,
-            "org.matrix.msc3773.unread_thread_notifications": true,
         };
 
         if (this.opts.disablePresence) {

@@ -221,6 +221,14 @@ export class Filter {
         setProp(this.definition, "room.timeline.limit", limit);
     }
 
+    /**
+     * Enable threads unread notification
+     * @param {boolean} enabled
+     */
+    public setUnreadThreadNotifications(enabled: boolean) {
+        setProp(this.definition, "room.timeline.unread_thread_notifications", enabled);
+    }
+
     setLazyLoadMembers(enabled: boolean) {
         setProp(this.definition, "room.state.lazy_load_members", !!enabled);
     }
