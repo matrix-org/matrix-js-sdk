@@ -78,7 +78,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
     private volumeLooperTimeout: ReturnType<typeof setTimeout>;
-    private disposed = false;
+    private _disposed = false;
 
     constructor(opts: ICallFeedOpts) {
         super();
@@ -298,12 +298,16 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             this.analyser = null;
             releaseContext();
         }
-        this.disposed = true;
+        this._disposed = true;
         this.emit(CallFeedEvent.Disposed);
     }
 
-    public idDisposed(): boolean {
-        return this.disposed;
+    public get disposed(): boolean {
+        return this._disposed;
+    }
+
+    public set disposed(value: boolean) {
+        this._disposed = value;
     }
 
     public getLocalVolume(): number {
