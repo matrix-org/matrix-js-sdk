@@ -25,6 +25,7 @@ import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState } from "./sync-accumulator";
 import { MatrixError } from "./http-api";
 import { RoomStateEvent } from "./models/room-state";
+import { BeaconEvent } from "./models/beacon";
 import { RoomMemberEvent } from "./models/room-member";
 import {
     Extension,
@@ -536,7 +537,6 @@ export class SlidingSyncSdk {
             }
 
             if (limited) {
-                deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     roomData.prev_batch,
                     null, // TODO this.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
@@ -546,7 +546,6 @@ export class SlidingSyncSdk {
                 // reason to stop incrementally tracking notifications and
                 // reset the timeline.
                 this.client.resetNotifTimelineSet();
-                registerStateListeners(this.client, room);
             }
         } */
 
@@ -818,11 +817,13 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
 
 function createRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room { // XXX cargoculted from sync.ts
     const { timelineSupport } = client;
+
     const room = new Room(roomId, client, client.getUserId(), {
         lazyLoadMembers: opts.lazyLoadMembers,
         pendingEventOrdering: opts.pendingEventOrdering,
         timelineSupport,
     });
+
     client.reEmitter.reEmit(room, [
         RoomEvent.Name,
         RoomEvent.Redaction,
@@ -834,22 +835,19 @@ function createRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredC
         RoomEvent.MyMembership,
         RoomEvent.Timeline,
         RoomEvent.TimelineReset,
-    ]);
-    registerStateListeners(client, room);
-    return room;
-}
-
-function registerStateListeners(client: MatrixClient, room: Room): void { // XXX cargoculted from sync.ts
-    // we need to also re-emit room state and room member events, so hook it up
-    // to the client now. We need to add a listener for RoomState.members in
-    // order to hook them correctly.
-    client.reEmitter.reEmit(room.currentState, [
         RoomStateEvent.Events,
         RoomStateEvent.Members,
         RoomStateEvent.NewMember,
         RoomStateEvent.Update,
+        BeaconEvent.New,
+        BeaconEvent.Update,
+        BeaconEvent.Destroy,
+        BeaconEvent.LivenessChange,
     ]);
-    room.currentState.on(RoomStateEvent.NewMember, function(event, state, member) {
+
+    // We need to add a listener for RoomState.members in order to hook them
+    // correctly.
+    room.on(RoomStateEvent.NewMember, (event, state, member) => {
         member.user = client.getUser(member.userId);
         client.reEmitter.reEmit(member, [
             RoomMemberEvent.Name,
@@ -858,15 +856,9 @@ function registerStateListeners(client: MatrixClient, room: Room): void { // XXX
             RoomMemberEvent.Membership,
         ]);
     });
-}
 
-/*
-function deregisterStateListeners(room: Room): void { // XXX cargoculted from sync.ts
-    // could do with a better way of achieving this.
-    room.currentState.removeAllListeners(RoomStateEvent.Events);
-    room.currentState.removeAllListeners(RoomStateEvent.Members);
-    room.currentState.removeAllListeners(RoomStateEvent.NewMember);
-} */
+    return room;
+}
 
 function mapEvents(client: MatrixClient, roomId: string, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });

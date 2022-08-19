@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,8 @@ import {
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter, IFilterDefinition } from "../filter";
-import { RoomState } from "./room-state";
+import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
+import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import {
     Thread,
     ThreadEvent,
@@ -172,16 +173,19 @@ export enum RoomEvent {
 }
 
 type EmittedEvents = RoomEvent
+    | RoomStateEvent.Events
+    | RoomStateEvent.Members
+    | RoomStateEvent.NewMember
+    | RoomStateEvent.Update
+    | RoomStateEvent.Marker
     | ThreadEvent.New
     | ThreadEvent.Update
     | ThreadEvent.NewReply
-    | RoomEvent.Timeline
-    | RoomEvent.TimelineReset
-    | RoomEvent.TimelineRefresh
-    | RoomEvent.HistoryImportedWithinTimeline
-    | RoomEvent.OldStateUpdated
-    | RoomEvent.CurrentStateUpdated
-    | MatrixEventEvent.BeforeRedaction;
+    | MatrixEventEvent.BeforeRedaction
+    | BeaconEvent.New
+    | BeaconEvent.Update
+    | BeaconEvent.Destroy
+    | BeaconEvent.LivenessChange;
 
 export type RoomEventHandlerMap = {
     [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
@@ -205,7 +209,21 @@ export type RoomEventHandlerMap = {
     ) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
-} & ThreadHandlerMap & MatrixEventHandlerMap;
+} & ThreadHandlerMap
+    & MatrixEventHandlerMap
+    & Pick<
+        RoomStateEventHandlerMap,
+        RoomStateEvent.Events
+            | RoomStateEvent.Members
+            | RoomStateEvent.NewMember
+            | RoomStateEvent.Update
+            | RoomStateEvent.Marker
+            | BeaconEvent.New
+    >
+    & Pick<
+        BeaconEventHandlerMap,
+        BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange
+    >;
 
 export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
@@ -1068,6 +1086,33 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         if (previousCurrentState !== this.currentState) {
             this.emit(RoomEvent.CurrentStateUpdated, this, previousCurrentState, this.currentState);
+
+            // Re-emit various events on the current room state
+            // TODO: If currentState really only exists for backwards
+            // compatibility, shouldn't we be doing this some other way?
+
+            this.reEmitter.stopReEmitting(previousCurrentState, [
+                RoomStateEvent.Events,
+                RoomStateEvent.Members,
+                RoomStateEvent.NewMember,
+                RoomStateEvent.Update,
+                RoomStateEvent.Marker,
+                BeaconEvent.New,
+                BeaconEvent.Update,
+                BeaconEvent.Destroy,
+                BeaconEvent.LivenessChange,
+            ]);
+            this.reEmitter.reEmit(this.currentState, [
+                RoomStateEvent.Events,
+                RoomStateEvent.Members,
+                RoomStateEvent.NewMember,
+                RoomStateEvent.Update,
+                RoomStateEvent.Marker,
+                BeaconEvent.New,
+                BeaconEvent.Update,
+                BeaconEvent.Destroy,
+                BeaconEvent.LivenessChange,
+            ]);
         }
     }
 

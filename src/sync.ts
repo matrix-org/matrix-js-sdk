@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -51,7 +51,7 @@ import { MatrixError, Method } from "./http-api";
 import { ISavedSync } from "./store";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
-import { RoomState, RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
+import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
@@ -200,14 +200,14 @@ export class SyncApi {
      */
     public createRoom(roomId: string): Room {
         const client = this.client;
-        const {
-            timelineSupport,
-        } = client;
+        const { timelineSupport } = client;
+
         const room = new Room(roomId, client, client.getUserId(), {
             lazyLoadMembers: this.opts.lazyLoadMembers,
             pendingEventOrdering: this.opts.pendingEventOrdering,
             timelineSupport,
         });
+
         client.reEmitter.reEmit(room, [
             RoomEvent.Name,
             RoomEvent.Redaction,
@@ -219,30 +219,6 @@ export class SyncApi {
             RoomEvent.MyMembership,
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
-        ]);
-        this.registerStateListeners(room);
-        // Register listeners again after the state reference changes
-        room.on(RoomEvent.CurrentStateUpdated, (targetRoom, previousCurrentState) => {
-            if (targetRoom !== room) {
-                return;
-            }
-
-            this.deregisterStateListeners(previousCurrentState);
-            this.registerStateListeners(room);
-        });
-        return room;
-    }
-
-    /**
-     * @param {Room} room
-     * @private
-     */
-    private registerStateListeners(room: Room): void {
-        const client = this.client;
-        // we need to also re-emit room state and room member events, so hook it up
-        // to the client now. We need to add a listener for RoomState.members in
-        // order to hook them correctly. (TODO: find a better way?)
-        client.reEmitter.reEmit(room.currentState, [
             RoomStateEvent.Events,
             RoomStateEvent.Members,
             RoomStateEvent.NewMember,
@@ -253,7 +229,9 @@ export class SyncApi {
             BeaconEvent.LivenessChange,
         ]);
 
-        room.currentState.on(RoomStateEvent.NewMember, function(event, state, member) {
+        // We need to add a listener for RoomState.members in order to hook them
+        // correctly. (TODO: find a better way?)
+        room.on(RoomStateEvent.NewMember, (event, state, member) => {
             member.user = client.getUser(member.userId);
             client.reEmitter.reEmit(member, [
                 RoomMemberEvent.Name,
@@ -263,21 +241,11 @@ export class SyncApi {
             ]);
         });
 
-        room.currentState.on(RoomStateEvent.Marker, (markerEvent, markerFoundOptions) => {
+        room.on(RoomStateEvent.Marker, (markerEvent, markerFoundOptions) => {
             this.onMarkerStateEvent(room, markerEvent, markerFoundOptions);
         });
-    }
 
-    /**
-     * @param {RoomState} roomState The roomState to clear listeners from
-     * @private
-     */
-    private deregisterStateListeners(roomState: RoomState): void {
-        // could do with a better way of achieving this.
-        roomState.removeAllListeners(RoomStateEvent.Events);
-        roomState.removeAllListeners(RoomStateEvent.Members);
-        roomState.removeAllListeners(RoomStateEvent.NewMember);
-        roomState.removeAllListeners(RoomStateEvent.Marker);
+        return room;
     }
 
     /** When we see the marker state change in the room, we know there is some
