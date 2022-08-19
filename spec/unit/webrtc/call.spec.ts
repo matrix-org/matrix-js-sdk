@@ -897,6 +897,8 @@ describe('Call', function() {
 
             expect(caught).toEqual(true);
             expect(client.client.sendEvent).not.toHaveBeenCalled();
+
+            call.hangup();
         });
 
         it("hangs up a call", async () => {
