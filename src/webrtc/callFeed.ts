@@ -56,7 +56,7 @@ type EventHandlerMap = {
     [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
-    [CallFeedEvent.Disposed]: (disposed: boolean) => void;
+    [CallFeedEvent.Disposed]: () => void;
 };
 
 export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
@@ -299,7 +299,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             releaseContext();
         }
         this.disposed = true;
-        this.emit(CallFeedEvent.Disposed, this.disposed);
+        this.emit(CallFeedEvent.Disposed);
     }
 
     public idDisposed(): boolean {
