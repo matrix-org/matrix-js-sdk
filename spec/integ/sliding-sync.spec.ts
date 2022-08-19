@@ -118,6 +118,7 @@ describe("SlidingSync", () => {
                 expect(body.lists[0]).toEqual(listInfo);
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: true });
+                expect(req.queryParams["pos"]).toBeUndefined();
                 txnId = body.txn_id;
             }).respond(200, function() {
                 return {
@@ -139,6 +140,7 @@ describe("SlidingSync", () => {
                 });
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: false });
+                expect(req.queryParams["pos"]).toEqual("11");
             }).respond(200, function() {
                 return {
                     pos: "12",
@@ -167,6 +169,7 @@ describe("SlidingSync", () => {
                 expect(body.lists[0]).toEqual(listInfo);
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: true });
+                expect(req.queryParams["pos"]).toBeUndefined();
             }).respond(200, function() {
                 return {
                     pos: "1",
