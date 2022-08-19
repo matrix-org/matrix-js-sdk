@@ -47,6 +47,7 @@ export enum CallFeedEvent {
     LocalVolumeChanged = "local_volume_changed",
     VolumeChanged = "volume_changed",
     Speaking = "speaking",
+    Disposed = "disposed",
 }
 
 type EventHandlerMap = {
@@ -55,6 +56,7 @@ type EventHandlerMap = {
     [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
+    [CallFeedEvent.Disposed]: (disposed: boolean) => void;
 };
 
 export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
@@ -76,6 +78,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
     private volumeLooperTimeout: ReturnType<typeof setTimeout>;
+    private disposed = false;
 
     constructor(opts: ICallFeedOpts) {
         super();
@@ -295,6 +298,12 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             this.analyser = null;
             releaseContext();
         }
+        this.disposed = true;
+        this.emit(CallFeedEvent.Disposed, this.disposed);
+    }
+
+    public idDisposed(): boolean {
+        return this.disposed;
     }
 
     public getLocalVolume(): number {
