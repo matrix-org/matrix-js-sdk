@@ -19,14 +19,11 @@ import { logger } from './logger';
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData, SyncState } from "./sync";
+import { ISyncStateData, SyncState, createRoom } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState } from "./sync-accumulator";
 import { MatrixError } from "./http-api";
-import { RoomStateEvent } from "./models/room-state";
-import { BeaconEvent } from "./models/beacon";
-import { RoomMemberEvent } from "./models/room-member";
 import {
     Extension,
     ExtensionState,
@@ -814,51 +811,6 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
 
 // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
 // just outside the class.
-
-function createRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room { // XXX cargoculted from sync.ts
-    const { timelineSupport } = client;
-
-    const room = new Room(roomId, client, client.getUserId(), {
-        lazyLoadMembers: opts.lazyLoadMembers,
-        pendingEventOrdering: opts.pendingEventOrdering,
-        timelineSupport,
-    });
-
-    client.reEmitter.reEmit(room, [
-        RoomEvent.Name,
-        RoomEvent.Redaction,
-        RoomEvent.RedactionCancelled,
-        RoomEvent.Receipt,
-        RoomEvent.Tags,
-        RoomEvent.LocalEchoUpdated,
-        RoomEvent.AccountData,
-        RoomEvent.MyMembership,
-        RoomEvent.Timeline,
-        RoomEvent.TimelineReset,
-        RoomStateEvent.Events,
-        RoomStateEvent.Members,
-        RoomStateEvent.NewMember,
-        RoomStateEvent.Update,
-        BeaconEvent.New,
-        BeaconEvent.Update,
-        BeaconEvent.Destroy,
-        BeaconEvent.LivenessChange,
-    ]);
-
-    // We need to add a listener for RoomState.members in order to hook them
-    // correctly.
-    room.on(RoomStateEvent.NewMember, (event, state, member) => {
-        member.user = client.getUser(member.userId);
-        client.reEmitter.reEmit(member, [
-            RoomMemberEvent.Name,
-            RoomMemberEvent.Typing,
-            RoomMemberEvent.PowerLevel,
-            RoomMemberEvent.Membership,
-        ]);
-    });
-
-    return room;
-}
 
 function mapEvents(client: MatrixClient, roomId: string, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });
