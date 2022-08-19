@@ -109,6 +109,12 @@ export class MockRTCPeerConnection {
             sdp: DUMMY_SDP,
         });
     }
+    createAnswer() {
+        return Promise.resolve({
+            type: 'answer',
+            sdp: DUMMY_SDP,
+        });
+    }
     setRemoteDescription() {
         return Promise.resolve();
     }
