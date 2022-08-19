@@ -306,7 +306,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         return this._disposed;
     }
 
-    public set disposed(value: boolean) {
+    private set disposed(value: boolean) {
         this._disposed = value;
     }
 
