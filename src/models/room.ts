@@ -1090,7 +1090,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // Re-emit various events on the current room state
             // TODO: If currentState really only exists for backwards
             // compatibility, shouldn't we be doing this some other way?
-
             this.reEmitter.stopReEmitting(previousCurrentState, [
                 RoomStateEvent.Events,
                 RoomStateEvent.Members,
