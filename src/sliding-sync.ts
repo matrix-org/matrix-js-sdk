@@ -695,6 +695,26 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
+     * Re-setup this connection e.g in the event of an expired session.
+     */
+    private resetup(): void {
+        logger.warn("SlidingSync: resetting connection info");
+        // any pending txn ID defers will be forgotten already by the server, so clear them out
+        this.txnIdDefers.forEach((d) => {
+            d.reject(d.txnId);
+        });
+        this.txnIdDefers = [];
+        // resend sticky params and de-confirm all subscriptions
+        this.lists.forEach((l) => {
+            l.setModified(true);
+        });
+        this.confirmedRoomSubscriptions = new Set<string>(); // leave desired ones alone though!
+        // reset the connection as we might be wedged
+        this.needsResend = true;
+        this.pendingReq?.abort();
+    }
+
+    /**
      * Start syncing with the server. Blocks until stopped.
      */
     public async start() {
@@ -732,7 +752,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
                 this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl);
                 resp = await this.pendingReq;
-                logger.debug(resp);
                 currentPos = resp.pos;
                 // update what we think we're subscribed to.
                 for (const roomId of newSubscriptions) {
@@ -770,7 +789,15 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         null,
                         err,
                     );
-                    await sleep(3000);
+                    if (err.httpStatus === 400) {
+                        // session probably expired TODO: assign an errcode
+                        // so drop state and re-request
+                        this.resetup();
+                        currentPos = undefined;
+                        await sleep(50); // in case the 400 was for something else; don't tightloop
+                        continue;
+                    }
+                    await sleep(5000);
                 } else if (this.needsResend || err === "aborted") {
                     // don't sleep as we caused this error by abort()ing the request.
                     // we check for 'aborted' because that's the error Jest returns and without it
@@ -778,7 +805,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     continue;
                 } else {
                     logger.error(err);
-                    await sleep(3000);
+                    await sleep(5000);
                 }
             }
             if (!resp) {

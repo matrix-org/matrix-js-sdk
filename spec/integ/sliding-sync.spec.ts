@@ -80,6 +80,103 @@ describe("SlidingSync", () => {
             slidingSync.stop();
             httpBackend.verifyNoOutstandingExpectation();
         });
+
+        it("should reset the connection on HTTP 400 and send everything again", async () => {
+            // seed the connection with some lists, extensions and subscriptions to verify they are sent again
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            const roomId = "!sub:localhost";
+            const subInfo = {
+                timeline_limit: 42,
+                required_state: [["m.room.create", ""]],
+            };
+            const listInfo = {
+                ranges: [[0,10]],
+                filters: {
+                    is_dm: true,
+                },
+            };
+            const ext = {
+                name: () => "custom_extension",
+                onRequest: (initial) => { return { initial: initial } },
+                onResponse: (res) => { return {} },
+                when: () => ExtensionState.PreProcess,
+            };
+            slidingSync.modifyRoomSubscriptions(new Set([roomId]));
+            slidingSync.modifyRoomSubscriptionInfo(subInfo);
+            slidingSync.setList(0, listInfo);
+            slidingSync.registerExtension(ext);
+            slidingSync.start();
+
+            // expect everything to be sent
+            let txnId;
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toEqual({
+                    [roomId]: subInfo,
+                });
+                expect(body.lists[0]).toEqual(listInfo);
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions["custom_extension"]).toEqual({initial:true});
+                txnId = body.txn_id;
+            }).respond(200, function() {
+                return {
+                    pos: "11",
+                    lists: [{ count: 5 }],
+                    extensions: {},
+                    txn_id: txnId,
+                };
+            });
+            await httpBackend.flushAllExpected();
+
+            // expect nothing but ranges and non-initial extensions to be sent
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toBeFalsy();
+                expect(body.lists[0]).toEqual({
+                    ranges: [[0,10]],
+                });
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions["custom_extension"]).toEqual({initial:false});
+            }).respond(200, function() {
+                return {
+                    pos: "12",
+                    lists: [{ count: 5 }],
+                    extensions: {},
+                };
+            });
+            await httpBackend.flushAllExpected();
+
+            // now we expire the session
+            httpBackend.when("POST", syncUrl).respond(400, function() {
+                logger.debug("sending session expired 400");
+                return {
+                    error: "HTTP 400 : session expired",
+                };
+            });
+            await httpBackend.flushAllExpected();
+
+            // ...and everything should be sent again
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toEqual({
+                    [roomId]: subInfo,
+                });
+                expect(body.lists[0]).toEqual(listInfo);
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions["custom_extension"]).toEqual({initial:true});
+            }).respond(200, function() {
+                return {
+                    pos: "1",
+                    lists: [{ count: 6 }],
+                    extensions: {},
+                };
+            });
+            await httpBackend.flushAllExpected();
+            slidingSync.stop();
+        });
     });
 
     describe("room subscriptions", () => {
