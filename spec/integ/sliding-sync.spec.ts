@@ -90,15 +90,15 @@ describe("SlidingSync", () => {
                 required_state: [["m.room.create", ""]],
             };
             const listInfo = {
-                ranges: [[0,10]],
+                ranges: [[0, 10]],
                 filters: {
                     is_dm: true,
                 },
             };
             const ext = {
                 name: () => "custom_extension",
-                onRequest: (initial) => { return { initial: initial } },
-                onResponse: (res) => { return {} },
+                onRequest: (initial) => { return { initial: initial }; },
+                onResponse: (res) => { return {}; },
                 when: () => ExtensionState.PreProcess,
             };
             slidingSync.modifyRoomSubscriptions(new Set([roomId]));
@@ -117,7 +117,7 @@ describe("SlidingSync", () => {
                 });
                 expect(body.lists[0]).toEqual(listInfo);
                 expect(body.extensions).toBeTruthy();
-                expect(body.extensions["custom_extension"]).toEqual({initial:true});
+                expect(body.extensions["custom_extension"]).toEqual({ initial: true });
                 txnId = body.txn_id;
             }).respond(200, function() {
                 return {
@@ -135,10 +135,10 @@ describe("SlidingSync", () => {
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
                 expect(body.lists[0]).toEqual({
-                    ranges: [[0,10]],
+                    ranges: [[0, 10]],
                 });
                 expect(body.extensions).toBeTruthy();
-                expect(body.extensions["custom_extension"]).toEqual({initial:false});
+                expect(body.extensions["custom_extension"]).toEqual({ initial: false });
             }).respond(200, function() {
                 return {
                     pos: "12",
@@ -166,7 +166,7 @@ describe("SlidingSync", () => {
                 });
                 expect(body.lists[0]).toEqual(listInfo);
                 expect(body.extensions).toBeTruthy();
-                expect(body.extensions["custom_extension"]).toEqual({initial:true});
+                expect(body.extensions["custom_extension"]).toEqual({ initial: true });
             }).respond(200, function() {
                 return {
                     pos: "1",
