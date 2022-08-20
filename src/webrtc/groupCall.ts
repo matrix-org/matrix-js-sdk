@@ -368,7 +368,7 @@ export class GroupCall extends TypedEventEmitter<
             sfuCall.isPtt = this.isPtt;
 
             try {
-                await sfuCall.placeCallWithCallFeeds(this.getLocalFeeds()); // TODO: We should just setup the datachannel
+                await sfuCall.placeCallWithCallFeeds(this.getLocalFeeds());
                 sfuCall.createDataChannel("datachannel", this.dataChannelOptions);
             } catch (e) {
                 logger.warn(`Failed to place call to ${this.sfu.user_id}!`, e);
