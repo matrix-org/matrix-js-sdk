@@ -419,6 +419,11 @@ export class GroupCall extends TypedEventEmitter<
         this.retryCallCounts.clear();
         clearTimeout(this.retryCallLoopTimeout);
 
+        for (const [userId] of this.memberStateExpirationTimers) {
+            clearTimeout(this.memberStateExpirationTimers.get(userId));
+            this.memberStateExpirationTimers.delete(userId);
+        }
+
         if (this.transmitTimer !== null) {
             clearTimeout(this.transmitTimer);
             this.transmitTimer = null;
@@ -743,6 +748,8 @@ export class GroupCall extends TypedEventEmitter<
 
         const res = await send();
 
+        // Clear the old interval first, so that it isn't forgot
+        clearInterval(this.resendMemberStateTimer);
         // Resend the state event every so often so it doesn't become stale
         this.resendMemberStateTimer = setInterval(async () => {
             logger.log("Resending call member state");
@@ -1081,7 +1088,7 @@ export class GroupCall extends TypedEventEmitter<
         this.sendMemberStateEvent();
 
         // Find removed feeds
-        [...this.userMediaFeeds, ...this.screenshareFeeds].filter((gf) => gf.isDisposed()).forEach((feed) => {
+        [...this.userMediaFeeds, ...this.screenshareFeeds].filter((gf) => gf.disposed).forEach((feed) => {
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
             else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.removeScreenshareFeed(feed);
         });

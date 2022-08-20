@@ -17,6 +17,8 @@ limitations under the License.
 
 /** @module auto-discovery */
 
+import { ServerResponse } from "http";
+
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from './logger';
 
@@ -409,39 +411,41 @@ export class AutoDiscovery {
      * @return {Promise<object>} Resolves to the returned state.
      * @private
      */
-    private static fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
-        return new Promise(function(resolve) {
+    private static fetchWellKnownObject(uri: string): Promise<IWellKnownConfig> {
+        return new Promise((resolve) => {
             // eslint-disable-next-line
             const request = require("./matrix").getRequest();
             if (!request) throw new Error("No request library available");
             request(
-                { method: "GET", uri: url, timeout: 5000 },
-                (err, response, body) => {
-                    if (err || response &&
-                        (response.statusCode < 200 || response.statusCode >= 300)
-                    ) {
-                        let action = AutoDiscoveryAction.FAIL_PROMPT;
-                        let reason = (err ? err.message : null) || "General failure";
-                        if (response && response.statusCode === 404) {
-                            action = AutoDiscoveryAction.IGNORE;
-                            reason = AutoDiscovery.ERROR_MISSING_WELLKNOWN;
-                        }
-                        resolve({ raw: {}, action: action, reason: reason, error: err });
-                        return;
+                { method: "GET", uri, timeout: 5000 },
+                (error: Error, response: ServerResponse, body: string) => {
+                    if (error || response?.statusCode < 200 || response?.statusCode >= 300) {
+                        const result = { error, raw: {} };
+                        return resolve(response?.statusCode === 404
+                            ? {
+                                ...result,
+                                action: AutoDiscoveryAction.IGNORE,
+                                reason: AutoDiscovery.ERROR_MISSING_WELLKNOWN,
+                            } : {
+                                ...result,
+                                action: AutoDiscoveryAction.FAIL_PROMPT,
+                                reason: error?.message || "General failure",
+                            });
                     }
 
                     try {
-                        resolve({ raw: JSON.parse(body), action: AutoDiscoveryAction.SUCCESS });
-                    } catch (e) {
-                        let reason = AutoDiscovery.ERROR_INVALID;
-                        if (e.name === "SyntaxError") {
-                            reason = AutoDiscovery.ERROR_INVALID_JSON;
-                        }
-                        resolve({
+                        return resolve({
+                            raw: JSON.parse(body),
+                            action: AutoDiscoveryAction.SUCCESS,
+                        });
+                    } catch (err) {
+                        return resolve({
+                            error: err,
                             raw: {},
                             action: AutoDiscoveryAction.FAIL_PROMPT,
-                            reason: reason,
-                            error: e,
+                            reason: err?.name === "SyntaxError"
+                                ? AutoDiscovery.ERROR_INVALID_JSON
+                                : AutoDiscovery.ERROR_INVALID,
                         });
                     }
                 },

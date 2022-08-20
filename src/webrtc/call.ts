@@ -1067,8 +1067,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public answerWithCallFeeds(callFeeds: CallFeed[]): void {
         if (this.inviteOrAnswerSent) return;
 
-        logger.debug(`Answering call ${this.callId}`);
-
         this.queueGotCallFeedsForAnswer(callFeeds);
     }
 
@@ -2355,10 +2353,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const shouldTerminate = (
             // reject events also end the call if it's ringing: it's another of
             // our devices rejecting the call.
-            ([CallState.InviteSent, CallState.Ringing].includes(this.state)) ||
+            [CallState.InviteSent, CallState.Ringing].includes(this.state) ||
             // also if we're in the init state and it's an inbound call, since
             // this means we just haven't entered the ringing state yet
-            this.state === CallState.Fledgling && this.direction === CallDirection.Inbound
+            (this.state === CallState.Fledgling && this.direction === CallDirection.Inbound)
         );
 
         if (shouldTerminate) {

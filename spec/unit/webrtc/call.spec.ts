@@ -16,20 +16,27 @@ limitations under the License.
 
 import { TestClient } from '../../TestClient';
 import { MatrixCall, CallErrorCode, CallEvent, supportsMatrixCall, CallType } from '../../../src/webrtc/call';
-import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
+import { SDPStreamMetadata, SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
 import {
     DUMMY_SDP,
     MockMediaHandler,
     MockMediaStream,
     MockMediaStreamTrack,
-    MockMediaDeviceInfo,
-    MockRTCPeerConnection,
-    MockAudioContext,
+    installWebRTCMocks,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
+import { EventType } from "../../../src";
 
 const startVoiceCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
     const callPromise = call.placeVoiceCall();
+    await client.httpBackend.flush("");
+    await callPromise;
+
+    call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
+};
+
+const startVideoCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
+    const callPromise = call.placeVideoCall();
     await client.httpBackend.flush("");
     await callPromise;
 
@@ -48,29 +55,7 @@ describe('Call', function() {
         prevDocument = global.document;
         prevWindow = global.window;
 
-        global.navigator = {
-            mediaDevices: {
-                // @ts-ignore Mock
-                getUserMedia: () => new MockMediaStream("local_stream"),
-                // @ts-ignore Mock
-                enumerateDevices: async () => [new MockMediaDeviceInfo("audio"), new MockMediaDeviceInfo("video")],
-            },
-        };
-
-        global.window = {
-            // @ts-ignore Mock
-            RTCPeerConnection: MockRTCPeerConnection,
-            // @ts-ignore Mock
-            RTCSessionDescription: {},
-            // @ts-ignore Mock
-            RTCIceCandidate: {},
-            getUserMedia: () => new MockMediaStream("local_stream"),
-        };
-        // @ts-ignore Mock
-        global.document = {};
-
-        // @ts-ignore Mock
-        global.AudioContext = MockAudioContext;
+        installWebRTCMocks();
 
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
         // We just stub out sendEvent: we're not interested in testing the client's
@@ -787,6 +772,77 @@ describe('Call', function() {
             expect(call.getLocalFeeds().length).toBe(2);
             expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
             expect(call.pushLocalFeed).toHaveBeenCalled();
+        });
+    });
+
+    describe("muting", () => {
+        beforeEach(async () => {
+            call.sendVoipEvent = jest.fn();
+            await startVideoCall(client, call);
+        });
+
+        describe("sending sdp_stream_metadata_changed events", () => {
+            it("should send sdp_stream_metadata_changed when muting audio", async () => {
+                await call.setMicrophoneMuted(true);
+                expect(call.sendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
+                    [SDPStreamMetadataKey]: {
+                        mock_stream_from_media_handler: {
+                            purpose: SDPStreamMetadataPurpose.Usermedia,
+                            audio_muted: true,
+                            video_muted: false,
+                        },
+                    },
+                });
+            });
+
+            it("should send sdp_stream_metadata_changed when muting video", async () => {
+                await call.setLocalVideoMuted(true);
+                expect(call.sendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
+                    [SDPStreamMetadataKey]: {
+                        mock_stream_from_media_handler: {
+                            purpose: SDPStreamMetadataPurpose.Usermedia,
+                            audio_muted: false,
+                            video_muted: true,
+                        },
+                    },
+                });
+            });
+        });
+
+        describe("receiving sdp_stream_metadata_changed events", () => {
+            const setupCall = (audio: boolean, video: boolean): SDPStreamMetadata => {
+                const metadata = {
+                    stream: {
+                        purpose: SDPStreamMetadataPurpose.Usermedia,
+                        audio_muted: audio,
+                        video_muted: video,
+                    },
+                };
+                call.pushRemoteFeed(new MockMediaStream("stream", [
+                    new MockMediaStreamTrack("track1", "audio"),
+                    new MockMediaStreamTrack("track1", "video"),
+                ]));
+                call.onSDPStreamMetadataChangedReceived({
+                    getContent: () => ({
+                        [SDPStreamMetadataKey]: metadata,
+                    }),
+                });
+                return metadata;
+            };
+
+            it("should handle incoming sdp_stream_metadata_changed with audio muted", async () => {
+                const metadata = setupCall(true, false);
+                expect(call.remoteSDPStreamMetadata).toStrictEqual(metadata);
+                expect(call.getRemoteFeeds()[0].isAudioMuted()).toBe(true);
+                expect(call.getRemoteFeeds()[0].isVideoMuted()).toBe(false);
+            });
+
+            it("should handle incoming sdp_stream_metadata_changed with video muted", async () => {
+                const metadata = setupCall(false, true);
+                expect(call.remoteSDPStreamMetadata).toStrictEqual(metadata);
+                expect(call.getRemoteFeeds()[0].isAudioMuted()).toBe(false);
+                expect(call.getRemoteFeeds()[0].isVideoMuted()).toBe(true);
+            });
         });
     });
 });

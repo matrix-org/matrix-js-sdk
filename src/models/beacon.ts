@@ -197,7 +197,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         const startTimestamp = this._beaconInfo?.timestamp > Date.now() ?
             this._beaconInfo?.timestamp - 360000 /* 6min */ :
             this._beaconInfo?.timestamp;
-        this._isLive = this._beaconInfo?.live &&
+        this._isLive = !!this._beaconInfo?.live &&
             isTimestampInDuration(startTimestamp, this._beaconInfo?.timeout, Date.now());
 
         if (prevLiveness !== this.isLive) {

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { IScreensharingOpts } from "../../src/webrtc/mediaHandler";
+
 export const DUMMY_SDP = (
     "v=0\r\n" +
     "o=- 5022425983810148698 2 IN IP4 127.0.0.1\r\n" +
@@ -70,7 +72,22 @@ export class MockAudioContext {
 }
 
 export class MockRTCPeerConnection {
+    private static instances: MockRTCPeerConnection[] = [];
+
+    private negotiationNeededListener: () => void;
+    private needsNegotiation = false;
     localDescription: RTCSessionDescription;
+    signalingState: RTCSignalingState = "stable";
+
+    public static triggerAllNegotiations() {
+        for (const inst of this.instances) {
+            inst.doNegotiation();
+        }
+    }
+
+    public static resetInstances() {
+        this.instances = [];
+    }
 
     constructor() {
         this.localDescription = {
@@ -78,12 +95,19 @@ export class MockRTCPeerConnection {
             type: 'offer',
             toJSON: function() { },
         };
+
+        MockRTCPeerConnection.instances.push(this);
     }
 
-    addEventListener() { }
+    addEventListener(type: string, listener: () => void) {
+        if (type === 'negotiationneeded') this.negotiationNeededListener = listener;
+    }
     createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
     createOffer() {
-        return Promise.resolve({});
+        return Promise.resolve({
+            type: 'offer',
+            sdp: DUMMY_SDP,
+        });
     }
     setRemoteDescription() {
         return Promise.resolve();
@@ -93,7 +117,17 @@ export class MockRTCPeerConnection {
     }
     close() { }
     getStats() { return []; }
-    addTrack(track: MockMediaStreamTrack) { return new MockRTCRtpSender(track); }
+    addTrack(track: MockMediaStreamTrack) {
+        this.needsNegotiation = true;
+        return new MockRTCRtpSender(track);
+    }
+
+    doNegotiation() {
+        if (this.needsNegotiation && this.negotiationNeededListener) {
+            this.needsNegotiation = false;
+            this.negotiationNeededListener();
+        }
+    }
 }
 
 export class MockRTCRtpSender {
@@ -106,6 +140,26 @@ export class MockMediaStreamTrack {
     constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) { }
 
     stop() { }
+
+    listeners: [string, (...args: any[]) => any][] = [];
+    public isStopped = false;
+
+    // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
+    // implementation
+    dispatchEvent(eventType: string) {
+        this.listeners.forEach(([t, c]) => {
+            if (t !== eventType) return;
+            c();
+        });
+    }
+    addEventListener(eventType: string, callback: (...args: any[]) => any) {
+        this.listeners.push([eventType, callback]);
+    }
+    removeEventListener(eventType: string, callback: (...args: any[]) => any) {
+        this.listeners.filter(([t, c]) => {
+            return t !== eventType || c !== callback;
+        });
+    }
 }
 
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
@@ -117,6 +171,7 @@ export class MockMediaStream {
     ) {}
 
     listeners: [string, (...args: any[]) => any][] = [];
+    public isStopped = false;
 
     dispatchEvent(eventType: string) {
         this.listeners.forEach(([t, c]) => {
@@ -140,23 +195,75 @@ export class MockMediaStream {
         this.dispatchEvent("addtrack");
     }
     removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
+
+    clone() {
+        return new MockMediaStream(this.id, this.tracks);
+    }
 }
 
 export class MockMediaDeviceInfo {
     constructor(
-        public kind: "audio" | "video",
+        public kind: "audioinput" | "videoinput" | "audiooutput",
     ) { }
 }
 
 export class MockMediaHandler {
+    public userMediaStreams: MockMediaStream[] = [];
+    public screensharingStreams: MockMediaStream[] = [];
+
     getUserMediaStream(audio: boolean, video: boolean) {
         const tracks = [];
         if (audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
         if (video) tracks.push(new MockMediaStreamTrack("video_track", "video"));
 
-        return new MockMediaStream("mock_stream_from_media_handler", tracks);
+        const stream = new MockMediaStream("mock_stream_from_media_handler", tracks);
+        this.userMediaStreams.push(stream);
+        return stream;
     }
-    stopUserMediaStream() { }
+    stopUserMediaStream(stream: MockMediaStream) {
+        stream.isStopped = true;
+    }
+    getScreensharingStream(opts?: IScreensharingOpts) {
+        const tracks = [new MockMediaStreamTrack("video_track", "video")];
+        if (opts?.audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
+
+        const stream = new MockMediaStream("mock_screen_stream_from_media_handler", tracks);
+        this.screensharingStreams.push(stream);
+        return stream;
+    }
+    stopScreensharingStream(stream: MockMediaStream) {
+        stream.isStopped = true;
+    }
     hasAudioDevice() { return true; }
+    hasVideoDevice() { return true; }
     stopAllStreams() {}
+}
+
+export function installWebRTCMocks() {
+    global.navigator = {
+        mediaDevices: {
+            // @ts-ignore Mock
+            getUserMedia: () => new MockMediaStream("local_stream"),
+            // @ts-ignore Mock
+            enumerateDevices: async () => [new MockMediaDeviceInfo("audio"), new MockMediaDeviceInfo("video")],
+        },
+    };
+
+    global.window = {
+        // @ts-ignore Mock
+        RTCPeerConnection: MockRTCPeerConnection,
+        // @ts-ignore Mock
+        RTCSessionDescription: {},
+        // @ts-ignore Mock
+        RTCIceCandidate: {},
+        getUserMedia: () => new MockMediaStream("local_stream"),
+    };
+    // @ts-ignore Mock
+    global.document = {};
+
+    // @ts-ignore Mock
+    global.AudioContext = MockAudioContext;
+
+    // @ts-ignore Mock
+    global.RTCRtpReceiver = {};
 }
