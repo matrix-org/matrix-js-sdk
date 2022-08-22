@@ -1569,12 +1569,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         try {
             await this.peerConn.setLocalDescription(answer);
+
+            // make sure we're still going
+            if (this.callHasEnded()) return;
+
             this.setState(CallState.Connecting);
 
             // Allow a short time for initial candidates to be gathered
             await new Promise(resolve => {
                 setTimeout(resolve, 200);
             });
+
+            // make sure the call hasn't ended before we continue
+            if (this.callHasEnded()) return;
 
             this.sendAnswer();
         } catch (err) {
