@@ -15,7 +15,14 @@ limitations under the License.
 */
 
 import { TestClient } from '../../TestClient';
-import { MatrixCall, CallErrorCode, CallEvent, supportsMatrixCall, CallType } from '../../../src/webrtc/call';
+import {
+    MatrixCall,
+    CallErrorCode,
+    CallEvent,
+    supportsMatrixCall,
+    CallType,
+    CallState,
+} from '../../../src/webrtc/call';
 import { SDPStreamMetadata, SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
 import {
     DUMMY_SDP,
@@ -28,6 +35,7 @@ import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, MatrixEvent } from "../../../src";
 
 const FAKE_ROOM_ID = "!foo:bar";
+const CALL_LIFETIME = 60000;
 
 const startVoiceCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
     const callPromise = call.placeVoiceCall();
@@ -51,12 +59,13 @@ const fakeIncomingCall = async (client: TestClient, call: MatrixCall, version: s
             version,
             call_id: "call_id",
             party_id: "remote_party_id",
+            lifetime: CALL_LIFETIME,
             offer: {
                 sdp: DUMMY_SDP,
             },
         }),
         getSender: () => "@test:foo",
-        getLocalAge: () => null,
+        getLocalAge: () => 1,
     } as unknown as MatrixEvent);
     call.getFeeds().push(new CallFeed({
         client: client.client,
@@ -66,7 +75,6 @@ const fakeIncomingCall = async (client: TestClient, call: MatrixCall, version: s
         id: "remote_feed_id",
         purpose: SDPStreamMetadataPurpose.Usermedia,
     }));
-    await client.httpBackend.flush("");
     await callPromise;
 };
 
@@ -90,6 +98,7 @@ describe('Call', function() {
         client.client.sendEvent = jest.fn();
         client.client.mediaHandler = new MockMediaHandler;
         client.client.getMediaHandler = () => client.client.mediaHandler;
+        client.client.turnServersExpiry = Date.now() + 60 * 60 * 1000;
         client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
         client.client.getRoom = () => {
             return {
@@ -112,6 +121,8 @@ describe('Call', function() {
         global.navigator = prevNavigator;
         global.window = prevWindow;
         global.document = prevDocument;
+
+        jest.useRealTimers();
     });
 
     it('should ignore candidate events from non-matching party ID', async function() {
@@ -918,5 +929,16 @@ describe('Call', function() {
                 }),
             );
         });
+    });
+
+    it("times out an incoming call", async () => {
+        jest.useFakeTimers();
+        await fakeIncomingCall(client, call, "1");
+
+        expect(call.state).toEqual(CallState.Ringing);
+
+        jest.advanceTimersByTime(CALL_LIFETIME + 1000);
+
+        expect(call.state).toEqual(CallState.Ended);
     });
 });
