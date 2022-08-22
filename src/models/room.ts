@@ -2914,6 +2914,33 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         return this.getType() === RoomType.ElementVideo;
     }
 
+    private roomNameGenerator(state: RoomNameState): string {
+        if (this.client.roomNameGenerator) {
+            const name = this.client.roomNameGenerator(this.roomId, state);
+            if (name !== null) {
+                return name;
+            }
+        }
+
+        switch (state.type) {
+            case RoomNameType.Actual:
+                return state.name;
+            case RoomNameType.Generated:
+                switch (state.subtype) {
+                    case "Inviting":
+                        return `Inviting ${memberNamesToRoomName(state.names, state.count)}`;
+                    default:
+                        return memberNamesToRoomName(state.names, state.count);
+                }
+            case RoomNameType.EmptyRoom:
+                if (state.oldName) {
+                    return `Empty room (was ${state.oldName})`;
+                } else {
+                    return "Empty room";
+                }
+        }
+    }
+
     /**
      * This is an internal method. Calculates the name of the room from the current
      * room state.
@@ -2928,14 +2955,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // check for an alias, if any. for now, assume first alias is the
             // official one.
             const mRoomName = this.currentState.getStateEvents(EventType.RoomName, "");
-            if (mRoomName && mRoomName.getContent() && mRoomName.getContent().name) {
-                return mRoomName.getContent().name;
+            if (mRoomName?.getContent().name) {
+                return this.roomNameGenerator({
+                    type: RoomNameType.Actual,
+                    name: mRoomName.getContent().name,
+                });
             }
         }
 
         const alias = this.getCanonicalAlias();
         if (alias) {
-            return alias;
+            return this.roomNameGenerator({
+                type: RoomNameType.Actual,
+                name: alias,
+            });
         }
 
         const joinedMemberCount = this.currentState.getJoinedMemberCount();
@@ -2967,8 +3000,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
-                return m.userId !== userId &&
-                    (m.membership === "invite" || m.membership === "join");
+                return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
             });
             otherMembers = otherMembers.filter(({ userId }) => {
                 // filter service members
@@ -2986,24 +3018,33 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         if (inviteJoinCount) {
-            return memberNamesToRoomName(otherNames, inviteJoinCount);
+            return this.roomNameGenerator({
+                type: RoomNameType.Generated,
+                names: otherNames,
+                count: inviteJoinCount,
+            });
         }
 
         const myMembership = this.getMyMembership();
         // if I have created a room and invited people through
         // 3rd party invites
         if (myMembership == 'join') {
-            const thirdPartyInvites =
-                this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
+            const thirdPartyInvites = this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
 
-            if (thirdPartyInvites && thirdPartyInvites.length) {
+            if (thirdPartyInvites?.length) {
                 const thirdPartyNames = thirdPartyInvites.map((i) => {
                     return i.getContent().display_name;
                 });
 
-                return `Inviting ${memberNamesToRoomName(thirdPartyNames)}`;
+                return this.roomNameGenerator({
+                    type: RoomNameType.Generated,
+                    subtype: "Inviting",
+                    names: thirdPartyNames,
+                    count: thirdPartyNames.length + 1,
+                });
             }
         }
+
         // let's try to figure out who was here before
         let leftNames = otherNames;
         // if we didn't have heroes, try finding them in the room state
@@ -3014,11 +3055,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     m.membership !== "join";
             }).map((m) => m.name);
         }
+
+        let oldName: string;
         if (leftNames.length) {
-            return `Empty room (was ${memberNamesToRoomName(leftNames)})`;
-        } else {
-            return "Empty room";
+            oldName = this.roomNameGenerator({
+                type: RoomNameType.Generated,
+                names: leftNames,
+                count: leftNames.length + 1,
+            });
         }
+
+        return this.roomNameGenerator({
+            type: RoomNameType.EmptyRoom,
+            oldName,
+        });
     }
 
     /**
@@ -3203,8 +3253,33 @@ const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
     [EventStatus.CANCELLED]: [],
 };
 
-// TODO i18n
-function memberNamesToRoomName(names: string[], count = (names.length + 1)) {
+export enum RoomNameType {
+    EmptyRoom,
+    Generated,
+    Actual,
+}
+
+export interface EmptyRoomNameState {
+    type: RoomNameType.EmptyRoom;
+    oldName?: string;
+}
+
+export interface GeneratedRoomNameState {
+    type: RoomNameType.Generated;
+    subtype?: "Inviting";
+    names: string[];
+    count: number;
+}
+
+export interface ActualRoomNameState {
+    type: RoomNameType.Actual;
+    name: string;
+}
+
+export type RoomNameState = EmptyRoomNameState | GeneratedRoomNameState | ActualRoomNameState;
+
+// Can be overriden by IMatrixClientCreateOpts::memberNamesToRoomNameFn
+function memberNamesToRoomName(names: string[], count: number): string {
     const countWithoutMe = count - 1;
     if (!names.length) {
         return "Empty room";
