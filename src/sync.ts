@@ -199,7 +199,7 @@ export class SyncApi {
      * @return {Room}
      */
     public createRoom(roomId: string): Room {
-        const room = createRoom(this.client, roomId, this.opts);
+        const room = _createAndReEmitRoom(this.client, roomId, this.opts);
 
         room.on(RoomStateEvent.Marker, (markerEvent, markerFoundOptions) => {
             this.onMarkerStateEvent(room, markerEvent, markerFoundOptions);
@@ -1722,7 +1722,7 @@ function createNewUser(client: MatrixClient, userId: string): User {
 
 // /!\ This function is not intended for public use! It's only exported from
 // here in order to share some common logic with sliding-sync-sdk.ts.
-export function createRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room {
+export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room {
     const { timelineSupport } = client;
 
     const room = new Room(roomId, client, client.getUserId(), {

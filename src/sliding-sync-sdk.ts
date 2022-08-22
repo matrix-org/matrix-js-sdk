@@ -19,7 +19,7 @@ import { logger } from './logger';
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData, SyncState, createRoom } from "./sync";
+import { ISyncStateData, SyncState, _createAndReEmitRoom } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState } from "./sync-accumulator";
@@ -288,7 +288,7 @@ export class SlidingSyncSdk {
                 logger.debug("initial flag not set but no stored room exists for room ", roomId, roomData);
                 return;
             }
-            room = createRoom(this.client, roomId, this.opts);
+            room = _createAndReEmitRoom(this.client, roomId, this.opts);
         }
         this.processRoomData(this.client, room, roomData);
     }
