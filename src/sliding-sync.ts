@@ -47,6 +47,8 @@ export interface MSC3575Filter {
     room_types?: string[];
     not_room_types?: string[];
     spaces?: string[];
+    tags?: string[];
+    not_tags?: string[];
 }
 
 /**
