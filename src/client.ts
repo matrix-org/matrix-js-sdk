@@ -122,7 +122,6 @@ import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } f
 import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
 import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
 import { RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
-
 import {
     IAddThreePidOnlyBody,
     IBindThreePidBody,

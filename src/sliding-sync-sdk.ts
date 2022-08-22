@@ -36,6 +36,8 @@ import {
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { PushProcessor } from "./pushprocessor";
+import { RoomStateEvent } from "./models/room-state";
+import { RoomMemberEvent } from "./models/room-member";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
