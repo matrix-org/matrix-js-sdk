@@ -554,7 +554,7 @@ export class SlidingSyncSdk {
         // local fields must be set before any async calls because call site assumes
         // synchronous execution prior to emitting SlidingSyncState.Complete
         room.updateMyMembership("join");
-        
+
         room.recalculate();
         if (roomData.initial) {
             client.store.storeRoom(room);
