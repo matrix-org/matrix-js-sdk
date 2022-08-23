@@ -84,7 +84,7 @@ jobs:
           use-check: true
           check-fail-mode: added
           output-behaviour: annotate
-          head-ts-options: '--strict'
+          ts-extra-args: '--strict'
           files-changed: ${{ steps.files.outputs.files_updated }}
           files-added: ${{ steps.files.outputs.files_created }}
           files-deleted: ${{ steps.files.outputs.files_deleted }}
