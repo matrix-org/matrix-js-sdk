@@ -5,10 +5,9 @@
 # Requires:
 #   jq; install from your distribution's package manager (https://stedolan.github.io/jq/)
 #   hub; install via brew (macOS) or source/pre-compiled binaries (debian) (https://github.com/github/hub) - Tested on v2.2.9
-#   npm; typically installed by Node.js
 #   yarn; install via brew (macOS) or similar (https://yarnpkg.com/docs/install/)
 #
-# Note: this script is also used to release matrix-react-sdk and element-web.
+# Note: this script is also used to release matrix-react-sdk, element-web, and element-desktop.
 
 set -e
 
@@ -24,7 +23,6 @@ else
     echo "hub is required: please install it"
     exit
 fi
-npm --version > /dev/null || (echo "npm is required: please install it"; kill $$)
 yarn --version > /dev/null || (echo "yarn is required: please install it"; kill $$)
 
 USAGE="$0 [-x] [-c changelog_file] vX.Y.Z"
@@ -35,7 +33,6 @@ $USAGE
 
     -c changelog_file:  specify name of file containing changelog
     -x:                 skip updating the changelog
-    -n:                 skip publish to NPM
 EOF
 }
 
@@ -57,10 +54,8 @@ if ! git diff-files --quiet; then
 fi
 
 skip_changelog=
-skip_npm=
 changelog_file="CHANGELOG.md"
-expected_npm_user="matrixdotorg"
-while getopts hc:u:xzn f; do
+while getopts hc:x f; do
     case $f in
         h)
             help
@@ -71,12 +66,6 @@ while getopts hc:u:xzn f; do
             ;;
         x)
             skip_changelog=1
-            ;;
-        n)
-            skip_npm=1
-            ;;
-        u)
-            expected_npm_user="$OPTARG"
             ;;
     esac
 done
@@ -94,16 +83,6 @@ fi
 yarn cache clean
 # Ensure all dependencies are updated
 yarn install --ignore-scripts --pure-lockfile
-
-# Login and publish continues to use `npm`, as it seems to have more clearly
-# defined options and semantics than `yarn` for writing to the registry.
-if [ -z "$skip_npm" ]; then
-    actual_npm_user=`npm whoami`;
-    if [ $expected_npm_user != $actual_npm_user ]; then
-        echo "you need to be logged into npm as $expected_npm_user, but you are logged in as $actual_npm_user" >&2
-        exit 1
-    fi
-fi
 
 # ignore leading v on release
 release="${1#v}"
@@ -307,19 +286,6 @@ if [ $dodist -eq 0 ]; then
 fi
 rm "${release_text}"
 rm "${latest_changes}"
-
-# Login and publish continues to use `npm`, as it seems to have more clearly
-# defined options and semantics than `yarn` for writing to the registry.
-# Tag both releases and prereleases as `next` so the last stable release remains
-# the default.
-if [ -z "$skip_npm" ]; then
-    npm publish --tag next
-    if [ $prerelease -eq 0 ]; then
-        # For a release, also add the default `latest` tag.
-        package=$(cat package.json | jq -er .name)
-        npm dist-tag add "$package@$release" latest
-    fi
-fi
 
 # if it is a pre-release, leave it on the release branch for now.
 if [ $prerelease -eq 1 ]; then
