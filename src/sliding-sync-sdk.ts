@@ -551,6 +551,10 @@ export class SlidingSyncSdk {
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
 
+        // local fields must be set before any async calls because call site assumes
+        // synchronous execution prior to emitting SlidingSyncState.Complete
+        room.updateMyMembership("join");
+
         room.recalculate();
         if (roomData.initial) {
             client.store.storeRoom(room);
@@ -573,8 +577,6 @@ export class SlidingSyncSdk {
         ephemeralEvents.forEach(function(e) {
             client.emit(ClientEvent.Event, e);
         });
-
-        room.updateMyMembership("join");
 
         // Decrypt only the last message in all rooms to make sure we can generate a preview
         // And decrypt all events after the recorded read receipt to ensure an accurate
