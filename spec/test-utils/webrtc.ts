@@ -56,6 +56,9 @@ export const DUMMY_SDP = (
     "a=ssrc:3619738545 cname:2RWtmqhXLdoF4sOi\r\n"
 );
 
+export const USERMEDIA_STREAM_ID = "mock_stream_from_media_handler";
+export const SCREENSHARE_STREAM_ID = "mock_screen_stream_from_media_handler";
+
 class MockMediaStreamAudioSourceNode {
     connect() {}
 }
@@ -126,6 +129,10 @@ export class MockRTCPeerConnection {
     addTrack(track: MockMediaStreamTrack) {
         this.needsNegotiation = true;
         return new MockRTCRtpSender(track);
+    }
+
+    removeTrack() {
+        this.needsNegotiation = true;
     }
 
     doNegotiation() {
@@ -222,7 +229,7 @@ export class MockMediaHandler {
         if (audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
         if (video) tracks.push(new MockMediaStreamTrack("video_track", "video"));
 
-        const stream = new MockMediaStream("mock_stream_from_media_handler", tracks);
+        const stream = new MockMediaStream(USERMEDIA_STREAM_ID, tracks);
         this.userMediaStreams.push(stream);
         return stream;
     }
@@ -233,7 +240,7 @@ export class MockMediaHandler {
         const tracks = [new MockMediaStreamTrack("video_track", "video")];
         if (opts?.audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
 
-        const stream = new MockMediaStream("mock_screen_stream_from_media_handler", tracks);
+        const stream = new MockMediaStream(SCREENSHARE_STREAM_ID, tracks);
         this.screensharingStreams.push(stream);
         return stream;
     }
