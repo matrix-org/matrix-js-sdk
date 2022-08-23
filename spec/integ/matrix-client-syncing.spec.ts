@@ -52,7 +52,7 @@ describe("MatrixClient syncing", () => {
 
     afterEach(() => {
         httpBackend!.verifyNoOutstandingExpectation();
-        client.stopClient();
+        client!.stopClient();
         return httpBackend!.stop();
     });
 
@@ -66,7 +66,7 @@ describe("MatrixClient syncing", () => {
         it("should /sync after /pushrules and /filter.", (done) => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-            client.startClient();
+            client!.startClient();
 
             httpBackend!.flushAllExpected().then(() => {
                 done();
@@ -79,7 +79,7 @@ describe("MatrixClient syncing", () => {
                 expect(req.queryParams.since).toEqual(syncData.next_batch);
             }).respond(200, syncData);
 
-            client.startClient();
+            client!.startClient();
 
             httpBackend!.flushAllExpected().then(() => {
                 done();
@@ -159,21 +159,21 @@ describe("MatrixClient syncing", () => {
 
             // First fire: an initial invite
             let fires = 0;
-            client.once(RoomEvent.MyMembership, (room, membership, oldMembership) => { // Room, string, string
+            client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => { // Room, string, string
                 fires++;
                 expect(room.roomId).toBe(roomId);
                 expect(membership).toBe("invite");
                 expect(oldMembership).toBeFalsy();
 
                 // Second fire: a leave
-                client.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
                     fires++;
                     expect(room.roomId).toBe(roomId);
                     expect(membership).toBe("leave");
                     expect(oldMembership).toBe("invite");
 
                     // Third/final fire: a second invite
-                    client.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
+                    client!.once(RoomEvent.MyMembership, (room, membership, oldMembership) => {
                         fires++;
                         expect(room.roomId).toBe(roomId);
                         expect(membership).toBe("invite");
@@ -182,25 +182,25 @@ describe("MatrixClient syncing", () => {
                 });
 
                 // For maximum safety, "leave" the room after we register the handler
-                client.leave(roomId);
+                client!.leave(roomId);
             });
 
             // noinspection ES6MissingAwait
-            client.startClient();
+            client!.startClient();
             await httpBackend!.flushAllExpected();
 
             expect(fires).toBe(3);
         });
 
         it("should honour lazyLoadMembers if user is not a guest", () => {
-            client.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
+            client!.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
 
             httpBackend!.when("GET", "/sync").check((req) => {
                 expect(JSON.parse(req.queryParams.filter).room.state.lazy_load_members).toBeTruthy();
             }).respond(200, syncData);
 
-            client.setGuest(false);
-            client.startClient({ lazyLoadMembers: true });
+            client!.setGuest(false);
+            client!.startClient({ lazyLoadMembers: true });
 
             return httpBackend!.flushAllExpected();
         });
@@ -208,14 +208,14 @@ describe("MatrixClient syncing", () => {
         it("should not honour lazyLoadMembers if user is a guest", () => {
             httpBackend!.expectedRequests = [];
             httpBackend!.when("GET", "/versions").respond(200, {});
-            client.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
+            client!.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
 
             httpBackend!.when("GET", "/sync").check((req) => {
                 expect(JSON.parse(req.queryParams.filter).room?.state?.lazy_load_members).toBeFalsy();
             }).respond(200, syncData);
 
-            client.setGuest(true);
-            client.startClient({ lazyLoadMembers: true });
+            client!.setGuest(true);
+            client!.startClient({ lazyLoadMembers: true });
 
             return httpBackend!.flushAllExpected();
         });
@@ -238,7 +238,7 @@ describe("MatrixClient syncing", () => {
                 expect(req.queryParams.filter).toEqual("a filter id");
             }).respond(200, syncData);
 
-            client.startClient({ initialSyncLimit: 1 });
+            client!.startClient({ initialSyncLimit: 1 });
 
             httpBackend!.flushSync(undefined);
             return httpBackend!.flushAllExpected();
@@ -249,8 +249,8 @@ describe("MatrixClient syncing", () => {
                 expect(req.queryParams.filter).toEqual("a filter id");
             }).respond(200, syncData);
 
-            client.store.getSavedSyncToken = jest.fn().mockResolvedValue("this-is-a-token");
-            client.startClient({ initialSyncLimit: 1 });
+            client!.store.getSavedSyncToken = jest.fn().mockResolvedValue("this-is-a-token");
+            client!.startClient({ initialSyncLimit: 1 });
 
             return httpBackend!.flushAllExpected();
         });
@@ -313,7 +313,7 @@ describe("MatrixClient syncing", () => {
                 },
             );
 
-            client.startClient({
+            client!.startClient({
                 resolveInvitesToProfiles: true,
             });
 
@@ -321,7 +321,7 @@ describe("MatrixClient syncing", () => {
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(),
             ]).then(() => {
-                const member = client.getRoom(roomOne).getMember(userC);
+                const member = client!.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Boss");
                 expect(
                     member.getAvatarUrl("home.server.url", null, null, null, false, false),
@@ -345,7 +345,7 @@ describe("MatrixClient syncing", () => {
 
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-            client.startClient({
+            client!.startClient({
                 resolveInvitesToProfiles: true,
             });
 
@@ -353,7 +353,7 @@ describe("MatrixClient syncing", () => {
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(),
             ]).then(() => {
-                const member = client.getRoom(roomOne).getMember(userC);
+                const member = client!.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual("The Ghost");
             });
         });
@@ -375,13 +375,13 @@ describe("MatrixClient syncing", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
             let latestFiredName = null;
-            client.on(RoomMemberEvent.Name, (event, m) => {
+            client!.on(RoomMemberEvent.Name, (event, m) => {
                 if (m.userId === userC && m.roomId === roomOne) {
                     latestFiredName = m.name;
                 }
             });
 
-            client.startClient({
+            client!.startClient({
                 resolveInvitesToProfiles: true,
             });
 
@@ -402,13 +402,13 @@ describe("MatrixClient syncing", () => {
 
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(),
             ]).then(() => {
-                const member = client.getRoom(roomOne).getMember(userC);
+                const member = client!.getRoom(roomOne).getMember(userC);
                 expect(member.name).toEqual(userC);
                 expect(
                     member.getAvatarUrl("home.server.url", null, null, null, false, false),
@@ -437,14 +437,14 @@ describe("MatrixClient syncing", () => {
         it("should create users for presence events from /sync", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(),
             ]).then(() => {
-                expect(client.getUser(userA).presence).toEqual("online");
-                expect(client.getUser(userB).presence).toEqual("unavailable");
+                expect(client!.getUser(userA).presence).toEqual("online");
+                expect(client!.getUser(userB).presence).toEqual("unavailable");
             });
         });
     });
@@ -559,13 +559,13 @@ describe("MatrixClient syncing", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(2),
             ]).then(() => {
-                const room = client.getRoom(roomOne);
+                const room = client!.getRoom(roomOne);
                 // should have clobbered the name to the one from /events
                 expect(room.name).toEqual(
                     nextSyncData.rooms.join[roomOne].state.events[0].content.name,
@@ -577,13 +577,13 @@ describe("MatrixClient syncing", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(2),
             ]).then(() => {
-                const room = client.getRoom(roomTwo);
+                const room = client!.getRoom(roomTwo);
                 // should have added the message from /events
                 expect(room.timeline.length).toEqual(2);
                 expect(room.timeline[1].getContent().body).toEqual(msgText);
@@ -594,12 +594,12 @@ describe("MatrixClient syncing", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
-            client.startClient();
+            client!.startClient();
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(2),
             ]).then(() => {
-                const room = client.getRoom(roomTwo);
+                const room = client!.getRoom(roomTwo);
                 // should use the display name of the other person.
                 expect(room.name).toEqual(otherDisplayName);
             });
@@ -609,13 +609,13 @@ describe("MatrixClient syncing", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(2),
             ]).then(() => {
-                const room = client.getRoom(roomTwo);
+                const room = client!.getRoom(roomTwo);
                 let member = room.getMember(otherUserId);
                 expect(member).toBeTruthy();
                 expect(member.typing).toEqual(true);
@@ -633,12 +633,12 @@ describe("MatrixClient syncing", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
-            client.startClient();
+            client!.startClient();
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(2),
             ]).then(() => {
-                const room = client.getRoom(roomOne);
+                const room = client!.getRoom(roomOne);
                 const stateAtStart = room.getLiveTimeline().getState(
                     EventTimeline.BACKWARDS,
                 );
@@ -730,13 +730,13 @@ describe("MatrixClient syncing", () => {
                 httpBackend!.when("GET", "/sync").respond(200, normalFirstSync);
                 httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
-                client.startClient();
+                client!.startClient();
                 await Promise.all([
                     httpBackend!.flushAllExpected(),
                     awaitSyncEvent(2),
                 ]);
 
-                const room = client.getRoom(roomOne);
+                const room = client!.getRoom(roomOne);
                 expect(room.getTimelineNeedsRefresh()).toEqual(false);
             });
 
@@ -800,13 +800,13 @@ describe("MatrixClient syncing", () => {
 
                         httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-                        client.startClient();
+                        client!.startClient();
                         await Promise.all([
                             httpBackend!.flushAllExpected(),
                             awaitSyncEvent(),
                         ]);
 
-                        const room = client.getRoom(roomOne);
+                        const room = client!.getRoom(roomOne);
                         expect(room.getTimelineNeedsRefresh()).toEqual(false);
                     });
 
@@ -830,13 +830,13 @@ describe("MatrixClient syncing", () => {
 
                         httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-                        client.startClient();
+                        client!.startClient();
                         await Promise.all([
                             httpBackend!.flushAllExpected(),
                             awaitSyncEvent(),
                         ]);
 
-                        const room = client.getRoom(roomOne);
+                        const room = client!.getRoom(roomOne);
                         expect(room.getTimelineNeedsRefresh()).toEqual(false);
                     });
 
@@ -863,13 +863,13 @@ describe("MatrixClient syncing", () => {
 
                         httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-                        client.startClient();
+                        client!.startClient();
                         await Promise.all([
                             httpBackend!.flushAllExpected(),
                             awaitSyncEvent(),
                         ]);
 
-                        const room = client.getRoom(roomOne);
+                        const room = client!.getRoom(roomOne);
                         expect(room.getTimelineNeedsRefresh()).toEqual(false);
                     });
 
@@ -896,14 +896,14 @@ describe("MatrixClient syncing", () => {
 
                         // Only do the first sync
                         httpBackend!.when("GET", "/sync").respond(200, normalFirstSync);
-                        client.startClient();
+                        client!.startClient();
                         await Promise.all([
                             httpBackend!.flushAllExpected(),
                             awaitSyncEvent(),
                         ]);
 
                         // Get the room after the first sync so the room is created
-                        const room = client.getRoom(roomOne);
+                        const room = client!.getRoom(roomOne);
 
                         let emitCount = 0;
                         room.on(RoomEvent.HistoryImportedWithinTimeline, (markerEvent, room) => {
@@ -953,13 +953,13 @@ describe("MatrixClient syncing", () => {
                         httpBackend!.when("GET", "/sync").respond(200, normalFirstSync);
                         httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
-                        client.startClient();
+                        client!.startClient();
                         await Promise.all([
                             httpBackend!.flushAllExpected(),
                             awaitSyncEvent(2),
                         ]);
 
-                        const room = client.getRoom(roomOne);
+                        const room = client!.getRoom(roomOne);
                         expect(room.getTimelineNeedsRefresh()).toEqual(true);
                     });
                 });
@@ -1007,18 +1007,18 @@ describe("MatrixClient syncing", () => {
                "the timeline is reset during `limited` sync response", async () => {
                 // Create a room from the sync
                 httpBackend!.when("GET", "/sync").respond(200, syncData);
-                client.startClient();
+                client!.startClient();
                 await Promise.all([
                     httpBackend!.flushAllExpected(),
                     awaitSyncEvent(),
                 ]);
 
                 // Get the room after the first sync so the room is created
-                const room = client.getRoom(roomOne);
+                const room = client!.getRoom(roomOne);
                 expect(room).toBeTruthy();
 
                 let stateEventEmitCount = 0;
-                client.on(RoomStateEvent.Update, () => {
+                client!.on(RoomStateEvent.Update, () => {
                     stateEventEmitCount += 1;
                 });
 
@@ -1081,18 +1081,18 @@ describe("MatrixClient syncing", () => {
 
                 // Create a room from the sync
                 httpBackend!.when("GET", "/sync").respond(200, syncData);
-                client.startClient();
+                client!.startClient();
                 await Promise.all([
                     httpBackend!.flushAllExpected(),
                     awaitSyncEvent(),
                 ]);
 
                 // Get the room after the first sync so the room is created
-                const room = client.getRoom(roomOne);
+                const room = client!.getRoom(roomOne);
                 expect(room).toBeTruthy();
 
                 let stateEventEmitCount = 0;
-                client.on(RoomStateEvent.Update, () => {
+                client!.on(RoomStateEvent.Update, () => {
                     stateEventEmitCount += 1;
                 });
 
@@ -1154,7 +1154,7 @@ describe("MatrixClient syncing", () => {
 
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-            client.startClient();
+            client!.startClient();
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(),
@@ -1185,7 +1185,7 @@ describe("MatrixClient syncing", () => {
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(),
             ]).then(() => {
-                const room = client.getRoom(roomTwo);
+                const room = client!.getRoom(roomTwo);
                 expect(room).toBeTruthy();
                 const tok = room.getLiveTimeline()
                     .getPaginationToken(EventTimeline.BACKWARDS);
@@ -1215,7 +1215,7 @@ describe("MatrixClient syncing", () => {
 
             let resetCallCount = 0;
             // the token should be set *before* timelineReset is emitted
-            client.on(RoomEvent.TimelineReset, (room) => {
+            client!.on(RoomEvent.TimelineReset, (room) => {
                 resetCallCount++;
 
                 const tl = room.getLiveTimeline();
@@ -1228,7 +1228,7 @@ describe("MatrixClient syncing", () => {
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(),
             ]).then(() => {
-                const room = client.getRoom(roomOne);
+                const room = client!.getRoom(roomOne);
                 const tl = room.getLiveTimeline();
                 expect(tl.getEvents().length).toEqual(1);
                 expect(resetCallCount).toEqual(1);
@@ -1301,13 +1301,13 @@ describe("MatrixClient syncing", () => {
             }];
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
                 httpBackend!.flushAllExpected(),
                 awaitSyncEvent(),
             ]).then(() => {
-                const room = client.getRoom(roomOne);
+                const room = client!.getRoom(roomOne);
                 expect(room.getReceiptsForEvent(new MatrixEvent(ackEvent))).toEqual([{
                     type: "m.read",
                     userId: userC,
@@ -1332,7 +1332,7 @@ describe("MatrixClient syncing", () => {
 
     describe("syncLeftRooms", () => {
         beforeEach((done) => {
-            client.startClient();
+            client!.startClient();
 
             httpBackend!.flushAllExpected().then(() => {
                 // the /sync call from syncLeftRooms ends up in the request
@@ -1361,7 +1361,7 @@ describe("MatrixClient syncing", () => {
                 }).respond(200, {});
             });
 
-            client.syncLeftRooms();
+            client!.syncLeftRooms();
 
             // first flush the filter request; this will make syncLeftRooms
             // make its /sync call
@@ -1400,8 +1400,8 @@ describe("MatrixClient syncing", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
             return Promise.all([
-                client.syncLeftRooms().then(() => {
-                    const room = client.getRoom(roomTwo);
+                client!.syncLeftRooms().then(() => {
+                    const room = client!.getRoom(roomTwo);
                     const tok = room.getLiveTimeline().getPaginationToken(
                         EventTimeline.BACKWARDS);
 
