@@ -61,6 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       pull-requests: read
+      checks: write
     steps:
       - uses: actions/checkout@v3
 
