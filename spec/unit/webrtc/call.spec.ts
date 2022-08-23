@@ -119,6 +119,9 @@ describe('Call', function() {
     });
 
     afterEach(function() {
+        // Hangup to stop timers
+        call.hangup(CallErrorCode.UserHangup, true);
+
         client.stop();
         global.navigator = prevNavigator;
         global.window = prevWindow;
@@ -180,9 +183,6 @@ describe('Call', function() {
             getSender: () => "@test:foo",
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
-
-        // Hangup to stop timers
-        call.hangup(CallErrorCode.UserHangup, true);
     });
 
     it('should add candidates received before answer if party ID is correct', async function() {
@@ -285,9 +285,6 @@ describe('Call', function() {
         const ident = call.getRemoteAssertedIdentity();
         expect(ident.id).toEqual("@steve:example.com");
         expect(ident.displayName).toEqual("Steve Gibbons");
-
-        // Hangup to stop timers
-        call.hangup(CallErrorCode.UserHangup, true);
     });
 
     it("should map SDPStreamMetadata to feeds", async () => {
@@ -736,16 +733,14 @@ describe('Call', function() {
 
     describe("ignoring streams with ids for which we already have a feed", () => {
         const STREAM_ID = "stream_id";
-        const FEEDS_CHANGED_CALLBACK = jest.fn();
+        let FEEDS_CHANGED_CALLBACK;
 
         beforeEach(async () => {
+            FEEDS_CHANGED_CALLBACK = jest.fn();
+
             await startVoiceCall(client, call);
             call.on(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
             jest.spyOn(call, "pushLocalFeed");
-        });
-
-        afterEach(() => {
-            FEEDS_CHANGED_CALLBACK.mockReset();
         });
 
         it("should ignore stream passed to pushRemoteFeed()", async () => {

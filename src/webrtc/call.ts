@@ -2240,7 +2240,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 eventType,
                 roomId: this.roomId,
                 content: realContent,
-                userId: this.invitee || this.getOpponentMember().userId,
+                userId: this.invitee || this.getOpponentMember()?.userId,
             });
 
             await this.client.sendEvent(this.roomId, eventType, realContent);
