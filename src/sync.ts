@@ -23,6 +23,8 @@ limitations under the License.
  * for HTTP and WS at some point.
  */
 
+import { Optional } from "matrix-events-sdk";
+
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import * as utils from "./utils";
@@ -159,14 +161,14 @@ type WrappedRoom<T> = T & {
  * updating presence.
  */
 export class SyncApi {
-    private _peekRoom: Room = null;
-    private currentSyncRequest: IAbortablePromise<ISyncResponse> = null;
-    private syncState: SyncState = null;
-    private syncStateData: ISyncStateData = null; // additional data (eg. error object for failed sync)
+    private _peekRoom: Optional<Room> = null;
+    private currentSyncRequest: Optional<IAbortablePromise<ISyncResponse>> = null;
+    private syncState: Optional<SyncState> = null;
+    private syncStateData: Optional<ISyncStateData> = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
-    private keepAliveTimer: ReturnType<typeof setTimeout> = null;
-    private connectionReturnedDefer: IDeferred<boolean> = null;
+    private keepAliveTimer: Optional<ReturnType<typeof setTimeout>> = null;
+    private connectionReturnedDefer: Optional<IDeferred<boolean>> = null;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
@@ -611,8 +613,8 @@ export class SyncApi {
     };
 
     private getFilter = async (): Promise<{
-        filterId: string;
-        filter: Filter;
+        filterId?: string;
+        filter?: Filter;
     }> => {
         debuglog("Getting filter...");
         let filter: Filter;
@@ -627,7 +629,7 @@ export class SyncApi {
             filterId = await this.client.getOrCreateFilter(getFilterName(this.client.credentials.userId), filter);
         } catch (err) {
             logger.error("Getting filter failed", err);
-            if (this.shouldAbortSync(err)) return;
+            if (this.shouldAbortSync(err)) return {};
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
             debuglog("Waiting for saved sync before retrying filter...");
@@ -684,6 +686,7 @@ export class SyncApi {
         await this.getPushRules();
         await this.checkLazyLoadStatus();
         const { filterId, filter } = await this.getFilter();
+        if (!filter) return; // bail, getFilter failed
 
         // reset the notifications timeline to prepare it to paginate from
         // the current point in time.
@@ -762,8 +765,7 @@ export class SyncApi {
         this.client.store.setSyncToken(nextSyncToken);
 
         // No previous sync, set old token to null
-        const syncEventData = {
-            oldSyncToken: null,
+        const syncEventData: ISyncStateData = {
             nextSyncToken,
             catchingUp: false,
             fromCache: true,
@@ -1001,8 +1003,6 @@ export class SyncApi {
         // and CATCHUP.
         if (connDidFail && this.getSyncState() === SyncState.Error) {
             this.updateSyncState(SyncState.Catchup, {
-                oldSyncToken: null,
-                nextSyncToken: null,
                 catchingUp: true,
             });
         }
