@@ -125,6 +125,7 @@ export class MediaHandler {
                 } else if (track.kind === "video") {
                     this.videoInput = settings.deviceId;
                 }
+                this.audioInput = settings.deviceId;
             }
 
             if (reusable) {
