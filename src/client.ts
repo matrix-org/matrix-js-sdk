@@ -1048,37 +1048,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // actions for themselves, so we have to kinda help them out when they are encrypted.
         // We do this so that push rules are correctly executed on events in their decrypted
         // state, such as highlights when the user's name is mentioned.
-        this.on(MatrixEventEvent.Decrypted, (event) => {
-            const oldActions = event.getPushActions();
-            const actions = this.getPushActionsForEvent(event, true);
-
-            const room = this.getRoom(event.getRoomId());
-            if (!room) return;
-
-            const currentCount = room.getUnreadNotificationCount(NotificationCountType.Highlight);
-
-            // Ensure the unread counts are kept up to date if the event is encrypted
-            // We also want to make sure that the notification count goes up if we already
-            // have encrypted events to avoid other code from resetting 'highlight' to zero.
-            const oldHighlight = !!oldActions?.tweaks?.highlight;
-            const newHighlight = !!actions?.tweaks?.highlight;
-            if (oldHighlight !== newHighlight || currentCount > 0) {
-                // TODO: Handle mentions received while the client is offline
-                // See also https://github.com/vector-im/element-web/issues/9069
-                if (!room.hasUserReadEvent(this.getUserId(), event.getId())) {
-                    let newCount = currentCount;
-                    if (newHighlight && !oldHighlight) newCount++;
-                    if (!newHighlight && oldHighlight) newCount--;
-                    room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
-
-                    // Fix 'Mentions Only' rooms from not having the right badge count
-                    const totalCount = room.getUnreadNotificationCount(NotificationCountType.Total);
-                    if (totalCount < newCount) {
-                        room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
-                    }
-                }
-            }
-        });
+        this.on(MatrixEventEvent.Decrypted, this.recalculateNotifications);
 
         // Like above, we have to listen for read receipts from ourselves in order to
         // correctly handle notification counts on encrypted rooms.
@@ -1128,6 +1098,69 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 room.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
             }
         });
+    }
+
+    private recalculateNotifications(event: MatrixEvent): void {
+        const oldActions = event.getPushActions();
+        const actions = this.getPushActionsForEvent(event, true);
+
+        const room = this.getRoom(event.getRoomId());
+        if (!room) return;
+
+        const isThreadEvent = !!event.threadRootId;
+        let currentCount;
+
+        if (isThreadEvent) {
+            currentCount = room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Highlight);
+        } else {
+            currentCount = room.getUnreadNotificationCount(NotificationCountType.Highlight);
+        }
+
+        // Ensure the unread counts are kept up to date if the event is encrypted
+        // We also want to make sure that the notification count goes up if we already
+        // have encrypted events to avoid other code from resetting 'highlight' to zero.
+        const oldHighlight = !!oldActions?.tweaks?.highlight;
+        const newHighlight = !!actions?.tweaks?.highlight;
+        if (oldHighlight !== newHighlight || currentCount > 0) {
+            // TODO: Handle mentions received while the client is offline
+            // See also https://github.com/vector-im/element-web/issues/9069
+            const hasReadEvent = isThreadEvent
+                ? room.getThread(event.threadRootId).hasUserReadEvent(this.getUserId(), event.getId())
+                : room.hasUserReadEvent(this.getUserId(), event.getId());
+
+            if (!hasReadEvent) {
+                let newCount = currentCount;
+                if (newHighlight && !oldHighlight) newCount++;
+                if (!newHighlight && oldHighlight) newCount--;
+
+                if (isThreadEvent) {
+                    room.setThreadUnreadNotificationCount(
+                        event.threadRootId,
+                        NotificationCountType.Highlight,
+                        newCount,
+                    );
+                } else {
+                    room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
+                }
+
+                // Fix 'Mentions Only' rooms from not having the right badge count
+                const totalCount = isThreadEvent
+                    ? room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total)
+                    : room.getUnreadNotificationCount(NotificationCountType.Total);
+
+                if (totalCount < newCount) {
+                    if (isThreadEvent) {
+                        room.setThreadUnreadNotificationCount(
+                            event.threadRootId,
+                            NotificationCountType.Total,
+                            newCount,
+                        );
+                    } else {
+                        room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
+                    }
+                }
+            }
+        }
     }
 
     /**
