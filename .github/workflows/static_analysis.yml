@@ -77,7 +77,7 @@ jobs:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: '^.*\.tsx?$'
 
-      - uses: t3chguy/typescript-check-action@main
+      - uses: t3chguy/typescript-check-action@#2f0b004ed53145bc4d2fb2035ef0ce3d34e426fe
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           use-check: true
