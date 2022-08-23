@@ -135,7 +135,7 @@ export interface ISfuAnswerDataChannelMessage extends ISfuBaseDataChannelMessage
 
 export interface ISfuPublishDataChannelMessage extends ISfuBaseDataChannelMessage {
     op: SFUDataChannelMessageOp.Publish;
-    sdp: string;
+    start: ISfuTrackDesc[];
 }
 
 export interface ISfuUnpublishDataChannelMessage extends ISfuBaseDataChannelMessage {

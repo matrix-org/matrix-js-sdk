@@ -277,6 +277,7 @@ const CALL_TIMEOUT_MS = 60000;
 
 const CALL_LENGTH_INTERVAL = 1000; // 1 second
 const SFU_KEEP_ALIVE_INTERVAL = 30 * 1000; // 30 seconds
+const SFU_STREAM_COUNT = 4;
 
 export class CallError extends Error {
     code: string;
@@ -362,6 +363,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private feeds: Array<CallFeed> = [];
     private usermediaTransceivers: Array<RTCRtpTransceiver> = [];
     private screensharingTransceivers: Array<RTCRtpTransceiver> = [];
+    private unusedStream: Set<MediaStream> = new Set<MediaStream>();
     private subscribedTracks: ISfuTrackDesc[] = [];
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream: boolean;
@@ -399,6 +401,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private remoteAssertedIdentity: AssertedIdentity;
 
     private remoteSDPStreamMetadata: SDPStreamMetadata;
+    private publishSDPStreamMetadata: SDPStreamMetadata;
 
     private sfuKeepAliveInterval: ReturnType<typeof setInterval>;
     private callLengthInterval: ReturnType<typeof setInterval>;
@@ -592,12 +595,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
+    private getMsidByMid(transceiver: RTCRtpTransceiver): string[] | undefined {
+        const sdp = this.peerConn?.localDescription?.sdp ? parseSdp(this.peerConn.localDescription.sdp) : null;
+
+        // XXX: We only use double equals because MediaDescription::mid is in fact a number
+        return sdp?.media?.find((m) => m.mid == transceiver.mid)?.msid?.split(" ");
+    }
+
     /**
      * Generates and returns localSDPStreamMetadata
      * @returns {SDPStreamMetadata} localSDPStreamMetadata
      */
     private getLocalSDPStreamMetadata(updateStreamIds = false): SDPStreamMetadata {
-        const sdp = this.peerConn?.localDescription?.sdp ? parseSdp(this.peerConn.localDescription.sdp) : null;
         const metadata: SDPStreamMetadata = {};
         for (const localFeed of this.getLocalFeeds()) {
             if (updateStreamIds) {
@@ -609,10 +618,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const tracks = (localFeed.purpose === SDPStreamMetadataPurpose.Usermedia
                 ? this.usermediaTransceivers
                 : this.screensharingTransceivers).reduce((tracks, transceiver) => {
-                // XXX: We only use double equals because MediaDescription::mid is in fact a number
-                const trackId = sdp?.media?.find((m) => m.mid == transceiver.mid)?.msid?.split(" ")?.[1];
-                if (trackId) {
-                    tracks[trackId] = {};
+                const msid = this.getMsidByMid(transceiver);
+                if (msid?.[1]) {
+                    tracks[msid[1]] = {};
+                }
+                if (msid?.[0]) {
+                    localFeed.sdpMetadataStreamId = msid[0];
                 }
                 return tracks;
             }, {} as SDPStreamMetadataTracks);
@@ -643,12 +654,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private pushRemoteFeed(stream: MediaStream): void {
-        // Fallback to old behavior if the other side doesn't support SDPStreamMetadata
         const metadata = this.remoteSDPStreamMetadata?.[stream.id];
-        if (!this.opponentSupportsSDPStreamMetadata() || !metadata) {
+        if (!metadata && this.isSfu) {
+            // If we're calling it with an SFU, it will send us empty tracks, which
+            // we recognize by the lack of metadata
+            this.unusedStream.add(stream);
+            return;
+        } else if (!metadata) {
+            // Fallback to old behavior if the other side doesn't support SDPStreamMetadata
             this.pushRemoteFeedWithoutMetadata(stream);
             return;
         }
+
+        this.unusedStream.delete(stream);
 
         const userId = metadata.user_id;
         const purpose = metadata.purpose;
@@ -772,20 +790,44 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             // Empty the array
             transceiverArray.splice(0, transceiverArray.length);
 
-            for (const track of callFeed.stream.getTracks()) {
-                logger.info(
-                    `Call ${this.callId} ` +
-                    `Adding track (` +
-                    `id="${track.id}", ` +
-                    `kind="${track.kind}", ` +
-                    `streamId="${callFeed.stream.id}", ` +
-                    `streamPurpose="${callFeed.purpose}", ` +
-                    `enabled=${track.enabled}` +
-                    `) to peer connection`,
-                );
-                transceiverArray.push(this.peerConn.addTransceiver(track, {
-                    streams: [callFeed.stream],
-                }));
+            if (this.isSfu && this.state !== CallState.Fledgling) {
+                const tracksToPublish: ISfuTrackDesc[] = [];
+
+                for (const track of callFeed.stream.getTracks()) {
+                    for (const transceiver of this.peerConn.getTransceivers()) {
+                        if (!transceiver.sender.track) {
+                            transceiverArray.push(transceiver);
+                            transceiver.sender.replaceTrack(track);
+                            const msid = this.getMsidByMid(transceiver);
+                            if (!msid) throw new Error("Nope");
+                            tracksToPublish.push({
+                                track_id: msid?.[1],
+                                stream_id: msid?.[0],
+                            });
+                            break;
+                        }
+                    }
+                }
+                this.sendSFUDataChannelMessage(SFUDataChannelMessageOp.Publish, {
+                    start: tracksToPublish,
+                } as ISfuPublishDataChannelMessage);
+            } else {
+                for (const track of callFeed.stream.getTracks()) {
+                    logger.info(
+                        `Call ${this.callId} ` +
+                        `Adding track (` +
+                        `id="${track.id}", ` +
+                        `kind="${track.kind}", ` +
+                        `streamId="${callFeed.stream.id}", ` +
+                        `streamPurpose="${callFeed.purpose}", ` +
+                        `enabled=${track.enabled}` +
+                        `) to peer connection`,
+                    );
+
+                    transceiverArray.push(this.peerConn.addTransceiver(track, {
+                        streams: [callFeed.stream],
+                    }));
+                }
             }
         }
 
@@ -797,20 +839,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             `purpose="${callFeed.purpose}")`,
         );
 
-        // If we're calling with an SFU and we aren't setting up the call, we
-        // send the offer manually
-        if (this.isSfu && this.state !== CallState.Fledgling && addToPeerConnection) {
-            this.peerConn.createOffer().then(async (offer) => {
-                await this.peerConn.setLocalDescription(offer);
-
-                this.sendSFUDataChannelMessage(SFUDataChannelMessageOp.Publish, {
-                    sdp: offer.sdp,
-                } as ISfuPublishDataChannelMessage);
-                this.emit(CallEvent.FeedsChanged, this.feeds);
-            });
-        } else {
-            this.emit(CallEvent.FeedsChanged, this.feeds);
-        }
+        this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
     /**
@@ -1499,10 +1528,27 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.pushLocalFeed(feed);
         }
 
-        if (requestScreenshareFeed) {
-            this.peerConn.addTransceiver("video", {
-                direction: "recvonly",
-            });
+        if (this.isSfu) {
+            // TODO: We should request more audio transceivers than video
+            // transceivers
+            for (let i = 0; i < (SFU_STREAM_COUNT - (requestScreenshareFeed ? 2 : 1)); i++) {
+                const stream = new MediaStream();
+
+                this.peerConn.addTransceiver("audio", {
+                    direction: "sendrecv",
+                    streams: [stream],
+                });
+                this.peerConn.addTransceiver("video", {
+                    direction: "sendrecv",
+                    streams: [stream],
+                });
+            }
+        } else {
+            if (requestScreenshareFeed) {
+                this.peerConn.addTransceiver("video", {
+                    direction: "recvonly",
+                });
+            }
         }
 
         this.setState(CallState.CreateOffer);
@@ -1772,7 +1818,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.setState(CallState.Connecting);
 
         const sdpStreamMetadata = content[SDPStreamMetadataKey];
-        if (sdpStreamMetadata) {
+        if (sdpStreamMetadata && this.isSfu) {
+            this.publishSDPStreamMetadata = sdpStreamMetadata;
+        } else if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else if (!this.isSfu) {
             logger.warn(`Call ${this.callId} Did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
@@ -1946,6 +1994,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.updateRemoteSDPStreamMetadata(metadata.metadata);
             }
                 break;
+            case SFUDataChannelMessageOp.Publish: {
+                const publish = json as ISfuPublishDataChannelMessage;
+                this.publishSDPStreamMetadata = publish.metadata;
+                this.subscribeToSFU();
+            }
+                break;
             default:
                 logger.warn("Ignoring unrecognized DC event op ", json.op);
 
@@ -1966,10 +2020,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public async subscribeToSFU(): Promise<void> {
         await this.waitForDatachannelToBeOpen();
-        if (!this.remoteSDPStreamMetadata) return;
+        if (!this.publishSDPStreamMetadata) return;
         if (this.dataChannel.readyState !== "open") return;
 
-        const tracks: ISfuTrackDesc[] = Object.entries(this.remoteSDPStreamMetadata)
+        const tracks: ISfuTrackDesc[] = Object.entries(this.publishSDPStreamMetadata)
             .filter(([, info]) => Boolean(info.tracks)) // Skip trackless feeds
             .reduce((a, [s, i]) => [...a, ...Object.keys(i.tracks).map((t) => ({ stream_id: s, track_id: t }))], []) // Get array of tracks from feeds
             .filter((track) => !this.subscribedTracks.find((subscribed) => utils.deepCompare(track, subscribed))); // Filter out already subscribed tracks
@@ -1988,18 +2042,29 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
-        if (!metadata) return;
-        this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
+        if (this.isSfu) {
+            this.remoteSDPStreamMetadata = metadata ?? {};
+        } else {
+            this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
+        }
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
             const metadata = this.remoteSDPStreamMetadata[streamId];
+
+            if (!metadata) {
+                this.unusedStream.add(feed.stream);
+                this.deleteFeed(feed);
+                continue;
+            }
 
             feed.setAudioVideoMuted(metadata?.audio_muted, metadata?.video_muted);
             feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
             feed.userId = this.remoteSDPStreamMetadata[streamId]?.user_id;
         }
         if (this.isSfu) {
-            this.subscribeToSFU();
+            for (const stream of this.unusedStream) {
+                this.pushRemoteFeed(stream);
+            }
         }
     }
 
@@ -2210,6 +2275,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     this.sendSFUDataChannelMessage(SFUDataChannelMessageOp.Alive);
                 }, SFU_KEEP_ALIVE_INTERVAL * 3 / 4);
             }
+
+            if (this.isSfu) {
+                this.subscribeToSFU();
+            }
         } else if (this.peerConn.iceConnectionState == 'failed') {
             // Firefox for Android does not yet have support for restartIce()
             if (this.peerConn.restartIce) {
@@ -2419,6 +2488,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     content,
                 });
             } else {
+                logger.log("Sending to-device", eventType, content);
                 await this.client.sendToDevice(eventType, {
                     [userId]: {
                         [this.opponentDeviceId]: content,
@@ -2777,6 +2847,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         pc.addEventListener('track', this.onTrack);
         pc.addEventListener('negotiationneeded', this.onNegotiationNeeded);
         pc.addEventListener('datachannel', this.onDataChannel);
+
+        window.peerConn = pc;
 
         return pc;
     }
