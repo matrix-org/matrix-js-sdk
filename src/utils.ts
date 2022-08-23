@@ -74,8 +74,7 @@ export function decodeParams(query: string): QueryDict {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate: string,
-    variables: Record<string, string>): string {
+export function encodeUri(pathTemplate: string, variables?: Record<string, string>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
