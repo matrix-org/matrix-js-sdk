@@ -12,7 +12,7 @@
 set -e
 
 jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
-if [[ `command -v hub` ]] && [[ `hub --version` =~ hub[[:space:]]version[[:space:]]([0-9]*).([0-9]*) ]]; then
+if [[ $(command -v hub) ]] && [[ $(hub --version) =~ hub[[:space:]]version[[:space:]]([0-9]*).([0-9]*) ]]; then
     HUB_VERSION_MAJOR=${BASH_REMATCH[1]}
     HUB_VERSION_MINOR=${BASH_REMATCH[2]}
     if [[ $HUB_VERSION_MAJOR -lt 2 ]] || [[ $HUB_VERSION_MAJOR -eq 2 && $HUB_VERSION_MINOR -lt 5 ]]; then
@@ -69,11 +69,52 @@ while getopts hc:x f; do
             ;;
     esac
 done
-shift `expr $OPTIND - 1`
+shift $(expr $OPTIND - 1)
 
 if [ $# -ne 1 ]; then
     echo "Usage: $USAGE" >&2
     exit 1
+fi
+
+function check_dependency {
+    echo "Checking version of $1..."
+    local depver=$(cat package.json | jq -r .dependencies[\"$1\"])
+    local latestver=$(yarn info -s "$1" dist-tags.next)
+    if [ "$depver" != "$latestver" ]
+    then
+        echo "The latest version of $1 is $latestver but package.json depends on $depver."
+        echo -n "Type 'u' to auto-upgrade, 'c' to continue anyway, or 'a' to abort:"
+        read resp
+        if [ "$resp" != "u" ] && [ "$resp" != "c" ]
+        then
+            echo "Aborting."
+            exit 1
+        fi
+        if [ "$resp" == "u" ]
+        then
+            echo "Upgrading $1 to $latestver..."
+            yarn add -E "$1@$latestver"
+            git add -u
+            git commit -m "Upgrade $1 to $latestver"
+        fi
+    fi
+}
+
+function reset_dependency {
+    echo "Resetting $1 to develop branch..."
+    yarn add "github:matrix-org/$1#develop"
+    git add -u
+    git commit -m "Reset $1 back to develop branch"
+}
+
+has_subprojects=0
+subprojects=$(cat release_config.yaml | python -c "import yaml; import sys; print(' '.join(list(yaml.load(sys.stdin)['subprojects'].keys())))" 2> /dev/null)
+if [ "$?" -eq 0 ]; then
+    has_subprojects=1
+    echo "Checking subprojects for upgrades"
+    for proj in $subprojects; do
+        check_dependency "$proj"
+    done
 fi
 
 # We use Git branch / commit dependencies for some packages, and Yarn seems
@@ -94,7 +135,7 @@ prerelease=0
 # see if the version has a hyphen in it. Crude,
 # but semver doesn't support postreleases so anything
 # with a hyphen is a prerelease.
-echo $release | grep -q '-' && prerelease=1
+echo "$release" | grep -q '-' && prerelease=1
 
 if [ $prerelease -eq 1 ]; then
     echo Making a PRE-RELEASE
@@ -120,13 +161,13 @@ if [ -z "$skip_changelog" ]; then
     yarn run allchange "$release"
     read -p "Edit $changelog_file manually, or press enter to continue " REPLY
 
-    if [ -n "$(git ls-files --modified $changelog_file)" ]; then
+    if [ -n "$(git ls-files --modified "$changelog_file")" ]; then
         echo "Committing updated changelog"
         git commit "$changelog_file" -m "Prepare changelog for $tag"
     fi
 fi
-latest_changes=`mktemp`
-cat "${changelog_file}" | `dirname $0`/scripts/changelog_head.py > "${latest_changes}"
+latest_changes=$(mktemp)
+cat "${changelog_file}" | "$(dirname "$0")/scripts/changelog_head.py" > "${latest_changes}"
 
 set -x
 
@@ -153,19 +194,19 @@ do
 done
 
 # commit yarn.lock if it exists, is versioned, and is modified
-if [[ -f yarn.lock && `git status --porcelain yarn.lock | grep '^ M'` ]];
+if [[ -f yarn.lock && $(git status --porcelain yarn.lock | grep '^ M') ]];
 then
     pkglock='yarn.lock'
 else
     pkglock=''
 fi
-git commit package.json $pkglock -m "$tag"
+git commit package.json "$pkglock" -m "$tag"
 
 
 # figure out if we should be signing this release
 signing_id=
 if [ -f release_config.yaml ]; then
-    result=`cat release_config.yaml | python -c "import yaml; import sys; print yaml.load(sys.stdin)['signing_id']" 2> /dev/null || true`
+    result=$(cat release_config.yaml | python -c "import yaml; import sys; print(yaml.load(sys.stdin)['signing_id'])" 2> /dev/null || true)
     if [ "$?" -eq 0 ]; then
         signing_id=$result
     fi
@@ -183,8 +224,8 @@ assets=''
 dodist=0
 jq -e .scripts.dist package.json 2> /dev/null || dodist=$?
 if [ $dodist -eq 0 ]; then
-    projdir=`pwd`
-    builddir=`mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir'`
+    projdir=$(pwd)
+    builddir=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
     echo "Building distribution copy in $builddir"
     pushd "$builddir"
     git clone "$projdir" .
@@ -209,7 +250,7 @@ fi
 if [ -n "$signing_id" ]; then
     # make a signed tag
     # gnupg seems to fail to get the right tty device unless we set it here
-    GIT_COMMITTER_EMAIL="$signing_id" GPG_TTY=`tty` git tag -u "$signing_id" -F "${latest_changes}" "$tag"
+    GIT_COMMITTER_EMAIL="$signing_id" GPG_TTY=$(tty) git tag -u "$signing_id" -F "${latest_changes}" "$tag"
 else
     git tag -a -F "${latest_changes}" "$tag"
 fi
@@ -247,7 +288,7 @@ if [ -n "$signing_id" ]; then
     curl -L "${gh_project_url}/archive/${tarfile}" -o "${tarfile}"
 
     # unzip it and compare it with the tar we would generate
-    if ! cmp --silent <(gunzip -c $tarfile) \
+    if ! cmp --silent <(gunzip -c "$tarfile") \
          <(git archive --format tar --prefix="${project_name}-${release}/" "$tag"); then
 
         # we don't bail out here, because really it's more likely that our comparison
@@ -275,11 +316,11 @@ if [ $prerelease -eq 1 ]; then
     hubflags='-p'
 fi
 
-release_text=`mktemp`
+release_text=$(mktemp)
 echo "$tag" > "${release_text}"
 echo >> "${release_text}"
 cat "${latest_changes}" >> "${release_text}"
-hub release create $hubflags $assets -F "${release_text}" "$tag"
+hub release create $hubflags "$assets" -F "${release_text}" "$tag"
 
 if [ $dodist -eq 0 ]; then
     rm -rf "$builddir"
@@ -303,7 +344,7 @@ git merge "$rel_branch" --no-edit
 git push origin master
 
 # finally, merge master back onto develop (if it exists)
-if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then
+if [ "$(git branch -lr | grep origin/develop -c)" -ge 1 ]; then
     git checkout develop
     git pull
     git merge master --no-edit
@@ -311,3 +352,11 @@ if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then
 fi
 
 [ -x ./post-release.sh ] && ./post-release.sh
+
+if [ $has_subprojects -eq 1 ] && [ $prerelease -eq 0 ]; then
+    echo "Resetting subprojects to develop"
+    for proj in $subprojects; do
+        reset_dependency "$proj"
+    done
+    git push origin develop
+fi
