@@ -56,7 +56,7 @@ jobs:
         run: "yarn run gendoc"
 
   tsc-strict:
-    name: Typescript strict error check
+    name: Typescript Strict Error Checker
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     permissions:
@@ -89,4 +89,3 @@ jobs:
           files-added: ${{ steps.files.outputs.files_created }}
           files-deleted: ${{ steps.files.outputs.files_deleted }}
           line-numbers: ${{ steps.diff.outputs.lineNumbers }}
-          debug: true
