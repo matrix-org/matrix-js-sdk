@@ -743,6 +743,10 @@ describe('Call', function() {
             jest.spyOn(call, "pushLocalFeed");
         });
 
+        afterEach(() => {
+            call.off(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
+        });
+
         it("should ignore stream passed to pushRemoteFeed()", async () => {
             await call.onAnswerReceived({
                 getContent: () => {
