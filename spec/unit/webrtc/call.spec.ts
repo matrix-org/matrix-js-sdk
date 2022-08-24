@@ -1005,7 +1005,7 @@ describe('Call', function() {
 
             client.client.sendEvent.mockReset();
             const sendNegotiatePromise = new Promise<void>(resolve => {
-                client.client.sendEvent.mockImplementation(() => {
+                client.client.sendEvent.mockImplementationOnce(() => {
                     resolve();
                 });
             });
