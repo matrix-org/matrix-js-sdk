@@ -974,7 +974,7 @@ describe('Call', function() {
             call.hangup(CallErrorCode.UserHangup, true);
         });
 
-        it("enables screensharing", async () => {
+        it("enables and disables screensharing", async () => {
             await call.setScreensharingEnabled(true);
 
             expect(call.feeds.filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length).toEqual(1);
@@ -1002,20 +1002,6 @@ describe('Call', function() {
                     }),
                 }),
             );
-        });
-
-        it("disables screensharing", async () => {
-            await call.setScreensharingEnabled(true);
-
-            client.client.sendEvent.mockReset();
-            const sendNegotiatePromise = new Promise<void>(resolve => {
-                client.client.sendEvent.mockImplementationOnce(() => {
-                    resolve();
-                });
-            });
-
-            MockRTCPeerConnection.triggerAllNegotiations();
-            await sendNegotiatePromise;
 
             await call.setScreensharingEnabled(false);
 
