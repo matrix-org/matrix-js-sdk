@@ -733,7 +733,7 @@ describe('Call', function() {
 
     describe("ignoring streams with ids for which we already have a feed", () => {
         const STREAM_ID = "stream_id";
-        let FEEDS_CHANGED_CALLBACK;
+        let FEEDS_CHANGED_CALLBACK: jest.Mock<void, []>;
 
         beforeEach(async () => {
             FEEDS_CHANGED_CALLBACK = jest.fn();
