@@ -23,7 +23,13 @@ describe("CallFeed", () => {
     let client;
 
     beforeEach(() => {
-        client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
+        client = new TestClient(
+            "@alice:foo",
+            "somedevice",
+            "token",
+            undefined,
+            {},
+        );
     });
 
     afterEach(() => {
@@ -59,13 +65,17 @@ describe("CallFeed", () => {
         describe("muting after adding a track", () => {
             it("should un-mute audio", () => {
                 // @ts-ignore Mock
-                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
+                feed.stream.addTrack(
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
                 expect(feed.isAudioMuted()).toBeFalsy();
             });
 
             it("should un-mute video", () => {
                 // @ts-ignore Mock
-                feed.stream.addTrack(new MockMediaStreamTrack("track", "video", true));
+                feed.stream.addTrack(
+                    new MockMediaStreamTrack("track", "video", true),
+                );
                 expect(feed.isVideoMuted()).toBeFalsy();
             });
         });
@@ -73,16 +83,75 @@ describe("CallFeed", () => {
         describe("muting after calling setAudioVideoMuted()", () => {
             it("should mute audio by default ", () => {
                 // @ts-ignore Mock
-                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
+                feed.stream.addTrack(
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
                 feed.setAudioVideoMuted(true, false);
                 expect(feed.isAudioMuted()).toBeTruthy();
             });
 
             it("should mute video by default", () => {
                 // @ts-ignore Mock
-                feed.stream.addTrack(new MockMediaStreamTrack("track", "video", true));
+                feed.stream.addTrack(
+                    new MockMediaStreamTrack("track", "video", true),
+                );
                 feed.setAudioVideoMuted(false, true);
                 expect(feed.isVideoMuted()).toBeTruthy();
+            });
+        });
+
+        describe("voice activity detection", () => {
+            it("should disable track", () => {
+                feed.stream.addTrack(
+                    //@ts-ignore
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
+
+                feed.setVoiceActivityTreshold(Infinity);
+
+                setTimeout(() => {
+                    expect(feed.stream.getAudioTracks()[0].enabled).toBe(false);
+                }, 1000);
+            });
+
+            it("should enable track", () => {
+                feed.stream.addTrack(
+                    //@ts-ignore
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
+
+                feed.setVoiceActivityTreshold(-Infinity);
+                setTimeout(() => {
+                    expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
+                }, 1000);
+            });
+
+            it("should enable track", () => {
+                feed.stream.addTrack(
+                    //@ts-ignore
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
+
+                feed.setVoiceActivityTreshold(-50);
+                feed.speakingVolumeSamples = [-40];
+
+                setTimeout(() => {
+                    expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
+                }, 1000);
+            });
+
+            it("should enable track", () => {
+                feed.stream.addTrack(
+                    //@ts-ignore
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
+
+                feed.setVoiceActivityTreshold(-50);
+                feed.speakingVolumeSamples = [-60];
+
+                setTimeout(() => {
+                    expect(feed.stream.getAudioTracks()[0].enabled).toBe(false);
+                }, 1000);
             });
         });
     });
