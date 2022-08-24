@@ -30,6 +30,8 @@ import {
     MockMediaStream,
     MockMediaStreamTrack,
     installWebRTCMocks,
+    MockRTCPeerConnection,
+    SCREENSHARE_STREAM_ID,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, MatrixEvent } from "../../../src";
@@ -117,6 +119,9 @@ describe('Call', function() {
     });
 
     afterEach(function() {
+        // Hangup to stop timers
+        call.hangup(CallErrorCode.UserHangup, true);
+
         client.stop();
         global.navigator = prevNavigator;
         global.window = prevWindow;
@@ -178,9 +183,6 @@ describe('Call', function() {
             getSender: () => "@test:foo",
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
-
-        // Hangup to stop timers
-        call.hangup(CallErrorCode.UserHangup, true);
     });
 
     it('should add candidates received before answer if party ID is correct', async function() {
@@ -283,9 +285,6 @@ describe('Call', function() {
         const ident = call.getRemoteAssertedIdentity();
         expect(ident.id).toEqual("@steve:example.com");
         expect(ident.displayName).toEqual("Steve Gibbons");
-
-        // Hangup to stop timers
-        call.hangup(CallErrorCode.UserHangup, true);
     });
 
     it("should map SDPStreamMetadata to feeds", async () => {
@@ -734,16 +733,18 @@ describe('Call', function() {
 
     describe("ignoring streams with ids for which we already have a feed", () => {
         const STREAM_ID = "stream_id";
-        const FEEDS_CHANGED_CALLBACK = jest.fn();
+        let FEEDS_CHANGED_CALLBACK: jest.Mock<void, []>;
 
         beforeEach(async () => {
+            FEEDS_CHANGED_CALLBACK = jest.fn();
+
             await startVoiceCall(client, call);
             call.on(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
             jest.spyOn(call, "pushLocalFeed");
         });
 
         afterEach(() => {
-            FEEDS_CHANGED_CALLBACK.mockReset();
+            call.off(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
         });
 
         it("should ignore stream passed to pushRemoteFeed()", async () => {
@@ -940,5 +941,71 @@ describe('Call', function() {
         jest.advanceTimersByTime(CALL_LIFETIME + 1000);
 
         expect(call.state).toEqual(CallState.Ended);
+    });
+
+    describe("Screen sharing", () => {
+        beforeEach(async () => {
+            await startVoiceCall(client, call);
+
+            await call.onAnswerReceived({
+                getContent: () => {
+                    return {
+                        "version": 1,
+                        "call_id": call.callId,
+                        "party_id": 'party_id',
+                        "answer": {
+                            sdp: DUMMY_SDP,
+                        },
+                        "org.matrix.msc3077.sdp_stream_metadata": {
+                            "foo": {
+                                "purpose": "m.usermedia",
+                                "audio_muted": false,
+                                "video_muted": false,
+                            },
+                        },
+                    };
+                },
+                getSender: () => "@test:foo",
+            });
+        });
+
+        afterEach(() => {
+            // Hangup to stop timers
+            call.hangup(CallErrorCode.UserHangup, true);
+        });
+
+        it("enables and disables screensharing", async () => {
+            await call.setScreensharingEnabled(true);
+
+            expect(call.feeds.filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length).toEqual(1);
+
+            client.client.sendEvent.mockReset();
+            const sendNegotiatePromise = new Promise<void>(resolve => {
+                client.client.sendEvent.mockImplementationOnce(() => {
+                    resolve();
+                });
+            });
+
+            MockRTCPeerConnection.triggerAllNegotiations();
+            await sendNegotiatePromise;
+
+            expect(client.client.sendEvent).toHaveBeenCalledWith(
+                FAKE_ROOM_ID,
+                EventType.CallNegotiate,
+                expect.objectContaining({
+                    "version": "1",
+                    "call_id": call.callId,
+                    "org.matrix.msc3077.sdp_stream_metadata": expect.objectContaining({
+                        [SCREENSHARE_STREAM_ID]: expect.objectContaining({
+                            purpose: SDPStreamMetadataPurpose.Screenshare,
+                        }),
+                    }),
+                }),
+            );
+
+            await call.setScreensharingEnabled(false);
+
+            expect(call.feeds.filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length).toEqual(0);
+        });
     });
 });
