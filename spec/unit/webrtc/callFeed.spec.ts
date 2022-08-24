@@ -107,7 +107,7 @@ describe("CallFeed", () => {
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityTreshold(Infinity);
+                feed.setVoiceActivityThreshold(Infinity);
 
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(false);
@@ -120,7 +120,7 @@ describe("CallFeed", () => {
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityTreshold(-Infinity);
+                feed.setVoiceActivityThreshold(-Infinity);
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
                 }, 1000);
@@ -132,7 +132,7 @@ describe("CallFeed", () => {
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityTreshold(-50);
+                feed.setVoiceActivityThreshold(-50);
                 feed.speakingVolumeSamples = [-40];
 
                 setTimeout(() => {
@@ -146,7 +146,7 @@ describe("CallFeed", () => {
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityTreshold(-50);
+                feed.setVoiceActivityThreshold(-50);
                 feed.speakingVolumeSamples = [-60];
 
                 setTimeout(() => {

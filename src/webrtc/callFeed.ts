@@ -49,7 +49,7 @@ export enum CallFeedEvent {
     LocalVolumeChanged = "local_volume_changed",
     VolumeChanged = "volume_changed",
     Speaking = "speaking",
-    VoiceActivityTresholdChanged = "voice_activity_treshold_changed",
+    VoiceActivityThresholdChanged = "voice_activity_threshold_changed",
 }
 
 type EventHandlerMap = {
@@ -61,7 +61,7 @@ type EventHandlerMap = {
     ) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
-    [CallFeedEvent.VoiceActivityTresholdChanged]: (threshold: number) => void;
+    [CallFeedEvent.VoiceActivityThresholdChanged]: (threshold: number) => void;
 };
 export class CallFeed extends TypedEventEmitter<
     CallFeedEvent,
@@ -73,7 +73,7 @@ export class CallFeed extends TypedEventEmitter<
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
     public speakingVolumeSamples: number[];
-    public voiceActivityTreshold: number;
+    public voiceActivityThreshold: number;
     public setVADMute: (muted: boolean) => void;
     public VADEnabled = true;
     public maxCurrentVolume = -Infinity;
@@ -111,7 +111,7 @@ export class CallFeed extends TypedEventEmitter<
             -Infinity,
         );
         this.sdpMetadataStreamId = opts.stream.id;
-        this.voiceActivityTreshold = -55;
+        this.voiceActivityThreshold = -55;
         this.setVADMute = opts.setVADMute;
 
         this.updateStream(null, opts.stream);
@@ -121,8 +121,8 @@ export class CallFeed extends TypedEventEmitter<
         }
     }
 
-    public setVoiceActivityTreshold(treshold: number): void {
-        this.voiceActivityTreshold = treshold;
+    public setVoiceActivityThreshold(threshold: number): void {
+        this.voiceActivityThreshold = threshold;
     }
 
     private get hasAudioTrack(): boolean {
@@ -324,7 +324,7 @@ export class CallFeed extends TypedEventEmitter<
         // Handle voice activity detection only if it is enabled and user has not manually muted themselves
         if (this.VADEnabled && !this.audioMuted) {
             // If the user is speaking
-            if (this.maxCurrentVolume > this.voiceActivityTreshold) {
+            if (this.maxCurrentVolume > this.voiceActivityThreshold) {
                 this.VADCooldownStarted = new Date();
 
                 if (this.vadAudioMuted) {
