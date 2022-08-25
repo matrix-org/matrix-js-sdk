@@ -2268,11 +2268,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // to send if we successfully send the answer.
         // Equally don't send if we haven't yet sent the answer because we can send the
         // first batch of candidates along with the answer
-        //if (this.state === CallState.Ringing || !this.inviteOrAnswerSent) return;
+        if (this.state === CallState.Ringing || !this.inviteOrAnswerSent) return;
 
         // MSC2746 recommends these values (can be quite long when calling because the
         // callee will need a while to answer the call)
-        const delay = 0;//this.direction === CallDirection.Inbound ? 500 : 2000;
+        const delay = this.direction === CallDirection.Inbound ? 500 : 2000;
 
         if (this.candidateSendTries === 0) {
             setTimeout(() => {
