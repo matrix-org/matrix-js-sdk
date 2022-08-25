@@ -21,7 +21,7 @@ import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 
-const POLLING_INTERVAL = 20; // ms
+const POLLING_INTERVAL = 10; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
 const SPEAKING_SAMPLE_COUNT = 8; // samples
 
@@ -55,10 +55,7 @@ export enum CallFeedEvent {
 type EventHandlerMap = {
     [CallFeedEvent.NewStream]: (stream: MediaStream) => void;
     [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
-    [CallFeedEvent.MuteStateChanged]: (
-        audioMuted: boolean,
-        videoMuted: boolean,
-    ) => void;
+    [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
     [CallFeedEvent.VoiceActivityThresholdChanged]: (threshold: number) => void;
@@ -219,7 +216,6 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      */
     public setNewStream(newStream: MediaStream): void {
         this.updateStream(this.stream, newStream);
-        //this.updateStream(this.secondStream, newStream);
     }
 
     /**
@@ -268,6 +264,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     private volumeLooper = () => {
         if (!this.analyser) return;
+
         if (!this.measuringVolumeActivity) return;
 
         this.analyser.getFloatFrequencyData(this.frequencyBinCount);
@@ -320,10 +317,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             this.emit(CallFeedEvent.Speaking, this.speaking);
         }
 
-        this.volumeLooperTimeout = setTimeout(
-            this.volumeLooper,
-            POLLING_INTERVAL,
-        );
+        this.volumeLooperTimeout = setTimeout(this.volumeLooper, POLLING_INTERVAL);
     };
 
     private isVADinCooldown(): boolean {

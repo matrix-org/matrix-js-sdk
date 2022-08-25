@@ -483,14 +483,15 @@ export class GroupCall extends TypedEventEmitter<
 
         if (sendUpdatesBefore) {
             try {
-                await Promise.all(this.calls.map((c) => c.sendMetadataUpdate()));
+                await Promise.all(this.calls.map(c => c.sendMetadataUpdate()));
             } catch (e) {
                 logger.info("Failed to send one or more metadata updates", e);
             }
         }
 
         if (this.localCallFeed) {
-            logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted stream ${this.localCallFeed.stream.id} muted ${muted}`);
+            logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted stream ${
+                this.localCallFeed.stream.id} muted ${muted}`);
             this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
             // are the one on the groupcall's own CallFeed and are cloned before being
@@ -505,7 +506,7 @@ export class GroupCall extends TypedEventEmitter<
 
         if (!sendUpdatesBefore) {
             try {
-                await Promise.all(this.calls.map((c) => c.sendMetadataUpdate()));
+                await Promise.all(this.calls.map(c => c.sendMetadataUpdate()));
             } catch (e) {
                 logger.info("Failed to send one or more metadata updates", e);
             }
@@ -573,7 +574,7 @@ export class GroupCall extends TypedEventEmitter<
             call.setLocalVideoMuted(muted);
         }
 
-        this.emit(GroupCallEvent.LocalMuteStateChanged, this.isLocalVideoMuted(), muted);
+        this.emit(GroupCallEvent.LocalMuteStateChanged, this.isMicrophoneMuted(), muted);
         return true;
     }
 
@@ -587,9 +588,7 @@ export class GroupCall extends TypedEventEmitter<
         if (enabled) {
             try {
                 logger.log("Asking for screensharing permissions...");
-                const stream = await this.client
-                    .getMediaHandler()
-                    .getScreensharingStream(opts);
+                const stream = await this.client.getMediaHandler().getScreensharingStream(opts);
 
                 for (const track of stream.getTracks()) {
                     const onTrackEnded = () => {
@@ -622,8 +621,8 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map((call) =>
-                    call.pushLocalFeed(this.localScreenshareFeed.clone(),
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(
+                    this.localScreenshareFeed.clone(),
                 )));
 
                 await this.sendMemberStateEvent();
@@ -637,7 +636,7 @@ export class GroupCall extends TypedEventEmitter<
                 return false;
             }
         } else {
-            await Promise.all(this.calls.map((call) =>call.removeLocalFeed(call.localScreensharingFeed)));
+            await Promise.all(this.calls.map(call => call.removeLocalFeed(call.localScreensharingFeed)));
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
@@ -796,7 +795,7 @@ export class GroupCall extends TypedEventEmitter<
         };
 
         const content = event.getContent<IGroupCallRoomMemberState>();
-        const callsState =!callMemberStateIsExpired(event) &&Array.isArray(content["m.calls"])
+        const callsState =!callMemberStateIsExpired(event) && Array.isArray(content["m.calls"])
             ? content["m.calls"].filter((call) => call)
             : []; // Ignore expired device data
 
@@ -825,7 +824,7 @@ export class GroupCall extends TypedEventEmitter<
         this.addParticipant(member);
 
         clearTimeout(this.memberStateExpirationTimers.get(member.userId));
-        this.memberStateExpirationTimers.set(member.userId,setTimeout(() => {
+        this.memberStateExpirationTimers.set(member.userId, setTimeout(() => {
             logger.warn(`Call member state for ${member.userId} has expired`);
             this.removeParticipant(member);
         }, content["m.expires_ts"] - Date.now()));
@@ -1153,7 +1152,7 @@ export class GroupCall extends TypedEventEmitter<
         this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
     }
 
-    private replaceUserMediaFeed(existingFeed: CallFeed,replacementFeed: CallFeed) {
+    private replaceUserMediaFeed(existingFeed: CallFeed, replacementFeed: CallFeed) {
         const feedIndex = this.userMediaFeeds.findIndex((feed) => feed.userId === existingFeed.userId);
 
         if (feedIndex === -1) {
