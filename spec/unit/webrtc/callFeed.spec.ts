@@ -126,7 +126,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("should enable track", () => {
+            it("should disable track", () => {
                 feed.stream.addTrack(
                     //@ts-ignore
                     new MockMediaStreamTrack("track", "audio", true),
