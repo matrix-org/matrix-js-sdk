@@ -191,7 +191,7 @@ export class MemoryCryptoStore implements CryptoStore {
         deviceId: string,
         wantedStates: number[],
     ): Promise<OutgoingRoomKeyRequest[]> {
-        const results = [];
+        const results: OutgoingRoomKeyRequest[] = [];
 
         for (const req of this.outgoingRoomKeyRequests) {
             for (const state of wantedStates) {
