@@ -195,7 +195,9 @@ export class MemoryCryptoStore implements CryptoStore {
 
         for (const req of this.outgoingRoomKeyRequests) {
             for (const state of wantedStates) {
-                if (req.state === state && req.recipients.includes({ userId, deviceId })) {
+                if (req.state === state && req.recipients.some(
+                    (recipient) => recipient.userId === userId && recipient.deviceId === deviceId,
+                )) {
                     results.push(req);
                 }
             }

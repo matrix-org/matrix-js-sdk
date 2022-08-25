@@ -28,16 +28,27 @@ const requests = [
         requestId: "A",
         requestBody: { session_id: "A", room_id: "A" },
         state: RoomKeyRequestState.Sent,
+        recipients: [
+            { userId: "@alice:example.com", deviceId: "*" },
+            { userId: "@becca:example.com", deviceId: "foobarbaz" },
+        ],
     },
     {
         requestId: "B",
         requestBody: { session_id: "B", room_id: "B" },
         state: RoomKeyRequestState.Sent,
+        recipients: [
+            { userId: "@alice:example.com", deviceId: "*" },
+            { userId: "@carrie:example.com", deviceId: "barbazquux" },
+        ],
     },
     {
         requestId: "C",
         requestBody: { session_id: "C", room_id: "C" },
         state: RoomKeyRequestState.Unsent,
+        recipients: [
+            { userId: "@becca:example.com", deviceId: "foobarbaz" },
+        ],
     },
 ];
 
@@ -73,6 +84,15 @@ describe.each([
             requests.filter((e) => e.state === RoomKeyRequestState.Sent).forEach((e) => {
                 expect(r).toContainEqual(e);
             });
+        });
+
+    it("getOutgoingRoomKeyRequestsByTarget retrieves all entries with a given target",
+        async () => {
+            const r = await store.getOutgoingRoomKeyRequestsByTarget(
+                "@becca:example.com", "foobarbaz", [RoomKeyRequestState.Sent],
+            );
+            expect(r).toHaveLength(1);
+            expect(r[0]).toEqual(requests[0]);
         });
 
     test("getOutgoingRoomKeyRequestByState retrieves any entry in a given state",
