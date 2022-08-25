@@ -54,8 +54,8 @@ export enum CallFeedEvent {
 
 type EventHandlerMap = {
     [CallFeedEvent.NewStream]: (stream: MediaStream) => void;
-    [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
+    [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
     [CallFeedEvent.VoiceActivityThresholdChanged]: (threshold: number) => void;

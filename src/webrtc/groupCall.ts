@@ -529,17 +529,8 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         if (this.localCallFeed) {
-            // logger.log(
-            //     `groupCall ${this.groupCallId} setVadMicrophoneMuted
-            //     stream ${this.localCallFeed.stream.id} muted ${muted}`,
-            // );
-            // this.localCallFeed.setAudioVideoMuted(muted, null);
             this.localCallFeed.setVadMuted(muted, null);
-            // this.localCallFeed.mute
-            // I don't believe its actually necessary to enable these tracks: they
-            // are the one on the groupcall's own CallFeed and are cloned before being
-            // given to any of the actual calls, so these tracks don't actually go
-            // anywhere. Let's do it anyway to avoid confusion.
+
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
         }
 
