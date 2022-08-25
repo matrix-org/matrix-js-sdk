@@ -1611,10 +1611,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             // As with the offer, note we need to make a copy of this object, not
             // pass the original: that broke in Chrome ~m43.
-            if (event.candidate.candidate !== '') {
-                this.queueCandidate(event.candidate);
-            } else {
+            if (event.candidate.candidate === '') {
                 this.queueCandidate(null);
+            } else {
+                this.queueCandidate(event.candidate);
             }
         }
     };
