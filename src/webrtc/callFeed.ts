@@ -21,7 +21,7 @@ import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 
-const POLLING_INTERVAL = 10; // ms
+const POLLING_INTERVAL = 1; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
 const SPEAKING_SAMPLE_COUNT = 8; // samples
 
@@ -115,7 +115,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     public setVoiceActivityThreshold(threshold: number): void {
         this.voiceActivityThreshold = threshold;
-        if(threshold === -100) {
+        if (threshold === -100) {
             this.VADEnabled = false;
             this.setVADMute?.(false);
         } else { 
@@ -282,23 +282,23 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         this.emit(CallFeedEvent.VolumeChanged, this.maxVolume);
 
-          // Handle voice activity detection only if it is enabled and user has not manually muted themselves
-          if (this.VADEnabled) {
-            // If the user is speaking
-            if (this.maxVolume > this.voiceActivityThreshold) {
-                this.VADCooldownStarted = new Date();
+        // Handle voice activity detection only if it is enabled and user has not manually muted themselves
+        if (this.VADEnabled) {
+          // If the user is speaking
+          if (this.maxVolume > this.voiceActivityThreshold) {
+              this.VADCooldownStarted = new Date();
     
-                if (this.vadAudioMuted) {
-                    this.setVADMute?.(false);
-                }
-            } else if (!this.vadAudioMuted) {
-                // User stops speaking
+              if (this.vadAudioMuted) {
+                  this.setVADMute?.(false);
+              }
+          } else if (!this.vadAudioMuted) {
+              // User stops speaking
     
-                if (!this.isVADinCooldown()) {
-                    // user has been silent for X milliseconds
-                    this.setVADMute?.(true);
-                }
-            }
+              if (!this.isVADinCooldown()) {
+                  // user has been silent for X milliseconds
+                  this.setVADMute?.(true);
+              }
+          }
         }
 
         let newSpeaking = false;
