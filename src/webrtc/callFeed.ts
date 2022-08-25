@@ -73,7 +73,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public voiceActivityThreshold: number;
     public setVADMute: (muted: boolean) => void;
     public VADEnabled = true;
-    public maxCurrentVolume = -Infinity;
+    public maxVolume = -Infinity;
 
     private client: MatrixClient;
     private roomId: string;
@@ -118,6 +118,12 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     public setVoiceActivityThreshold(threshold: number): void {
         this.voiceActivityThreshold = threshold;
+        if(threshold === -100) {
+            this.VADEnabled = false;
+            this.setVADMute?.(false);
+        } else { 
+            this.VADEnabled = true;
+        }
     }
 
     private get hasAudioTrack(): boolean {
@@ -154,7 +160,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.analyser.smoothingTimeConstant = 0.1;
 
         this.secondStream = this.stream.clone();
-        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.stream);
+        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.secondStream);
         mediaStreamAudioSourceNode.connect(this.analyser);
 
         this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
@@ -230,6 +236,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         }
         if (videoMuted !== null) this.videoMuted = videoMuted;
         this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
+        this.VADEnabled = !audioMuted;
     }
 
     public setVadMuted(audioMuted: boolean | null, videoMuted: boolean | null): void {
@@ -265,17 +272,18 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         this.analyser.getFloatFrequencyData(this.frequencyBinCount);
 
-        this.maxCurrentVolume = -Infinity;
+        let maxCurrentVolume = -Infinity;
         for (let i = 0; i < this.frequencyBinCount.length; i++) {
-            if (this.frequencyBinCount[i] > this.maxCurrentVolume) {
-                this.maxCurrentVolume = this.frequencyBinCount[i];
+            if (this.frequencyBinCount[i] > maxCurrentVolume) {
+                maxCurrentVolume = this.frequencyBinCount[i];
             }
+            this.maxVolume = maxCurrentVolume;
         }
 
         this.speakingVolumeSamples.shift();
-        this.speakingVolumeSamples.push(this.maxCurrentVolume);
+        this.speakingVolumeSamples.push(this.maxVolume);
 
-        this.emit(CallFeedEvent.VolumeChanged, this.maxCurrentVolume);
+        this.emit(CallFeedEvent.VolumeChanged, this.maxVolume);
 
         let newSpeaking = false;
 
@@ -298,9 +306,9 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         }
 
         // Handle voice activity detection only if it is enabled and user has not manually muted themselves
-        if (this.VADEnabled && !this.audioMuted) {
+        if (this.VADEnabled) {
             // If the user is speaking
-            if (this.maxCurrentVolume > this.voiceActivityThreshold) {
+            if (this.maxVolume > this.voiceActivityThreshold) {
                 this.VADCooldownStarted = new Date();
 
                 if (this.vadAudioMuted) {
