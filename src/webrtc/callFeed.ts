@@ -287,13 +287,13 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             // If the user is speaking
             if (this.maxVolume > this.voiceActivityThreshold) {
                 this.VADCooldownStarted = new Date();
-    
+
                 if (this.vadAudioMuted) {
                     this.setVADMute?.(false);
                 }
             } else if (!this.vadAudioMuted) {
                 // User stops speaking
-    
+
                 if (!this.isVADinCooldown()) {
                     // user has been silent for X milliseconds
                     this.setVADMute?.(true);
