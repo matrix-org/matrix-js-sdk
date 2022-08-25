@@ -795,7 +795,7 @@ export class GroupCall extends TypedEventEmitter<
         };
 
         const content = event.getContent<IGroupCallRoomMemberState>();
-        const callsState =!callMemberStateIsExpired(event) && Array.isArray(content["m.calls"])
+        const callsState = !callMemberStateIsExpired(event) && Array.isArray(content["m.calls"])
             ? content["m.calls"].filter((call) => call)
             : []; // Ignore expired device data
 
