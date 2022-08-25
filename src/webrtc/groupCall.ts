@@ -718,7 +718,7 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private async sendMemberStateEvent(): Promise<ISendEventResponse> {
-        const send = () =>this.updateMemberCallState({
+        const send = () => this.updateMemberCallState({
             "m.call_id": this.groupCallId,
             "m.devices": [
                 {
