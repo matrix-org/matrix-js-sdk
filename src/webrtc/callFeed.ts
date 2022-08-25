@@ -118,7 +118,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         if (threshold === -100) {
             this.VADEnabled = false;
             this.setVADMute?.(false);
-        } else { 
+        } else {
             this.VADEnabled = true;
         }
     }
@@ -284,21 +284,21 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         // Handle voice activity detection only if it is enabled and user has not manually muted themselves
         if (this.VADEnabled) {
-          // If the user is speaking
-          if (this.maxVolume > this.voiceActivityThreshold) {
-              this.VADCooldownStarted = new Date();
+            // If the user is speaking
+            if (this.maxVolume > this.voiceActivityThreshold) {
+                this.VADCooldownStarted = new Date();
     
-              if (this.vadAudioMuted) {
-                  this.setVADMute?.(false);
-              }
-          } else if (!this.vadAudioMuted) {
-              // User stops speaking
+                if (this.vadAudioMuted) {
+                    this.setVADMute?.(false);
+                }
+            } else if (!this.vadAudioMuted) {
+                // User stops speaking
     
-              if (!this.isVADinCooldown()) {
-                  // user has been silent for X milliseconds
-                  this.setVADMute?.(true);
-              }
-          }
+                if (!this.isVADinCooldown()) {
+                    // user has been silent for X milliseconds
+                    this.setVADMute?.(true);
+                }
+            }
         }
 
         let newSpeaking = false;
