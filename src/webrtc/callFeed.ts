@@ -324,9 +324,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     private isVADinCooldown(): boolean {
         return (
-            new Date().getTime() - this.VADCooldownStarted.getTime() <
-            this.VADCooldownMs
-        );
+            new Date().getTime() - this.VADCooldownStarted.getTime() < this.VADCooldownMs);
     }
 
     public clone(): CallFeed {
