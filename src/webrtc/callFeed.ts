@@ -94,7 +94,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private volumeLooperTimeout: ReturnType<typeof setTimeout>;
     /**
      * Cooldown for voice activity detection, so that we don't mute immediately when the user stops speaking
-     * But when he has been silent 100ms
+     * But when he has been silent 200ms
      */
     private VADCooldownStarted = new Date();
     
