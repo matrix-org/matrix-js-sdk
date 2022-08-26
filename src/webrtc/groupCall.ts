@@ -264,6 +264,7 @@ export class GroupCall extends TypedEventEmitter<
         // start muted on ptt calls
         if (this.isPtt) {
             setTracksEnabled(stream.getAudioTracks(), false);
+            callFeed.VADEnabled = false;
         }
 
         const userId = this.client.getUserId();
@@ -276,7 +277,7 @@ export class GroupCall extends TypedEventEmitter<
             purpose: SDPStreamMetadataPurpose.Usermedia,
             audioMuted: stream.getAudioTracks().length === 0 || this.isPtt,
             videoMuted: stream.getVideoTracks().length === 0,
-            setVADMute: (muted: boolean) => this.setVadMicrophoneMuted(muted),
+            setVoiceActivityDetectionMute(): (muted: boolean) => this.setVadMicrophoneMuted(muted),
         });
 
         this.localCallFeed = callFeed;
@@ -474,11 +475,6 @@ export class GroupCall extends TypedEventEmitter<
         for (const call of this.calls) {
             call.localUsermediaFeed.setAudioVideoMuted(muted, null);
 
-            // Disable voice activity detection when user has muted their microphone
-            // (This can't happen when push-to-talk is enabled)
-            if (!this.isPtt) {
-                call.localUsermediaFeed.VADEnabled = !muted;
-            }
         }
 
         if (sendUpdatesBefore) {
@@ -498,6 +494,12 @@ export class GroupCall extends TypedEventEmitter<
             // given to any of the actual calls, so these tracks don't actually go
             // anywhere. Let's do it anyway to avoid confusion.
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
+
+            // Disable voice activity detection when user has muted their microphone
+            // (This can't happen when push-to-talk is enabled)
+            if (!this.isPtt) {
+                call.localUsermediaFeed.VADEnabled = !muted;
+            }
         }
 
         for (const call of this.calls) {
@@ -525,11 +527,11 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         for (const call of this.calls) {
-            call.localUsermediaFeed.setVadMuted(muted, null);
+            call.localUsermediaFeed.setVoiceActivityDetectionMuteLocal(muted, null);
         }
 
         if (this.localCallFeed) {
-            this.localCallFeed.setVadMuted(muted, null);
+            this.localCallFeed.setVoiceActivityDetectionMuteLocal(muted, null);
 
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
         }
