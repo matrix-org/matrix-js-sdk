@@ -264,7 +264,7 @@ export class GroupCall extends TypedEventEmitter<
         // start muted on ptt calls
         if (this.isPtt) {
             setTracksEnabled(stream.getAudioTracks(), false);
-            callFeed.VADEnabled = false;
+            this.localCallFeed.VADEnabled = false;
         }
 
         const userId = this.client.getUserId();
@@ -277,7 +277,7 @@ export class GroupCall extends TypedEventEmitter<
             purpose: SDPStreamMetadataPurpose.Usermedia,
             audioMuted: stream.getAudioTracks().length === 0 || this.isPtt,
             videoMuted: stream.getVideoTracks().length === 0,
-            setVoiceActivityDetectionMute(): (muted: boolean) => this.setVadMicrophoneMuted(muted),
+            setVoiceActivityDetectionMute: (muted: boolean) => this.setVadMicrophoneMuted(muted),
         });
 
         this.localCallFeed = callFeed;
@@ -498,7 +498,7 @@ export class GroupCall extends TypedEventEmitter<
             // Disable voice activity detection when user has muted their microphone
             // (This can't happen when push-to-talk is enabled)
             if (!this.isPtt) {
-                call.localUsermediaFeed.VADEnabled = !muted;
+                this.localCallFeed.VADEnabled = !muted;
             }
         }
 

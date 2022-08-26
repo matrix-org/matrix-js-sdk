@@ -45,7 +45,7 @@ export interface ICallFeedOpts {
      * set the Tracks to muted when volume threshold has not been reached
      * This does not show the user as muted.
      */
-    setVoiceActivityDetectionMute()?: (muted: boolean) => void;
+    setVoiceActivityDetectionMute?: (muted: boolean) => void;
 }
 
 export enum CallFeedEvent {
@@ -75,7 +75,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public purpose: SDPStreamMetadataPurpose;
     public speakingVolumeSamples: number[];
     public voiceActivityThreshold: number;
-    public setVoiceActivityDetectionMute(): (muted: boolean) => void;
+    public setVoiceActivityDetectionMute: (muted: boolean) => void;
     public VADEnabled = true;
     public maxVolume = -Infinity;
 
@@ -111,7 +111,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
         this.sdpMetadataStreamId = opts.stream.id;
         this.voiceActivityThreshold = VAD_THRESHOLD;
-        this.setVoiceActivityDetectionMute() = opts.setVoiceActivityDetectionMute();
+        this.setVoiceActivityDetectionMute = opts.setVoiceActivityDetectionMute;
 
         this.updateStream(null, opts.stream);
 
@@ -124,7 +124,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.voiceActivityThreshold = threshold;
         if (threshold === -100) {
             this.VADEnabled = false;
-            this.setVoiceActivityDetectionMute()?.(false);
+            this.setVoiceActivityDetectionMute?.(false);
         } else {
             this.VADEnabled = true;
         }
@@ -296,7 +296,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
                 if (this.vadAudioMuted) {
                     //this.emit(CallFeedEvent.VADMuteStateChanged, false)
-                    this.setVoiceActivityDetectionMute()?.(false);
+                    this.setVoiceActivityDetectionMute?.(false);
                 }
             } else if (!this.vadAudioMuted) {
                 // User stops speaking
@@ -304,7 +304,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
                 if (!this.isVADinCooldown()) {
                     // user has been silent for X milliseconds
                     //this.emit(CallFeedEvent.VADMuteStateChanged, true)
-                    this.setVoiceActivityDetectionMute()?.(true);
+                    this.setVoiceActivityDetectionMute?.(true);
                 }
             }
         }
@@ -330,7 +330,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     private isVADinCooldown(): boolean {
         return (
-            new Date().getTime() - this.VADCooldownStarted.getTime() < this.VADCOOLDOWN);
+            new Date().getTime() - this.VADCooldownStarted.getTime() < VADCOOLDOWN);
     }
 
     public clone(): CallFeed {
