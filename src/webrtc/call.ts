@@ -343,7 +343,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // possible
     private candidateSendQueue: Array<RTCIceCandidate> = [];
     private candidateSendTries = 0;
-    private sentEndOfCandidates = false;
+    private candidatesEnded = false;
     private feeds: Array<CallFeed> = [];
     private usermediaSenders: Array<RTCRtpSender> = [];
     private screensharingSenders: Array<RTCRtpSender> = [];
@@ -1597,6 +1597,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      */
     private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent): Promise<void> => {
         if (event.candidate) {
+            if (this.candidatesEnded) {
+                logger.warn("Got candidate after candidates have ended - ignoring!");
+                return;
+            }
+
             logger.debug(
                 "Call " + this.callId + " got local ICE " + event.candidate.sdpMid + " candidate: " +
                 event.candidate.candidate,
@@ -1606,29 +1611,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             // As with the offer, note we need to make a copy of this object, not
             // pass the original: that broke in Chrome ~m43.
-            if (event.candidate.candidate !== '' || !this.sentEndOfCandidates) {
+            if (event.candidate.candidate === '') {
+                this.queueCandidate(null);
+            } else {
                 this.queueCandidate(event.candidate);
-
-                if (event.candidate.candidate === '') this.sentEndOfCandidates = true;
             }
         }
     };
 
     private onIceGatheringStateChange = (event: Event): void => {
         logger.debug(`Call ${this.callId} ice gathering state changed to  ${this.peerConn.iceGatheringState}`);
-        if (this.peerConn.iceGatheringState === 'complete' && !this.sentEndOfCandidates) {
-            // If we didn't get an empty-string candidate to signal the end of candidates,
-            // create one ourselves now gathering has finished.
-            // We cast because the interface lists all the properties as required but we
-            // only want to send 'candidate'
-            // XXX: We probably want to send either sdpMid or sdpMLineIndex, as it's not strictly
-            // correct to have a candidate that lacks both of these. We'd have to figure out what
-            // previous candidates had been sent with and copy them.
-            const c = {
-                candidate: '',
-            } as RTCIceCandidate;
-            this.queueCandidate(c);
-            this.sentEndOfCandidates = true;
+        if (this.peerConn.iceGatheringState === 'complete') {
+            this.queueCandidate(null);
         }
     };
 
@@ -2247,7 +2241,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
-    private queueCandidate(content: RTCIceCandidate): void {
+    /**
+     * Queue a candidate to be sent
+     * @param content The candidate to queue up, or null if candidates have finished being generated
+     *                and end-of-candidates should be signalled
+     */
+    private queueCandidate(content: RTCIceCandidate | null): void {
         // We partially de-trickle candidates by waiting for `delay` before sending them
         // amalgamated, in order to avoid sending too many m.call.candidates events and hitting
         // rate limits in Matrix.
@@ -2257,7 +2256,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // currently proposes as the way to indicate that candidate gathering is complete.
         // This will hopefully be changed to an explicit rather than implicit notification
         // shortly.
-        this.candidateSendQueue.push(content);
+        if (content) {
+            this.candidateSendQueue.push(content);
+        } else {
+            this.candidatesEnded = true;
+        }
 
         // Don't send the ICE candidates yet if the call is in the ringing state: this
         // means we tried to pick (ie. started generating candidates) and then failed to
@@ -2446,6 +2449,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.candidateSendQueue = [];
         ++this.candidateSendTries;
         const content = { candidates: candidates.map(candidate => candidate.toJSON()) };
+        if (this.candidatesEnded) {
+            // If there are no more candidates, signal this by adding an empty string candidate
+            content.candidates.push({
+                candidate: '',
+            });
+        }
         logger.debug(`Call ${this.callId} attempting to send ${candidates.length} candidates`);
         try {
             await this.sendVoipEvent(EventType.CallCandidates, content);
