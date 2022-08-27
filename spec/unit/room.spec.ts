@@ -2444,6 +2444,7 @@ describe("Room", function() {
                     if (receiptType === ReceiptType.Read) {
                         return { eventId: "eventId2" } as IWrappedReceipt;
                     }
+                    return null;
                 };
 
                 for (let i = 1; i <= 2; i++) {
@@ -2468,6 +2469,7 @@ describe("Room", function() {
                             if (receiptType === ReceiptType.Read) {
                                 return { eventId: "eventId2", data: { ts: i === 2 ? 2 : 1 } } as IWrappedReceipt;
                             }
+                            return null;
                         };
 
                         expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
@@ -2482,6 +2484,7 @@ describe("Room", function() {
                         if (receiptType === ReceiptType.Read) {
                             return { eventId: "eventId2", data: { ts: 1 } } as IWrappedReceipt;
                         }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
@@ -2514,6 +2517,7 @@ describe("Room", function() {
                         if (receiptType === ReceiptType.Read) {
                             return { eventId: "eventId3" } as IWrappedReceipt;
                         }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId3`);
