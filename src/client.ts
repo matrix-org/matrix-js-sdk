@@ -7523,9 +7523,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             [ReceiptType.Read]: rrEventId,
         };
 
-        const privateField = await utils.getPrivateReadReceiptField(this);
-        if (privateField) {
-            content[privateField] = rpEventId;
+        if (this.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) {
+            content[ReceiptType.ReadPrivate] = rpEventId;
         }
 
         return this.http.authedRequest(undefined, Method.Post, path, undefined, content);

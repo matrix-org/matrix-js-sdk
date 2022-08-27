@@ -2597,59 +2597,24 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // some more intelligent manner or the client should just use timestamps
 
         const timelineSet = this.getUnfilteredTimelineSet();
-        const publicReadReceipt = this.getReadReceiptForUserId(
-            userId,
-            ignoreSynthesized,
-            ReceiptType.Read,
-        );
-        const privateReadReceipt = this.getReadReceiptForUserId(
-            userId,
-            ignoreSynthesized,
-            ReceiptType.ReadPrivate,
-        );
-        const unstablePrivateReadReceipt = this.getReadReceiptForUserId(
-            userId,
-            ignoreSynthesized,
-            ReceiptType.UnstableReadPrivate,
-        );
+        const publicReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.Read);
+        const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
 
-        // If we have all, compare them
-        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId && unstablePrivateReadReceipt?.eventId) {
-            const comparison1 = timelineSet.compareEventOrdering(
-                publicReadReceipt.eventId,
-                privateReadReceipt.eventId,
-            );
-            const comparison2 = timelineSet.compareEventOrdering(
-                publicReadReceipt.eventId,
-                unstablePrivateReadReceipt.eventId,
-            );
-            const comparison3 = timelineSet.compareEventOrdering(
-                privateReadReceipt.eventId,
-                unstablePrivateReadReceipt.eventId,
-            );
-            if (comparison1 && comparison2 && comparison3) {
-                return (comparison1 > 0)
-                    ? ((comparison2 > 0) ? publicReadReceipt.eventId : unstablePrivateReadReceipt.eventId)
-                    : ((comparison3 > 0) ? privateReadReceipt.eventId : unstablePrivateReadReceipt.eventId);
-            }
+        // If we have both, compare them
+        let comparison: number | undefined;
+        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
+            comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
         }
 
-        let latest = privateReadReceipt;
-        [unstablePrivateReadReceipt, publicReadReceipt].forEach((receipt) => {
-            if (receipt?.data?.ts > latest?.data?.ts || !latest) {
-                latest = receipt;
-            }
-        });
-        if (latest?.eventId) return latest?.eventId;
+        // If we didn't get a comparison try to compare the ts of the receipts
+        if (!comparison) comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
 
-        // The more less likely it is for a read receipt to drift out of date
-        // the bigger is its precedence
-        return (
-            privateReadReceipt?.eventId ??
-            unstablePrivateReadReceipt?.eventId ??
-            publicReadReceipt?.eventId ??
-            null
-        );
+        // The public receipt is more likely to drift out of date so the private
+        // one has precedence
+        if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
+
+        // If public read receipt is older, return the private one
+        return (comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId;
     }
 
     /**
