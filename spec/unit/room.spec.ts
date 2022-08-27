@@ -2503,6 +2503,7 @@ describe("Room", function() {
                         if (receiptType === ReceiptType.Read) {
                             return { eventId: "eventId2" } as IWrappedReceipt;
                         }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId1`);

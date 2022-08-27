@@ -7523,7 +7523,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             [ReceiptType.Read]: rrEventId,
         };
 
-        if (this.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) {
+        if (await this.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) {
             content[ReceiptType.ReadPrivate] = rpEventId;
         }
 

@@ -2601,7 +2601,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
 
         // If we have both, compare them
-        let comparison: number | undefined;
+        let comparison: number | null | undefined;
         if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
             comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
         }
@@ -2614,7 +2614,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
 
         // If public read receipt is older, return the private one
-        return (comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId;
+        return ((comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId) ?? null;
     }
 
     /**
