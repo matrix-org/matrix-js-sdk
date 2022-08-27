@@ -16,8 +16,8 @@ limitations under the License.
 
 import { CryptoStore } from '../../../src/crypto/store/base';
 import { IndexedDBCryptoStore } from '../../../src/crypto/store/indexeddb-crypto-store';
-import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store';
 import { LocalStorageCryptoStore } from '../../../src/crypto/store/localStorage-crypto-store';
+import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store';
 import { RoomKeyRequestState } from '../../../src/crypto/OutgoingRoomKeyRequestManager';
 
 import 'fake-indexeddb/auto';
