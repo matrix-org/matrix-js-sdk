@@ -2463,10 +2463,10 @@ describe("Room", function() {
                         } as EventTimelineSet);
                         room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
                             if (receiptType === ReceiptType.ReadPrivate) {
-                                return { eventId: "eventId1", data: { ts: i === 1 ? 1 : 0 } } as IWrappedReceipt;
+                                return { eventId: "eventId1", data: { ts: i === 1 ? 2 : 1 } } as IWrappedReceipt;
                             }
                             if (receiptType === ReceiptType.Read) {
-                                return { eventId: "eventId2", data: { ts: i === 2 ? 1 : 0 } } as IWrappedReceipt;
+                                return { eventId: "eventId2", data: { ts: i === 2 ? 2 : 1 } } as IWrappedReceipt;
                             }
                         };
 
