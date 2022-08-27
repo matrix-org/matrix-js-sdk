@@ -2607,7 +2607,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         // If we didn't get a comparison try to compare the ts of the receipts
-        if (!comparison) comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
+        if (!comparison && publicReadReceipt?.data?.ts && privateReadReceipt?.data?.ts) {
+            comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
+        }
 
         // The public receipt is more likely to drift out of date so the private
         // one has precedence
