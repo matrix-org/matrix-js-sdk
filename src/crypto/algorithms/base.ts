@@ -34,7 +34,7 @@ import { IRoomEncryption } from "../RoomList";
  *
  * @type {Object.<string, function(new: module:crypto/algorithms/base.EncryptionAlgorithm)>}
  */
-export const ENCRYPTION_CLASSES: Record<string, new (params: IParams) => EncryptionAlgorithm> = {};
+export const ENCRYPTION_CLASSES = new Map<string, new (params: IParams) => EncryptionAlgorithm>();
 
 type DecryptionClassParams = Omit<IParams, "deviceId" | "config">;
 
@@ -44,7 +44,7 @@ type DecryptionClassParams = Omit<IParams, "deviceId" | "config">;
  *
  * @type {Object.<string, function(new: module:crypto/algorithms/base.DecryptionAlgorithm)>}
  */
-export const DECRYPTION_CLASSES: Record<string, new (params: DecryptionClassParams) => DecryptionAlgorithm> = {};
+export const DECRYPTION_CLASSES = new Map<string, new (params: DecryptionClassParams) => DecryptionAlgorithm>();
 
 export interface IParams {
     userId: string;
@@ -297,6 +297,6 @@ export function registerAlgorithm(
     encryptor: new (params: IParams) => EncryptionAlgorithm,
     decryptor: new (params: Omit<IParams, "deviceId">) => DecryptionAlgorithm,
 ): void {
-    ENCRYPTION_CLASSES[algorithm] = encryptor;
-    DECRYPTION_CLASSES[algorithm] = decryptor;
+    ENCRYPTION_CLASSES.set(algorithm, encryptor);
+    DECRYPTION_CLASSES.set(algorithm, decryptor);
 }
