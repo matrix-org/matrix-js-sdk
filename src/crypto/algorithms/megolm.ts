@@ -606,96 +606,25 @@ class MegolmEncryption extends EncryptionAlgorithm {
     private encryptAndSendKeysToDevices(
         session: OutboundSessionInfo,
         chainIndex: number,
-        userDeviceMap: IOlmDevice[],
+        devices: IOlmDevice[],
         payload: IPayload,
     ): Promise<void> {
-        const contentMap: Record<string, Record<string, IEncryptedContent>> = {};
-        // Map from userId to a map of deviceId to deviceInfo
-        const deviceInfoByUserIdAndDeviceId = new Map<string, Map<string, DeviceInfo>>();
-
-        const promises: Promise<unknown>[] = [];
-        for (let i = 0; i < userDeviceMap.length; i++) {
-            const encryptedContent: IEncryptedContent = {
-                algorithm: olmlib.OLM_ALGORITHM,
-                sender_key: this.olmDevice.deviceCurve25519Key,
-                ciphertext: {},
-            };
-            const val = userDeviceMap[i];
-            const userId = val.userId;
-            const deviceInfo = val.deviceInfo;
-            const deviceId = deviceInfo.deviceId;
-
-            // Assign to temp value to make type-checking happy
-            let userIdDeviceInfo = deviceInfoByUserIdAndDeviceId.get(userId);
-
-            if (userIdDeviceInfo === undefined) {
-                userIdDeviceInfo = new Map<string, DeviceInfo>();
-
-                deviceInfoByUserIdAndDeviceId.set(userId, userIdDeviceInfo);
+        return this.crypto.encryptAndSendToDevices(
+            devices,
+            payload,
+        ).then(() => {
+            // store that we successfully uploaded the keys of the current slice
+            for (const device of devices) {
+                session.markSharedWithDevice(
+                    device.userId,
+                    device.deviceInfo.deviceId,
+                    device.deviceInfo.getIdentityKey(),
+                    chainIndex,
+                );
             }
-
-            // We hold by reference, this updates deviceInfoByUserIdAndDeviceId[userId]
-            userIdDeviceInfo.set(deviceId, deviceInfo);
-
-            if (!contentMap[userId]) {
-                contentMap[userId] = {};
-            }
-            contentMap[userId][deviceId] = encryptedContent;
-
-            promises.push(
-                olmlib.encryptMessageForDevice(
-                    encryptedContent.ciphertext,
-                    this.userId,
-                    this.deviceId,
-                    this.olmDevice,
-                    userId,
-                    deviceInfo,
-                    payload,
-                ),
-            );
-        }
-
-        return Promise.all(promises).then(() => {
-            // prune out any devices that encryptMessageForDevice could not encrypt for,
-            // in which case it will have just not added anything to the ciphertext object.
-            // There's no point sending messages to devices if we couldn't encrypt to them,
-            // since that's effectively a blank message.
-            for (const userId of Object.keys(contentMap)) {
-                for (const deviceId of Object.keys(contentMap[userId])) {
-                    if (Object.keys(contentMap[userId][deviceId].ciphertext).length === 0) {
-                        logger.log(
-                            "No ciphertext for device " +
-                            userId + ":" + deviceId + ": pruning",
-                        );
-                        delete contentMap[userId][deviceId];
-                    }
-                }
-                // No devices left for that user? Strip that too.
-                if (Object.keys(contentMap[userId]).length === 0) {
-                    logger.log("Pruned all devices for user " + userId);
-                    delete contentMap[userId];
-                }
-            }
-
-            // Is there anything left?
-            if (Object.keys(contentMap).length === 0) {
-                logger.log("No users left to send to: aborting");
-                return;
-            }
-
-            return this.baseApis.sendToDevice("m.room.encrypted", contentMap).then(() => {
-                // store that we successfully uploaded the keys of the current slice
-                for (const userId of Object.keys(contentMap)) {
-                    for (const deviceId of Object.keys(contentMap[userId])) {
-                        session.markSharedWithDevice(
-                            userId,
-                            deviceId,
-                            deviceInfoByUserIdAndDeviceId.get(userId).get(deviceId).getIdentityKey(),
-                            chainIndex,
-                        );
-                    }
-                }
-            });
+        }).catch((error) => {
+            logger.error("failed to encryptAndSendToDevices", error);
+            throw error;
         });
     }
 
@@ -738,7 +667,6 @@ class MegolmEncryption extends EncryptionAlgorithm {
             contentMap[userId][deviceId] = message;
         }
 
-        await this.baseApis.sendToDevice("org.matrix.room_key.withheld", contentMap);
         await this.baseApis.sendToDevice("m.room_key.withheld", contentMap);
 
         // record the fact that we notified these blocked devices

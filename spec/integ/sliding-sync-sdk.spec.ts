@@ -28,6 +28,7 @@ import {
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
 import { IStoredClientOpts } from "../../src/client";
+import { logger } from "../../src/logger";
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient = null;
@@ -371,6 +372,36 @@ describe("SlidingSyncSdk", () => {
                     expect(
                         gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
                     ).toEqual(1);
+                });
+
+                // Regression test for a bug which caused the timeline entries to be out-of-order
+                // when the same room appears twice with different timeline limits. E.g appears in
+                // the list with timeline_limit:1 then appears again as a room subscription with
+                // timeline_limit:50
+                it("can return history with a larger timeline_limit", async () => {
+                    const timeline = data[roomA].timeline;
+                    const oldTimeline = [
+                        mkOwnEvent(EventType.RoomMessage, { body: "old event A" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "old event B" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "old event C" }),
+                        ...timeline,
+                    ];
+                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, {
+                        timeline: oldTimeline,
+                        required_state: [],
+                        name: data[roomA].name,
+                        initial: true, // e.g requested via room subscription
+                    });
+                    const gotRoom = client.getRoom(roomA);
+                    expect(gotRoom).toBeDefined();
+
+                    logger.log("want:", oldTimeline.map((e) => (e.type + " : " + (e.content || {}).body)));
+                    logger.log("got:", gotRoom.getLiveTimeline().getEvents().map(
+                        (e) => (e.getType() + " : " + e.getContent().body)),
+                    );
+
+                    // we expect the timeline now to be oldTimeline (so the old events are in fact old)
+                    assertTimelineEvents(gotRoom.getLiveTimeline().getEvents(), oldTimeline);
                 });
             });
         });

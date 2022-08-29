@@ -23,6 +23,7 @@ import { RoomSummary } from "../models/room-summary";
 import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator";
 import { IStartClientOpts } from "../client";
 import { IStateEventWithRoomId } from "../@types/search";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 export interface ISavedSync {
     nextBatch: string;
@@ -31,8 +32,7 @@ export interface ISavedSync {
 }
 
 /**
- * Construct a stub store. This does no-ops on most store methods.
- * @constructor
+ * A store for most of the data js-sdk needs to store, apart from crypto data
  */
 export interface IStore {
     readonly accountData: Record<string, MatrixEvent>; // type : content
@@ -57,21 +57,21 @@ export interface IStore {
     setSyncToken(token: string): void;
 
     /**
-     * No-op.
-     * @param {Room} room
+     * Store the given room.
+     * @param {Room} room The room to be stored. All properties must be stored.
      */
     storeRoom(room: Room): void;
 
     /**
-     * No-op.
-     * @param {string} roomId
-     * @return {null}
+     * Retrieve a room by its' room ID.
+     * @param {string} roomId The room ID.
+     * @return {Room} The room or null.
      */
     getRoom(roomId: string): Room | null;
 
     /**
-     * No-op.
-     * @return {Array} An empty array.
+     * Retrieve all known rooms.
+     * @return {Room[]} A list of rooms, which may be empty.
      */
     getRooms(): Room[];
 
@@ -82,35 +82,36 @@ export interface IStore {
     removeRoom(roomId: string): void;
 
     /**
-     * No-op.
-     * @return {Array} An empty array.
+     * Retrieve a summary of all the rooms.
+     * @return {RoomSummary[]} A summary of each room.
      */
     getRoomSummaries(): RoomSummary[];
 
     /**
-     * No-op.
-     * @param {User} user
+     * Store a User.
+     * @param {User} user The user to store.
      */
     storeUser(user: User): void;
 
     /**
-     * No-op.
-     * @param {string} userId
-     * @return {null}
+     * Retrieve a User by its' user ID.
+     * @param {string} userId The user ID.
+     * @return {User} The user or null.
      */
     getUser(userId: string): User | null;
 
     /**
-     * No-op.
-     * @return {User[]}
+     * Retrieve all known users.
+     * @return {User[]} A list of users, which may be empty.
      */
     getUsers(): User[];
 
     /**
-     * No-op.
-     * @param {Room} room
-     * @param {number} limit
-     * @return {Array}
+     * Retrieve scrollback for this room.
+     * @param {Room} room The matrix room
+     * @param {number} limit The max number of old events to retrieve.
+     * @return {Array<Object>} An array of objects which will be at most 'limit'
+     * length and at least 0. The objects are the raw event JSON.
      */
     scrollback(room: Room, limit: number): MatrixEvent[];
 
@@ -209,8 +210,23 @@ export interface IStore {
      */
     deleteAllData(): Promise<void>;
 
+    /**
+     * Returns the out-of-band membership events for this room that
+     * were previously loaded.
+     * @param {string} roomId
+     * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns {null} in case the members for this room haven't been stored yet
+     */
     getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null>;
 
+    /**
+     * Stores the out-of-band membership events for this room. Note that
+     * it still makes sense to store an empty array as the OOB status for the room is
+     * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
+     * @param {string} roomId
+     * @param {event[]} membershipEvents the membership events to store
+     * @returns {Promise} when all members have been stored
+     */
     setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void>;
 
     clearOutOfBandMembers(roomId: string): Promise<void>;
@@ -222,4 +238,19 @@ export interface IStore {
     getPendingEvents(roomId: string): Promise<Partial<IEvent>[]>;
 
     setPendingEvents(roomId: string, events: Partial<IEvent>[]): Promise<void>;
+
+    /**
+     * Stores batches of outgoing to-device messages
+     */
+     saveToDeviceBatches(batch: ToDeviceBatchWithTxnId[]): Promise<void>;
+
+     /**
+      * Fetches the oldest batch of to-device messages in the queue
+      */
+     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch>;
+
+     /**
+      * Removes a specific batch of to-device messages from the queue
+      */
+     removeToDeviceBatch(id: number): Promise<void>;
 }

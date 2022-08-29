@@ -218,10 +218,66 @@ describe("SAS verification", function() {
             ]);
 
             // make sure that it uses the preferred method
-            expect(macMethod).toBe("hkdf-hmac-sha256");
+            expect(macMethod).toBe("org.matrix.msc3783.hkdf-hmac-sha256");
             expect(keyAgreement).toBe("curve25519-hkdf-sha256");
 
             // make sure Alice and Bob verified each other
+            const bobDevice
+                  = await alice.client.getStoredDevice("@bob:example.com", "Dynabook");
+            expect(bobDevice.isVerified()).toBeTruthy();
+            const aliceDevice
+                  = await bob.client.getStoredDevice("@alice:example.com", "Osborne2");
+            expect(aliceDevice.isVerified()).toBeTruthy();
+        });
+
+        it("should be able to verify using the old base64", async () => {
+            // pretend that Alice can only understand the old (incorrect) base64
+            // encoding, and make sure that she can still verify with Bob
+            let macMethod;
+            const aliceOrigSendToDevice = alice.client.sendToDevice.bind(alice.client);
+            alice.client.sendToDevice = (type, map) => {
+                if (type === "m.key.verification.start") {
+                    // Note: this modifies not only the message that Bob
+                    // receives, but also the copy of the message that Alice
+                    // has, since it is the same object.  If this does not
+                    // happen, the verification will fail due to a hash
+                    // commitment mismatch.
+                    map[bob.client.getUserId()][bob.client.deviceId]
+                        .message_authentication_codes = ['hkdf-hmac-sha256'];
+                }
+                return aliceOrigSendToDevice(type, map);
+            };
+            const bobOrigSendToDevice = bob.client.sendToDevice.bind(bob.client);
+            bob.client.sendToDevice = (type, map) => {
+                if (type === "m.key.verification.accept") {
+                    macMethod = map[alice.client.getUserId()][alice.client.deviceId]
+                        .message_authentication_code;
+                }
+                return bobOrigSendToDevice(type, map);
+            };
+
+            alice.httpBackend.when('POST', '/keys/query').respond(200, {
+                failures: {},
+                device_keys: {
+                    "@bob:example.com": BOB_DEVICES,
+                },
+            });
+            bob.httpBackend.when('POST', '/keys/query').respond(200, {
+                failures: {},
+                device_keys: {
+                    "@alice:example.com": ALICE_DEVICES,
+                },
+            });
+
+            await Promise.all([
+                aliceVerifier.verify(),
+                bobPromise.then((verifier) => verifier.verify()),
+                alice.httpBackend.flush(),
+                bob.httpBackend.flush(),
+            ]);
+
+            expect(macMethod).toBe("hkdf-hmac-sha256");
+
             const bobDevice
                   = await alice.client.getStoredDevice("@bob:example.com", "Dynabook");
             expect(bobDevice.isVerified()).toBeTruthy();

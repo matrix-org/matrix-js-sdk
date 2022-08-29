@@ -1,9 +1,9 @@
-import { Filter } from "../../src/filter";
+import { Filter, IFilterDefinition } from "../../src/filter";
 
 describe("Filter", function() {
     const filterId = "f1lt3ring15g00d4ursoul";
     const userId = "@sir_arthur_david:humming.tiger";
-    let filter;
+    let filter: Filter;
 
     beforeEach(function() {
         filter = new Filter(userId);
@@ -37,7 +37,7 @@ describe("Filter", function() {
     describe("setDefinition/getDefinition", function() {
         it("should set and get the filter body", function() {
             const definition = {
-                event_format: "client",
+                event_format: "client" as IFilterDefinition['event_format'],
             };
             filter.setDefinition(definition);
             expect(filter.getDefinition()).toEqual(definition);

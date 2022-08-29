@@ -1,5 +1,5 @@
 /*
-Copyright 2022 Šimon Brandner <simon.bra.ag@gmail.com>
+Copyright 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,12 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export enum ReceiptType {
-    Read = "m.read",
-    FullyRead = "m.fully_read",
-    ReadPrivate = "m.read.private",
-    /**
-     * @deprecated Please use the ReadPrivate type when possible. This value may be removed at any time without notice.
-     */
-    UnstableReadPrivate = "org.matrix.msc2285.read.private",
+export type ToDevicePayload = Record<string, any>;
+
+export interface ToDeviceMessage {
+    userId: string;
+    deviceId: string;
+    payload: ToDevicePayload;
+}
+
+export interface ToDeviceBatch {
+    eventType: string;
+    batch: ToDeviceMessage[];
+}
+
+// Only used internally
+export interface ToDeviceBatchWithTxnId extends ToDeviceBatch {
+    txnId: string;
+}
+
+// Only used internally
+export interface IndexedToDeviceBatch extends ToDeviceBatchWithTxnId {
+    id: number;
 }

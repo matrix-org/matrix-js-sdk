@@ -1,6 +1,6 @@
 /*
 Copyright 2017 Vector Creations Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -302,6 +302,9 @@ describe("SyncAccumulator", function() {
                     [ReceiptType.ReadPrivate]: {
                         "@dan:localhost": { ts: 4 },
                     },
+                    [ReceiptType.UnstableReadPrivate]: {
+                        "@matthew:localhost": { ts: 5 },
+                    },
                     "some.other.receipt.type": {
                         "@should_be_ignored:localhost": { key: "val" },
                     },
@@ -347,6 +350,9 @@ describe("SyncAccumulator", function() {
                     [ReceiptType.ReadPrivate]: {
                         "@dan:localhost": { ts: 4 },
                     },
+                    [ReceiptType.UnstableReadPrivate]: {
+                        "@matthew:localhost": { ts: 5 },
+                    },
                 },
                 "$event2:localhost": {
                     [ReceiptType.Read]: {
@@ -384,6 +390,10 @@ describe("SyncAccumulator", function() {
             };
         }
 
+        afterEach(() => {
+            jest.spyOn(global.Date, 'now').mockRestore();
+        });
+
         it("should copy summary properties", function() {
             sa.accumulate(createSyncResponseWithSummary({
                 "m.heroes": ["@alice:bar"],
@@ -413,25 +423,19 @@ describe("SyncAccumulator", function() {
             const delta = 1000;
             const startingTs = 1000;
 
-            const oldDateNow = Date.now;
-            try {
-                Date.now = jest.fn();
-                Date.now.mockReturnValue(startingTs);
+            jest.spyOn(global.Date, 'now').mockReturnValue(startingTs);
 
-                sa.accumulate(RES_WITH_AGE);
+            sa.accumulate(RES_WITH_AGE);
 
-                Date.now.mockReturnValue(startingTs + delta);
+            jest.spyOn(global.Date, 'now').mockReturnValue(startingTs + delta);
 
-                const output = sa.getJSON();
-                expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned.age).toEqual(
-                    RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0].unsigned.age + delta,
-                );
-                expect(Object.keys(output.roomsData.join["!foo:bar"].timeline.events[0])).toEqual(
-                    Object.keys(RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0]),
-                );
-            } finally {
-                Date.now = oldDateNow;
-            }
+            const output = sa.getJSON();
+            expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned.age).toEqual(
+                RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0].unsigned.age + delta,
+            );
+            expect(Object.keys(output.roomsData.join["!foo:bar"].timeline.events[0])).toEqual(
+                Object.keys(RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0]),
+            );
         });
 
         it("should mangle age without adding extra keys", () => {

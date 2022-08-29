@@ -24,8 +24,9 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
 import type * as NodeCrypto from "crypto";
-import { MatrixEvent } from ".";
+import { MatrixClient, MatrixEvent } from ".";
 import { M_TIMESTAMP } from "./@types/location";
+import { ReceiptType } from "./@types/read_receipts";
 
 /**
  * Encode a dictionary of query parameters.
@@ -73,8 +74,7 @@ export function decodeParams(query: string): QueryDict {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate: string,
-    variables: Record<string, string>): string {
+export function encodeUri(pathTemplate: string, variables: Record<string, string>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
@@ -327,22 +327,28 @@ export function escapeRegExp(string: string): string {
 }
 
 export function globToRegexp(glob: string, extended?: any): string {
-    extended = typeof(extended) === 'boolean' ? extended : true;
     // From
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
     // Because micromatch is about 130KB with dependencies,
     // and minimatch is not much better.
-    let pat = escapeRegExp(glob);
-    pat = pat.replace(/\\\*/g, '.*');
-    pat = pat.replace(/\?/g, '.');
-    if (extended) {
-        pat = pat.replace(/\\\[(!|)(.*)\\]/g, function(match, p1, p2, offset, string) {
-            const first = p1 && '^' || '';
-            const second = p2.replace(/\\-/, '-');
-            return '[' + first + second + ']';
-        });
-    }
-    return pat;
+    const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
+        [/\\\*/g, '.*'],
+        [/\?/g, '.'],
+        extended !== false && [
+            /\\\[(!|)(.*)\\]/g,
+            (_match: string, neg: string, pat: string) => [
+                '[',
+                neg ? '^' : '',
+                pat.replace(/\\-/, '-'),
+                ']',
+            ].join(''),
+        ],
+    ];
+    return replacements.reduce(
+        // https://github.com/microsoft/TypeScript/issues/30134
+        (pat, args) => args ? pat.replace(args[0], args[1] as any) : pat,
+        escapeRegExp(glob),
+    );
 }
 
 export function ensureNoTrailingSlash(url: string): string {
@@ -648,3 +654,18 @@ function getContentTimestampWithFallback(event: MatrixEvent): number {
 export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: MatrixEvent): number {
     return getContentTimestampWithFallback(right) - getContentTimestampWithFallback(left);
 }
+
+export async function getPrivateReadReceiptField(client: MatrixClient): Promise<ReceiptType | null> {
+    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) return ReceiptType.ReadPrivate;
+    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285")) return ReceiptType.UnstableReadPrivate;
+    return null;
+}
+
+export function isSupportedReceiptType(receiptType: string): boolean {
+    return [
+        ReceiptType.Read,
+        ReceiptType.ReadPrivate,
+        ReceiptType.UnstableReadPrivate,
+    ].includes(receiptType as ReceiptType);
+}
+
