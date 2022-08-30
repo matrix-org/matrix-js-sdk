@@ -293,7 +293,7 @@ export class SlidingSyncSdk {
         this.processRoomData(this.client, room, roomData);
     }
 
-    private onLifecycle(state: SlidingSyncState, resp?: MSC3575SlidingSyncResponse, err?: Error): void {
+    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error | null): void {
         if (err) {
             logger.debug("onLifecycle", state, err);
         }
