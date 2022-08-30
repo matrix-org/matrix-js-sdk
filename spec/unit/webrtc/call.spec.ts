@@ -34,7 +34,7 @@ import {
     SCREENSHARE_STREAM_ID,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
-import { EventType, MatrixEvent } from "../../../src";
+import { Callback, EventType, IContent, MatrixEvent, Room } from "../../../src";
 
 const FAKE_ROOM_ID = "!foo:bar";
 const CALL_LIFETIME = 60000;
@@ -80,12 +80,23 @@ const fakeIncomingCall = async (client: TestClient, call: MatrixCall, version: s
     await callPromise;
 };
 
+function makeMockEvent(sender: string, content: Record<string, any>): MatrixEvent {
+    return {
+        getContent: () => {
+            return content;
+        },
+        getSender: () => sender,
+    } as MatrixEvent;
+}
+
 describe('Call', function() {
-    let client;
-    let call;
-    let prevNavigator;
-    let prevDocument;
-    let prevWindow;
+    let client: TestClient;
+    let call: MatrixCall;
+    let prevNavigator: Navigator;
+    let prevDocument: Document;
+    let prevWindow: Window & typeof globalThis;
+    // We retain a reference to this in the correct Mock type
+    let mockSendEvent: jest.Mock<void, [string, string, IContent, string, Callback<any>]>;
 
     beforeEach(function() {
         prevNavigator = global.navigator;
@@ -97,17 +108,21 @@ describe('Call', function() {
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
         // We just stub out sendEvent: we're not interested in testing the client's
         // event sending code here
-        client.client.sendEvent = jest.fn();
-        client.client.mediaHandler = new MockMediaHandler;
-        client.client.getMediaHandler = () => client.client.mediaHandler;
-        client.client.turnServersExpiry = Date.now() + 60 * 60 * 1000;
+        client.client.sendEvent = mockSendEvent = jest.fn();
+        {
+            // in which we do naughty assignments to private members
+            const untypedClient = (client.client as any);
+            untypedClient.mediaHandler = new MockMediaHandler;
+            untypedClient.turnServersExpiry = Date.now() + 60 * 60 * 1000;
+        }
+        //client.client.getMediaHandler = () => client.client.mediaHandler;
         client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
         client.client.getRoom = () => {
             return {
                 getMember: () => {
                     return {};
                 },
-            };
+            } as unknown as Room;
         };
 
         call = new MatrixCall({
@@ -115,7 +130,7 @@ describe('Call', function() {
             roomId: FAKE_ROOM_ID,
         });
         // call checks one of these is wired up
-        call.on('error', () => {});
+        call.on(CallEvent.Error, () => {});
     });
 
     afterEach(function() {
@@ -133,114 +148,84 @@ describe('Call', function() {
     it('should ignore candidate events from non-matching party ID', async function() {
         await startVoiceCall(client, call);
 
-        await call.onAnswerReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'the_correct_party_id',
-                    answer: {
-                        sdp: DUMMY_SDP,
-                    },
-                };
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'the_correct_party_id',
+            answer: {
+                sdp: DUMMY_SDP,
             },
-            getSender: () => "@test:foo",
-        });
+        }));
 
-        call.peerConn.addIceCandidate = jest.fn();
-        call.onRemoteIceCandidatesReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'the_correct_party_id',
-                    candidates: [
-                        {
-                            candidate: '',
-                            sdpMid: '',
-                        },
-                    ],
-                };
-            },
-            getSender: () => "@test:foo",
-        });
-        expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
+        const mockAddIceCandidate = call.peerConn.addIceCandidate = jest.fn();
+        call.onRemoteIceCandidatesReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'the_correct_party_id',
+            candidates: [
+                {
+                    candidate: '',
+                    sdpMid: '',
+                },
+            ],
+        }));
+        expect(mockAddIceCandidate.mock.calls.length).toBe(1);
 
-        call.onRemoteIceCandidatesReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'some_other_party_id',
-                    candidates: [
-                        {
-                            candidate: '',
-                            sdpMid: '',
-                        },
-                    ],
-                };
-            },
-            getSender: () => "@test:foo",
-        });
-        expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
+        call.onRemoteIceCandidatesReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'some_other_party_id',
+            candidates: [
+                {
+                    candidate: '',
+                    sdpMid: '',
+                },
+            ],
+        }));
+        expect(mockAddIceCandidate.mock.calls.length).toBe(1);
     });
 
     it('should add candidates received before answer if party ID is correct', async function() {
         await startVoiceCall(client, call);
-        call.peerConn.addIceCandidate = jest.fn();
+        const mockAddIceCandidate = call.peerConn.addIceCandidate = jest.fn();
 
-        call.onRemoteIceCandidatesReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'the_correct_party_id',
-                    candidates: [
-                        {
-                            candidate: 'the_correct_candidate',
-                            sdpMid: '',
-                        },
-                    ],
-                };
+        call.onRemoteIceCandidatesReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'the_correct_party_id',
+            candidates: [
+                {
+                    candidate: 'the_correct_candidate',
+                    sdpMid: '',
+                },
+            ],
+        }));
+
+        call.onRemoteIceCandidatesReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'some_other_party_id',
+            candidates: [
+                {
+                    candidate: 'the_wrong_candidate',
+                    sdpMid: '',
+                },
+            ],
+        }));
+
+        expect(mockAddIceCandidate.mock.calls.length).toBe(0);
+
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'the_correct_party_id',
+            answer: {
+                sdp: DUMMY_SDP,
             },
-            getSender: () => "@test:foo",
-        });
+        }));
 
-        call.onRemoteIceCandidatesReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'some_other_party_id',
-                    candidates: [
-                        {
-                            candidate: 'the_wrong_candidate',
-                            sdpMid: '',
-                        },
-                    ],
-                };
-            },
-            getSender: () => "@test:foo",
-        });
-
-        expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(0);
-
-        await call.onAnswerReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'the_correct_party_id',
-                    answer: {
-                        sdp: DUMMY_SDP,
-                    },
-                };
-            },
-            getSender: () => "@test:foo",
-        });
-
-        expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
-        expect(call.peerConn.addIceCandidate).toHaveBeenCalledWith({
+        expect(mockAddIceCandidate.mock.calls.length).toBe(1);
+        expect(mockAddIceCandidate).toHaveBeenCalledWith({
             candidate: 'the_correct_candidate',
             sdpMid: '',
         });
@@ -248,37 +233,27 @@ describe('Call', function() {
 
     it('should map asserted identity messages to remoteAssertedIdentity', async function() {
         await startVoiceCall(client, call);
-        await call.onAnswerReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'party_id',
-                    answer: {
-                        sdp: DUMMY_SDP,
-                    },
-                };
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'party_id',
+            answer: {
+                sdp: DUMMY_SDP,
             },
-            getSender: () => "@test:foo",
-        });
+        }));
 
         const identChangedCallback = jest.fn();
         call.on(CallEvent.AssertedIdentityChanged, identChangedCallback);
 
-        await call.onAssertedIdentityReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'party_id',
-                    asserted_identity: {
-                        id: "@steve:example.com",
-                        display_name: "Steve Gibbons",
-                    },
-                };
+        await call.onAssertedIdentityReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'party_id',
+            asserted_identity: {
+                id: "@steve:example.com",
+                display_name: "Steve Gibbons",
             },
-            getSender: () => "@test:foo",
-        });
+        }));
 
         expect(identChangedCallback).toHaveBeenCalled();
 
@@ -290,28 +265,23 @@ describe('Call', function() {
     it("should map SDPStreamMetadata to feeds", async () => {
         await startVoiceCall(client, call);
 
-        await call.onAnswerReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'party_id',
-                    answer: {
-                        sdp: DUMMY_SDP,
-                    },
-                    [SDPStreamMetadataKey]: {
-                        "remote_stream": {
-                            purpose: SDPStreamMetadataPurpose.Usermedia,
-                            audio_muted: true,
-                            video_muted: false,
-                        },
-                    },
-                };
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'party_id',
+            answer: {
+                sdp: DUMMY_SDP,
             },
-            getSender: () => "@test:foo",
-        });
+            [SDPStreamMetadataKey]: {
+                "remote_stream": {
+                    purpose: SDPStreamMetadataPurpose.Usermedia,
+                    audio_muted: true,
+                    video_muted: false,
+                },
+            },
+        }));
 
-        call.pushRemoteFeed(
+        (call as any).pushRemoteFeed(
             new MockMediaStream(
                 "remote_stream",
                 [
@@ -329,40 +299,35 @@ describe('Call', function() {
     it("should fallback to replaceTrack() if the other side doesn't support SPDStreamMetadata", async () => {
         await startVoiceCall(client, call);
 
-        await call.onAnswerReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'party_id',
-                    answer: {
-                        sdp: DUMMY_SDP,
-                    },
-                };
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'party_id',
+            answer: {
+                sdp: DUMMY_SDP,
             },
-            getSender: () => "@test:foo",
-        });
+        }));
 
-        call.setScreensharingEnabledWithoutMetadataSupport = jest.fn();
+        const mockScreenshareNoMetadata = (call as any).setScreensharingEnabledWithoutMetadataSupport = jest.fn();
 
         call.setScreensharingEnabled(true);
-        expect(call.setScreensharingEnabledWithoutMetadataSupport).toHaveBeenCalled();
+        expect(mockScreenshareNoMetadata).toHaveBeenCalled();
     });
 
     it("should fallback to answering with no video", async () => {
-        await client.httpBackend.flush();
+        await client.httpBackend.flush("");
 
-        call.shouldAnswerWithMediaType = (wantedValue: boolean) => wantedValue;
-        client.client.mediaHandler.getUserMediaStream = jest.fn().mockRejectedValue("reject");
+        (call as any).shouldAnswerWithMediaType = (wantedValue: boolean) => wantedValue;
+        client.client.getMediaHandler().getUserMediaStream = jest.fn().mockRejectedValue("reject");
 
         await call.answer(true, true);
 
-        expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(1, true, true);
-        expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(2, true, false);
+        expect(client.client.getMediaHandler().getUserMediaStream).toHaveBeenNthCalledWith(1, true, true);
+        expect(client.client.getMediaHandler().getUserMediaStream).toHaveBeenNthCalledWith(2, true, false);
     });
 
     it("should handle mid-call device changes", async () => {
-        client.client.mediaHandler.getUserMediaStream = jest.fn().mockReturnValue(
+        client.client.getMediaHandler().getUserMediaStream = jest.fn().mockReturnValue(
             new MockMediaStream(
                 "stream", [
                     new MockMediaStreamTrack("audio_track", "audio"),
@@ -373,19 +338,14 @@ describe('Call', function() {
 
         await startVoiceCall(client, call);
 
-        await call.onAnswerReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'party_id',
-                    answer: {
-                        sdp: DUMMY_SDP,
-                    },
-                };
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'party_id',
+            answer: {
+                sdp: DUMMY_SDP,
             },
-            getSender: () => "@test:foo",
-        });
+        }));
 
         await call.updateLocalUsermediaStream(
             new MockMediaStream(
@@ -394,15 +354,18 @@ describe('Call', function() {
                     new MockMediaStreamTrack("new_audio_track", "audio"),
                     new MockMediaStreamTrack("video_track", "video"),
                 ],
-            ),
+            ).typed(),
         );
+
+        const usermediaSenders: Array<RTCRtpSender> = (call as any).usermediaSenders;
+
         expect(call.localUsermediaStream.id).toBe("stream");
         expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("new_audio_track");
         expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
-        expect(call.usermediaSenders.find((sender) => {
+        expect(usermediaSenders.find((sender) => {
             return sender?.track?.kind === "audio";
         }).track.id).toBe("new_audio_track");
-        expect(call.usermediaSenders.find((sender) => {
+        expect(usermediaSenders.find((sender) => {
             return sender?.track?.kind === "video";
         }).track.id).toBe("video_track");
     });
@@ -410,29 +373,28 @@ describe('Call', function() {
     it("should handle upgrade to video call", async () => {
         await startVoiceCall(client, call);
 
-        await call.onAnswerReceived({
-            getContent: () => {
-                return {
-                    version: 1,
-                    call_id: call.callId,
-                    party_id: 'party_id',
-                    answer: {
-                        sdp: DUMMY_SDP,
-                    },
-                    [SDPStreamMetadataKey]: {},
-                };
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'party_id',
+            answer: {
+                sdp: DUMMY_SDP,
             },
-            getSender: () => "@test:foo",
-        });
+            [SDPStreamMetadataKey]: {},
+        }));
 
-        await call.upgradeCall(false, true);
+        // XXX Should probably test using the public interfaces, ie.
+        // setLocalVideoMuted probably?
+        await (call as any).upgradeCall(false, true);
+
+        const usermediaSenders: Array<RTCRtpSender> = (call as any).usermediaSenders;
 
         expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("audio_track");
         expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
-        expect(call.usermediaSenders.find((sender) => {
+        expect(usermediaSenders.find((sender) => {
             return sender?.track?.kind === "audio";
         }).track.id).toBe("audio_track");
-        expect(call.usermediaSenders.find((sender) => {
+        expect(usermediaSenders.find((sender) => {
             return sender?.track?.kind === "video";
         }).track.id).toBe("video_track");
     });
@@ -440,37 +402,35 @@ describe('Call', function() {
     it("should handle SDPStreamMetadata changes", async () => {
         await startVoiceCall(client, call);
 
-        call.updateRemoteSDPStreamMetadata({
+        (call as any).updateRemoteSDPStreamMetadata({
             "remote_stream": {
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audio_muted: false,
                 video_muted: false,
             },
         });
-        call.pushRemoteFeed(new MockMediaStream("remote_stream", []));
+        (call as any).pushRemoteFeed(new MockMediaStream("remote_stream", []));
         const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream");
 
-        call.onSDPStreamMetadataChangedReceived({
-            getContent: () => ({
-                [SDPStreamMetadataKey]: {
-                    "remote_stream": {
-                        purpose: SDPStreamMetadataPurpose.Screenshare,
-                        audio_muted: true,
-                        video_muted: true,
-                        id: "feed_id2",
-                    },
+        call.onSDPStreamMetadataChangedReceived(makeMockEvent("@test:foo", {
+            [SDPStreamMetadataKey]: {
+                "remote_stream": {
+                    purpose: SDPStreamMetadataPurpose.Screenshare,
+                    audio_muted: true,
+                    video_muted: true,
+                    id: "feed_id2",
                 },
-            }),
-        });
+            },
+        }));
 
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Screenshare);
-        expect(feed?.audioMuted).toBe(true);
-        expect(feed?.videoMuted).toBe(true);
+        expect(feed?.isAudioMuted()).toBe(true);
+        expect(feed?.isVideoMuted()).toBe(true);
     });
 
     it("should choose opponent member", async () => {
         const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
+        await client.httpBackend.flush("");
         await callPromise;
 
         const opponentMember = {
@@ -485,25 +445,22 @@ describe('Call', function() {
                         return opponentMember;
                     }
                 },
-            };
+            } as unknown as Room;
         };
 
         const opponentCaps = {
             "m.call.transferee": true,
             "m.call.dtmf": false,
         };
-        call.chooseOpponent({
-            getContent: () => ({
-                version: 1,
-                party_id: "party_id",
-                capabilities: opponentCaps,
-            }),
-            getSender: () => opponentMember.userId,
-        });
+        (call as any).chooseOpponent(makeMockEvent(opponentMember.userId, {
+            version: 1,
+            party_id: "party_id",
+            capabilities: opponentCaps,
+        }));
 
         expect(call.getOpponentMember()).toBe(opponentMember);
-        expect(call.opponentPartyId).toBe("party_id");
-        expect(call.opponentCaps).toBe(opponentCaps);
+        expect((call as any).opponentPartyId).toBe("party_id");
+        expect((call as any).opponentCaps).toBe(opponentCaps);
         expect(call.opponentCanBeTransferred()).toBe(true);
         expect(call.opponentSupportsDTMF()).toBe(false);
     });
@@ -512,21 +469,23 @@ describe('Call', function() {
         it("if no video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-            call.pushRemoteFeed(new MockMediaStream("remote_stream1", []));
+            (call as any).pushRemoteFeed(new MockMediaStream("remote_stream1", []));
             expect(call.type).toBe(CallType.Voice);
         });
 
         it("if remote video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-            call.pushRemoteFeed(new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]));
+            (call as any).pushRemoteFeed(
+                new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
+            );
             expect(call.type).toBe(CallType.Video);
         });
 
         it("if local video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-            call.pushNewLocalFeed(
+            (call as any).pushNewLocalFeed(
                 new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
                 SDPStreamMetadataPurpose.Usermedia,
                 false,
@@ -537,7 +496,7 @@ describe('Call', function() {
 
     it("should correctly generate local SDPStreamMetadata", async () => {
         const callPromise = call.placeCallWithCallFeeds([new CallFeed({
-            client,
+            client: client.client,
             // @ts-ignore Mock
             stream: new MockMediaStream("local_stream1", [new MockMediaStreamTrack("track_id", "audio")]),
             roomId: call.roomId,
@@ -546,17 +505,17 @@ describe('Call', function() {
             audioMuted: false,
             videoMuted: false,
         })]);
-        await client.httpBackend.flush();
+        await client.httpBackend.flush("");
         await callPromise;
         call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-        call.pushNewLocalFeed(
+        (call as any).pushNewLocalFeed(
             new MockMediaStream("local_stream2", [new MockMediaStreamTrack("track_id", "video")]),
             SDPStreamMetadataPurpose.Screenshare, "feed_id2",
         );
         await call.setMicrophoneMuted(true);
 
-        expect(call.getLocalSDPStreamMetadata()).toStrictEqual({
+        expect((call as any).getLocalSDPStreamMetadata()).toStrictEqual({
             "local_stream1": {
                 "purpose": SDPStreamMetadataPurpose.Usermedia,
                 "audio_muted": true,
@@ -578,7 +537,7 @@ describe('Call', function() {
 
         const callPromise = call.placeCallWithCallFeeds([
             new CallFeed({
-                client,
+                client: client.client,
                 userId: client.getUserId(),
                 // @ts-ignore Mock
                 stream: localUsermediaStream,
@@ -588,7 +547,7 @@ describe('Call', function() {
                 videoMuted: false,
             }),
             new CallFeed({
-                client,
+                client: client.client,
                 userId: client.getUserId(),
                 // @ts-ignore Mock
                 stream: localScreensharingStream,
@@ -598,13 +557,14 @@ describe('Call', function() {
                 videoMuted: false,
             }),
         ]);
-        await client.httpBackend.flush();
+        await client.httpBackend.flush("");
         await callPromise;
         call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-        call.updateRemoteSDPStreamMetadata({
+        (call as any).updateRemoteSDPStreamMetadata({
             "remote_usermedia_stream_id": {
                 purpose: SDPStreamMetadataPurpose.Usermedia,
+                // XXX: This type doesn't include 'id'?
                 id: "remote_usermedia_feed_id",
                 audio_muted: false,
                 video_muted: false,
@@ -616,8 +576,8 @@ describe('Call', function() {
                 video_muted: false,
             },
         });
-        call.pushRemoteFeed(remoteUsermediaStream);
-        call.pushRemoteFeed(remoteScreensharingStream);
+        (call as any).pushRemoteFeed(remoteUsermediaStream);
+        (call as any).pushRemoteFeed(remoteScreensharingStream);
 
         expect(call.localUsermediaFeed.stream).toBe(localUsermediaStream);
         expect(call.localUsermediaStream).toBe(localUsermediaStream);
@@ -636,14 +596,12 @@ describe('Call', function() {
         const callHangupCallback = jest.fn();
         call.on(CallEvent.Hangup, callHangupCallback);
 
-        await call.onSelectAnswerReceived({
-            getContent: () => ({
-                version: 1,
-                call_id: call.callId,
-                party_id: 'party_id',
-                selected_party_id: "different_party_id",
-            }),
-        });
+        await call.onSelectAnswerReceived(makeMockEvent("@test:foo.bar", {
+            version: 1,
+            call_id: call.callId,
+            party_id: 'party_id',
+            selected_party_id: "different_party_id",
+        }));
 
         expect(callHangupCallback).toHaveBeenCalled();
     });
@@ -748,43 +706,38 @@ describe('Call', function() {
         });
 
         it("should ignore stream passed to pushRemoteFeed()", async () => {
-            await call.onAnswerReceived({
-                getContent: () => {
-                    return {
-                        version: 1,
-                        call_id: call.callId,
-                        party_id: 'party_id',
-                        answer: {
-                            sdp: DUMMY_SDP,
-                        },
-                        [SDPStreamMetadataKey]: {
-                            [STREAM_ID]: {
-                                purpose: SDPStreamMetadataPurpose.Usermedia,
-                            },
-                        },
-                    };
+            await call.onAnswerReceived(makeMockEvent("@test:foo", {
+                version: 1,
+                call_id: call.callId,
+                party_id: 'party_id',
+                answer: {
+                    sdp: DUMMY_SDP,
                 },
-                getSender: () => "@test:foo",
-            });
+                [SDPStreamMetadataKey]: {
+                    [STREAM_ID]: {
+                        purpose: SDPStreamMetadataPurpose.Usermedia,
+                    },
+                },
+            }));
 
-            call.pushRemoteFeed(new MockMediaStream(STREAM_ID));
-            call.pushRemoteFeed(new MockMediaStream(STREAM_ID));
+            (call as any).pushRemoteFeed(new MockMediaStream(STREAM_ID));
+            (call as any).pushRemoteFeed(new MockMediaStream(STREAM_ID));
 
             expect(call.getRemoteFeeds().length).toBe(1);
             expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
         });
 
         it("should ignore stream passed to pushRemoteFeedWithoutMetadata()", async () => {
-            call.pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
-            call.pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
+            (call as any).pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
+            (call as any).pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
 
             expect(call.getRemoteFeeds().length).toBe(1);
             expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
         });
 
         it("should ignore stream passed to pushNewLocalFeed()", async () => {
-            call.pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
-            call.pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
+            (call as any).pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
+            (call as any).pushNewLocalFeed(new MockMediaStream(STREAM_ID), SDPStreamMetadataPurpose.Screenshare);
 
             // We already have one local feed from placeVoiceCall()
             expect(call.getLocalFeeds().length).toBe(2);
@@ -794,15 +747,16 @@ describe('Call', function() {
     });
 
     describe("muting", () => {
+        let mockSendVoipEvent: jest.Mock<Promise<void>, [string, object]>;
         beforeEach(async () => {
-            call.sendVoipEvent = jest.fn();
+            (call as any).sendVoipEvent = mockSendVoipEvent = jest.fn();
             await startVideoCall(client, call);
         });
 
         describe("sending sdp_stream_metadata_changed events", () => {
             it("should send sdp_stream_metadata_changed when muting audio", async () => {
                 await call.setMicrophoneMuted(true);
-                expect(call.sendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
+                expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
                     [SDPStreamMetadataKey]: {
                         mock_stream_from_media_handler: {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
@@ -815,7 +769,7 @@ describe('Call', function() {
 
             it("should send sdp_stream_metadata_changed when muting video", async () => {
                 await call.setLocalVideoMuted(true);
-                expect(call.sendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
+                expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
                     [SDPStreamMetadataKey]: {
                         mock_stream_from_media_handler: {
                             purpose: SDPStreamMetadataPurpose.Usermedia,
@@ -836,7 +790,7 @@ describe('Call', function() {
                         video_muted: video,
                     },
                 };
-                call.pushRemoteFeed(new MockMediaStream("stream", [
+                (call as any).pushRemoteFeed(new MockMediaStream("stream", [
                     new MockMediaStreamTrack("track1", "audio"),
                     new MockMediaStreamTrack("track1", "video"),
                 ]));
@@ -844,20 +798,20 @@ describe('Call', function() {
                     getContent: () => ({
                         [SDPStreamMetadataKey]: metadata,
                     }),
-                });
+                } as MatrixEvent);
                 return metadata;
             };
 
             it("should handle incoming sdp_stream_metadata_changed with audio muted", async () => {
                 const metadata = setupCall(true, false);
-                expect(call.remoteSDPStreamMetadata).toStrictEqual(metadata);
+                expect((call as any).remoteSDPStreamMetadata).toStrictEqual(metadata);
                 expect(call.getRemoteFeeds()[0].isAudioMuted()).toBe(true);
                 expect(call.getRemoteFeeds()[0].isVideoMuted()).toBe(false);
             });
 
             it("should handle incoming sdp_stream_metadata_changed with video muted", async () => {
                 const metadata = setupCall(false, true);
-                expect(call.remoteSDPStreamMetadata).toStrictEqual(metadata);
+                expect((call as any).remoteSDPStreamMetadata).toStrictEqual(metadata);
                 expect(call.getRemoteFeeds()[0].isAudioMuted()).toBe(false);
                 expect(call.getRemoteFeeds()[0].isVideoMuted()).toBe(true);
             });
@@ -898,7 +852,7 @@ describe('Call', function() {
 
             await call.answer();
 
-            client.client.sendEvent.mockReset();
+            mockSendEvent.mockReset();
 
             let caught = false;
             try {
@@ -910,7 +864,7 @@ describe('Call', function() {
             expect(caught).toEqual(true);
             expect(client.client.sendEvent).not.toHaveBeenCalled();
 
-            call.hangup();
+            call.hangup(CallErrorCode.UserHangup, true);
         });
 
         it("hangs up a call", async () => {
@@ -918,9 +872,9 @@ describe('Call', function() {
 
             await call.answer();
 
-            client.client.sendEvent.mockReset();
+            mockSendEvent.mockReset();
 
-            call.hangup();
+            call.hangup(CallErrorCode.UserHangup, true);
 
             expect(client.client.sendEvent).toHaveBeenCalledWith(
                 FAKE_ROOM_ID,
@@ -947,26 +901,21 @@ describe('Call', function() {
         beforeEach(async () => {
             await startVoiceCall(client, call);
 
-            await call.onAnswerReceived({
-                getContent: () => {
-                    return {
-                        "version": 1,
-                        "call_id": call.callId,
-                        "party_id": 'party_id',
-                        "answer": {
-                            sdp: DUMMY_SDP,
-                        },
-                        "org.matrix.msc3077.sdp_stream_metadata": {
-                            "foo": {
-                                "purpose": "m.usermedia",
-                                "audio_muted": false,
-                                "video_muted": false,
-                            },
-                        },
-                    };
+            await call.onAnswerReceived(makeMockEvent("@test:foo", {
+                "version": 1,
+                "call_id": call.callId,
+                "party_id": 'party_id',
+                "answer": {
+                    sdp: DUMMY_SDP,
                 },
-                getSender: () => "@test:foo",
-            });
+                "org.matrix.msc3077.sdp_stream_metadata": {
+                    "foo": {
+                        "purpose": "m.usermedia",
+                        "audio_muted": false,
+                        "video_muted": false,
+                    },
+                },
+            }));
         });
 
         afterEach(() => {
@@ -977,11 +926,13 @@ describe('Call', function() {
         it("enables and disables screensharing", async () => {
             await call.setScreensharingEnabled(true);
 
-            expect(call.feeds.filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length).toEqual(1);
+            expect(
+                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length,
+            ).toEqual(1);
 
-            client.client.sendEvent.mockReset();
+            mockSendEvent.mockReset();
             const sendNegotiatePromise = new Promise<void>(resolve => {
-                client.client.sendEvent.mockImplementationOnce(() => {
+                mockSendEvent.mockImplementationOnce(() => {
                     resolve();
                 });
             });
@@ -1005,7 +956,9 @@ describe('Call', function() {
 
             await call.setScreensharingEnabled(false);
 
-            expect(call.feeds.filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length).toEqual(0);
+            expect(
+                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length,
+            ).toEqual(0);
         });
     });
 });
