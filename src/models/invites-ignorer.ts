@@ -20,10 +20,14 @@ import { globToRegexp } from "../utils";
 import { Room } from "./room";
 
 /// The event type storing the user's individual policies.
-const POLICIES_ACCOUNT_EVENT_TYPE = "org.matrix.msc3847.policies";
+///
+/// Exported for testing purposes.
+export const POLICIES_ACCOUNT_EVENT_TYPE = "org.matrix.msc3847.policies";
 
 /// The key within the user's individual policies storing the user's ignored invites.
-const IGNORE_INVITES_ACCOUNT_EVENT_KEY = "org.matrix.msc3847.ignore.invites";
+///
+/// Exported for testing purposes.
+export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = "org.matrix.msc3847.ignore.invites";
 
 /// The types of recommendations understood.
 enum PolicyRecommendation {
@@ -75,14 +79,16 @@ export class IgnoredInvites {
      * @param scope The scope for this rule.
      * @param entity The entity covered by this rule. Globs are supported.
      * @param reason A human-readable reason for introducing this new rule.
+     * @return The event id for the new rule.
      */
-    public async addRule(scope: PolicyScope, entity: string, reason: string) {
+    public async addRule(scope: PolicyScope, entity: string, reason: string): Promise<string> {
         const target = await this.getOrCreateTargetRoom();
-        await this.client.sendStateEvent(target.roomId, scope, {
+        const response = await this.client.sendStateEvent(target.roomId, scope, {
             entity,
             reason,
             recommendation: PolicyRecommendation.Ban,
         });
+        return response.event_id;
     }
 
     /**
@@ -90,6 +96,44 @@ export class IgnoredInvites {
      */
     public async removeRule(event: MatrixEvent) {
         await this.client.redactEvent(event.getRoomId()!, event.getId()!);
+    }
+
+    /**
+     * Add a new room to the list of sources. If the user isn't a member of the
+     * room, attempt to join it.
+     *
+     * @param roomId A valid room id. If this room is already in the list
+     * of sources, it will not be duplicated.
+     * @return `true` if the source was added, `false` if it was already present.
+     * @throws If `roomId` isn't the id of a room that the current user is already
+     * member of or can join.
+     *
+     * # Safety
+     *
+     * This method will rewrite the `Policies` object in the user's account data.
+     * This rewrite is inherently racy and could overwrite or be overwritten by
+     * other concurrent rewrites of the same object.
+     */
+    public async addSource(roomId: string): Promise<boolean> {
+        // We attempt to join the room *before* calling
+        // `await this.getOrCreateSourceRooms()` to decrease the duration
+        // of the racy section.
+        await this.client.joinRoom(roomId);
+        // Race starts.
+        const sources = (await this.getOrCreateSourceRooms())
+            .map(room => room.roomId);
+        if (sources.includes(roomId)) {
+            return false;
+        }
+        sources.push(roomId);
+        const policies = this.client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE)?.getContent() || {};
+
+        const ignoreInvitesPolicies = policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY] || {};
+        ignoreInvitesPolicies.sources = sources;
+        await this.client.setAccountData(POLICIES_ACCOUNT_EVENT_TYPE, policies);
+
+        // Race ends.
+        return true;
     }
 
     /**
@@ -136,7 +180,7 @@ export class IgnoredInvites {
                         // Invalid event.
                         continue;
                     }
-                    let regexp;
+                    let regexp: string;
                     try {
                         regexp = globToRegexp(glob, false);
                     } catch (ex) {
@@ -162,6 +206,12 @@ export class IgnoredInvites {
      *
      * Note: This method is public for testing reasons. Most clients should not need
      * to call it directly.
+     *
+     * # Safety
+     *
+     * This method will rewrite the `Policies` object in the user's account data.
+     * This rewrite is inherently racy and could overwrite or be overwritten by
+     * other concurrent rewrites of the same object.
      */
     public async getOrCreateTargetRoom(): Promise<Room> {
         const policies = this.client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE)?.getContent() || {};
@@ -201,6 +251,12 @@ export class IgnoredInvites {
      *
      * Note: This method is public for testing reasons. Most clients should not need
      * to call it directly.
+     *
+     * # Safety
+     *
+     * This method will rewrite the `Policies` object in the user's account data.
+     * This rewrite is inherently racy and could overwrite or be overwritten by
+     * other concurrent rewrites of the same object.
      */
     public async getOrCreateSourceRooms(): Promise<Room[]> {
         const policies = this.client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE)?.getContent() || {};
