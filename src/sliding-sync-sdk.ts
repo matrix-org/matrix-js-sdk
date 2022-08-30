@@ -19,13 +19,11 @@ import { logger } from './logger';
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData, SyncState } from "./sync";
+import { ISyncStateData, SyncState, _createAndReEmitRoom } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState } from "./sync-accumulator";
 import { MatrixError } from "./http-api";
-import { RoomStateEvent } from "./models/room-state";
-import { RoomMemberEvent } from "./models/room-member";
 import {
     Extension,
     ExtensionState,
@@ -38,6 +36,8 @@ import {
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
 import { PushProcessor } from "./pushprocessor";
+import { RoomStateEvent } from "./models/room-state";
+import { RoomMemberEvent } from "./models/room-member";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
@@ -291,7 +291,7 @@ export class SlidingSyncSdk {
                 logger.debug("initial flag not set but no stored room exists for room ", roomId, roomData);
                 return;
             }
-            room = this.createRoom(roomId);
+            room = _createAndReEmitRoom(this.client, roomId, this.opts);
         }
         this.processRoomData(this.client, room, roomData);
     }
@@ -591,7 +591,6 @@ export class SlidingSyncSdk {
             }
 
             if (limited) {
-                deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     roomData.prev_batch,
                     null, // TODO this.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
@@ -869,6 +868,8 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
     return roomData;
 }
 
+// Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
+// just outside the class.
 function mapEvents(client: MatrixClient, roomId: string, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });
     return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {

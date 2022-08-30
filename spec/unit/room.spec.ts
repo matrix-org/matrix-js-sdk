@@ -2545,4 +2545,16 @@ describe("Room", function() {
             });
         });
     });
+
+    describe("roomNameGenerator", () => {
+        const client = new TestClient(userA).client;
+        client.roomNameGenerator = jest.fn().mockReturnValue(null);
+        const room = new Room(roomId, client, userA);
+
+        it("should call fn when recalculating room name", () => {
+            (client.roomNameGenerator as jest.Mock).mockClear();
+            room.recalculate();
+            expect(client.roomNameGenerator).toHaveBeenCalled();
+        });
+    });
 });

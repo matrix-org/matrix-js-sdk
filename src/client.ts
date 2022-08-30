@@ -119,7 +119,7 @@ import { VerificationRequest } from "./crypto/verification/request/VerificationR
 import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
 import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
-import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap } from "./models/room";
+import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
 import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
 import { RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
 import {
@@ -364,6 +364,12 @@ export interface ICreateClientOpts {
      * The device ID for the local SFU to use for group calling, if any
      */
     localSfuDeviceId?: string;
+
+    /**
+     * Method to generate room names for empty rooms and rooms names based on membership.
+     * Defaults to a built-in English handler with basic pluralisation.
+     */
+    roomNameGenerator?: (roomId: string, state: RoomNameState) => string | null;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -951,6 +957,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
     protected syncApi: SlidingSyncSdk | SyncApi;
+    public roomNameGenerator?: ICreateClientOpts["roomNameGenerator"];
     public pushRules: IPushRules;
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
@@ -1085,6 +1092,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we still want to know which rooms are encrypted even if crypto is disabled:
         // we don't want to start sending unencrypted events to them.
         this.roomList = new RoomList(this.cryptoStore);
+        this.roomNameGenerator = opts.roomNameGenerator;
 
         this.toDeviceMessageQueue = new ToDeviceMessageQueue(this);
 

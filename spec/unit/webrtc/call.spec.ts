@@ -15,7 +15,14 @@ limitations under the License.
 */
 
 import { TestClient } from '../../TestClient';
-import { MatrixCall, CallErrorCode, CallEvent, supportsMatrixCall, CallType } from '../../../src/webrtc/call';
+import {
+    MatrixCall,
+    CallErrorCode,
+    CallEvent,
+    supportsMatrixCall,
+    CallType,
+    CallState,
+} from '../../../src/webrtc/call';
 import { SDPStreamMetadata, SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
 import {
     DUMMY_SDP,
@@ -23,9 +30,14 @@ import {
     MockMediaStream,
     MockMediaStreamTrack,
     installWebRTCMocks,
+    MockRTCPeerConnection,
+    SCREENSHARE_STREAM_ID,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
-import { EventType } from "../../../src";
+import { EventType, MatrixEvent } from "../../../src";
+
+const FAKE_ROOM_ID = "!foo:bar";
+const CALL_LIFETIME = 60000;
 
 const startVoiceCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
     const callPromise = call.placeVoiceCall();
@@ -41,6 +53,31 @@ const startVideoCall = async (client: TestClient, call: MatrixCall): Promise<voi
     await callPromise;
 
     call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
+};
+
+const fakeIncomingCall = async (client: TestClient, call: MatrixCall, version: string | number = "1") => {
+    const callPromise = call.initWithInvite({
+        getContent: jest.fn().mockReturnValue({
+            version,
+            call_id: "call_id",
+            party_id: "remote_party_id",
+            lifetime: CALL_LIFETIME,
+            offer: {
+                sdp: DUMMY_SDP,
+            },
+        }),
+        getSender: () => "@test:foo",
+        getLocalAge: () => 1,
+    } as unknown as MatrixEvent);
+    call.getFeeds().push(new CallFeed({
+        client: client.client,
+        userId: "remote_user_id",
+        // @ts-ignore Mock
+        stream: new MockMediaStream("remote_stream_id", [new MockMediaStreamTrack("remote_tack_id")]),
+        id: "remote_feed_id",
+        purpose: SDPStreamMetadataPurpose.Usermedia,
+    }));
+    await callPromise;
 };
 
 describe('Call', function() {
@@ -60,9 +97,10 @@ describe('Call', function() {
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
         // We just stub out sendEvent: we're not interested in testing the client's
         // event sending code here
-        client.client.sendEvent = () => {};
+        client.client.sendEvent = jest.fn();
         client.client.mediaHandler = new MockMediaHandler;
         client.client.getMediaHandler = () => client.client.mediaHandler;
+        client.client.turnServersExpiry = Date.now() + 60 * 60 * 1000;
         client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
         client.client.getRoom = () => {
             return {
@@ -74,17 +112,22 @@ describe('Call', function() {
 
         call = new MatrixCall({
             client: client.client,
-            roomId: '!foo:bar',
+            roomId: FAKE_ROOM_ID,
         });
         // call checks one of these is wired up
         call.on('error', () => {});
     });
 
     afterEach(function() {
+        // Hangup to stop timers
+        call.hangup(CallErrorCode.UserHangup, true);
+
         client.stop();
         global.navigator = prevNavigator;
         global.window = prevWindow;
         global.document = prevDocument;
+
+        jest.useRealTimers();
     });
 
     it('should ignore candidate events from non-matching party ID', async function() {
@@ -140,9 +183,6 @@ describe('Call', function() {
             getSender: () => "@test:foo",
         });
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
-
-        // Hangup to stop timers
-        call.hangup(CallErrorCode.UserHangup, true);
     });
 
     it('should add candidates received before answer if party ID is correct', async function() {
@@ -245,9 +285,6 @@ describe('Call', function() {
         const ident = call.getRemoteAssertedIdentity();
         expect(ident.id).toEqual("@steve:example.com");
         expect(ident.displayName).toEqual("Steve Gibbons");
-
-        // Hangup to stop timers
-        call.hangup(CallErrorCode.UserHangup, true);
     });
 
     it("should map SDPStreamMetadata to feeds", async () => {
@@ -594,28 +631,7 @@ describe('Call', function() {
     });
 
     it("should end call after receiving a select event with a different party id", async () => {
-        const callPromise = call.initWithInvite({
-            getContent: () => ({
-                version: 1,
-                call_id: "call_id",
-                party_id: "remote_party_id",
-                offer: {
-                    sdp: DUMMY_SDP,
-                },
-            }),
-            getSender: () => "@test:foo",
-            getLocalAge: () => null,
-        });
-        call.feeds.push(new CallFeed({
-            client,
-            userId: "remote_user_id",
-            // @ts-ignore Mock
-            stream: new MockMediaStream("remote_stream_id", [new MockMediaStreamTrack("remote_tack_id")]),
-            id: "remote_feed_id",
-            purpose: SDPStreamMetadataPurpose.Usermedia,
-        }));
-        await client.httpBackend.flush();
-        await callPromise;
+        await fakeIncomingCall(client, call);
 
         const callHangupCallback = jest.fn();
         call.on(CallEvent.Hangup, callHangupCallback);
@@ -717,16 +733,18 @@ describe('Call', function() {
 
     describe("ignoring streams with ids for which we already have a feed", () => {
         const STREAM_ID = "stream_id";
-        const FEEDS_CHANGED_CALLBACK = jest.fn();
+        let FEEDS_CHANGED_CALLBACK: jest.Mock<void, []>;
 
         beforeEach(async () => {
+            FEEDS_CHANGED_CALLBACK = jest.fn();
+
             await startVoiceCall(client, call);
             call.on(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
             jest.spyOn(call, "pushLocalFeed");
         });
 
         afterEach(() => {
-            FEEDS_CHANGED_CALLBACK.mockReset();
+            call.off(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
         });
 
         it("should ignore stream passed to pushRemoteFeed()", async () => {
@@ -843,6 +861,151 @@ describe('Call', function() {
                 expect(call.getRemoteFeeds()[0].isAudioMuted()).toBe(false);
                 expect(call.getRemoteFeeds()[0].isVideoMuted()).toBe(true);
             });
+        });
+    });
+
+    describe("rejecting calls", () => {
+        it("sends hangup event when rejecting v0 calls", async () => {
+            await fakeIncomingCall(client, call, 0);
+
+            call.reject();
+
+            expect(client.client.sendEvent).toHaveBeenCalledWith(
+                FAKE_ROOM_ID,
+                EventType.CallHangup,
+                expect.objectContaining({
+                    call_id: call.callId,
+                }),
+            );
+        });
+
+        it("sends reject event when rejecting v1 calls", async () => {
+            await fakeIncomingCall(client, call, "1");
+
+            call.reject();
+
+            expect(client.client.sendEvent).toHaveBeenCalledWith(
+                FAKE_ROOM_ID,
+                EventType.CallReject,
+                expect.objectContaining({
+                    call_id: call.callId,
+                }),
+            );
+        });
+
+        it("does not reject a call that has already been answered", async () => {
+            await fakeIncomingCall(client, call, "1");
+
+            await call.answer();
+
+            client.client.sendEvent.mockReset();
+
+            let caught = false;
+            try {
+                call.reject();
+            } catch (e) {
+                caught = true;
+            }
+
+            expect(caught).toEqual(true);
+            expect(client.client.sendEvent).not.toHaveBeenCalled();
+
+            call.hangup();
+        });
+
+        it("hangs up a call", async () => {
+            await fakeIncomingCall(client, call, "1");
+
+            await call.answer();
+
+            client.client.sendEvent.mockReset();
+
+            call.hangup();
+
+            expect(client.client.sendEvent).toHaveBeenCalledWith(
+                FAKE_ROOM_ID,
+                EventType.CallHangup,
+                expect.objectContaining({
+                    call_id: call.callId,
+                }),
+            );
+        });
+    });
+
+    it("times out an incoming call", async () => {
+        jest.useFakeTimers();
+        await fakeIncomingCall(client, call, "1");
+
+        expect(call.state).toEqual(CallState.Ringing);
+
+        jest.advanceTimersByTime(CALL_LIFETIME + 1000);
+
+        expect(call.state).toEqual(CallState.Ended);
+    });
+
+    describe("Screen sharing", () => {
+        beforeEach(async () => {
+            await startVoiceCall(client, call);
+
+            await call.onAnswerReceived({
+                getContent: () => {
+                    return {
+                        "version": 1,
+                        "call_id": call.callId,
+                        "party_id": 'party_id',
+                        "answer": {
+                            sdp: DUMMY_SDP,
+                        },
+                        "org.matrix.msc3077.sdp_stream_metadata": {
+                            "foo": {
+                                "purpose": "m.usermedia",
+                                "audio_muted": false,
+                                "video_muted": false,
+                            },
+                        },
+                    };
+                },
+                getSender: () => "@test:foo",
+            });
+        });
+
+        afterEach(() => {
+            // Hangup to stop timers
+            call.hangup(CallErrorCode.UserHangup, true);
+        });
+
+        it("enables and disables screensharing", async () => {
+            await call.setScreensharingEnabled(true);
+
+            expect(call.feeds.filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length).toEqual(1);
+
+            client.client.sendEvent.mockReset();
+            const sendNegotiatePromise = new Promise<void>(resolve => {
+                client.client.sendEvent.mockImplementationOnce(() => {
+                    resolve();
+                });
+            });
+
+            MockRTCPeerConnection.triggerAllNegotiations();
+            await sendNegotiatePromise;
+
+            expect(client.client.sendEvent).toHaveBeenCalledWith(
+                FAKE_ROOM_ID,
+                EventType.CallNegotiate,
+                expect.objectContaining({
+                    "version": "1",
+                    "call_id": call.callId,
+                    "org.matrix.msc3077.sdp_stream_metadata": expect.objectContaining({
+                        [SCREENSHARE_STREAM_ID]: expect.objectContaining({
+                            purpose: SDPStreamMetadataPurpose.Screenshare,
+                        }),
+                    }),
+                }),
+            );
+
+            await call.setScreensharingEnabled(false);
+
+            expect(call.feeds.filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length).toEqual(0);
         });
     });
 });
