@@ -362,6 +362,8 @@ describe("SlidingSyncSdk", () => {
 
                 it("can update with a new required_state event", async () => {
                     let gotRoom = client.getRoom(roomB);
+                    expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(gotRoom.getJoinRule()).toEqual(JoinRule.Invite); // default
                     mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomB, {
                         required_state: [
