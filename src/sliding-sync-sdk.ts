@@ -293,13 +293,16 @@ export class SlidingSyncSdk {
         this.processRoomData(this.client, room, roomData);
     }
 
-    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
+    private onLifecycle(state: SlidingSyncState, resp?: MSC3575SlidingSyncResponse, err?: Error): void {
         if (err) {
             logger.debug("onLifecycle", state, err);
         }
         switch (state) {
             case SlidingSyncState.Complete:
                 this.purgeNotifications();
+                if (!resp) {
+                    break;
+                }
                 // Element won't stop showing the initial loading spinner unless we fire SyncState.Prepared
                 if (!this.lastPos) {
                     this.updateSyncState(SyncState.Prepared, {
