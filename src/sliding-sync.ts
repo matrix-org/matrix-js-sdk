@@ -322,7 +322,9 @@ export enum SlidingSyncEvent {
 
 export type SlidingSyncEventHandlerMap = {
     [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
-    [SlidingSyncEvent.Lifecycle]: (state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error) => void;
+    [SlidingSyncEvent.Lifecycle]: (
+        state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error,
+    ) => void;
     [SlidingSyncEvent.List]: (
         listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number, string>,
     ) => void;
