@@ -168,6 +168,7 @@ describe("SlidingSyncSdk", () => {
             const roomD = "!d_with_notif_count:localhost";
             const roomE = "!e_with_invite:localhost";
             const roomF = "!f_calc_room_name:localhost";
+            const roomG = "!g_join_invite_counts:localhost";
             const data: Record<string, MSC3575RoomData> = {
                 [roomA]: {
                     name: "A",
@@ -261,6 +262,18 @@ describe("SlidingSyncSdk", () => {
                     ],
                     initial: true,
                 },
+                [roomG]: {
+                    name: "G",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    ],
+                    joined_count: 5,
+                    invited_count: 2,
+                    initial: true,
+                },
             };
 
             it("can be created with required_state and timeline", () => {
@@ -297,6 +310,14 @@ describe("SlidingSyncSdk", () => {
                 expect(
                     gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
                 ).toEqual(data[roomD].notification_count);
+            });
+
+            it("can be created with an invited/joined_count", () => {
+                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomG, data[roomG]);
+                const gotRoom = client.getRoom(roomG);
+                expect(gotRoom).toBeDefined();
+                expect(gotRoom.getInvitedMemberCount()).toEqual(data[roomG].invited_count);
+                expect(gotRoom.getJoinedMemberCount()).toEqual(data[roomG].joined_count);
             });
 
             it("can be created with invite_state", () => {
@@ -372,6 +393,18 @@ describe("SlidingSyncSdk", () => {
                     expect(
                         gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
                     ).toEqual(1);
+                });
+
+                it("can update with a new joined_count", () => {
+                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomG, {
+                        name: data[roomD].name,
+                        required_state: [],
+                        timeline: [],
+                        joined_count: 1,
+                    });
+                    const gotRoom = client.getRoom(roomG);
+                    expect(gotRoom).toBeDefined();
+                    expect(gotRoom.getJoinedMemberCount()).toEqual(1);
                 });
 
                 // Regression test for a bug which caused the timeline entries to be out-of-order

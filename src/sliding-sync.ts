@@ -84,6 +84,8 @@ export interface MSC3575RoomData {
     timeline: (IRoomEvent | IStateEvent)[];
     notification_count?: number;
     highlight_count?: number;
+    joined_count?: number;
+    invited_count?: number;
     invite_state?: IStateEvent[];
     initial?: boolean;
     limited?: boolean;

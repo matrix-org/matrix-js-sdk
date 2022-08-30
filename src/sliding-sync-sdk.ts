@@ -472,6 +472,13 @@ export class SlidingSyncSdk {
             }
         }
 
+        if (Number.isInteger(roomData.invited_count)) {
+            room.currentState.setInvitedMemberCount(roomData.invited_count);
+        }
+        if (Number.isInteger(roomData.joined_count)) {
+            room.currentState.setJoinedMemberCount(roomData.joined_count);
+        }
+
         if (roomData.invite_state) {
             const inviteStateEvents = mapEvents(this.client, room.roomId, roomData.invite_state);
             this.processRoomEvents(room, inviteStateEvents);
