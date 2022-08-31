@@ -15,6 +15,7 @@ import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { logger } from '../../src/logger';
 import { MemoryStore } from "../../src";
+import { IStore } from '../../src/store';
 
 const Olm = global.Olm;
 
@@ -159,7 +160,7 @@ describe("Crypto", function() {
 
         beforeEach(async function() {
             const mockStorage = new MockStorageApi() as unknown as Storage;
-            const clientStore = new MemoryStore({ localStorage: mockStorage });
+            const clientStore = new MemoryStore({ localStorage: mockStorage }) as unknown as IStore;
             const cryptoStore = new MemoryCryptoStore();
 
             cryptoStore.storeEndToEndDeviceData({
@@ -469,12 +470,12 @@ describe("Crypto", function() {
             jest.setTimeout(10000);
             const client = (new TestClient("@a:example.com", "dev")).client;
             await client.initCrypto();
-            client.crypto.getSecretStorageKey = async () => null;
+            client.crypto.getSecretStorageKey = jest.fn().mockResolvedValue(null);
             client.crypto.isCrossSigningReady = async () => false;
             client.crypto.baseApis.uploadDeviceSigningKeys = jest.fn().mockResolvedValue(null);
-            client.crypto.baseApis.setAccountData = () => null;
-            client.crypto.baseApis.uploadKeySignatures = () => null;
-            client.crypto.baseApis.http.authedRequest = () => null;
+            client.crypto.baseApis.setAccountData = jest.fn().mockResolvedValue(null);
+            client.crypto.baseApis.uploadKeySignatures = jest.fn();
+            client.crypto.baseApis.http.authedRequest = jest.fn();
             const createSecretStorageKey = async () => {
                 return {
                     keyInfo: undefined, // Returning undefined here used to cause a crash

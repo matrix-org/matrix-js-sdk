@@ -16,13 +16,14 @@ limitations under the License.
 
 import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
+import { RoomState } from "../../src";
 
 describe("RoomMember", function() {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
     const userB = "@bertha:bar";
     const userC = "@clarissa:bar";
-    let member;
+    let member = new RoomMember(roomId, userA);
 
     beforeEach(function() {
         member = new RoomMember(roomId, userA);
@@ -43,15 +44,15 @@ describe("RoomMember", function() {
                     avatar_url: "mxc://flibble/wibble",
                 },
             });
-            const url = member.getAvatarUrl(hsUrl);
+            const url = member.getAvatarUrl(hsUrl, 1, 1, '', false, false);
             // we don't care about how the mxc->http conversion is done, other
             // than it contains the mxc body.
-            expect(url.indexOf("flibble/wibble")).not.toEqual(-1);
+            expect(url?.indexOf("flibble/wibble")).not.toEqual(-1);
         });
 
         it("should return nothing if there is no m.room.member and allowDefault=false",
             function() {
-                const url = member.getAvatarUrl(hsUrl, 64, 64, "crop", false);
+                const url = member.getAvatarUrl(hsUrl, 64, 64, "crop", false, false);
                 expect(url).toEqual(null);
             });
     });
@@ -282,7 +283,7 @@ describe("RoomMember", function() {
                     getUserIdsWithDisplayName: function(displayName) {
                         return [userA, userC];
                     },
-                };
+                } as unknown as RoomState;
                 expect(member.name).toEqual(userA); // default = user_id
                 member.setMembershipEvent(joinEvent);
                 expect(member.name).toEqual("Alice"); // prefer displayname
@@ -357,7 +358,7 @@ describe("RoomMember", function() {
                 getUserIdsWithDisplayName: function(displayName) {
                     return [userA, userC];
                 },
-            };
+            } as unknown as RoomState;
             expect(member.name).toEqual(userA); // default = user_id
             member.setMembershipEvent(joinEvent, roomState);
             expect(member.name).not.toEqual("Alíce"); // it should disambig.
