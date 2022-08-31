@@ -115,7 +115,7 @@ describe('Call', function() {
             untypedClient.mediaHandler = new MockMediaHandler;
             untypedClient.turnServersExpiry = Date.now() + 60 * 60 * 1000;
         }
-        //client.client.getMediaHandler = () => client.client.mediaHandler;
+
         client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
         client.client.getRoom = () => {
             return {
@@ -169,7 +169,7 @@ describe('Call', function() {
                 },
             ],
         }));
-        expect(mockAddIceCandidate.mock.calls.length).toBe(1);
+        expect(mockAddIceCandidate).toHaveBeenCalled();
 
         call.onRemoteIceCandidatesReceived(makeMockEvent("@test:foo", {
             version: 1,
