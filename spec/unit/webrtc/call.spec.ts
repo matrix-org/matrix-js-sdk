@@ -564,8 +564,6 @@ describe('Call', function() {
         (call as any).updateRemoteSDPStreamMetadata({
             "remote_usermedia_stream_id": {
                 purpose: SDPStreamMetadataPurpose.Usermedia,
-                // XXX: This type doesn't include 'id'?
-                id: "remote_usermedia_feed_id",
                 audio_muted: false,
                 video_muted: false,
             },
