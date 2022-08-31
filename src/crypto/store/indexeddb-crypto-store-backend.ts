@@ -26,7 +26,7 @@ import {
     Mode,
     OutgoingRoomKeyRequest,
 } from "./base";
-import { IRoomKeyRequestBody } from "../index";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
@@ -261,7 +261,9 @@ export class Backend implements CryptoStore {
             const cursor = this.result;
             if (cursor) {
                 const keyReq = cursor.value;
-                if (keyReq.recipients.includes({ userId, deviceId })) {
+                if (keyReq.recipients.some((recipient: IRoomKeyRequestRecipient) =>
+                    recipient.userId === userId && recipient.deviceId === deviceId,
+                )) {
                     results.push(keyReq);
                 }
                 cursor.continue();
