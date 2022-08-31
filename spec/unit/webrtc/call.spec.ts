@@ -182,7 +182,7 @@ describe('Call', function() {
                 },
             ],
         }));
-        expect(mockAddIceCandidate.mock.calls.length).toBe(1);
+        expect(mockAddIceCandidate).toHaveBeenCalled();
     });
 
     it('should add candidates received before answer if party ID is correct', async function() {
@@ -213,7 +213,7 @@ describe('Call', function() {
             ],
         }));
 
-        expect(mockAddIceCandidate.mock.calls.length).toBe(0);
+        expect(mockAddIceCandidate).not.toHaveBeenCalled();
 
         await call.onAnswerReceived(makeMockEvent("@test:foo", {
             version: 1,
@@ -224,7 +224,7 @@ describe('Call', function() {
             },
         }));
 
-        expect(mockAddIceCandidate.mock.calls.length).toBe(1);
+        expect(mockAddIceCandidate).toHaveBeenCalled();
         expect(mockAddIceCandidate).toHaveBeenCalledWith({
             candidate: 'the_correct_candidate',
             sdpMid: '',
