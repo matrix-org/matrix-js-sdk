@@ -748,11 +748,21 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public onMemberStateChanged = async (event: MatrixEvent) => {
+        // If we haven't entered the call yet, we don't care
+        if (this.state !== GroupCallState.Entered) {
+            return;
+        }
+
         // The member events may be received for another room, which we will ignore.
         if (event.getRoomId() !== this.room.roomId) return;
 
         const member = this.room.getMember(event.getStateKey());
-        if (!member) return;
+        if (!member) {
+            logger.warn(`Couldn't find room member for ${event.getStateKey()}: ignoring member state event!`);
+            return;
+        }
+
+        logger.debug(`Processing member state event for ${member.userId}`);
 
         const ignore = () => {
             this.removeParticipant(member);
@@ -766,7 +776,7 @@ export class GroupCall extends TypedEventEmitter<
             : []; // Ignore expired device data
 
         if (callsState.length === 0) {
-            logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);
+            logger.info(`Ignoring member state from ${member.userId} member not in any calls.`);
             ignore();
             return;
         }
@@ -802,14 +812,10 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        if (this.state !== GroupCallState.Entered) {
-            return;
-        }
-
         // Only initiate a call with a user who has a userId that is lexicographically
         // less than your own. Otherwise, that user will call you.
         if (member.userId < localUserId) {
-            logger.log(`Waiting for ${member.userId} to send call invite.`);
+            logger.debug(`Waiting for ${member.userId} to send call invite.`);
             return;
         }
 
@@ -848,6 +854,8 @@ export class GroupCall extends TypedEventEmitter<
 
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+
+        logger.log(`Placing call to ${member.userId}.`);
 
         try {
             await newCall.placeCallWithCallFeeds(
