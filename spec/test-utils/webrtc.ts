@@ -212,6 +212,11 @@ export class MockMediaStream {
     clone() {
         return new MockMediaStream(this.id, this.tracks);
     }
+
+    // syntactic sugar for typing
+    typed(): MediaStream {
+        return this as unknown as MediaStream;
+    }
 }
 
 export class MockMediaDeviceInfo {
