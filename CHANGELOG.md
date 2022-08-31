@@ -1,3 +1,20 @@
+Changes in [19.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.4.0) (2022-08-31)
+==================================================================================================
+
+## ✨ Features
+ * Re-emit room state events on rooms ([\#2607](https://github.com/matrix-org/matrix-js-sdk/pull/2607)).
+ * Add ability to override built in room name generator for an i18n'able one ([\#2609](https://github.com/matrix-org/matrix-js-sdk/pull/2609)).
+ * Add txn_id support to sliding sync ([\#2567](https://github.com/matrix-org/matrix-js-sdk/pull/2567)).
+
+## 🐛 Bug Fixes
+ * Refactor Sync and fix `initialSyncLimit` ([\#2587](https://github.com/matrix-org/matrix-js-sdk/pull/2587)).
+ * Use deep equality comparisons when searching for outgoing key requests by target ([\#2623](https://github.com/matrix-org/matrix-js-sdk/pull/2623)). Contributed by @duxovni.
+ * Fix room membership race with PREPARED event ([\#2613](https://github.com/matrix-org/matrix-js-sdk/pull/2613)). Contributed by @jotto.
+ * fixed a sliding sync bug which could cause the `roomIndexToRoomId` map to be incorrect when a new room is added in the middle of the list or when an existing room is deleted from the middle of the list. ([\#2610](https://github.com/matrix-org/matrix-js-sdk/pull/2610)).
+ * Fix: Handle parsing of a beacon info event without asset ([\#2591](https://github.com/matrix-org/matrix-js-sdk/pull/2591)). Fixes vector-im/element-web#23078. Contributed by @kerryarchibald.
+ * Fix finding event read up to if stable private read receipts is missing ([\#2585](https://github.com/matrix-org/matrix-js-sdk/pull/2585)). Fixes vector-im/element-web#23027.
+ * fixed a sliding sync issue where history could be interpreted as live events. ([\#2583](https://github.com/matrix-org/matrix-js-sdk/pull/2583)).
+
 Changes in [19.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.3.0) (2022-08-16)
 ==================================================================================================
 

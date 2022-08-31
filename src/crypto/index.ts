@@ -278,9 +278,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     private oneTimeKeyCheckInProgress = false;
 
     // EncryptionAlgorithm instance for each room
-    private roomEncryptors: Record<string, EncryptionAlgorithm> = {};
+    private roomEncryptors = new Map<string, EncryptionAlgorithm>();
     // map from algorithm to DecryptionAlgorithm instance, for each room
-    private roomDecryptors: Record<string, Record<string, DecryptionAlgorithm>> = {};
+    private roomDecryptors = new Map<string, Map<string, DecryptionAlgorithm>>();
 
     private deviceKeys: Record<string, string> = {}; // type: key
 
@@ -422,7 +422,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         this.deviceList.on(CryptoEvent.UserCrossSigningUpdated, this.onDeviceListUserCrossSigningUpdated);
         this.reEmitter.reEmit(this.deviceList, [CryptoEvent.DevicesUpdated, CryptoEvent.WillUpdateDevices]);
 
-        this.supportedAlgorithms = Object.keys(algorithms.DECRYPTION_CLASSES);
+        this.supportedAlgorithms = Array.from(algorithms.DECRYPTION_CLASSES.keys());
 
         this.outgoingRoomKeyRequestManager = new OutgoingRoomKeyRequestManager(
             baseApis, this.deviceId, this.cryptoStore,
@@ -2527,7 +2527,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * This should not normally be necessary.
      */
     public forceDiscardSession(roomId: string): void {
-        const alg = this.roomEncryptors[roomId];
+        const alg = this.roomEncryptors.get(roomId);
         if (alg === undefined) throw new Error("Room not encrypted");
         if (alg.forceDiscardSession === undefined) {
             throw new Error("Room encryption algorithm doesn't support session discarding");
@@ -2580,7 +2580,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // the encryption event would appear in both.
         // If it's called more than twice though,
         // it signals a bug on client or server.
-        const existingAlg = this.roomEncryptors[roomId];
+        const existingAlg = this.roomEncryptors.get(roomId);
         if (existingAlg) {
             return;
         }
@@ -2594,7 +2594,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             storeConfigPromise = this.roomList.setRoomEncryption(roomId, config);
         }
 
-        const AlgClass = algorithms.ENCRYPTION_CLASSES[config.algorithm];
+        const AlgClass = algorithms.ENCRYPTION_CLASSES.get(config.algorithm);
         if (!AlgClass) {
             throw new Error("Unable to encrypt with " + config.algorithm);
         }
@@ -2608,7 +2608,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             roomId,
             config,
         });
-        this.roomEncryptors[roomId] = alg;
+        this.roomEncryptors.set(roomId, alg);
 
         if (storeConfigPromise) {
             await storeConfigPromise;
@@ -2640,7 +2640,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public trackRoomDevices(roomId: string): Promise<void> {
         const trackMembers = async () => {
             // not an encrypted room
-            if (!this.roomEncryptors[roomId]) {
+            if (!this.roomEncryptors.has(roomId)) {
                 return;
             }
             const room = this.clientStore.getRoom(roomId);
@@ -2785,7 +2785,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param {module:models/room} room the room the event is in
      */
     public prepareToEncrypt(room: Room): void {
-        const alg = this.roomEncryptors[room.roomId];
+        const alg = this.roomEncryptors.get(room.roomId);
         if (alg) {
             alg.prepareToEncrypt(room);
         }
@@ -2808,7 +2808,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         const roomId = event.getRoomId();
 
-        const alg = this.roomEncryptors[roomId];
+        const alg = this.roomEncryptors.get(roomId);
         if (!alg) {
             // MatrixClient has already checked that this room should be encrypted,
             // so this is an unexpected situation.
@@ -3097,7 +3097,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     private getTrackedE2eRooms(): Room[] {
         return this.clientStore.getRooms().filter((room) => {
             // check for rooms with encryption enabled
-            const alg = this.roomEncryptors[room.roomId];
+            const alg = this.roomEncryptors.get(room.roomId);
             if (!alg) {
                 return false;
             }
@@ -3533,7 +3533,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         const roomId = member.roomId;
 
-        const alg = this.roomEncryptors[roomId];
+        const alg = this.roomEncryptors.get(roomId);
         if (!alg) {
             // not encrypting in this room
             return;
@@ -3634,11 +3634,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             ` for ${roomId} / ${body.session_id} (id ${req.requestId})`);
 
         if (userId !== this.userId) {
-            if (!this.roomEncryptors[roomId]) {
+            if (!this.roomEncryptors.get(roomId)) {
                 logger.debug(`room key request for unencrypted room ${roomId}`);
                 return;
             }
-            const encryptor = this.roomEncryptors[roomId];
+            const encryptor = this.roomEncryptors.get(roomId);
             const device = this.deviceList.getStoredDevice(userId, deviceId);
             if (!device) {
                 logger.debug(`Ignoring keyshare for unknown device ${userId}:${deviceId}`);
@@ -3674,12 +3674,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         // if we don't have a decryptor for this room/alg, we don't have
         // the keys for the requested events, and can drop the requests.
-        if (!this.roomDecryptors[roomId]) {
+        if (!this.roomDecryptors.has(roomId)) {
             logger.log(`room key request for unencrypted room ${roomId}`);
             return;
         }
 
-        const decryptor = this.roomDecryptors[roomId][alg];
+        const decryptor = this.roomDecryptors.get(roomId).get(alg);
         if (!decryptor) {
             logger.log(`room key request for unknown alg ${alg} in room ${roomId}`);
             return;
@@ -3745,23 +3745,24 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * unknown
      */
     public getRoomDecryptor(roomId: string, algorithm: string): DecryptionAlgorithm {
-        let decryptors: Record<string, DecryptionAlgorithm>;
+        let decryptors: Map<string, DecryptionAlgorithm>;
         let alg: DecryptionAlgorithm;
 
         roomId = roomId || null;
         if (roomId) {
-            decryptors = this.roomDecryptors[roomId];
+            decryptors = this.roomDecryptors.get(roomId);
             if (!decryptors) {
-                this.roomDecryptors[roomId] = decryptors = {};
+                decryptors = new Map<string, DecryptionAlgorithm>();
+                this.roomDecryptors.set(roomId, decryptors);
             }
 
-            alg = decryptors[algorithm];
+            alg = decryptors.get(algorithm);
             if (alg) {
                 return alg;
             }
         }
 
-        const AlgClass = algorithms.DECRYPTION_CLASSES[algorithm];
+        const AlgClass = algorithms.DECRYPTION_CLASSES.get(algorithm);
         if (!AlgClass) {
             throw new algorithms.DecryptionError(
                 'UNKNOWN_ENCRYPTION_ALGORITHM',
@@ -3777,7 +3778,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         });
 
         if (decryptors) {
-            decryptors[algorithm] = alg;
+            decryptors.set(algorithm, alg);
         }
         return alg;
     }
@@ -3791,9 +3792,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     private getRoomDecryptors(algorithm: string): DecryptionAlgorithm[] {
         const decryptors = [];
-        for (const d of Object.values(this.roomDecryptors)) {
-            if (algorithm in d) {
-                decryptors.push(d[algorithm]);
+        for (const d of this.roomDecryptors.values()) {
+            if (d.has(algorithm)) {
+                decryptors.push(d.get(algorithm));
             }
         }
         return decryptors;
