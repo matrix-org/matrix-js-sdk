@@ -1,6 +1,11 @@
 Changes in [19.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.4.0) (2022-08-31)
 ==================================================================================================
 
+## 🔒 Security
+* Fix for [CVE-2022-36059](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D36059)
+
+Find more details at https://matrix.org/blog/2022/08/31/security-releases-matrix-js-sdk-19-4-0-and-matrix-react-sdk-3-53-0
+
 ## ✨ Features
  * Re-emit room state events on rooms ([\#2607](https://github.com/matrix-org/matrix-js-sdk/pull/2607)).
  * Add ability to override built in room name generator for an i18n'able one ([\#2609](https://github.com/matrix-org/matrix-js-sdk/pull/2609)).
