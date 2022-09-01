@@ -7071,7 +7071,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param {module:client.callback} callback Optional.
-     * @return {Promise<ILoginFlowsResponse} Resolves to the available login flows
+     * @return {Promise<ILoginFlowsResponse>} Resolves to the available login flows
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public loginFlows(callback?: Callback): Promise<ILoginFlowsResponse> {
