@@ -23,7 +23,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 const POLLING_INTERVAL = 1; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
-const VAD_THRESHOLD = -55; //dB
+const VAD_THRESHOLD = -100; //dB
 const SPEAKING_SAMPLE_COUNT = 8; // samples
 const VADCOOLDOWN = 200; // ms
 
@@ -41,7 +41,7 @@ export interface ICallFeedOpts {
      * Whether or not the remote SDPStreamMetadata says video is muted
      */
     videoMuted: boolean;
-    /** 
+    /**
      * set the Tracks to muted when volume threshold has not been reached
      * This does not show the user as muted.
      */
@@ -97,7 +97,6 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      * But when he has been silent 200ms
      */
     private VADCooldownStarted = new Date();
-    
 
     constructor(opts: ICallFeedOpts) {
         super();
