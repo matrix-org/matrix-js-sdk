@@ -27,3 +27,11 @@ export interface IRefreshTokenResponse {
 }
 
 /* eslint-enable camelcase */
+
+export enum SSOAction {
+    /** The user intends to login to an existing account */
+    LOGIN = "login",
+
+    /** The user intends to register for a new account */
+    REGISTER = "register",
+}

@@ -188,7 +188,7 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { IRefreshTokenResponse } from "./@types/auth";
+import { IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
@@ -7153,14 +7153,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} loginType The type of SSO login we are doing (sso or cas).
      *     Defaults to 'sso'.
      * @param {string} idpId The ID of the Identity Provider being targeted, optional.
-     * @param {"login"|"register"} action the SSO flow to indicate to the IdP, optional.
+     * @param {SSOAction} action the SSO flow to indicate to the IdP, optional.
      * @return {string} The HS URL to hit to begin the SSO login process.
      */
     public getSsoLoginUrl(
         redirectUrl: string,
         loginType = "sso",
         idpId?: string,
-        action?: "login" | "register",
+        action?: SSOAction,
     ): string {
         let url = "/login/" + loginType + "/redirect";
         if (idpId) {
