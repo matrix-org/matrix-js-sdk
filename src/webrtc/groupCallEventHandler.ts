@@ -28,6 +28,7 @@ import { RoomState } from "../models/room-state";
 import { RoomMember } from "../models/room-member";
 import { logger } from '../logger';
 import { EventType } from "../@types/event";
+import { SyncState } from '../sync';
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
@@ -46,7 +47,25 @@ export class GroupCallEventHandler {
 
     constructor(private client: MatrixClient) { }
 
-    public start(): void {
+    public async start(): Promise<void> {
+        // We wait until the client has started syncing for real.
+        // This is because we only support one call at a time, and want
+        // the latest. We therefore want the latest state of the room before
+        // we create a group call for the room so we can be fairly sure that
+        // the group call we create is really the latest one.
+        if (this.client.getSyncState() !== SyncState.Syncing) {
+            logger.debug("Waiting for client to start syncing...");
+            await new Promise<void>(resolve => {
+                const onSync = () => {
+                    if (this.client.getSyncState() === SyncState.Syncing) {
+                        this.client.off(ClientEvent.Sync, onSync);
+                        return resolve();
+                    }
+                };
+                this.client.on(ClientEvent.Sync, onSync);
+            });
+        }
+
         const rooms = this.client.getRooms();
 
         for (const room of rooms) {
