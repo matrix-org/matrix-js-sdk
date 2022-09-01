@@ -7167,7 +7167,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             url += "/" + idpId;
         }
 
-        const params = { 
+        const params = {
             redirectUrl,
             [SSO_ACTION_PARAM.unstable]: action,
         };
