@@ -67,7 +67,7 @@ export class GroupCallEventHandler {
         return [...this.groupCalls.values()].find((groupCall) => groupCall.groupCallId === groupCallId);
     }
 
-    private createGroupCallForRoom(room: Room) {
+    private createGroupCallForRoom(room: Room): void {
         const callEvents = room.currentState.getStateEvents(EventType.GroupCallPrefix);
         const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
 
