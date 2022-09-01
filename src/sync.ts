@@ -102,7 +102,7 @@ const MSC2716_ROOM_VERSIONS = [
 function getFilterName(userId: string, suffix?: string): string {
     // scope this on the user ID because people may login on many accounts
     // and they all need to be stored!
-    return `FILTER_SYNC_${userId}` + suffix ? "_" + suffix : "";
+    return `FILTER_SYNC_${userId}` + (suffix ? "_" + suffix : "");
 }
 
 function debuglog(...params) {

@@ -427,7 +427,7 @@ describe("MatrixClient", function() {
                 }
             });
         });
-        await client.startClient();
+        await client.startClient({ filter });
         await syncPromise;
     });
 
