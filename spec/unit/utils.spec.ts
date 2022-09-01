@@ -152,6 +152,9 @@ describe("utils", function() {
             assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 2 }));
             assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { b: 2, a: 1 }));
             assert.isFalse(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 3 }));
+            assert.isFalse(utils.deepCompare({ a: 1, b: 2 }, { a: 1 }));
+            assert.isFalse(utils.deepCompare({ a: 1 }, { a: 1, b: 2 }));
+            assert.isFalse(utils.deepCompare({ a: 1 }, { b: 1 }));
 
             assert.isTrue(utils.deepCompare({
                 1: { name: "mhc", age: 28 },
