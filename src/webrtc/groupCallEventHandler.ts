@@ -33,12 +33,14 @@ export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
     Ended = "GroupCall.ended",
     Participants = "GroupCall.participants",
+    Room = "GroupCall.Room",
 }
 
 export type GroupCallEventHandlerEventHandlerMap = {
     [GroupCallEventHandlerEvent.Incoming]: (call: GroupCall) => void;
     [GroupCallEventHandlerEvent.Ended]: (call: GroupCall) => void;
     [GroupCallEventHandlerEvent.Participants]: (participants: RoomMember[], call: GroupCall) => void;
+    [GroupCallEventHandlerEvent.Room]: (room: Room) => void;
 };
 
 export class GroupCallEventHandler {
@@ -76,7 +78,9 @@ export class GroupCallEventHandler {
                 continue;
             }
 
-            return this.createGroupCallFromRoomStateEvent(callEvent);
+            const groupCall = this.createGroupCallFromRoomStateEvent(callEvent);
+            this.client.emit(GroupCallEventHandlerEvent.Room, room);
+            return groupCall;
         }
     }
 
