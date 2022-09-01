@@ -869,6 +869,7 @@ type EmittedEvents = ClientEvent
     | GroupCallEventHandlerEvent.Incoming
     | GroupCallEventHandlerEvent.Ended
     | GroupCallEventHandlerEvent.Participants
+    | GroupCallEventHandlerEvent.Room
     | HttpApiEvent.SessionLoggedOut
     | HttpApiEvent.NoConsent
     | BeaconEvent;
