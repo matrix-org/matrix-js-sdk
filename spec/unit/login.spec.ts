@@ -38,19 +38,19 @@ describe('SSO login URL', function() {
     describe('SSOAction', function() {
         const redirectUri = "https://test.com/foo";
 
-        it('No action', async function() {
+        it('No action', function() {
             const urlString = client.client.getSsoLoginUrl(redirectUri, undefined, undefined, undefined);
             const url = new URL(urlString);
             expect(url.searchParams.has('org.matrix.msc3824.action')).toBe(false);
         });
 
-        it('register', async function() {
+        it('register', function() {
             const urlString = client.client.getSsoLoginUrl(redirectUri, undefined, undefined, SSOAction.REGISTER);
             const url = new URL(urlString);
             expect(url.searchParams.get('org.matrix.msc3824.action')).toEqual('register');
         });
 
-        it('login', async function() {
+        it('login', function() {
             const urlString = client.client.getSsoLoginUrl(redirectUri, undefined, undefined, SSOAction.LOGIN);
             const url = new URL(urlString);
             expect(url.searchParams.get('org.matrix.msc3824.action')).toEqual('login');
