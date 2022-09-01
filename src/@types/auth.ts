@@ -32,8 +32,10 @@ export interface IRefreshTokenResponse {
  * Response to GET login flows as per https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3login
  */
 export interface ILoginFlowsResponse {
-    flows: ILoginFlow[];
+    flows: LoginFlow[];
 }
+
+export type LoginFlow = ISSOFlow | IPasswordFlow| ILoginFlow;
 
 export interface ILoginFlow {
     type: string;
