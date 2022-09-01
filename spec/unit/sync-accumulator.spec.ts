@@ -302,6 +302,9 @@ describe("SyncAccumulator", function() {
                     [ReceiptType.ReadPrivate]: {
                         "@dan:localhost": { ts: 4 },
                     },
+                    [ReceiptType.UnstableReadPrivate]: {
+                        "@matthew:localhost": { ts: 5 },
+                    },
                     "some.other.receipt.type": {
                         "@should_be_ignored:localhost": { key: "val" },
                     },
@@ -346,6 +349,9 @@ describe("SyncAccumulator", function() {
                     },
                     [ReceiptType.ReadPrivate]: {
                         "@dan:localhost": { ts: 4 },
+                    },
+                    [ReceiptType.UnstableReadPrivate]: {
+                        "@matthew:localhost": { ts: 5 },
                     },
                 },
                 "$event2:localhost": {

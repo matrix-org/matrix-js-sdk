@@ -558,6 +558,372 @@ describe("SlidingSync", () => {
             await httpBackend.flushAllExpected();
             await responseProcessed;
             await listPromise;
+        });
+
+        // this refers to a set of operations where the end result is no change.
+        it("should handle net zero operations correctly", async () => {
+            const indexToRoomId = {
+                0: roomB,
+                1: roomC,
+            };
+            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual(indexToRoomId);
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "f",
+                // currently the list is [B,C] so we will insert D then immediately delete it
+                lists: [{
+                    count: 500,
+                    ops: [
+                        {
+                            op: "DELETE", index: 2,
+                        },
+                        {
+                            op: "INSERT", index: 0, room_id: roomA,
+                        },
+                        {
+                            op: "DELETE", index: 0,
+                        },
+                    ],
+                },
+                {
+                    count: 50,
+                }],
+            });
+            const listPromise = listenUntil(slidingSync, "SlidingSync.List",
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(500);
+                    expect(roomIndexToRoomId).toEqual(indexToRoomId);
+                    return true;
+                });
+            const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
+        });
+
+        it("should handle deletions correctly", async () => {
+            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual({
+                0: roomB,
+                1: roomC,
+            });
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "g",
+                lists: [{
+                    count: 499,
+                    ops: [
+                        {
+                            op: "DELETE", index: 0,
+                        },
+                    ],
+                },
+                {
+                    count: 50,
+                }],
+            });
+            const listPromise = listenUntil(slidingSync, "SlidingSync.List",
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(499);
+                    expect(roomIndexToRoomId).toEqual({
+                        0: roomC,
+                    });
+                    return true;
+                });
+            const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
+        });
+
+        it("should handle insertions correctly", async () => {
+            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual({
+                0: roomC,
+            });
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "h",
+                lists: [{
+                    count: 500,
+                    ops: [
+                        {
+                            op: "INSERT", index: 1, room_id: roomA,
+                        },
+                    ],
+                },
+                {
+                    count: 50,
+                }],
+            });
+            let listPromise = listenUntil(slidingSync, "SlidingSync.List",
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(500);
+                    expect(roomIndexToRoomId).toEqual({
+                        0: roomC,
+                        1: roomA,
+                    });
+                    return true;
+                });
+            let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
+
+            httpBackend.when("POST", syncUrl).respond(200, {
+                pos: "h",
+                lists: [{
+                    count: 501,
+                    ops: [
+                        {
+                            op: "INSERT", index: 1, room_id: roomB,
+                        },
+                    ],
+                },
+                {
+                    count: 50,
+                }],
+            });
+            listPromise = listenUntil(slidingSync, "SlidingSync.List",
+                (listIndex, joinedCount, roomIndexToRoomId) => {
+                    expect(listIndex).toEqual(0);
+                    expect(joinedCount).toEqual(501);
+                    expect(roomIndexToRoomId).toEqual({
+                        0: roomC,
+                        1: roomB,
+                        2: roomA,
+                    });
+                    return true;
+                });
+            responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend.flushAllExpected();
+            await responseProcessed;
+            await listPromise;
+            slidingSync.stop();
+        });
+    });
+
+    describe("transaction IDs", () => {
+        beforeAll(setupClient);
+        afterAll(teardownClient);
+        const roomId = "!foo:bar";
+
+        let slidingSync: SlidingSync;
+
+        // really this applies to them all but it's easier to just test one
+        it("should resolve modifyRoomSubscriptions after SlidingSync.start() is called", async () => {
+            const roomSubInfo = {
+                timeline_limit: 1,
+                required_state: [
+                    ["m.room.name", ""],
+                ],
+            };
+            // add the subscription
+            slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
+            // modification before SlidingSync.start()
+            const subscribePromise = slidingSync.modifyRoomSubscriptions(new Set([roomId]));
+            let txnId;
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomId]).toEqual(roomSubInfo);
+                expect(body.txn_id).toBeTruthy();
+                txnId = body.txn_id;
+            }).respond(200, function() {
+                return {
+                    pos: "aaa",
+                    txn_id: txnId,
+                    lists: [],
+                    extensions: {},
+                    rooms: {
+                        [roomId]: {
+                            name: "foo bar",
+                            required_state: [],
+                            timeline: [],
+                        },
+                    },
+                };
+            });
+            slidingSync.start();
+            await httpBackend.flushAllExpected();
+            await subscribePromise;
+        });
+        it("should resolve setList during a connection", async () => {
+            const newList = {
+                ranges: [[0, 20]],
+            };
+            const promise = slidingSync.setList(0, newList);
+            let txnId;
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toBeFalsy();
+                expect(body.lists[0]).toEqual(newList);
+                expect(body.txn_id).toBeTruthy();
+                txnId = body.txn_id;
+            }).respond(200, function() {
+                return {
+                    pos: "bbb",
+                    txn_id: txnId,
+                    lists: [{ count: 5 }],
+                    extensions: {},
+                };
+            });
+            await httpBackend.flushAllExpected();
+            await promise;
+            expect(txnId).toBeDefined();
+        });
+        it("should resolve setListRanges during a connection", async () => {
+            const promise = slidingSync.setListRanges(0, [[20, 40]]);
+            let txnId;
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toBeFalsy();
+                expect(body.lists[0]).toEqual({
+                    ranges: [[20, 40]],
+                });
+                expect(body.txn_id).toBeTruthy();
+                txnId = body.txn_id;
+            }).respond(200, function() {
+                return {
+                    pos: "ccc",
+                    txn_id: txnId,
+                    lists: [{ count: 5 }],
+                    extensions: {},
+                };
+            });
+            await httpBackend.flushAllExpected();
+            await promise;
+            expect(txnId).toBeDefined();
+        });
+        it("should resolve modifyRoomSubscriptionInfo during a connection", async () => {
+            const promise = slidingSync.modifyRoomSubscriptionInfo({
+                timeline_limit: 99,
+            });
+            let txnId;
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomId]).toEqual({
+                    timeline_limit: 99,
+                });
+                expect(body.txn_id).toBeTruthy();
+                txnId = body.txn_id;
+            }).respond(200, function() {
+                return {
+                    pos: "ddd",
+                    txn_id: txnId,
+                    extensions: {},
+                };
+            });
+            await httpBackend.flushAllExpected();
+            await promise;
+            expect(txnId).toBeDefined();
+        });
+        it("should reject earlier pending promises if a later transaction is acknowledged", async () => {
+            // i.e if we have [A,B,C] and see txn_id=C then A,B should be rejected.
+            const gotTxnIds = [];
+            const pushTxn = function(req) {
+                gotTxnIds.push(req.data.txn_id);
+            };
+            const failPromise = slidingSync.setListRanges(0, [[20, 40]]);
+            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "e" }); // missing txn_id
+            await httpBackend.flushAllExpected();
+            const failPromise2 = slidingSync.setListRanges(0, [[60, 70]]);
+            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "f" }); // missing txn_id
+            await httpBackend.flushAllExpected();
+
+            // attach rejection handlers now else if we do it later Jest treats that as an unhandled rejection
+            // which is a fail.
+            expect(failPromise).rejects.toEqual(gotTxnIds[0]);
+            expect(failPromise2).rejects.toEqual(gotTxnIds[1]);
+
+            const okPromise = slidingSync.setListRanges(0, [[0, 20]]);
+            let txnId;
+            httpBackend.when("POST", syncUrl).check((req) => {
+                txnId = req.data.txn_id;
+            }).respond(200, () => {
+                // include the txn_id, earlier requests should now be reject()ed.
+                return {
+                    pos: "g",
+                    txn_id: txnId,
+                };
+            });
+            await httpBackend.flushAllExpected();
+            await okPromise;
+
+            expect(txnId).toBeDefined();
+        });
+        it("should not reject later pending promises if an earlier transaction is acknowledged", async () => {
+            // i.e if we have [A,B,C] and see txn_id=B then C should not be rejected but A should.
+            const gotTxnIds = [];
+            const pushTxn = function(req) {
+                gotTxnIds.push(req.data.txn_id);
+            };
+            const A = slidingSync.setListRanges(0, [[20, 40]]);
+            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "A" });
+            await httpBackend.flushAllExpected();
+            const B = slidingSync.setListRanges(0, [[60, 70]]);
+            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "B" }); // missing txn_id
+            await httpBackend.flushAllExpected();
+
+            // attach rejection handlers now else if we do it later Jest treats that as an unhandled rejection
+            // which is a fail.
+            expect(A).rejects.toEqual(gotTxnIds[0]);
+
+            const C = slidingSync.setListRanges(0, [[0, 20]]);
+            let pendingC = true;
+            C.finally(() => {
+                pendingC = false;
+            });
+            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, () => {
+                // include the txn_id for B, so C's promise is outstanding
+                return {
+                    pos: "C",
+                    txn_id: gotTxnIds[1],
+                };
+            });
+            await httpBackend.flushAllExpected();
+            // A is rejected, see above
+            expect(B).resolves.toEqual(gotTxnIds[1]); // B is resolved
+            expect(pendingC).toBe(true); // C is pending still
+        });
+        it("should do nothing for unknown txn_ids", async () => {
+            const promise = slidingSync.setListRanges(0, [[20, 40]]);
+            let pending = true;
+            promise.finally(() => {
+                pending = false;
+            });
+            let txnId;
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toBeFalsy();
+                expect(body.lists[0]).toEqual({
+                    ranges: [[20, 40]],
+                });
+                expect(body.txn_id).toBeTruthy();
+                txnId = body.txn_id;
+            }).respond(200, function() {
+                return {
+                    pos: "ccc",
+                    txn_id: "bogus transaction id",
+                    lists: [{ count: 5 }],
+                    extensions: {},
+                };
+            });
+            await httpBackend.flushAllExpected();
+            expect(txnId).toBeDefined();
+            expect(pending).toBe(true);
             slidingSync.stop();
         });
     });

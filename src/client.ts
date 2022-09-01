@@ -40,7 +40,6 @@ import { sleep } from './utils';
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
-import { IEncryptAndSendToDevicesResult } from "./crypto";
 import * as olmlib from "./crypto/olmlib";
 import { decodeBase64, encodeBase64 } from "./crypto/olmlib";
 import { IExportedDevice as IExportedOlmDevice } from "./crypto/OlmDevice";
@@ -138,7 +137,7 @@ import { VerificationRequest } from "./crypto/verification/request/VerificationR
 import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
 import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
-import { Room } from "./models/room";
+import { Room, RoomNameState } from "./models/room";
 import {
     IAddThreePidOnlyBody,
     IBindThreePidBody,
@@ -346,6 +345,12 @@ export interface ICreateClientOpts {
     fallbackICEServerAllowed?: boolean;
 
     cryptoCallbacks?: ICryptoCallbacks;
+
+    /**
+     * Method to generate room names for empty rooms and rooms names based on membership.
+     * Defaults to a built-in English handler with basic pluralisation.
+     */
+    roomNameGenerator?: (roomId: string, state: RoomNameState) => string | null;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -392,8 +397,7 @@ export interface IStartClientOpts {
     pollTimeout?: number;
 
     /**
-     * The filter to apply to /sync calls. This will override the opts.initialSyncLimit, which would
-     * normally result in a timeline limit filter.
+     * The filter to apply to /sync calls.
      */
     filter?: Filter;
 
@@ -922,6 +926,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
     protected syncApi: SlidingSyncSdk | SyncApi;
+    public roomNameGenerator?: ICreateClientOpts["roomNameGenerator"];
     public pushRules: IPushRules;
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
@@ -1045,6 +1050,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // we still want to know which rooms are encrypted even if crypto is disabled:
         // we don't want to start sending unencrypted events to them.
         this.roomList = new RoomList(this.cryptoStore);
+        this.roomNameGenerator = opts.roomNameGenerator;
 
         this.toDeviceMessageQueue = new ToDeviceMessageQueue(this);
 
@@ -1092,11 +1098,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Figure out if we've read something or if it's just informational
                 const content = event.getContent();
                 const isSelf = Object.keys(content).filter(eid => {
-                    const read = content[eid][ReceiptType.Read];
-                    if (read && Object.keys(read).includes(this.getUserId())) return true;
+                    for (const [key, value] of Object.entries(content[eid])) {
+                        if (!utils.isSupportedReceiptType(key)) continue;
+                        if (!value) continue;
 
-                    const readPrivate = content[eid][ReceiptType.ReadPrivate];
-                    if (readPrivate && Object.keys(readPrivate).includes(this.getUserId())) return true;
+                        if (Object.keys(value).includes(this.getUserId())) return true;
+                    }
 
                     return false;
                 }).length > 0;
@@ -2586,7 +2593,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public encryptAndSendToDevices(
         userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
         payload: object,
-    ): Promise<IEncryptAndSendToDevicesResult> {
+    ): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-End encryption disabled");
         }
@@ -4664,7 +4671,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             room?.addLocalEchoReceipt(this.credentials.userId, rpEvent, ReceiptType.ReadPrivate);
         }
 
-        return this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
+        return await this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
     }
 
     /**
@@ -7513,7 +7520,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * don't want other users to see the read receipts. This is experimental. Optional.
      * @return {Promise} Resolves: the empty object, {}.
      */
-    public setRoomReadMarkersHttpRequest(
+    public async setRoomReadMarkersHttpRequest(
         roomId: string,
         rmEventId: string,
         rrEventId: string,
@@ -7526,8 +7533,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const content = {
             [ReceiptType.FullyRead]: rmEventId,
             [ReceiptType.Read]: rrEventId,
-            [ReceiptType.ReadPrivate]: rpEventId,
         };
+
+        const privateField = await utils.getPrivateReadReceiptField(this);
+        if (privateField) {
+            content[privateField] = rpEventId;
+        }
 
         return this.http.authedRequest(undefined, Method.Post, path, undefined, content);
     }

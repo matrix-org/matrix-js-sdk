@@ -9,6 +9,8 @@ module.exports = {
         browser: true,
         node: true,
     },
+    // NOTE: These rules are frozen and new rules should not be added here.
+    // New changes belong in https://github.com/matrix-org/eslint-plugin-matrix-org/
     rules: {
         "no-var": ["warn"],
         "prefer-rest-params": ["warn"],
@@ -54,6 +56,10 @@ module.exports = {
             "@typescript-eslint/ban-ts-comment": "off",
             // We're okay with assertion errors when we ask for them
             "@typescript-eslint/no-non-null-assertion": "off",
+
+            // The non-TypeScript rule produces false positives
+            "func-call-spacing": "off",
+            "@typescript-eslint/func-call-spacing": ["error"],
 
             "quotes": "off",
             // We use a `logger` intermediary module

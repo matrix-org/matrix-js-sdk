@@ -19,13 +19,11 @@ import { logger } from './logger';
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData, SyncState } from "./sync";
+import { ISyncStateData, SyncState, _createAndReEmitRoom } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState } from "./sync-accumulator";
 import { MatrixError } from "./http-api";
-import { RoomStateEvent } from "./models/room-state";
-import { RoomMemberEvent } from "./models/room-member";
 import {
     Extension,
     ExtensionState,
@@ -290,7 +288,7 @@ export class SlidingSyncSdk {
                 logger.debug("initial flag not set but no stored room exists for room ", roomId, roomData);
                 return;
             }
-            room = createRoom(this.client, roomId, this.opts);
+            room = _createAndReEmitRoom(this.client, roomId, this.opts);
         }
         this.processRoomData(this.client, room, roomData);
     }
@@ -406,8 +404,50 @@ export class SlidingSyncSdk {
         // this helps large account to speed up faster
         // room::decryptCriticalEvent is in charge of decrypting all the events
         // required for a client to function properly
-        const timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false);
+        let timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false);
         const ephemeralEvents = []; // TODO this.mapSyncEventsFormat(joinObj.ephemeral);
+
+        // TODO: handle threaded / beacon events
+
+        if (roomData.initial) {
+            // we should not know about any of these timeline entries if this is a genuinely new room.
+            // If we do, then we've effectively done scrollback (e.g requesting timeline_limit: 1 for
+            // this room, then timeline_limit: 50).
+            const knownEvents = new Set<string>();
+            room.getLiveTimeline().getEvents().forEach((e) => {
+                knownEvents.add(e.getId());
+            });
+            // all unknown events BEFORE a known event must be scrollback e.g:
+            //       D E   <-- what we know
+            // A B C D E F <-- what we just received
+            // means:
+            // A B C       <-- scrollback
+            //       D E   <-- dupes
+            //           F <-- new event
+            // We bucket events based on if we have seen a known event yet.
+            const oldEvents: MatrixEvent[] = [];
+            const newEvents: MatrixEvent[] = [];
+            let seenKnownEvent = false;
+            for (let i = timelineEvents.length-1; i >= 0; i--) {
+                const recvEvent = timelineEvents[i];
+                if (knownEvents.has(recvEvent.getId())) {
+                    seenKnownEvent = true;
+                    continue; // don't include this event, it's a dupe
+                }
+                if (seenKnownEvent) {
+                    // old -> new
+                    oldEvents.push(recvEvent);
+                } else {
+                    // old -> new
+                    newEvents.unshift(recvEvent);
+                }
+            }
+            timelineEvents = newEvents;
+            if (oldEvents.length > 0) {
+                // old events are scrollback, insert them now
+                room.addEventsToTimeline(oldEvents, true, room.getLiveTimeline(), roomData.prev_batch);
+            }
+        }
 
         const encrypted = this.client.isRoomEncrypted(room.roomId);
         // we do this first so it's correct when any of the events fire
@@ -494,7 +534,6 @@ export class SlidingSyncSdk {
             }
 
             if (limited) {
-                deregisterStateListeners(room);
                 room.resetLiveTimeline(
                     roomData.prev_batch,
                     null, // TODO this.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
@@ -504,7 +543,6 @@ export class SlidingSyncSdk {
                 // reason to stop incrementally tracking notifications and
                 // reset the timeline.
                 this.client.resetNotifTimelineSet();
-                registerStateListeners(this.client, room);
             }
         } */
 
@@ -512,6 +550,10 @@ export class SlidingSyncSdk {
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
+
+        // local fields must be set before any async calls because call site assumes
+        // synchronous execution prior to emitting SlidingSyncState.Complete
+        room.updateMyMembership("join");
 
         room.recalculate();
         if (roomData.initial) {
@@ -535,8 +577,6 @@ export class SlidingSyncSdk {
         ephemeralEvents.forEach(function(e) {
             client.emit(ClientEvent.Event, e);
         });
-
-        room.updateMyMembership("join");
 
         // Decrypt only the last message in all rooms to make sure we can generate a preview
         // And decrypt all events after the recorded read receipt to ensure an accurate
@@ -773,58 +813,6 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
 
 // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
 // just outside the class.
-
-function createRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room { // XXX cargoculted from sync.ts
-    const { timelineSupport } = client;
-    const room = new Room(roomId, client, client.getUserId(), {
-        lazyLoadMembers: opts.lazyLoadMembers,
-        pendingEventOrdering: opts.pendingEventOrdering,
-        timelineSupport,
-    });
-    client.reEmitter.reEmit(room, [
-        RoomEvent.Name,
-        RoomEvent.Redaction,
-        RoomEvent.RedactionCancelled,
-        RoomEvent.Receipt,
-        RoomEvent.Tags,
-        RoomEvent.LocalEchoUpdated,
-        RoomEvent.AccountData,
-        RoomEvent.MyMembership,
-        RoomEvent.Timeline,
-        RoomEvent.TimelineReset,
-    ]);
-    registerStateListeners(client, room);
-    return room;
-}
-
-function registerStateListeners(client: MatrixClient, room: Room): void { // XXX cargoculted from sync.ts
-    // we need to also re-emit room state and room member events, so hook it up
-    // to the client now. We need to add a listener for RoomState.members in
-    // order to hook them correctly.
-    client.reEmitter.reEmit(room.currentState, [
-        RoomStateEvent.Events,
-        RoomStateEvent.Members,
-        RoomStateEvent.NewMember,
-        RoomStateEvent.Update,
-    ]);
-    room.currentState.on(RoomStateEvent.NewMember, function(event, state, member) {
-        member.user = client.getUser(member.userId);
-        client.reEmitter.reEmit(member, [
-            RoomMemberEvent.Name,
-            RoomMemberEvent.Typing,
-            RoomMemberEvent.PowerLevel,
-            RoomMemberEvent.Membership,
-        ]);
-    });
-}
-
-/*
-function deregisterStateListeners(room: Room): void { // XXX cargoculted from sync.ts
-    // could do with a better way of achieving this.
-    room.currentState.removeAllListeners(RoomStateEvent.Events);
-    room.currentState.removeAllListeners(RoomStateEvent.Members);
-    room.currentState.removeAllListeners(RoomStateEvent.NewMember);
-} */
 
 function mapEvents(client: MatrixClient, roomId: string, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });

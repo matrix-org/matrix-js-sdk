@@ -30,11 +30,10 @@ import * as olmlib from "../../../../src/crypto/olmlib";
 import { TypedEventEmitter } from '../../../../src/models/typed-event-emitter';
 import { ClientEvent, MatrixClient, RoomMember } from '../../../../src';
 import { DeviceInfo, IDevice } from '../../../../src/crypto/deviceinfo';
-import { DeviceTrustLevel, UserTrustLevel } from '../../../../src/crypto/CrossSigning';
-import { resetCrossSigningKeys } from "../crypto-utils";
+import { DeviceTrustLevel } from '../../../../src/crypto/CrossSigning';
 
-const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
-const MegolmEncryption = algorithms.ENCRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
+const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
+const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
 
 const ROOM_ID = '!ROOM:ID';
 
@@ -345,10 +344,6 @@ describe("MegolmDecryption", function() {
                     },
                 }));
 
-                mockCrypto.checkUserTrust.mockReturnValue({
-                    isVerified: () => false,
-                } as UserTrustLevel);
-
                 mockCrypto.checkDeviceTrust.mockReturnValue({
                     isVerified: () => false,
                 } as DeviceTrustLevel);
@@ -580,120 +575,6 @@ describe("MegolmDecryption", function() {
         aliceClient.stopClient();
         bobClient1.stopClient();
         bobClient2.stopClient();
-    });
-
-    it("always blocks unverified devices of verified users", async function() {
-        const keys = {};
-        function getCrossSigningKey(keyType: string) {
-            return keys[keyType];
-        }
-
-        function saveCrossSigningKeys(k: Record<string, Uint8Array>) {
-            Object.assign(keys, k);
-        }
-
-        const aliceClient = (new TestClient(
-            "@alice:example.com", "alicedevice",
-            undefined, undefined,
-            { cryptoCallbacks: { getCrossSigningKey, saveCrossSigningKeys } },
-        )).client;
-        const bobClient1 = (new TestClient(
-            "@bob:example.com", "bobdevice1",
-        )).client;
-        await Promise.all([
-            aliceClient.initCrypto(),
-            bobClient1.initCrypto(),
-        ]);
-        const aliceDevice = aliceClient.crypto.olmDevice;
-        const bobDevice1 = bobClient1.crypto.olmDevice;
-
-        aliceClient.uploadDeviceSigningKeys = async () => ({});
-        aliceClient.uploadKeySignatures = async () => ({ failures: {} });
-        // set Alice's cross-signing key
-        await resetCrossSigningKeys(aliceClient);
-        // Alice downloads Bob's device key
-        aliceClient.crypto.deviceList.storeCrossSigningForUser("@bob:example.com", {
-            keys: {
-                master: {
-                    user_id: "@bob:example.com",
-                    usage: ["master"],
-                    keys: {
-                        "ed25519:bobs+master+pubkey": "bobs+master+pubkey",
-                    },
-                },
-            },
-            firstUse: false,
-            crossSigningVerifiedBefore: false,
-        });
-        await aliceClient.setDeviceVerified("@bob:example.com", "bobs+master+pubkey", true);
-
-        const encryptionCfg = {
-            "algorithm": "m.megolm.v1.aes-sha2",
-        };
-        const roomId = "!someroom";
-        const room = new Room(roomId, aliceClient, "@alice:example.com", {});
-        const bobMember = new RoomMember(roomId, "@bob:example.com");
-        room.getEncryptionTargetMembers = async function() {
-            return [bobMember];
-        };
-        room.setBlacklistUnverifiedDevices(false);
-        aliceClient.store.storeRoom(room);
-        await aliceClient.setRoomEncryption(roomId, encryptionCfg);
-
-        const BOB_DEVICES = {
-            bobdevice1: {
-                user_id: "@bob:example.com",
-                device_id: "bobdevice1",
-                algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
-                keys: {
-                    "ed25519:Dynabook": bobDevice1.deviceEd25519Key,
-                    "curve25519:Dynabook": bobDevice1.deviceCurve25519Key,
-                },
-                verified: 0,
-                known: true,
-            },
-        };
-
-        aliceClient.crypto.deviceList.storeDevicesForUser(
-            "@bob:example.com", BOB_DEVICES,
-        );
-        aliceClient.crypto.deviceList.downloadKeys = async function(userIds) {
-            return this.getDevicesFromStore(userIds);
-        };
-
-        aliceClient.sendToDevice = jest.fn().mockResolvedValue({});
-
-        const event = new MatrixEvent({
-            type: "m.room.message",
-            sender: "@alice:example.com",
-            room_id: roomId,
-            event_id: "$event",
-            content: {
-                msgtype: "m.text",
-                body: "secret",
-            },
-        });
-        await aliceClient.crypto.encryptEvent(event, room);
-
-        expect(aliceClient.sendToDevice).toHaveBeenCalled();
-        const [msgtype, contentMap] = mocked(aliceClient.sendToDevice).mock.calls[0];
-        expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
-        delete contentMap["@bob:example.com"].bobdevice1.session_id;
-        expect(contentMap).toStrictEqual({
-            '@bob:example.com': {
-                bobdevice1: {
-                    algorithm: "m.megolm.v1.aes-sha2",
-                    room_id: roomId,
-                    code: 'm.unverified',
-                    reason:
-                    'The sender has disabled encrypting to unverified devices.',
-                    sender_key: aliceDevice.deviceCurve25519Key,
-                },
-            },
-        });
-
-        aliceClient.stopClient();
-        bobClient1.stopClient();
     });
 
     it("notifies devices when unable to create olm session", async function() {
