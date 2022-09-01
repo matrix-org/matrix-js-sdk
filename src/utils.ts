@@ -28,6 +28,30 @@ import { MatrixClient, MatrixEvent } from ".";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
 
+const interns = new Map<string, string>();
+
+/**
+ * Internalises a string, reusing a known pointer or storing the pointer
+ * if needed for future strings.
+ * @param str The string to internalise.
+ * @returns The internalised string.
+ */
+export function internaliseString(str: string): string {
+    // Unwrap strings before entering the map, if we somehow got a wrapped
+    // string as our input. This should only happen from tests.
+    if ((str as unknown) instanceof String) {
+        str = str.toString();
+    }
+
+    // Check the map to see if we can store the value
+    if (!interns.has(str)) {
+        interns.set(str, str);
+    }
+
+    // Return any cached string reference
+    return interns.get(str);
+}
+
 /**
  * Encode a dictionary of query parameters.
  * Omits any undefined/null values.
