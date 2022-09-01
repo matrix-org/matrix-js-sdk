@@ -180,15 +180,15 @@ export class IgnoredInvites {
                         // Invalid event.
                         continue;
                     }
-                    let regexp: string;
+                    let regexp: RegExp;
                     try {
-                        regexp = globToRegexp(glob, false);
+                        regexp = new RegExp(globToRegexp(glob, false));
                     } catch (ex) {
                         // Assume invalid event.
                         continue;
                     }
                     for (const entity of entities) {
-                        if (entity && entity.search(regexp) >= 0) {
+                        if (entity && regexp.test(entity)) {
                             return event;
                         }
                     }
