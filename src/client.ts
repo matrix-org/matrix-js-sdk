@@ -197,6 +197,7 @@ import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
+import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
 
 export type Store = IStore;
 
@@ -4581,7 +4582,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public sendReceipt(event: MatrixEvent, receiptType: ReceiptType, body: any, callback?: Callback): Promise<{}> {
+    public async sendReceipt(
+        event: MatrixEvent,
+        receiptType: ReceiptType,
+        body: any,
+        callback?: Callback,
+    ): Promise<{}> {
         if (typeof (body) === 'function') {
             callback = body as any as Callback; // legacy
             body = {};
@@ -4596,6 +4602,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $receiptType: receiptType,
             $eventId: event.getId(),
         });
+
+        // TODO: Add a check for which spec version this will be released in
+        if (await this.doesServerSupportUnstableFeature("org.matrix.msc3771")) {
+            const isThread = !!event.threadRootId;
+            body.thread_id = isThread
+                ? event.threadRootId
+                : MAIN_ROOM_TIMELINE;
+        }
+
         const promise = this.http.authedRequest(callback, Method.Post, path, undefined, body || {});
 
         const room = this.getRoom(event.getRoomId());
@@ -4613,7 +4628,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async sendReadReceipt(event: MatrixEvent, receiptType = ReceiptType.Read, callback?: Callback): Promise<{}> {
+    public async sendReadReceipt(
+        event: MatrixEvent | null,
+        receiptType = ReceiptType.Read,
+        callback?: Callback,
+    ): Promise<{} | undefined> {
+        if (!event) return;
         const eventId = event.getId();
         const room = this.getRoom(event.getRoomId());
         if (room && room.hasPendingEvent(eventId)) {
