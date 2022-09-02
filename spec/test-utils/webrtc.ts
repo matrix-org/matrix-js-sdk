@@ -79,6 +79,8 @@ export class MockRTCPeerConnection {
 
     private negotiationNeededListener: () => void;
     private needsNegotiation = false;
+    public readyToNegotiate: Promise<void>;
+    private onReadyToNegotiate: () => void;
     localDescription: RTCSessionDescription;
     signalingState: RTCSignalingState = "stable";
 
@@ -98,6 +100,10 @@ export class MockRTCPeerConnection {
             type: 'offer',
             toJSON: function() { },
         };
+
+        this.readyToNegotiate = new Promise<void>(resolve => {
+            this.onReadyToNegotiate = resolve;
+        });
 
         MockRTCPeerConnection.instances.push(this);
     }
@@ -128,11 +134,13 @@ export class MockRTCPeerConnection {
     getStats() { return []; }
     addTrack(track: MockMediaStreamTrack) {
         this.needsNegotiation = true;
+        this.onReadyToNegotiate();
         return new MockRTCRtpSender(track);
     }
 
     removeTrack() {
         this.needsNegotiation = true;
+        this.onReadyToNegotiate();
     }
 
     doNegotiation() {
