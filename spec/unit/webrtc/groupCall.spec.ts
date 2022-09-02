@@ -14,7 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventType, GroupCallIntent, GroupCallType, MatrixCall, MatrixEvent, Room, RoomMember } from '../../../src';
+import {
+    EventType,
+    GroupCallIntent,
+    GroupCallType,
+    ISendEventResponse,
+    MatrixCall,
+    MatrixEvent,
+    Room,
+    RoomMember,
+} from '../../../src';
 import { GroupCall } from "../../../src/webrtc/groupCall";
 import { MatrixClient } from "../../../src/client";
 import {
@@ -112,8 +121,14 @@ class MockCallMatrixClient extends TypedEventEmitter<CallEventHandlerEvent.Incom
         calls: new Map<string, MatrixCall>(),
     };
 
-    sendStateEvent = jest.fn();
-    sendToDevice = jest.fn();
+    sendStateEvent = jest.fn<Promise<ISendEventResponse>, [
+        roomId: string, eventType: EventType, content: any, statekey: string,
+    ]>();
+    sendToDevice = jest.fn<Promise<{}>, [
+        eventType: string,
+        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
+        txnId?: string,
+    ]>();
 
     getMediaHandler(): MediaHandler { return this.mediaHandler.typed(); }
 
@@ -407,21 +422,24 @@ describe('Group Call', function() {
     describe('Placing calls', function() {
         let groupCall1: GroupCall;
         let groupCall2: GroupCall;
-        let client1: MatrixClient;
-        let client2: MatrixClient;
+        let client1: MockCallMatrixClient;
+        let client2: MockCallMatrixClient;
 
         beforeEach(function() {
             MockRTCPeerConnection.resetInstances();
 
             client1 = new MockCallMatrixClient(
                 FAKE_USER_ID_1, FAKE_DEVICE_ID_1, FAKE_SESSION_ID_1,
-            ) as unknown as MatrixClient;
+            );
 
             client2 = new MockCallMatrixClient(
                 FAKE_USER_ID_2, FAKE_DEVICE_ID_2, FAKE_SESSION_ID_2,
-            ) as unknown as MatrixClient;
+            );
 
-            client1.sendStateEvent = client2.sendStateEvent = (roomId, eventType, content, statekey) => {
+            // Inject the state events directly into each client when sent
+            const fakeSendStateEvents = (
+                roomId: string, eventType: EventType, content: any, statekey: string,
+            ) => {
                 if (eventType === EventType.GroupCallMemberPrefix) {
                     const fakeEvent = {
                         getContent: () => content,
@@ -445,16 +463,19 @@ describe('Group Call', function() {
                 return Promise.resolve(null);
             };
 
-            const client1Room = new Room(FAKE_ROOM_ID, client1, FAKE_USER_ID_1);
+            client1.sendStateEvent.mockImplementation(fakeSendStateEvents);
+            client2.sendStateEvent.mockImplementation(fakeSendStateEvents);
 
-            const client2Room = new Room(FAKE_ROOM_ID, client2, FAKE_USER_ID_2);
+            const client1Room = new Room(FAKE_ROOM_ID, client1.typed(), FAKE_USER_ID_1);
+
+            const client2Room = new Room(FAKE_ROOM_ID, client2.typed(), FAKE_USER_ID_2);
 
             groupCall1 = new GroupCall(
-                client1, client1Room, GroupCallType.Video, false, GroupCallIntent.Prompt, FAKE_CONF_ID,
+                client1.typed(), client1Room, GroupCallType.Video, false, GroupCallIntent.Prompt, FAKE_CONF_ID,
             );
 
             groupCall2 = new GroupCall(
-                client2, client2Room, GroupCallType.Video, false, GroupCallIntent.Prompt, FAKE_CONF_ID,
+                client2.typed(), client2Room, GroupCallType.Video, false, GroupCallIntent.Prompt, FAKE_CONF_ID,
             );
 
             client1Room.currentState.members[FAKE_USER_ID_1] = {
@@ -480,22 +501,12 @@ describe('Group Call', function() {
             await groupCall1.create();
 
             try {
-                // keep this as its own variable so we have it typed as a mock
-                // rather than its type in the client object
-                const mockSendToDevice = jest.fn<Promise<{}>, [
-                    eventType: string,
-                    contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
-                    txnId?: string,
-                ]>();
-
                 const toDeviceProm = new Promise<void>(resolve => {
-                    mockSendToDevice.mockImplementation(() => {
+                    client1.sendToDevice.mockImplementation(() => {
                         resolve();
                         return Promise.resolve({});
                     });
                 });
-
-                client1.sendToDevice = mockSendToDevice;
 
                 await Promise.all([groupCall1.enter(), groupCall2.enter()]);
 
@@ -503,9 +514,9 @@ describe('Group Call', function() {
 
                 await toDeviceProm;
 
-                expect(mockSendToDevice.mock.calls[0][0]).toBe("m.call.invite");
+                expect(client1.sendToDevice.mock.calls[0][0]).toBe("m.call.invite");
 
-                const toDeviceCallContent = mockSendToDevice.mock.calls[0][1];
+                const toDeviceCallContent = client1.sendToDevice.mock.calls[0][1];
                 expect(Object.keys(toDeviceCallContent).length).toBe(1);
                 expect(Object.keys(toDeviceCallContent)[0]).toBe(FAKE_USER_ID_2);
 
