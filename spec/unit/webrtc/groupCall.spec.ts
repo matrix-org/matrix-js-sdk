@@ -98,35 +98,37 @@ const createAndEnterGroupCall = async (cli: MatrixClient, room: Room): Promise<G
 };
 
 class MockCallMatrixClient extends TypedEventEmitter<CallEventHandlerEvent.Incoming, CallEventHandlerEventHandlerMap> {
-    public mediaHandler: MediaHandler = new MockMediaHandler() as unknown as MediaHandler;
+    public mediaHandler = new MockMediaHandler();
 
     constructor(public userId: string, public deviceId: string, public sessionId: string) {
         super();
     }
 
     groupCallEventHandler = {
-        groupCalls: new Map(),
+        groupCalls: new Map<string, GroupCall>(),
     };
 
     callEventHandler = {
-        calls: new Map(),
+        calls: new Map<string, MatrixCall>(),
     };
 
     sendStateEvent = jest.fn();
     sendToDevice = jest.fn();
 
-    getMediaHandler() { return this.mediaHandler; }
+    getMediaHandler(): MediaHandler { return this.mediaHandler.typed(); }
 
-    getUserId() { return this.userId; }
+    getUserId(): string { return this.userId; }
 
-    getDeviceId() { return this.deviceId; }
-    getSessionId() { return this.sessionId; }
+    getDeviceId(): string { return this.deviceId; }
+    getSessionId(): string { return this.sessionId; }
 
     getTurnServers = () => [];
     isFallbackICEServerAllowed = () => false;
     reEmitter = new ReEmitter(new TypedEventEmitter());
     getUseE2eForGroupCall = () => false;
     checkTurnServers = () => null;
+
+    typed(): MatrixClient { return this as unknown as MatrixClient; }
 }
 
 class MockCall {
@@ -732,15 +734,16 @@ describe('Group Call', function() {
     });
 
     describe("screensharing", () => {
+        let typedMockClient: MockCallMatrixClient;
         let mockClient: MatrixClient;
         let room: Room;
         let groupCall: GroupCall;
 
         beforeEach(async () => {
-            const typedMockClient = new MockCallMatrixClient(
+            typedMockClient = new MockCallMatrixClient(
                 FAKE_USER_ID_1, FAKE_DEVICE_ID_1, FAKE_SESSION_ID_1,
             );
-            mockClient = typedMockClient as unknown as MatrixClient;
+            mockClient = typedMockClient.typed();
 
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
             room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
@@ -761,7 +764,10 @@ describe('Group Call', function() {
                 return call.gotLocalOffer;
             });
 
-            await groupCall.setScreensharingEnabled(true);
+            let enabledResult;
+            enabledResult = await groupCall.setScreensharingEnabled(true);
+            expect(enabledResult).toEqual(true);
+            expect(typedMockClient.mediaHandler.getScreensharingStream).toHaveBeenCalled();
             MockRTCPeerConnection.triggerAllNegotiations();
 
             expect(groupCall.screenshareFeeds).toHaveLength(1);
@@ -769,6 +775,17 @@ describe('Group Call', function() {
                 expect(c.getLocalFeeds().find(f => f.purpose === SDPStreamMetadataPurpose.Screenshare)).toBeDefined();
             });
             onNegotiationNeededArray.forEach(f => expect(f).toHaveBeenCalled());
+
+            // Enabling it again should do nothing
+            typedMockClient.mediaHandler.getScreensharingStream.mockClear();
+            enabledResult = await groupCall.setScreensharingEnabled(true);
+            expect(enabledResult).toEqual(true);
+            expect(typedMockClient.mediaHandler.getScreensharingStream).not.toHaveBeenCalled();
+
+            // Should now be able to disable it
+            enabledResult = await groupCall.setScreensharingEnabled(false);
+            expect(enabledResult).toEqual(false);
+            expect(groupCall.screenshareFeeds).toHaveLength(0);
 
             groupCall.terminate();
         });

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IScreensharingOpts } from "../../src/webrtc/mediaHandler";
+import { IScreensharingOpts, MediaHandler } from "../../src/webrtc/mediaHandler";
 
 export const DUMMY_SDP = (
     "v=0\r\n" +
@@ -241,20 +241,22 @@ export class MockMediaHandler {
     stopUserMediaStream(stream: MockMediaStream) {
         stream.isStopped = true;
     }
-    getScreensharingStream(opts?: IScreensharingOpts) {
+    getScreensharingStream = jest.fn((opts?: IScreensharingOpts) => {
         const tracks = [new MockMediaStreamTrack("video_track", "video")];
         if (opts?.audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
 
         const stream = new MockMediaStream(SCREENSHARE_STREAM_ID, tracks);
         this.screensharingStreams.push(stream);
         return stream;
-    }
+    });
     stopScreensharingStream(stream: MockMediaStream) {
         stream.isStopped = true;
     }
     hasAudioDevice() { return true; }
     hasVideoDevice() { return true; }
     stopAllStreams() {}
+
+    typed(): MediaHandler { return this as unknown as MediaHandler; }
 }
 
 export function installWebRTCMocks() {
