@@ -35,7 +35,7 @@ export interface ILoginFlowsResponse {
     flows: LoginFlow[];
 }
 
-export type LoginFlow = ISSOFlow | IPasswordFlow| ILoginFlow;
+export type LoginFlow = ISSOFlow | IPasswordFlow | ILoginFlow;
 
 export interface ILoginFlow {
     type: string;
