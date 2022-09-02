@@ -384,7 +384,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public async fetchEvents(opts: IRelationsRequestOpts = { limit: 20, direction: Direction.Backward }): Promise<{
         originalEvent: MatrixEvent;
         events: MatrixEvent[];
-        nextBatch?: string;
+        nextBatch?: string | null;
         prevBatch?: string;
     }> {
         let {
