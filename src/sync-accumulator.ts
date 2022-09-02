@@ -401,7 +401,7 @@ export class SyncAccumulator {
                 // typing forever until someone really does start typing (which
                 // will prompt Synapse to send down an actual m.typing event to
                 // clobber the one we persisted).
-                if (e.type !== "m.receipt" || !e.content) {
+                if (e.type !== EventType.Receipt || !e.content) {
                     // This means we'll drop unknown ephemeral events but that
                     // seems okay.
                     return;
@@ -546,7 +546,7 @@ export class SyncAccumulator {
 
             // Add receipt data
             const receiptEvent = {
-                type: "m.receipt",
+                type: EventType.Receipt,
                 room_id: roomId,
                 content: {
                     // $event_id: { "m.read": { $user_id: $json } }
