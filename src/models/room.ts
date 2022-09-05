@@ -50,7 +50,7 @@ import {
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
-import { MAIN_ROOM_TIMELINE, ReadReceipt, ReceiptContent, synthesizeReceipt, WrappedReceipt } from "./read-receipt";
+import { MAIN_ROOM_TIMELINE, ReadReceipt, Receipt, ReceiptContent, synthesizeReceipt, WrappedReceipt } from "./read-receipt";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -2419,12 +2419,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
-                    const receipt = content[eventId][receiptType][userId] as any;
-                    const receiptForMainTimeline = !receipt.threafd_id || receipt.thread_id === MAIN_ROOM_TIMELINE;
+                    const receipt = content[eventId][receiptType][userId] as Receipt;
+                    const receiptForMainTimeline = !receipt.thread_id || receipt.thread_id === MAIN_ROOM_TIMELINE;
                     const receiptDestination = receiptForMainTimeline
                         ? this
                         : this.threads.get(receipt.thread_id);
-                    receiptDestination.addReceiptToStructure(
+                    receiptDestination?.addReceiptToStructure(
                         eventId,
                         receiptType,
                         userId,

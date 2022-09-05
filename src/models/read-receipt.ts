@@ -19,7 +19,6 @@ import * as utils from "../utils";
 export const MAIN_ROOM_TIMELINE = "main";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
-    // console.log("synthesizing receipt for "+event.getId());
     return new MatrixEvent({
         content: {
             [event.getId()]: {
@@ -67,7 +66,7 @@ const ReceiptPairSyntheticIndex = 1;
 // We will only hold a synthetic receipt if we do not have a real receipt or the synthetic is newer.
 type Receipts = {
     [receiptType: string]: {
-        [userId: string]: [WrappedReceipt, WrappedReceipt]; // Pair<real receipt, synthetic receipt> (both nullable)
+        [userId: string]: [WrappedReceipt | null, WrappedReceipt | null]; // Pair<real receipt, synthetic receipt> (both nullable)
     };
 };
 
