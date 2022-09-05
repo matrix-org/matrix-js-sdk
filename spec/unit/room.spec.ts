@@ -426,6 +426,17 @@ describe("Room", function() {
             // but without the event ID matching we will still have the local event in pending events
             expect(room.getEventForTxnId(txnId)).toBeUndefined();
         });
+
+        it("should correctly handle remote echoes from other devices", () => {
+            const remoteEvent = utils.mkMessage({
+                room: roomId, user: userA, event: true,
+            });
+            remoteEvent.event.unsigned = { transaction_id: "TXN_ID" };
+
+            // add the remoteEvent
+            room.addLiveEvents([remoteEvent]);
+            expect(room.timeline.length).toEqual(1);
+        });
     });
 
     describe('addEphemeralEvents', () => {
