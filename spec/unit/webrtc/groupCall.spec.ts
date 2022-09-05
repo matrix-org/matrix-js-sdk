@@ -40,7 +40,8 @@ import { TypedEventEmitter } from '../../../src/models/typed-event-emitter';
 import { MediaHandler } from '../../../src/webrtc/mediaHandler';
 import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from '../../../src/webrtc/callEventHandler';
 import { CallFeed } from '../../../src/webrtc/callFeed';
-import { CallState } from '../../../src/webrtc/call';
+import { CallEvent, CallEventHandlerMap, CallState } from '../../../src/webrtc/call';
+import { flushPromises } from '../../test-utils/flushPromises';
 
 const FAKE_ROOM_ID = "!fake:test.dummy";
 const FAKE_CONF_ID = "fakegroupcallid";
@@ -106,7 +107,10 @@ const createAndEnterGroupCall = async (cli: MatrixClient, room: Room): Promise<G
     return groupCall;
 };
 
-class MockCallMatrixClient extends TypedEventEmitter<CallEventHandlerEvent.Incoming, CallEventHandlerEventHandlerMap> {
+type EmittedEvents = CallEventHandlerEvent | CallEvent;
+type EmittedEventMap = CallEventHandlerEventHandlerMap & CallEventHandlerMap;
+
+class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, EmittedEventMap> {
     public mediaHandler = new MockMediaHandler();
 
     constructor(public userId: string, public deviceId: string, public sessionId: string) {
@@ -494,6 +498,8 @@ describe('Group Call', function() {
         });
 
         afterEach(function() {
+            jest.useRealTimers();
+
             MockRTCPeerConnection.resetInstances();
         });
 
@@ -526,6 +532,66 @@ describe('Group Call', function() {
 
                 const bobDeviceMessage = toDeviceBobDevices[FAKE_DEVICE_ID_2];
                 expect(bobDeviceMessage.conf_id).toBe(FAKE_CONF_ID);
+            } finally {
+                await Promise.all([groupCall1.leave(), groupCall2.leave()]);
+            }
+        });
+
+        it("Retries calls", async function() {
+            jest.useFakeTimers();
+            await groupCall1.create();
+
+            try {
+                const toDeviceProm = new Promise<void>(resolve => {
+                    client1.sendToDevice.mockImplementation(() => {
+                        resolve();
+                        return Promise.resolve({});
+                    });
+                });
+
+                await Promise.all([groupCall1.enter(), groupCall2.enter()]);
+
+                MockRTCPeerConnection.triggerAllNegotiations();
+
+                await toDeviceProm;
+
+                expect(client1.sendToDevice).toHaveBeenCalled();
+
+                const oldCall = groupCall1.getCallByUserId(client2.userId);
+                oldCall.emit(CallEvent.Hangup, oldCall);
+
+                client1.sendToDevice.mockClear();
+
+                const toDeviceProm2 = new Promise<void>(resolve => {
+                    client1.sendToDevice.mockImplementation(() => {
+                        resolve();
+                        return Promise.resolve({});
+                    });
+                });
+
+                jest.advanceTimersByTime(groupCall1.retryCallInterval + 500);
+
+                // when we placed the call, we could await on enter which waited for the call to
+                // be made. We don't have that luxury now, so first have to wait for the call
+                // to even be created...
+                let newCall: MatrixCall;
+                while (
+                    (newCall = groupCall1.getCallByUserId(client2.userId)) === undefined ||
+                    newCall.callId == oldCall.callId
+                ) {
+                    await flushPromises();
+                }
+                const mockPc = newCall.peerConn as unknown as MockRTCPeerConnection;
+
+                // ...then wait for it to be ready to negotiate
+                await mockPc.readyToNegotiate;
+
+                MockRTCPeerConnection.triggerAllNegotiations();
+
+                // ...and then finally we can wait for the invite to be sent
+                await toDeviceProm2;
+
+                expect(client1.sendToDevice).toHaveBeenCalledWith(EventType.CallInvite, expect.objectContaining({}));
             } finally {
                 await Promise.all([groupCall1.leave(), groupCall2.leave()]);
             }
