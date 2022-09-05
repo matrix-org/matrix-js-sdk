@@ -39,8 +39,11 @@ import { M_BEACON_INFO } from "../../src/@types/beacon";
 import { ContentHelpers, EventTimeline, Room } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
-import { IGNORE_INVITES_ACCOUNT_EVENT_KEY, POLICIES_ACCOUNT_EVENT_TYPE, PolicyScope }
-    from "../../src/models/invites-ignorer";
+import {
+    IGNORE_INVITES_ACCOUNT_EVENT_KEY,
+    POLICIES_ACCOUNT_EVENT_TYPE,
+    PolicyScope,
+} from "../../src/models/invites-ignorer";
 
 jest.useFakeTimers();
 
@@ -1498,12 +1501,14 @@ describe("MatrixClient", function() {
                 }
             };
         });
+
         it("should initialize and return the same `target` consistently", async () => {
             const target1 = await client.ignoredInvites.getOrCreateTargetRoom();
             const target2 = await client.ignoredInvites.getOrCreateTargetRoom();
             expect(target1).toBeTruthy();
             expect(target1).toBe(target2);
         });
+
         it("should initialize and return the same `sources` consistently", async () => {
             const sources1 = await client.ignoredInvites.getOrCreateSourceRooms();
             const sources2 = await client.ignoredInvites.getOrCreateSourceRooms();
@@ -1511,6 +1516,7 @@ describe("MatrixClient", function() {
             expect(sources1).toHaveLength(1);
             expect(sources1).toEqual(sources2);
         });
+
         it("should initially not reject any invite", async () => {
             const rule = await client.ignoredInvites.getRuleForInvite({
                 sender: "@foobar:example.org",
@@ -1518,6 +1524,7 @@ describe("MatrixClient", function() {
             });
             expect(rule).toBeFalsy();
         });
+
         it("should reject invites once we have added a matching rule in the target room (scope: user)", async () => {
             await client.ignoredInvites.addRule(PolicyScope.User, "*:example.org", "just a test");
 
@@ -1545,6 +1552,7 @@ describe("MatrixClient", function() {
             });
             expect(ruleWrongServerRoom).toBeFalsy();
         });
+
         it("should reject invites once we have added a matching rule in the target room (scope: server)", async () => {
             const REASON = `Just a test ${Math.random()}`;
             await client.ignoredInvites.addRule(PolicyScope.Server, "example.org", REASON);
@@ -1577,6 +1585,7 @@ describe("MatrixClient", function() {
             });
             expect(ruleWrongServer).toBeFalsy();
         });
+
         it("should reject invites once we have added a matching rule in the target room (scope: room)", async () => {
             const REASON = `Just a test ${Math.random()}`;
             const BAD_ROOM_ID = "!bad:example.org";
@@ -1601,6 +1610,7 @@ describe("MatrixClient", function() {
             });
             expect(ruleWrongRoom).toBeFalsy();
         });
+
         it("should reject invites once we have added a matching rule in a non-target source room", async () => {
             const NEW_SOURCE_ROOM_ID = "!another-source:example.org";
 
@@ -1640,6 +1650,7 @@ describe("MatrixClient", function() {
             });
             expect(ruleWrongServerRoom).toBeFalsy();
         });
+
         it("should not reject invites anymore once we have removed a rule", async () => {
             await client.ignoredInvites.addRule(PolicyScope.User, "*:example.org", "just a test");
 
@@ -1662,6 +1673,7 @@ describe("MatrixClient", function() {
             });
             expect(ruleMatch2).toBeFalsy();
         });
+
         it("should add new rules in the target room, rather than any other source room", async () => {
             const NEW_SOURCE_ROOM_ID = "!another-source:example.org";
 
@@ -1671,9 +1683,9 @@ describe("MatrixClient", function() {
             const newSourceRoom = client.getRoom(NEW_SOURCE_ROOM_ID);
 
             // Fetch the list of sources and check that we do not have the new room yet.
-            const policies = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE).getContent();
+            const policies = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name).getContent();
             expect(policies).toBeTruthy();
-            const ignoreInvites = policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY];
+            const ignoreInvites = policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites).toBeTruthy();
             expect(ignoreInvites.sources).toBeTruthy();
             expect(ignoreInvites.sources).not.toContain(NEW_SOURCE_ROOM_ID);
@@ -1685,9 +1697,9 @@ describe("MatrixClient", function() {
             expect(added2).toBe(false);
 
             // Fetch the list of sources and check that we have added the new room.
-            const policies2 = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE).getContent();
+            const policies2 = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name).getContent();
             expect(policies2).toBeTruthy();
-            const ignoreInvites2 = policies2[IGNORE_INVITES_ACCOUNT_EVENT_KEY];
+            const ignoreInvites2 = policies2[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites2).toBeTruthy();
             expect(ignoreInvites2.sources).toBeTruthy();
             expect(ignoreInvites2.sources).toContain(NEW_SOURCE_ROOM_ID);
