@@ -596,6 +596,41 @@ describe('Group Call', function() {
                 await Promise.all([groupCall1.leave(), groupCall2.leave()]);
             }
         });
+
+        it("Updates call mute status correctly on call state change", async function() {
+            await groupCall1.create();
+
+            try {
+                const toDeviceProm = new Promise<void>(resolve => {
+                    client1.sendToDevice.mockImplementation(() => {
+                        resolve();
+                        return Promise.resolve({});
+                    });
+                });
+
+                await Promise.all([groupCall1.enter(), groupCall2.enter()]);
+
+                MockRTCPeerConnection.triggerAllNegotiations();
+
+                await toDeviceProm;
+
+                groupCall1.setMicrophoneMuted(false);
+                groupCall1.setLocalVideoMuted(false);
+
+                const call = groupCall1.getCallByUserId(client2.userId);
+                call.isMicrophoneMuted = jest.fn().mockReturnValue(true);
+                call.setMicrophoneMuted = jest.fn();
+                call.isLocalVideoMuted = jest.fn().mockReturnValue(true);
+                call.setLocalVideoMuted = jest.fn();
+
+                call.emit(CallEvent.State, CallState.Connected);
+
+                expect(call.setMicrophoneMuted).toHaveBeenCalledWith(false);
+                expect(call.setLocalVideoMuted).toHaveBeenCalledWith(false);
+            } finally {
+                await Promise.all([groupCall1.leave(), groupCall2.leave()]);
+            }
+        });
     });
 
     describe("muting", () => {
