@@ -298,7 +298,7 @@ export class EventTimeline {
      *
      * @return {?string} pagination token
      */
-    public getPaginationToken(direction: Direction): string | null | undefined {
+    public getPaginationToken(direction: Direction): string | null {
         return this.getState(direction).paginationToken;
     }
 
@@ -307,7 +307,7 @@ export class EventTimeline {
      *
      * @param {?string} token       pagination token
      *
-     * @param {string} direction    EventTimeline.BACKWARDS to set the pagination
+     * @param {string} direction    EventTimeline.BACKWARDS to set the paginatio
      *   token for going backwards in time; EventTimeline.FORWARDS to set the
      *   pagination token for going forwards in time.
      */
