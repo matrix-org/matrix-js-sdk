@@ -288,11 +288,11 @@ describe("Room", function() {
                 room.addLiveEvents(events);
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[0]],
-                    { timelineWasEmpty: undefined },
+                    { timelineWasEmpty: false },
                 );
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[1]],
-                    { timelineWasEmpty: undefined },
+                    { timelineWasEmpty: false },
                 );
                 expect(events[0].forwardLooking).toBe(true);
                 expect(events[1].forwardLooking).toBe(true);
