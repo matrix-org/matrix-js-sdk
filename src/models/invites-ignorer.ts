@@ -24,12 +24,12 @@ import { Room } from "./room";
 /// The event type storing the user's individual policies.
 ///
 /// Exported for testing purposes.
-export const POLICIES_ACCOUNT_EVENT_TYPE = new UnstableValue(null, "org.matrix.msc3847.policies");
+export const POLICIES_ACCOUNT_EVENT_TYPE = new UnstableValue("m.policies", "org.matrix.msc3847.policies");
 
 /// The key within the user's individual policies storing the user's ignored invites.
 ///
 /// Exported for testing purposes.
-export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue(null, "org.matrix.msc3847.ignore.invites");
+export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue("m.ignore.invites", "org.matrix.msc3847.ignore.invites");
 
 /// The types of recommendations understood.
 enum PolicyRecommendation {
