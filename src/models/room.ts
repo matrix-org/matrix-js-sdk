@@ -2336,7 +2336,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         fromCache = false,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty = false;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy,
@@ -2386,7 +2386,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             this.processLiveEvent(event);
 
             if (event.getUnsigned().transaction_id) {
-                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
+                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id!];
                 if (existingEvent) {
                     // remote echo of an event we sent earlier
                     this.handleRemoteEcho(event, existingEvent);
