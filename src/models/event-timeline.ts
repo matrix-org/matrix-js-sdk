@@ -298,7 +298,7 @@ export class EventTimeline {
      *
      * @return {?string} pagination token
      */
-    public getPaginationToken(direction: Direction): string | null {
+    public getPaginationToken(direction: Direction): string | null | undefined {
         return this.getState(direction).paginationToken;
     }
 
