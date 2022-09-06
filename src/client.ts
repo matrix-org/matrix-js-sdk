@@ -869,7 +869,6 @@ type EmittedEvents = ClientEvent
     | GroupCallEventHandlerEvent.Incoming
     | GroupCallEventHandlerEvent.Ended
     | GroupCallEventHandlerEvent.Participants
-    | GroupCallEventHandlerEvent.Room
     | HttpApiEvent.SessionLoggedOut
     | HttpApiEvent.NoConsent
     | BeaconEvent;
@@ -1592,6 +1591,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             dataChannelsEnabled,
             dataChannelOptions,
         ).create();
+    }
+
+    /**
+     * Wait until an initial state for the given room has been processed by the
+     * client and the client is aware of any ongoing group calls. Awaiting on
+     * the promise returned by this method before calling getGroupCallForRoom()
+     * avoids races where getGroupCallForRoom is called before the state for that
+     * room has been processed. It does not, however, fix other races, eg. two
+     * clients both creating a group call at the same time.
+     * @param roomId The room ID to wait for
+     * @returns A promise that resolves once existing group calls in the room
+     *          have been processed.
+     */
+    public waitUntilRoomReadyForGroupCalls(roomId: string): Promise<void> {
+        return this.groupCallEventHandler.waitUntilRoomReadyForGroupCalls(roomId);
     }
 
     /**
