@@ -1,4 +1,4 @@
-Changes in [19.5.0-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.5.0-rc.3) (2022-09-06)
+Changes in [19.5.0-rc.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.5.0-rc.4) (2022-09-06)
 ============================================================================================================
 
 ## 🐛 Bug Fixes
