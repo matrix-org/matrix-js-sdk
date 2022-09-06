@@ -20,8 +20,6 @@ import { MockMediaDeviceInfo, MockMediaDevices, MockMediaStream, MockMediaStream
 
 const FAKE_AUDIO_INPUT_ID = "aaaaaaaa";
 const FAKE_VIDEO_INPUT_ID = "vvvvvvvv";
-const FAKE_AUDIO_INPUT_ID_2 = "aaaaaaa2";
-const FAKE_VIDEO_INPUT_ID_2 = "vvvvvvv2";
 
 describe('Media Handler', function() {
     let mockMediaDevices: MockMediaDevices;
