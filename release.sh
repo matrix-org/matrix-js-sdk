@@ -202,7 +202,7 @@ then
 else
     pkglock=''
 fi
-git commit package.json "$pkglock" -m "$tag"
+git commit package.json $pkglock -m "$tag"
 
 
 # figure out if we should be signing this release
