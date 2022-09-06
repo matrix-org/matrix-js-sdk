@@ -5,7 +5,6 @@ on:
     secrets:
       NPM_TOKEN:
         required: true
-concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   npm:
     name: Publish to npm
