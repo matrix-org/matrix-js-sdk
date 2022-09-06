@@ -34,18 +34,27 @@ export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
     Ended = "GroupCall.ended",
     Participants = "GroupCall.participants",
-    Room = "GroupCall.Room",
 }
 
 export type GroupCallEventHandlerEventHandlerMap = {
     [GroupCallEventHandlerEvent.Incoming]: (call: GroupCall) => void;
     [GroupCallEventHandlerEvent.Ended]: (call: GroupCall) => void;
     [GroupCallEventHandlerEvent.Participants]: (participants: RoomMember[], call: GroupCall) => void;
-    [GroupCallEventHandlerEvent.Room]: (room: Room) => void;
 };
+
+interface RoomDeferred {
+    prom: Promise<void>;
+    resolve?: () => void;
+}
 
 export class GroupCallEventHandler {
     public groupCalls = new Map<string, GroupCall>(); // roomId -> GroupCall
+
+    // All rooms we know about and whether we've seen a 'Room' event
+    // for them. The promise will be fulfilled once we've processed that
+    // event which means we're "up to date" on what calls are in a room
+    // and get
+    private roomDeferreds = new Map<string, RoomDeferred>();
 
     constructor(private client: MatrixClient) { }
 
@@ -82,6 +91,26 @@ export class GroupCallEventHandler {
         this.client.removeListener(RoomStateEvent.Events, this.onRoomStateChanged);
     }
 
+    private getRoomDeferred(roomId: string): RoomDeferred {
+        let deferred: RoomDeferred = this.roomDeferreds.get(roomId);
+        if (deferred === undefined) {
+            let resolveFunc: () => void;
+            deferred = {
+                prom: new Promise<void>(resolve => {
+                    resolveFunc = resolve;
+                }),
+            };
+            deferred.resolve = resolveFunc;
+            this.roomDeferreds.set(roomId, deferred);
+        }
+
+        return deferred;
+    }
+
+    public waitUntilRoomReadyForGroupCalls(roomId: string): Promise<void> {
+        return this.getRoomDeferred(roomId).prom;
+    }
+
     public getGroupCallById(groupCallId: string): GroupCall {
         return [...this.groupCalls.values()].find((groupCall) => groupCall.groupCallId === groupCallId);
     }
@@ -98,9 +127,11 @@ export class GroupCallEventHandler {
             }
 
             this.createGroupCallFromRoomStateEvent(callEvent);
-            this.client.emit(GroupCallEventHandlerEvent.Room, room);
             break;
         }
+
+        logger.info("Group call event handler processed room", room);
+        this.getRoomDeferred(room.roomId).resolve();
     }
 
     private createGroupCallFromRoomStateEvent(event: MatrixEvent): GroupCall | undefined {
