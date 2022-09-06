@@ -29,7 +29,8 @@ export const POLICIES_ACCOUNT_EVENT_TYPE = new UnstableValue("m.policies", "org.
 /// The key within the user's individual policies storing the user's ignored invites.
 ///
 /// Exported for testing purposes.
-export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue("m.ignore.invites", "org.matrix.msc3847.ignore.invites");
+export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue("m.ignore.invites",
+    "org.matrix.msc3847.ignore.invites");
 
 /// The types of recommendations understood.
 enum PolicyRecommendation {
