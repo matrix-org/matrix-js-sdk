@@ -179,13 +179,28 @@ export class MediaHandler extends TypedEventEmitter<
 
         let stream: MediaStream;
 
-        if (
-            !this.localUserMediaStream ||
-            (this.localUserMediaStream.getAudioTracks().length === 0 && shouldRequestAudio) ||
-            (this.localUserMediaStream.getVideoTracks().length === 0 && shouldRequestVideo) ||
-            (this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput) ||
-            (this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput)
-        ) {
+        let canReuseStream = true;
+        if (this.localUserMediaStream) {
+            if (shouldRequestAudio) {
+                if (
+                    this.localUserMediaStream.getAudioTracks().length === 0 ||
+                    this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput
+                ) {
+                    canReuseStream = false;
+                }
+            }
+            if (shouldRequestVideo) {
+                if (
+                    this.localUserMediaStream.getVideoTracks().length === 0 ||
+                    this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput) {
+                    canReuseStream = false;
+                }
+            }
+        } else {
+            canReuseStream = false;
+        }
+
+        if (!canReuseStream) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
             logger.log(`mediaHandler getUserMediaStream streamId ${stream.id} shouldRequestAudio ${
