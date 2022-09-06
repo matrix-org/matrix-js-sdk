@@ -108,13 +108,15 @@ function reset_dependency {
 }
 
 has_subprojects=0
-subprojects=$(cat release_config.yaml | python -c "import yaml; import sys; print(' '.join(list(yaml.load(sys.stdin)['subprojects'].keys())))" 2> /dev/null)
-if [ "$?" -eq 0 ]; then
-    has_subprojects=1
-    echo "Checking subprojects for upgrades"
-    for proj in $subprojects; do
-        check_dependency "$proj"
-    done
+if [ -f release_config.yaml ]; then
+    subprojects=$(cat release_config.yaml | python -c "import yaml; import sys; print(' '.join(list(yaml.load(sys.stdin)['subprojects'].keys())))" 2> /dev/null)
+    if [ "$?" -eq 0 ]; then
+        has_subprojects=1
+        echo "Checking subprojects for upgrades"
+        for proj in $subprojects; do
+            check_dependency "$proj"
+        done
+    fi
 fi
 
 # We use Git branch / commit dependencies for some packages, and Yarn seems
