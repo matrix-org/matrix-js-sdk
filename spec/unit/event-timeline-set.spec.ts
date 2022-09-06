@@ -295,7 +295,7 @@ describe('EventTimelineSet', () => {
 
     describe("handleRemoteEcho", () => {
         it("should add to liveTimeline only if the event matches the filter", () => {
-            const filter = new Filter(client.getUserId(), "test_filter");
+            const filter = new Filter(client.getUserId()!, "test_filter");
             filter.setDefinition({
                 room: {
                     timeline: {
