@@ -36,13 +36,6 @@ $USAGE
 EOF
 }
 
-ret=0
-cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
-if [ "$ret" -eq 0 ]; then
-    echo "package.json contains develop dependencies. Refusing to release."
-    exit
-fi
-
 if ! git diff-index --quiet --cached HEAD; then
     echo "this git checkout has staged (uncommitted) changes. Refusing to release."
     exit
@@ -117,6 +110,13 @@ if [ -f release_config.yaml ]; then
             check_dependency "$proj"
         done
     fi
+fi
+
+ret=0
+cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
+if [ "$ret" -eq 0 ]; then
+    echo "package.json contains develop dependencies. Refusing to release."
+    exit
 fi
 
 # We use Git branch / commit dependencies for some packages, and Yarn seems
