@@ -160,10 +160,13 @@ export class MockRTCRtpSender {
 export class MockMediaStreamTrack {
     constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) { }
 
-    stop() { }
+    stop = jest.fn<void, []>();
 
     listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
+    public settings: MediaTrackSettings;
+
+    getSettings(): MediaTrackSettings { return this.settings; }
 
     // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
     // implementation
@@ -181,6 +184,8 @@ export class MockMediaStreamTrack {
             return t !== eventType || c !== callback;
         });
     }
+
+    typed(): MediaStreamTrack { return this as unknown as MediaStreamTrack; }
 }
 
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
@@ -217,8 +222,12 @@ export class MockMediaStream {
     }
     removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
 
-    clone() {
-        return new MockMediaStream(this.id, this.tracks);
+    clone(): MediaStream {
+        return new MockMediaStream(this.id + ".clone", this.tracks).typed();
+    }
+
+    isCloneOf(stream: MediaStream) {
+        return this.id === stream.id + ".clone";
     }
 
     // syntactic sugar for typing
@@ -231,6 +240,8 @@ export class MockMediaDeviceInfo {
     constructor(
         public kind: "audioinput" | "videoinput" | "audiooutput",
     ) { }
+
+    typed(): MediaDeviceInfo { return this as unknown as MediaDeviceInfo; }
 }
 
 export class MockMediaHandler {
@@ -267,15 +278,27 @@ export class MockMediaHandler {
     typed(): MediaHandler { return this as unknown as MediaHandler; }
 }
 
+export class MockMediaDevices {
+    enumerateDevices = jest.fn<Promise<MediaDeviceInfo[]>, []>().mockResolvedValue([
+        new MockMediaDeviceInfo("audioinput").typed(),
+        new MockMediaDeviceInfo("videoinput").typed(),
+    ]);
+
+    getUserMedia = jest.fn<Promise<MediaStream>, [MediaStreamConstraints]>().mockReturnValue(
+        Promise.resolve(new MockMediaStream("local_stream").typed()),
+    );
+
+    getDisplayMedia = jest.fn<Promise<MediaStream>, [DisplayMediaStreamConstraints]>().mockReturnValue(
+        Promise.resolve(new MockMediaStream("local_display_stream").typed()),
+    );
+
+    typed(): MediaDevices { return this as unknown as MediaDevices; }
+}
+
 export function installWebRTCMocks() {
     global.navigator = {
-        mediaDevices: {
-            // @ts-ignore Mock
-            getUserMedia: () => new MockMediaStream("local_stream"),
-            // @ts-ignore Mock
-            enumerateDevices: async () => [new MockMediaDeviceInfo("audio"), new MockMediaDeviceInfo("video")],
-        },
-    };
+        mediaDevices: new MockMediaDevices().typed(),
+    } as unknown as Navigator;
 
     global.window = {
         // @ts-ignore Mock
