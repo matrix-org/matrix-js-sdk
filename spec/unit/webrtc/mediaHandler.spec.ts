@@ -200,12 +200,9 @@ describe('Media Handler', function() {
             });
 
             it("emits LocalStreamsChanged", async () => {
-                const onLocalStreamsChanged = jest.fn();
-                mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamsChanged);
-
                 await mediaHandler.updateLocalUsermediaStreams();
 
-                expect(onLocalStreamsChanged).toHaveBeenCalled();
+                expect(localStreamsChangedHandler).toHaveBeenCalled();
             });
         });
     });
