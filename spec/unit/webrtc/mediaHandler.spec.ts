@@ -336,6 +336,8 @@ describe('Media Handler', function() {
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
             await mediaHandler.getScreensharingStream();
             expect(onLocalStreamChanged).toHaveBeenCalled();
+
+            mediaHandler.off(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
         });
     });
 
@@ -365,6 +367,8 @@ describe('Media Handler', function() {
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
             mediaHandler.stopUserMediaStream(stream);
             expect(onLocalStreamChanged).toHaveBeenCalled();
+
+            mediaHandler.off(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
         });
     });
 
@@ -434,6 +438,8 @@ describe('Media Handler', function() {
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
             mediaHandler.stopAllStreams();
             expect(onLocalStreamChanged).toHaveBeenCalled();
+
+            mediaHandler.off(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
         });
     });
 });
