@@ -20,6 +20,7 @@ import { MockMediaDeviceInfo, MockMediaDevices, MockMediaStream, MockMediaStream
 
 const FAKE_AUDIO_INPUT_ID = "aaaaaaaa";
 const FAKE_VIDEO_INPUT_ID = "vvvvvvvv";
+const FAKE_DESKTOP_SOURCE_ID = "ddddddd";
 
 describe('Media Handler', function() {
     let mockMediaDevices: MockMediaDevices;
@@ -266,9 +267,178 @@ describe('Media Handler', function() {
 
         it("doesn't re-use stream if reusable is false", async () => {
             const stream1 = await mediaHandler.getUserMediaStream(true, false, false);
-            const stream2 = await mediaHandler.getUserMediaStream(true, false);
+            const stream2 = await mediaHandler.getUserMediaStream(true, false) as unknown as MockMediaStream;
 
-            expect(stream1).not.toBe(stream2);
+            expect(stream2.isCloneOf(stream1)).toEqual(false);
+        });
+
+        it("doesn't re-use stream if existing stream lacks audio", async () => {
+            const stream1 = await mediaHandler.getUserMediaStream(false, true);
+            const stream2 = await mediaHandler.getUserMediaStream(true, false) as unknown as MockMediaStream;
+
+            expect(stream2.isCloneOf(stream1)).toEqual(false);
+        });
+
+        it("doesn't re-use stream if existing stream lacks video", async () => {
+            const stream1 = await mediaHandler.getUserMediaStream(true, false);
+            const stream2 = await mediaHandler.getUserMediaStream(false, true) as unknown as MockMediaStream;
+
+            expect(stream2.isCloneOf(stream1)).toEqual(false);
+        });
+
+        it("strips unwanted audio tracks from re-used stream", async () => {
+            const stream1 = await mediaHandler.getUserMediaStream(true, true);
+            const stream2 = await mediaHandler.getUserMediaStream(false, true) as unknown as MockMediaStream;
+
+            expect(stream2.isCloneOf(stream1)).toEqual(true);
+            expect(stream2.getAudioTracks().length).toEqual(0);
+        });
+
+        it("strips unwanted video tracks from re-used stream", async () => {
+            const stream1 = await mediaHandler.getUserMediaStream(true, true);
+            const stream2 = await mediaHandler.getUserMediaStream(true, false) as unknown as MockMediaStream;
+
+            expect(stream2.isCloneOf(stream1)).toEqual(true);
+            expect(stream2.getVideoTracks().length).toEqual(0);
+        });
+    });
+
+    describe("getScreensharingStream", () => {
+        it("gets any screen sharing stream when called with no args", async () => {
+            const stream = await mediaHandler.getScreensharingStream();
+            expect(stream).toBeTruthy();
+            expect(stream.getTracks()).toBeTruthy();
+        });
+
+        it("re-uses streams", async () => {
+            const stream = await mediaHandler.getScreensharingStream(undefined, true);
+
+            expect(mockMediaDevices.getDisplayMedia).toHaveBeenCalled();
+            mockMediaDevices.getDisplayMedia.mockClear();
+
+            const stream2 = await mediaHandler.getScreensharingStream() as unknown as MockMediaStream;
+
+            expect(mockMediaDevices.getDisplayMedia).not.toHaveBeenCalled();
+
+            expect(stream2.isCloneOf(stream)).toEqual(true);
+        });
+
+        it("passes through desktopCapturerSourceId for Electron", async () => {
+            await mediaHandler.getScreensharingStream({
+                desktopCapturerSourceId: FAKE_DESKTOP_SOURCE_ID,
+            });
+
+            expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
+                video: {
+                    mandatory: expect.objectContaining({
+                        chromeMediaSource: "desktop",
+                        chromeMediaSourceId: FAKE_DESKTOP_SOURCE_ID,
+                    }),
+                },
+            }));
+        });
+
+        it("emits LocalStreamsChanged", async () => {
+            const onLocalStreamChanged = jest.fn();
+            mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
+            await mediaHandler.getScreensharingStream();
+            expect(onLocalStreamChanged).toHaveBeenCalled();
+        });
+    });
+
+    describe("stopUserMediaStream", () => {
+        let stream;
+
+        beforeEach(async () => {
+            stream = await mediaHandler.getUserMediaStream(true, false);
+        });
+
+        it("stops tracks on streams", async () => {
+            const mockTrack = new MockMediaStreamTrack("audio_track", "audio");
+            stream.addTrack(mockTrack.typed());
+
+            mediaHandler.stopUserMediaStream(stream);
+            expect(mockTrack.stop).toHaveBeenCalled();
+        });
+
+        it("removes stopped streams", async () => {
+            expect(mediaHandler.userMediaStreams).toContain(stream);
+            mediaHandler.stopUserMediaStream(stream);
+            expect(mediaHandler.userMediaStreams).not.toContain(stream);
+        });
+
+        it("emits LocalStreamsChanged", async () => {
+            const onLocalStreamChanged = jest.fn();
+            mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
+            mediaHandler.stopUserMediaStream(stream);
+            expect(onLocalStreamChanged).toHaveBeenCalled();
+        });
+    });
+
+    describe("stopUserMediaStream", () => {
+        let stream;
+
+        beforeEach(async () => {
+            stream = await mediaHandler.getScreensharingStream();
+        });
+
+        it("stops tracks on streams", async () => {
+            const mockTrack = new MockMediaStreamTrack("audio_track", "audio");
+            stream.addTrack(mockTrack.typed());
+
+            mediaHandler.stopScreensharingStream(stream);
+            expect(mockTrack.stop).toHaveBeenCalled();
+        });
+
+        it("removes stopped streams", async () => {
+            expect(mediaHandler.screensharingStreams).toContain(stream);
+            mediaHandler.stopScreensharingStream(stream);
+            expect(mediaHandler.screensharingStreams).not.toContain(stream);
+        });
+
+        it("emits LocalStreamsChanged", async () => {
+            const onLocalStreamChanged = jest.fn();
+            mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
+            mediaHandler.stopScreensharingStream(stream);
+            expect(onLocalStreamChanged).toHaveBeenCalled();
+        });
+    });
+
+    describe("stopAllStreams", () => {
+        let userMediaStream;
+        let screenSharingStream;
+
+        beforeEach(async () => {
+            userMediaStream = await mediaHandler.getUserMediaStream();
+            screenSharingStream = await mediaHandler.getScreensharingStream();
+        });
+
+        it("stops tracks on streams", async () => {
+            const mockUserMediaTrack = new MockMediaStreamTrack("audio_track", "audio");
+            userMediaStream.addTrack(mockUserMediaTrack.typed());
+
+            const mockScreenshareTrack = new MockMediaStreamTrack("audio_track", "audio");
+            screenSharingStream.addTrack(mockScreenshareTrack.typed());
+
+            mediaHandler.stopAllStreams();
+
+            expect(mockUserMediaTrack.stop).toHaveBeenCalled();
+            expect(mockScreenshareTrack.stop).toHaveBeenCalled();
+        });
+
+        it("removes stopped streams", async () => {
+            expect(mediaHandler.userMediaStreams).toContain(userMediaStream);
+            expect(mediaHandler.screensharingStreams).toContain(screenSharingStream);
+            mediaHandler.stopAllStreams();
+            expect(mediaHandler.userMediaStreams).not.toContain(userMediaStream);
+            expect(mediaHandler.screensharingStreams).not.toContain(screenSharingStream);
+        });
+
+        it("emits LocalStreamsChanged", async () => {
+            const onLocalStreamChanged = jest.fn();
+            mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
+            mediaHandler.stopAllStreams();
+            expect(onLocalStreamChanged).toHaveBeenCalled();
         });
     });
 });

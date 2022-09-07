@@ -160,7 +160,7 @@ export class MockRTCRtpSender {
 export class MockMediaStreamTrack {
     constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) { }
 
-    stop() { }
+    stop = jest.fn<void, []>();
 
     listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
@@ -184,6 +184,8 @@ export class MockMediaStreamTrack {
             return t !== eventType || c !== callback;
         });
     }
+
+    typed(): MediaStreamTrack { return this as unknown as MediaStreamTrack; }
 }
 
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
@@ -286,6 +288,10 @@ export class MockMediaDevices {
 
     getUserMedia = jest.fn<Promise<MediaStream>, [MediaStreamConstraints]>().mockReturnValue(
         Promise.resolve(new MockMediaStream("local_stream").typed()),
+    );
+
+    getDisplayMedia = jest.fn<Promise<MediaStream>, [DisplayMediaStreamConstraints]>().mockReturnValue(
+        Promise.resolve(new MockMediaStream("local_display_stream").typed()),
     );
 
     typed(): MediaDevices { return this as unknown as MediaDevices; }

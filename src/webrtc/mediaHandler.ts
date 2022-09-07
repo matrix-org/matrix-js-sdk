@@ -181,6 +181,9 @@ export class MediaHandler extends TypedEventEmitter<
 
         let canReuseStream = true;
         if (this.localUserMediaStream) {
+            // This code checks that the device ID is the same as the localUserMediaStream stream, but we update
+            // the localUserMediaStream whenever the device ID changes (apart from when restoring) so it's not
+            // clear why this would ever be different, unless there's a race.
             if (shouldRequestAudio) {
                 if (
                     this.localUserMediaStream.getAudioTracks().length === 0 ||
