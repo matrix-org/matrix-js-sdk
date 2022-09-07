@@ -409,7 +409,7 @@ describe('Media Handler', function() {
         let screenSharingStream;
 
         beforeEach(async () => {
-            userMediaStream = await mediaHandler.getUserMediaStream();
+            userMediaStream = await mediaHandler.getUserMediaStream(true, false);
             screenSharingStream = await mediaHandler.getScreensharingStream();
         });
 
