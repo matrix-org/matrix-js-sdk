@@ -340,7 +340,7 @@ describe('Media Handler', function() {
     });
 
     describe("stopUserMediaStream", () => {
-        let stream;
+        let stream: MediaStream;
 
         beforeEach(async () => {
             stream = await mediaHandler.getUserMediaStream(true, false);
@@ -369,7 +369,7 @@ describe('Media Handler', function() {
     });
 
     describe("stopUserMediaStream", () => {
-        let stream;
+        let stream: MediaStream;
 
         beforeEach(async () => {
             stream = await mediaHandler.getScreensharingStream();
@@ -400,8 +400,8 @@ describe('Media Handler', function() {
     });
 
     describe("stopAllStreams", () => {
-        let userMediaStream;
-        let screenSharingStream;
+        let userMediaStream: MediaStream;
+        let screenSharingStream: MediaStream;
 
         beforeEach(async () => {
             userMediaStream = await mediaHandler.getUserMediaStream(true, false);
