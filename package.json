@@ -60,7 +60,7 @@
     "content-type": "^1.0.4",
     "loglevel": "^1.7.1",
     "matrix-events-sdk": "^0.0.1-beta.7",
-    "p-retry": "4",
+    "p-retry": "5",
     "qs": "^6.9.6",
     "request": "^2.88.2",
     "unhomoglyph": "^1.0.6"
