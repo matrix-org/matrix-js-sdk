@@ -279,12 +279,10 @@ export class MockMediaHandler {
 }
 
 export class MockMediaDevices {
-    enumerateDevices = jest.fn<Promise<MediaDeviceInfo[]>, []>().mockReturnValue(
-        Promise.resolve([
-            new MockMediaDeviceInfo("audioinput").typed(),
-            new MockMediaDeviceInfo("videoinput").typed(),
-        ]),
-    );
+    enumerateDevices = jest.fn<Promise<MediaDeviceInfo[]>, []>().mockResolvedValue([
+        new MockMediaDeviceInfo("audioinput").typed(),
+        new MockMediaDeviceInfo("videoinput").typed(),
+    ]);
 
     getUserMedia = jest.fn<Promise<MediaStream>, [MediaStreamConstraints]>().mockReturnValue(
         Promise.resolve(new MockMediaStream("local_stream").typed()),
