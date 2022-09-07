@@ -112,18 +112,19 @@ describe('Media Handler', function() {
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, localStreamsChangedHandler);
         });
 
+        afterEach(() => {
+            mediaHandler.off(MediaHandlerEvent.LocalStreamsChanged, localStreamsChangedHandler);
+        });
+
         it("does nothing if it has no streams", async () => {
             mediaHandler.updateLocalUsermediaStreams();
             expect(mockMediaDevices.getUserMedia).not.toHaveBeenCalled();
         });
 
         it("does not emit LocalStreamsChanged if it had no streams", async () => {
-            const onLocalStreamsChanged = jest.fn();
-            mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamsChanged);
-
             await mediaHandler.updateLocalUsermediaStreams();
 
-            expect(onLocalStreamsChanged).not.toHaveBeenCalled();
+            expect(localStreamsChangedHandler).not.toHaveBeenCalled();
         });
 
         describe("with existing streams", () => {
