@@ -394,6 +394,8 @@ describe('Media Handler', function() {
             mediaHandler.on(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
             mediaHandler.stopScreensharingStream(stream);
             expect(onLocalStreamChanged).toHaveBeenCalled();
+
+            mediaHandler.off(MediaHandlerEvent.LocalStreamsChanged, onLocalStreamChanged);
         });
     });
 
