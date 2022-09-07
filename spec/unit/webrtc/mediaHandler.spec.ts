@@ -129,6 +129,7 @@ describe('Media Handler', function() {
 
         describe("with existing streams", () => {
             let stopTrack: jest.Mock<void, []>;
+            let updateLocalUsermediaStream: jest.Mock;
 
             beforeEach(() => {
                 stopTrack = jest.fn();
@@ -140,6 +141,8 @@ describe('Media Handler', function() {
                         } as unknown as MediaStreamTrack],
                     } as unknown as MediaStream,
                 ];
+
+                updateLocalUsermediaStream = jest.fn();
             });
 
             it("stops existing streams", async () => {
@@ -148,8 +151,6 @@ describe('Media Handler', function() {
             });
 
             it("replaces streams on calls", async () => {
-                const updateLocalUsermediaStream = jest.fn();
-
                 calls.set("some_call", {
                     hasLocalUserMediaAudioTrack: true,
                     hasLocalUserMediaVideoTrack: true,
@@ -162,8 +163,6 @@ describe('Media Handler', function() {
             });
 
             it("doesn't replace streams on ended calls", async () => {
-                const updateLocalUsermediaStream = jest.fn();
-
                 calls.set("some_call", {
                     hasLocalUserMediaAudioTrack: true,
                     hasLocalUserMediaVideoTrack: true,
@@ -176,8 +175,6 @@ describe('Media Handler', function() {
             });
 
             it("replaces streams on group calls", async () => {
-                const updateLocalUsermediaStream = jest.fn();
-
                 groupCalls.set("some_group_call", {
                     localCallFeed: {},
                     updateLocalUsermediaStream,
@@ -188,8 +185,6 @@ describe('Media Handler', function() {
             });
 
             it("doesn't replace streams on group calls with no localCallFeed", async () => {
-                const updateLocalUsermediaStream = jest.fn();
-
                 groupCalls.set("some_group_call", {
                     localCallFeed: null,
                     updateLocalUsermediaStream,
