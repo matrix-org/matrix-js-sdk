@@ -64,7 +64,7 @@ describe('Group Call Event Handler', function() {
         const setSyncState = async (newState: SyncState) => {
             const oldState = mockClient.getSyncState();
             mockClient.getSyncState.mockReturnValue(newState);
-            mockClient.emit(ClientEvent.Sync, newState, oldState, null);
+            mockClient.emit(ClientEvent.Sync, newState, oldState, undefined);
             await flushPromises();
         };
 
