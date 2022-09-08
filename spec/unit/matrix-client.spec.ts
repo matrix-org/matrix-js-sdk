@@ -1500,12 +1500,25 @@ describe("MatrixClient", function() {
             expect(target1).toBe(target2);
         });
 
-        it("should initialize and return the same `sources` consistently", async () => {
-            const sources1 = await client.ignoredInvites.getOrCreateSourceRooms();
-            const sources2 = await client.ignoredInvites.getOrCreateSourceRooms();
-            expect(sources1).toBeTruthy();
+        it("if there are no source rooms, it should return an empty list consistently", async () => {
+            const sources1 = client.ignoredInvites.getSourceRooms();
+            const sources2 = client.ignoredInvites.getSourceRooms();
+            expect(sources1).toHaveLength(0);
+            expect(sources1).toEqual(sources2);
+        });
+
+        it("if there are any source rooms, it should the same list consistently", async () => {
+            const NEW_SOURCE_ROOM_ID = "!another-source:example.org";
+
+            // Make sure that everything is initialized.
+            await client.joinRoom(NEW_SOURCE_ROOM_ID);
+            await client.ignoredInvites.addSource(NEW_SOURCE_ROOM_ID);
+
+            const sources1 = client.ignoredInvites.getSourceRooms();
+            const sources2 = client.ignoredInvites.getSourceRooms();
             expect(sources1).toHaveLength(1);
             expect(sources1).toEqual(sources2);
+            expect(sources1.map(room => room.roomId)).toContain(NEW_SOURCE_ROOM_ID);
         });
 
         it("should initially not reject any invite", async () => {
@@ -1517,6 +1530,7 @@ describe("MatrixClient", function() {
         });
 
         it("should reject invites once we have added a matching rule in the target room (scope: user)", async () => {
+            await client.ignoredInvites.getOrCreateTargetRoom();
             await client.ignoredInvites.addRule(PolicyScope.User, "*:example.org", "just a test");
 
             // We should reject this invite.
@@ -1606,7 +1620,6 @@ describe("MatrixClient", function() {
             const NEW_SOURCE_ROOM_ID = "!another-source:example.org";
 
             // Make sure that everything is initialized.
-            await client.ignoredInvites.getOrCreateSourceRooms();
             await client.joinRoom(NEW_SOURCE_ROOM_ID);
             await client.ignoredInvites.addSource(NEW_SOURCE_ROOM_ID);
 
@@ -1669,8 +1682,8 @@ describe("MatrixClient", function() {
             const NEW_SOURCE_ROOM_ID = "!another-source:example.org";
 
             // Make sure that everything is initialized.
-            await client.ignoredInvites.getOrCreateSourceRooms();
             await client.joinRoom(NEW_SOURCE_ROOM_ID);
+            await client.ignoredInvites.getOrCreateTargetRoom();
             const newSourceRoom = client.getRoom(NEW_SOURCE_ROOM_ID);
 
             // Fetch the list of sources and check that we do not have the new room yet.
