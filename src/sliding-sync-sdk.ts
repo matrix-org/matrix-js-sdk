@@ -296,13 +296,16 @@ export class SlidingSyncSdk {
         this.processRoomData(this.client, room, roomData);
     }
 
-    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
+    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error | null): void {
         if (err) {
             logger.debug("onLifecycle", state, err);
         }
         switch (state) {
             case SlidingSyncState.Complete:
                 this.purgeNotifications();
+                if (!resp) {
+                    break;
+                }
                 // Element won't stop showing the initial loading spinner unless we fire SyncState.Prepared
                 if (!this.lastPos) {
                     this.updateSyncState(SyncState.Prepared, {
@@ -529,6 +532,13 @@ export class SlidingSyncSdk {
             }
         }
 
+        if (Number.isInteger(roomData.invited_count)) {
+            room.currentState.setInvitedMemberCount(roomData.invited_count!);
+        }
+        if (Number.isInteger(roomData.joined_count)) {
+            room.currentState.setJoinedMemberCount(roomData.joined_count!);
+        }
+
         if (roomData.invite_state) {
             const inviteStateEvents = mapEvents(this.client, room.roomId, roomData.invite_state);
             this.injectRoomEvents(room, inviteStateEvents);
@@ -609,6 +619,10 @@ export class SlidingSyncSdk {
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
 
+        // local fields must be set before any async calls because call site assumes
+        // synchronous execution prior to emitting SlidingSyncState.Complete
+        room.updateMyMembership("join");
+
         room.recalculate();
         if (roomData.initial) {
             client.store.storeRoom(room);
@@ -631,8 +645,6 @@ export class SlidingSyncSdk {
         ephemeralEvents.forEach(function(e) {
             client.emit(ClientEvent.Event, e);
         });
-
-        room.updateMyMembership("join");
 
         // Decrypt only the last message in all rooms to make sure we can generate a preview
         // And decrypt all events after the recorded read receipt to ensure an accurate

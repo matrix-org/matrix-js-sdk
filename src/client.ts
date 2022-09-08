@@ -201,6 +201,7 @@ import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
+import { IgnoredInvites } from "./models/invites-ignorer";
 
 export type Store = IStore;
 
@@ -406,8 +407,7 @@ export interface IStartClientOpts {
     pollTimeout?: number;
 
     /**
-     * The filter to apply to /sync calls. This will override the opts.initialSyncLimit, which would
-     * normally result in a timeline limit filter.
+     * The filter to apply to /sync calls.
      */
     filter?: Filter;
 
@@ -974,6 +974,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
 
+    // A manager for determining which invites should be ignored.
+    public readonly ignoredInvites: IgnoredInvites;
+
     constructor(opts: IMatrixClientCreateOpts) {
         super();
 
@@ -1159,6 +1162,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 room.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
             }
         });
+
+        this.ignoredInvites = new IgnoredInvites(this);
     }
 
     /**
