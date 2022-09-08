@@ -18,7 +18,11 @@ import { ClientEvent, GroupCall, Room, RoomState, RoomStateEvent } from "../../.
 import { SyncState } from "../../../src/sync";
 import { GroupCallEventHandler, GroupCallEventHandlerEvent } from "../../../src/webrtc/groupCallEventHandler";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { makeMockGroupCallMemberStateEvent, makeMockGroupCallStateEvent, MockCallMatrixClient } from "../../test-utils/webrtc";
+import {
+    makeMockGroupCallMemberStateEvent,
+    makeMockGroupCallStateEvent,
+    MockCallMatrixClient,
+} from "../../test-utils/webrtc";
 
 const FAKE_USER_ID = "@alice:test.dummy";
 const FAKE_DEVICE_ID = "AAAAAAA";
