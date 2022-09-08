@@ -1410,7 +1410,6 @@
 
 "@matrix-org/olm@https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.12.tgz":
   version "3.2.12"
-  uid "0bce3c86f9d36a4984d3c3e07df1c3fb4c679bd9"
   resolved "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.12.tgz#0bce3c86f9d36a4984d3c3e07df1c3fb4c679bd9"
 
 "@nicolo-ribaudo/chokidar-2@2.1.8-no-fsevents.3":
