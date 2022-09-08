@@ -78,7 +78,7 @@ describe('Group Call Event Handler', function() {
         expect(isStarted).toEqual(true);
     });
 
-    it("finds exiting group calls when started", async () => {
+    it("finds existing group calls when started", async () => {
         const mockClientEmit = mockClient.emit = jest.fn();
 
         mockClient.getRooms.mockReturnValue([mockRoom]);
