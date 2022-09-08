@@ -18,7 +18,6 @@ import {
     EventType,
     GroupCallIntent,
     GroupCallType,
-    ISendEventResponse,
     MatrixCall,
     MatrixEvent,
     Room,
@@ -28,19 +27,16 @@ import { GroupCall } from "../../../src/webrtc/groupCall";
 import { MatrixClient } from "../../../src/client";
 import {
     installWebRTCMocks,
-    MockMediaHandler,
+    MockCallMatrixClient,
     MockMediaStream,
     MockMediaStreamTrack,
     MockRTCPeerConnection,
 } from '../../test-utils/webrtc';
 import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
 import { sleep } from "../../../src/utils";
-import { ReEmitter } from "../../../src/ReEmitter";
-import { TypedEventEmitter } from '../../../src/models/typed-event-emitter';
-import { MediaHandler } from '../../../src/webrtc/mediaHandler';
-import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from '../../../src/webrtc/callEventHandler';
+import { CallEventHandlerEvent } from '../../../src/webrtc/callEventHandler';
 import { CallFeed } from '../../../src/webrtc/callFeed';
-import { CallEvent, CallEventHandlerMap, CallState } from '../../../src/webrtc/call';
+import { CallEvent, CallState } from '../../../src/webrtc/call';
 import { flushPromises } from '../../test-utils/flushPromises';
 
 const FAKE_ROOM_ID = "!fake:test.dummy";
@@ -106,49 +102,6 @@ const createAndEnterGroupCall = async (cli: MatrixClient, room: Room): Promise<G
 
     return groupCall;
 };
-
-type EmittedEvents = CallEventHandlerEvent | CallEvent;
-type EmittedEventMap = CallEventHandlerEventHandlerMap & CallEventHandlerMap;
-
-class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, EmittedEventMap> {
-    public mediaHandler = new MockMediaHandler();
-
-    constructor(public userId: string, public deviceId: string, public sessionId: string) {
-        super();
-    }
-
-    groupCallEventHandler = {
-        groupCalls: new Map<string, GroupCall>(),
-    };
-
-    callEventHandler = {
-        calls: new Map<string, MatrixCall>(),
-    };
-
-    sendStateEvent = jest.fn<Promise<ISendEventResponse>, [
-        roomId: string, eventType: EventType, content: any, statekey: string,
-    ]>();
-    sendToDevice = jest.fn<Promise<{}>, [
-        eventType: string,
-        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
-        txnId?: string,
-    ]>();
-
-    getMediaHandler(): MediaHandler { return this.mediaHandler.typed(); }
-
-    getUserId(): string { return this.userId; }
-
-    getDeviceId(): string { return this.deviceId; }
-    getSessionId(): string { return this.sessionId; }
-
-    getTurnServers = () => [];
-    isFallbackICEServerAllowed = () => false;
-    reEmitter = new ReEmitter(new TypedEventEmitter());
-    getUseE2eForGroupCall = () => false;
-    checkTurnServers = () => null;
-
-    typed(): MatrixClient { return this as unknown as MatrixClient; }
-}
 
 class MockCall {
     constructor(public roomId: string, public groupCallId: string) {
