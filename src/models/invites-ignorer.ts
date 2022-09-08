@@ -78,7 +78,7 @@ export class IgnoredInvites {
     // Used to ensure that only one async task of this class
     // is creating a new target room and modifying the
     // `target` property of account key `IGNORE_INVITES_POLICIES`.
-    private _getOrCreateTargetRoomLock = new AwaitLock();
+    private _getOrCreateTargetRoomPromise: Promise<Room> | null = null;
 
     // A lock around method `withIgnoreInvitesPoliciesLock`.
     // Used to ensure that only one async task of this class is
@@ -232,6 +232,19 @@ export class IgnoredInvites {
      * other concurrent rewrites of the same object.
      */
     public async getOrCreateTargetRoom(): Promise<Room> {
+        // Synchronous code. Do NOT introduce any `await` before locking
+        // or there will be race conditions on both in-memory data and
+        // homeserver-stored data.
+        //
+        // Thanks to run-to-completion, the uninterruptible behavior of this
+        // method is the following:
+        // 1. Execute all the code until the first `await`, including
+        //    * all the code before testing whether `this._getOrCreateTargetRoomPromise`
+        //      is set;
+        //    * if `this._getOrCreateTargetRoomPromise` isn't set, all the code within
+        //      the anonymous async function until that anonymous function yields control;
+        //    * the code that sets `this._getOrCreateTargetRoomPromise`
+        // 2. Now, possibly yield control to the stack or the runtime.
         const ignoreInvitesPolicies = this.getIgnoreInvitesPolicies();
         let target = ignoreInvitesPolicies.target;
         // Validate `target`. If it is invalid, trash out the current `target`
@@ -246,27 +259,45 @@ export class IgnoredInvites {
                 return room;
             }
         }
-        try {
-            // We need to create our own policy room for ignoring invites.
-            await this._getOrCreateTargetRoomLock.acquireAsync();
-            target = (await this.client.createRoom({
-                name: "Individual Policy Room",
-                preset: Preset.PrivateChat,
-            })).room_id;
-            await this.withIgnoreInvitesPolicies(ignoreInvitesPolicies => {
-                ignoreInvitesPolicies.target = target;
-                if (!("sources" in ignoreInvitesPolicies)) {
-                    // `[target]` is a reasonable default for `sources`.
-                    ignoreInvitesPolicies.sources = [target];
-                }
-            });
 
-            // Since we have just called `createRoom`, `getRoom` should not be `null`.
-            // Note that this is unavoidably racy, e.g. another client could have left
-            // the room during the call to `this.withIgnoreInvitesPolicies`.
-            return this.client.getRoom(target)!;
+        // If we reach this line, we need to setup the target room.
+        // However, it is possible that other callers within this client
+        // may be racing with us.
+        if (this._getOrCreateTargetRoomPromise) {
+            // Another caller is already calling this method.
+            // Merge the calls.
+            return this._getOrCreateTargetRoomPromise;
+        }
+        try {
+            // Nobody is calling the method at the moment.
+            // Register ourselves as the leader and start creating our policy room.
+            this._getOrCreateTargetRoomPromise = (async () => {
+                // We need to create our own policy room for ignoring invites.
+                target = (await this.client.createRoom({
+                    name: "Individual Policy Room",
+                    preset: Preset.PrivateChat,
+                })).room_id;
+                await this.withIgnoreInvitesPolicies(ignoreInvitesPolicies => {
+                    ignoreInvitesPolicies.target = target;
+                    if (!("sources" in ignoreInvitesPolicies)) {
+                        // `[target]` is a reasonable default for `sources`.
+                        ignoreInvitesPolicies.sources = [target];
+                    }
+                });
+
+                // Since we have just called `createRoom`, `getRoom` should not be `null`.
+                // Note that this is unavoidably racy, e.g. another client could have left
+                // the room during the call to `this.withIgnoreInvitesPolicies`.
+                return this.client.getRoom(target)!;
+            })();
+            return await this._getOrCreateTargetRoomPromise;
         } finally {
-            this._getOrCreateTargetRoomLock.release();
+            // Don't forget to release the lock.
+            //
+            // If, for some reason, the async function has failed (e.g. network
+            // errors), the next call to `getOrCreateTargetRoomPromise` needs to
+            // be able to retry.
+            this._getOrCreateTargetRoomPromise = null;
         }
     }
 
