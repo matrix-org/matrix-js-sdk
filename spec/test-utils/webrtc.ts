@@ -14,6 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import {
+    ClientEvent,
+    ClientEventHandlerMap,
+    EventType,
+    GroupCall,
+    GroupCallIntent,
+    GroupCallType,
+    ISendEventResponse,
+    MatrixClient,
+    MatrixEvent,
+    Room,
+    RoomStateEvent,
+    RoomStateEventHandlerMap,
+} from "../../src";
+import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
+import { ReEmitter } from "../../src/ReEmitter";
+import { SyncState } from "../../src/sync";
+import { CallEvent, CallEventHandlerMap, MatrixCall } from "../../src/webrtc/call";
+import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "../../src/webrtc/callEventHandler";
+import { GroupCallEventHandlerMap } from "../../src/webrtc/groupCall";
+import { GroupCallEventHandlerEvent } from "../../src/webrtc/groupCallEventHandler";
 import { IScreensharingOpts, MediaHandler } from "../../src/webrtc/mediaHandler";
 
 export const DUMMY_SDP = (
@@ -295,6 +316,57 @@ export class MockMediaDevices {
     typed(): MediaDevices { return this as unknown as MediaDevices; }
 }
 
+type EmittedEvents = CallEventHandlerEvent | CallEvent | ClientEvent | RoomStateEvent | GroupCallEventHandlerEvent;
+type EmittedEventMap = CallEventHandlerEventHandlerMap &
+    CallEventHandlerMap &
+    ClientEventHandlerMap &
+    RoomStateEventHandlerMap &
+    GroupCallEventHandlerMap;
+
+export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, EmittedEventMap> {
+    public mediaHandler = new MockMediaHandler();
+
+    constructor(public userId: string, public deviceId: string, public sessionId: string) {
+        super();
+    }
+
+    groupCallEventHandler = {
+        groupCalls: new Map<string, GroupCall>(),
+    };
+
+    callEventHandler = {
+        calls: new Map<string, MatrixCall>(),
+    };
+
+    sendStateEvent = jest.fn<Promise<ISendEventResponse>, [
+        roomId: string, eventType: EventType, content: any, statekey: string,
+    ]>();
+    sendToDevice = jest.fn<Promise<{}>, [
+        eventType: string,
+        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
+        txnId?: string,
+    ]>();
+
+    getMediaHandler(): MediaHandler { return this.mediaHandler.typed(); }
+
+    getUserId(): string { return this.userId; }
+
+    getDeviceId(): string { return this.deviceId; }
+    getSessionId(): string { return this.sessionId; }
+
+    getTurnServers = () => [];
+    isFallbackICEServerAllowed = () => false;
+    reEmitter = new ReEmitter(new TypedEventEmitter());
+    getUseE2eForGroupCall = () => false;
+    checkTurnServers = () => null;
+
+    getSyncState = jest.fn<SyncState, []>().mockReturnValue(SyncState.Syncing);
+
+    getRooms = jest.fn<Room[], []>().mockReturnValue([]);
+
+    typed(): MatrixClient { return this as unknown as MatrixClient; }
+}
+
 export function installWebRTCMocks() {
     global.navigator = {
         mediaDevices: new MockMediaDevices().typed(),
@@ -317,4 +389,27 @@ export function installWebRTCMocks() {
 
     // @ts-ignore Mock
     global.RTCRtpReceiver = {};
+}
+
+export function makeMockGroupCallStateEvent(roomId: string, groupCallId: string): MatrixEvent {
+    return {
+        getType: jest.fn().mockReturnValue(EventType.GroupCallPrefix),
+        getRoomId: jest.fn().mockReturnValue(roomId),
+        getTs: jest.fn().mockReturnValue(0),
+        getContent: jest.fn().mockReturnValue({
+            "m.type": GroupCallType.Video,
+            "m.intent": GroupCallIntent.Prompt,
+        }),
+        getStateKey: jest.fn().mockReturnValue(groupCallId),
+    } as unknown as MatrixEvent;
+}
+
+export function makeMockGroupCallMemberStateEvent(roomId: string, groupCallId: string): MatrixEvent {
+    return {
+        getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+        getRoomId: jest.fn().mockReturnValue(roomId),
+        getTs: jest.fn().mockReturnValue(0),
+        getContent: jest.fn().mockReturnValue({}),
+        getStateKey: jest.fn().mockReturnValue(groupCallId),
+    } as unknown as MatrixEvent;
 }
