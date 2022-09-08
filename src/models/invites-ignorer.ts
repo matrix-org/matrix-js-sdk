@@ -17,7 +17,9 @@ limitations under the License.
 import { UnstableValue } from "matrix-events-sdk";
 
 import { MatrixClient } from "../client";
-import { EventTimeline, MatrixEvent, Preset } from "../matrix";
+import { MatrixEvent } from "./event";
+import { EventTimeline } from "./event-timeline";
+import { Preset } from "../@types/partials";
 import { globToRegexp } from "../utils";
 import { Room } from "./room";
 
