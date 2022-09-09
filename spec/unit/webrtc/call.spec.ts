@@ -32,6 +32,7 @@ import {
     installWebRTCMocks,
     MockRTCPeerConnection,
     SCREENSHARE_STREAM_ID,
+    MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { Callback, EventType, IContent, MatrixEvent, Room } from "../../../src";
@@ -974,6 +975,9 @@ describe('Call', function() {
 
         MockRTCPeerConnection.triggerAllNegotiations();
 
+        const mockVideoSender = call.peerConn.getSenders().find(s => s.track.kind === "video");
+        const mockReplaceTrack = mockVideoSender.replaceTrack = jest.fn();
+
         await call.setScreensharingEnabled(true);
 
         // our local feed should still reflect the purpose of the feed (ie. screenshare)
@@ -984,6 +988,11 @@ describe('Call', function() {
         // but we should not have re-negotiated
         expect(MockRTCPeerConnection.hasAnyPendingNegotiations()).toEqual(false);
 
+        expect(mockReplaceTrack).toHaveBeenCalledWith(expect.objectContaining({
+            id: "screenshare_video_track",
+        }));
+        mockReplaceTrack.mockClear();
+
         await call.setScreensharingEnabled(false);
 
         expect(
@@ -992,5 +1001,9 @@ describe('Call', function() {
         expect(call.getLocalFeeds()).toHaveLength(1);
 
         expect(MockRTCPeerConnection.hasAnyPendingNegotiations()).toEqual(false);
+
+        expect(mockReplaceTrack).toHaveBeenCalledWith(expect.objectContaining({
+            id: "usermedia_video_track",
+        }));
     });
 });

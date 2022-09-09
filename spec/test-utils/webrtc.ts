@@ -83,6 +83,7 @@ export class MockRTCPeerConnection {
     private onReadyToNegotiate: () => void;
     localDescription: RTCSessionDescription;
     signalingState: RTCSignalingState = "stable";
+    public senders: MockRTCRtpSender[] = [];
 
     public static triggerAllNegotiations(): void {
         for (const inst of this.instances) {
@@ -139,13 +140,17 @@ export class MockRTCPeerConnection {
     addTrack(track: MockMediaStreamTrack) {
         this.needsNegotiation = true;
         this.onReadyToNegotiate();
-        return new MockRTCRtpSender(track);
+        const newSender = new MockRTCRtpSender(track);
+        this.senders.push(newSender);
+        return newSender;
     }
 
     removeTrack() {
         this.needsNegotiation = true;
         this.onReadyToNegotiate();
     }
+
+    getSenders(): MockRTCRtpSender[] { return this.senders; }
 
     doNegotiation() {
         if (this.needsNegotiation && this.negotiationNeededListener) {
@@ -254,8 +259,8 @@ export class MockMediaHandler {
 
     getUserMediaStream(audio: boolean, video: boolean) {
         const tracks = [];
-        if (audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
-        if (video) tracks.push(new MockMediaStreamTrack("video_track", "video"));
+        if (audio) tracks.push(new MockMediaStreamTrack("usermedia_audio_track", "audio"));
+        if (video) tracks.push(new MockMediaStreamTrack("usermedia_video_track", "video"));
 
         const stream = new MockMediaStream(USERMEDIA_STREAM_ID, tracks);
         this.userMediaStreams.push(stream);
@@ -265,8 +270,8 @@ export class MockMediaHandler {
         stream.isStopped = true;
     }
     getScreensharingStream = jest.fn((opts?: IScreensharingOpts) => {
-        const tracks = [new MockMediaStreamTrack("video_track", "video")];
-        if (opts?.audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
+        const tracks = [new MockMediaStreamTrack("screenshare_video_track", "video")];
+        if (opts?.audio) tracks.push(new MockMediaStreamTrack("screenshare_audio_track", "audio"));
 
         const stream = new MockMediaStream(SCREENSHARE_STREAM_ID, tracks);
         this.screensharingStreams.push(stream);
