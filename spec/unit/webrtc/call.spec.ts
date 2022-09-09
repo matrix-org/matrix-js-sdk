@@ -32,6 +32,7 @@ import {
     installWebRTCMocks,
     MockRTCPeerConnection,
     SCREENSHARE_STREAM_ID,
+    MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { Callback, EventType, IContent, MatrixEvent, Room } from "../../../src";
@@ -957,6 +958,40 @@ describe('Call', function() {
             expect(
                 call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare),
             ).toHaveLength(0);
+        });
+
+        it("removes RTX codec from screen sharing transcievers", async () => {
+            (global.RTCRtpSender.getCapabilities as unknown as jest.Mock).mockReturnValue({
+                codecs: [
+                    { mimeType: "video/rtx" },
+                    { mimeType: "video/somethingelse" },
+                ],
+                headerExtensions: [],
+            });
+
+            const prom = new Promise<void>(resolve => {
+                const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+                mockPeerConn.addTrack = jest.fn().mockImplementation((track: MockMediaStreamTrack) => {
+                    const mockSender = new MockRTCRtpSender(track);
+                    mockPeerConn.getTransceivers.mockReturnValue([{
+                        sender: mockSender,
+                        setCodecPreferences: (prefs: RTCRtpCodecCapability[]) => {
+                            expect(prefs).toEqual([
+                                expect.objectContaining({ mimeType: "video/somethingelse" }),
+                            ]);
+
+                            resolve();
+                        },
+                    }]);
+
+                    return mockSender;
+                });
+            });
+
+            await call.setScreensharingEnabled(true);
+            MockRTCPeerConnection.triggerAllNegotiations();
+
+            await prom;
         });
     });
 
