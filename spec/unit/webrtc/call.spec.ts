@@ -389,14 +389,14 @@ describe('Call', function() {
 
         const usermediaSenders: Array<RTCRtpSender> = (call as any).usermediaSenders;
 
-        expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("audio_track");
-        expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
+        expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("usermedia_audio_track");
+        expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("usermedia_video_track");
         expect(usermediaSenders.find((sender) => {
             return sender?.track?.kind === "audio";
-        }).track.id).toBe("audio_track");
+        }).track.id).toBe("usermedia_audio_track");
         expect(usermediaSenders.find((sender) => {
             return sender?.track?.kind === "video";
-        }).track.id).toBe("video_track");
+        }).track.id).toBe("usermedia_video_track");
     });
 
     it("should handle SDPStreamMetadata changes", async () => {
