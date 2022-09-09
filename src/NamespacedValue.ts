@@ -41,6 +41,13 @@ export class NamespacedValue<S extends string, U extends string> {
         return this.unstable;
     }
 
+    public get names(): (U | S)[] {
+        const names = [this.name];
+        const altName = this.altName;
+        if (altName) names.push(altName);
+        return names;
+    }
+
     public matches(val: string): boolean {
         return this.name === val || this.altName === val;
     }
