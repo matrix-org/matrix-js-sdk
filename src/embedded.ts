@@ -146,6 +146,11 @@ export class RoomWidgetClient extends MatrixClient {
         this.lifecycle.abort(); // Signal to other async tasks that the client has stopped
     }
 
+    public async joinRoom(roomIdOrAlias: string): Promise<Room> {
+        if (roomIdOrAlias === this.roomId) return this.room;
+        throw new Error(`Unknown room: ${roomIdOrAlias}`);
+    }
+
     public async sendStateEvent(
         roomId: string,
         eventType: string,
