@@ -263,7 +263,7 @@ export class GroupCall extends TypedEventEmitter<
             throw error;
         }
 
-        const userId = this.client.getUserId();
+        const userId = this.client.getUserId()!;
 
         const callFeed = new CallFeed({
             client: this.client,
