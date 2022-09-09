@@ -137,7 +137,7 @@ export class MockRTCPeerConnection {
     }
     close() { }
     getStats() { return []; }
-    addTrack(track: MockMediaStreamTrack) {
+    addTrack(track: MockMediaStreamTrack): MockRTCRtpSender {
         this.needsNegotiation = true;
         this.onReadyToNegotiate();
         const newSender = new MockRTCRtpSender(track);
