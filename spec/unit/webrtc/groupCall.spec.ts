@@ -24,7 +24,7 @@ import {
     Room,
     RoomMember,
 } from '../../../src';
-import { GroupCall } from "../../../src/webrtc/groupCall";
+import { GroupCall, GroupCallEvent } from "../../../src/webrtc/groupCall";
 import { MatrixClient } from "../../../src/client";
 import {
     installWebRTCMocks,
@@ -52,6 +52,7 @@ const FAKE_SESSION_ID_1 = "alice1";
 const FAKE_USER_ID_2 = "@bob:test.dummy";
 const FAKE_DEVICE_ID_2 = "@BBBBBB";
 const FAKE_SESSION_ID_2 = "bob1";
+const FAKE_USER_ID_3 = "@charlie:test.dummy";
 const FAKE_STATE_EVENTS = [
     {
         getContent: () => ({
@@ -176,6 +177,8 @@ class MockCall {
             userId: this.opponentUserId,
         };
     }
+
+    typed(): MatrixCall { return this as unknown as MatrixCall; }
 }
 
 describe('Group Call', function() {
@@ -930,6 +933,72 @@ describe('Group Call', function() {
             expect(groupCall.getScreenshareFeedByUserId(call.invitee)).toBeDefined();
 
             groupCall.terminate();
+        });
+    });
+
+    describe("active speaker events", () => {
+        let room: Room;
+        let groupCall: GroupCall;
+        let mediaFeed1: CallFeed;
+        let mediaFeed2: CallFeed;
+        let onActiveSpeakerEvent: jest.Mock<void, []>;
+
+        beforeEach(async () => {
+            jest.useFakeTimers();
+
+            const mockClient = new MockCallMatrixClient(
+                FAKE_USER_ID_1, FAKE_DEVICE_ID_1, FAKE_SESSION_ID_1,
+            );
+
+            room = new Room(FAKE_ROOM_ID, mockClient.typed(), FAKE_USER_ID_1);
+            groupCall = await createAndEnterGroupCall(mockClient.typed(), room);
+
+            mediaFeed1 = new CallFeed({
+                client: mockClient.typed(),
+                roomId: FAKE_ROOM_ID,
+                userId: FAKE_USER_ID_2,
+                stream: (new MockMediaStream("foo", [])).typed(),
+                purpose: SDPStreamMetadataPurpose.Usermedia,
+                audioMuted: false,
+                videoMuted: true,
+            });
+            groupCall.userMediaFeeds.push(mediaFeed1);
+
+            mediaFeed2 = new CallFeed({
+                client: mockClient.typed(),
+                roomId: FAKE_ROOM_ID,
+                userId: FAKE_USER_ID_3,
+                stream: (new MockMediaStream("foo", [])).typed(),
+                purpose: SDPStreamMetadataPurpose.Usermedia,
+                audioMuted: false,
+                videoMuted: true,
+            });
+            groupCall.userMediaFeeds.push(mediaFeed2);
+
+            onActiveSpeakerEvent = jest.fn();
+            groupCall.on(GroupCallEvent.ActiveSpeakerChanged, onActiveSpeakerEvent);
+        });
+
+        afterEach(() => {
+            groupCall.off(GroupCallEvent.ActiveSpeakerChanged, onActiveSpeakerEvent);
+
+            jest.useRealTimers();
+        });
+
+        it("fires active speaker events when a user is speaking", async () => {
+            mediaFeed1.speakingVolumeSamples = [100, 100];
+            mediaFeed2.speakingVolumeSamples = [0, 0];
+
+            jest.runOnlyPendingTimers();
+            expect(groupCall.activeSpeaker).toEqual(FAKE_USER_ID_2);
+            expect(onActiveSpeakerEvent).toHaveBeenCalledWith(FAKE_USER_ID_2);
+
+            mediaFeed1.speakingVolumeSamples = [0, 0];
+            mediaFeed2.speakingVolumeSamples = [100, 100];
+
+            jest.runOnlyPendingTimers();
+            expect(groupCall.activeSpeaker).toEqual(FAKE_USER_ID_3);
+            expect(onActiveSpeakerEvent).toHaveBeenCalledWith(FAKE_USER_ID_3);
         });
     });
 });
