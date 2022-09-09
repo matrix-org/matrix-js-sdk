@@ -131,7 +131,7 @@ export class RoomWidgetClient extends MatrixClient {
                 });
             }) ?? [],
         );
-        this.setSyncState(SyncState.Prepared);
+        this.setSyncState(SyncState.Syncing);
         logger.info("Finished backfilling events");
 
         // Watch for TURN servers, if requested
