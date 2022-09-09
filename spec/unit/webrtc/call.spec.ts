@@ -925,8 +925,8 @@ describe('Call', function() {
             await call.setScreensharingEnabled(true);
 
             expect(
-                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length,
-            ).toEqual(1);
+                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare),
+            ).toHaveLength(1);
 
             mockSendEvent.mockReset();
             const sendNegotiatePromise = new Promise<void>(resolve => {
@@ -955,8 +955,42 @@ describe('Call', function() {
             await call.setScreensharingEnabled(false);
 
             expect(
-                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length,
-            ).toEqual(0);
+                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare),
+            ).toHaveLength(0);
         });
+    });
+
+    it("falls back to replaceTrack for opponents that don't support stream metadata", async () => {
+        await startVideoCall(client, call);
+
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            "version": 1,
+            "call_id": call.callId,
+            "party_id": 'party_id',
+            "answer": {
+                sdp: DUMMY_SDP,
+            },
+        }));
+
+        MockRTCPeerConnection.triggerAllNegotiations();
+
+        await call.setScreensharingEnabled(true);
+
+        // our local feed should still reflect the purpose of the feed (ie. screenshare)
+        expect(
+            call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length,
+        ).toEqual(1);
+
+        // but we should not have re-negotiated
+        expect(MockRTCPeerConnection.hasAnyPendingNegotiations()).toEqual(false);
+
+        await call.setScreensharingEnabled(false);
+
+        expect(
+            call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare),
+        ).toHaveLength(0);
+        expect(call.getLocalFeeds()).toHaveLength(1);
+
+        expect(MockRTCPeerConnection.hasAnyPendingNegotiations()).toEqual(false);
     });
 });

@@ -84,10 +84,14 @@ export class MockRTCPeerConnection {
     localDescription: RTCSessionDescription;
     signalingState: RTCSignalingState = "stable";
 
-    public static triggerAllNegotiations() {
+    public static triggerAllNegotiations(): void {
         for (const inst of this.instances) {
             inst.doNegotiation();
         }
+    }
+
+    public static hasAnyPendingNegotiations(): boolean {
+        return this.instances.some(i => i.needsNegotiation);
     }
 
     public static resetInstances() {
