@@ -389,14 +389,14 @@ describe('Call', function() {
 
         const usermediaSenders: Array<RTCRtpSender> = (call as any).usermediaSenders;
 
-        expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("audio_track");
-        expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
+        expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("usermedia_audio_track");
+        expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("usermedia_video_track");
         expect(usermediaSenders.find((sender) => {
             return sender?.track?.kind === "audio";
-        }).track.id).toBe("audio_track");
+        }).track.id).toBe("usermedia_audio_track");
         expect(usermediaSenders.find((sender) => {
             return sender?.track?.kind === "video";
-        }).track.id).toBe("video_track");
+        }).track.id).toBe("usermedia_video_track");
     });
 
     it("should handle SDPStreamMetadata changes", async () => {
@@ -925,8 +925,8 @@ describe('Call', function() {
             await call.setScreensharingEnabled(true);
 
             expect(
-                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length,
-            ).toEqual(1);
+                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare),
+            ).toHaveLength(1);
 
             mockSendEvent.mockReset();
             const sendNegotiatePromise = new Promise<void>(resolve => {
@@ -955,8 +955,54 @@ describe('Call', function() {
             await call.setScreensharingEnabled(false);
 
             expect(
-                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length,
-            ).toEqual(0);
+                call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare),
+            ).toHaveLength(0);
         });
+    });
+
+    it("falls back to replaceTrack for opponents that don't support stream metadata", async () => {
+        await startVideoCall(client, call);
+
+        await call.onAnswerReceived(makeMockEvent("@test:foo", {
+            "version": 1,
+            "call_id": call.callId,
+            "party_id": 'party_id',
+            "answer": {
+                sdp: DUMMY_SDP,
+            },
+        }));
+
+        MockRTCPeerConnection.triggerAllNegotiations();
+
+        const mockVideoSender = call.peerConn.getSenders().find(s => s.track.kind === "video");
+        const mockReplaceTrack = mockVideoSender.replaceTrack = jest.fn();
+
+        await call.setScreensharingEnabled(true);
+
+        // our local feed should still reflect the purpose of the feed (ie. screenshare)
+        expect(
+            call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare).length,
+        ).toEqual(1);
+
+        // but we should not have re-negotiated
+        expect(MockRTCPeerConnection.hasAnyPendingNegotiations()).toEqual(false);
+
+        expect(mockReplaceTrack).toHaveBeenCalledWith(expect.objectContaining({
+            id: "screenshare_video_track",
+        }));
+        mockReplaceTrack.mockClear();
+
+        await call.setScreensharingEnabled(false);
+
+        expect(
+            call.getLocalFeeds().filter(f => f.purpose == SDPStreamMetadataPurpose.Screenshare),
+        ).toHaveLength(0);
+        expect(call.getLocalFeeds()).toHaveLength(1);
+
+        expect(MockRTCPeerConnection.hasAnyPendingNegotiations()).toEqual(false);
+
+        expect(mockReplaceTrack).toHaveBeenCalledWith(expect.objectContaining({
+            id: "usermedia_video_track",
+        }));
     });
 });
