@@ -183,6 +183,8 @@ export class GroupCall extends TypedEventEmitter<
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
     private memberStateExpirationTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private resendMemberStateTimer: ReturnType<typeof setInterval> | null = null;
+    private initWithAudioMuted = false;
+    private initWithVideoMuted = false;
 
     constructor(
         private client: MatrixClient,
@@ -261,12 +263,7 @@ export class GroupCall extends TypedEventEmitter<
             throw error;
         }
 
-        // start muted on ptt calls
-        if (this.isPtt) {
-            setTracksEnabled(stream.getAudioTracks(), false);
-        }
-
-        const userId = this.client.getUserId();
+        const userId = this.client.getUserId()!;
 
         const callFeed = new CallFeed({
             client: this.client,
@@ -274,9 +271,12 @@ export class GroupCall extends TypedEventEmitter<
             userId,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: stream.getAudioTracks().length === 0 || this.isPtt,
-            videoMuted: stream.getVideoTracks().length === 0,
+            audioMuted: this.initWithAudioMuted || stream.getAudioTracks().length === 0 || this.isPtt,
+            videoMuted: this.initWithVideoMuted || stream.getVideoTracks().length === 0,
         });
+
+        setTracksEnabled(stream.getAudioTracks(), !callFeed.isAudioMuted());
+        setTracksEnabled(stream.getVideoTracks(), !callFeed.isVideoMuted());
 
         this.localCallFeed = callFeed;
         this.addUserMediaFeed(callFeed);
@@ -496,6 +496,9 @@ export class GroupCall extends TypedEventEmitter<
             // given to any of the actual calls, so these tracks don't actually go
             // anywhere. Let's do it anyway to avoid confusion.
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
+        } else {
+            logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted no stream muted ${muted}`);
+            this.initWithAudioMuted = muted;
         }
 
         for (const call of this.calls) {
@@ -532,6 +535,9 @@ export class GroupCall extends TypedEventEmitter<
                 this.localCallFeed.stream.id} muted ${muted}`);
             this.localCallFeed.setAudioVideoMuted(null, muted);
             setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+        } else {
+            logger.log(`groupCall ${this.groupCallId} setLocalVideoMuted no stream muted ${muted}`);
+            this.initWithVideoMuted = muted;
         }
 
         for (const call of this.calls) {

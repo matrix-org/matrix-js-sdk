@@ -131,7 +131,7 @@ export class RoomWidgetClient extends MatrixClient {
                 });
             }) ?? [],
         );
-        this.setSyncState(SyncState.Prepared);
+        this.setSyncState(SyncState.Syncing);
         logger.info("Finished backfilling events");
 
         // Watch for TURN servers, if requested
@@ -144,6 +144,11 @@ export class RoomWidgetClient extends MatrixClient {
 
         super.stopClient();
         this.lifecycle.abort(); // Signal to other async tasks that the client has stopped
+    }
+
+    public async joinRoom(roomIdOrAlias: string): Promise<Room> {
+        if (roomIdOrAlias === this.roomId) return this.room;
+        throw new Error(`Unknown room: ${roomIdOrAlias}`);
     }
 
     public async sendStateEvent(
