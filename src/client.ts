@@ -198,6 +198,7 @@ import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { IgnoredInvites } from "./models/invites-ignorer";
+import { UnstableValue } from "./NamespacedValue";
 
 export type Store = IStore;
 
@@ -522,11 +523,16 @@ interface IServerVersions {
     unstable_features: Record<string, boolean>;
 }
 
+export const M_AUTHENTICATION = new UnstableValue(
+    "m.authentication",
+    "org.matrix.msc2965.authentication",
+);
+
 export interface IClientWellKnown {
     [key: string]: any;
     "m.homeserver"?: IWellKnownConfig;
     "m.identity_server"?: IWellKnownConfig;
-    "org.matrix.msc2965.authentication"?: IDelegatedAuthConfig; // MSC2965
+    [M_AUTHENTICATION.name]?: IDelegatedAuthConfig; // MSC2965
 }
 
 export interface IWellKnownConfig {
