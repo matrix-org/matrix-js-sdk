@@ -24,8 +24,33 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
 import type * as NodeCrypto from "crypto";
-import { MatrixEvent } from ".";
+import { MatrixClient, MatrixEvent } from ".";
 import { M_TIMESTAMP } from "./@types/location";
+import { ReceiptType } from "./@types/read_receipts";
+
+const interns = new Map<string, string>();
+
+/**
+ * Internalises a string, reusing a known pointer or storing the pointer
+ * if needed for future strings.
+ * @param str The string to internalise.
+ * @returns The internalised string.
+ */
+export function internaliseString(str: string): string {
+    // Unwrap strings before entering the map, if we somehow got a wrapped
+    // string as our input. This should only happen from tests.
+    if ((str as unknown) instanceof String) {
+        str = str.toString();
+    }
+
+    // Check the map to see if we can store the value
+    if (!interns.has(str)) {
+        interns.set(str, str);
+    }
+
+    // Return any cached string reference
+    return interns.get(str);
+}
 
 /**
  * Encode a dictionary of query parameters.
@@ -73,8 +98,7 @@ export function decodeParams(query: string): QueryDict {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate: string,
-    variables: Record<string, string>): string {
+export function encodeUri(pathTemplate: string, variables: Record<string, string>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
@@ -140,23 +164,6 @@ export function checkObjectHasKeys(obj: object, keys: string[]) {
     for (let i = 0; i < keys.length; i++) {
         if (!obj.hasOwnProperty(keys[i])) {
             throw new Error("Missing required key: " + keys[i]);
-        }
-    }
-}
-
-/**
- * Checks that the given object has no extra keys other than the specified ones.
- * @param {Object} obj The object to check.
- * @param {string[]} allowedKeys The list of allowed key names.
- * @throws If there are extra keys.
- */
-export function checkObjectHasNoAdditionalKeys(obj: object, allowedKeys: string[]): void {
-    for (const key in obj) {
-        if (!obj.hasOwnProperty(key)) {
-            continue;
-        }
-        if (allowedKeys.indexOf(key) === -1) {
-            throw new Error("Unknown key: " + key);
         }
     }
 }
@@ -231,33 +238,24 @@ export function deepCompare(x: any, y: any): boolean {
             }
         }
     } else {
-        // disable jshint "The body of a for in should be wrapped in an if
-        // statement"
-        /* jshint -W089 */
-
         // check that all of y's direct keys are in x
-        let p;
-        for (p in y) {
+        for (const p in y) {
             if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
                 return false;
             }
         }
 
         // finally, compare each of x's keys with y
-        for (p in y) { // eslint-disable-line guard-for-in
-            if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
-                return false;
-            }
-            if (!deepCompare(x[p], y[p])) {
+        for (const p in x) {
+            if (y.hasOwnProperty(p) !== x.hasOwnProperty(p) || !deepCompare(x[p], y[p])) {
                 return false;
             }
         }
     }
-    /* jshint +W089 */
     return true;
 }
 
-// Dev note: This returns a tuple, but jsdoc doesn't like that. https://github.com/jsdoc/jsdoc/issues/1703
+// Dev note: This returns an array of tuples, but jsdoc doesn't like that. https://github.com/jsdoc/jsdoc/issues/1703
 /**
  * Creates an array of object properties/values (entries) then
  * sorts the result by key, recursively. The input object must
@@ -281,69 +279,6 @@ export function deepSortedObjectEntries(obj: any): [string, any][] {
     pairs.sort((a, b) => lexicographicCompare(a[0], b[0]));
 
     return pairs;
-}
-
-/**
- * Inherit the prototype methods from one constructor into another. This is a
- * port of the Node.js implementation with an Object.create polyfill.
- *
- * @param {function} ctor Constructor function which needs to inherit the
- *     prototype.
- * @param {function} superCtor Constructor function to inherit prototype from.
- */
-export function inherits(ctor: Function, superCtor: Function) {
-    // Add util.inherits from Node.js
-    // Source:
-    // https://github.com/joyent/node/blob/master/lib/util.js
-    // Copyright Joyent, Inc. and other Node contributors.
-    //
-    // Permission is hereby granted, free of charge, to any person obtaining a
-    // copy of this software and associated documentation files (the
-    // "Software"), to deal in the Software without restriction, including
-    // without limitation the rights to use, copy, modify, merge, publish,
-    // distribute, sublicense, and/or sell copies of the Software, and to permit
-    // persons to whom the Software is furnished to do so, subject to the
-    // following conditions:
-    //
-    // The above copyright notice and this permission notice shall be included
-    // in all copies or substantial portions of the Software.
-    //
-    // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
-    // OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-    // MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN
-    // NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM,
-    // DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
-    // OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
-    // USE OR OTHER DEALINGS IN THE SOFTWARE.
-    (ctor as any).super_ = superCtor;
-    ctor.prototype = Object.create(superCtor.prototype, {
-        constructor: {
-            value: ctor,
-            enumerable: false,
-            writable: true,
-            configurable: true,
-        },
-    });
-}
-
-/**
- * Polyfills inheritance for prototypes by allowing different kinds of
- * super types. Typically prototypes would use `SuperType.call(this, params)`
- * though this doesn't always work in some environments - this function
- * falls back to using `Object.assign()` to clone a constructed copy
- * of the super type onto `thisArg`.
- * @param {any} thisArg The child instance. Modified in place.
- * @param {any} SuperType The type to act as a super instance
- * @param {any} params Arguments to supply to the super type's constructor
- */
-export function polyfillSuper(thisArg: any, SuperType: any, ...params: any[]) {
-    try {
-        SuperType.call(thisArg, ...params);
-    } catch (e) {
-        // fall back to Object.assign to just clone the thing
-        const fakeSuper = new SuperType(...params);
-        Object.assign(thisArg, fakeSuper);
-    }
 }
 
 /**
@@ -406,23 +341,29 @@ export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function globToRegexp(glob: string, extended?: any): string {
-    extended = typeof(extended) === 'boolean' ? extended : true;
+export function globToRegexp(glob: string, extended = false): string {
     // From
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
     // Because micromatch is about 130KB with dependencies,
     // and minimatch is not much better.
-    let pat = escapeRegExp(glob);
-    pat = pat.replace(/\\\*/g, '.*');
-    pat = pat.replace(/\?/g, '.');
-    if (extended) {
-        pat = pat.replace(/\\\[(!|)(.*)\\]/g, function(match, p1, p2, offset, string) {
-            const first = p1 && '^' || '';
-            const second = p2.replace(/\\-/, '-');
-            return '[' + first + second + ']';
-        });
-    }
-    return pat;
+    const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
+        [/\\\*/g, '.*'],
+        [/\?/g, '.'],
+        !extended && [
+            /\\\[(!|)(.*)\\]/g,
+            (_match: string, neg: string, pat: string) => [
+                '[',
+                neg ? '^' : '',
+                pat.replace(/\\-/, '-'),
+                ']',
+            ].join(''),
+        ],
+    ];
+    return replacements.reduce(
+        // https://github.com/microsoft/TypeScript/issues/30134
+        (pat, args) => args ? pat.replace(args[0], args[1] as any) : pat,
+        escapeRegExp(glob),
+    );
 }
 
 export function ensureNoTrailingSlash(url: string): string {
@@ -728,3 +669,18 @@ function getContentTimestampWithFallback(event: MatrixEvent): number {
 export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: MatrixEvent): number {
     return getContentTimestampWithFallback(right) - getContentTimestampWithFallback(left);
 }
+
+export async function getPrivateReadReceiptField(client: MatrixClient): Promise<ReceiptType | null> {
+    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) return ReceiptType.ReadPrivate;
+    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285")) return ReceiptType.UnstableReadPrivate;
+    return null;
+}
+
+export function isSupportedReceiptType(receiptType: string): boolean {
+    return [
+        ReceiptType.Read,
+        ReceiptType.ReadPrivate,
+        ReceiptType.UnstableReadPrivate,
+    ].includes(receiptType as ReceiptType);
+}
+

@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,8 @@ import {
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter, IFilterDefinition } from "../filter";
-import { RoomState } from "./room-state";
+import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
+import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import {
     Thread,
     ThreadEvent,
@@ -72,7 +73,7 @@ function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: Rece
                 },
             },
         },
-        type: "m.receipt",
+        type: EventType.Receipt,
         room_id: event.getRoomId(),
     });
 }
@@ -172,16 +173,19 @@ export enum RoomEvent {
 }
 
 type EmittedEvents = RoomEvent
+    | RoomStateEvent.Events
+    | RoomStateEvent.Members
+    | RoomStateEvent.NewMember
+    | RoomStateEvent.Update
+    | RoomStateEvent.Marker
     | ThreadEvent.New
     | ThreadEvent.Update
     | ThreadEvent.NewReply
-    | RoomEvent.Timeline
-    | RoomEvent.TimelineReset
-    | RoomEvent.TimelineRefresh
-    | RoomEvent.HistoryImportedWithinTimeline
-    | RoomEvent.OldStateUpdated
-    | RoomEvent.CurrentStateUpdated
-    | MatrixEventEvent.BeforeRedaction;
+    | MatrixEventEvent.BeforeRedaction
+    | BeaconEvent.New
+    | BeaconEvent.Update
+    | BeaconEvent.Destroy
+    | BeaconEvent.LivenessChange;
 
 export type RoomEventHandlerMap = {
     [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
@@ -205,7 +209,21 @@ export type RoomEventHandlerMap = {
     ) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
-} & ThreadHandlerMap & MatrixEventHandlerMap;
+} & ThreadHandlerMap
+    & MatrixEventHandlerMap
+    & Pick<
+        RoomStateEventHandlerMap,
+        RoomStateEvent.Events
+            | RoomStateEvent.Members
+            | RoomStateEvent.NewMember
+            | RoomStateEvent.Update
+            | RoomStateEvent.Marker
+            | BeaconEvent.New
+    >
+    & Pick<
+        BeaconEventHandlerMap,
+        BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange
+    >;
 
 export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
@@ -1068,6 +1086,32 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         if (previousCurrentState !== this.currentState) {
             this.emit(RoomEvent.CurrentStateUpdated, this, previousCurrentState, this.currentState);
+
+            // Re-emit various events on the current room state
+            // TODO: If currentState really only exists for backwards
+            // compatibility, shouldn't we be doing this some other way?
+            this.reEmitter.stopReEmitting(previousCurrentState, [
+                RoomStateEvent.Events,
+                RoomStateEvent.Members,
+                RoomStateEvent.NewMember,
+                RoomStateEvent.Update,
+                RoomStateEvent.Marker,
+                BeaconEvent.New,
+                BeaconEvent.Update,
+                BeaconEvent.Destroy,
+                BeaconEvent.LivenessChange,
+            ]);
+            this.reEmitter.reEmit(this.currentState, [
+                RoomStateEvent.Events,
+                RoomStateEvent.Members,
+                RoomStateEvent.NewMember,
+                RoomStateEvent.Update,
+                RoomStateEvent.Marker,
+                BeaconEvent.New,
+                BeaconEvent.Update,
+                BeaconEvent.Destroy,
+                BeaconEvent.LivenessChange,
+            ]);
         }
     }
 
@@ -1917,11 +1961,24 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         // If any pending visibility change is waiting for this (older) event,
         this.applyPendingVisibilityEvents(event);
 
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.handleRemoteEcho(event, existingEvent);
+        // Sliding Sync modifications:
+        // The proxy cannot guarantee every sent event will have a transaction_id field, so we need
+        // to check the event ID against the list of pending events if there is no transaction ID
+        // field. Only do this for events sent by us though as it's potentially expensive to loop
+        // the pending events map.
+        const txnId = event.getUnsigned().transaction_id;
+        if (!txnId && event.getSender() === this.myUserId) {
+            // check the txn map for a matching event ID
+            for (const tid in this.txnToEvent) {
+                const localEvent = this.txnToEvent[tid];
+                if (localEvent.getId() === event.getId()) {
+                    logger.debug("processLiveEvent: found sent event without txn ID: ", tid, event.getId());
+                    // update the unsigned field so we can re-use the same codepaths
+                    const unsigned = event.getUnsigned();
+                    unsigned.transaction_id = tid;
+                    event.setUnsigned(unsigned);
+                    break;
+                }
             }
         }
     }
@@ -1931,7 +1988,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * "Room.timeline".
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {IAddLiveEventOptions} options addLiveEvent options
+     * @param {IAddLiveEventOptions} addLiveEventOptions addLiveEvent options
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
@@ -2173,7 +2230,22 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             const timeline = this.getTimelineForEvent(newEventId);
             if (timeline) {
                 // we've already received the event via the event stream.
-                // nothing more to do here.
+                // nothing more to do here, assuming the transaction ID was correctly matched.
+                // Let's check that.
+                const remoteEvent = this.findEventById(newEventId);
+                const remoteTxnId = remoteEvent.getUnsigned().transaction_id;
+                if (!remoteTxnId) {
+                    // This code path is mostly relevant for the Sliding Sync proxy.
+                    // The remote event did not contain a transaction ID, so we did not handle
+                    // the remote echo yet. Handle it now.
+                    const unsigned = remoteEvent.getUnsigned();
+                    unsigned.transaction_id = event.getTxnId();
+                    remoteEvent.setUnsigned(unsigned);
+                    // the remote event is _already_ in the timeline, so we need to remove it so
+                    // we can convert the local event into the final event.
+                    this.removeEvent(remoteEvent.getId());
+                    this.handleRemoteEcho(remoteEvent, event);
+                }
                 return;
             }
         }
@@ -2264,7 +2336,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         fromCache = false,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty = false;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy,
@@ -2303,9 +2375,24 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const threadRoots = this.findThreadRoots(events);
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
 
+        const options: IAddLiveEventOptions = {
+            duplicateStrategy,
+            fromCache,
+            timelineWasEmpty,
+        };
+
         for (const event of events) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.processLiveEvent(event);
+
+            if (event.getUnsigned().transaction_id) {
+                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id!];
+                if (existingEvent) {
+                    // remote echo of an event we sent earlier
+                    this.handleRemoteEcho(event, existingEvent);
+                    continue; // we can skip adding the event to the timeline sets, it is already there
+                }
+            }
 
             const {
                 shouldLiveInRoom,
@@ -2319,11 +2406,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             eventsByThread[threadId]?.push(event);
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(event, {
-                    duplicateStrategy,
-                    fromCache,
-                    timelineWasEmpty,
-                });
+                this.addLiveEvent(event, options);
             }
         }
 
@@ -2387,9 +2470,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public addEphemeralEvents(events: MatrixEvent[]): void {
         for (const event of events) {
-            if (event.getType() === 'm.typing') {
+            if (event.getType() === EventType.Typing) {
                 this.currentState.setTypingEvent(event);
-            } else if (event.getType() === 'm.receipt') {
+            } else if (event.getType() === EventType.Receipt) {
                 this.addReceipt(event);
             } // else ignore - life is too short for us to care about these events
         }
@@ -2478,7 +2561,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public getUsersReadUpTo(event: MatrixEvent): string[] {
         return this.getReceiptsForEvent(event).filter(function(receipt) {
-            return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receipt.type);
+            return utils.isSupportedReceiptType(receipt.type);
         }).map(function(receipt) {
             return receipt.userId;
         });
@@ -2512,25 +2595,64 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * @return {String} ID of the latest event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
-        const timelineSet = this.getUnfilteredTimelineSet();
-        const publicReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.Read);
-        const privateReadReceipt = this.getReadReceiptForUserId(userId, ignoreSynthesized, ReceiptType.ReadPrivate);
+        // XXX: This is very very ugly and I hope I won't have to ever add a new
+        // receipt type here again. IMHO this should be done by the server in
+        // some more intelligent manner or the client should just use timestamps
 
-        // If we have both, compare them
-        let comparison: number | undefined;
-        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId) {
-            comparison = timelineSet.compareEventOrdering(publicReadReceipt?.eventId, privateReadReceipt?.eventId);
+        const timelineSet = this.getUnfilteredTimelineSet();
+        const publicReadReceipt = this.getReadReceiptForUserId(
+            userId,
+            ignoreSynthesized,
+            ReceiptType.Read,
+        );
+        const privateReadReceipt = this.getReadReceiptForUserId(
+            userId,
+            ignoreSynthesized,
+            ReceiptType.ReadPrivate,
+        );
+        const unstablePrivateReadReceipt = this.getReadReceiptForUserId(
+            userId,
+            ignoreSynthesized,
+            ReceiptType.UnstableReadPrivate,
+        );
+
+        // If we have all, compare them
+        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId && unstablePrivateReadReceipt?.eventId) {
+            const comparison1 = timelineSet.compareEventOrdering(
+                publicReadReceipt.eventId,
+                privateReadReceipt.eventId,
+            );
+            const comparison2 = timelineSet.compareEventOrdering(
+                publicReadReceipt.eventId,
+                unstablePrivateReadReceipt.eventId,
+            );
+            const comparison3 = timelineSet.compareEventOrdering(
+                privateReadReceipt.eventId,
+                unstablePrivateReadReceipt.eventId,
+            );
+            if (comparison1 && comparison2 && comparison3) {
+                return (comparison1 > 0)
+                    ? ((comparison2 > 0) ? publicReadReceipt.eventId : unstablePrivateReadReceipt.eventId)
+                    : ((comparison3 > 0) ? privateReadReceipt.eventId : unstablePrivateReadReceipt.eventId);
+            }
         }
 
-        // If we didn't get a comparison try to compare the ts of the receipts
-        if (!comparison) comparison = publicReadReceipt?.data?.ts - privateReadReceipt?.data?.ts;
+        let latest = privateReadReceipt;
+        [unstablePrivateReadReceipt, publicReadReceipt].forEach((receipt) => {
+            if (receipt?.data?.ts > latest?.data?.ts || !latest) {
+                latest = receipt;
+            }
+        });
+        if (latest?.eventId) return latest?.eventId;
 
-        // The public receipt is more likely to drift out of date so the private
-        // one has precedence
-        if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
-
-        // If public read receipt is older, return the private one
-        return (comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId;
+        // The more less likely it is for a read receipt to drift out of date
+        // the bigger is its precedence
+        return (
+            privateReadReceipt?.eventId ??
+            unstablePrivateReadReceipt?.eventId ??
+            publicReadReceipt?.eventId ??
+            null
+        );
     }
 
     /**
@@ -2839,6 +2961,33 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         return this.getType() === RoomType.ElementVideo;
     }
 
+    private roomNameGenerator(state: RoomNameState): string {
+        if (this.client.roomNameGenerator) {
+            const name = this.client.roomNameGenerator(this.roomId, state);
+            if (name !== null) {
+                return name;
+            }
+        }
+
+        switch (state.type) {
+            case RoomNameType.Actual:
+                return state.name;
+            case RoomNameType.Generated:
+                switch (state.subtype) {
+                    case "Inviting":
+                        return `Inviting ${memberNamesToRoomName(state.names, state.count)}`;
+                    default:
+                        return memberNamesToRoomName(state.names, state.count);
+                }
+            case RoomNameType.EmptyRoom:
+                if (state.oldName) {
+                    return `Empty room (was ${state.oldName})`;
+                } else {
+                    return "Empty room";
+                }
+        }
+    }
+
     /**
      * This is an internal method. Calculates the name of the room from the current
      * room state.
@@ -2853,14 +3002,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // check for an alias, if any. for now, assume first alias is the
             // official one.
             const mRoomName = this.currentState.getStateEvents(EventType.RoomName, "");
-            if (mRoomName && mRoomName.getContent() && mRoomName.getContent().name) {
-                return mRoomName.getContent().name;
+            if (mRoomName?.getContent().name) {
+                return this.roomNameGenerator({
+                    type: RoomNameType.Actual,
+                    name: mRoomName.getContent().name,
+                });
             }
         }
 
         const alias = this.getCanonicalAlias();
         if (alias) {
-            return alias;
+            return this.roomNameGenerator({
+                type: RoomNameType.Actual,
+                name: alias,
+            });
         }
 
         const joinedMemberCount = this.currentState.getJoinedMemberCount();
@@ -2892,8 +3047,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
-                return m.userId !== userId &&
-                    (m.membership === "invite" || m.membership === "join");
+                return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
             });
             otherMembers = otherMembers.filter(({ userId }) => {
                 // filter service members
@@ -2911,24 +3065,33 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         if (inviteJoinCount) {
-            return memberNamesToRoomName(otherNames, inviteJoinCount);
+            return this.roomNameGenerator({
+                type: RoomNameType.Generated,
+                names: otherNames,
+                count: inviteJoinCount,
+            });
         }
 
         const myMembership = this.getMyMembership();
         // if I have created a room and invited people through
         // 3rd party invites
         if (myMembership == 'join') {
-            const thirdPartyInvites =
-                this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
+            const thirdPartyInvites = this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
 
-            if (thirdPartyInvites && thirdPartyInvites.length) {
+            if (thirdPartyInvites?.length) {
                 const thirdPartyNames = thirdPartyInvites.map((i) => {
                     return i.getContent().display_name;
                 });
 
-                return `Inviting ${memberNamesToRoomName(thirdPartyNames)}`;
+                return this.roomNameGenerator({
+                    type: RoomNameType.Generated,
+                    subtype: "Inviting",
+                    names: thirdPartyNames,
+                    count: thirdPartyNames.length + 1,
+                });
             }
         }
+
         // let's try to figure out who was here before
         let leftNames = otherNames;
         // if we didn't have heroes, try finding them in the room state
@@ -2939,11 +3102,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     m.membership !== "join";
             }).map((m) => m.name);
         }
+
+        let oldName: string;
         if (leftNames.length) {
-            return `Empty room (was ${memberNamesToRoomName(leftNames)})`;
-        } else {
-            return "Empty room";
+            oldName = this.roomNameGenerator({
+                type: RoomNameType.Generated,
+                names: leftNames,
+                count: leftNames.length + 1,
+            });
         }
+
+        return this.roomNameGenerator({
+            type: RoomNameType.EmptyRoom,
+            oldName,
+        });
     }
 
     /**
@@ -3128,8 +3300,33 @@ const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
     [EventStatus.CANCELLED]: [],
 };
 
-// TODO i18n
-function memberNamesToRoomName(names: string[], count = (names.length + 1)) {
+export enum RoomNameType {
+    EmptyRoom,
+    Generated,
+    Actual,
+}
+
+export interface EmptyRoomNameState {
+    type: RoomNameType.EmptyRoom;
+    oldName?: string;
+}
+
+export interface GeneratedRoomNameState {
+    type: RoomNameType.Generated;
+    subtype?: "Inviting";
+    names: string[];
+    count: number;
+}
+
+export interface ActualRoomNameState {
+    type: RoomNameType.Actual;
+    name: string;
+}
+
+export type RoomNameState = EmptyRoomNameState | GeneratedRoomNameState | ActualRoomNameState;
+
+// Can be overriden by IMatrixClientCreateOpts::memberNamesToRoomNameFn
+function memberNamesToRoomName(names: string[], count: number): string {
     const countWithoutMe = count - 1;
     if (!names.length) {
         return "Empty room";

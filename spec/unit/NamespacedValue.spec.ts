@@ -21,18 +21,21 @@ describe("NamespacedValue", () => {
         const ns = new NamespacedValue("stable", "unstable");
         expect(ns.name).toBe(ns.stable);
         expect(ns.altName).toBe(ns.unstable);
+        expect(ns.names).toEqual([ns.stable, ns.unstable]);
     });
 
     it("should return unstable if there is no stable", () => {
         const ns = new NamespacedValue(null, "unstable");
         expect(ns.name).toBe(ns.unstable);
         expect(ns.altName).toBeFalsy();
+        expect(ns.names).toEqual([ns.unstable]);
     });
 
     it("should have a falsey unstable if needed", () => {
         const ns = new NamespacedValue("stable", null);
         expect(ns.name).toBe(ns.stable);
         expect(ns.altName).toBeFalsy();
+        expect(ns.names).toEqual([ns.stable]);
     });
 
     it("should match against either stable or unstable", () => {
@@ -58,12 +61,14 @@ describe("UnstableValue", () => {
         const ns = new UnstableValue("stable", "unstable");
         expect(ns.name).toBe(ns.unstable);
         expect(ns.altName).toBe(ns.stable);
+        expect(ns.names).toEqual([ns.unstable, ns.stable]);
     });
 
     it("should return unstable if there is no stable", () => {
         const ns = new UnstableValue(null, "unstable");
         expect(ns.name).toBe(ns.unstable);
         expect(ns.altName).toBeFalsy();
+        expect(ns.names).toEqual([ns.unstable]);
     });
 
     it("should not permit falsey unstable values", () => {

@@ -79,7 +79,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public readonly reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
-    private displayNameToUserIds: Record<string, string[]> = {};
+    private displayNameToUserIds = new Map<string, string[]>();
     private userIdsToDisplayNames: Record<string, string> = {};
     private tokenToInvite: Record<string, MatrixEvent> = {}; // 3pid invite state_key to m.room.member invite
     private joinedMemberCount: number = null; // cache of the number of joined members
@@ -370,7 +370,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         });
 
         this.onBeaconLivenessChange();
-
         // update higher level data structures. This needs to be done AFTER the
         // core event dict as these structures may depend on other state events in
         // the given array (e.g. disambiguating display names in one go to do both
@@ -401,7 +400,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
                 const member = this.getOrCreateMember(userId, event);
                 member.setMembershipEvent(event, this);
-
                 this.updateMember(member);
                 this.emit(RoomStateEvent.Members, event, this, member);
             } else if (event.getType() === EventType.RoomPowerLevels) {
@@ -711,7 +709,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @return {string[]} An array of user IDs or an empty array.
      */
     public getUserIdsWithDisplayName(displayName: string): string[] {
-        return this.displayNameToUserIds[utils.removeHiddenChars(displayName)] || [];
+        return this.displayNameToUserIds.get(utils.removeHiddenChars(displayName)) ?? [];
     }
 
     /**
@@ -943,11 +941,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // the lot.
             const strippedOldName = utils.removeHiddenChars(oldName);
 
-            const existingUserIds = this.displayNameToUserIds[strippedOldName];
+            const existingUserIds = this.displayNameToUserIds.get(strippedOldName);
             if (existingUserIds) {
                 // remove this user ID from this array
                 const filteredUserIDs = existingUserIds.filter((id) => id !== userId);
-                this.displayNameToUserIds[strippedOldName] = filteredUserIDs;
+                this.displayNameToUserIds.set(strippedOldName, filteredUserIDs);
             }
         }
 
@@ -956,10 +954,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const strippedDisplayname = displayName && utils.removeHiddenChars(displayName);
         // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
         if (strippedDisplayname) {
-            if (!this.displayNameToUserIds[strippedDisplayname]) {
-                this.displayNameToUserIds[strippedDisplayname] = [];
-            }
-            this.displayNameToUserIds[strippedDisplayname].push(userId);
+            const arr = this.displayNameToUserIds.get(strippedDisplayname) ?? [];
+            arr.push(userId);
+            this.displayNameToUserIds.set(strippedDisplayname, arr);
         }
     }
 }

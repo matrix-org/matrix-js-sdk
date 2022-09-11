@@ -47,13 +47,6 @@ export const newUserCancelledError = errorFactory("m.user", "Cancelled by user")
 export const newTimeoutError = errorFactory("m.timeout", "Timed out");
 
 /**
- * The transaction is unknown.
- */
-export const newUnknownTransactionError = errorFactory(
-    "m.unknown_transaction", "Unknown transaction",
-);
-
-/**
  * An unknown method was selected.
  */
 export const newUnknownMethodError = errorFactory("m.unknown_method", "Unknown method");
@@ -71,11 +64,6 @@ export const newUnexpectedMessageError = errorFactory(
 export const newKeyMismatchError = errorFactory(
     "m.key_mismatch", "Key mismatch",
 );
-
-/**
- * The user does not match.
- */
-export const newUserMismatchError = errorFactory("m.user_error", "User mismatch");
 
 /**
  * An invalid message was sent.

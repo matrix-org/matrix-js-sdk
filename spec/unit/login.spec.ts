@@ -1,7 +1,7 @@
 import { TestClient } from '../TestClient';
 
 describe('Login request', function() {
-    let client;
+    let client: TestClient;
 
     beforeEach(function() {
         client = new TestClient();

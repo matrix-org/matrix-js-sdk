@@ -279,7 +279,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = bundledRelationship.current_user_participated;
 
-            const event = new MatrixEvent(bundledRelationship.latest_event);
+            const event = new MatrixEvent({
+                room_id: this.rootEvent.getRoomId(),
+                ...bundledRelationship.latest_event,
+            });
             this.setEventMetadata(event);
             event.setThread(this);
             this.lastEvent = event;

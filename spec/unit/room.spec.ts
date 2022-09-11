@@ -288,11 +288,11 @@ describe("Room", function() {
                 room.addLiveEvents(events);
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[0]],
-                    { timelineWasEmpty: undefined },
+                    { timelineWasEmpty: false },
                 );
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[1]],
-                    { timelineWasEmpty: undefined },
+                    { timelineWasEmpty: false },
                 );
                 expect(events[0].forwardLooking).toBe(true);
                 expect(events[1].forwardLooking).toBe(true);
@@ -360,6 +360,82 @@ describe("Room", function() {
             expect(room.timeline.length).toEqual(1);
 
             expect(callCount).toEqual(2);
+        });
+
+        it("should be able to update local echo without a txn ID (/send then /sync)", function() {
+            const eventJson = utils.mkMessage({
+                room: roomId, user: userA, event: false,
+            }) as object;
+            delete eventJson["txn_id"];
+            delete eventJson["event_id"];
+            const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp" }, eventJson));
+            localEvent.status = EventStatus.SENDING;
+            expect(localEvent.getTxnId()).toBeNull();
+            expect(room.timeline.length).toEqual(0);
+
+            // first add the local echo. This is done before the /send request is even sent.
+            const txnId = "My_txn_id";
+            room.addPendingEvent(localEvent, txnId);
+            expect(room.getEventForTxnId(txnId)).toEqual(localEvent);
+            expect(room.timeline.length).toEqual(1);
+
+            // now the /send request returns the true event ID.
+            const realEventId = "$real-event-id";
+            room.updatePendingEvent(localEvent, EventStatus.SENT, realEventId);
+
+            // then /sync returns the remoteEvent, it should de-dupe based on the event ID.
+            const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
+            expect(remoteEvent.getTxnId()).toBeNull();
+            room.addLiveEvents([remoteEvent]);
+            // the duplicate strategy code should ensure we don't add a 2nd event to the live timeline
+            expect(room.timeline.length).toEqual(1);
+            // but without the event ID matching we will still have the local event in pending events
+            expect(room.getEventForTxnId(txnId)).toBeUndefined();
+        });
+
+        it("should be able to update local echo without a txn ID (/sync then /send)", function() {
+            const eventJson = utils.mkMessage({
+                room: roomId, user: userA, event: false,
+            }) as object;
+            delete eventJson["txn_id"];
+            delete eventJson["event_id"];
+            const txnId = "My_txn_id";
+            const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp", txn_id: txnId }, eventJson));
+            localEvent.status = EventStatus.SENDING;
+            expect(localEvent.getTxnId()).toEqual(txnId);
+            expect(room.timeline.length).toEqual(0);
+
+            // first add the local echo. This is done before the /send request is even sent.
+            room.addPendingEvent(localEvent, txnId);
+            expect(room.getEventForTxnId(txnId)).toEqual(localEvent);
+            expect(room.timeline.length).toEqual(1);
+
+            // now the /sync returns the remoteEvent, it is impossible for the JS SDK to de-dupe this.
+            const realEventId = "$real-event-id";
+            const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
+            expect(remoteEvent.getUnsigned().transaction_id).toBeUndefined();
+            room.addLiveEvents([remoteEvent]);
+            expect(room.timeline.length).toEqual(2); // impossible to de-dupe as no txn ID or matching event ID
+
+            // then the /send request returns the real event ID.
+            // Now it is possible for the JS SDK to de-dupe this.
+            room.updatePendingEvent(localEvent, EventStatus.SENT, realEventId);
+
+            // the 2nd event should be removed from the timeline.
+            expect(room.timeline.length).toEqual(1);
+            // but without the event ID matching we will still have the local event in pending events
+            expect(room.getEventForTxnId(txnId)).toBeUndefined();
+        });
+
+        it("should correctly handle remote echoes from other devices", () => {
+            const remoteEvent = utils.mkMessage({
+                room: roomId, user: userA, event: true,
+            });
+            remoteEvent.event.unsigned = { transaction_id: "TXN_ID" };
+
+            // add the remoteEvent
+            room.addLiveEvents([remoteEvent]);
+            expect(room.timeline.length).toEqual(1);
         });
     });
 
@@ -2370,16 +2446,126 @@ describe("Room", function() {
             expect(room.getEventReadUpTo(userA)).toEqual("eventId");
         });
 
-        it("prefers older receipt", () => {
-            room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
-                return (receiptType === ReceiptType.Read
-                    ? { eventId: "eventId1" }
-                    : { eventId: "eventId2" }
-                    ) as IWrappedReceipt;
-            };
-            room.getUnfilteredTimelineSet = () => ({ compareEventOrdering: (event1, event2) => 1 } as EventTimelineSet);
+        describe("prefers newer receipt", () => {
+            it("should compare correctly using timelines", () => {
+                room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                    if (receiptType === ReceiptType.ReadPrivate) {
+                        return { eventId: "eventId1" } as IWrappedReceipt;
+                    }
+                    if (receiptType === ReceiptType.UnstableReadPrivate) {
+                        return { eventId: "eventId2" } as IWrappedReceipt;
+                    }
+                    if (receiptType === ReceiptType.Read) {
+                        return { eventId: "eventId3" } as IWrappedReceipt;
+                    }
+                };
 
-            expect(room.getEventReadUpTo(userA)).toEqual("eventId1");
+                for (let i = 1; i <= 3; i++) {
+                    room.getUnfilteredTimelineSet = () => ({ compareEventOrdering: (event1, event2) => {
+                        return (event1 === `eventId${i}`) ? 1 : -1;
+                    } } as EventTimelineSet);
+
+                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
+                }
+            });
+
+            describe("correctly compares by timestamp", () => {
+                it("should correctly compare, if we have all receipts", () => {
+                    for (let i = 1; i <= 3; i++) {
+                        room.getUnfilteredTimelineSet = () => ({
+                            compareEventOrdering: (_1, _2) => null,
+                        } as EventTimelineSet);
+                        room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                            if (receiptType === ReceiptType.ReadPrivate) {
+                                return { eventId: "eventId1", data: { ts: i === 1 ? 1 : 0 } } as IWrappedReceipt;
+                            }
+                            if (receiptType === ReceiptType.UnstableReadPrivate) {
+                                return { eventId: "eventId2", data: { ts: i === 2 ? 1 : 0 } } as IWrappedReceipt;
+                            }
+                            if (receiptType === ReceiptType.Read) {
+                                return { eventId: "eventId3", data: { ts: i === 3 ? 1 : 0 } } as IWrappedReceipt;
+                            }
+                        };
+
+                        expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
+                    }
+                });
+
+                it("should correctly compare, if private read receipt is missing", () => {
+                    room.getUnfilteredTimelineSet = () => ({
+                        compareEventOrdering: (_1, _2) => null,
+                    } as EventTimelineSet);
+                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                        if (receiptType === ReceiptType.UnstableReadPrivate) {
+                            return { eventId: "eventId1", data: { ts: 0 } } as IWrappedReceipt;
+                        }
+                        if (receiptType === ReceiptType.Read) {
+                            return { eventId: "eventId2", data: { ts: 1 } } as IWrappedReceipt;
+                        }
+                    };
+
+                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
+                });
+            });
+
+            describe("fallback precedence", () => {
+                beforeAll(() => {
+                    room.getUnfilteredTimelineSet = () => ({
+                        compareEventOrdering: (_1, _2) => null,
+                    } as EventTimelineSet);
+                });
+
+                it("should give precedence to m.read.private", () => {
+                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                        if (receiptType === ReceiptType.ReadPrivate) {
+                            return { eventId: "eventId1" } as IWrappedReceipt;
+                        }
+                        if (receiptType === ReceiptType.UnstableReadPrivate) {
+                            return { eventId: "eventId2" } as IWrappedReceipt;
+                        }
+                        if (receiptType === ReceiptType.Read) {
+                            return { eventId: "eventId3" } as IWrappedReceipt;
+                        }
+                    };
+
+                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId1`);
+                });
+
+                it("should give precedence to org.matrix.msc2285.read.private", () => {
+                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                        if (receiptType === ReceiptType.UnstableReadPrivate) {
+                            return { eventId: "eventId2" } as IWrappedReceipt;
+                        }
+                        if (receiptType === ReceiptType.Read) {
+                            return { eventId: "eventId2" } as IWrappedReceipt;
+                        }
+                    };
+
+                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
+                });
+
+                it("should give precedence to m.read", () => {
+                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                        if (receiptType === ReceiptType.Read) {
+                            return { eventId: "eventId3" } as IWrappedReceipt;
+                        }
+                    };
+
+                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId3`);
+                });
+            });
+        });
+    });
+
+    describe("roomNameGenerator", () => {
+        const client = new TestClient(userA).client;
+        client.roomNameGenerator = jest.fn().mockReturnValue(null);
+        const room = new Room(roomId, client, userA);
+
+        it("should call fn when recalculating room name", () => {
+            (client.roomNameGenerator as jest.Mock).mockClear();
+            room.recalculate();
+            expect(client.roomNameGenerator).toHaveBeenCalled();
         });
     });
 });

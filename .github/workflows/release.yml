@@ -24,7 +24,6 @@ jobs:
 
       - name: 📋 Copy to temp
         run: |
-          ls -lah
           tag="${{ github.ref_name }}"
           version="${tag#v}"
           echo "VERSION=$version" >> $GITHUB_ENV
@@ -40,7 +39,7 @@ jobs:
           cp -a "$RUNNER_TEMP/$VERSION" .
 
           # Add the new directory to the index if it isn't there already
-          if ! grep -q "Version $VERSION" index.html; then
+          if ! grep -q ">Version $VERSION</a>" index.html; then
             perl -i -pe 'BEGIN {$rel=shift} $_ =~ /^<\/ul>/ && print
               "<li><a href=\"${rel}/index.html\">Version ${rel}</a></li>\n"' "$VERSION" index.html
           fi
@@ -51,3 +50,9 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           keep_files: true
           publish_dir: .
+
+  npm:
+    name: Publish
+    uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
