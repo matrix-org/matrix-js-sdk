@@ -199,7 +199,6 @@ import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { IgnoredInvites } from "./models/invites-ignorer";
-import { UnstableValue } from "./NamespacedValue";
 
 export type Store = IStore;
 
