@@ -50,7 +50,7 @@ export class TestClient {
         options?: Partial<ICreateClientOpts>,
     ) {
         if (sessionStoreBackend === undefined) {
-            sessionStoreBackend = new MockStorageApi();
+            sessionStoreBackend = new MockStorageApi() as unknown as Storage;
         }
 
         this.httpBackend = new MockHttpBackend();

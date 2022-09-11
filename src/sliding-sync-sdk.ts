@@ -293,13 +293,16 @@ export class SlidingSyncSdk {
         this.processRoomData(this.client, room, roomData);
     }
 
-    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
+    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error | null): void {
         if (err) {
             logger.debug("onLifecycle", state, err);
         }
         switch (state) {
             case SlidingSyncState.Complete:
                 this.purgeNotifications();
+                if (!resp) {
+                    break;
+                }
                 // Element won't stop showing the initial loading spinner unless we fire SyncState.Prepared
                 if (!this.lastPos) {
                     this.updateSyncState(SyncState.Prepared, {
@@ -470,6 +473,13 @@ export class SlidingSyncSdk {
                     roomData.highlight_count,
                 );
             }
+        }
+
+        if (Number.isInteger(roomData.invited_count)) {
+            room.currentState.setInvitedMemberCount(roomData.invited_count!);
+        }
+        if (Number.isInteger(roomData.joined_count)) {
+            room.currentState.setJoinedMemberCount(roomData.joined_count!);
         }
 
         if (roomData.invite_state) {
