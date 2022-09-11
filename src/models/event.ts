@@ -26,7 +26,7 @@ import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
 import { EVENT_VISIBILITY_CHANGE_TYPE, EventType, MsgType, RelationType } from "../@types/event";
 import { Crypto, IEventDecryptionResult } from "../crypto";
-import { deepSortedObjectEntries } from "../utils";
+import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
 import { Thread, ThreadEvent, EventHandlerMap as ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
 import { IActionsObject } from '../pushprocessor';
@@ -36,14 +36,6 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
 
 export { EventStatus } from "./event-status";
-
-const interns: Record<string, string> = {};
-function intern(str: string): string {
-    if (!interns[str]) {
-        interns[str] = str;
-    }
-    return interns[str];
-}
 
 /* eslint-disable camelcase */
 export interface IContent {
@@ -326,17 +318,17 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         // of space if we don't intern it.
         ["state_key", "type", "sender", "room_id", "membership"].forEach((prop) => {
             if (typeof event[prop] !== "string") return;
-            event[prop] = intern(event[prop]);
+            event[prop] = internaliseString(event[prop]);
         });
 
         ["membership", "avatar_url", "displayname"].forEach((prop) => {
             if (typeof event.content?.[prop] !== "string") return;
-            event.content[prop] = intern(event.content[prop]);
+            event.content[prop] = internaliseString(event.content[prop]);
         });
 
         ["rel_type"].forEach((prop) => {
             if (typeof event.content?.["m.relates_to"]?.[prop] !== "string") return;
-            event.content["m.relates_to"][prop] = intern(event.content["m.relates_to"][prop]);
+            event.content["m.relates_to"][prop] = internaliseString(event.content["m.relates_to"][prop]);
         });
 
         this.txnId = event.txn_id || null;
@@ -796,6 +788,8 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
                     // not a decryption error: log the whole exception as an error
                     // (and don't bother with a retry)
                     const re = options.isRetry ? 're' : '';
+                    // For find results: this can produce "Error decrypting event (id=$ev)" and
+                    // "Error redecrypting event (id=$ev)".
                     logger.error(
                         `Error ${re}decrypting event ` +
                         `(id=${this.getId()}): ${e.stack || e}`,

@@ -1191,7 +1191,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 class MegolmDecryption extends DecryptionAlgorithm {
     // events which we couldn't decrypt due to unknown sessions / indexes: map from
     // senderKey|sessionId to Set of MatrixEvents
-    private pendingEvents: Record<string, Map<string, Set<MatrixEvent>>> = {};
+    private pendingEvents = new Map<string, Map<string, Set<MatrixEvent>>>();
 
     // this gets stubbed out by the unit tests.
     private olmlib = olmlib;
@@ -1343,10 +1343,10 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const content = event.getWireContent();
         const senderKey = content.sender_key;
         const sessionId = content.session_id;
-        if (!this.pendingEvents[senderKey]) {
-            this.pendingEvents[senderKey] = new Map();
+        if (!this.pendingEvents.has(senderKey)) {
+            this.pendingEvents.set(senderKey, new Map<string, Set<MatrixEvent>>());
         }
-        const senderPendingEvents = this.pendingEvents[senderKey];
+        const senderPendingEvents = this.pendingEvents.get(senderKey);
         if (!senderPendingEvents.has(sessionId)) {
             senderPendingEvents.set(sessionId, new Set());
         }
@@ -1364,7 +1364,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const content = event.getWireContent();
         const senderKey = content.sender_key;
         const sessionId = content.session_id;
-        const senderPendingEvents = this.pendingEvents[senderKey];
+        const senderPendingEvents = this.pendingEvents.get(senderKey);
         const pendingEvents = senderPendingEvents?.get(sessionId);
         if (!pendingEvents) {
             return;
@@ -1375,7 +1375,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             senderPendingEvents.delete(sessionId);
         }
         if (senderPendingEvents.size === 0) {
-            delete this.pendingEvents[senderKey];
+            this.pendingEvents.delete(senderKey);
         }
     }
 
@@ -1711,7 +1711,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * @return {Boolean} whether all messages were successfully decrypted
      */
     private async retryDecryption(senderKey: string, sessionId: string): Promise<boolean> {
-        const senderPendingEvents = this.pendingEvents[senderKey];
+        const senderPendingEvents = this.pendingEvents.get(senderKey);
         if (!senderPendingEvents) {
             return true;
         }
@@ -1732,16 +1732,16 @@ class MegolmDecryption extends DecryptionAlgorithm {
         }));
 
         // If decrypted successfully, they'll have been removed from pendingEvents
-        return !this.pendingEvents[senderKey]?.has(sessionId);
+        return !this.pendingEvents.get(senderKey)?.has(sessionId);
     }
 
     public async retryDecryptionFromSender(senderKey: string): Promise<boolean> {
-        const senderPendingEvents = this.pendingEvents[senderKey];
+        const senderPendingEvents = this.pendingEvents.get(senderKey);
         if (!senderPendingEvents) {
             return true;
         }
 
-        delete this.pendingEvents[senderKey];
+        this.pendingEvents.delete(senderKey);
 
         await Promise.all([...senderPendingEvents].map(async ([_sessionId, pending]) => {
             await Promise.all([...pending].map(async (ev) => {
@@ -1753,7 +1753,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             }));
         }));
 
-        return !this.pendingEvents[senderKey];
+        return !this.pendingEvents.has(senderKey);
     }
 
     public async sendSharedHistoryInboundSessions(devicesByUser: Record<string, DeviceInfo[]>): Promise<void> {

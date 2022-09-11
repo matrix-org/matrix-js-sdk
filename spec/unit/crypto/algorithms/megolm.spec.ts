@@ -32,8 +32,8 @@ import { ClientEvent, MatrixClient, RoomMember } from '../../../../src';
 import { DeviceInfo, IDevice } from '../../../../src/crypto/deviceinfo';
 import { DeviceTrustLevel } from '../../../../src/crypto/CrossSigning';
 
-const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
-const MegolmEncryption = algorithms.ENCRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
+const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
+const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
 
 const ROOM_ID = '!ROOM:ID';
 
