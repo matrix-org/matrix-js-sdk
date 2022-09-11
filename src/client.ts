@@ -188,13 +188,14 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { ILoginFlowsResponse, IRefreshTokenResponse } from "./@types/auth";
+import { ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { IgnoredInvites } from "./models/invites-ignorer";
@@ -894,6 +895,8 @@ export type ClientEventHandlerMap = {
     & CallEventHandlerMap
     & HttpApiEventHandlerMap
     & BeaconEventHandlerMap;
+
+const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action");
 
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
@@ -7170,15 +7173,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} loginType The type of SSO login we are doing (sso or cas).
      *     Defaults to 'sso'.
      * @param {string} idpId The ID of the Identity Provider being targeted, optional.
+     * @param {SSOAction} action the SSO flow to indicate to the IdP, optional.
      * @return {string} The HS URL to hit to begin the SSO login process.
      */
-    public getSsoLoginUrl(redirectUrl: string, loginType = "sso", idpId?: string): string {
+    public getSsoLoginUrl(
+        redirectUrl: string,
+        loginType = "sso",
+        idpId?: string,
+        action?: SSOAction,
+    ): string {
         let url = "/login/" + loginType + "/redirect";
         if (idpId) {
             url += "/" + idpId;
         }
 
-        return this.http.getUrl(url, { redirectUrl }, PREFIX_R0);
+        const params = {
+            redirectUrl,
+            [SSO_ACTION_PARAM.unstable!]: action,
+        };
+
+        return this.http.getUrl(url, params, PREFIX_R0);
     }
 
     /**
