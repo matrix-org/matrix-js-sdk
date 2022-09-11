@@ -729,18 +729,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         if (existingTimeline) {
             this._eventIdToTimeline.delete(oldEventId);
             this._eventIdToTimeline.set(newEventId, existingTimeline);
-        } else {
-            if (this.filter) {
-                if (this.filter.filterRoomTimeline([localEvent]).length) {
-                    this.addEventToTimeline(localEvent, this.liveTimeline, {
-                        toStartOfTimeline: false,
-                    });
-                }
-            } else {
-                this.addEventToTimeline(localEvent, this.liveTimeline, {
-                    toStartOfTimeline: false,
-                });
-            }
+        } else if (!this.filter || this.filter.filterRoomTimeline([localEvent]).length) {
+            this.addEventToTimeline(localEvent, this.liveTimeline, {
+                toStartOfTimeline: false,
+            });
         }
     }
 

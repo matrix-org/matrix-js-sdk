@@ -1,6 +1,6 @@
 /*
 Copyright 2015, 2016 OpenMarket Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,31 +17,32 @@ limitations under the License.
 
 /**
  * A mock implementation of the webstorage api
- * @constructor
  */
-export function MockStorageApi() {
-    this.data = {};
-    this.keys = [];
-    this.length = 0;
-}
+export class MockStorageApi {
+    public data: Record<string, string> = {};
+    public keys: string[] = [];
+    public length = 0;
 
-MockStorageApi.prototype = {
-    setItem: function(k, v) {
+    public setItem(k: string, v: string): void {
         this.data[k] = v;
-        this._recalc();
-    },
-    getItem: function(k) {
+        this.recalc();
+    }
+
+    public getItem(k: string): string | null {
         return this.data[k] || null;
-    },
-    removeItem: function(k) {
+    }
+
+    public removeItem(k: string): void {
         delete this.data[k];
-        this._recalc();
-    },
-    key: function(index) {
+        this.recalc();
+    }
+
+    public key(index: number): string {
         return this.keys[index];
-    },
-    _recalc: function() {
-        const keys = [];
+    }
+
+    private recalc(): void {
+        const keys: string[] = [];
         for (const k in this.data) {
             if (!this.data.hasOwnProperty(k)) {
                 continue;
@@ -50,6 +51,5 @@ MockStorageApi.prototype = {
         }
         this.keys = keys;
         this.length = keys.length;
-    },
-};
-
+    }
+}

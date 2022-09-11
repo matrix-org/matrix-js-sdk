@@ -238,33 +238,24 @@ export function deepCompare(x: any, y: any): boolean {
             }
         }
     } else {
-        // disable jshint "The body of a for in should be wrapped in an if
-        // statement"
-        /* jshint -W089 */
-
         // check that all of y's direct keys are in x
-        let p;
-        for (p in y) {
+        for (const p in y) {
             if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
                 return false;
             }
         }
 
         // finally, compare each of x's keys with y
-        for (p in y) { // eslint-disable-line guard-for-in
-            if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
-                return false;
-            }
-            if (!deepCompare(x[p], y[p])) {
+        for (const p in x) {
+            if (y.hasOwnProperty(p) !== x.hasOwnProperty(p) || !deepCompare(x[p], y[p])) {
                 return false;
             }
         }
     }
-    /* jshint +W089 */
     return true;
 }
 
-// Dev note: This returns a tuple, but jsdoc doesn't like that. https://github.com/jsdoc/jsdoc/issues/1703
+// Dev note: This returns an array of tuples, but jsdoc doesn't like that. https://github.com/jsdoc/jsdoc/issues/1703
 /**
  * Creates an array of object properties/values (entries) then
  * sorts the result by key, recursively. The input object must
@@ -350,7 +341,7 @@ export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function globToRegexp(glob: string, extended?: any): string {
+export function globToRegexp(glob: string, extended = false): string {
     // From
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
     // Because micromatch is about 130KB with dependencies,
@@ -358,7 +349,7 @@ export function globToRegexp(glob: string, extended?: any): string {
     const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
         [/\\\*/g, '.*'],
         [/\?/g, '.'],
-        extended !== false && [
+        !extended && [
             /\\\[(!|)(.*)\\]/g,
             (_match: string, neg: string, pat: string) => [
                 '[',

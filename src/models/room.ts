@@ -1981,14 +1981,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 }
             }
         }
-
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.handleRemoteEcho(event, existingEvent);
-            }
-        }
     }
 
     /**
@@ -1996,7 +1988,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * "Room.timeline".
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {IAddLiveEventOptions} options addLiveEvent options
+     * @param {IAddLiveEventOptions} addLiveEventOptions addLiveEvent options
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
@@ -2344,7 +2336,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         fromCache = false,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty = false;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy,
@@ -2383,9 +2375,24 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const threadRoots = this.findThreadRoots(events);
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
 
+        const options: IAddLiveEventOptions = {
+            duplicateStrategy,
+            fromCache,
+            timelineWasEmpty,
+        };
+
         for (const event of events) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.processLiveEvent(event);
+
+            if (event.getUnsigned().transaction_id) {
+                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id!];
+                if (existingEvent) {
+                    // remote echo of an event we sent earlier
+                    this.handleRemoteEcho(event, existingEvent);
+                    continue; // we can skip adding the event to the timeline sets, it is already there
+                }
+            }
 
             const {
                 shouldLiveInRoom,
@@ -2399,11 +2406,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             eventsByThread[threadId]?.push(event);
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(event, {
-                    duplicateStrategy,
-                    fromCache,
-                    timelineWasEmpty,
-                });
+                this.addLiveEvent(event, options);
             }
         }
 
