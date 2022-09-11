@@ -7175,7 +7175,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const params = {
             redirectUrl,
-            [SSO_ACTION_PARAM.unstable]: action,
+            [SSO_ACTION_PARAM.unstable!]: action,
         };
 
         return this.http.getUrl(url, params, PREFIX_R0);
