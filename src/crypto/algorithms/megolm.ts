@@ -20,7 +20,7 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
-import { logger } from '../../logger';
+import { logger } from "../../logger";
 import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
@@ -30,8 +30,8 @@ import {
     registerAlgorithm,
     UnknownDeviceError,
 } from "./base";
-import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from '../OlmDevice';
-import { Room } from '../../models/room';
+import { IDecryptedGroupMessage, WITHHELD_MESSAGES } from "../OlmDevice";
+import { Room } from "../../models/room";
 import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
@@ -1132,7 +1132,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         // The global value is treated as a default for when rooms don't specify a value.
         let isBlacklisting = this.crypto.getGlobalBlacklistUnverifiedDevices();
-        if (typeof room.getBlacklistUnverifiedDevices() === 'boolean') {
+        if (typeof room.getBlacklistUnverifiedDevices() === "boolean") {
             isBlacklisting = room.getBlacklistUnverifiedDevices();
         }
 
@@ -1239,16 +1239,16 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
             let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
 
-            if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
+            if (e && e.message === "OLM.UNKNOWN_MESSAGE_INDEX") {
                 this.requestKeysForEvent(event);
 
-                errorCode = 'OLM_UNKNOWN_MESSAGE_INDEX';
+                errorCode = "OLM_UNKNOWN_MESSAGE_INDEX";
             }
 
             throw new DecryptionError(
                 errorCode,
                 e ? e.toString() : "Unknown Error: Error is undefined", {
-                    session: content.sender_key + '|' + content.session_id,
+                    session: content.sender_key + "|" + content.session_id,
                 },
             );
         }
@@ -1280,7 +1280,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                     "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
                     problemDescription,
                     {
-                        session: content.sender_key + '|' + content.session_id,
+                        session: content.sender_key + "|" + content.session_id,
                     },
                 );
             }
@@ -1289,7 +1289,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
                 "The sender's device has not sent us the keys for this message.",
                 {
-                    session: content.sender_key + '|' + content.session_id,
+                    session: content.sender_key + "|" + content.session_id,
                 },
             );
         }
@@ -1423,7 +1423,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             const ed25519Key = content.sender_claimed_ed25519_key;
             if (!ed25519Key) {
                 logger.error(
-                    `forwarded_room_key_event is missing sender_claimed_ed25519_key field`,
+                    "forwarded_room_key_event is missing sender_claimed_ed25519_key field",
                 );
                 return;
             }

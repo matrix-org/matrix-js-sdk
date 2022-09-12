@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { MatrixClient } from "../client";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index";
-import { CryptoStore, OutgoingRoomKeyRequest } from './store/base';
+import { CryptoStore, OutgoingRoomKeyRequest } from "./store/base";
 import { EventType } from "../@types/event";
 
 /**
@@ -103,7 +103,7 @@ export class OutgoingRoomKeyRequestManager {
      * Called when the client is stopped. Stops any running background processes.
      */
     public stop(): void {
-        logger.log('stopping OutgoingRoomKeyRequestManager');
+        logger.log("stopping OutgoingRoomKeyRequestManager");
         // stop the timer on the next run
         this.clientRunning = false;
     }
@@ -220,7 +220,7 @@ export class OutgoingRoomKeyRequestManager {
                     break;
                 }
                 default:
-                    throw new Error('unhandled state: ' + req.state);
+                    throw new Error("unhandled state: " + req.state);
             }
         }
     }
@@ -256,7 +256,7 @@ export class OutgoingRoomKeyRequestManager {
                     // in that case :/
 
                     logger.log(
-                        'deleting unnecessary room key request for ' +
+                        "deleting unnecessary room key request for " +
                         stringifyRequestBody(requestBody),
                     );
                     return this.cryptoStore.deleteOutgoingRoomKeyRequest(req.requestId, RoomKeyRequestState.Unsent);
@@ -277,9 +277,9 @@ export class OutgoingRoomKeyRequestManager {
                             // sending another cancellation since the other tab
                             // will do it.
                             logger.log(
-                                'Tried to cancel room key request for ' +
+                                "Tried to cancel room key request for " +
                                 stringifyRequestBody(requestBody) +
-                                ' but it was already cancelled in another tab',
+                                " but it was already cancelled in another tab",
                             );
                             return;
                         }
@@ -305,7 +305,7 @@ export class OutgoingRoomKeyRequestManager {
                     });
                 }
                 default:
-                    throw new Error('unhandled state: ' + req.state);
+                    throw new Error("unhandled state: " + req.state);
             }
         });
     }
@@ -437,7 +437,7 @@ export class OutgoingRoomKeyRequestManager {
     // andResend is set, in which case transition to UNSENT.
     private sendOutgoingRoomKeyRequestCancellation(req: OutgoingRoomKeyRequest, andResend = false): Promise<unknown> {
         logger.log(
-            `Sending cancellation for key request for ` +
+            "Sending cancellation for key request for " +
             `${stringifyRequestBody(req.requestBody)} to ` +
             `${stringifyRecipientList(req.recipients)} ` +
             `(cancellation id ${req.cancellationTxnId})`,
@@ -487,8 +487,8 @@ function stringifyRequestBody(requestBody) {
 }
 
 function stringifyRecipientList(recipients) {
-    return '['
+    return "["
         + recipients.map((r) => `${r.userId}:${r.deviceId}`).join(",")
-        + ']';
+        + "]";
 }
 

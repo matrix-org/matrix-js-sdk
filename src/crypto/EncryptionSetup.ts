@@ -17,7 +17,7 @@ limitations under the License.
 import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
-import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { Method, PREFIX_UNSTABLE } from "../http-api";
 import { Crypto, IBootstrapCrossSigningOpts } from "./index";
 import {
@@ -166,7 +166,7 @@ export class EncryptionSetupBuilder {
             }
             // store own cross-sign pubkeys as trusted
             await crypto.cryptoStore.doTxn(
-                'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+                "readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     crypto.cryptoStore.storeCrossSigningKeys(
                         txn, this.crossSigningKeys.keys);

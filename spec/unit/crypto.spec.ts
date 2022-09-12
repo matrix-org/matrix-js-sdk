@@ -1,4 +1,4 @@
-import '../olm-loader';
+import "../olm-loader";
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
@@ -13,9 +13,9 @@ import * as olmlib from "../../src/crypto/olmlib";
 import { sleep } from "../../src/utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
-import { logger } from '../../src/logger';
+import { logger } from "../../src/logger";
 import { MemoryStore } from "../../src";
-import { IStore } from '../../src/store';
+import { IStore } from "../../src/store";
 
 const Olm = global.Olm;
 
@@ -92,12 +92,12 @@ describe("Crypto", function() {
             expect(encryptionInfo.encrypted).toBeFalsy();
 
             // unknown sender (e.g. deleted device), forwarded megolm key (untrusted)
-            event.getSenderKey = () => 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
+            event.getSenderKey = () => "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI";
             event.getWireContent = () => {return { algorithm: olmlib.MEGOLM_ALGORITHM };};
             event.getForwardingCurve25519KeyChain = () => ["not empty"];
             event.isKeySourceUntrusted = () => false;
             event.getClaimedEd25519Key =
-                () => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+                () => "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
             encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeTruthy();
@@ -109,9 +109,9 @@ describe("Crypto", function() {
             event.isKeySourceUntrusted = () => true;
             const device = new DeviceInfo("FLIBBLE");
             device.keys["curve25519:FLIBBLE"] =
-                'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
+                "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI";
             device.keys["ed25519:FLIBBLE"] =
-                'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+                "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
             client.crypto.deviceList.getDeviceByIdentityKey = () => device;
 
             encryptionInfo = client.getEventEncryptionInfo(event);
@@ -123,7 +123,7 @@ describe("Crypto", function() {
             // known sender, trusted megolm key, but bad ed25519key
             event.isKeySourceUntrusted = () => false;
             device.keys["ed25519:FLIBBLE"] =
-                'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+                "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
 
             encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeTruthy();
@@ -135,16 +135,16 @@ describe("Crypto", function() {
         });
     });
 
-    describe('Session management', function() {
+    describe("Session management", function() {
         const otkResponse = {
             one_time_keys: {
-                '@alice:home.server': {
+                "@alice:home.server": {
                     aliceDevice: {
-                        'signed_curve25519:FLIBBLE': {
-                            key: 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI',
+                        "signed_curve25519:FLIBBLE": {
+                            key: "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI",
                             signatures: {
-                                '@alice:home.server': {
-                                    'ed25519:aliceDevice': 'totally a valid signature',
+                                "@alice:home.server": {
+                                    "ed25519:aliceDevice": "totally a valid signature",
                                 },
                             },
                         },
@@ -165,13 +165,13 @@ describe("Crypto", function() {
 
             cryptoStore.storeEndToEndDeviceData({
                 devices: {
-                    '@bob:home.server': {
-                        'BOBDEVICE': {
+                    "@bob:home.server": {
+                        "BOBDEVICE": {
                             algorithms: [],
                             verified: 1,
                             known: false,
                             keys: {
-                                'curve25519:BOBDEVICE': 'this is a key',
+                                "curve25519:BOBDEVICE": "this is a key",
                             },
                         },
                     },
@@ -213,24 +213,24 @@ describe("Crypto", function() {
                 };
             });
 
-            fakeEmitter.emit('toDeviceEvent', {
+            fakeEmitter.emit("toDeviceEvent", {
                 getId: jest.fn().mockReturnValue("$wedged"),
-                getType: jest.fn().mockReturnValue('m.room.message'),
+                getType: jest.fn().mockReturnValue("m.room.message"),
                 getContent: jest.fn().mockReturnValue({
-                    msgtype: 'm.bad.encrypted',
+                    msgtype: "m.bad.encrypted",
                 }),
                 getWireContent: jest.fn().mockReturnValue({
-                    algorithm: 'm.olm.v1.curve25519-aes-sha2',
-                    sender_key: 'this is a key',
+                    algorithm: "m.olm.v1.curve25519-aes-sha2",
+                    sender_key: "this is a key",
                 }),
-                getSender: jest.fn().mockReturnValue('@bob:home.server'),
+                getSender: jest.fn().mockReturnValue("@bob:home.server"),
             });
 
             await prom;
         });
     });
 
-    describe('Key requests', function() {
+    describe("Key requests", function() {
         let aliceClient: MatrixClient;
         let bobClient: MatrixClient;
 
@@ -464,9 +464,9 @@ describe("Crypto", function() {
         });
     });
 
-    describe('Secret storage', function() {
+    describe("Secret storage", function() {
         it("creates secret storage even if there is no keyInfo", async function() {
-            jest.spyOn(logger, 'log').mockImplementation(() => {});
+            jest.spyOn(logger, "log").mockImplementation(() => {});
             jest.setTimeout(10000);
             const client = (new TestClient("@a:example.com", "dev")).client;
             await client.initCrypto();

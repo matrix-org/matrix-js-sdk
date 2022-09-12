@@ -20,7 +20,7 @@ limitations under the License.
  * @module scheduler
  */
 import * as utils from "./utils";
-import { logger } from './logger';
+import { logger } from "./logger";
 import { MatrixEvent } from "./models/event";
 import { EventType } from "./@types/event";
 import { IDeferred } from "./utils";

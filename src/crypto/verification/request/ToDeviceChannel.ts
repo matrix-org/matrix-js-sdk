@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from '../../../randomstring';
-import { logger } from '../../../logger';
+import { randomString } from "../../../randomstring";
+import { logger } from "../../../logger";
 import {
     CANCEL_TYPE,
     PHASE_STARTED,
@@ -30,7 +30,7 @@ import { errorFromEvent, newUnexpectedMessageError } from "../Error";
 import { MatrixEvent } from "../../../models/event";
 import { IVerificationChannel } from "./Channel";
 import { MatrixClient } from "../../../client";
-import { IRequestsMap } from '../..';
+import { IRequestsMap } from "../..";
 
 export type Request = VerificationRequest<ToDeviceChannel>;
 

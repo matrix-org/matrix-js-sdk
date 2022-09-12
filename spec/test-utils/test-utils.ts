@@ -2,9 +2,9 @@
 import EventEmitter from "events";
 
 // load olm before the sdk if possible
-import '../olm-loader';
+import "../olm-loader";
 
-import { logger } from '../../src/logger';
+import { logger } from "../../src/logger";
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { ClientEvent, EventType, MatrixClient, MsgType } from "../../src";
 import { SyncState } from "../../src/sync";

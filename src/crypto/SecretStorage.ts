@@ -14,15 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../logger';
-import * as olmlib from './olmlib';
-import { encodeBase64 } from './olmlib';
-import { randomString } from '../randomstring';
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from './aes';
-import { ClientEvent, ICryptoCallbacks, MatrixEvent } from '../matrix';
+import { logger } from "../logger";
+import * as olmlib from "./olmlib";
+import { encodeBase64 } from "./olmlib";
+import { randomString } from "../randomstring";
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
+import { ClientEvent, ICryptoCallbacks, MatrixEvent } from "../matrix";
 import { ClientEventHandlerMap, MatrixClient } from "../client";
-import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
-import { TypedEventEmitter } from '../models/typed-event-emitter';
+import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -85,7 +85,7 @@ export class SecretStorage {
 
     public async getDefaultKeyId(): Promise<string | null> {
         const defaultKey = await this.accountDataAdapter.getAccountDataFromServer<{ key: string }>(
-            'm.secret_storage.default_key',
+            "m.secret_storage.default_key",
         );
         if (!defaultKey) return null;
         return defaultKey.key;
@@ -95,7 +95,7 @@ export class SecretStorage {
         return new Promise<void>((resolve, reject) => {
             const listener = (ev: MatrixEvent): void => {
                 if (
-                    ev.getType() === 'm.secret_storage.default_key' &&
+                    ev.getType() === "m.secret_storage.default_key" &&
                     ev.getContent().key === keyId
                 ) {
                     this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
@@ -105,7 +105,7 @@ export class SecretStorage {
             this.accountDataAdapter.on(ClientEvent.AccountData, listener);
 
             this.accountDataAdapter.setAccountData(
-                'm.secret_storage.default_key',
+                "m.secret_storage.default_key",
                 { key: keyId },
             ).catch(e => {
                 this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
@@ -219,7 +219,7 @@ export class SecretStorage {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
                 const { mac } = await calculateKeyCheck(key, info.iv);
-                return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
+                return info.mac.replace(/=+$/g, "") === mac.replace(/=+$/g, "");
             } else {
                 // if we have no information, we have to assume the key is right
                 return true;
@@ -313,7 +313,7 @@ export class SecretStorage {
 
         if (Object.keys(keys).length === 0) {
             throw new Error(`Could not decrypt ${name} because none of ` +
-                `the keys it is encrypted with are for a supported algorithm`);
+                "the keys it is encrypted with are for a supported algorithm");
         }
 
         let keyId: string;

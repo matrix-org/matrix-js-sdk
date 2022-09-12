@@ -27,7 +27,7 @@ class EventSource extends EventEmitter {
     }
 
     doAnError() {
-        this.emit('error');
+        this.emit("error");
     }
 }
 
@@ -58,13 +58,13 @@ describe("ReEmitter", function() {
         const tgt = new EventTarget();
 
         const reEmitter = new ReEmitter(tgt);
-        reEmitter.reEmit(src, ['error']);
+        reEmitter.reEmit(src, ["error"]);
 
         // without the workaround in ReEmitter, this would throw
         src.doAnError();
 
         const handler = jest.fn();
-        tgt.on('error', handler);
+        tgt.on("error", handler);
 
         src.doAnError();
 

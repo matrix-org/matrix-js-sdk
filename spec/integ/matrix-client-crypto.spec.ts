@@ -26,9 +26,9 @@ limitations under the License.
  */
 
 // load olm before the sdk if possible
-import '../olm-loader';
+import "../olm-loader";
 
-import { logger } from '../../src/logger';
+import { logger } from "../../src/logger";
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { CRYPTO_ENABLED } from "../../src/client";
@@ -408,17 +408,17 @@ describe("MatrixClient crypto", () => {
         const eveUserId = "@eve:localhost";
 
         const bobDeviceKeys = {
-            algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
-            device_id: 'bvcxz',
+            algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+            device_id: "bvcxz",
             keys: {
-                'ed25519:bvcxz': 'pYuWKMCVuaDLRTM/eWuB8OlXEb61gZhfLVJ+Y54tl0Q',
-                'curve25519:bvcxz': '7Gni0loo/nzF0nFp9847RbhElGewzwUXHPrljjBGPTQ',
+                "ed25519:bvcxz": "pYuWKMCVuaDLRTM/eWuB8OlXEb61gZhfLVJ+Y54tl0Q",
+                "curve25519:bvcxz": "7Gni0loo/nzF0nFp9847RbhElGewzwUXHPrljjBGPTQ",
             },
-            user_id: '@eve:localhost',
+            user_id: "@eve:localhost",
             signatures: {
-                '@eve:localhost': {
-                    'ed25519:bvcxz': 'CliUPZ7dyVPBxvhSA1d+X+LYa5b2AYdjcTwG' +
-                        '0stXcIxjaJNemQqtdgwKDtBFl3pN2I13SEijRDCf1A8bYiQMDg',
+                "@eve:localhost": {
+                    "ed25519:bvcxz": "CliUPZ7dyVPBxvhSA1d+X+LYa5b2AYdjcTwG" +
+                        "0stXcIxjaJNemQqtdgwKDtBFl3pN2I13SEijRDCf1A8bYiQMDg",
                 },
             },
         };
@@ -444,17 +444,17 @@ describe("MatrixClient crypto", () => {
 
     it("Ali gets keys with an incorrect deviceId", async () => {
         const bobDeviceKeys = {
-            algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
-            device_id: 'bad_device',
+            algorithms: ["m.olm.v1.curve25519-aes-sha2", "m.megolm.v1.aes-sha2"],
+            device_id: "bad_device",
             keys: {
-                'ed25519:bad_device': 'e8XlY5V8x2yJcwa5xpSzeC/QVOrU+D5qBgyTK0ko+f0',
-                'curve25519:bad_device': 'YxuuLG/4L5xGeP8XPl5h0d7DzyYVcof7J7do+OXz0xc',
+                "ed25519:bad_device": "e8XlY5V8x2yJcwa5xpSzeC/QVOrU+D5qBgyTK0ko+f0",
+                "curve25519:bad_device": "YxuuLG/4L5xGeP8XPl5h0d7DzyYVcof7J7do+OXz0xc",
             },
-            user_id: '@bob:localhost',
+            user_id: "@bob:localhost",
             signatures: {
-                '@bob:localhost': {
-                    'ed25519:bad_device': 'fEFTq67RaSoIEVBJ8DtmRovbwUBKJ0A' +
-                        'me9m9PDzM9azPUwZ38Xvf6vv1A7W1PSafH4z3Y2ORIyEnZgHaNby3CQ',
+                "@bob:localhost": {
+                    "ed25519:bad_device": "fEFTq67RaSoIEVBJ8DtmRovbwUBKJ0A" +
+                        "me9m9PDzM9azPUwZ38Xvf6vv1A7W1PSafH4z3Y2ORIyEnZgHaNby3CQ",
                 },
             },
         };
@@ -598,7 +598,7 @@ describe("MatrixClient crypto", () => {
         await aliTestClient.start();
         await firstSync(aliTestClient);
         const syncData = {
-            next_batch: '2',
+            next_batch: "2",
             rooms: {
                 join: {},
             },
@@ -607,19 +607,19 @@ describe("MatrixClient crypto", () => {
             state: {
                 events: [
                     testUtils.mkEvent({
-                        type: 'm.room.encryption',
-                        skey: '',
+                        type: "m.room.encryption",
+                        skey: "",
                         content: {
-                            algorithm: 'm.olm.v1.curve25519-aes-sha2',
+                            algorithm: "m.olm.v1.curve25519-aes-sha2",
                         },
                     }),
                 ],
             },
         };
 
-        aliTestClient.httpBackend.when('GET', '/sync').respond(
+        aliTestClient.httpBackend.when("GET", "/sync").respond(
             200, syncData);
-        await aliTestClient.httpBackend.flush('/sync', 1);
+        await aliTestClient.httpBackend.flush("/sync", 1);
         aliTestClient.expectKeyQuery({
             device_keys: {
                 [bobUserId]: {},
@@ -642,7 +642,7 @@ describe("MatrixClient crypto", () => {
         // enqueue expectations:
         // * Sync with empty one_time_keys => upload keys
 
-        logger.log(aliTestClient + ': starting');
+        logger.log(aliTestClient + ": starting");
         httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
@@ -656,13 +656,13 @@ describe("MatrixClient crypto", () => {
             aliTestClient.client.startClient({}),
             httpBackend.flushAllExpected(),
         ]);
-        logger.log(aliTestClient + ': started');
+        logger.log(aliTestClient + ": started");
         httpBackend.when("POST", "/keys/upload")
             .respond(200, (_path, content) => {
                 expect(content.one_time_keys).toBeTruthy();
                 expect(content.one_time_keys).not.toEqual({});
                 expect(Object.keys(content.one_time_keys).length).toBeGreaterThanOrEqual(1);
-                logger.log('received %i one-time keys', Object.keys(content.one_time_keys).length);
+                logger.log("received %i one-time keys", Object.keys(content.one_time_keys).length);
                 // cancel futher calls by telling the client
                 // we have more than we need
                 return {

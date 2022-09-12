@@ -137,7 +137,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             logger.trace(
                 `membership event with membership undefined (forwardLooking: ${event.forwardLooking})!`,
                 event.getContent(),
-                `prevcontent is `, event.getPrevContent(),
+                "prevcontent is ", event.getPrevContent(),
             );
         }
 

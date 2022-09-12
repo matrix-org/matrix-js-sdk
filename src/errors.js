@@ -2,7 +2,7 @@
 // because of http://babeljs.io/docs/usage/caveats/#classes
 export function InvalidStoreError(reason, value) {
     const message = `Store is invalid because ${reason}, ` +
-        `please stop the client, delete all data and start the client again`;
+        "please stop the client, delete all data and start the client again";
     const instance = Reflect.construct(Error, [message]);
     Reflect.setPrototypeOf(instance, Reflect.getPrototypeOf(this));
     instance.reason = reason;
@@ -24,11 +24,11 @@ Reflect.setPrototypeOf(InvalidStoreError, Error);
 
 export function InvalidCryptoStoreError(reason) {
     const message = `Crypto store is invalid because ${reason}, ` +
-        `please stop the client, delete all data and start the client again`;
+        "please stop the client, delete all data and start the client again";
     const instance = Reflect.construct(Error, [message]);
     Reflect.setPrototypeOf(instance, Reflect.getPrototypeOf(this));
     instance.reason = reason;
-    instance.name = 'InvalidCryptoStoreError';
+    instance.name = "InvalidCryptoStoreError";
     return instance;
 }
 

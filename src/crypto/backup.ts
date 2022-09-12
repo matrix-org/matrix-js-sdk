@@ -24,12 +24,12 @@ import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
 import { DeviceInfo } from "./deviceinfo";
-import { DeviceTrustLevel } from './CrossSigning';
-import { keyFromPassphrase } from './key_passphrase';
+import { DeviceTrustLevel } from "./CrossSigning";
+import { keyFromPassphrase } from "./key_passphrase";
 import { getCrypto, sleep } from "../utils";
-import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
-import { encodeRecoveryKey } from './recoverykey';
-import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
+import { encodeRecoveryKey } from "./recoverykey";
+import { calculateKeyCheck, decryptAES, encryptAES } from "./aes";
 import { IAes256AuthData, ICurve25519AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent, IMegolmSessionData } from "./index";
@@ -358,8 +358,8 @@ export class BackupManager {
         const mySigs = backupInfo.auth_data.signatures[this.baseApis.getUserId()] || {};
 
         for (const keyId of Object.keys(mySigs)) {
-            const keyIdParts = keyId.split(':');
-            if (keyIdParts[0] !== 'ed25519') {
+            const keyIdParts = keyId.split(":");
+            if (keyIdParts[0] !== "ed25519") {
                 logger.log("Ignoring unknown signature type: " + keyIdParts[0]);
                 continue;
             }
@@ -470,8 +470,8 @@ export class BackupManager {
                     logger.log("Key backup request failed", err);
                     if (err.data) {
                         if (
-                            err.data.errcode == 'M_NOT_FOUND' ||
-                                err.data.errcode == 'M_WRONG_ROOM_KEYS_VERSION'
+                            err.data.errcode == "M_NOT_FOUND" ||
+                                err.data.errcode == "M_WRONG_ROOM_KEYS_VERSION"
                         ) {
                             // Re-check key backup status on error, so we can be
                             // sure to present the current situation when asked.
@@ -532,7 +532,7 @@ export class BackupManager {
             );
             const verified = this.baseApis.crypto.checkDeviceInfoTrust(userId, device).isVerified();
 
-            rooms[roomId]['sessions'][session.sessionId] = {
+            rooms[roomId]["sessions"][session.sessionId] = {
                 first_message_index: sessionData.first_known_index,
                 forwarded_count: forwardedCount,
                 is_verified: verified,
@@ -585,7 +585,7 @@ export class BackupManager {
      */
     public async flagAllGroupSessionsForBackup(): Promise<number> {
         await this.baseApis.crypto.cryptoStore.doTxn(
-            'readwrite',
+            "readwrite",
             [
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
                 IndexedDBCryptoStore.STORE_BACKUP,
@@ -762,7 +762,7 @@ export class Aes256 implements BackupAlgorithm {
         const key = await getKey();
         if (authData.mac) {
             const { mac } = await calculateKeyCheck(key, authData.iv);
-            if (authData.mac.replace(/=+$/g, '') !== mac.replace(/=+/g, '')) {
+            if (authData.mac.replace(/=+$/g, "") !== mac.replace(/=+/g, "")) {
                 throw new Error("Key does not match");
             }
         }
@@ -826,7 +826,7 @@ export class Aes256 implements BackupAlgorithm {
     public async keyMatches(key: Uint8Array): Promise<boolean> {
         if (this.authData.mac) {
             const { mac } = await calculateKeyCheck(key, this.authData.iv);
-            return this.authData.mac.replace(/=+$/g, '') === mac.replace(/=+/g, '');
+            return this.authData.mac.replace(/=+$/g, "") === mac.replace(/=+/g, "");
         } else {
             // if we have no information, we have to assume the key is right
             return true;

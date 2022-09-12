@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TestClient } from '../../TestClient';
+import { TestClient } from "../../TestClient";
 import {
     ClientEvent,
     EventTimeline,

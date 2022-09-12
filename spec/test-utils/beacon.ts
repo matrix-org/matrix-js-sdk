@@ -77,9 +77,9 @@ type ContentProps = {
     description?: string;
 };
 const DEFAULT_CONTENT_PROPS: ContentProps = {
-    uri: 'geo:-36.24484561954707,175.46884959563613;u=10',
+    uri: "geo:-36.24484561954707,175.46884959563613;u=10",
     timestamp: 123,
-    beaconInfoId: '$123',
+    beaconInfoId: "$123",
 };
 
 /**

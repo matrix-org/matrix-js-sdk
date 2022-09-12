@@ -50,7 +50,7 @@ describe("MatrixClient", function() {
     });
 
     describe("uploadContent", function() {
-        const buf = Buffer.from('hello world');
+        const buf = Buffer.from("hello world");
         it("should upload the file", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
@@ -538,8 +538,8 @@ describe("MatrixClient", function() {
 
             httpBackend.when("POST", "/keys/query").check(function(req) {
                 expect(req.data).toEqual({ device_keys: {
-                    'boris': [],
-                    'chaz': [],
+                    "boris": [],
+                    "chaz": [],
                 } });
             }).respond(200, {
                 device_keys: {

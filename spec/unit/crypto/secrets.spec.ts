@@ -14,25 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import '../../olm-loader';
+import "../../olm-loader";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/crypto/SecretStorage";
 import { MatrixEvent } from "../../../src/models/event";
-import { TestClient } from '../../TestClient';
-import { makeTestClients } from './verification/util';
+import { TestClient } from "../../TestClient";
+import { makeTestClients } from "./verification/util";
 import { encryptAES } from "../../../src/crypto/aes";
 import { resetCrossSigningKeys, createSecretStorageKey } from "./crypto-utils";
-import { logger } from '../../../src/logger';
+import { logger } from "../../../src/logger";
 import * as utils from "../../../src/utils";
-import { ICreateClientOpts } from '../../../src/client';
-import { ISecretStorageKeyInfo } from '../../../src/crypto/api';
+import { ICreateClientOpts } from "../../../src/client";
+import { ISecretStorageKeyInfo } from "../../../src/crypto/api";
 
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
+    const crypto = require("crypto");
     utils.setCrypto(crypto);
 } catch (err) {
-    logger.log('nodejs was compiled without crypto support');
+    logger.log("nodejs was compiled without crypto support");
 }
 
 async function makeTestClient(userInfo: { userId: string, deviceId: string}, options: Partial<ICreateClientOpts> = {}) {
@@ -49,7 +49,7 @@ async function makeTestClient(userInfo: { userId: string, deviceId: string}, opt
     await client.initCrypto();
 
     // No need to download keys for these tests
-    jest.spyOn(client.crypto, 'downloadKeys').mockResolvedValue({});
+    jest.spyOn(client.crypto, "downloadKeys").mockResolvedValue({});
 
     return client;
 }
@@ -57,13 +57,13 @@ async function makeTestClient(userInfo: { userId: string, deviceId: string}, opt
 // Wrapper around pkSign to return a signed object. pkSign returns the
 // signature, rather than the signed object.
 function sign(obj, key, userId) {
-    olmlib.pkSign(obj, key, userId, '');
+    olmlib.pkSign(obj, key, userId, "");
     return obj;
 }
 
 describe("Secrets", function() {
     if (!global.Olm) {
-        logger.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
@@ -81,15 +81,15 @@ describe("Secrets", function() {
 
         const signingkeyInfo = {
             user_id: "@alice:example.com",
-            usage: ['master'],
+            usage: ["master"],
             keys: {
-                ['ed25519:' + signingPubKey]: signingPubKey,
+                ["ed25519:" + signingPubKey]: signingPubKey,
             },
         };
 
         const getKey = jest.fn().mockImplementation(async e => {
             expect(Object.keys(e.keys)).toEqual(["abc"]);
-            return ['abc', key];
+            return ["abc", key];
         });
 
         const alice = await makeTestClient(
@@ -107,7 +107,7 @@ describe("Secrets", function() {
 
         const secretStorage = alice.crypto.secretStorage;
 
-        jest.spyOn(alice, 'setAccountData').mockImplementation(
+        jest.spyOn(alice, "setAccountData").mockImplementation(
             async function(eventType, contents, callback) {
                 alice.store.storeAccountDataEvents([
                     new MatrixEvent({
@@ -124,7 +124,7 @@ describe("Secrets", function() {
         const keyAccountData = {
             algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
         };
-        await alice.crypto.crossSigningInfo.signObject(keyAccountData, 'master');
+        await alice.crypto.crossSigningInfo.signObject(keyAccountData, "master");
 
         alice.store.storeAccountDataEvents([
             new MatrixEvent({
@@ -210,7 +210,7 @@ describe("Secrets", function() {
         alice.setDefaultSecretStorageKeyId(newKeyId);
         await alice.storeSecret("foo", "bar");
 
-        const accountData = alice.getAccountData('foo');
+        const accountData = alice.getAccountData("foo");
         expect(accountData.getContent().encrypted).toBeTruthy();
         alice.stopClient();
     });

@@ -21,10 +21,10 @@ limitations under the License.
 
 import { PkSigning } from "@matrix-org/olm";
 
-import { decodeBase64, encodeBase64, pkSign, pkVerify } from './olmlib';
-import { logger } from '../logger';
-import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
-import { decryptAES, encryptAES } from './aes';
+import { decodeBase64, encodeBase64, pkSign, pkVerify } from "./olmlib";
+import { logger } from "../logger";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
+import { decryptAES, encryptAES } from "./aes";
 import { DeviceInfo } from "./deviceinfo";
 import { SecretStorage } from "./SecretStorage";
 import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
@@ -313,9 +313,9 @@ export class CrossSigningInfo {
                 masterPub = masterSigning.init_with_seed(privateKeys.master);
                 keys.master = {
                     user_id: this.userId,
-                    usage: ['master'],
+                    usage: ["master"],
                     keys: {
-                        ['ed25519:' + masterPub]: masterPub,
+                        ["ed25519:" + masterPub]: masterPub,
                     },
                 };
             } else {
@@ -329,9 +329,9 @@ export class CrossSigningInfo {
                     const sskPub = sskSigning.init_with_seed(privateKeys.self_signing);
                     keys.self_signing = {
                         user_id: this.userId,
-                        usage: ['self_signing'],
+                        usage: ["self_signing"],
                         keys: {
-                            ['ed25519:' + sskPub]: sskPub,
+                            ["ed25519:" + sskPub]: sskPub,
                         },
                     };
                     pkSign(keys.self_signing, masterSigning, this.userId, masterPub);
@@ -347,9 +347,9 @@ export class CrossSigningInfo {
                     const uskPub = uskSigning.init_with_seed(privateKeys.user_signing);
                     keys.user_signing = {
                         user_id: this.userId,
-                        usage: ['user_signing'],
+                        usage: ["user_signing"],
                         keys: {
-                            ['ed25519:' + uskPub]: uskPub,
+                            ["ed25519:" + uskPub]: uskPub,
                         },
                     };
                     pkSign(keys.user_signing, masterSigning, this.userId, masterPub);
@@ -523,7 +523,7 @@ export class CrossSigningInfo {
 
         let userTrusted;
         const userMaster = userCrossSigning.keys.master;
-        const uskId = this.getId('user_signing');
+        const uskId = this.getId("user_signing");
         try {
             pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
@@ -702,7 +702,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
         getCrossSigningKeyCache: async function(type: string, _expectedPublicKey: string): Promise<Uint8Array> {
             const key = await new Promise<any>((resolve) => {
                 return store.doTxn(
-                    'readonly',
+                    "readonly",
                     [IndexedDBCryptoStore.STORE_ACCOUNT],
                     (txn) => {
                         store.getSecretStorePrivateKey(txn, resolve, type);
@@ -727,7 +727,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
             const pickleKey = Buffer.from(olmDevice.pickleKey);
             const encryptedKey = await encryptAES(encodeBase64(key), pickleKey, type);
             return store.doTxn(
-                'readwrite',
+                "readwrite",
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     store.storeSecretStorePrivateKey(txn, type, encryptedKey);
@@ -799,7 +799,7 @@ export function requestKeysDuringVerification(
             if (!cachedKey) {
                 logger.info("No cached backup key found. Requesting...");
                 const secretReq = client.requestSecret(
-                    'm.megolm_backup.v1', [deviceId],
+                    "m.megolm_backup.v1", [deviceId],
                 );
                 const base64Key = await secretReq.promise;
                 logger.info("Got key backup key, decoding...");

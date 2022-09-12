@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import 'fake-indexeddb/auto';
-import 'jest-localstorage-mock';
+import "fake-indexeddb/auto";
+import "jest-localstorage-mock";
 
 import { IndexedDBStore, IStateEventWithRoomId, MemoryStore } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";

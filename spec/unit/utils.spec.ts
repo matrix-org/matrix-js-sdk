@@ -213,8 +213,8 @@ describe("utils", function() {
         });
     });
 
-    describe('simpleRetryOperation', () => {
-        it('should retry', async () => {
+    describe("simpleRetryOperation", () => {
+        it("should retry", async () => {
             let count = 0;
             const val = {};
             const fn = (attempt: any) => {
@@ -241,24 +241,24 @@ describe("utils", function() {
         // all that concerns us.
     });
 
-    describe('DEFAULT_ALPHABET', () => {
-        it('should be usefully printable ASCII in order', () => {
+    describe("DEFAULT_ALPHABET", () => {
+        it("should be usefully printable ASCII in order", () => {
             expect(DEFAULT_ALPHABET).toEqual(
                 " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
             );
         });
     });
 
-    describe('alphabetPad', () => {
-        it('should pad to the alphabet length', () => {
+    describe("alphabetPad", () => {
+        it("should pad to the alphabet length", () => {
             const len = 12;
             expect(alphabetPad("a", len)).toEqual("a" + ("".padEnd(len - 1, DEFAULT_ALPHABET[0])));
-            expect(alphabetPad("a", len, "123")).toEqual("a" + ("".padEnd(len - 1, '1')));
+            expect(alphabetPad("a", len, "123")).toEqual("a" + ("".padEnd(len - 1, "1")));
         });
     });
 
-    describe('baseToString', () => {
-        it('should calculate the appropriate string from numbers', () => {
+    describe("baseToString", () => {
+        it("should calculate the appropriate string from numbers", () => {
             // Verify the whole alphabet
             for (let i = BigInt(1); i <= DEFAULT_ALPHABET.length; i++) {
                 logger.log({ i }); // for debugging
@@ -275,14 +275,14 @@ describe("utils", function() {
             expect(baseToString(BigInt(7820126496))).toEqual(DEFAULT_ALPHABET[0].repeat(6));
 
             expect(baseToString(BigInt(10))).toEqual(DEFAULT_ALPHABET[9]);
-            expect(baseToString(BigInt(10), "abcdefghijklmnopqrstuvwxyz")).toEqual('j');
+            expect(baseToString(BigInt(10), "abcdefghijklmnopqrstuvwxyz")).toEqual("j");
             expect(baseToString(BigInt(6337))).toEqual("ab");
-            expect(baseToString(BigInt(80), "abcdefghijklmnopqrstuvwxyz")).toEqual('cb');
+            expect(baseToString(BigInt(80), "abcdefghijklmnopqrstuvwxyz")).toEqual("cb");
         });
     });
 
-    describe('stringToBase', () => {
-        it('should calculate the appropriate number for a string', () => {
+    describe("stringToBase", () => {
+        it("should calculate the appropriate number for a string", () => {
             expect(stringToBase(DEFAULT_ALPHABET[0].repeat(1))).toEqual(BigInt(1));
             expect(stringToBase(DEFAULT_ALPHABET[0].repeat(2))).toEqual(BigInt(96));
             expect(stringToBase(DEFAULT_ALPHABET[0].repeat(3))).toEqual(BigInt(9121));
@@ -297,42 +297,42 @@ describe("utils", function() {
         });
     });
 
-    describe('averageBetweenStrings', () => {
-        it('should average appropriately', () => {
+    describe("averageBetweenStrings", () => {
+        it("should average appropriately", () => {
             expect(averageBetweenStrings("  ", "!!")).toEqual(" P");
             expect(averageBetweenStrings(" ", "!")).toEqual("  ");
-            expect(averageBetweenStrings('A', 'B')).toEqual('A ');
-            expect(averageBetweenStrings('AA', 'BB')).toEqual('Aq');
-            expect(averageBetweenStrings('A', 'z')).toEqual(']');
-            expect(averageBetweenStrings('a', 'z', "abcdefghijklmnopqrstuvwxyz")).toEqual('m');
-            expect(averageBetweenStrings('AA', 'zz')).toEqual('^.');
-            expect(averageBetweenStrings('aa', 'zz', "abcdefghijklmnopqrstuvwxyz")).toEqual('mz');
-            expect(averageBetweenStrings('cat', 'doggo')).toEqual("d9>Cw");
-            expect(averageBetweenStrings('cat', 'doggo', "abcdefghijklmnopqrstuvwxyz")).toEqual("cumqh");
+            expect(averageBetweenStrings("A", "B")).toEqual("A ");
+            expect(averageBetweenStrings("AA", "BB")).toEqual("Aq");
+            expect(averageBetweenStrings("A", "z")).toEqual("]");
+            expect(averageBetweenStrings("a", "z", "abcdefghijklmnopqrstuvwxyz")).toEqual("m");
+            expect(averageBetweenStrings("AA", "zz")).toEqual("^.");
+            expect(averageBetweenStrings("aa", "zz", "abcdefghijklmnopqrstuvwxyz")).toEqual("mz");
+            expect(averageBetweenStrings("cat", "doggo")).toEqual("d9>Cw");
+            expect(averageBetweenStrings("cat", "doggo", "abcdefghijklmnopqrstuvwxyz")).toEqual("cumqh");
         });
     });
 
-    describe('nextString', () => {
-        it('should find the next string appropriately', () => {
-            expect(nextString('A')).toEqual('B');
-            expect(nextString('b', 'abcdefghijklmnopqrstuvwxyz')).toEqual('c');
-            expect(nextString('cat')).toEqual('cau');
-            expect(nextString('cat', 'abcdefghijklmnopqrstuvwxyz')).toEqual('cau');
+    describe("nextString", () => {
+        it("should find the next string appropriately", () => {
+            expect(nextString("A")).toEqual("B");
+            expect(nextString("b", "abcdefghijklmnopqrstuvwxyz")).toEqual("c");
+            expect(nextString("cat")).toEqual("cau");
+            expect(nextString("cat", "abcdefghijklmnopqrstuvwxyz")).toEqual("cau");
         });
     });
 
-    describe('prevString', () => {
-        it('should find the next string appropriately', () => {
-            expect(prevString('B')).toEqual('A');
-            expect(prevString('c', 'abcdefghijklmnopqrstuvwxyz')).toEqual('b');
-            expect(prevString('cau')).toEqual('cat');
-            expect(prevString('cau', 'abcdefghijklmnopqrstuvwxyz')).toEqual('cat');
+    describe("prevString", () => {
+        it("should find the next string appropriately", () => {
+            expect(prevString("B")).toEqual("A");
+            expect(prevString("c", "abcdefghijklmnopqrstuvwxyz")).toEqual("b");
+            expect(prevString("cau")).toEqual("cat");
+            expect(prevString("cau", "abcdefghijklmnopqrstuvwxyz")).toEqual("cat");
         });
     });
 
     // Let's just ensure the ordering is sensible for lexicographic ordering
-    describe('string averaging unified', () => {
-        it('should be truly previous and next', () => {
+    describe("string averaging unified", () => {
+        it("should be truly previous and next", () => {
             let midpoint = "cat";
 
             // We run this test 100 times to ensure we end up with a sane sequence.
@@ -349,7 +349,7 @@ describe("utils", function() {
             }
         });
 
-        it('should roll over', () => {
+        it("should roll over", () => {
             const lastAlpha = DEFAULT_ALPHABET[DEFAULT_ALPHABET.length - 1];
             const firstAlpha = DEFAULT_ALPHABET[0];
 
@@ -360,14 +360,14 @@ describe("utils", function() {
             expect(prevString(highRoll)).toEqual(lowRoll);
         });
 
-        it('should be reversible on small strings', () => {
+        it("should be reversible on small strings", () => {
             // Large scale reversibility is tested for max space order value
             const input = "cats";
             expect(prevString(nextString(input))).toEqual(input);
         });
 
         // We want to explicitly make sure that Space order values are supported and roll appropriately
-        it('should properly handle rolling over at 50 characters', () => {
+        it("should properly handle rolling over at 50 characters", () => {
             // Note: we also test reversibility of large strings here.
 
             const maxSpaceValue = DEFAULT_ALPHABET[DEFAULT_ALPHABET.length - 1].repeat(50);
@@ -382,30 +382,30 @@ describe("utils", function() {
         });
     });
 
-    describe('lexicographicCompare', () => {
-        it('should work', () => {
+    describe("lexicographicCompare", () => {
+        it("should work", () => {
             // Simple tests
-            expect(lexicographicCompare('a', 'b') < 0).toBe(true);
-            expect(lexicographicCompare('ab', 'b') < 0).toBe(true);
-            expect(lexicographicCompare('cat', 'dog') < 0).toBe(true);
+            expect(lexicographicCompare("a", "b") < 0).toBe(true);
+            expect(lexicographicCompare("ab", "b") < 0).toBe(true);
+            expect(lexicographicCompare("cat", "dog") < 0).toBe(true);
 
             // Simple tests (reversed)
-            expect(lexicographicCompare('b', 'a') > 0).toBe(true);
-            expect(lexicographicCompare('b', 'ab') > 0).toBe(true);
-            expect(lexicographicCompare('dog', 'cat') > 0).toBe(true);
+            expect(lexicographicCompare("b", "a") > 0).toBe(true);
+            expect(lexicographicCompare("b", "ab") > 0).toBe(true);
+            expect(lexicographicCompare("dog", "cat") > 0).toBe(true);
 
             // Simple equality tests
-            expect(lexicographicCompare('a', 'a') === 0).toBe(true);
-            expect(lexicographicCompare('A', 'A') === 0).toBe(true);
+            expect(lexicographicCompare("a", "a") === 0).toBe(true);
+            expect(lexicographicCompare("A", "A") === 0).toBe(true);
 
             // ASCII rule testing
-            expect(lexicographicCompare('A', 'a') < 0).toBe(true);
-            expect(lexicographicCompare('a', 'A') > 0).toBe(true);
+            expect(lexicographicCompare("A", "a") < 0).toBe(true);
+            expect(lexicographicCompare("a", "A") > 0).toBe(true);
         });
     });
 
-    describe('deepSortedObjectEntries', () => {
-        it('should auto-return non-objects', () => {
+    describe("deepSortedObjectEntries", () => {
+        it("should auto-return non-objects", () => {
             expect(deepSortedObjectEntries(42)).toEqual(42);
             expect(deepSortedObjectEntries("not object")).toEqual("not object");
             expect(deepSortedObjectEntries(true)).toEqual(true);
@@ -414,7 +414,7 @@ describe("utils", function() {
             expect(deepSortedObjectEntries(undefined)).toEqual(undefined);
         });
 
-        it('should sort objects appropriately', () => {
+        it("should sort objects appropriately", () => {
             const input = {
                 a: 42,
                 b: {
@@ -502,9 +502,9 @@ describe("utils", function() {
         });
     });
 
-    describe('sortEventsByLatestContentTimestamp', () => {
-        const roomId = '!room:server';
-        const userId = '@user:server';
+    describe("sortEventsByLatestContentTimestamp", () => {
+        const roomId = "!room:server";
+        const userId = "@user:server";
         const eventWithoutContentTimestamp = mkMessage({ room: roomId, user: userId, event: true });
         // m.beacon events have timestamp in content
         const beaconEvent1 = makeBeaconEvent(userId, { timestamp: 1648804528557 });
@@ -512,7 +512,7 @@ describe("utils", function() {
         const beaconEvent3 = makeBeaconEvent(userId, { timestamp: 1648804528000 });
         const beaconEvent4 = makeBeaconEvent(userId, { timestamp: 0 });
 
-        it('sorts events with timestamps as later than events without', () => {
+        it("sorts events with timestamps as later than events without", () => {
             expect(
                 [beaconEvent4, eventWithoutContentTimestamp, beaconEvent1]
                     .sort(utils.sortEventsByLatestContentTimestamp),
@@ -521,23 +521,23 @@ describe("utils", function() {
             ]);
         });
 
-        it('sorts by content timestamps correctly', () => {
+        it("sorts by content timestamps correctly", () => {
             expect(
                 [beaconEvent1, beaconEvent2, beaconEvent3].sort(sortEventsByLatestContentTimestamp),
             ).toEqual([beaconEvent2, beaconEvent1, beaconEvent3]);
         });
     });
 
-    describe('isSupportedReceiptType', () => {
-        it('should support m.read', () => {
+    describe("isSupportedReceiptType", () => {
+        it("should support m.read", () => {
             expect(utils.isSupportedReceiptType(ReceiptType.Read)).toBeTruthy();
         });
 
-        it('should support m.read.private', () => {
+        it("should support m.read.private", () => {
             expect(utils.isSupportedReceiptType(ReceiptType.ReadPrivate)).toBeTruthy();
         });
 
-        it('should not support other receipt types', () => {
+        it("should not support other receipt types", () => {
             expect(utils.isSupportedReceiptType("this is a receipt type")).toBeFalsy();
         });
     });

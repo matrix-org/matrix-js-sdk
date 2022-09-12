@@ -71,7 +71,7 @@ describe("MatrixClient retrying", function() {
             "body": "m1",
         }).then(function() {
             // we expect the first message to fail
-            throw new Error('Message 1 unexpectedly sent successfully');
+            throw new Error("Message 1 unexpectedly sent successfully");
         }, () => {
             // this is expected
         });

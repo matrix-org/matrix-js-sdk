@@ -20,9 +20,9 @@ limitations under the License.
  * @module crypto/verification/Base
  */
 
-import { MatrixEvent } from '../../models/event';
-import { logger } from '../../logger';
-import { DeviceInfo } from '../deviceinfo';
+import { MatrixEvent } from "../../models/event";
+import { logger } from "../../logger";
+import { DeviceInfo } from "../deviceinfo";
 import { newTimeoutError } from "./Error";
 import { KeysDuringVerification, requestKeysDuringVerification } from "../CrossSigning";
 import { IVerificationChannel } from "./request/Channel";
@@ -195,7 +195,7 @@ export class VerificationBase<
             if (reject) {
                 const content = e.getContent();
                 const { reason, code } = content;
-                reject(new Error(`Other side cancelled verification ` +
+                reject(new Error("Other side cancelled verification " +
                     `because ${reason} (${code})`));
             }
         } else if (this.expectedEvent) {
@@ -313,7 +313,7 @@ export class VerificationBase<
         const verifiedDevices = [];
 
         for (const [keyId, keyInfo] of Object.entries(keys)) {
-            const deviceId = keyId.split(':', 2)[1];
+            const deviceId = keyId.split(":", 2)[1];
             const device = this.baseApis.getStoredDevice(userId, deviceId);
             if (device) {
                 verifier(keyId, device, keyInfo);

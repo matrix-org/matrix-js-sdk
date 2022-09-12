@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import { logger } from './logger';
+import { logger } from "./logger";
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
@@ -125,7 +125,7 @@ class ExtensionToDevice implements Extension {
                 // so we can flag the verification events as cancelled in the loop
                 // below.
                 if (toDeviceEvent.getType() === "m.key.verification.cancel") {
-                    const txnId = toDeviceEvent.getContent()['transaction_id'];
+                    const txnId = toDeviceEvent.getContent()["transaction_id"];
                     if (txnId) {
                         cancelledKeyVerificationTxns.push(txnId);
                     }
@@ -144,7 +144,7 @@ class ExtensionToDevice implements Extension {
                     ) {
                         // the mapper already logged a warning.
                         logger.log(
-                            'Ignoring undecryptable to-device event from ' +
+                            "Ignoring undecryptable to-device event from " +
                             toDeviceEvent.getSender(),
                         );
                         return;
@@ -152,7 +152,7 @@ class ExtensionToDevice implements Extension {
 
                     if (toDeviceEvent.getType() === "m.key.verification.start"
                         || toDeviceEvent.getType() === "m.key.verification.request") {
-                        const txnId = content['transaction_id'];
+                        const txnId = content["transaction_id"];
                         if (cancelledKeyVerificationTxns.includes(txnId)) {
                             toDeviceEvent.flagCancelled();
                         }

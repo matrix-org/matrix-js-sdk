@@ -44,7 +44,7 @@ describe("RoomMember", function() {
                     avatar_url: "mxc://flibble/wibble",
                 },
             });
-            const url = member.getAvatarUrl(hsUrl, 1, 1, '', false, false);
+            const url = member.getAvatarUrl(hsUrl, 1, 1, "", false, false);
             // we don't care about how the mxc->http conversion is done, other
             // than it contains the mxc body.
             expect(url?.indexOf("flibble/wibble")).not.toEqual(-1);
@@ -132,7 +132,7 @@ describe("RoomMember", function() {
                 member.powerLevel = 1;
                 member.on(RoomMemberEvent.PowerLevel, function(emitEvent, emitMember) {
                     emitCount += 1;
-                    expect(emitMember.userId).toEqual('@alice:bar');
+                    expect(emitMember.userId).toEqual("@alice:bar");
                     expect(emitMember.powerLevel).toEqual(0);
                     expect(emitEvent).toEqual(event);
                 });
@@ -160,7 +160,7 @@ describe("RoomMember", function() {
 
                 member.on(RoomMemberEvent.PowerLevel, function(emitEvent, emitMember) {
                     emitCount += 1;
-                    expect(emitMember.userId).toEqual('@alice:bar');
+                    expect(emitMember.userId).toEqual("@alice:bar");
                     expect(emitMember.powerLevel).toEqual(20);
                     expect(emitEvent).toEqual(event);
                 });

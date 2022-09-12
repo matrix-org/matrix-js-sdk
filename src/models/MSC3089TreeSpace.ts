@@ -106,7 +106,7 @@ export class MSC3089TreeSpace {
         // but is safe for a managed usecase like we offer in the SDK.
         const parentEvents = this.room.currentState.getStateEvents(EventType.SpaceParent);
         if (!parentEvents?.length) return true;
-        return parentEvents.every(e => !e.getContent()?.['via']);
+        return parentEvents.every(e => !e.getContent()?.["via"]);
     }
 
     /**
@@ -173,11 +173,11 @@ export class MSC3089TreeSpace {
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
         const pls = currentPls.getContent() || {};
-        const viewLevel = pls['users_default'] || 0;
-        const editLevel = pls['events_default'] || 50;
-        const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;
+        const viewLevel = pls["users_default"] || 0;
+        const editLevel = pls["events_default"] || 50;
+        const adminLevel = pls["events"]?.[EventType.RoomPowerLevels] || 100;
 
-        const users = pls['users'] || {};
+        const users = pls["users"] || {};
         switch (role) {
             case TreePermissions.Viewer:
                 users[userId] = viewLevel;
@@ -191,7 +191,7 @@ export class MSC3089TreeSpace {
             default:
                 throw new Error("Invalid role: " + role);
         }
-        pls['users'] = users;
+        pls["users"] = users;
 
         await this.client.sendStateEvent(this.roomId, EventType.RoomPowerLevels, pls, "");
     }
@@ -208,11 +208,11 @@ export class MSC3089TreeSpace {
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
         const pls = currentPls.getContent() || {};
-        const viewLevel = pls['users_default'] || 0;
-        const editLevel = pls['events_default'] || 50;
-        const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;
+        const viewLevel = pls["users_default"] || 0;
+        const editLevel = pls["events_default"] || 50;
+        const adminLevel = pls["events"]?.[EventType.RoomPowerLevels] || 100;
 
-        const userLevel = pls['users']?.[userId] || viewLevel;
+        const userLevel = pls["users"]?.[userId] || viewLevel;
         if (userLevel >= adminLevel) return TreePermissions.Owner;
         if (userLevel >= editLevel) return TreePermissions.Editor;
         return TreePermissions.Viewer;
@@ -296,7 +296,7 @@ export class MSC3089TreeSpace {
 
     private getOrderedChildren(children: MatrixEvent[]): { roomId: string, order: string }[] {
         const ordered: { roomId: string, order: string }[] = children
-            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()['order'] }))
+            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()["order"] }))
             .filter(c => c.roomId) as { roomId: string, order: string }[];
         ordered.sort((a, b) => {
             if (a.order && !b.order) {
@@ -507,7 +507,7 @@ export class MSC3089TreeSpace {
         await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
             active: true,
             name: name,
-        }, res['event_id']);
+        }, res["event_id"]);
 
         return res;
     }

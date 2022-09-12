@@ -20,7 +20,7 @@ limitations under the License.
  * @module crypto/algorithms/olm
  */
 
-import { logger } from '../../logger';
+import { logger } from "../../logger";
 import * as olmlib from "../olmlib";
 import { DeviceInfo } from "../deviceinfo";
 import {
@@ -29,7 +29,7 @@ import {
     EncryptionAlgorithm,
     registerAlgorithm,
 } from "./base";
-import { Room } from '../../models/room';
+import { Room } from "../../models/room";
 import { MatrixEvent } from "../..";
 import { IEventDecryptionResult } from "../index";
 import { IInboundSession } from "../OlmDevice";

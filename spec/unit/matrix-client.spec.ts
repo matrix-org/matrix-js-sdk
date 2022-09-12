@@ -467,11 +467,11 @@ describe("MatrixClient", function() {
                 // and they all need to be stored!
                 return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
             }
-            const invalidFilterId = 'invalidF1lt3r';
+            const invalidFilterId = "invalidF1lt3r";
             httpLookups = [];
             httpLookups.push({
                 method: "GET",
-                path: FILTER_PATH + '/' + invalidFilterId,
+                path: FILTER_PATH + "/" + invalidFilterId,
                 error: {
                     errcode: "M_UNKNOWN",
                     name: "M_UNKNOWN",
@@ -1141,7 +1141,7 @@ describe("MatrixClient", function() {
     });
 
     describe("beacons", () => {
-        const roomId = '!room:server.org';
+        const roomId = "!room:server.org";
         const content = makeBeaconInfoContent(100, true);
 
         beforeEach(() => {
@@ -1155,7 +1155,7 @@ describe("MatrixClient", function() {
             const expectedEventType = M_BEACON_INFO.name;
             const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(callback).toBeFalsy();
-            expect(method).toBe('PUT');
+            expect(method).toBe("PUT");
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
                 `${encodeURIComponent(expectedEventType)}/${encodeURIComponent(userId)}`,
@@ -1176,26 +1176,26 @@ describe("MatrixClient", function() {
             expect(requestContent).toEqual(content);
         });
 
-        describe('processBeaconEvents()', () => {
-            it('does nothing when events is falsy', () => {
+        describe("processBeaconEvents()", () => {
+            it("does nothing when events is falsy", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
 
                 client.processBeaconEvents(room, undefined);
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
             });
 
-            it('does nothing when events is of length 0', () => {
+            it("does nothing when events is of length 0", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
 
                 client.processBeaconEvents(room, []);
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
             });
 
-            it('calls room states processBeaconEvents with events', () => {
+            it("calls room states processBeaconEvents with events", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
 
                 const messageEvent = testUtils.mkMessage({ room: roomId, user: userId, event: true });
                 const beaconEvent = makeBeaconEvent(userId);
@@ -1242,8 +1242,8 @@ describe("MatrixClient", function() {
     });
 
     describe("setPassword", () => {
-        const auth = { session: 'abcdef', type: 'foo' };
-        const newPassword = 'newpassword';
+        const auth = { session: "abcdef", type: "foo" };
+        const newPassword = "newpassword";
         const callback = () => {};
 
         const passwordTest = (expectedRequestContent: any, expectedCallback?: Function) => {
@@ -1253,8 +1253,8 @@ describe("MatrixClient", function() {
             } else {
                 expect(callback).toBeFalsy();
             }
-            expect(method).toBe('POST');
-            expect(path).toEqual('/account/password');
+            expect(method).toBe("POST");
+            expect(path).toEqual("/account/password");
             expect(queryParams).toBeFalsy();
             expect(requestContent).toEqual(expectedRequestContent);
         };
@@ -1308,7 +1308,7 @@ describe("MatrixClient", function() {
             const [callback, method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
             expect(callback).toBeFalsy();
             expect(data).toBeFalsy();
-            expect(method).toBe('GET');
+            expect(method).toBe("GET");
             expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
             expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
             expect(queryParams).toBeFalsy();

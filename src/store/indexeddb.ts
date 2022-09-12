@@ -21,7 +21,7 @@ import { LocalIndexedDBStoreBackend } from "./indexeddb-local-backend";
 import { RemoteIndexedDBStoreBackend } from "./indexeddb-remote-backend";
 import { User } from "../models/user";
 import { IEvent, MatrixEvent } from "../models/event";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend } from "./indexeddb-backend";
 import { ISyncResponse } from "../sync-accumulator";
@@ -112,7 +112,7 @@ export class IndexedDBStore extends MemoryStore {
         super(opts);
 
         if (!opts.indexedDB) {
-            throw new Error('Missing required option: indexedDB');
+            throw new Error("Missing required option: indexedDB");
         }
 
         if (opts.workerFactory) {
@@ -129,16 +129,16 @@ export class IndexedDBStore extends MemoryStore {
      */
     public startup(): Promise<void> {
         if (this.startedUp) {
-            logger.log(`IndexedDBStore.startup: already started`);
+            logger.log("IndexedDBStore.startup: already started");
             return Promise.resolve();
         }
 
-        logger.log(`IndexedDBStore.startup: connecting to backend`);
+        logger.log("IndexedDBStore.startup: connecting to backend");
         return this.backend.connect().then(() => {
-            logger.log(`IndexedDBStore.startup: loading presence events`);
+            logger.log("IndexedDBStore.startup: loading presence events");
             return this.backend.getUserPresenceEvents();
         }).then((userPresenceEvents) => {
-            logger.log(`IndexedDBStore.startup: processing presence events`);
+            logger.log("IndexedDBStore.startup: processing presence events");
             userPresenceEvents.forEach(([userId, rawEvent]) => {
                 const u = new User(userId);
                 if (rawEvent) {

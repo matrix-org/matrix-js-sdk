@@ -27,7 +27,6 @@ module.exports = {
         }],
         "arrow-parens": "off",
         "prefer-promise-reject-errors": "off",
-        "quotes": "off",
         "indent": "off",
         "no-constant-condition": "off",
         "no-async-promise-executor": "off",
@@ -61,7 +60,6 @@ module.exports = {
             "func-call-spacing": "off",
             "@typescript-eslint/func-call-spacing": ["error"],
 
-            "quotes": "off",
             // We use a `logger` intermediary module
             "no-console": "error",
         },

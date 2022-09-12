@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import type { BinaryLike } from "crypto";
-import { getCrypto } from '../utils';
-import { decodeBase64, encodeBase64 } from './olmlib';
+import { getCrypto } from "../utils";
+import { decodeBase64, encodeBase64 } from "./olmlib";
 
 const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
     (window.crypto.subtle || window.crypto.webkitSubtle) : null;
@@ -95,9 +95,9 @@ async function decryptNode(data: IEncryptedPayload, key: Uint8Array, name: strin
 
     const hmac = crypto.createHmac("sha256", hmacKey)
         .update(Buffer.from(data.ciphertext, "base64"))
-        .digest("base64").replace(/=+$/g, '');
+        .digest("base64").replace(/=+$/g, "");
 
-    if (hmac !== data.mac.replace(/=+$/g, '')) {
+    if (hmac !== data.mac.replace(/=+$/g, "")) {
         throw new Error(`Error decrypting secret ${name}: bad MAC`);
     }
 
@@ -158,7 +158,7 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
     );
 
     const hmac = await subtleCrypto.sign(
-        { name: 'HMAC' },
+        { name: "HMAC" },
         hmacKey,
         ciphertext,
     );
@@ -209,7 +209,7 @@ async function decryptBrowser(data: IEncryptedPayload, key: Uint8Array, name: st
 
 async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[CryptoKey, CryptoKey]> {
     const hkdfkey = await subtleCrypto.importKey(
-        'raw',
+        "raw",
         key,
         { name: "HKDF" },
         false,
@@ -232,22 +232,22 @@ async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[Crypto
     const hmacKey = keybits.slice(32);
 
     const aesProm = subtleCrypto.importKey(
-        'raw',
+        "raw",
         aesKey,
-        { name: 'AES-CTR' },
+        { name: "AES-CTR" },
         false,
-        ['encrypt', 'decrypt'],
+        ["encrypt", "decrypt"],
     );
 
     const hmacProm = subtleCrypto.importKey(
-        'raw',
+        "raw",
         hmacKey,
         {
-            name: 'HMAC',
-            hash: { name: 'SHA-256' },
+            name: "HMAC",
+            hash: { name: "SHA-256" },
         },
         false,
-        ['sign', 'verify'],
+        ["sign", "verify"],
     );
 
     return Promise.all([aesProm, hmacProm]);

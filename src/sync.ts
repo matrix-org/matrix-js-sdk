@@ -32,8 +32,8 @@ import { IDeferred } from "./utils";
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
 import { PushProcessor } from "./pushprocessor";
-import { logger } from './logger';
-import { InvalidStoreError } from './errors';
+import { logger } from "./logger";
+import { InvalidStoreError } from "./errors";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import {
     IEphemeral,
@@ -96,7 +96,7 @@ export enum SyncState {
 // by power-levels. MSC2716 is supported in existing room versions but they
 // should only have special meaning when the room creator sends them.
 const MSC2716_ROOM_VERSIONS = [
-    'org.matrix.msc2716v3',
+    "org.matrix.msc2716v3",
 ];
 
 function getFilterName(userId: string, suffix?: string): string {
@@ -230,7 +230,7 @@ export class SyncApi {
         if (timelineWasEmpty) {
             logger.debug(
                 `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} ` +
-                `because the timeline was empty before the marker arrived which means there is nothing to refresh.`,
+                "because the timeline was empty before the marker arrived which means there is nothing to refresh.",
             );
             return;
         }
@@ -261,7 +261,7 @@ export class SyncApi {
             // Saw new marker event, let's let the clients know they should
             // refresh the timeline.
             logger.debug(
-                `MarkerState: Timeline needs to be refreshed because ` +
+                "MarkerState: Timeline needs to be refreshed because " +
                 `a new markerEventId=${markerEvent.getId()} was sent in roomId=${room.roomId}`,
             );
             room.setTimelineNeedsRefresh(true);
@@ -269,8 +269,8 @@ export class SyncApi {
         } else {
             logger.debug(
                 `MarkerState: Ignoring markerEventId=${markerEvent.getId()} in roomId=${room.roomId} because ` +
-                `MSC2716 is not supported in the room version or for any room version, the marker wasn't sent ` +
-                `by the room creator.`,
+                "MSC2716 is not supported in the room version or for any room version, the marker wasn't sent " +
+                "by the room creator.",
             );
         }
     }
@@ -975,7 +975,7 @@ export class SyncApi {
         }
 
         this.failedSyncCount++;
-        logger.log('Number of consecutive failed sync requests:', this.failedSyncCount);
+        logger.log("Number of consecutive failed sync requests:", this.failedSyncCount);
 
         debuglog("Starting keep-alive");
         // Note that we do *not* mark the sync connection as
@@ -1117,7 +1117,7 @@ export class SyncApi {
                     // so we can flag the verification events as cancelled in the loop
                     // below.
                     if (toDeviceEvent.getType() === "m.key.verification.cancel") {
-                        const txnId = toDeviceEvent.getContent()['transaction_id'];
+                        const txnId = toDeviceEvent.getContent()["transaction_id"];
                         if (txnId) {
                             cancelledKeyVerificationTxns.push(txnId);
                         }
@@ -1136,7 +1136,7 @@ export class SyncApi {
                         ) {
                             // the mapper already logged a warning.
                             logger.log(
-                                'Ignoring undecryptable to-device event from ' +
+                                "Ignoring undecryptable to-device event from " +
                                 toDeviceEvent.getSender(),
                             );
                             return;
@@ -1144,7 +1144,7 @@ export class SyncApi {
 
                         if (toDeviceEvent.getType() === "m.key.verification.start"
                             || toDeviceEvent.getType() === "m.key.verification.request") {
-                            const txnId = content['transaction_id'];
+                            const txnId = content["transaction_id"];
                             if (cancelledKeyVerificationTxns.includes(txnId)) {
                                 toDeviceEvent.flagCancelled();
                             }
@@ -1457,7 +1457,7 @@ export class SyncApi {
             undefined, // queryParams
             undefined, // data
             {
-                prefix: '',
+                prefix: "",
                 localTimeoutMs: 15 * 1000,
             },
         ).then(() => {

@@ -27,8 +27,8 @@ import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, Matr
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
-import { logger } from '../logger';
-import { TypedReEmitter } from '../ReEmitter';
+import { logger } from "../logger";
+import { TypedReEmitter } from "../ReEmitter";
 import {
     EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     EVENT_VISIBILITY_CHANGE_TYPE,
@@ -58,8 +58,8 @@ import { RelationsContainer } from "./relations-container";
 // room versions which are considered okay for people to run without being asked
 // to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
 // return an m.room_versions capability.
-export const KNOWN_SAFE_ROOM_VERSION = '9';
-const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+export const KNOWN_SAFE_ROOM_VERSION = "9";
+const SAFE_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     // console.log("synthesizing receipt for "+event.getId());
@@ -476,7 +476,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     public getCreator(): string | null {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
-        return createEvent?.getContent()['creator'] ?? null;
+        return createEvent?.getContent()["creator"] ?? null;
     }
 
     /**
@@ -490,10 +490,10 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 logger.warn("[getVersion] Room " + this.roomId + " does not have an m.room.create event");
                 this.getVersionWarning = true;
             }
-            return '1';
+            return "1";
         }
-        const ver = createEvent.getContent()['room_version'];
-        if (ver === undefined) return '1';
+        const ver = createEvent.getContent()["room_version"];
+        if (ver === undefined) return "1";
         return ver;
     }
 
@@ -583,7 +583,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         if (currentVersion === versionCap.default) return result;
 
         const stableVersions = Object.keys(versionCap.available)
-            .filter((v) => versionCap.available[v] === 'stable');
+            .filter((v) => versionCap.available[v] === "stable");
 
         // Check if the room is on an unstable version. We determine urgency based
         // off the version being in the Matrix spec namespace or not (if the version
@@ -929,7 +929,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      */
     private cleanupAfterLeaving(): void {
         this.clearLoadedMembersIfNeeded().catch((err) => {
-            logger.error(`error after clearing loaded members from ` +
+            logger.error("error after clearing loaded members from " +
                 `room ${this.roomId} after leaving`);
             logger.log(err);
         });
@@ -1024,8 +1024,8 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         } else {
             logger.log(
                 `[refreshLiveTimeline for ${this.roomId}] \`/sync\` or some other request beat us to creating a new ` +
-                `live timeline after we reset it. We'll use that instead since any events in the scrollback from ` +
-                `this timeline will include the history.`,
+                "live timeline after we reset it. We'll use that instead since any events in the scrollback from " +
+                "this timeline will include the history.",
             );
         }
 
@@ -1334,7 +1334,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 if (Array.isArray(aliasEvent.getContent().aliases)) {
                     const filteredAliases = aliasEvent.getContent<{ aliases: string[] }>().aliases.filter(a => {
                         if (typeof(a) !== "string") return false;
-                        if (a[0] !== '#') return false;
+                        if (a[0] !== "#") return false;
                         if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
 
                         // It's probably valid by here.
@@ -2337,7 +2337,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
         let timelineWasEmpty = false;
-        if (typeof (duplicateStrategyOrOpts) === 'object') {
+        if (typeof (duplicateStrategyOrOpts) === "object") {
             ({
                 duplicateStrategy,
                 fromCache = false,
@@ -2348,9 +2348,9 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // Deprecation warning
             // FIXME: Remove after 2023-06-01 (technical debt)
             logger.warn(
-                'Overload deprecated: ' +
-                '`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` ' +
-                'is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`',
+                "Overload deprecated: " +
+                "`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` " +
+                "is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`",
             );
         }
 
@@ -2843,7 +2843,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      *                   message events into the room.
      */
     public maySendMessage(): boolean {
-        return this.getMyMembership() === 'join' && (this.client.isRoomEncrypted(this.roomId)
+        return this.getMyMembership() === "join" && (this.client.isRoomEncrypted(this.roomId)
             ? this.currentState.maySendEvent(EventType.RoomMessageEncrypted, this.myUserId)
             : this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId));
     }
@@ -3042,7 +3042,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const myMembership = this.getMyMembership();
         // if I have created a room and invited people through
         // 3rd party invites
-        if (myMembership == 'join') {
+        if (myMembership == "join") {
             const thirdPartyInvites = this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
 
             if (thirdPartyInvites?.length) {

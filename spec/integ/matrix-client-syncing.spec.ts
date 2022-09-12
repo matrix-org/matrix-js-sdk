@@ -642,14 +642,14 @@ describe("MatrixClient syncing", () => {
                 const stateAtStart = room.getLiveTimeline().getState(
                     EventTimeline.BACKWARDS,
                 );
-                const startRoomNameEvent = stateAtStart.getStateEvents('m.room.name', '');
-                expect(startRoomNameEvent.getContent().name).toEqual('Old room name');
+                const startRoomNameEvent = stateAtStart.getStateEvents("m.room.name", "");
+                expect(startRoomNameEvent.getContent().name).toEqual("Old room name");
 
                 const stateAtEnd = room.getLiveTimeline().getState(
                     EventTimeline.FORWARDS,
                 );
-                const endRoomNameEvent = stateAtEnd.getStateEvents('m.room.name', '');
-                expect(endRoomNameEvent.getContent().name).toEqual('A new room name');
+                const endRoomNameEvent = stateAtEnd.getStateEvents("m.room.name", "");
+                expect(endRoomNameEvent.getContent().name).toEqual("A new room name");
             });
         });
 
@@ -666,13 +666,13 @@ describe("MatrixClient syncing", () => {
                 room: roomOne, user: otherUserId, msg: "hello",
             });
 
-            it('new marker event *NOT* from the room creator in a subsequent syncs ' +
-                'should *NOT* mark the timeline as needing a refresh', async () => {
+            it("new marker event *NOT* from the room creator in a subsequent syncs " +
+                "should *NOT* mark the timeline as needing a refresh", async () => {
                 const roomCreateEvent = utils.mkEvent({
                     type: "m.room.create", room: roomOne, user: otherUserId,
                     content: {
                         creator: otherUserId,
-                        room_version: '9',
+                        room_version: "9",
                     },
                 });
                 const normalFirstSync = {
@@ -741,11 +741,11 @@ describe("MatrixClient syncing", () => {
             });
 
             [{
-                label: 'In existing room versions (when the room creator sends the MSC2716 events)',
-                roomVersion: '9',
+                label: "In existing room versions (when the room creator sends the MSC2716 events)",
+                roomVersion: "9",
             }, {
-                label: 'In a MSC2716 supported room version',
-                roomVersion: 'org.matrix.msc2716v3',
+                label: "In a MSC2716 supported room version",
+                roomVersion: "org.matrix.msc2716v3",
             }].forEach((testMeta) => {
                 describe(testMeta.label, () => {
                     const roomCreateEvent = utils.mkEvent({
@@ -780,8 +780,8 @@ describe("MatrixClient syncing", () => {
                         },
                     };
 
-                    it('no marker event in sync response '+
-                        'should *NOT* mark the timeline as needing a refresh (check for a sane default)', async () => {
+                    it("no marker event in sync response "+
+                        "should *NOT* mark the timeline as needing a refresh (check for a sane default)", async () => {
                         const syncData = {
                             next_batch: "batch_token",
                             rooms: {
@@ -810,8 +810,8 @@ describe("MatrixClient syncing", () => {
                         expect(room.getTimelineNeedsRefresh()).toEqual(false);
                     });
 
-                    it('marker event already sent within timeline range when you join ' +
-                        'should *NOT* mark the timeline as needing a refresh (timelineWasEmpty)', async () => {
+                    it("marker event already sent within timeline range when you join " +
+                        "should *NOT* mark the timeline as needing a refresh (timelineWasEmpty)", async () => {
                         const syncData = {
                             next_batch: "batch_token",
                             rooms: {
@@ -840,8 +840,8 @@ describe("MatrixClient syncing", () => {
                         expect(room.getTimelineNeedsRefresh()).toEqual(false);
                     });
 
-                    it('marker event already sent before joining (in state) ' +
-                        'should *NOT* mark the timeline as needing a refresh (timelineWasEmpty)', async () => {
+                    it("marker event already sent before joining (in state) " +
+                        "should *NOT* mark the timeline as needing a refresh (timelineWasEmpty)", async () => {
                         const syncData = {
                             next_batch: "batch_token",
                             rooms: {
@@ -873,8 +873,8 @@ describe("MatrixClient syncing", () => {
                         expect(room.getTimelineNeedsRefresh()).toEqual(false);
                     });
 
-                    it('new marker event in a subsequent syncs timeline range ' +
-                        'should mark the timeline as needing a refresh', async () => {
+                    it("new marker event in a subsequent syncs timeline range " +
+                        "should mark the timeline as needing a refresh", async () => {
                         const nextSyncData = {
                             next_batch: "batch_token",
                             rooms: {
@@ -925,7 +925,7 @@ describe("MatrixClient syncing", () => {
                     });
 
                     // Mimic a marker event being sent far back in the scroll back but since our last sync
-                    it('new marker event in sync state should mark the timeline as needing a refresh', async () => {
+                    it("new marker event in sync state should mark the timeline as needing a refresh", async () => {
                         const nextSyncData = {
                             next_batch: "batch_token",
                             rooms: {
@@ -968,7 +968,7 @@ describe("MatrixClient syncing", () => {
 
         // Make sure the state listeners work and events are re-emitted properly from
         // the client regardless if we reset and refresh the timeline.
-        describe('state listeners and re-registered when RoomEvent.CurrentStateUpdated is fired', () => {
+        describe("state listeners and re-registered when RoomEvent.CurrentStateUpdated is fired", () => {
             const EVENTS = [
                 utils.mkMessage({
                     room: roomOne, user: userA, msg: "we",
@@ -986,7 +986,7 @@ describe("MatrixClient syncing", () => {
 
             const SOME_STATE_EVENT = utils.mkEvent({
                 event: true,
-                type: 'org.matrix.test_state',
+                type: "org.matrix.test_state",
                 room: roomOne,
                 user: userA,
                 skey: "",

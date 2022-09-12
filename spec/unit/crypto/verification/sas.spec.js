@@ -15,7 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 import "../../../olm-loader";
-import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
+import { makeTestClients, setupWebcrypto, teardownWebcrypto } from "./util";
 import { MatrixEvent } from "../../../../src/models/event";
 import { SAS } from "../../../../src/crypto/verification/SAS";
 import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
@@ -31,7 +31,7 @@ let BOB_DEVICES;
 
 describe("SAS verification", function() {
     if (!global.Olm) {
-        logger.warn('Not running device verification unit tests: libolm not present');
+        logger.warn("Not running device verification unit tests: libolm not present");
         return;
     }
 
@@ -197,13 +197,13 @@ describe("SAS verification", function() {
                 return origSendToDevice(type, map);
             };
 
-            alice.httpBackend.when('POST', '/keys/query').respond(200, {
+            alice.httpBackend.when("POST", "/keys/query").respond(200, {
                 failures: {},
                 device_keys: {
                     "@bob:example.com": BOB_DEVICES,
                 },
             });
-            bob.httpBackend.when('POST', '/keys/query').respond(200, {
+            bob.httpBackend.when("POST", "/keys/query").respond(200, {
                 failures: {},
                 device_keys: {
                     "@alice:example.com": ALICE_DEVICES,
@@ -243,7 +243,7 @@ describe("SAS verification", function() {
                     // happen, the verification will fail due to a hash
                     // commitment mismatch.
                     map[bob.client.getUserId()][bob.client.deviceId]
-                        .message_authentication_codes = ['hkdf-hmac-sha256'];
+                        .message_authentication_codes = ["hkdf-hmac-sha256"];
                 }
                 return aliceOrigSendToDevice(type, map);
             };
@@ -256,13 +256,13 @@ describe("SAS verification", function() {
                 return bobOrigSendToDevice(type, map);
             };
 
-            alice.httpBackend.when('POST', '/keys/query').respond(200, {
+            alice.httpBackend.when("POST", "/keys/query").respond(200, {
                 failures: {},
                 device_keys: {
                     "@bob:example.com": BOB_DEVICES,
                 },
             });
-            bob.httpBackend.when('POST', '/keys/query').respond(200, {
+            bob.httpBackend.when("POST", "/keys/query").respond(200, {
                 failures: {},
                 device_keys: {
                     "@alice:example.com": ALICE_DEVICES,
@@ -299,7 +299,7 @@ describe("SAS verification", function() {
                     // happen, the verification will fail due to a hash
                     // commitment mismatch.
                     map[bob.client.getUserId()][bob.client.deviceId]
-                        .message_authentication_codes = ['hmac-sha256'];
+                        .message_authentication_codes = ["hmac-sha256"];
                 }
                 return aliceOrigSendToDevice(type, map);
             };
@@ -312,13 +312,13 @@ describe("SAS verification", function() {
                 return bobOrigSendToDevice(type, map);
             };
 
-            alice.httpBackend.when('POST', '/keys/query').respond(200, {
+            alice.httpBackend.when("POST", "/keys/query").respond(200, {
                 failures: {},
                 device_keys: {
                     "@bob:example.com": BOB_DEVICES,
                 },
             });
-            bob.httpBackend.when('POST', '/keys/query').respond(200, {
+            bob.httpBackend.when("POST", "/keys/query").respond(200, {
                 failures: {},
                 device_keys: {
                     "@alice:example.com": ALICE_DEVICES,
@@ -343,14 +343,14 @@ describe("SAS verification", function() {
         });
 
         it("should verify a cross-signing key", async () => {
-            alice.httpBackend.when('POST', '/keys/device_signing/upload').respond(
+            alice.httpBackend.when("POST", "/keys/device_signing/upload").respond(
                 200, {},
             );
-            alice.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
+            alice.httpBackend.when("POST", "/keys/signatures/upload").respond(200, {});
             alice.httpBackend.flush(undefined, 2);
             await resetCrossSigningKeys(alice.client);
-            bob.httpBackend.when('POST', '/keys/device_signing/upload').respond(200, {});
-            bob.httpBackend.when('POST', '/keys/signatures/upload').respond(200, {});
+            bob.httpBackend.when("POST", "/keys/device_signing/upload").respond(200, {});
+            bob.httpBackend.when("POST", "/keys/signatures/upload").respond(200, {});
             bob.httpBackend.flush(undefined, 2);
 
             await resetCrossSigningKeys(bob.client);
@@ -365,7 +365,7 @@ describe("SAS verification", function() {
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => {
                     bob.httpBackend.when(
-                        'POST', '/keys/signatures/upload',
+                        "POST", "/keys/signatures/upload",
                     ).respond(200, {});
                     bob.httpBackend.flush(undefined, 1, 2000);
                     return verifier.verify();

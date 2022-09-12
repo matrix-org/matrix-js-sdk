@@ -291,7 +291,7 @@ describe("MatrixClient events", function() {
         });
 
         it("should emit Session.logged_out on M_UNKNOWN_TOKEN", function() {
-            const error = { errcode: 'M_UNKNOWN_TOKEN' };
+            const error = { errcode: "M_UNKNOWN_TOKEN" };
             httpBackend.when("GET", "/sync").respond(401, error);
 
             let sessionLoggedOutCount = 0;
@@ -310,7 +310,7 @@ describe("MatrixClient events", function() {
         });
 
         it("should emit Session.logged_out on M_UNKNOWN_TOKEN (soft logout)", function() {
-            const error = { errcode: 'M_UNKNOWN_TOKEN', soft_logout: true };
+            const error = { errcode: "M_UNKNOWN_TOKEN", soft_logout: true };
             httpBackend.when("GET", "/sync").respond(401, error);
 
             let sessionLoggedOutCount = 0;

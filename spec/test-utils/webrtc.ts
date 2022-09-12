@@ -60,7 +60,7 @@ export class MockRTCPeerConnection {
     constructor() {
         this.localDescription = {
             sdp: DUMMY_SDP,
-            type: 'offer',
+            type: "offer",
             toJSON: function() { },
         };
     }

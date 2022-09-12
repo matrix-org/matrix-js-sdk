@@ -49,7 +49,7 @@ describe("Location", function() {
 
     it("should create a valid location with defaults", function() {
         const loc = makeLocationContent(undefined, "geo:foo", 134235435);
-        expect(loc.body).toEqual('User Location geo:foo at 1970-01-02T13:17:15.435Z');
+        expect(loc.body).toEqual("User Location geo:foo at 1970-01-02T13:17:15.435Z");
         expect(loc.msgtype).toEqual(MsgType.Location);
         expect(loc.geo_uri).toEqual("geo:foo");
         expect(M_LOCATION.findIn(loc)).toEqual({
@@ -57,7 +57,7 @@ describe("Location", function() {
             description: undefined,
         });
         expect(M_ASSET.findIn(loc)).toEqual({ type: LocationAssetType.Self });
-        expect(TEXT_NODE_TYPE.findIn(loc)).toEqual('User Location geo:foo at 1970-01-02T13:17:15.435Z');
+        expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("User Location geo:foo at 1970-01-02T13:17:15.435Z");
         expect(M_TIMESTAMP.findIn(loc)).toEqual(134235435);
     });
 
@@ -77,19 +77,19 @@ describe("Location", function() {
         expect(M_TIMESTAMP.findIn(loc)).toEqual(134235436);
     });
 
-    it('parses backwards compatible event correctly', () => {
+    it("parses backwards compatible event correctly", () => {
         const eventContent = parseLocationEvent(backwardsCompatibleEventContent);
 
         expect(eventContent).toEqual(backwardsCompatibleEventContent);
     });
 
-    it('parses modern correctly', () => {
+    it("parses modern correctly", () => {
         const eventContent = parseLocationEvent(modernEventContent);
 
         expect(eventContent).toEqual(backwardsCompatibleEventContent);
     });
 
-    it('parses legacy event correctly', () => {
+    it("parses legacy event correctly", () => {
         const eventContent = parseLocationEvent(legacyEventContent);
 
         const {

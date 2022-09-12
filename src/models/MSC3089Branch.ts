@@ -82,7 +82,7 @@ export class MSC3089Branch {
      * @returns {string} The name, or "Unnamed File" if unknown.
      */
     public getName(): string {
-        return this.indexEvent.getContent()['name'] || "Unnamed File";
+        return this.indexEvent.getContent()["name"] || "Unnamed File";
     }
 
     /**
@@ -102,7 +102,7 @@ export class MSC3089Branch {
      * @returns {boolean} True if locked, false otherwise.
      */
     public isLocked(): boolean {
-        return this.indexEvent.getContent()['locked'] || false;
+        return this.indexEvent.getContent()["locked"] || false;
     }
 
     /**
@@ -124,11 +124,11 @@ export class MSC3089Branch {
     public async getFileInfo(): Promise<{ info: IEncryptedFile, httpUrl: string }> {
         const event = await this.getFileEvent();
 
-        const file = event.getOriginalContent()['file'];
-        const httpUrl = this.client.mxcUrlToHttp(file['url']);
+        const file = event.getOriginalContent()["file"];
+        const httpUrl = this.client.mxcUrlToHttp(file["url"]);
 
         if (!httpUrl) {
-            throw new Error(`No HTTP URL available for ${file['url']}`);
+            throw new Error(`No HTTP URL available for ${file["url"]}`);
         }
 
         return { info: file, httpUrl: httpUrl };
@@ -187,7 +187,7 @@ export class MSC3089Branch {
             active: true,
             name: name,
             version: this.version + 1,
-        }, fileEventResponse['event_id']);
+        }, fileEventResponse["event_id"]);
 
         // Deprecate ourselves
         await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {

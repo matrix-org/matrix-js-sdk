@@ -26,7 +26,7 @@ import { Logger } from "loglevel";
 import type { PkSigning } from "@matrix-org/olm";
 import { OlmDevice } from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { IOneTimeKey } from "./dehydration";
 import { IClaimOTKsResult, MatrixClient } from "../client";
 import { ISignatures } from "../@types/signed";
@@ -518,7 +518,7 @@ export function pkSign(obj: IObject, key: PkSigning, userId: string, pubKey: str
         const mysigs = sigs[userId] || {};
         sigs[userId] = mysigs;
 
-        return mysigs['ed25519:' + pubKey] = key.sign(anotherjson.stringify(obj));
+        return mysigs["ed25519:" + pubKey] = key.sign(anotherjson.stringify(obj));
     } finally {
         obj.signatures = sigs;
         if (unsigned) obj.unsigned = unsigned;
@@ -569,7 +569,7 @@ export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
  * @return {string} The unpadded base64.
  */
 export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return encodeBase64(uint8Array).replace(/=+$/g, '');
+    return encodeBase64(uint8Array).replace(/=+$/g, "");
 }
 
 /**

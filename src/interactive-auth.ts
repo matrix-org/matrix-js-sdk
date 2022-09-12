@@ -18,7 +18,7 @@ limitations under the License.
 
 /** @module interactive-auth */
 
-import { logger } from './logger';
+import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
 
@@ -534,7 +534,7 @@ export class InteractiveAuth {
 
         if (nextStage === AuthType.Dummy) {
             this.submitAuthDict({
-                type: 'm.login.dummy',
+                type: "m.login.dummy",
             });
             return;
         }

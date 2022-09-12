@@ -1106,7 +1106,7 @@ function listenUntil<T>(
     callback: (...args: any[]) => T,
     timeoutMs = 500,
 ): Promise<T> {
-    const trace = new Error().stack.split(`\n`)[2];
+    const trace = new Error().stack.split("\n")[2];
     return Promise.race([new Promise<T>((resolve, reject) => {
         const wrapper = (...args) => {
             try {

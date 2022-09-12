@@ -17,9 +17,9 @@ limitations under the License.
 
 import nodeCrypto from "crypto";
 
-import { TestClient } from '../../../TestClient';
+import { TestClient } from "../../../TestClient";
 import { MatrixEvent } from "../../../../src/models/event";
-import { logger } from '../../../../src/logger';
+import { logger } from "../../../../src/logger";
 
 export async function makeTestClients(userInfos, options) {
     const clients = [];

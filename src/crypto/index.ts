@@ -24,8 +24,8 @@ limitations under the License.
 import anotherjson from "another-json";
 
 import { EventType } from "../@types/event";
-import { TypedReEmitter } from '../ReEmitter';
-import { logger } from '../logger';
+import { TypedReEmitter } from "../ReEmitter";
+import { logger } from "../logger";
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
 import { IOlmDevice } from "./algorithms/megolm";
 import * as olmlib from "./olmlib";
@@ -33,7 +33,7 @@ import { DeviceInfoMap, DeviceList } from "./DeviceList";
 import { DeviceInfo, IDevice } from "./deviceinfo";
 import type { DecryptionAlgorithm, EncryptionAlgorithm } from "./algorithms";
 import * as algorithms from "./algorithms";
-import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from './CrossSigning';
+import { createCryptoStoreCacheCallbacks, CrossSigningInfo, DeviceTrustLevel, UserTrustLevel } from "./CrossSigning";
 import { EncryptionSetupBuilder } from "./EncryptionSetup";
 import {
     IAccountDataClient,
@@ -42,7 +42,7 @@ import {
     SecretStorage,
     SecretStorageKeyObject,
     SecretStorageKeyTuple,
-} from './SecretStorage';
+} from "./SecretStorage";
 import {
     IAddSecretStorageKeyOpts,
     ICreateSecretStorageOpts,
@@ -51,20 +51,20 @@ import {
     IRecoveryKey,
     ISecretStorageKeyInfo,
 } from "./api";
-import { OutgoingRoomKeyRequestManager } from './OutgoingRoomKeyRequestManager';
-import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
+import { OutgoingRoomKeyRequestManager } from "./OutgoingRoomKeyRequestManager";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import { VerificationBase } from "./verification/Base";
-import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from './verification/QRCode';
-import { SAS as SASVerification } from './verification/SAS';
-import { keyFromPassphrase } from './key_passphrase';
-import { decodeRecoveryKey, encodeRecoveryKey } from './recoverykey';
+import { ReciprocateQRCode, SCAN_QR_CODE_METHOD, SHOW_QR_CODE_METHOD } from "./verification/QRCode";
+import { SAS as SASVerification } from "./verification/SAS";
+import { keyFromPassphrase } from "./key_passphrase";
+import { decodeRecoveryKey, encodeRecoveryKey } from "./recoverykey";
 import { VerificationRequest } from "./verification/request/VerificationRequest";
 import { InRoomChannel, InRoomRequests } from "./verification/request/InRoomChannel";
 import { ToDeviceChannel, ToDeviceRequests, Request } from "./verification/request/ToDeviceChannel";
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
-import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
-import { DehydrationManager, IDeviceKeys, IOneTimeKey } from './dehydration';
+import { calculateKeyCheck, decryptAES, encryptAES } from "./aes";
+import { DehydrationManager, IDeviceKeys, IOneTimeKey } from "./dehydration";
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
@@ -494,7 +494,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         await this.cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readonly", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.cryptoStore.getCrossSigningKeys(txn, (keys) => {
                     // can be an empty object after resetting cross-signing keys, see storeTrustedSelfKeys
@@ -1018,7 +1018,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         // Cache the session backup key
-        const sessionBackupKey = await secretStorage.get('m.megolm_backup.v1');
+        const sessionBackupKey = await secretStorage.get("m.megolm_backup.v1");
         if (sessionBackupKey) {
             logger.info("Got session backup key from secret storage: caching");
             // fix up the backup key if it's in the wrong format, and replace
@@ -1133,7 +1133,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async getSessionBackupPrivateKey(): Promise<Uint8Array | null> {
         let key = await new Promise<any>((resolve) => { // TODO types
             this.cryptoStore.doTxn(
-                'readonly',
+                "readonly",
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     this.cryptoStore.getSecretStorePrivateKey(
@@ -1170,7 +1170,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const pickleKey = Buffer.from(this.olmDevice.pickleKey);
         const encryptedKey = await encryptAES(olmlib.encodeBase64(key), pickleKey, "m.megolm_backup.v1");
         return this.cryptoStore.doTxn(
-            'readwrite',
+            "readwrite",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.cryptoStore.storeSecretStorePrivateKey(txn, "m.megolm_backup.v1", encryptedKey);
@@ -1332,7 +1332,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const deviceIds: string[] = [];
         if (devices && key.signatures && key.signatures[userId]) {
             for (const signame of Object.keys(key.signatures[userId])) {
-                const [, deviceId] = signame.split(':', 2);
+                const [, deviceId] = signame.split(":", 2);
                 if (deviceId in devices
                     && devices[deviceId].verified === DeviceVerification.VERIFIED) {
                     try {
@@ -1538,7 +1538,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // aborts any larger operation as well.
             try {
                 const ret = await this.crossSigningInfo.getCrossSigningKey(
-                    'master', seenPubkey,
+                    "master", seenPubkey,
                 );
                 signing = ret[1];
                 logger.info("Got cross-signing master private key");
@@ -1686,7 +1686,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             this.crossSigningInfo.clearKeys();
         }
         await this.cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.cryptoStore.storeCrossSigningKeys(txn, this.crossSigningInfo.keys);
             },
@@ -2305,7 +2305,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         if (racingRequest) {
             request = racingRequest;
         } else {
-            logger.log(`Crypto: adding new request to ` +
+            logger.log("Crypto: adding new request to " +
                 `requestsByTxnId with id ${channel.transactionId} ${channel.roomId}`);
             requestsMap.setRequestByChannel(channel, request);
         }
@@ -2715,7 +2715,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         const exportedSessions: IMegolmSessionData[] = [];
         await this.cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
+            "readonly", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS], (txn) => {
                 this.cryptoStore.getAllEndToEndInboundGroupSessions(txn, (s) => {
                     if (s === null) return;
 
@@ -2828,27 +2828,27 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         let content = event.getContent();
         // If event has an m.relates_to then we need
         // to put this on the wrapping event instead
-        const mRelatesTo = content['m.relates_to'];
+        const mRelatesTo = content["m.relates_to"];
         if (mRelatesTo) {
             // Clone content here so we don't remove `m.relates_to` from the local-echo
             content = Object.assign({}, content);
-            delete content['m.relates_to'];
+            delete content["m.relates_to"];
         }
 
         // Treat element's performance metrics the same as `m.relates_to` (when present)
-        const elementPerfMetrics = content['io.element.performance_metrics'];
+        const elementPerfMetrics = content["io.element.performance_metrics"];
         if (elementPerfMetrics) {
             content = Object.assign({}, content);
-            delete content['io.element.performance_metrics'];
+            delete content["io.element.performance_metrics"];
         }
 
         const encryptedContent = await alg.encryptMessage(room, event.getType(), content);
 
         if (mRelatesTo) {
-            encryptedContent['m.relates_to'] = mRelatesTo;
+            encryptedContent["m.relates_to"] = mRelatesTo;
         }
         if (elementPerfMetrics) {
-            encryptedContent['io.element.performance_metrics'] = elementPerfMetrics;
+            encryptedContent["io.element.performance_metrics"] = elementPerfMetrics;
         }
 
         event.makeEncrypted(
@@ -2941,7 +2941,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }).catch((e) => {
             // this normally means we couldn't talk to the store
             logger.error(
-                'Error requesting key for event', e,
+                "Error requesting key for event", e,
             );
         });
     }
@@ -3385,7 +3385,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             request = createRequest(event);
             // a request could not be made from this event, so ignore event
             if (!request) {
-                logger.log(`Crypto: could not find VerificationRequest for ` +
+                logger.log("Crypto: could not find VerificationRequest for " +
                     `${event.getType()}, and could not create one, so ignoring.`);
                 return;
             }
@@ -3543,13 +3543,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // the result of anyway, as we'll need to do a query again once all the members are fetched
         // by calling _trackRoomDevices
         if (this.roomDeviceTrackingState[roomId]) {
-            if (member.membership == 'join') {
-                logger.log('Join event for ' + member.userId + ' in ' + roomId);
+            if (member.membership == "join") {
+                logger.log("Join event for " + member.userId + " in " + roomId);
                 // make sure we are tracking the deviceList for this user
                 this.deviceList.startTrackingDeviceList(member.userId);
-            } else if (member.membership == 'invite' &&
+            } else if (member.membership == "invite" &&
                 this.clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
-                logger.log('Invite event for ' + member.userId + ' in ' + roomId);
+                logger.log("Invite event for " + member.userId + " in " + roomId);
                 this.deviceList.startTrackingDeviceList(member.userId);
             }
         }
@@ -3699,7 +3699,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         // if the device is verified already, share the keys
         if (this.checkDeviceTrust(userId, deviceId).isVerified()) {
-            logger.log('device is already verified: sharing keys');
+            logger.log("device is already verified: sharing keys");
             req.share();
             return;
         }
@@ -3765,7 +3765,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const AlgClass = algorithms.DECRYPTION_CLASSES.get(algorithm);
         if (!AlgClass) {
             throw new algorithms.DecryptionError(
-                'UNKNOWN_ENCRYPTION_ALGORITHM',
+                "UNKNOWN_ENCRYPTION_ALGORITHM",
                 'Unknown encryption algorithm "' + algorithm + '".',
             );
         }

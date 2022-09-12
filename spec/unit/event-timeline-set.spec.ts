@@ -25,12 +25,12 @@ import {
     MatrixEvent,
     MatrixEventEvent,
     Room,
-} from '../../src';
+} from "../../src";
 import { Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
 
-describe('EventTimelineSet', () => {
-    const roomId = '!foo:bar';
+describe("EventTimelineSet", () => {
+    const roomId = "!foo:bar";
     const userA = "@alice:bar";
 
     let room: Room;
@@ -42,7 +42,7 @@ describe('EventTimelineSet', () => {
     let replyEvent: MatrixEvent;
 
     const itShouldReturnTheRelatedEvents = () => {
-        it('should return the related events', () => {
+        it("should return the related events", () => {
             eventTimelineSet.relations.aggregateChildEvent(messageEvent);
             const relations = eventTimelineSet.relations.getChildEventsForEvent(
                 messageEvent.getId(),
@@ -56,27 +56,27 @@ describe('EventTimelineSet', () => {
     };
 
     beforeEach(() => {
-        client = utils.mock(MatrixClient, 'MatrixClient');
-        client.reEmitter = utils.mock(ReEmitter, 'ReEmitter');
+        client = utils.mock(MatrixClient, "MatrixClient");
+        client.reEmitter = utils.mock(ReEmitter, "ReEmitter");
         room = new Room(roomId, client, userA);
         eventTimelineSet = new EventTimelineSet(room);
         eventTimeline = new EventTimeline(eventTimelineSet);
         messageEvent = utils.mkMessage({
             room: roomId,
             user: userA,
-            msg: 'Hi!',
+            msg: "Hi!",
             event: true,
         });
         replyEvent = utils.mkReplyMessage({
             room: roomId,
             user: userA,
-            msg: 'Hoo!',
+            msg: "Hoo!",
             event: true,
             replyToMessage: messageEvent,
         });
     });
 
-    describe('addLiveEvent', () => {
+    describe("addLiveEvent", () => {
         it("Adds event to the live timeline in the timeline set", () => {
             const liveTimeline = eventTimelineSet.getLiveTimeline();
             expect(liveTimeline.getEvents().length).toStrictEqual(0);
@@ -116,7 +116,7 @@ describe('EventTimelineSet', () => {
         });
     });
 
-    describe('addEventToTimeline', () => {
+    describe("addEventToTimeline", () => {
         it("Adds event to timeline", () => {
             const liveTimeline = eventTimelineSet.getLiveTimeline();
             expect(liveTimeline.getEvents().length).toStrictEqual(0);
@@ -146,8 +146,8 @@ describe('EventTimelineSet', () => {
         });
     });
 
-    describe('aggregateRelations', () => {
-        describe('with unencrypted events', () => {
+    describe("aggregateRelations", () => {
+        describe("with unencrypted events", () => {
             beforeEach(() => {
                 eventTimelineSet.addEventsToTimeline(
                     [
@@ -156,14 +156,14 @@ describe('EventTimelineSet', () => {
                     ],
                     true,
                     eventTimeline,
-                    'foo',
+                    "foo",
                 );
             });
 
             itShouldReturnTheRelatedEvents();
         });
 
-        describe('with events to be decrypted', () => {
+        describe("with events to be decrypted", () => {
             let messageEventShouldAttemptDecryptionSpy: jest.SpyInstance;
             let messageEventIsDecryptionFailureSpy: jest.SpyInstance;
 
@@ -171,13 +171,13 @@ describe('EventTimelineSet', () => {
             let replyEventIsDecryptionFailureSpy: jest.SpyInstance;
 
             beforeEach(() => {
-                messageEventShouldAttemptDecryptionSpy = jest.spyOn(messageEvent, 'shouldAttemptDecryption');
+                messageEventShouldAttemptDecryptionSpy = jest.spyOn(messageEvent, "shouldAttemptDecryption");
                 messageEventShouldAttemptDecryptionSpy.mockReturnValue(true);
-                messageEventIsDecryptionFailureSpy = jest.spyOn(messageEvent, 'isDecryptionFailure');
+                messageEventIsDecryptionFailureSpy = jest.spyOn(messageEvent, "isDecryptionFailure");
 
-                replyEventShouldAttemptDecryptionSpy = jest.spyOn(replyEvent, 'shouldAttemptDecryption');
+                replyEventShouldAttemptDecryptionSpy = jest.spyOn(replyEvent, "shouldAttemptDecryption");
                 replyEventShouldAttemptDecryptionSpy.mockReturnValue(true);
-                replyEventIsDecryptionFailureSpy = jest.spyOn(messageEvent, 'isDecryptionFailure');
+                replyEventIsDecryptionFailureSpy = jest.spyOn(messageEvent, "isDecryptionFailure");
 
                 eventTimelineSet.addEventsToTimeline(
                     [
@@ -186,11 +186,11 @@ describe('EventTimelineSet', () => {
                     ],
                     true,
                     eventTimeline,
-                    'foo',
+                    "foo",
                 );
             });
 
-            it('should not return the related events', () => {
+            it("should not return the related events", () => {
                 eventTimelineSet.relations.aggregateChildEvent(messageEvent);
                 const relations = eventTimelineSet.relations.getChildEventsForEvent(
                     messageEvent.getId(),
@@ -200,7 +200,7 @@ describe('EventTimelineSet', () => {
                 expect(relations).toBeUndefined();
             });
 
-            describe('after decryption', () => {
+            describe("after decryption", () => {
                 beforeEach(() => {
                     // simulate decryption failure once
                     messageEventIsDecryptionFailureSpy.mockReturnValue(true);

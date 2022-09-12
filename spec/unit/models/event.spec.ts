@@ -16,8 +16,8 @@ limitations under the License.
 
 import { MatrixEvent } from "../../../src/models/event";
 
-describe('MatrixEvent', () => {
-    it('should create copies of itself', () => {
+describe("MatrixEvent", () => {
+    it("should create copies of itself", () => {
         const a = new MatrixEvent({
             type: "com.example.test",
             content: {
@@ -35,7 +35,7 @@ describe('MatrixEvent', () => {
         // The other properties we're not super interested in, honestly.
     });
 
-    it('should compare itself to other events using json', () => {
+    it("should compare itself to other events using json", () => {
         const a = new MatrixEvent({
             type: "com.example.test",
             content: {

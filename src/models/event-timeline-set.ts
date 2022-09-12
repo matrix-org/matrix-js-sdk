@@ -20,7 +20,7 @@ limitations under the License.
 
 import { EventTimeline, IAddEventOptions } from "./event-timeline";
 import { MatrixEvent } from "./event";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { Room, RoomEvent } from "./room";
 import { Filter } from "../filter";
 import { RoomState } from "./room-state";
@@ -56,13 +56,13 @@ export interface IRoomTimelineData {
 }
 
 export interface IAddEventToTimelineOptions
-    extends Pick<IAddEventOptions, 'toStartOfTimeline' | 'roomState' | 'timelineWasEmpty'> {
+    extends Pick<IAddEventOptions, "toStartOfTimeline" | "roomState" | "timelineWasEmpty"> {
     /** Whether the sync response came from cache */
     fromCache?: boolean;
 }
 
 export interface IAddLiveEventOptions
-    extends Pick<IAddEventToTimelineOptions, 'fromCache' | 'roomState' | 'timelineWasEmpty'> {
+    extends Pick<IAddEventToTimelineOptions, "fromCache" | "roomState" | "timelineWasEmpty"> {
     /** Applies to events in the timeline only. If this is 'replace' then if a
      * duplicate is encountered, the event passed to this function will replace
      * the existing event in the timeline. If this is not specified, or is
@@ -535,7 +535,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             if (direction === EventTimeline.FORWARDS && timeline === this.liveTimeline) {
                 logger.warn({ lastEventWasNew, didUpdate }); // for debugging
                 logger.warn(
-                    `Refusing to set forwards pagination token of live timeline ` +
+                    "Refusing to set forwards pagination token of live timeline " +
                     `${timeline} to ${paginationToken}`,
                 );
                 return;
@@ -576,7 +576,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy || DuplicateStrategy.Ignore;
         let timelineWasEmpty: boolean;
-        if (typeof (duplicateStrategyOrOpts) === 'object') {
+        if (typeof (duplicateStrategyOrOpts) === "object") {
             ({
                 duplicateStrategy = DuplicateStrategy.Ignore,
                 fromCache = false,
@@ -587,10 +587,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             // Deprecation warning
             // FIXME: Remove after 2023-06-01 (technical debt)
             logger.warn(
-                'Overload deprecated: ' +
-                '`EventTimelineSet.addLiveEvent(event, duplicateStrategy?, fromCache?, roomState?)` ' +
-                'is deprecated in favor of the overload with ' +
-                '`EventTimelineSet.addLiveEvent(event, IAddLiveEventOptions)`',
+                "Overload deprecated: " +
+                "`EventTimelineSet.addLiveEvent(event, duplicateStrategy?, fromCache?, roomState?)` " +
+                "is deprecated in favor of the overload with " +
+                "`EventTimelineSet.addLiveEvent(event, IAddLiveEventOptions)`",
             );
         }
 
@@ -678,16 +678,16 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     ): void {
         let toStartOfTimeline = !!toStartOfTimelineOrOpts;
         let timelineWasEmpty: boolean;
-        if (typeof (toStartOfTimelineOrOpts) === 'object') {
+        if (typeof (toStartOfTimelineOrOpts) === "object") {
             ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
         } else if (toStartOfTimelineOrOpts !== undefined) {
             // Deprecation warning
             // FIXME: Remove after 2023-06-01 (technical debt)
             logger.warn(
-                'Overload deprecated: ' +
-                '`EventTimelineSet.addEventToTimeline(event, timeline, toStartOfTimeline, fromCache?, roomState?)` ' +
-                'is deprecated in favor of the overload with ' +
-                '`EventTimelineSet.addEventToTimeline(event, timeline, IAddEventToTimelineOptions)`',
+                "Overload deprecated: " +
+                "`EventTimelineSet.addEventToTimeline(event, timeline, toStartOfTimeline, fromCache?, roomState?)` " +
+                "is deprecated in favor of the overload with " +
+                "`EventTimelineSet.addEventToTimeline(event, timeline, IAddEventToTimelineOptions)`",
             );
         }
 

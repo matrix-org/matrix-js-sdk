@@ -133,7 +133,7 @@ describe("Room", function() {
         room.currentState = room.getLiveTimeline().endState = utils.mock(RoomState, "currentState");
     });
 
-    describe('getCreator', () => {
+    describe("getCreator", () => {
         it("should return the creator from m.room.create", function() {
             room.currentState.getStateEvents.mockImplementation(function(type, key) {
                 if (type === EventType.RoomCreate && key === "") {
@@ -439,7 +439,7 @@ describe("Room", function() {
         });
     });
 
-    describe('addEphemeralEvents', () => {
+    describe("addEphemeralEvents", () => {
         it("should call RoomState.setTypingEvent on m.typing events", function() {
             const typing = utils.mkEvent({
                 room: roomId,
@@ -622,7 +622,7 @@ describe("Room", function() {
         it("should copy state from previous timeline", function() {
             room.addLiveEvents([events[0], events[1]]);
             expect(room.getLiveTimeline().getEvents().length).toEqual(2);
-            room.resetLiveTimeline('sometoken', 'someothertoken');
+            room.resetLiveTimeline("sometoken", "someothertoken");
 
             room.addLiveEvents([events[2]]);
             const oldState = room.getLiveTimeline().getState(EventTimeline.BACKWARDS);
@@ -652,7 +652,7 @@ describe("Room", function() {
                 currentStateUpdateEmitCount += 1;
             });
 
-            room.resetLiveTimeline('sometoken', 'someothertoken');
+            room.resetLiveTimeline("sometoken", "someothertoken");
 
             room.addLiveEvents([events[2]]);
             const newLiveTimeline = room.getLiveTimeline();
@@ -689,7 +689,7 @@ describe("Room", function() {
             room.addLiveEvents([events[0]]);
             expect(room.timeline.length).toEqual(1);
             const firstLiveTimeline = room.getLiveTimeline();
-            room.resetLiveTimeline('sometoken', 'someothertoken');
+            room.resetLiveTimeline("sometoken", "someothertoken");
 
             const tl = room.getTimelineForEvent(events[0].getId());
             expect(tl).toBe(timelineSupport ? firstLiveTimeline : null);
@@ -732,8 +732,8 @@ describe("Room", function() {
 
         it("should handle events in adjacent timelines", function() {
             const oldTimeline = room.addTimeline();
-            oldTimeline.setNeighbouringTimeline(room.getLiveTimeline(), 'f');
-            room.getLiveTimeline().setNeighbouringTimeline(oldTimeline, 'b');
+            oldTimeline.setNeighbouringTimeline(room.getLiveTimeline(), "f");
+            room.getLiveTimeline().setNeighbouringTimeline(oldTimeline, "b");
 
             room.addEventsToTimeline([events[0]], false, oldTimeline);
             room.addLiveEvents([events[1]]);
@@ -1166,7 +1166,7 @@ describe("Room", function() {
                "available",
             function() {
                 setJoinRule(JoinRule.Invite);
-                addMember(userB, 'join', { name: "Alice" });
+                addMember(userB, "join", { name: "Alice" });
                 addMember(userA, "invite", { user: userA });
                 room.recalculate();
                 const name = room.name;
@@ -1721,9 +1721,9 @@ describe("Room", function() {
         it("should return first hero id", function() {
             const room = new Room(roomId, new TestClient(userA).client, userA);
             room.setSummary({
-                'm.heroes': [userB],
-                'm.joined_member_count': 1,
-                'm.invited_member_count': 1,
+                "m.heroes": [userB],
+                "m.joined_member_count": 1,
+                "m.invited_member_count": 1,
             });
             expect(room.guessDMUserId()).toEqual(userB);
         });
@@ -2498,7 +2498,7 @@ describe("Room", function() {
                         return null;
                     };
 
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
+                    expect(room.getEventReadUpTo(userA)).toEqual("eventId2");
                 });
             });
 
@@ -2520,7 +2520,7 @@ describe("Room", function() {
                         return null;
                     };
 
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId1`);
+                    expect(room.getEventReadUpTo(userA)).toEqual("eventId1");
                 });
 
                 it("should give precedence to m.read", () => {
@@ -2531,7 +2531,7 @@ describe("Room", function() {
                         return null;
                     };
 
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId3`);
+                    expect(room.getEventReadUpTo(userA)).toEqual("eventId3");
                 });
             });
         });

@@ -72,16 +72,16 @@ describe("MSC3089TreeSpace", () => {
         });
     }
 
-    it('should populate the room reference', () => {
+    it("should populate the room reference", () => {
         expect(tree.room).toBe(room);
     });
 
-    it('should proxy the ID member to room ID', () => {
+    it("should proxy the ID member to room ID", () => {
         expect(tree.id).toEqual(tree.roomId);
         expect(tree.id).toEqual(roomId);
     });
 
-    it('should support setting the name of the space', async () => {
+    it("should support setting the name of the space", async () => {
         const newName = "NEW NAME";
         const fn = jest.fn()
             .mockImplementation((stateRoomId: string, eventType: EventType, content: any, stateKey: string) => {
@@ -96,7 +96,7 @@ describe("MSC3089TreeSpace", () => {
         expect(fn).toHaveBeenCalledTimes(1);
     });
 
-    it('should support inviting users to the space', async () => {
+    it("should support inviting users to the space", async () => {
         const target = targetUser;
         const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
             expect(inviteRoomId).toEqual(roomId);
@@ -108,7 +108,7 @@ describe("MSC3089TreeSpace", () => {
         expect(fn).toHaveBeenCalledTimes(1);
     });
 
-    it('should retry invites to the space', async () => {
+    it("should retry invites to the space", async () => {
         const target = targetUser;
         const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
             expect(inviteRoomId).toEqual(roomId);
@@ -121,7 +121,7 @@ describe("MSC3089TreeSpace", () => {
         expect(fn).toHaveBeenCalledTimes(2);
     });
 
-    it('should not retry invite permission errors', async () => {
+    it("should not retry invite permission errors", async () => {
         const target = targetUser;
         const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
             expect(inviteRoomId).toEqual(roomId);
@@ -141,7 +141,7 @@ describe("MSC3089TreeSpace", () => {
         expect(fn).toHaveBeenCalledTimes(1);
     });
 
-    it('should invite to subspaces', async () => {
+    it("should invite to subspaces", async () => {
         const target = targetUser;
         const fn = jest.fn().mockImplementation((inviteRoomId: string, userId: string) => {
             expect(inviteRoomId).toEqual(roomId);
@@ -162,7 +162,7 @@ describe("MSC3089TreeSpace", () => {
         expect(fn).toHaveBeenCalledTimes(4);
     });
 
-    it('should share keys with invitees', async () => {
+    it("should share keys with invitees", async () => {
         const target = targetUser;
         const sendKeysFn = jest.fn().mockImplementation((inviteRoomId: string, userIds: string[]) => {
             expect(inviteRoomId).toEqual(roomId);
@@ -190,7 +190,7 @@ describe("MSC3089TreeSpace", () => {
         expect(historyFn).toHaveBeenCalledTimes(1);
     });
 
-    it('should not share keys with invitees if inappropriate history visibility', async () => {
+    it("should not share keys with invitees if inappropriate history visibility", async () => {
         const target = targetUser;
         const sendKeysFn = jest.fn().mockImplementation((inviteRoomId: string, userIds: string[]) => {
             expect(inviteRoomId).toEqual(roomId);
@@ -240,7 +240,7 @@ describe("MSC3089TreeSpace", () => {
         expect(finalPermissions).toEqual(role);
     }
 
-    it('should support setting Viewer permissions', () => {
+    it("should support setting Viewer permissions", () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
             users_default: 1024,
@@ -251,7 +251,7 @@ describe("MSC3089TreeSpace", () => {
         }, TreePermissions.Viewer, 1024);
     });
 
-    it('should support setting Editor permissions', () => {
+    it("should support setting Editor permissions", () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
             users_default: 1024,
@@ -262,7 +262,7 @@ describe("MSC3089TreeSpace", () => {
         }, TreePermissions.Editor, 1025);
     });
 
-    it('should support setting Owner permissions', () => {
+    it("should support setting Owner permissions", () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
             users_default: 1024,
@@ -273,7 +273,7 @@ describe("MSC3089TreeSpace", () => {
         }, TreePermissions.Owner, 1026);
     });
 
-    it('should support demoting permissions', () => {
+    it("should support demoting permissions", () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
             users_default: 1024,
@@ -287,7 +287,7 @@ describe("MSC3089TreeSpace", () => {
         }, TreePermissions.Viewer, 1024);
     });
 
-    it('should support promoting permissions', () => {
+    it("should support promoting permissions", () => {
         return evaluatePowerLevels({
             ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
             users_default: 1024,
@@ -301,19 +301,19 @@ describe("MSC3089TreeSpace", () => {
         }, TreePermissions.Editor, 1025);
     });
 
-    it('should support defaults: Viewer', () => {
+    it("should support defaults: Viewer", () => {
         return evaluatePowerLevels({}, TreePermissions.Viewer, 0);
     });
 
-    it('should support defaults: Editor', () => {
+    it("should support defaults: Editor", () => {
         return evaluatePowerLevels({}, TreePermissions.Editor, 50);
     });
 
-    it('should support defaults: Owner', () => {
+    it("should support defaults: Owner", () => {
         return evaluatePowerLevels({}, TreePermissions.Owner, 100);
     });
 
-    it('should create subdirectories', async () => {
+    it("should create subdirectories", async () => {
         const subspaceName = "subdirectory";
         const subspaceId = "!subspace:localhost";
         const domain = "domain.example.com";
@@ -361,7 +361,7 @@ describe("MSC3089TreeSpace", () => {
         expect(sendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, content, subspaceId);
     });
 
-    it('should find subdirectories', () => {
+    it("should find subdirectories", () => {
         const firstChildRoom = "!one:example.org";
         const secondChildRoom = "!two:example.org";
         const thirdChildRoom = "!three:example.org"; // to ensure it doesn't end up in the subdirectories
@@ -399,7 +399,7 @@ describe("MSC3089TreeSpace", () => {
         expect(getFn).toHaveBeenCalledWith(thirdChildRoom); // check to make sure it tried
     });
 
-    it('should find specific directories', () => {
+    it("should find specific directories", () => {
         client.getRoom = () => ({} as Room); // to appease the TreeSpace constructor
 
         // Only mocking used API
@@ -415,7 +415,7 @@ describe("MSC3089TreeSpace", () => {
         expect(result).toBeFalsy();
     });
 
-    it('should be able to delete itself', async () => {
+    it("should be able to delete itself", async () => {
         const delete1 = jest.fn().mockImplementation(() => Promise.resolve());
         const subdir1 = { delete: delete1 } as any as MSC3089TreeSpace; // mock tested bits
 
@@ -466,7 +466,7 @@ describe("MSC3089TreeSpace", () => {
         expect(leaveFn).toHaveBeenCalledTimes(1);
     });
 
-    describe('get and set order', () => {
+    describe("get and set order", () => {
         // Danger: these are partial implementations for testing purposes only
 
         // @ts-ignore - "MatrixEvent is a value but used as a type", which is true but not important
@@ -483,7 +483,7 @@ describe("MSC3089TreeSpace", () => {
             const content = {
                 via: [staticDomain],
             };
-            if (order) content['order'] = order;
+            if (order) content["order"] = order;
             parentState.push({
                 getType: () => EventType.SpaceChild,
                 getStateKey: () => roomId,
@@ -587,7 +587,7 @@ describe("MSC3089TreeSpace", () => {
             client.sendStateEvent = clientSendStateFn;
         });
 
-        it('should know when something is top level', () => {
+        it("should know when something is top level", () => {
             const a = "!a:example.org";
             addSubspace(a);
 
@@ -595,12 +595,12 @@ describe("MSC3089TreeSpace", () => {
             expect(childTrees[0].isTopLevel).toBe(false); // a bit of a hack to get at this, but it's fine
         });
 
-        it('should return -1 for top level spaces', () => {
+        it("should return -1 for top level spaces", () => {
             // The tree is what we've defined as top level, so it should work
             expect(tree.getOrder()).toEqual(-1);
         });
 
-        it('should throw when setting an order at the top level space', async () => {
+        it("should throw when setting an order at the top level space", async () => {
             try {
                 // The tree is what we've defined as top level, so it should work
                 await tree.setOrder(2);
@@ -612,7 +612,7 @@ describe("MSC3089TreeSpace", () => {
             }
         });
 
-        it('should return a stable order for unordered children', () => {
+        it("should return a stable order for unordered children", () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -627,7 +627,7 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(c, 2);
         });
 
-        it('should return a stable order for ordered children', () => {
+        it("should return a stable order for ordered children", () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -642,7 +642,7 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(a, 2);
         });
 
-        it('should return a stable order for partially ordered children', () => {
+        it("should return a stable order for partially ordered children", () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -660,7 +660,7 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(a, 2);
         });
 
-        it('should return a stable order if the create event timestamps are the same', () => {
+        it("should return a stable order if the create event timestamps are the same", () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -675,7 +675,7 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(c, 2);
         });
 
-        it('should return a stable order if there are no known create events', () => {
+        it("should return a stable order if there are no known create events", () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -692,7 +692,7 @@ describe("MSC3089TreeSpace", () => {
 
         // XXX: These tests rely on `getOrder()` re-calculating and not caching values.
 
-        it('should allow reordering within unordered children', async () => {
+        it("should allow reordering within unordered children", async () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -729,7 +729,7 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(c, 2);
         });
 
-        it('should allow reordering within ordered children', async () => {
+        it("should allow reordering within ordered children", async () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -748,14 +748,14 @@ describe("MSC3089TreeSpace", () => {
             expect(clientSendStateFn).toHaveBeenCalledTimes(1);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
                 via: [staticDomain], // should retain domain independent of client.getDomain()
-                order: 'Y',
+                order: "Y",
             }), a);
             expectOrder(a, 1);
             expectOrder(b, 0);
             expectOrder(c, 2);
         });
 
-        it('should allow reordering within partially ordered children', async () => {
+        it("should allow reordering within partially ordered children", async () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -776,7 +776,7 @@ describe("MSC3089TreeSpace", () => {
             expect(clientSendStateFn).toHaveBeenCalledTimes(1);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
                 via: [staticDomain], // should retain domain independent of client.getDomain()
-                order: 'Z',
+                order: "Z",
             }), a);
             expectOrder(a, 2);
             expectOrder(b, 3);
@@ -784,7 +784,7 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(d, 0);
         });
 
-        it('should support moving upwards', async () => {
+        it("should support moving upwards", async () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -805,7 +805,7 @@ describe("MSC3089TreeSpace", () => {
             expect(clientSendStateFn).toHaveBeenCalledTimes(1);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
                 via: [staticDomain], // should retain domain independent of client.getDomain()
-                order: 'Y',
+                order: "Y",
             }), b);
             expectOrder(a, 0);
             expectOrder(b, 2);
@@ -813,7 +813,7 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(d, 3);
         });
 
-        it('should support moving downwards', async () => {
+        it("should support moving downwards", async () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -834,7 +834,7 @@ describe("MSC3089TreeSpace", () => {
             expect(clientSendStateFn).toHaveBeenCalledTimes(1);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
                 via: [staticDomain], // should retain domain independent of client.getDomain()
-                order: 'U',
+                order: "U",
             }), c);
             expectOrder(a, 0);
             expectOrder(b, 2);
@@ -842,7 +842,7 @@ describe("MSC3089TreeSpace", () => {
             expectOrder(d, 3);
         });
 
-        it('should support moving over the partial ordering boundary', async () => {
+        it("should support moving over the partial ordering boundary", async () => {
             const a = "!a:example.org";
             const b = "!b:example.org";
             const c = "!c:example.org";
@@ -863,11 +863,11 @@ describe("MSC3089TreeSpace", () => {
             expect(clientSendStateFn).toHaveBeenCalledTimes(2);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
                 via: [staticDomain], // should retain domain independent of client.getDomain()
-                order: 'W',
+                order: "W",
             }), c);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
                 via: [staticDomain], // should retain domain independent of client.getDomain()
-                order: 'X',
+                order: "X",
             }), b);
             expectOrder(a, 0);
             expectOrder(b, 2);
@@ -876,7 +876,7 @@ describe("MSC3089TreeSpace", () => {
         });
     });
 
-    it('should upload files', async () => {
+    it("should upload files", async () => {
         const mxc = "mxc://example.org/file";
         const fileInfo = {
             mimetype: "text/plain",
@@ -936,7 +936,7 @@ describe("MSC3089TreeSpace", () => {
         expect(sendStateFn).toHaveBeenCalledTimes(1);
     });
 
-    it('should upload file versions', async () => {
+    it("should upload file versions", async () => {
         const mxc = "mxc://example.org/file";
         const fileInfo = {
             mimetype: "text/plain",
@@ -999,7 +999,7 @@ describe("MSC3089TreeSpace", () => {
         expect(sendStateFn).toHaveBeenCalledTimes(1);
     });
 
-    it('should support getting files', () => {
+    it("should support getting files", () => {
         const fileEventId = "$file";
         const fileEvent = { forTest: true }; // MatrixEvent mock
         room.currentState = {
@@ -1015,7 +1015,7 @@ describe("MSC3089TreeSpace", () => {
         expect(file.indexEvent).toBe(fileEvent);
     });
 
-    it('should return falsy for unknown files', () => {
+    it("should return falsy for unknown files", () => {
         const fileEventId = "$file";
         room.currentState = {
             getStateEvents: (eventType: string, stateKey?: string): MatrixEvent[] | MatrixEvent | null => {
@@ -1029,7 +1029,7 @@ describe("MSC3089TreeSpace", () => {
         expect(file).toBeFalsy();
     });
 
-    it('should list files', () => {
+    it("should list files", () => {
         const firstFile = { getContent: () => ({ active: true }) };
         const secondFile = { getContent: () => ({ active: false }) }; // deliberately inactive
         room.currentState = {
@@ -1046,7 +1046,7 @@ describe("MSC3089TreeSpace", () => {
         expect(files[0].indexEvent).toBe(firstFile);
     });
 
-    it('should list all files', () => {
+    it("should list all files", () => {
         const firstFile = { getContent: () => ({ active: true }) };
         const secondFile = { getContent: () => ({ active: false }) }; // deliberately inactive
         room.currentState = {

@@ -715,7 +715,7 @@ describe("MatrixClient event timelines", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
 
-            const latestMessageId = 'event1:bar';
+            const latestMessageId = "event1:bar";
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
                 .respond(200, function() {

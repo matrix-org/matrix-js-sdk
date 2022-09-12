@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent, MatrixEventEvent } from '../models/event';
-import { logger } from '../logger';
-import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
-import { EventType } from '../@types/event';
-import { ClientEvent, MatrixClient } from '../client';
+import { MatrixEvent, MatrixEventEvent } from "../models/event";
+import { logger } from "../logger";
+import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from "./call";
+import { EventType } from "../@types/event";
+import { ClientEvent, MatrixClient } from "../client";
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
 import { SyncState } from "../sync";
 import { RoomEvent } from "../models/room";
@@ -153,7 +153,7 @@ export class CallEventHandler {
             if (call) {
                 logger.log(
                     `WARN: Already have a MatrixCall with id ${content.call_id} but got an ` +
-                    `invite. Clobbering.`,
+                    "invite. Clobbering.",
                 );
             }
 

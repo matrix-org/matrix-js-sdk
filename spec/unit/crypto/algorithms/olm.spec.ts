@@ -15,15 +15,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from 'jest-mock';
+import { MockedObject } from "jest-mock";
 
-import '../../../olm-loader';
+import "../../../olm-loader";
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
 import { logger } from "../../../../src/logger";
 import { OlmDevice } from "../../../../src/crypto/OlmDevice";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
-import { MatrixClient } from '../../../../src';
+import { MatrixClient } from "../../../../src";
 
 function makeOlmDevice() {
     const cryptoStore = new MemoryCryptoStore();
@@ -34,7 +34,7 @@ function makeOlmDevice() {
 async function setupSession(initiator, opponent) {
     await opponent.generateOneTimeKeys(1);
     const keys = await opponent.getOneTimeKeys();
-    const firstKey = Object.values(keys['curve25519'])[0];
+    const firstKey = Object.values(keys["curve25519"])[0];
 
     const sid = await initiator.createOutboundSession(
         opponent.deviceCurve25519Key, firstKey,
@@ -44,7 +44,7 @@ async function setupSession(initiator, opponent) {
 
 describe("OlmDevice", function() {
     if (!global.Olm) {
-        logger.warn('Not running megolm unit tests: libolm not present');
+        logger.warn("Not running megolm unit tests: libolm not present");
         return;
     }
 
@@ -62,7 +62,7 @@ describe("OlmDevice", function() {
         await bobOlmDevice.init();
     });
 
-    describe('olm', function() {
+    describe("olm", function() {
         it("can decrypt messages", async function() {
             const sid = await setupSession(aliceOlmDevice, bobOlmDevice);
 
@@ -82,7 +82,7 @@ describe("OlmDevice", function() {
             );
         });
 
-        it('exports picked account and olm sessions', async function() {
+        it("exports picked account and olm sessions", async function() {
             const sessionId = await setupSession(aliceOlmDevice, bobOlmDevice);
 
             const exported = await bobOlmDevice.export();

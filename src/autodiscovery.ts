@@ -20,7 +20,7 @@ limitations under the License.
 import { ServerResponse } from "http";
 
 import { IClientWellKnown, IWellKnownConfig } from "./client";
-import { logger } from './logger';
+import { logger } from "./logger";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery

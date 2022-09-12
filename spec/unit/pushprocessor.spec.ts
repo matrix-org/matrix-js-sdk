@@ -2,7 +2,7 @@ import * as utils from "../test-utils/test-utils";
 import { PushProcessor } from "../../src/pushprocessor";
 import { EventType, MatrixClient, MatrixEvent } from "../../src";
 
-describe('NotificationService', function() {
+describe("NotificationService", function() {
     const testUserId = "@ali:matrix.org";
     const testDisplayName = "Alice M";
     const testRoomId = "!fl1bb13:localhost";
@@ -215,25 +215,25 @@ describe('NotificationService', function() {
 
     // User IDs
 
-    it('should bing on a user ID.', function() {
+    it("should bing on a user ID.", function() {
         testEvent.event.content.body = "Hello @ali:matrix.org, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on a partial user ID with an @.', function() {
+    it("should bing on a partial user ID with an @.", function() {
         testEvent.event.content.body = "Hello @ali, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on a partial user ID without @.', function() {
+    it("should bing on a partial user ID without @.", function() {
         testEvent.event.content.body = "Hello ali, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on a case-insensitive user ID.', function() {
+    it("should bing on a case-insensitive user ID.", function() {
         testEvent.event.content.body = "Hello @AlI:matrix.org, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
@@ -241,13 +241,13 @@ describe('NotificationService', function() {
 
     // Display names
 
-    it('should bing on a display name.', function() {
+    it("should bing on a display name.", function() {
         testEvent.event.content.body = "Hello Alice M, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on a case-insensitive display name.', function() {
+    it("should bing on a case-insensitive display name.", function() {
         testEvent.event.content.body = "Hello ALICE M, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
@@ -255,25 +255,25 @@ describe('NotificationService', function() {
 
     // Bing words
 
-    it('should bing on a bing word.', function() {
+    it("should bing on a bing word.", function() {
         testEvent.event.content.body = "I really like coffee";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on case-insensitive bing words.', function() {
+    it("should bing on case-insensitive bing words.", function() {
         testEvent.event.content.body = "Coffee is great";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on wildcard (.*) bing words.', function() {
+    it("should bing on wildcard (.*) bing words.", function() {
         testEvent.event.content.body = "It was foomahbar I think.";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on character group ([abc]) bing words.', function() {
+    it("should bing on character group ([abc]) bing words.", function() {
         testEvent.event.content.body = "Ping!";
         let actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
@@ -282,13 +282,13 @@ describe('NotificationService', function() {
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on character range ([a-z]) bing words.', function() {
+    it("should bing on character range ([a-z]) bing words.", function() {
         testEvent.event.content.body = "I ate 6 pies";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
-    it('should bing on character negation ([!a]) bing words.', function() {
+    it("should bing on character negation ([!a]) bing words.", function() {
         testEvent.event.content.body = "boke";
         let actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
@@ -297,7 +297,7 @@ describe('NotificationService', function() {
         expect(actions.tweaks.highlight).toEqual(false);
     });
 
-    it('should not bing on room server ACL changes', function() {
+    it("should not bing on room server ACL changes", function() {
         testEvent = utils.mkEvent({
             type: EventType.RoomServerAcl,
             room: testRoomId,
@@ -315,7 +315,7 @@ describe('NotificationService', function() {
 
     // invalid
 
-    it('should gracefully handle bad input.', function() {
+    it("should gracefully handle bad input.", function() {
         testEvent.event.content.body = { "foo": "bar" };
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);

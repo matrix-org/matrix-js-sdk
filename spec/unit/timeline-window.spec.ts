@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from 'jest-mock';
+import { MockedObject } from "jest-mock";
 
 import { MatrixClient } from "../../src/client";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
@@ -37,7 +37,7 @@ const mockClient = {
 function createTimeline(numEvents = 3, baseIndex = 1): EventTimeline {
     const room = new Room(ROOM_ID, mockClient, USER_ID);
     const timelineSet = new EventTimelineSet(room);
-    jest.spyOn(timelineSet.room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
+    jest.spyOn(timelineSet.room, "getUnfilteredTimelineSet").mockReturnValue(timelineSet);
 
     const timeline = new EventTimeline(timelineSet);
 
@@ -178,7 +178,7 @@ describe("TimelineWindow", function() {
             const liveTimeline = createTimeline();
             const room = new Room(ROOM_ID, mockClient, USER_ID);
             const timelineSet = new EventTimelineSet(room);
-            jest.spyOn(timelineSet, 'getLiveTimeline').mockReturnValue(liveTimeline);
+            jest.spyOn(timelineSet, "getLiveTimeline").mockReturnValue(liveTimeline);
 
             const timelineWindow = new TimelineWindow(mockClient, timelineSet);
             await timelineWindow.load(undefined, 2);

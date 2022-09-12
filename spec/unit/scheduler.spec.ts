@@ -1,7 +1,7 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
-import { defer } from '../../src/utils';
+import { defer } from "../../src/utils";
 import { MatrixError } from "../../src/http-api";
 import { MatrixScheduler } from "../../src/scheduler";
 import * as utils from "../test-utils/test-utils";

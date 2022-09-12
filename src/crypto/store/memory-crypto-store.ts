@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../../logger';
+import { logger } from "../../logger";
 import * as utils from "../../utils";
 import {
     CryptoStore,
@@ -100,9 +100,9 @@ export class MemoryCryptoStore implements CryptoStore {
             if (existing) {
                 // this entry matches the request - return it.
                 logger.log(
-                    `already have key request outstanding for ` +
+                    "already have key request outstanding for " +
                     `${requestBody.room_id} / ${requestBody.session_id}: ` +
-                    `not sending another`,
+                    "not sending another",
                 );
                 return existing;
             }
@@ -402,7 +402,7 @@ export class MemoryCryptoStore implements CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
+        const k = senderCurve25519Key+"/"+sessionId;
         func(
             this.inboundGroupSessions[k] || null,
             this.inboundGroupSessionsWithheld[k] || null,
@@ -434,7 +434,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
+        const k = senderCurve25519Key+"/"+sessionId;
         if (this.inboundGroupSessions[k] === undefined) {
             this.inboundGroupSessions[k] = sessionData;
         }
@@ -446,7 +446,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        this.inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+        this.inboundGroupSessions[senderCurve25519Key+"/"+sessionId] = sessionData;
     }
 
     public storeEndToEndInboundGroupSessionWithheld(
@@ -455,7 +455,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: IWithheld,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
+        const k = senderCurve25519Key+"/"+sessionId;
         this.inboundGroupSessionsWithheld[k] = sessionData;
     }
 
@@ -502,7 +502,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + '/' + session.sessionId;
+            const sessionKey = session.senderKey + "/" + session.sessionId;
             delete this.sessionsNeedingBackup[sessionKey];
         }
         return Promise.resolve();
@@ -510,7 +510,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + '/' + session.sessionId;
+            const sessionKey = session.senderKey + "/" + session.sessionId;
             this.sessionsNeedingBackup[sessionKey] = true;
         }
         return Promise.resolve();

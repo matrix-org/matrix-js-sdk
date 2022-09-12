@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { RoomMember } from "./room-member";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import * as utils from "../utils";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
 import { MatrixEvent, MatrixEventEvent } from "./event";
@@ -152,7 +152,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.joinedMemberCount === null) {
             this.joinedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === 'join' ? count + 1 : count;
+                return m.membership === "join" ? count + 1 : count;
             }, 0);
         }
         return this.joinedMemberCount;
@@ -176,7 +176,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.invitedMemberCount === null) {
             this.invitedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === 'invite' ? count + 1 : count;
+                return m.membership === "invite" ? count + 1 : count;
             }, 0);
         }
         return this.invitedMemberCount;
@@ -514,7 +514,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const beacon = this.beacons.get(beaconIdentifier);
 
             if (event.isRedacted()) {
-                if (beacon.beaconInfoId === event.getRedactionEvent()?.['redacts']) {
+                if (beacon.beaconInfoId === event.getRedactionEvent()?.["redacts"]) {
                     beacon.destroy();
                     this.beacons.delete(beaconIdentifier);
                 }
@@ -632,7 +632,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (this.oobMemberFlags.status !== OobStatus.InProgress) {
             return;
         }
-        logger.log(`LL: RoomState put in finished state ...`);
+        logger.log("LL: RoomState put in finished state ...");
         this.oobMemberFlags.status = OobStatus.Finished;
         stateEvents.forEach((e) => this.setOutOfBandMember(e));
         this.emit(RoomStateEvent.Update, this);
@@ -721,7 +721,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public maySendRedactionForEvent(mxEvent: MatrixEvent, userId: string): boolean {
         const member = this.getMember(userId);
-        if (!member || member.membership === 'leave') return false;
+        if (!member || member.membership === "leave") return false;
 
         if (mxEvent.status || mxEvent.isRedacted()) return false;
 
@@ -730,7 +730,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const canRedact = this.maySendEvent(EventType.RoomRedaction, userId);
         if (mxEvent.getSender() === userId) return canRedact;
 
-        return this.hasSufficientPowerLevelFor('redact', member.powerLevel);
+        return this.hasSufficientPowerLevelFor("redact", member.powerLevel);
     }
 
     /**
@@ -820,7 +820,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      *                        according to the room's state.
      */
     private maySendEventOfType(eventType: EventType | string, userId: string, state: boolean): boolean {
-        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
+        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
         let powerLevels;
         let eventsLevels = {};
@@ -871,7 +871,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return false;
         }
 
-        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
+        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
         let notifLevel = 50;
         if (

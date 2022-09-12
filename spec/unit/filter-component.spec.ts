@@ -1,15 +1,15 @@
 import { RelationType } from "../../src";
 import { FilterComponent } from "../../src/filter-component";
-import { mkEvent } from '../test-utils/test-utils';
+import { mkEvent } from "../test-utils/test-utils";
 
 describe("Filter Component", function() {
     describe("types", function() {
         it("should filter out events with other types", function() {
-            const filter = new FilterComponent({ types: ['m.room.message'] });
+            const filter = new FilterComponent({ types: ["m.room.message"] });
             const event = mkEvent({
-                type: 'm.room.member',
+                type: "m.room.member",
                 content: { },
-                room: 'roomId',
+                room: "roomId",
                 event: true,
             });
 
@@ -19,11 +19,11 @@ describe("Filter Component", function() {
         });
 
         it("should validate events with the same type", function() {
-            const filter = new FilterComponent({ types: ['m.room.message'] });
+            const filter = new FilterComponent({ types: ["m.room.message"] });
             const event = mkEvent({
-                type: 'm.room.message',
+                type: "m.room.message",
                 content: { },
-                room: 'roomId',
+                room: "roomId",
                 event: true,
             });
 
@@ -33,16 +33,16 @@ describe("Filter Component", function() {
         });
 
         it("should filter out events by relation participation", function() {
-            const currentUserId = '@me:server.org';
+            const currentUserId = "@me:server.org";
             const filter = new FilterComponent({
                 related_by_senders: [currentUserId],
             }, currentUserId);
 
             const threadRootNotParticipated = mkEvent({
-                type: 'm.room.message',
+                type: "m.room.message",
                 content: {},
-                room: 'roomId',
-                user: '@someone-else:server.org',
+                room: "roomId",
+                user: "@someone-else:server.org",
                 event: true,
                 unsigned: {
                     "m.relations": {
@@ -58,13 +58,13 @@ describe("Filter Component", function() {
         });
 
         it("should keep events by relation participation", function() {
-            const currentUserId = '@me:server.org';
+            const currentUserId = "@me:server.org";
             const filter = new FilterComponent({
                 related_by_senders: [currentUserId],
             }, currentUserId);
 
             const threadRootParticipated = mkEvent({
-                type: 'm.room.message',
+                type: "m.room.message",
                 content: {},
                 unsigned: {
                     "m.relations": {
@@ -74,8 +74,8 @@ describe("Filter Component", function() {
                         },
                     },
                 },
-                user: '@someone-else:server.org',
-                room: 'roomId',
+                user: "@someone-else:server.org",
+                room: "roomId",
                 event: true,
             });
 
@@ -88,9 +88,9 @@ describe("Filter Component", function() {
             });
 
             const referenceRelationEvent = mkEvent({
-                type: 'm.room.message',
+                type: "m.room.message",
                 content: {},
-                room: 'roomId',
+                room: "roomId",
                 event: true,
                 unsigned: {
                     "m.relations": {
@@ -108,7 +108,7 @@ describe("Filter Component", function() {
             });
 
             const threadRootEvent = mkEvent({
-                type: 'm.room.message',
+                type: "m.room.message",
                 content: {},
                 unsigned: {
                     "m.relations": {
@@ -118,7 +118,7 @@ describe("Filter Component", function() {
                         },
                     },
                 },
-                room: 'roomId',
+                room: "roomId",
                 event: true,
             });
 
@@ -143,7 +143,7 @@ describe("Filter Component", function() {
                         },
                     },
                 },
-                "room": 'roomId',
+                "room": "roomId",
                 "event": true,
             });
 
@@ -155,7 +155,7 @@ describe("Filter Component", function() {
                         "testtesttest": {},
                     },
                 },
-                "room": 'roomId',
+                "room": "roomId",
                 "event": true,
             });
 

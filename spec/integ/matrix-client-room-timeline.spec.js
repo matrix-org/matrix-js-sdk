@@ -610,7 +610,7 @@ describe("MatrixClient room timelines", function() {
         });
     });
 
-    describe('Refresh live timeline', () => {
+    describe("Refresh live timeline", () => {
         const initialSyncEventData = [
             utils.mkMessage({ user: userId, room: roomId }),
             utils.mkMessage({ user: userId, room: roomId }),
@@ -645,7 +645,7 @@ describe("MatrixClient room timelines", function() {
             expect(room).toBeTruthy();
         });
 
-        it('should clear and refresh messages in timeline', async () => {
+        it("should clear and refresh messages in timeline", async () => {
             // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
             // to construct a new timeline from.
             httpBackend.when("GET", contextUrl)
@@ -672,7 +672,7 @@ describe("MatrixClient room timelines", function() {
             ]);
         });
 
-        it('Perfectly merges timelines if a sync finishes while refreshing the timeline', async () => {
+        it("Perfectly merges timelines if a sync finishes while refreshing the timeline", async () => {
             // `/context` request for `refreshLiveTimeline()` ->
             // `getEventTimeline()` to construct a new timeline from.
             //
@@ -706,12 +706,12 @@ describe("MatrixClient room timelines", function() {
                 const failTimeout = setTimeout(() => {
                     if (eventFired) {
                         reject(new Error(
-                            'TestError: `RoomEvent.TimelineReset` fired but we timed out trying to make' +
-                            'a `/sync` happen in time.',
+                            "TestError: `RoomEvent.TimelineReset` fired but we timed out trying to make" +
+                            "a `/sync` happen in time.",
                         ));
                     } else {
                         reject(new Error(
-                            'TestError: Timed out while waiting for `RoomEvent.TimelineReset` to fire.',
+                            "TestError: Timed out while waiting for `RoomEvent.TimelineReset` to fire.",
                         ));
                     }
                 }, 4000 /* FIXME: Is there a way to reference the current timeout of this test in Jest? */);
@@ -791,7 +791,7 @@ describe("MatrixClient room timelines", function() {
             ]);
         });
 
-        it('Timeline recovers after `/context` request to generate new timeline fails', async () => {
+        it("Timeline recovers after `/context` request to generate new timeline fails", async () => {
             // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
             // to construct a new timeline from.
             httpBackend.when("GET", contextUrl)
@@ -800,9 +800,9 @@ describe("MatrixClient room timelines", function() {
                     expect(room.timeline.length).toEqual(0);
 
                     return {
-                        errcode: 'TEST_FAKE_ERROR',
-                        error: 'We purposely intercepted this /context request to make it fail ' +
-                                 'in order to test whether the refresh timeline code is resilient',
+                        errcode: "TEST_FAKE_ERROR",
+                        error: "We purposely intercepted this /context request to make it fail " +
+                                 "in order to test whether the refresh timeline code is resilient",
                     };
                 });
 
@@ -813,9 +813,9 @@ describe("MatrixClient room timelines", function() {
             ]);
             // We only expect `TEST_FAKE_ERROR` here. Anything else is
             // unexpected and should fail the test.
-            if (settledFailedRefreshPromises[0].status === 'fulfilled') {
-                throw new Error('Expected the /context request to fail with a 500');
-            } else if (settledFailedRefreshPromises[0].reason.errcode !== 'TEST_FAKE_ERROR') {
+            if (settledFailedRefreshPromises[0].status === "fulfilled") {
+                throw new Error("Expected the /context request to fail with a 500");
+            } else if (settledFailedRefreshPromises[0].reason.errcode !== "TEST_FAKE_ERROR") {
                 throw settledFailedRefreshPromises[0].reason;
             }
 

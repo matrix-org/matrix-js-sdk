@@ -17,7 +17,7 @@ limitations under the License.
 
 import { MockedObject } from "jest-mock";
 
-import '../../olm-loader';
+import "../../olm-loader";
 import { logger } from "../../../src/logger";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { MatrixClient } from "../../../src/client";
@@ -30,27 +30,27 @@ import { Crypto } from "../../../src/crypto";
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { BackupManager } from "../../../src/crypto/backup";
 import { StubStore } from "../../../src/store/stub";
-import { IAbortablePromise, MatrixScheduler } from '../../../src';
+import { IAbortablePromise, MatrixScheduler } from "../../../src";
 
 const Olm = global.Olm;
 
-const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
+const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get("m.megolm.v1.aes-sha2");
 
-const ROOM_ID = '!ROOM:ID';
+const ROOM_ID = "!ROOM:ID";
 
-const SESSION_ID = 'o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc';
+const SESSION_ID = "o+21hSjP+mgEmcfdslPsQdvzWnkdt0Wyo00Kp++R8Kc";
 const ENCRYPTED_EVENT = new MatrixEvent({
-    type: 'm.room.encrypted',
-    room_id: '!ROOM:ID',
+    type: "m.room.encrypted",
+    room_id: "!ROOM:ID",
     content: {
-        algorithm: 'm.megolm.v1.aes-sha2',
-        sender_key: 'SENDER_CURVE25519',
+        algorithm: "m.megolm.v1.aes-sha2",
+        sender_key: "SENDER_CURVE25519",
         session_id: SESSION_ID,
-        ciphertext: 'AwgAEjD+VwXZ7PoGPRS/H4kwpAsMp/g+WPvJVtPEKE8fmM9IcT/N'
-            + 'CiwPb8PehecDKP0cjm1XO88k6Bw3D17aGiBHr5iBoP7oSw8CXULXAMTkBl'
-            + 'mkufRQq2+d0Giy1s4/Cg5n13jSVrSb2q7VTSv1ZHAFjUCsLSfR0gxqcQs',
+        ciphertext: "AwgAEjD+VwXZ7PoGPRS/H4kwpAsMp/g+WPvJVtPEKE8fmM9IcT/N"
+            + "CiwPb8PehecDKP0cjm1XO88k6Bw3D17aGiBHr5iBoP7oSw8CXULXAMTkBl"
+            + "mkufRQq2+d0Giy1s4/Cg5n13jSVrSb2q7VTSv1ZHAFjUCsLSfR0gxqcQs",
     },
-    event_id: '$event1',
+    event_id: "$event1",
     origin_server_ts: 1507753886000,
 });
 
@@ -59,19 +59,19 @@ const CURVE25519_KEY_BACKUP_DATA = {
     forwarded_count: 0,
     is_verified: false,
     session_data: {
-        ciphertext: '2z2M7CZ+azAiTHN1oFzZ3smAFFt+LEOYY6h3QO3XXGdw'
-            + '6YpNn/gpHDO6I/rgj1zNd4FoTmzcQgvKdU8kN20u5BWRHxaHTZ'
-            + 'Slne5RxE6vUdREsBgZePglBNyG0AogR/PVdcrv/v18Y6rLM5O9'
-            + 'SELmwbV63uV9Kuu/misMxoqbuqEdG7uujyaEKtjlQsJ5MGPQOy'
-            + 'Syw7XrnesSwF6XWRMxcPGRV0xZr3s9PI350Wve3EncjRgJ9IGF'
-            + 'ru1bcptMqfXgPZkOyGvrphHoFfoK7nY3xMEHUiaTRfRIjq8HNV'
-            + '4o8QY1qmWGnxNBQgOlL8MZlykjg3ULmQ3DtFfQPj/YYGS3jzxv'
-            + 'C+EBjaafmsg+52CTeK3Rswu72PX450BnSZ1i3If4xWAUKvjTpe'
-            + 'Ug5aDLqttOv1pITolTJDw5W/SD+b5rjEKg1CFCHGEGE9wwV3Nf'
-            + 'QHVCQL+dfpd7Or0poy4dqKMAi3g0o3Tg7edIF8d5rREmxaALPy'
-            + 'iie8PHD8mj/5Y0GLqrac4CD6+Mop7eUTzVovprjg',
-        mac: '5lxYBHQU80M',
-        ephemeral: '/Bn0A4UMFwJaDDvh0aEk1XZj3k1IfgCxgFY9P9a0b14',
+        ciphertext: "2z2M7CZ+azAiTHN1oFzZ3smAFFt+LEOYY6h3QO3XXGdw"
+            + "6YpNn/gpHDO6I/rgj1zNd4FoTmzcQgvKdU8kN20u5BWRHxaHTZ"
+            + "Slne5RxE6vUdREsBgZePglBNyG0AogR/PVdcrv/v18Y6rLM5O9"
+            + "SELmwbV63uV9Kuu/misMxoqbuqEdG7uujyaEKtjlQsJ5MGPQOy"
+            + "Syw7XrnesSwF6XWRMxcPGRV0xZr3s9PI350Wve3EncjRgJ9IGF"
+            + "ru1bcptMqfXgPZkOyGvrphHoFfoK7nY3xMEHUiaTRfRIjq8HNV"
+            + "4o8QY1qmWGnxNBQgOlL8MZlykjg3ULmQ3DtFfQPj/YYGS3jzxv"
+            + "C+EBjaafmsg+52CTeK3Rswu72PX450BnSZ1i3If4xWAUKvjTpe"
+            + "Ug5aDLqttOv1pITolTJDw5W/SD+b5rjEKg1CFCHGEGE9wwV3Nf"
+            + "QHVCQL+dfpd7Or0poy4dqKMAi3g0o3Tg7edIF8d5rREmxaALPy"
+            + "iie8PHD8mj/5Y0GLqrac4CD6+Mop7eUTzVovprjg",
+        mac: "5lxYBHQU80M",
+        ephemeral: "/Bn0A4UMFwJaDDvh0aEk1XZj3k1IfgCxgFY9P9a0b14",
     },
 };
 
@@ -80,23 +80,23 @@ const AES256_KEY_BACKUP_DATA = {
     forwarded_count: 0,
     is_verified: false,
     session_data: {
-        iv: 'b3Jqqvm5S9QdmXrzssspLQ',
-        ciphertext: 'GOOASO3E9ThogkG0zMjEduGLM3u9jHZTkS7AvNNbNj3q1znwk4OlaVKXce'
-            + '7ynofiiYIiS865VlOqrKEEXv96XzRyUpgn68e3WsicwYl96EtjIEh/iY003PG2Qd'
-            + 'EluT899Ax7PydpUHxEktbWckMppYomUR5q8x1KI1SsOQIiJaIGThmIMPANRCFiK0'
-            + 'WQj+q+dnhzx4lt9AFqU5bKov8qKnw2qGYP7/+6RmJ0Kpvs8tG6lrcNDEHtFc2r0r'
-            + 'KKubDypo0Vc8EWSwsAHdKa36ewRavpreOuE8Z9RLfY0QIR1ecXrMqW0CdGFr7H3P'
-            + 'vcjF8sjwvQAavzxEKT1WMGizSMLeKWo2mgZ5cKnwV5HGUAw596JQvKs9laG2U89K'
-            + 'YrT0sH30vi62HKzcBLcDkWkUSNYPz7UiZ1MM0L380UA+1ZOXSOmtBA9xxzzbc8Xd'
-            + 'fRimVgklGdxrxjzuNLYhL2BvVH4oPWonD9j0bvRwE6XkimdbGQA8HB7UmXXjE8WA'
-            + 'RgaDHkfzoA3g3aeQ',
-        mac: 'uR988UYgGL99jrvLLPX3V1ows+UYbktTmMxPAo2kxnU',
+        iv: "b3Jqqvm5S9QdmXrzssspLQ",
+        ciphertext: "GOOASO3E9ThogkG0zMjEduGLM3u9jHZTkS7AvNNbNj3q1znwk4OlaVKXce"
+            + "7ynofiiYIiS865VlOqrKEEXv96XzRyUpgn68e3WsicwYl96EtjIEh/iY003PG2Qd"
+            + "EluT899Ax7PydpUHxEktbWckMppYomUR5q8x1KI1SsOQIiJaIGThmIMPANRCFiK0"
+            + "WQj+q+dnhzx4lt9AFqU5bKov8qKnw2qGYP7/+6RmJ0Kpvs8tG6lrcNDEHtFc2r0r"
+            + "KKubDypo0Vc8EWSwsAHdKa36ewRavpreOuE8Z9RLfY0QIR1ecXrMqW0CdGFr7H3P"
+            + "vcjF8sjwvQAavzxEKT1WMGizSMLeKWo2mgZ5cKnwV5HGUAw596JQvKs9laG2U89K"
+            + "YrT0sH30vi62HKzcBLcDkWkUSNYPz7UiZ1MM0L380UA+1ZOXSOmtBA9xxzzbc8Xd"
+            + "fRimVgklGdxrxjzuNLYhL2BvVH4oPWonD9j0bvRwE6XkimdbGQA8HB7UmXXjE8WA"
+            + "RgaDHkfzoA3g3aeQ",
+        mac: "uR988UYgGL99jrvLLPX3V1ows+UYbktTmMxPAo2kxnU",
     },
 };
 
 const CURVE25519_BACKUP_INFO = {
     algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-    version: '1',
+    version: "1",
     auth_data: {
         public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
     },
@@ -104,7 +104,7 @@ const CURVE25519_BACKUP_INFO = {
 
 const AES256_BACKUP_INFO = {
     algorithm: "org.matrix.msc3270.v1.aes-hmac-sha2",
-    version: '1',
+    version: "1",
     auth_data: {
         // FIXME: add iv and mac
     },
@@ -143,7 +143,7 @@ function makeTestClient(cryptoStore) {
 
 describe("MegolmBackup", function() {
     if (!global.Olm) {
-        logger.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
@@ -157,7 +157,7 @@ describe("MegolmBackup", function() {
     let cryptoStore;
     let megolmDecryption;
     beforeEach(async function() {
-        mockCrypto = testUtils.mock(Crypto, 'Crypto');
+        mockCrypto = testUtils.mock(Crypto, "Crypto");
         mockCrypto.backupManager = testUtils.mock(BackupManager, "BackupManager");
         mockCrypto.backupKey = new Olm.PkEncryption();
         mockCrypto.backupKey.set_recipient_key(
@@ -183,7 +183,7 @@ describe("MegolmBackup", function() {
             mockBaseApis = {};
 
             megolmDecryption = new MegolmDecryption({
-                userId: '@user:id',
+                userId: "@user:id",
                 crypto: mockCrypto,
                 olmDevice: olmDevice,
                 baseApis: mockBaseApis,
@@ -196,29 +196,29 @@ describe("MegolmBackup", function() {
             // ideally we would use lolex, but we have no oportunity
             // to tick the clock between the first try and the retry.
             const realSetTimeout = global.setTimeout;
-            jest.spyOn(global, 'setTimeout').mockImplementation(function(f, n) {
+            jest.spyOn(global, "setTimeout").mockImplementation(function(f, n) {
                 return realSetTimeout(f, n/100);
             });
         });
 
         afterEach(function() {
-            jest.spyOn(global, 'setTimeout').mockRestore();
+            jest.spyOn(global, "setTimeout").mockRestore();
         });
 
-        it('automatically calls the key back up', function() {
+        it("automatically calls the key back up", function() {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
 
             // construct a fake decrypted key event via the use of a mocked
             // 'crypto' implementation.
             const event = new MatrixEvent({
-                type: 'm.room.encrypted',
+                type: "m.room.encrypted",
             });
             const decryptedData = {
                 clearEvent: {
-                    type: 'm.room_key',
+                    type: "m.room_key",
                     content: {
-                        algorithm: 'm.megolm.v1.aes-sha2',
+                        algorithm: "m.megolm.v1.aes-sha2",
                         room_id: ROOM_ID,
                         session_id: groupSession.session_id(),
                         session_key: groupSession.session_key(),
@@ -244,7 +244,7 @@ describe("MegolmBackup", function() {
             });
         });
 
-        it('sends backups to the server (Curve25519 version)', function() {
+        it("sends backups to the server (Curve25519 version)", function() {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new Olm.InboundGroupSession();
@@ -253,7 +253,7 @@ describe("MegolmBackup", function() {
             const client = makeTestClient(cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
-                userId: '@user:id',
+                userId: "@user:id",
                 crypto: mockCrypto,
                 olmDevice: olmDevice,
                 baseApis: client,
@@ -285,7 +285,7 @@ describe("MegolmBackup", function() {
                 .then(async () => {
                     await client.enableKeyBackup({
                         algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-                        version: '1',
+                        version: "1",
                         auth_data: {
                             public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
                         },
@@ -304,7 +304,7 @@ describe("MegolmBackup", function() {
                             }
                             expect(method).toBe("PUT");
                             expect(path).toBe("/room_keys/keys");
-                            expect(queryParams.version).toBe('1');
+                            expect(queryParams.version).toBe("1");
                             expect(data.rooms[ROOM_ID].sessions).toBeDefined();
                             expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
                                 groupSession.session_id(),
@@ -323,7 +323,7 @@ describe("MegolmBackup", function() {
                 });
         });
 
-        it('sends backups to the server (AES-256 version)', function() {
+        it("sends backups to the server (AES-256 version)", function() {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new Olm.InboundGroupSession();
@@ -332,7 +332,7 @@ describe("MegolmBackup", function() {
             const client = makeTestClient(cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
-                userId: '@user:id',
+                userId: "@user:id",
                 crypto: mockCrypto,
                 olmDevice: olmDevice,
                 baseApis: client,
@@ -367,7 +367,7 @@ describe("MegolmBackup", function() {
                 .then(async () => {
                     await client.enableKeyBackup({
                         algorithm: "org.matrix.msc3270.v1.aes-hmac-sha2",
-                        version: '1',
+                        version: "1",
                         auth_data: {
                             iv: "PsCAtR7gMc4xBd9YS3A9Ow",
                             mac: "ZSDsTFEZK7QzlauCLMleUcX96GQZZM7UNtk4sripSqQ",
@@ -387,7 +387,7 @@ describe("MegolmBackup", function() {
                             }
                             expect(method).toBe("PUT");
                             expect(path).toBe("/room_keys/keys");
-                            expect(queryParams.version).toBe('1');
+                            expect(queryParams.version).toBe("1");
                             expect(data.rooms[ROOM_ID].sessions).toBeDefined();
                             expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
                                 groupSession.session_id(),
@@ -406,7 +406,7 @@ describe("MegolmBackup", function() {
                 });
         });
 
-        it('signs backups with the cross-signing master key', async function() {
+        it("signs backups with the cross-signing master key", async function() {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new Olm.InboundGroupSession();
@@ -415,7 +415,7 @@ describe("MegolmBackup", function() {
             const client = makeTestClient(cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
-                userId: '@user:id',
+                userId: "@user:id",
                 crypto: mockCrypto,
                 olmDevice: olmDevice,
                 baseApis: client,
@@ -474,7 +474,7 @@ describe("MegolmBackup", function() {
             client.stopClient();
         });
 
-        it('retries when a backup fails', async function() {
+        it("retries when a backup fails", async function() {
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
             const ibGroupSession = new Olm.InboundGroupSession();
@@ -498,7 +498,7 @@ describe("MegolmBackup", function() {
             });
 
             megolmDecryption = new MegolmDecryption({
-                userId: '@user:id',
+                userId: "@user:id",
                 crypto: mockCrypto,
                 olmDevice: olmDevice,
                 baseApis: client,
@@ -528,7 +528,7 @@ describe("MegolmBackup", function() {
 
             await client.enableKeyBackup({
                 algorithm: olmlib.MEGOLM_BACKUP_ALGORITHM,
-                version: '1',
+                version: "1",
                 auth_data: {
                     public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
                 },
@@ -548,7 +548,7 @@ describe("MegolmBackup", function() {
                     }
                     expect(method).toBe("PUT");
                     expect(path).toBe("/room_keys/keys");
-                    expect(queryParams.version).toBe('1');
+                    expect(queryParams.version).toBe("1");
                     expect(data.rooms[ROOM_ID].sessions).toBeDefined();
                     expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
                         groupSession.session_id(),
@@ -579,7 +579,7 @@ describe("MegolmBackup", function() {
             client = makeTestClient(cryptoStore);
 
             megolmDecryption = new MegolmDecryption({
-                userId: '@user:id',
+                userId: "@user:id",
                 crypto: mockCrypto,
                 olmDevice: olmDevice,
                 baseApis: client,
@@ -595,7 +595,7 @@ describe("MegolmBackup", function() {
             client.stopClient();
         });
 
-        it('can restore from backup (Curve25519 version)', function() {
+        it("can restore from backup (Curve25519 version)", function() {
             client.http.authedRequest = function() {
                 return Promise.resolve(CURVE25519_KEY_BACKUP_DATA);
             };
@@ -607,12 +607,12 @@ describe("MegolmBackup", function() {
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
-                expect(res.clearEvent.content).toEqual('testytest');
+                expect(res.clearEvent.content).toEqual("testytest");
                 expect(res.untrusted).toBeTruthy(); // keys from Curve25519 backup are untrusted
             });
         });
 
-        it('can restore from backup (AES-256 version)', function() {
+        it("can restore from backup (AES-256 version)", function() {
             client.http.authedRequest = function() {
                 return Promise.resolve(AES256_KEY_BACKUP_DATA);
             };
@@ -624,12 +624,12 @@ describe("MegolmBackup", function() {
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
-                expect(res.clearEvent.content).toEqual('testytest');
+                expect(res.clearEvent.content).toEqual("testytest");
                 expect(res.untrusted).toBeFalsy(); // keys from AES backup are trusted
             });
         });
 
-        it('can restore backup by room (Curve25519 version)', function() {
+        it("can restore backup by room (Curve25519 version)", function() {
             client.http.authedRequest = function() {
                 return Promise.resolve({
                     rooms: {
@@ -647,18 +647,18 @@ describe("MegolmBackup", function() {
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
-                expect(res.clearEvent.content).toEqual('testytest');
+                expect(res.clearEvent.content).toEqual("testytest");
             });
         });
 
-        it('has working cache functions', async function() {
+        it("has working cache functions", async function() {
             const key = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
             await client.crypto.storeSessionBackupPrivateKey(key);
             const result = await client.crypto.getSessionBackupPrivateKey();
             expect(new Uint8Array(result)).toEqual(key);
         });
 
-        it('caches session backup keys as it encounters them', async function() {
+        it("caches session backup keys as it encounters them", async function() {
             const cachedNull = await client.crypto.getSessionBackupPrivateKey();
             expect(cachedNull).toBeNull();
             client.http.authedRequest = function() {

@@ -16,10 +16,10 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
-import { decodeBase64, encodeBase64 } from './olmlib';
-import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
-import { decryptAES, encryptAES } from './aes';
-import { logger } from '../logger';
+import { decodeBase64, encodeBase64 } from "./olmlib";
+import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
+import { decryptAES, encryptAES } from "./aes";
+import { logger } from "../logger";
 import { ISecretStorageKeyInfo } from "./api";
 import { Crypto } from "./index";
 import { Method } from "../http-api";
@@ -68,7 +68,7 @@ export class DehydrationManager {
 
     public getDehydrationKeyFromCache(): Promise<void> {
         return this.crypto.cryptoStore.doTxn(
-            'readonly',
+            "readonly",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.crypto.cryptoStore.getSecretStorePrivateKey(
@@ -118,7 +118,7 @@ export class DehydrationManager {
             }
             // clear storage
             await this.crypto.cryptoStore.doTxn(
-                'readwrite',
+                "readwrite",
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     this.crypto.cryptoStore.storeSecretStorePrivateKey(
@@ -166,7 +166,7 @@ export class DehydrationManager {
             // update the crypto store with the timestamp
             const key = await encryptAES(encodeBase64(this.key), pickleKey, DEHYDRATION_ALGORITHM);
             await this.crypto.cryptoStore.doTxn(
-                'readwrite',
+                "readwrite",
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     this.crypto.cryptoStore.storeSecretStorePrivateKey(

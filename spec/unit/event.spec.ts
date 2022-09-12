@@ -20,20 +20,20 @@ import { MatrixEvent } from "../../src/models/event";
 describe("MatrixEvent", () => {
     describe(".attemptDecryption", () => {
         let encryptedEvent;
-        const eventId = 'test_encrypted_event';
+        const eventId = "test_encrypted_event";
 
         beforeEach(() => {
             encryptedEvent = new MatrixEvent({
                 event_id: eventId,
-                type: 'm.room.encrypted',
+                type: "m.room.encrypted",
                 content: {
-                    ciphertext: 'secrets',
+                    ciphertext: "secrets",
                 },
             });
         });
 
-        it('should retry decryption if a retry is queued', async () => {
-            const eventAttemptDecryptionSpy = jest.spyOn(encryptedEvent, 'attemptDecryption');
+        it("should retry decryption if a retry is queued", async () => {
+            const eventAttemptDecryptionSpy = jest.spyOn(encryptedEvent, "attemptDecryption");
 
             const crypto = {
                 decryptEvent: jest.fn()
@@ -43,13 +43,13 @@ describe("MatrixEvent", () => {
                         encryptedEvent.attemptDecryption(crypto);
 
                         const error = new Error("nope");
-                        error.name = 'DecryptionError';
+                        error.name = "DecryptionError";
                         return Promise.reject(error);
                     })
                     .mockImplementationOnce(() => {
                         return Promise.resolve({
                             clearEvent: {
-                                type: 'm.room.message',
+                                type: "m.room.message",
                             },
                         });
                     }),
@@ -59,7 +59,7 @@ describe("MatrixEvent", () => {
 
             expect(eventAttemptDecryptionSpy).toHaveBeenCalledTimes(2);
             expect(crypto.decryptEvent).toHaveBeenCalledTimes(2);
-            expect(encryptedEvent.getType()).toEqual('m.room.message');
+            expect(encryptedEvent.getType()).toEqual("m.room.message");
         });
     });
 });

@@ -17,7 +17,7 @@ limitations under the License.
 import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { IStartClientOpts, IStateEventWithRoomId } from "..";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
@@ -158,13 +158,13 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     public connect(): Promise<void> {
         if (!this.disconnected) {
-            logger.log(`LocalIndexedDBStoreBackend.connect: already connected or connecting`);
+            logger.log("LocalIndexedDBStoreBackend.connect: already connected or connecting");
             return Promise.resolve();
         }
 
         this.disconnected = false;
 
-        logger.log(`LocalIndexedDBStoreBackend.connect: connecting...`);
+        logger.log("LocalIndexedDBStoreBackend.connect: connecting...");
         const req = this.indexedDB.open(this.dbName, VERSION);
         req.onupgradeneeded = (ev) => {
             const db = req.result;
@@ -189,12 +189,12 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         };
 
         req.onblocked = () => {
-            logger.log(`can't yet open LocalIndexedDBStoreBackend because it is open elsewhere`);
+            logger.log("can't yet open LocalIndexedDBStoreBackend because it is open elsewhere");
         };
 
-        logger.log(`LocalIndexedDBStoreBackend.connect: awaiting connection...`);
+        logger.log("LocalIndexedDBStoreBackend.connect: awaiting connection...");
         return reqAsEventPromise(req).then(() => {
-            logger.log(`LocalIndexedDBStoreBackend.connect: connected`);
+            logger.log("LocalIndexedDBStoreBackend.connect: connected");
             this.db = req.result;
 
             // add a poorly-named listener for when deleteDatabase is called
@@ -221,7 +221,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             this.loadAccountData(),
             this.loadSyncData(),
         ]).then(([accountData, syncData]) => {
-            logger.log(`LocalIndexedDBStoreBackend: loaded initial data`);
+            logger.log("LocalIndexedDBStoreBackend: loaded initial data");
             this.syncAccumulator.accumulate({
                 next_batch: syncData.nextBatch,
                 rooms: syncData.roomsData,
@@ -516,14 +516,14 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @return {Promise<Object[]>} A list of raw global account events.
      */
     private loadAccountData(): Promise<IMinimalEvent[]> {
-        logger.log(`LocalIndexedDBStoreBackend: loading account data...`);
+        logger.log("LocalIndexedDBStoreBackend: loading account data...");
         return utils.promiseTry<IMinimalEvent[]>(() => {
             const txn = this.db.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
             }).then((result: IMinimalEvent[]) => {
-                logger.log(`LocalIndexedDBStoreBackend: loaded account data`);
+                logger.log("LocalIndexedDBStoreBackend: loaded account data");
                 return result;
             });
         });
@@ -534,14 +534,14 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @return {Promise<Object>} An object with "roomsData" and "nextBatch" keys.
      */
     private loadSyncData(): Promise<ISyncData> {
-        logger.log(`LocalIndexedDBStoreBackend: loading sync data...`);
+        logger.log("LocalIndexedDBStoreBackend: loading sync data...");
         return utils.promiseTry<ISyncData>(() => {
             const txn = this.db.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
             }).then((results: ISyncData[]) => {
-                logger.log(`LocalIndexedDBStoreBackend: loaded sync data`);
+                logger.log("LocalIndexedDBStoreBackend: loaded sync data");
                 if (results.length > 1) {
                     logger.warn("loadSyncData: More than 1 sync row found.");
                 }

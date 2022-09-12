@@ -19,7 +19,7 @@ limitations under the License.
  * @module crypto/verification/SAS
  */
 
-import anotherjson from 'another-json';
+import anotherjson from "another-json";
 import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
 
 import { VerificationBase as Base, SwitchStartEventError, VerificationEventHandlerMap } from "./Base";
@@ -29,8 +29,8 @@ import {
     newKeyMismatchError,
     newUnknownMethodError,
     newUserCancelledError,
-} from './Error';
-import { logger } from '../../logger';
+} from "./Error";
+import { logger } from "../../logger";
 import { IContent, MatrixEvent } from "../../models/event";
 
 const START_TYPE = "m.key.verification.start";

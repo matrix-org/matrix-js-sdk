@@ -17,9 +17,9 @@ limitations under the License.
 import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
 import { Logger } from "loglevel";
 
-import { logger } from '../logger';
-import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
-import * as algorithms from './algorithms';
+import { logger } from "../logger";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
+import * as algorithms from "./algorithms";
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
 import { IMegolmSessionData } from "./index";
@@ -213,8 +213,8 @@ export class OlmDevice {
             if (fromExportedDevice) {
                 if (pickleKey) {
                     logger.warn(
-                        'ignoring opts.pickleKey'
-                        + ' because opts.fromExportedDevice is present.',
+                        "ignoring opts.pickleKey"
+                        + " because opts.fromExportedDevice is present.",
                     );
                 }
                 this.pickleKey = fromExportedDevice.pickleKey;
@@ -247,7 +247,7 @@ export class OlmDevice {
      */
     private async initialiseFromExportedDevice(exportedData: IExportedDevice, account: Account): Promise<void> {
         await this.cryptoStore.doTxn(
-            'readwrite',
+            "readwrite",
             [
                 IndexedDBCryptoStore.STORE_ACCOUNT,
                 IndexedDBCryptoStore.STORE_SESSIONS,
@@ -276,7 +276,7 @@ export class OlmDevice {
 
     private async initialiseAccount(account: Account): Promise<void> {
         await this.cryptoStore.doTxn(
-            'readwrite',
+            "readwrite",
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.cryptoStore.getAccount(txn, (pickledAccount) => {
@@ -342,7 +342,7 @@ export class OlmDevice {
         };
 
         await this.cryptoStore.doTxn(
-            'readonly',
+            "readonly",
             [
                 IndexedDBCryptoStore.STORE_ACCOUNT,
                 IndexedDBCryptoStore.STORE_SESSIONS,
@@ -453,7 +453,7 @@ export class OlmDevice {
     public async sign(message: string): Promise<string> {
         let result;
         await this.cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readonly", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account: Account) => {
                     result = account.sign(message);
@@ -472,7 +472,7 @@ export class OlmDevice {
     public async getOneTimeKeys(): Promise<{ curve25519: { [keyId: string]: string } }> {
         let result;
         await this.cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readonly", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account) => {
                     result = JSON.parse(account.one_time_keys());
@@ -497,7 +497,7 @@ export class OlmDevice {
      */
     public async markKeysAsPublished(): Promise<void> {
         await this.cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account: Account) => {
                     account.mark_keys_as_published();
@@ -515,7 +515,7 @@ export class OlmDevice {
      */
     public generateOneTimeKeys(numKeys: number): Promise<void> {
         return this.cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account) => {
                     account.generate_one_time_keys(numKeys);
@@ -532,7 +532,7 @@ export class OlmDevice {
      */
     public async generateFallbackKey(): Promise<void> {
         await this.cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account) => {
                     account.generate_fallback_key();
@@ -545,7 +545,7 @@ export class OlmDevice {
     public async getFallbackKey(): Promise<Record<string, Record<string, string>>> {
         let result: Record<string, Record<string, string>>;
         await this.cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readonly", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account: Account) => {
                     result = JSON.parse(account.unpublished_fallback_key());
@@ -557,7 +557,7 @@ export class OlmDevice {
 
     public async forgetOldFallbackKey(): Promise<void> {
         await this.cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
+            "readwrite", [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
                 this.getAccount(txn, (account: Account) => {
                     account.forget_old_fallback_key();
@@ -579,7 +579,7 @@ export class OlmDevice {
     public async createOutboundSession(theirIdentityKey: string, theirOneTimeKey: string): Promise<string> {
         let newSessionId: string;
         await this.cryptoStore.doTxn(
-            'readwrite', [
+            "readwrite", [
                 IndexedDBCryptoStore.STORE_ACCOUNT,
                 IndexedDBCryptoStore.STORE_SESSIONS,
             ],
@@ -632,7 +632,7 @@ export class OlmDevice {
 
         let result: { payload: string, session_id: string }; // eslint-disable-line camelcase
         await this.cryptoStore.doTxn(
-            'readwrite', [
+            "readwrite", [
                 IndexedDBCryptoStore.STORE_ACCOUNT,
                 IndexedDBCryptoStore.STORE_SESSIONS,
             ],
@@ -690,7 +690,7 @@ export class OlmDevice {
         }
         let sessionIds: string[];
         await this.cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
+            "readonly", [IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
                 this.cryptoStore.getEndToEndSessions(
                     theirDeviceIdentityKey, txn, (sessions) => {
@@ -781,7 +781,7 @@ export class OlmDevice {
         const info = [];
 
         await this.cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
+            "readonly", [IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
                 this.cryptoStore.getEndToEndSessions(deviceIdentityKey, txn, (sessions) => {
                     const sessionIds = Object.keys(sessions).sort();
@@ -821,7 +821,7 @@ export class OlmDevice {
 
         let res;
         await this.cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
+            "readwrite", [IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
                 this.getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
                     const sessionDesc = sessionInfo.session.describe();
@@ -857,7 +857,7 @@ export class OlmDevice {
     ): Promise<string> {
         let payloadString;
         await this.cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
+            "readwrite", [IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
                 this.getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo: IUnpickledSessionInfo) => {
                     const sessionDesc = sessionInfo.session.describe();
@@ -899,7 +899,7 @@ export class OlmDevice {
 
         let matches;
         await this.cryptoStore.doTxn(
-            'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
+            "readonly", [IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
                 this.getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
                     matches = sessionInfo.session.matches_inbound(ciphertext);
@@ -1104,7 +1104,7 @@ export class OlmDevice {
         extraSessionData: Record<string, any> = {},
     ): Promise<void> {
         await this.cryptoStore.doTxn(
-            'readwrite', [
+            "readwrite", [
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
                 IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS,
@@ -1195,7 +1195,7 @@ export class OlmDevice {
         reason: string,
     ): Promise<void> {
         await this.cryptoStore.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD],
+            "readwrite", [IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD],
             (txn) => {
                 this.cryptoStore.storeEndToEndInboundGroupSessionWithheld(
                     senderKey, sessionId,
@@ -1242,7 +1242,7 @@ export class OlmDevice {
         let error: Error;
 
         await this.cryptoStore.doTxn(
-            'readwrite', [
+            "readwrite", [
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
             ], (txn) => {
@@ -1254,7 +1254,7 @@ export class OlmDevice {
                                     "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
                                     calculateWithheldMessage(withheld),
                                     {
-                                        session: senderKey + '|' + sessionId,
+                                        session: senderKey + "|" + sessionId,
                                     },
                                 );
                             }
@@ -1265,12 +1265,12 @@ export class OlmDevice {
                         try {
                             res = session.decrypt(body);
                         } catch (e) {
-                            if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX' && withheld) {
+                            if (e && e.message === "OLM.UNKNOWN_MESSAGE_INDEX" && withheld) {
                                 error = new algorithms.DecryptionError(
                                     "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
                                     calculateWithheldMessage(withheld),
                                     {
-                                        session: senderKey + '|' + sessionId,
+                                        session: senderKey + "|" + sessionId,
                                     },
                                 );
                             } else {
@@ -1349,7 +1349,7 @@ export class OlmDevice {
     public async hasInboundSessionKeys(roomId: string, senderKey: string, sessionId: string): Promise<boolean> {
         let result: boolean;
         await this.cryptoStore.doTxn(
-            'readonly', [
+            "readonly", [
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
             ], (txn) => {
@@ -1407,7 +1407,7 @@ export class OlmDevice {
     ): Promise<IInboundGroupSessionKey> {
         let result: IInboundGroupSessionKey;
         await this.cryptoStore.doTxn(
-            'readonly', [
+            "readonly", [
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
             ], (txn) => {
@@ -1476,7 +1476,7 @@ export class OlmDevice {
     async getSharedHistoryInboundGroupSessions(roomId: string): Promise<[senderKey: string, sessionId: string][]> {
         let result: Promise<[senderKey: string, sessionId: string][]>;
         await this.cryptoStore.doTxn(
-            'readonly', [
+            "readonly", [
                 IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS,
             ], (txn) => {
                 result = this.cryptoStore.getSharedHistoryInboundGroupSessions(roomId, txn);

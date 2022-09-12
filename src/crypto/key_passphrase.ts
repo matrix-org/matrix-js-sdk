@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from '../randomstring';
-import { getCrypto } from '../utils';
+import { randomString } from "../randomstring";
+import { getCrypto } from "../utils";
 
 const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
     (window.crypto.subtle || window.crypto.webkitSubtle) : null;
@@ -93,19 +93,19 @@ async function deriveKeyBrowser(
     }
 
     const key = await subtleCrypto.importKey(
-        'raw',
+        "raw",
         new TextEncoder().encode(password),
-        { name: 'PBKDF2' },
+        { name: "PBKDF2" },
         false,
-        ['deriveBits'],
+        ["deriveBits"],
     );
 
     const keybits = await subtleCrypto.deriveBits(
         {
-            name: 'PBKDF2',
+            name: "PBKDF2",
             salt: new TextEncoder().encode(salt),
             iterations: iterations,
-            hash: 'SHA-512',
+            hash: "SHA-512",
         },
         key,
         numBits,
@@ -125,5 +125,5 @@ async function deriveKeyNode(
         throw new Error("No usable crypto implementation");
     }
 
-    return crypto.pbkdf2Sync(password, Buffer.from(salt, 'binary'), iterations, numBits, 'sha512');
+    return crypto.pbkdf2Sync(password, Buffer.from(salt, "binary"), iterations, numBits, "sha512");
 }

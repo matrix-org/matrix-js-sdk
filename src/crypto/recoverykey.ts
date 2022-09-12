@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as bs58 from 'bs58';
+import * as bs58 from "bs58";
 
 // picked arbitrarily but to try & avoid clashing with any bitcoin ones
 // (which are also base58 encoded, but bitcoin's involve a lot more hashing)
@@ -36,7 +36,7 @@ export function encodeRecoveryKey(key: ArrayLike<number>): string {
 }
 
 export function decodeRecoveryKey(recoveryKey: string): Uint8Array {
-    const result = bs58.decode(recoveryKey.replace(/ /g, ''));
+    const result = bs58.decode(recoveryKey.replace(/ /g, ""));
 
     let parity = 0;
     for (const b of result) {

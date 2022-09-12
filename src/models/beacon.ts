@@ -99,7 +99,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
 
     public update(beaconInfoEvent: MatrixEvent): void {
         if (getBeaconInfoIdentifier(beaconInfoEvent) !== this.identifier) {
-            throw new Error('Invalid updating event');
+            throw new Error("Invalid updating event");
         }
         // don't update beacon with an older event
         if (beaconInfoEvent.event.origin_server_ts < this.rootEvent.event.origin_server_ts) {

@@ -53,7 +53,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * @return {Promise} Resolves if successfully connected.
      */
     public connect(): Promise<void> {
-        return this.ensureStarted().then(() => this.doCmd('connect'));
+        return this.ensureStarted().then(() => this.doCmd("connect"));
     }
 
     /**
@@ -62,12 +62,12 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * @return {Promise} Resolved when the database is cleared.
      */
     public clearDatabase(): Promise<void> {
-        return this.ensureStarted().then(() => this.doCmd('clearDatabase'));
+        return this.ensureStarted().then(() => this.doCmd("clearDatabase"));
     }
 
     /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
     public isNewlyCreated(): Promise<boolean> {
-        return this.doCmd('isNewlyCreated');
+        return this.doCmd("isNewlyCreated");
     }
 
     /**
@@ -76,19 +76,19 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * is no saved sync data.
      */
     public getSavedSync(): Promise<ISavedSync> {
-        return this.doCmd('getSavedSync');
+        return this.doCmd("getSavedSync");
     }
 
     public getNextBatchToken(): Promise<string> {
-        return this.doCmd('getNextBatchToken');
+        return this.doCmd("getNextBatchToken");
     }
 
     public setSyncData(syncData: ISyncResponse): Promise<void> {
-        return this.doCmd('setSyncData', [syncData]);
+        return this.doCmd("setSyncData", [syncData]);
     }
 
     public syncToDatabase(userTuples: UserTuple[]): Promise<void> {
-        return this.doCmd('syncToDatabase', [userTuples]);
+        return this.doCmd("syncToDatabase", [userTuples]);
     }
 
     /**
@@ -99,7 +99,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns {null} in case the members for this room haven't been stored yet
      */
     public getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null> {
-        return this.doCmd('getOutOfBandMembers', [roomId]);
+        return this.doCmd("getOutOfBandMembers", [roomId]);
     }
 
     /**
@@ -111,19 +111,19 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns {Promise} when all members have been stored
      */
     public setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
-        return this.doCmd('setOutOfBandMembers', [roomId, membershipEvents]);
+        return this.doCmd("setOutOfBandMembers", [roomId, membershipEvents]);
     }
 
     public clearOutOfBandMembers(roomId: string): Promise<void> {
-        return this.doCmd('clearOutOfBandMembers', [roomId]);
+        return this.doCmd("clearOutOfBandMembers", [roomId]);
     }
 
     public getClientOptions(): Promise<IStartClientOpts> {
-        return this.doCmd('getClientOptions');
+        return this.doCmd("getClientOptions");
     }
 
     public storeClientOptions(options: IStartClientOpts): Promise<void> {
-        return this.doCmd('storeClientOptions', [options]);
+        return this.doCmd("storeClientOptions", [options]);
     }
 
     /**
@@ -131,19 +131,19 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * @return {Promise<Object[]>} A list of presence events in their raw form.
      */
     public getUserPresenceEvents(): Promise<UserTuple[]> {
-        return this.doCmd('getUserPresenceEvents');
+        return this.doCmd("getUserPresenceEvents");
     }
 
     public async saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void> {
-        return this.doCmd('saveToDeviceBatches', [batches]);
+        return this.doCmd("saveToDeviceBatches", [batches]);
     }
 
     public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
-        return this.doCmd('getOldestToDeviceBatch');
+        return this.doCmd("getOldestToDeviceBatch");
     }
 
     public async removeToDeviceBatch(id: number): Promise<void> {
-        return this.doCmd('removeToDeviceBatch', [id]);
+        return this.doCmd("removeToDeviceBatch", [id]);
     }
 
     private ensureStarted(): Promise<void> {
@@ -152,7 +152,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
             this.worker.onmessage = this.onWorkerMessage;
 
             // tell the worker the db name.
-            this.startPromise = this.doCmd('_setupWorker', [this.dbName]).then(() => {
+            this.startPromise = this.doCmd("_setupWorker", [this.dbName]).then(() => {
                 logger.log("IndexedDB worker is ready");
             });
         }
@@ -177,7 +177,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private onWorkerMessage = (ev: MessageEvent): void => {
         const msg = ev.data;
 
-        if (msg.command == 'cmd_success' || msg.command == 'cmd_fail') {
+        if (msg.command == "cmd_success" || msg.command == "cmd_fail") {
             if (msg.seq === undefined) {
                 logger.error("Got reply from worker with no seq");
                 return;
@@ -190,7 +190,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
             }
             delete this.inFlight[msg.seq];
 
-            if (msg.command == 'cmd_success') {
+            if (msg.command == "cmd_success") {
                 def.resolve(msg.result);
             } else {
                 const error = new Error(msg.error.message);

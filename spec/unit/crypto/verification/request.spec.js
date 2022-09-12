@@ -18,7 +18,7 @@ import "../../../olm-loader";
 import { verificationMethods } from "../../../../src/crypto";
 import { logger } from "../../../../src/logger";
 import { SAS } from "../../../../src/crypto/verification/SAS";
-import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
+import { makeTestClients, setupWebcrypto, teardownWebcrypto } from "./util";
 
 const Olm = global.Olm;
 
@@ -26,7 +26,7 @@ jest.useFakeTimers();
 
 describe("verification request integration tests with crypto layer", function() {
     if (!global.Olm) {
-        logger.warn('Not running device verification unit tests: libolm not present');
+        logger.warn("Not running device verification unit tests: libolm not present");
         return;
     }
 

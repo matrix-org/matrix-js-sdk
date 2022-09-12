@@ -1,4 +1,4 @@
-import { mocked } from 'jest-mock';
+import { mocked } from "jest-mock";
 
 import * as utils from "../test-utils/test-utils";
 import { EventTimeline } from "../../src/models/event-timeline";
@@ -21,7 +21,7 @@ describe("EventTimeline", function() {
     const getTimeline = (): EventTimeline => {
         const room = new Room(roomId, mockClient, userA);
         const timelineSet = new EventTimelineSet(room);
-        jest.spyOn(timelineSet.room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
+        jest.spyOn(timelineSet.room, "getUnfilteredTimelineSet").mockReturnValue(timelineSet);
 
         return new EventTimeline(timelineSet);
     };

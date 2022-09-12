@@ -37,7 +37,7 @@ describe("Filter", function() {
     describe("setDefinition/getDefinition", function() {
         it("should set and get the filter body", function() {
             const definition = {
-                event_format: "client" as IFilterDefinition['event_format'],
+                event_format: "client" as IFilterDefinition["event_format"],
             };
             filter.setDefinition(definition);
             expect(filter.getDefinition()).toEqual(definition);

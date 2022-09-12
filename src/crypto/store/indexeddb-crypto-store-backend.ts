@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, PrefixedLogger } from '../../logger';
+import { logger, PrefixedLogger } from "../../logger";
 import * as utils from "../../utils";
 import {
     CryptoStore,
@@ -90,9 +90,9 @@ export class Backend implements CryptoStore {
                 if (existing) {
                     // this entry matches the request - return it.
                     logger.log(
-                        `already have key request outstanding for ` +
+                        "already have key request outstanding for " +
                             `${requestBody.room_id} / ${requestBody.session_id}: ` +
-                            `not sending another`,
+                            "not sending another",
                     );
                     resolve(existing);
                     return;
@@ -672,7 +672,7 @@ export class Backend implements CryptoStore {
             senderCurve25519Key, sessionId, session: sessionData,
         });
         addReq.onerror = (ev) => {
-            if (addReq.error.name === 'ConstraintError') {
+            if (addReq.error.name === "ConstraintError") {
                 // This stops the error from triggering the txn's onerror
                 ev.stopPropagation();
                 // ...and this stops it from aborting the transaction

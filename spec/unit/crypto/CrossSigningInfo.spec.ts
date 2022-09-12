@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import '../../olm-loader';
+import "../../olm-loader";
 import {
     CrossSigningInfo,
     createCryptoStoreCacheCallbacks,
-} from '../../../src/crypto/CrossSigning';
+} from "../../../src/crypto/CrossSigning";
 import {
     IndexedDBCryptoStore,
-} from '../../../src/crypto/store/indexeddb-crypto-store';
-import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store';
-import 'fake-indexeddb/auto';
-import 'jest-localstorage-mock';
+} from "../../../src/crypto/store/indexeddb-crypto-store";
+import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store";
+import "fake-indexeddb/auto";
+import "jest-localstorage-mock";
 import { OlmDevice } from "../../../src/crypto/OlmDevice";
-import { logger } from '../../../src/logger';
+import { logger } from "../../../src/logger";
 
 const userId = "@alice:example.com";
 
@@ -52,7 +52,7 @@ const masterKeyPub = "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk";
 
 describe("CrossSigningInfo.getCrossSigningKey", function() {
     if (!global.Olm) {
-        logger.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 

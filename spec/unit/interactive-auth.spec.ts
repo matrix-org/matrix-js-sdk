@@ -60,7 +60,7 @@ describe("InteractiveAuth", () => {
 
         // first we expect a call here
         stateUpdated.mockImplementation((stage) => {
-            logger.log('aaaa');
+            logger.log("aaaa");
             expect(stage).toEqual(AuthType.Password);
             ia.submitAuthDict({
                 type: AuthType.Password,
@@ -70,7 +70,7 @@ describe("InteractiveAuth", () => {
         // .. which should trigger a call here
         const requestRes = { "a": "b" };
         doRequest.mockImplementation(async (authData) => {
-            logger.log('cccc');
+            logger.log("cccc");
             expect(authData).toEqual({
                 session: "sessionId",
                 type: AuthType.Password,
@@ -112,7 +112,7 @@ describe("InteractiveAuth", () => {
 
         // first we expect a call here
         stateUpdated.mockImplementation((stage) => {
-            logger.log('aaaa');
+            logger.log("aaaa");
             expect(stage).toEqual(AuthType.Password);
             ia.submitAuthDict({
                 type: AuthType.Password,
@@ -122,7 +122,7 @@ describe("InteractiveAuth", () => {
         // .. which should trigger a call here
         const requestRes = { "a": "b" };
         doRequest.mockImplementation(async (authData) => {
-            logger.log('cccc');
+            logger.log("cccc");
             expect(authData).toEqual({
                 session: "sessionId",
                 type: AuthType.Password,
@@ -146,7 +146,7 @@ describe("InteractiveAuth", () => {
             stateUpdated,
             requestEmailToken,
             matrixClient: getFakeClient(),
-            emailSid: 'myEmailSid',
+            emailSid: "myEmailSid",
             authData: {
                 session: "sessionId",
                 flows: [
@@ -166,7 +166,7 @@ describe("InteractiveAuth", () => {
 
         // first we expect a call here
         stateUpdated.mockImplementation((stage) => {
-            logger.log('husky');
+            logger.log("husky");
             expect(stage).toEqual(AuthType.Email);
             ia.submitAuthDict({
                 type: AuthType.Email,
@@ -176,7 +176,7 @@ describe("InteractiveAuth", () => {
         // .. which should trigger a call here
         const requestRes = { "a": "b" };
         doRequest.mockImplementation(async (authData) => {
-            logger.log('barfoo');
+            logger.log("barfoo");
             expect(authData).toEqual({
                 session: "sessionId",
                 type: AuthType.Email,
@@ -344,7 +344,7 @@ describe("InteractiveAuth", () => {
         });
 
         await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
-            new Error('No appropriate authentication flow found'),
+            new Error("No appropriate authentication flow found"),
         );
     });
 
@@ -380,7 +380,7 @@ describe("InteractiveAuth", () => {
         });
 
         await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
-            new Error('No appropriate authentication flow found'),
+            new Error("No appropriate authentication flow found"),
         );
     });
 
@@ -402,7 +402,7 @@ describe("InteractiveAuth", () => {
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual({ "session": "sessionId" }); // has existing sessionId
-            const err = new Error('myerror');
+            const err = new Error("myerror");
             (err as any).httpStatus = 401;
             throw err;
         });
@@ -423,7 +423,7 @@ describe("InteractiveAuth", () => {
             stateUpdated,
             requestEmailToken,
             authData: {
-                session: 'sessionId',
+                session: "sessionId",
                 flows: [
                     { stages: [AuthType.Dummy] },
                 ],

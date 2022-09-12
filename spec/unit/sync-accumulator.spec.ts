@@ -385,7 +385,7 @@ describe("SyncAccumulator", function() {
         }
 
         afterEach(() => {
-            jest.spyOn(global.Date, 'now').mockRestore();
+            jest.spyOn(global.Date, "now").mockRestore();
         });
 
         it("should copy summary properties", function() {
@@ -417,11 +417,11 @@ describe("SyncAccumulator", function() {
             const delta = 1000;
             const startingTs = 1000;
 
-            jest.spyOn(global.Date, 'now').mockReturnValue(startingTs);
+            jest.spyOn(global.Date, "now").mockReturnValue(startingTs);
 
             sa.accumulate(RES_WITH_AGE);
 
-            jest.spyOn(global.Date, 'now').mockReturnValue(startingTs + delta);
+            jest.spyOn(global.Date, "now").mockReturnValue(startingTs + delta);
 
             const output = sa.getJSON();
             expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned.age).toEqual(

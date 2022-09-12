@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TestClient } from '../../TestClient';
-import { MatrixCall, CallErrorCode, CallEvent, supportsMatrixCall, CallType } from '../../../src/webrtc/call';
-import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
+import { TestClient } from "../../TestClient";
+import { MatrixCall, CallErrorCode, CallEvent, supportsMatrixCall, CallType } from "../../../src/webrtc/call";
+import { SDPStreamMetadataKey, SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
 import {
     DUMMY_SDP,
     MockMediaHandler,
@@ -35,7 +35,7 @@ const startVoiceCall = async (client: TestClient, call: MatrixCall): Promise<voi
     call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 };
 
-describe('Call', function() {
+describe("Call", function() {
     let client;
     let call;
     let prevNavigator;
@@ -77,10 +77,10 @@ describe('Call', function() {
         client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
         call = new MatrixCall({
             client: client.client,
-            roomId: '!foo:bar',
+            roomId: "!foo:bar",
         });
         // call checks one of these is wired up
-        call.on('error', () => {});
+        call.on("error", () => {});
     });
 
     afterEach(function() {
@@ -90,7 +90,7 @@ describe('Call', function() {
         global.document = prevDocument;
     });
 
-    it('should ignore candidate events from non-matching party ID', async function() {
+    it("should ignore candidate events from non-matching party ID", async function() {
         await startVoiceCall(client, call);
 
         await call.onAnswerReceived({
@@ -98,7 +98,7 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'the_correct_party_id',
+                    party_id: "the_correct_party_id",
                     answer: {
                         sdp: DUMMY_SDP,
                     },
@@ -112,11 +112,11 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'the_correct_party_id',
+                    party_id: "the_correct_party_id",
                     candidates: [
                         {
-                            candidate: '',
-                            sdpMid: '',
+                            candidate: "",
+                            sdpMid: "",
                         },
                     ],
                 };
@@ -129,11 +129,11 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'some_other_party_id',
+                    party_id: "some_other_party_id",
                     candidates: [
                         {
-                            candidate: '',
-                            sdpMid: '',
+                            candidate: "",
+                            sdpMid: "",
                         },
                     ],
                 };
@@ -145,7 +145,7 @@ describe('Call', function() {
         call.hangup(CallErrorCode.UserHangup, true);
     });
 
-    it('should add candidates received before answer if party ID is correct', async function() {
+    it("should add candidates received before answer if party ID is correct", async function() {
         await startVoiceCall(client, call);
         call.peerConn.addIceCandidate = jest.fn();
 
@@ -154,11 +154,11 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'the_correct_party_id',
+                    party_id: "the_correct_party_id",
                     candidates: [
                         {
-                            candidate: 'the_correct_candidate',
-                            sdpMid: '',
+                            candidate: "the_correct_candidate",
+                            sdpMid: "",
                         },
                     ],
                 };
@@ -170,11 +170,11 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'some_other_party_id',
+                    party_id: "some_other_party_id",
                     candidates: [
                         {
-                            candidate: 'the_wrong_candidate',
-                            sdpMid: '',
+                            candidate: "the_wrong_candidate",
+                            sdpMid: "",
                         },
                     ],
                 };
@@ -188,7 +188,7 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'the_correct_party_id',
+                    party_id: "the_correct_party_id",
                     answer: {
                         sdp: DUMMY_SDP,
                     },
@@ -198,19 +198,19 @@ describe('Call', function() {
 
         expect(call.peerConn.addIceCandidate.mock.calls.length).toBe(1);
         expect(call.peerConn.addIceCandidate).toHaveBeenCalledWith({
-            candidate: 'the_correct_candidate',
-            sdpMid: '',
+            candidate: "the_correct_candidate",
+            sdpMid: "",
         });
     });
 
-    it('should map asserted identity messages to remoteAssertedIdentity', async function() {
+    it("should map asserted identity messages to remoteAssertedIdentity", async function() {
         await startVoiceCall(client, call);
         await call.onAnswerReceived({
             getContent: () => {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'party_id',
+                    party_id: "party_id",
                     answer: {
                         sdp: DUMMY_SDP,
                     },
@@ -226,7 +226,7 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'party_id',
+                    party_id: "party_id",
                     asserted_identity: {
                         id: "@steve:example.com",
                         display_name: "Steve Gibbons",
@@ -253,7 +253,7 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'party_id',
+                    party_id: "party_id",
                     answer: {
                         sdp: DUMMY_SDP,
                     },
@@ -291,7 +291,7 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'party_id',
+                    party_id: "party_id",
                     answer: {
                         sdp: DUMMY_SDP,
                     },
@@ -334,7 +334,7 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'party_id',
+                    party_id: "party_id",
                     answer: {
                         sdp: DUMMY_SDP,
                     },
@@ -370,7 +370,7 @@ describe('Call', function() {
                 return {
                     version: 1,
                     call_id: call.callId,
-                    party_id: 'party_id',
+                    party_id: "party_id",
                     answer: {
                         sdp: DUMMY_SDP,
                     },
@@ -603,7 +603,7 @@ describe('Call', function() {
             getContent: () => ({
                 version: 1,
                 call_id: call.callId,
-                party_id: 'party_id',
+                party_id: "party_id",
                 selected_party_id: "different_party_id",
             }),
         });
@@ -616,7 +616,7 @@ describe('Call', function() {
             client.client.isFallbackICEServerAllowed = () => true;
             const localCall = new MatrixCall({
                 client: client.client,
-                roomId: '!room_id',
+                roomId: "!room_id",
             });
 
             expect((localCall as any).turnServers).toStrictEqual([{ urls: ["stun:turn.matrix.org"] }]);
@@ -626,7 +626,7 @@ describe('Call', function() {
             client.client.isFallbackICEServerAllowed = () => false;
             const localCall = new MatrixCall({
                 client: client.client,
-                roomId: '!room_id',
+                roomId: "!room_id",
             });
 
             expect((localCall as any).turnServers).toStrictEqual([]);
@@ -637,7 +637,7 @@ describe('Call', function() {
             const turnServers = [{ urls: ["turn.server.org"] }];
             const localCall = new MatrixCall({
                 client: client.client,
-                roomId: '!room_id',
+                roomId: "!room_id",
                 turnServers,
             });
 
@@ -714,7 +714,7 @@ describe('Call', function() {
                     return {
                         version: 1,
                         call_id: call.callId,
-                        party_id: 'party_id',
+                        party_id: "party_id",
                         answer: {
                             sdp: DUMMY_SDP,
                         },

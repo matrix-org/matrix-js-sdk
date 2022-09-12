@@ -25,23 +25,23 @@ import {
     parseTopicContent,
 } from "../../src/content-helpers";
 
-describe('Beacon content helpers', () => {
-    describe('makeBeaconInfoContent()', () => {
+describe("Beacon content helpers", () => {
+    describe("makeBeaconInfoContent()", () => {
         const mockDateNow = 123456789;
         beforeEach(() => {
-            jest.spyOn(global.Date, 'now').mockReturnValue(mockDateNow);
+            jest.spyOn(global.Date, "now").mockReturnValue(mockDateNow);
         });
         afterAll(() => {
-            jest.spyOn(global.Date, 'now').mockRestore();
+            jest.spyOn(global.Date, "now").mockRestore();
         });
-        it('create fully defined event content', () => {
+        it("create fully defined event content", () => {
             expect(makeBeaconInfoContent(
                 1234,
                 true,
-                'nice beacon_info',
+                "nice beacon_info",
                 LocationAssetType.Pin,
             )).toEqual({
-                description: 'nice beacon_info',
+                description: "nice beacon_info",
                 timeout: 1234,
                 live: true,
                 [M_TIMESTAMP.name]: mockDateNow,
@@ -51,22 +51,22 @@ describe('Beacon content helpers', () => {
             });
         });
 
-        it('defaults timestamp to current time', () => {
+        it("defaults timestamp to current time", () => {
             expect(makeBeaconInfoContent(
                 1234,
                 true,
-                'nice beacon_info',
+                "nice beacon_info",
                 LocationAssetType.Pin,
             )).toEqual(expect.objectContaining({
                 [M_TIMESTAMP.name]: mockDateNow,
             }));
         });
 
-        it('uses timestamp when provided', () => {
+        it("uses timestamp when provided", () => {
             expect(makeBeaconInfoContent(
                 1234,
                 true,
-                'nice beacon_info',
+                "nice beacon_info",
                 LocationAssetType.Pin,
                 99999,
             )).toEqual(expect.objectContaining({
@@ -74,11 +74,11 @@ describe('Beacon content helpers', () => {
             }));
         });
 
-        it('defaults asset type to self when not set', () => {
+        it("defaults asset type to self when not set", () => {
             expect(makeBeaconInfoContent(
                 1234,
                 true,
-                'nice beacon_info',
+                "nice beacon_info",
                 // no assetType passed
             )).toEqual(expect.objectContaining({
                 [M_ASSET.name]: {
@@ -88,50 +88,50 @@ describe('Beacon content helpers', () => {
         });
     });
 
-    describe('makeBeaconContent()', () => {
-        it('creates event content without description', () => {
+    describe("makeBeaconContent()", () => {
+        it("creates event content without description", () => {
             expect(makeBeaconContent(
-                'geo:foo',
+                "geo:foo",
                 123,
-                '$1234',
+                "$1234",
                 // no description
             )).toEqual({
                 [M_LOCATION.name]: {
                     description: undefined,
-                    uri: 'geo:foo',
+                    uri: "geo:foo",
                 },
                 [M_TIMESTAMP.name]: 123,
                 "m.relates_to": {
                     rel_type: REFERENCE_RELATION.name,
-                    event_id: '$1234',
+                    event_id: "$1234",
                 },
             });
         });
 
-        it('creates event content with description', () => {
+        it("creates event content with description", () => {
             expect(makeBeaconContent(
-                'geo:foo',
+                "geo:foo",
                 123,
-                '$1234',
-                'test description',
+                "$1234",
+                "test description",
             )).toEqual({
                 [M_LOCATION.name]: {
-                    description: 'test description',
-                    uri: 'geo:foo',
+                    description: "test description",
+                    uri: "geo:foo",
                 },
                 [M_TIMESTAMP.name]: 123,
                 "m.relates_to": {
                     rel_type: REFERENCE_RELATION.name,
-                    event_id: '$1234',
+                    event_id: "$1234",
                 },
             });
         });
     });
 });
 
-describe('Topic content helpers', () => {
-    describe('makeTopicContent()', () => {
-        it('creates fully defined event content without html', () => {
+describe("Topic content helpers", () => {
+    describe("makeTopicContent()", () => {
+        it("creates fully defined event content without html", () => {
             expect(makeTopicContent("pizza")).toEqual({
                 topic: "pizza",
                 [M_TOPIC.name]: [{
@@ -141,7 +141,7 @@ describe('Topic content helpers', () => {
             });
         });
 
-        it('creates fully defined event content with html', () => {
+        it("creates fully defined event content with html", () => {
             expect(makeTopicContent("pizza", "<b>pizza</b>")).toEqual({
                 topic: "pizza",
                 [M_TOPIC.name]: [{
@@ -155,8 +155,8 @@ describe('Topic content helpers', () => {
         });
     });
 
-    describe('parseTopicContent()', () => {
-        it('parses event content with plain text topic without mimetype', () => {
+    describe("parseTopicContent()", () => {
+        it("parses event content with plain text topic without mimetype", () => {
             expect(parseTopicContent({
                 topic: "pizza",
                 [M_TOPIC.name]: [{
@@ -167,7 +167,7 @@ describe('Topic content helpers', () => {
             });
         });
 
-        it('parses event content with plain text topic', () => {
+        it("parses event content with plain text topic", () => {
             expect(parseTopicContent({
                 topic: "pizza",
                 [M_TOPIC.name]: [{
@@ -179,7 +179,7 @@ describe('Topic content helpers', () => {
             });
         });
 
-        it('parses event content with html topic', () => {
+        it("parses event content with html topic", () => {
             expect(parseTopicContent({
                 topic: "pizza",
                 [M_TOPIC.name]: [{

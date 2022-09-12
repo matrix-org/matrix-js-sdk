@@ -201,7 +201,7 @@ export function deepCompare(x: any, y: any): boolean {
     }
 
     // special-case NaN (since NaN !== NaN)
-    if (typeof x === 'number' && isNaN(x) && isNaN(y)) {
+    if (typeof x === "number" && isNaN(x) && isNaN(y)) {
         return true;
     }
 
@@ -288,7 +288,7 @@ export function deepSortedObjectEntries(obj: any): [string, any][] {
  * @return {boolean} whether or not value is a finite number without type-coercion
  */
 export function isNumber(value: any): boolean {
-    return typeof value === 'number' && isFinite(value);
+    return typeof value === "number" && isFinite(value);
 }
 
 /**
@@ -299,7 +299,7 @@ export function isNumber(value: any): boolean {
  */
 export function removeHiddenChars(str: string): string {
     if (typeof str === "string") {
-        return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
+        return unhomoglyph(str.normalize("NFD").replace(removeHiddenCharsRegex, ""));
     }
     return "";
 }
@@ -311,7 +311,7 @@ export function removeHiddenChars(str: string): string {
  */
 export function removeDirectionOverrideChars(str: string): string {
     if (typeof str === "string") {
-        return str.replace(/[\u202d-\u202e]/g, '');
+        return str.replace(/[\u202d-\u202e]/g, "");
     }
     return "";
 }
@@ -347,16 +347,16 @@ export function globToRegexp(glob: string, extended = false): string {
     // Because micromatch is about 130KB with dependencies,
     // and minimatch is not much better.
     const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
-        [/\\\*/g, '.*'],
-        [/\?/g, '.'],
+        [/\\\*/g, ".*"],
+        [/\?/g, "."],
         !extended && [
             /\\\[(!|)(.*)\\]/g,
             (_match: string, neg: string, pat: string) => [
-                '[',
-                neg ? '^' : '',
-                pat.replace(/\\-/, '-'),
-                ']',
-            ].join(''),
+                "[",
+                neg ? "^" : "",
+                pat.replace(/\\-/, "-"),
+                "]",
+            ].join(""),
         ],
     ];
     return replacements.reduce(

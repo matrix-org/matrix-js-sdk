@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
-import { logger } from './logger';
+import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { MatrixEvent } from "./models/event";
 import {
@@ -120,7 +120,7 @@ export class PushProcessor {
             const action = actionList[i];
             if (action === PushRuleActionName.Notify) {
                 actionObj.notify = true;
-            } else if (typeof action === 'object') {
+            } else if (typeof action === "object") {
                 if (action.value === undefined) {
                     action.value = true;
                 }
@@ -202,9 +202,9 @@ export class PushProcessor {
 
     private templateRuleToRaw(kind: PushRuleKind, tprule: any): any {
         const rawrule = {
-            'rule_id': tprule.rule_id,
-            'actions': tprule.actions,
-            'conditions': [],
+            "rule_id": tprule.rule_id,
+            "actions": tprule.actions,
+            "conditions": [],
         };
         switch (kind) {
             case PushRuleKind.Underride:
@@ -216,9 +216,9 @@ export class PushProcessor {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': ConditionKind.EventMatch,
-                    'key': 'room_id',
-                    'value': tprule.rule_id,
+                    "kind": ConditionKind.EventMatch,
+                    "key": "room_id",
+                    "value": tprule.rule_id,
                 });
                 break;
             case PushRuleKind.SenderSpecific:
@@ -226,9 +226,9 @@ export class PushProcessor {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': ConditionKind.EventMatch,
-                    'key': 'user_id',
-                    'value': tprule.rule_id,
+                    "kind": ConditionKind.EventMatch,
+                    "key": "user_id",
+                    "value": tprule.rule_id,
                 });
                 break;
             case PushRuleKind.ContentSpecific:
@@ -236,9 +236,9 @@ export class PushProcessor {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': ConditionKind.EventMatch,
-                    'key': 'content.body',
-                    'pattern': tprule.pattern,
+                    "kind": ConditionKind.EventMatch,
+                    "key": "content.body",
+                    "pattern": tprule.pattern,
                 });
                 break;
         }
@@ -267,7 +267,7 @@ export class PushProcessor {
         cond: ISenderNotificationPermissionCondition,
         ev: MatrixEvent,
     ): boolean {
-        const notifLevelKey = cond['key'];
+        const notifLevelKey = cond["key"];
         if (!notifLevelKey) {
             return false;
         }
@@ -305,16 +305,16 @@ export class PushProcessor {
             return false;
         }
         switch (ineq) {
-            case '':
-            case '==':
+            case "":
+            case "==":
                 return memberCount == rhs;
-            case '<':
+            case "<":
                 return memberCount < rhs;
-            case '>':
+            case ">":
                 return memberCount > rhs;
-            case '<=':
+            case "<=":
                 return memberCount <= rhs;
-            case '>=':
+            case ">=":
                 return memberCount >= rhs;
             default:
                 return false;
@@ -326,7 +326,7 @@ export class PushProcessor {
         if (ev.isEncrypted() && ev.getClearContent()) {
             content = ev.getClearContent();
         }
-        if (!content || !content.body || typeof content.body != 'string') {
+        if (!content || !content.body || typeof content.body != "string") {
             return false;
         }
 
@@ -340,7 +340,7 @@ export class PushProcessor {
 
         // N.B. we can't use \b as it chokes on unicode. however \W seems to be okay
         // as shorthand for [^0-9A-Za-z_].
-        const pat = new RegExp("(^|\\W)" + escapeRegExp(displayName) + "(\\W|$)", 'i');
+        const pat = new RegExp("(^|\\W)" + escapeRegExp(displayName) + "(\\W|$)", "i");
         return content.body.search(pat) > -1;
     }
 
@@ -350,7 +350,7 @@ export class PushProcessor {
         }
 
         const val = this.valueForDottedKey(cond.key, ev);
-        if (typeof val !== 'string') {
+        if (typeof val !== "string") {
             return false;
         }
 
@@ -358,13 +358,13 @@ export class PushProcessor {
             return cond.value === val;
         }
 
-        if (typeof cond.pattern !== 'string') {
+        if (typeof cond.pattern !== "string") {
             return false;
         }
 
-        const regex = cond.key === 'content.body'
-            ? this.createCachedRegex('(^|\\W)', cond.pattern, '(\\W|$)')
-            : this.createCachedRegex('^', cond.pattern, '$');
+        const regex = cond.key === "content.body"
+            ? this.createCachedRegex("(^|\\W)", cond.pattern, "(\\W|$)")
+            : this.createCachedRegex("^", cond.pattern, "$");
 
         return !!val.match(regex);
     }
@@ -375,21 +375,21 @@ export class PushProcessor {
         }
         PushProcessor.cachedGlobToRegex[glob] = new RegExp(
             prefix + globToRegexp(glob) + suffix,
-            'i', // Case insensitive
+            "i", // Case insensitive
         );
         return PushProcessor.cachedGlobToRegex[glob];
     }
 
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
-        const parts = key.split('.');
+        const parts = key.split(".");
         let val;
 
         // special-case the first component to deal with encrypted messages
         const firstPart = parts[0];
-        if (firstPart === 'content') {
+        if (firstPart === "content") {
             val = ev.getContent();
             parts.shift();
-        } else if (firstPart === 'type') {
+        } else if (firstPart === "type") {
             val = ev.getType();
             parts.shift();
         } else {
@@ -467,7 +467,7 @@ export class PushProcessor {
      * @return {object} The push rule, or null if no such rule was found
      */
     public getPushRuleById(ruleId: string): IPushRule {
-        for (const scope of ['global']) {
+        for (const scope of ["global"]) {
             if (this.client.pushRules[scope] === undefined) continue;
 
             for (const kind of RULEKINDS_IN_ORDER) {

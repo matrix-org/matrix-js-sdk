@@ -33,7 +33,7 @@ import { IAbortablePromise, IUsageLimit } from "./@types/partials";
 import { IDeferred, sleep } from "./utils";
 import { Callback } from "./client";
 import * as utils from "./utils";
-import { logger } from './logger';
+import { logger } from "./logger";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 
 /*
@@ -298,7 +298,7 @@ export class MatrixHttpApi {
 
         // if the file doesn't have a mime type, use a default since
         // the HS errors if we don't supply one.
-        const contentType = opts.type || (file as File).type || 'application/octet-stream';
+        const contentType = opts.type || (file as File).type || "application/octet-stream";
         const fileName = opts.name || (file as File).name;
 
         // We used to recommend setting file.stream to the thing to upload on
@@ -372,7 +372,7 @@ export class MatrixHttpApi {
                 if (onlyContentUri) {
                     body = body.content_uri;
                     if (body === undefined) {
-                        throw Error('Bad response');
+                        throw Error("Bad response");
                     }
                 }
                 return body;
@@ -386,7 +386,7 @@ export class MatrixHttpApi {
 
             const timeoutFn = function() {
                 xhr.abort();
-                cb(new Error('Timeout'));
+                cb(new Error("Timeout"));
             };
 
             // set an initial timeout of 30s; we'll advance it each time we get a progress notification
@@ -402,7 +402,7 @@ export class MatrixHttpApi {
                                 throw new AbortError();
                             }
                             if (!xhr.responseText) {
-                                throw new Error('No response body.');
+                                throw new Error("No response body.");
                             }
                             resp = xhr.responseText;
                             if (bodyParser) {
@@ -547,7 +547,7 @@ export class MatrixHttpApi {
         }
 
         if (accessToken) {
-            opts.headers['Authorization'] = `Bearer ${accessToken}`;
+            opts.headers["Authorization"] = `Bearer ${accessToken}`;
         }
 
         const defer = utils.defer<T>();
@@ -624,9 +624,9 @@ export class MatrixHttpApi {
         const requestPromise = this.request<T, O>(callback, method, path, queryParams, data, requestOpts);
 
         requestPromise.catch((err: MatrixError) => {
-            if (err.errcode == 'M_UNKNOWN_TOKEN' && !requestOpts?.inhibitLogoutEmit) {
+            if (err.errcode == "M_UNKNOWN_TOKEN" && !requestOpts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
-            } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
+            } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
                 this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
         });
@@ -809,11 +809,11 @@ export class MatrixHttpApi {
         if (json) {
             if (data) {
                 data = JSON.stringify(data);
-                headers['content-type'] = 'application/json';
+                headers["content-type"] = "application/json";
             }
 
-            if (!headers['accept']) {
-                headers['accept'] = 'application/json';
+            if (!headers["accept"]) {
+                headers["accept"] = "application/json";
             }
 
             if (bodyParser === undefined) {
@@ -882,7 +882,7 @@ export class MatrixHttpApi {
                 // `browser-request` import. Currently, `request` does not support progress
                 // updates - see https://github.com/request/request/pull/2346.
                 // `browser-request` returns an XHRHttpRequest which exposes `onprogress`
-                if ('onprogress' in req) {
+                if ("onprogress" in req) {
                     req.onprogress = (e) => {
                         // Prevent the timeout from rejecting the deferred promise if progress is
                         // seen with the request
@@ -1005,10 +1005,10 @@ function parseErrorResponse(response: XMLHttpRequest | IncomingMessage, body?: s
 
     let err;
     if (contentType) {
-        if (contentType.type === 'application/json') {
-            const jsonBody = typeof(body) === 'object' ? body : JSON.parse(body);
+        if (contentType.type === "application/json") {
+            const jsonBody = typeof(body) === "object" ? body : JSON.parse(body);
             err = new MatrixError(jsonBody);
-        } else if (contentType.type === 'text/plain') {
+        } else if (contentType.type === "text/plain") {
             err = new Error(`Server returned ${httpStatus} error: ${body}`);
         }
     }
@@ -1036,7 +1036,7 @@ function getResponseContentType(response: XMLHttpRequest | IncomingMessage): Par
         contentType = (response as XMLHttpRequest).getResponseHeader("Content-Type");
     } else if ((response as IncomingMessage).headers) {
         // request provides http.IncomingMessage which has a message.headers map
-        contentType = (response as IncomingMessage).headers['content-type'] || null;
+        contentType = (response as IncomingMessage).headers["content-type"] || null;
     }
 
     if (!contentType) {

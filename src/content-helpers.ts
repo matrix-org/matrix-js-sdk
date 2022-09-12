@@ -124,16 +124,16 @@ export const getTextForLocationEvent = (
     description?: string,
 ): string => {
     const date = `at ${new Date(timestamp).toISOString()}`;
-    const assetName = assetType === LocationAssetType.Self ? 'User' : undefined;
+    const assetName = assetType === LocationAssetType.Self ? "User" : undefined;
     const quotedDescription = description ? `"${description}"` : undefined;
 
     return [
         assetName,
-        'Location',
+        "Location",
         quotedDescription,
         uri,
         date,
-    ].filter(Boolean).join(' ');
+    ].filter(Boolean).join(" ");
 };
 
 /**

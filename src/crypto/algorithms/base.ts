@@ -245,19 +245,19 @@ export class DecryptionError extends Error {
     constructor(public readonly code: string, msg: string, details?: Record<string, string>) {
         super(msg);
         this.code = code;
-        this.name = 'DecryptionError';
+        this.name = "DecryptionError";
         this.detailedString = detailedStringForDecryptionError(this, details);
     }
 }
 
 function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string>): string {
-    let result = err.name + '[msg: ' + err.message;
+    let result = err.name + "[msg: " + err.message;
 
     if (details) {
-        result += ', ' + Object.keys(details).map((k) => k + ': ' + details[k]).join(', ');
+        result += ", " + Object.keys(details).map((k) => k + ": " + details[k]).join(", ");
     }
 
-    result += ']';
+    result += "]";
 
     return result;
 }

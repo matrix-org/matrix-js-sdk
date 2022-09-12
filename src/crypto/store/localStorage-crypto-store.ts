@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../../logger';
-import { MemoryCryptoStore } from './memory-crypto-store';
+import { logger } from "../../logger";
+import { MemoryCryptoStore } from "./memory-crypto-store";
 import { IDeviceData, IProblem, ISession, ISessionInfo, IWithheld, Mode } from "./base";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
@@ -86,7 +86,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     public countEndToEndSessions(txn: unknown, func: (count: number) => void): void {
         let count = 0;
         for (let i = 0; i < this.store.length; ++i) {
-            if (this.store.key(i).startsWith(keyEndToEndSessions(''))) ++count;
+            if (this.store.key(i).startsWith(keyEndToEndSessions(""))) ++count;
         }
         func(count);
     }
@@ -98,7 +98,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
 
         // fix up any old sessions to be objects rather than just the base64 pickle
         for (const [sid, val] of Object.entries(sessions || {})) {
-            if (typeof val === 'string') {
+            if (typeof val === "string") {
                 fixedSessions[sid] = {
                     session: val,
                 };
@@ -130,8 +130,8 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
 
     public getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo) => void): void {
         for (let i = 0; i < this.store.length; ++i) {
-            if (this.store.key(i).startsWith(keyEndToEndSessions(''))) {
-                const deviceKey = this.store.key(i).split('/')[1];
+            if (this.store.key(i).startsWith(keyEndToEndSessions(""))) {
+                const deviceKey = this.store.key(i).split("/")[1];
                 for (const sess of Object.values(this._getEndToEndSessions(deviceKey))) {
                     func(sess);
                 }
@@ -294,7 +294,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
 
     public getEndToEndRooms(txn: unknown, func: (rooms: Record<string, IRoomEncryption>) => void): void {
         const result: Record<string, IRoomEncryption> = {};
-        const prefix = keyEndToEndRoomsPrefix('');
+        const prefix = keyEndToEndRoomsPrefix("");
 
         for (let i = 0; i < this.store.length; ++i) {
             const key = this.store.key(i);
@@ -342,7 +342,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         const sessionsNeedingBackup
               = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         for (const session of sessions) {
-            delete sessionsNeedingBackup[session.senderKey + '/' + session.sessionId];
+            delete sessionsNeedingBackup[session.senderKey + "/" + session.sessionId];
         }
         setJsonItem(
             this.store, KEY_SESSIONS_NEEDING_BACKUP, sessionsNeedingBackup,
@@ -354,7 +354,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         const sessionsNeedingBackup
               = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         for (const session of sessions) {
-            sessionsNeedingBackup[session.senderKey + '/' + session.sessionId] = true;
+            sessionsNeedingBackup[session.senderKey + "/" + session.sessionId] = true;
         }
         setJsonItem(
             this.store, KEY_SESSIONS_NEEDING_BACKUP, sessionsNeedingBackup,

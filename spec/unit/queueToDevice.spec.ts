@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import MockHttpBackend from 'matrix-mock-request';
-import { indexedDB as fakeIndexedDB } from 'fake-indexeddb';
+import MockHttpBackend from "matrix-mock-request";
+import { indexedDB as fakeIndexedDB } from "fake-indexeddb";
 
 import { IHttpOpts, IndexedDBStore, MatrixEvent, MemoryStore, Room } from "../../src";
 import { MatrixClient } from "../../src/client";
-import { ToDeviceBatch } from '../../src/models/ToDeviceMessage';
-import { logger } from '../../src/logger';
-import { IStore } from '../../src/store';
+import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
+import { logger } from "../../src/logger";
+import { IStore } from "../../src/store";
 
 const FAKE_USER = "@alice:example.org";
 const FAKE_DEVICE_ID = "AAAAAAAA";
@@ -43,8 +43,8 @@ const FAKE_MSG = {
 };
 
 enum StoreType {
-    Memory = 'Memory',
-    IndexedDB = 'IndexedDB',
+    Memory = "Memory",
+    IndexedDB = "IndexedDB",
 }
 
 // Jest now uses @sinonjs/fake-timers which exposes tickAsync() and a number of

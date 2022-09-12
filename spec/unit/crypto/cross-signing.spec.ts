@@ -15,17 +15,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import '../../olm-loader';
-import anotherjson from 'another-json';
-import { PkSigning } from '@matrix-org/olm';
+import "../../olm-loader";
+import anotherjson from "another-json";
+import { PkSigning } from "@matrix-org/olm";
 
 import * as olmlib from "../../../src/crypto/olmlib";
-import { MatrixError } from '../../../src/http-api';
-import { logger } from '../../../src/logger';
-import { ICrossSigningKey, ICreateClientOpts, ISignedKey } from '../../../src/client';
-import { CryptoEvent } from '../../../src/crypto';
-import { IDevice } from '../../../src/crypto/deviceinfo';
-import { TestClient } from '../../TestClient';
+import { MatrixError } from "../../../src/http-api";
+import { logger } from "../../../src/logger";
+import { ICrossSigningKey, ICreateClientOpts, ISignedKey } from "../../../src/client";
+import { CryptoEvent } from "../../../src/crypto";
+import { IDevice } from "../../../src/crypto/deviceinfo";
+import { TestClient } from "../../TestClient";
 import { resetCrossSigningKeys } from "./crypto-utils";
 
 const PUSH_RULES_RESPONSE = {
@@ -79,7 +79,7 @@ async function makeTestClient(
 
 describe("Cross Signing", function() {
     if (!global.Olm) {
-        logger.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
@@ -215,7 +215,7 @@ describe("Cross Signing", function() {
                 cryptoCallbacks: {
                     // will be called to sign our own device
                     getCrossSigningKey: async type => {
-                        if (type === 'master') {
+                        if (type === "master") {
                             return masterKey;
                         } else {
                             return selfSigningKey;
@@ -271,7 +271,7 @@ describe("Cross Signing", function() {
             aliceDevice as ISignedKey,
             selfSigningKey as unknown as PkSigning,
             "@alice:example.com",
-            '',
+            "",
         );
 
         // feed sync result that includes master key, ssk, device key
@@ -531,7 +531,7 @@ describe("Cross Signing", function() {
             bobDevice,
             selfSigningKey as unknown as PkSigning,
             "@bob:example.com",
-            '',
+            "",
         );
 
         const bobMaster: ICrossSigningKey = {
@@ -542,7 +542,7 @@ describe("Cross Signing", function() {
                 "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
             },
         };
-        olmlib.pkSign(bobMaster, aliceKeys.user_signing, "@alice:example.com", '');
+        olmlib.pkSign(bobMaster, aliceKeys.user_signing, "@alice:example.com", "");
 
         // Alice downloads Bob's keys
         // - device key
@@ -979,7 +979,7 @@ describe("Cross Signing", function() {
             });
 
             // Alice has a second device that's cross-signed
-            const aliceDeviceId = 'Dynabook';
+            const aliceDeviceId = "Dynabook";
             const aliceUnsignedDevice = {
                 user_id: "@alice:example.com",
                 device_id: aliceDeviceId,

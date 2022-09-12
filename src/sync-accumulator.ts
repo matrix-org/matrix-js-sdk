@@ -19,7 +19,7 @@ limitations under the License.
  * @module sync-accumulator
  */
 
-import { logger } from './logger';
+import { logger } from "./logger";
 import { deepCopy, isSupportedReceiptType } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";

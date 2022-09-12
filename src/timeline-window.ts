@@ -16,8 +16,8 @@ limitations under the License.
 
 /** @module timeline-window */
 
-import { Direction, EventTimeline } from './models/event-timeline';
-import { logger } from './logger';
+import { Direction, EventTimeline } from "./models/event-timeline";
+import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { MatrixEvent } from "./models/event";

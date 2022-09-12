@@ -16,7 +16,7 @@ limitations under the License.
 
 import { Thread } from "../../../src/models/thread";
 
-describe('Thread', () => {
+describe("Thread", () => {
     describe("constructor", () => {
         it("should explode for element-web#22141 logging", () => {
             // Logging/debugging for https://github.com/vector-im/element-web/issues/22141

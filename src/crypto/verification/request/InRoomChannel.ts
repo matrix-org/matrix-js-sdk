@@ -21,7 +21,7 @@ import {
     READY_TYPE,
     START_TYPE,
 } from "./VerificationRequest";
-import { logger } from '../../../logger';
+import { logger } from "../../../logger";
 import { IVerificationChannel } from "./Channel";
 import { EventType } from "../../../@types/event";
 import { MatrixClient } from "../../../client";
@@ -209,7 +209,7 @@ export class InRoomChannel implements IVerificationChannel {
         const sender = event.getSender();
         if (this.userId !== null) {
             if (sender !== ownUserId && sender !== this.userId) {
-                logger.log(`InRoomChannel: ignoring verification event from ` +
+                logger.log("InRoomChannel: ignoring verification event from " +
                     `non-participating sender ${sender}`);
                 return;
             }

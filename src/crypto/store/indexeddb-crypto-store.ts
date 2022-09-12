@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, PrefixedLogger } from '../../logger';
-import { LocalStorageCryptoStore } from './localStorage-crypto-store';
-import { MemoryCryptoStore } from './memory-crypto-store';
-import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
-import { InvalidCryptoStoreError } from '../../errors';
+import { logger, PrefixedLogger } from "../../logger";
+import { LocalStorageCryptoStore } from "./localStorage-crypto-store";
+import { MemoryCryptoStore } from "./memory-crypto-store";
+import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend";
+import { InvalidCryptoStoreError } from "../../errors";
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
 import {
     CryptoStore,
@@ -50,14 +50,14 @@ import { IEncryptedPayload } from "../aes";
  * @implements {module:crypto/store/base~CryptoStore}
  */
 export class IndexedDBCryptoStore implements CryptoStore {
-    public static STORE_ACCOUNT = 'account';
-    public static STORE_SESSIONS = 'sessions';
-    public static STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
-    public static STORE_INBOUND_GROUP_SESSIONS_WITHHELD = 'inbound_group_sessions_withheld';
-    public static STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS = 'shared_history_inbound_group_sessions';
-    public static STORE_DEVICE_DATA = 'device_data';
-    public static STORE_ROOMS = 'rooms';
-    public static STORE_BACKUP = 'sessions_needing_backup';
+    public static STORE_ACCOUNT = "account";
+    public static STORE_SESSIONS = "sessions";
+    public static STORE_INBOUND_GROUP_SESSIONS = "inbound_group_sessions";
+    public static STORE_INBOUND_GROUP_SESSIONS_WITHHELD = "inbound_group_sessions_withheld";
+    public static STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS = "shared_history_inbound_group_sessions";
+    public static STORE_DEVICE_DATA = "device_data";
+    public static STORE_ROOMS = "rooms";
+    public static STORE_BACKUP = "sessions_needing_backup";
 
     public static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         return IndexedDBHelpers.exists(indexedDB, dbName);
@@ -90,7 +90,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
         this.backendPromise = new Promise<CryptoStore>((resolve, reject) => {
             if (!this.indexedDB) {
-                reject(new Error('no indexeddb support available'));
+                reject(new Error("no indexeddb support available"));
                 return;
             }
 
@@ -106,7 +106,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
             req.onblocked = () => {
                 logger.log(
-                    `can't yet open IndexedDBCryptoStore because it is open elsewhere`,
+                    "can't yet open IndexedDBCryptoStore because it is open elsewhere",
                 );
             };
 
@@ -126,17 +126,17 @@ export class IndexedDBCryptoStore implements CryptoStore {
             // Try a dummy query which will fail if the browser doesn't support compund keys, so
             // we can fall back to a different backend.
             return backend.doTxn(
-                'readonly',
+                "readonly",
                 [
                     IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
                     IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
                 ],
                 (txn) => {
-                    backend.getEndToEndInboundGroupSession('', '', txn, () => {});
+                    backend.getEndToEndInboundGroupSession("", "", txn, () => {});
                 }).then(() => backend,
             );
         }).catch((e) => {
-            if (e.name === 'VersionError') {
+            if (e.name === "VersionError") {
                 logger.warn("Crypto DB is too new for us to use!", e);
                 // don't fall back to a different store: the user has crypto data
                 // in this db so we should use it or nothing at all.
@@ -171,7 +171,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
     public deleteAllData(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             if (!this.indexedDB) {
-                reject(new Error('no indexeddb support available'));
+                reject(new Error("no indexeddb support available"));
                 return;
             }
 
@@ -180,7 +180,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
             req.onblocked = () => {
                 logger.log(
-                    `can't yet delete IndexedDBCryptoStore because it is open elsewhere`,
+                    "can't yet delete IndexedDBCryptoStore because it is open elsewhere",
                 );
             };
 
