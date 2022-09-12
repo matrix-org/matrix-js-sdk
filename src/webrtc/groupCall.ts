@@ -856,12 +856,22 @@ export class GroupCall extends TypedEventEmitter<
             },
         );
 
+        if (existingCall) {
+            logger.debug(`Replacing call ${existingCall.callId} to ${member.userId} with ${newCall.callId}`);
+            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
+        } else {
+            logger.debug(`Adding call ${newCall.callId} to ${member.userId}`);
+            this.addCall(newCall);
+        }
+
         newCall.isPtt = this.isPtt;
 
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
-        logger.log(`Placing call to ${member.userId}.`);
+        logger.log(
+            `Placing call to ${member.userId}/${opponentDevice.device_id} session ID ${opponentDevice.session_id}.`,
+        );
 
         try {
             await newCall.placeCallWithCallFeeds(
@@ -886,12 +896,6 @@ export class GroupCall extends TypedEventEmitter<
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
-        }
-
-        if (existingCall) {
-            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
-        } else {
-            this.addCall(newCall);
         }
     };
 
