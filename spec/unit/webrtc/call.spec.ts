@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { mocked } from "jest-mock";
+
 import { TestClient } from '../../TestClient';
 import {
     MatrixCall,
@@ -961,10 +963,10 @@ describe('Call', function() {
         });
 
         it("removes RTX codec from screen sharing transcievers", async () => {
-            (global.RTCRtpSender.getCapabilities as unknown as jest.Mock).mockReturnValue({
+            mocked(global.RTCRtpSender.getCapabilities).mockReturnValue({
                 codecs: [
-                    { mimeType: "video/rtx" },
-                    { mimeType: "video/somethingelse" },
+                    { mimeType: "video/rtx", clockRate: 90000 },
+                    { mimeType: "video/somethingelse", clockRate: 90000 },
                 ],
                 headerExtensions: [],
             });
