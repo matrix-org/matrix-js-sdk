@@ -185,6 +185,9 @@ export class GroupCall extends TypedEventEmitter<
     private resendMemberStateTimer: ReturnType<typeof setInterval> | null = null;
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
+    // We use this as a set of mutexes, effectively, to make sure we only enter the function
+    // to process a member state event once at any one time for each member
+    private processingMemberStateEvent = new Map<string, boolean>();
 
     constructor(
         private client: MatrixClient,
@@ -201,7 +204,8 @@ export class GroupCall extends TypedEventEmitter<
         this.groupCallId = groupCallId || genCallID();
 
         for (const stateEvent of this.getMemberStateEvents()) {
-            this.onMemberStateChanged(stateEvent);
+            logger.debug("Processing member states on group call initialisation");
+            this.processMemberStateEvent(stateEvent);
         }
     }
 
@@ -332,7 +336,8 @@ export class GroupCall extends TypedEventEmitter<
         // Set up participants for the members currently in the room.
         // Other members will be picked up by the RoomState.members event.
         for (const stateEvent of this.getMemberStateEvents()) {
-            this.onMemberStateChanged(stateEvent);
+            logger.debug("Processing member states on call enter");
+            this.processMemberStateEvent(stateEvent);
         }
 
         this.retryCallLoopTimeout = setTimeout(this.onRetryCallLoop, this.retryCallInterval);
@@ -754,6 +759,25 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public onMemberStateChanged = async (event: MatrixEvent) => {
+        logger.debug("Processing member states on member state change");
+        return this.processMemberStateEvent(event);
+    };
+
+    private processMemberStateEvent = async (event: MatrixEvent) => {
+        if (this.processingMemberStateEvent.has(event.getStateKey())) {
+            logger.debug(`Already processing meber state event for ${event.getStateKey()}`);
+            return;
+        }
+
+        this.processingMemberStateEvent.set(event.getStateKey(), true);
+        try {
+            return this.processMemberStateEventInternal(event);
+        } finally {
+            this.processingMemberStateEvent.delete(event.getStateKey());
+        }
+    };
+
+    private processMemberStateEventInternal = async (event: MatrixEvent) => {
         // If we haven't entered the call yet, we don't care
         if (this.state !== GroupCallState.Entered) {
             return;
@@ -861,7 +885,9 @@ export class GroupCall extends TypedEventEmitter<
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
-        logger.log(`Placing call to ${member.userId}.`);
+        logger.debug(
+            `Placing call to ${member.userId}/${opponentDevice.device_id} session ID ${opponentDevice.session_id}.`,
+        );
 
         try {
             await newCall.placeCallWithCallFeeds(
@@ -889,8 +915,10 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         if (existingCall) {
+            logger.debug(`Replacing call ${existingCall.callId} to ${member.userId} with ${newCall.callId}`);
             this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
         } else {
+            logger.debug(`Adding call ${newCall.callId} to ${member.userId}`);
             this.addCall(newCall);
         }
     };
@@ -928,7 +956,8 @@ export class GroupCall extends TypedEventEmitter<
 
             if (!existingCall && retryCallCount < 3) {
                 this.retryCallCounts.set(memberId, retryCallCount + 1);
-                this.onMemberStateChanged(event);
+                logger.debug("Processing member states on call retry");
+                this.processMemberStateEvent(event);
             }
         }
 
