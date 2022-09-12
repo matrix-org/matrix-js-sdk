@@ -173,6 +173,8 @@ export class MockRTCPeerConnection {
 
     getSenders(): MockRTCRtpSender[] { return this.senders; }
 
+    getTransceivers = jest.fn().mockReturnValue([]);
+
     doNegotiation() {
         if (this.needsNegotiation && this.negotiationNeededListener) {
             this.needsNegotiation = false;
@@ -185,6 +187,7 @@ export class MockRTCRtpSender {
     constructor(public track: MockMediaStreamTrack) { }
 
     replaceTrack(track: MockMediaStreamTrack) { this.track = track; }
+    setCodecPreferences(prefs: RTCRtpCodecCapability[]): void {}
 }
 
 export class MockMediaStreamTrack {
@@ -397,7 +400,20 @@ export function installWebRTCMocks() {
     global.AudioContext = MockAudioContext;
 
     // @ts-ignore Mock
-    global.RTCRtpReceiver = {};
+    global.RTCRtpReceiver = {
+        getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
+            codecs: [],
+            headerExtensions: [],
+        }),
+    };
+
+    // @ts-ignore Mock
+    global.RTCRtpSender = {
+        getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
+            codecs: [],
+            headerExtensions: [],
+        }),
+    };
 }
 
 export function makeMockGroupCallStateEvent(roomId: string, groupCallId: string): MatrixEvent {
