@@ -869,7 +869,7 @@ export class GroupCall extends TypedEventEmitter<
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
 
-        logger.log(
+        logger.debug(
             `Placing call to ${member.userId}/${opponentDevice.device_id} session ID ${opponentDevice.session_id}.`,
         );
 
