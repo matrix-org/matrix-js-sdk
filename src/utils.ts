@@ -24,7 +24,7 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
 import type * as NodeCrypto from "crypto";
-import { MatrixClient, MatrixEvent } from ".";
+import { MatrixEvent } from ".";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
 
@@ -670,17 +670,7 @@ export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: Mat
     return getContentTimestampWithFallback(right) - getContentTimestampWithFallback(left);
 }
 
-export async function getPrivateReadReceiptField(client: MatrixClient): Promise<ReceiptType | null> {
-    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) return ReceiptType.ReadPrivate;
-    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285")) return ReceiptType.UnstableReadPrivate;
-    return null;
-}
-
 export function isSupportedReceiptType(receiptType: string): boolean {
-    return [
-        ReceiptType.Read,
-        ReceiptType.ReadPrivate,
-        ReceiptType.UnstableReadPrivate,
-    ].includes(receiptType as ReceiptType);
+    return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receiptType as ReceiptType);
 }
 
