@@ -533,6 +533,7 @@ describe('Group Call', function() {
                 let newCall: MatrixCall;
                 while (
                     (newCall = groupCall1.getCallByUserId(client2.userId)) === undefined ||
+                    newCall.peerConn === undefined ||
                     newCall.callId == oldCall.callId
                 ) {
                     await flushPromises();
@@ -643,6 +644,7 @@ describe('Group Call', function() {
                 groupCall.localCallFeed.setAudioVideoMuted = jest.fn();
                 const setAVMutedArray = groupCall.calls.map(call => {
                     call.localUsermediaFeed.setAudioVideoMuted = jest.fn();
+                    call.localUsermediaFeed.isVideoMuted = jest.fn().mockReturnValue(true);
                     return call.localUsermediaFeed.setAudioVideoMuted;
                 });
                 const tracksArray = groupCall.calls.reduce((acc, call) => {
