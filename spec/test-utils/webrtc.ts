@@ -99,7 +99,7 @@ export class MockRTCPeerConnection {
     private static instances: MockRTCPeerConnection[] = [];
 
     private negotiationNeededListener: () => void;
-    public iceCandidateListener: (e: RTCPeerConnectionIceEvent) => void;
+    public iceCandidateListener?: (e: RTCPeerConnectionIceEvent) => void;
     private needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
     private onReadyToNegotiate: () => void;
