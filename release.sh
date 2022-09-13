@@ -70,8 +70,10 @@ if [ $# -ne 1 ]; then
 fi
 
 function check_dependency {
-    echo "Checking version of $1..."
     local depver=$(cat package.json | jq -r .dependencies[\"$1\"])
+    if [ "$depver" == "null" ]; then return 0; fi
+
+    echo "Checking version of $1..."
     local latestver=$(yarn info -s "$1" dist-tags.next)
     if [ "$depver" != "$latestver" ]
     then
