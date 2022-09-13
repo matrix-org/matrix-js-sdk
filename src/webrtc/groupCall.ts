@@ -476,7 +476,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         for (const call of this.calls) {
-            call.localUsermediaFeed.setAudioVideoMuted(muted, null);
+            call.localUsermediaFeed?.setAudioVideoMuted(muted, null);
         }
 
         if (sendUpdatesBefore) {
