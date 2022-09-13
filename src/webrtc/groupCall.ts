@@ -891,6 +891,7 @@ export class GroupCall extends TypedEventEmitter<
                     ),
                 );
             }
+            this.removeCall(newCall, CallErrorCode.SignallingFailed);
             return;
         }
 
