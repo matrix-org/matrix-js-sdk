@@ -888,34 +888,8 @@ describe('Call', function() {
     });
 
     describe("answering calls", () => {
-        //let answerSentProm;
-
         beforeEach(async () => {
             await fakeIncomingCall(client, call, "1");
-
-            /*answerSentProm = new Promise<void>(resolve => {
-                mocked(client.client.sendEvent).mockImplementation(
-                    (
-                        roomId: string,
-                        threadId: string | null,
-                        eventType: string | IContent,
-                        content: IContent | string,
-                        txnId?: string | Callback,
-                        callback?: Callback,
-                    ) => {
-                        // annoyingly we have top do backwards compat logic here
-                        if (!threadId?.startsWith("$") && threadId !== null) {
-                            callback = txnId as Callback;
-                            txnId = content as string;
-                            content = eventType as IContent;
-                            eventType = threadId;
-                            threadId = null;
-                        }
-                        if (eventType === EventType.CallAnswer) resolve();
-                        return Promise.resolve({ event_id: "foo" });
-                    },
-                );
-            });*/
         });
 
         const untilEventSent = async (...args) => {
