@@ -99,6 +99,7 @@ export class MockRTCPeerConnection {
     private static instances: MockRTCPeerConnection[] = [];
 
     private negotiationNeededListener: () => void;
+    public icecandidateListener: (e: RTCPeerConnectionIceEvent) => void;
     private needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
     private onReadyToNegotiate: () => void;
@@ -135,7 +136,11 @@ export class MockRTCPeerConnection {
     }
 
     addEventListener(type: string, listener: () => void) {
-        if (type === 'negotiationneeded') this.negotiationNeededListener = listener;
+        if (type === 'negotiationneeded') {
+            this.negotiationNeededListener = listener;
+        } else if (type == 'icecandidate') {
+            this.icecandidateListener = listener;
+        }
     }
     createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
     createOffer() {

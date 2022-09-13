@@ -887,6 +887,103 @@ describe('Call', function() {
         });
     });
 
+    describe("answering calls", () => {
+        //let answerSentProm;
+
+        beforeEach(async () => {
+            await fakeIncomingCall(client, call, "1");
+
+            /*answerSentProm = new Promise<void>(resolve => {
+                mocked(client.client.sendEvent).mockImplementation(
+                    (
+                        roomId: string,
+                        threadId: string | null,
+                        eventType: string | IContent,
+                        content: IContent | string,
+                        txnId?: string | Callback,
+                        callback?: Callback,
+                    ) => {
+                        // annoyingly we have top do backwards compat logic here
+                        if (!threadId?.startsWith("$") && threadId !== null) {
+                            callback = txnId as Callback;
+                            txnId = content as string;
+                            content = eventType as IContent;
+                            eventType = threadId;
+                            threadId = null;
+                        }
+                        if (eventType === EventType.CallAnswer) resolve();
+                        return Promise.resolve({ event_id: "foo" });
+                    },
+                );
+            });*/
+        });
+
+        const untilEventSent = async (...args) => {
+            const maxTries = 20;
+
+            for (let tries = 0; tries < maxTries; ++tries) {
+                if (tries) {
+                    await new Promise(resolve => {
+                        setTimeout(resolve, 100);
+                    });
+                }
+                try {
+                    expect(client.client.sendEvent).toHaveBeenCalledWith(...args);
+                    return;
+                } catch (e) {
+                    if (tries == maxTries - 1) {
+                        throw e;
+                    }
+                }
+            }
+        };
+
+        it("sends an answer event", async () => {
+            await call.answer();
+            await untilEventSent(
+                FAKE_ROOM_ID,
+                EventType.CallAnswer,
+                expect.objectContaining({
+                    call_id: call.callId,
+                    answer: expect.objectContaining({
+                        type: 'offer',
+                    }),
+                }),
+            );
+        });
+
+        it("sends ICE candidates as separate events if they arrive after the answer", async () => {
+            const fakeCandidateString = "here is a fake candidate!";
+
+            await call.answer();
+            await untilEventSent(
+                FAKE_ROOM_ID,
+                EventType.CallAnswer,
+                expect.objectContaining({}),
+            );
+
+            const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+            mockPeerConn.icecandidateListener({
+                candidate: {
+                    candidate: fakeCandidateString,
+                    sdpMLineIndex: 0,
+                    sdpMid: '0',
+                    toJSON: jest.fn().mockReturnValue(fakeCandidateString),
+                },
+            } as unknown as RTCPeerConnectionIceEvent);
+
+            await untilEventSent(
+                FAKE_ROOM_ID,
+                EventType.CallCandidates,
+                expect.objectContaining({
+                    candidates: [
+                        fakeCandidateString,
+                    ],
+                }),
+            );
+        });
+    });
+
     it("times out an incoming call", async () => {
         jest.useFakeTimers();
         await fakeIncomingCall(client, call, "1");
