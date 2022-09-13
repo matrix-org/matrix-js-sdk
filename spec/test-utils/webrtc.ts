@@ -139,7 +139,7 @@ export class MockRTCPeerConnection {
         if (type === 'negotiationneeded') {
             this.negotiationNeededListener = listener;
         } else if (type == 'icecandidate') {
-            this.icecandidateListener = listener;
+            this.iceCandidateListener = listener;
         }
     }
     createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
