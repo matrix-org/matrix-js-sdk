@@ -937,7 +937,7 @@ describe('Call', function() {
             );
 
             const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
-            mockPeerConn!.iceCandidateListener({
+            mockPeerConn.iceCandidateListener!({
                 candidate: {
                     candidate: fakeCandidateString,
                     sdpMLineIndex: 0,
