@@ -70,6 +70,7 @@ type EventHandlerMap = {
 export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
     public stream: MediaStream;
     public secondStream: MediaStream;
+    public audioDelay: DelayNode;
     public sdpMetadataStreamId: string;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
@@ -79,6 +80,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public VADEnabled = true;
     public maxVolume = -Infinity;
 
+    private streamNode = MediaStreamAudioSourceNode;
+    private destination = MediaStreamAudioDestinationNode;
     private client: MatrixClient;
     private roomId: string;
     private audioMuted: boolean;
@@ -101,6 +104,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     constructor(opts: ICallFeedOpts) {
         super();
 
+        this.steam = opts.stream;
         this.client = opts.client;
         this.roomId = opts.roomId;
         this.userId = opts.userId;
@@ -165,6 +169,15 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.secondStream = this.stream.clone();
         const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.secondStream);
         mediaStreamAudioSourceNode.connect(this.analyser);
+
+        this.streamNode = this.audioContext.createMediaStreamSource(this.stream);
+        this.audioDelay = this.audioContext.createDelay(0.001);
+        const gainNode = this.audioContext.createGain(1);
+        this.streamNode.connect(gainNode);
+        gainNode.connect(this.audioDelay);
+        this.destination = this.audioContext.createMediaStreamDestination();
+        this.audioDelay.connect(this.destination);
+        this.stream = this.destination.stream;
 
         this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
     }
