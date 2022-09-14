@@ -96,6 +96,9 @@ function check_dependency {
 }
 
 function reset_dependency {
+    local depver=$(cat package.json | jq -r .dependencies[\"$1\"])
+    if [ "$depver" == "null" ]; then return 0; fi
+
     echo "Resetting $1 to develop branch..."
     yarn add "github:matrix-org/$1#develop"
     git add -u
