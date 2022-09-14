@@ -5469,7 +5469,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 };
 
                 await thread.fetchInitialEvents();
-                let nextBatch = thread.liveTimeline.getPaginationToken(Direction.Backward);
+                let nextBatch: string | null | undefined = thread.liveTimeline.getPaginationToken(Direction.Backward);
 
                 // Fetch events until we find the one we were asked for, or we run out of pages
                 while (!thread.findEventById(eventId)) {
@@ -7182,10 +7182,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param {module:client.callback} callback Optional.
-     * @return {Promise<ILoginFlowsResponse>} Resolves to the available login flows
+     * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public loginFlows(callback?: Callback): Promise<ILoginFlowsResponse> {
+    public loginFlows(callback?: Callback): Promise<any> { // TODO: Types
         return this.http.request(callback, Method.Get, "/login");
     }
 
@@ -7645,9 +7645,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             [ReceiptType.Read]: rrEventId,
         };
 
-        const privateField = await utils.getPrivateReadReceiptField(this);
-        if (privateField) {
-            content[privateField] = rpEventId;
+        if (await this.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) {
+            content[ReceiptType.ReadPrivate] = rpEventId;
         }
 
         return this.http.authedRequest(undefined, Method.Post, path, undefined, content);

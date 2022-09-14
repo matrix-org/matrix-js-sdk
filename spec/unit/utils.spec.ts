@@ -528,38 +528,6 @@ describe("utils", function() {
         });
     });
 
-    describe('getPrivateReadReceiptField', () => {
-        it('should return m.read.private if server supports stable', async () => {
-            expect(await utils.getPrivateReadReceiptField({
-                doesServerSupportUnstableFeature: jest.fn().mockImplementation((feature) => {
-                    return feature === "org.matrix.msc2285.stable";
-                }),
-            } as any)).toBe(ReceiptType.ReadPrivate);
-        });
-
-        it('should return m.read.private if server supports stable and unstable', async () => {
-            expect(await utils.getPrivateReadReceiptField({
-                doesServerSupportUnstableFeature: jest.fn().mockImplementation((feature) => {
-                    return ["org.matrix.msc2285.stable", "org.matrix.msc2285"].includes(feature);
-                }),
-            } as any)).toBe(ReceiptType.ReadPrivate);
-        });
-
-        it('should return org.matrix.msc2285.read.private if server supports  unstable', async () => {
-            expect(await utils.getPrivateReadReceiptField({
-                doesServerSupportUnstableFeature: jest.fn().mockImplementation((feature) => {
-                    return feature === "org.matrix.msc2285";
-                }),
-            } as any)).toBe(ReceiptType.UnstableReadPrivate);
-        });
-
-        it('should return none if server does not support either', async () => {
-            expect(await utils.getPrivateReadReceiptField({
-                doesServerSupportUnstableFeature: jest.fn().mockResolvedValue(false),
-            } as any)).toBeFalsy();
-        });
-    });
-
     describe('isSupportedReceiptType', () => {
         it('should support m.read', () => {
             expect(utils.isSupportedReceiptType(ReceiptType.Read)).toBeTruthy();
@@ -567,10 +535,6 @@ describe("utils", function() {
 
         it('should support m.read.private', () => {
             expect(utils.isSupportedReceiptType(ReceiptType.ReadPrivate)).toBeTruthy();
-        });
-
-        it('should support org.matrix.msc2285.read.private', () => {
-            expect(utils.isSupportedReceiptType(ReceiptType.UnstableReadPrivate)).toBeTruthy();
         });
 
         it('should not support other receipt types', () => {

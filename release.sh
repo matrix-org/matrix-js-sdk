@@ -36,13 +36,6 @@ $USAGE
 EOF
 }
 
-ret=0
-cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
-if [ "$ret" -eq 0 ]; then
-    echo "package.json contains develop dependencies. Refusing to release."
-    exit
-fi
-
 if ! git diff-index --quiet --cached HEAD; then
     echo "this git checkout has staged (uncommitted) changes. Refusing to release."
     exit
@@ -77,8 +70,10 @@ if [ $# -ne 1 ]; then
 fi
 
 function check_dependency {
-    echo "Checking version of $1..."
     local depver=$(cat package.json | jq -r .dependencies[\"$1\"])
+    if [ "$depver" == "null" ]; then return 0; fi
+
+    echo "Checking version of $1..."
     local latestver=$(yarn info -s "$1" dist-tags.next)
     if [ "$depver" != "$latestver" ]
     then
@@ -101,6 +96,9 @@ function check_dependency {
 }
 
 function reset_dependency {
+    local depver=$(cat package.json | jq -r .dependencies[\"$1\"])
+    if [ "$depver" == "null" ]; then return 0; fi
+
     echo "Resetting $1 to develop branch..."
     yarn add "github:matrix-org/$1#develop"
     git add -u
@@ -117,6 +115,13 @@ if [ -f release_config.yaml ]; then
             check_dependency "$proj"
         done
     fi
+fi
+
+ret=0
+cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
+if [ "$ret" -eq 0 ]; then
+    echo "package.json contains develop dependencies. Refusing to release."
+    exit
 fi
 
 # We use Git branch / commit dependencies for some packages, and Yarn seems
@@ -137,7 +142,7 @@ prerelease=0
 # see if the version has a hyphen in it. Crude,
 # but semver doesn't support postreleases so anything
 # with a hyphen is a prerelease.
-echo "$release" | grep -q '-' && prerelease=1
+echo $release | grep -q '-' && prerelease=1
 
 if [ $prerelease -eq 1 ]; then
     echo Making a PRE-RELEASE
@@ -163,7 +168,7 @@ if [ -z "$skip_changelog" ]; then
     yarn run allchange "$release"
     read -p "Edit $changelog_file manually, or press enter to continue " REPLY
 
-    if [ -n "$(git ls-files --modified "$changelog_file")" ]; then
+    if [ -n "$(git ls-files --modified $changelog_file)" ]; then
         echo "Committing updated changelog"
         git commit "$changelog_file" -m "Prepare changelog for $tag"
     fi
@@ -202,7 +207,7 @@ then
 else
     pkglock=''
 fi
-git commit package.json "$pkglock" -m "$tag"
+git commit package.json $pkglock -m "$tag"
 
 
 # figure out if we should be signing this release
@@ -290,7 +295,7 @@ if [ -n "$signing_id" ]; then
     curl -L "${gh_project_url}/archive/${tarfile}" -o "${tarfile}"
 
     # unzip it and compare it with the tar we would generate
-    if ! cmp --silent <(gunzip -c "$tarfile") \
+    if ! cmp --silent <(gunzip -c $tarfile) \
          <(git archive --format tar --prefix="${project_name}-${release}/" "$tag"); then
 
         # we don't bail out here, because really it's more likely that our comparison
@@ -322,7 +327,7 @@ release_text=$(mktemp)
 echo "$tag" > "${release_text}"
 echo >> "${release_text}"
 cat "${latest_changes}" >> "${release_text}"
-hub release create $hubflags "$assets" -F "${release_text}" "$tag"
+hub release create $hubflags $assets -F "${release_text}" "$tag"
 
 if [ $dodist -eq 0 ]; then
     rm -rf "$builddir"
