@@ -287,7 +287,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @return {?module:models/event-timeline~EventTimeline} timeline containing
      * the given event, or null if unknown
      */
-    public getTimelineForEvent(eventId: string): EventTimeline | null {
+    public getTimelineForEvent(eventId: string | null): EventTimeline | null {
+        if (eventId === null) { return null; }
         const res = this._eventIdToTimeline.get(eventId);
         return (res === undefined) ? null : res;
     }

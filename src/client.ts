@@ -3333,7 +3333,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} roomId The room ID
      * @return {Room|null} The Room or null if it doesn't exist or there is no data store.
      */
-    public getRoom(roomId: string): Room | null {
+    public getRoom(roomId: string | undefined): Room | null {
+        if (!roomId) {
+            return null;
+        }
         return this.store.getRoom(roomId);
     }
 
@@ -4623,7 +4626,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const promise = this.http.authedRequest(callback, Method.Post, path, undefined, body || {});
 
         const room = this.getRoom(event.getRoomId());
-        if (room) {
+        if (room && this.credentials.userId) {
             room.addLocalEchoReceipt(this.credentials.userId, event, receiptType);
         }
         return promise;
@@ -7366,7 +7369,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 $eventType: eventType,
             });
         return this.http.authedRequest(
-            undefined, Method.Get, path, null, null, {
+            undefined, Method.Get, path, undefined, undefined, {
                 prefix: PREFIX_UNSTABLE,
             },
         );
@@ -7671,7 +7674,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public getLocalAliases(roomId: string): Promise<{ aliases: string[] }> {
         const path = utils.encodeUri("/rooms/$roomId/aliases", { $roomId: roomId });
         const prefix = PREFIX_V3;
-        return this.http.authedRequest(undefined, Method.Get, path, null, null, { prefix });
+        return this.http.authedRequest(undefined, Method.Get, path, undefined, undefined, { prefix });
     }
 
     /**
@@ -7908,7 +7911,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             'bind': bind,
         };
         return this.http.authedRequest(
-            callback, Method.Post, path, null, data,
+            callback, Method.Post, path, undefined, data,
         );
     }
 
@@ -7927,7 +7930,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
         const path = "/account/3pid/add";
         const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
-        return this.http.authedRequest(undefined, Method.Post, path, null, data, { prefix });
+        return this.http.authedRequest(undefined, Method.Post, path, undefined, data, { prefix });
     }
 
     /**
@@ -7949,7 +7952,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const prefix = await this.isVersionSupported("r0.6.0") ?
             PREFIX_R0 : PREFIX_UNSTABLE;
         return this.http.authedRequest(
-            undefined, Method.Post, path, null, data, { prefix },
+            undefined, Method.Post, path, undefined, data, { prefix },
         );
     }
 
@@ -7976,7 +7979,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             id_server: this.getIdentityServerUrl(true),
         };
         const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
-        return this.http.authedRequest(undefined, Method.Post, path, null, data, { prefix });
+        return this.http.authedRequest(undefined, Method.Post, path, undefined, data, { prefix });
     }
 
     /**
@@ -7993,7 +7996,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // eslint-disable-next-line camelcase
     ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
         const path = "/account/3pid/delete";
-        return this.http.authedRequest(undefined, Method.Post, path, null, { medium, address });
+        return this.http.authedRequest(undefined, Method.Post, path, undefined, { medium, address });
     }
 
     /**
@@ -8039,7 +8042,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
 
         return this.http.authedRequest<{}>(
-            callback, Method.Post, path, null, data,
+            callback, Method.Post, path, undefined, data,
         );
     }
 
@@ -8144,7 +8147,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setPusher(pusher: IPusherRequest, callback?: Callback): Promise<{}> {
         const path = "/pushers/set";
-        return this.http.authedRequest(callback, Method.Post, path, null, pusher);
+        return this.http.authedRequest(callback, Method.Post, path, undefined, pusher);
     }
 
     /**
@@ -8931,7 +8934,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: eventId,
         });
 
-        return this.http.authedRequest(undefined, Method.Post, path, null, { score, reason });
+        return this.http.authedRequest(undefined, Method.Post, path, undefined, { score, reason });
     }
 
     /**
@@ -9093,7 +9096,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummary> {
         const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-        return this.http.authedRequest(undefined, Method.Get, path, { via }, null, {
+        return this.http.authedRequest(undefined, Method.Get, path, { via }, undefined, {
             qsStringifyOptions: { arrayFormat: 'repeat' },
             prefix: "/_matrix/client/unstable/im.nheko.summary",
         });

@@ -87,7 +87,7 @@ describe("Read receipt", () => {
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
-            request: httpBackend.requestFn as IHttpOpts["request"],
+            request: httpBackend.requestFn as unknown as IHttpOpts["request"],
         });
         client.isGuest = () => false;
     });

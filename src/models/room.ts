@@ -2355,10 +2355,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 threadId,
             } = this.eventShouldLiveIn(event, events, threadRoots);
 
-            if (shouldLiveInThread && !eventsByThread[threadId]) {
-                eventsByThread[threadId] = [];
+            if (shouldLiveInThread && !eventsByThread[threadId ?? ""]) {
+                eventsByThread[threadId ?? ""] = [];
             }
-            eventsByThread[threadId]?.push(event);
+            eventsByThread[threadId ?? ""]?.push(event);
 
             if (shouldLiveInRoom) {
                 this.addLiveEvent(event, options);
@@ -2391,17 +2391,17 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 }
 
                 if (shouldLiveInThread) {
-                    event.setThreadId(threadId);
+                    event.setThreadId(threadId ?? "");
                     memo[THREAD].push(event);
                 }
 
                 return memo;
-            }, [[], []]);
+            }, [[] as MatrixEvent[], [] as MatrixEvent[]]);
         } else {
             // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
             return [
-                events,
-                [],
+                events as MatrixEvent[],
+                [] as MatrixEvent[],
             ];
         }
     }
@@ -2413,7 +2413,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         const threadRoots = new Set<string>();
         for (const event of events) {
             if (event.isRelation(THREAD_RELATION_TYPE.name)) {
-                threadRoots.add(event.relationEventId);
+                threadRoots.add(event.relationEventId ?? "");
             }
         }
         return threadRoots;
@@ -2427,16 +2427,16 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public addReceipt(event: MatrixEvent, synthetic = false): void {
         const content = event.getContent<ReceiptContent>();
         Object.keys(content).forEach((eventId: string) => {
-            Object.keys(content[eventId]).forEach((receiptType: ReceiptType) => {
+            Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
                     const receipt = content[eventId][receiptType][userId] as Receipt;
                     const receiptForMainTimeline = !receipt.thread_id || receipt.thread_id === MAIN_ROOM_TIMELINE;
-                    const receiptDestination = receiptForMainTimeline
+                    const receiptDestination: Thread | this | undefined = receiptForMainTimeline
                         ? this
-                        : this.threads.get(receipt.thread_id);
+                        : this.threads.get(receipt.thread_id ?? "");
                     receiptDestination?.addReceiptToStructure(
                         eventId,
-                        receiptType,
+                        receiptType as ReceiptType,
                         userId,
                         receipt,
                         synthetic,
