@@ -192,7 +192,7 @@ import {
 } from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
 import { GroupCallEventHandler } from "./webrtc/groupCallEventHandler";
-import { ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
+import { IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
