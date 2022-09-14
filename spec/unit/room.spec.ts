@@ -1437,7 +1437,7 @@ describe("Room", function() {
                 room.addReceipt(mkReceipt(roomId, [
                     mkRecord(eventToAck.getId(), "m.read", userB, ts),
                 ]));
-                expect(room.hasUserReadUpTo(eventToAck)).toEqual(true);
+                expect(room.hasUserReadEvent(userB, eventToAck.getId())).toEqual(true);
             });
         });
     });
