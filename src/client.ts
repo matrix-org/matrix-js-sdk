@@ -5368,7 +5368,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 };
 
                 await thread.fetchInitialEvents();
-                let nextBatch = thread.liveTimeline.getPaginationToken(Direction.Backward);
+                let nextBatch: string | null | undefined = thread.liveTimeline.getPaginationToken(Direction.Backward);
 
                 // Fetch events until we find the one we were asked for, or we run out of pages
                 while (!thread.findEventById(eventId)) {

@@ -335,7 +335,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     /**
      * Return last reply to the thread, if known.
      */
-    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): Optional<MatrixEvent> {
+    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): MatrixEvent | null {
         for (let i = this.events.length - 1; i >= 0; i--) {
             const event = this.events[i];
             if (matches(event)) {
@@ -384,7 +384,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public async fetchEvents(opts: IRelationsRequestOpts = { limit: 20, direction: Direction.Backward }): Promise<{
         originalEvent: MatrixEvent;
         events: MatrixEvent[];
-        nextBatch?: string;
+        nextBatch?: string | null;
         prevBatch?: string;
     }> {
         let {
