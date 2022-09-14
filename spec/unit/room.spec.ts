@@ -1430,6 +1430,16 @@ describe("Room", function() {
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual([userB]);
             });
         });
+
+        describe("hasUserReadUpTo", function() {
+            it("should acknowledge if an event has been read", function() {
+                const ts = 13787898424;
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                ]));
+                expect(room.hasUserReadUpTo(eventToAck)).toEqual(true);
+            });
+        });
     });
 
     describe("tags", function() {
