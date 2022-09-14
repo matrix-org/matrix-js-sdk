@@ -1439,6 +1439,9 @@ describe("Room", function() {
                 ]));
                 expect(room.hasUserReadEvent(userB, eventToAck.getId())).toEqual(true);
             });
+            it("return false for an unknown event", function() {
+                expect(room.hasUserReadEvent(userB, "unknown_event")).toEqual(true);
+            });
         });
     });
 
