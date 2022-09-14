@@ -188,16 +188,18 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { IRefreshTokenResponse } from "./@types/auth";
+import { IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
+import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
+import { IgnoredInvites } from "./models/invites-ignorer";
 
 export type Store = IStore;
 
@@ -881,6 +883,8 @@ export type ClientEventHandlerMap = {
     & HttpApiEventHandlerMap
     & BeaconEventHandlerMap;
 
+const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action");
+
 /**
  * Represents a Matrix Client. Only directly construct this if you want to use
  * custom modules. Normally, {@link createClient} should be used
@@ -954,6 +958,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
     private toDeviceMessageQueue: ToDeviceMessageQueue;
+
+    // A manager for determining which invites should be ignored.
+    public readonly ignoredInvites: IgnoredInvites;
 
     constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1136,6 +1143,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 room.setUnreadNotificationCount(NotificationCountType.Highlight, highlightCount);
             }
         });
+
+        this.ignoredInvites = new IgnoredInvites(this);
     }
 
     /**
@@ -5379,7 +5388,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 };
 
                 await thread.fetchInitialEvents();
-                let nextBatch = thread.liveTimeline.getPaginationToken(Direction.Backward);
+                let nextBatch: string | null | undefined = thread.liveTimeline.getPaginationToken(Direction.Backward);
 
                 // Fetch events until we find the one we were asked for, or we run out of pages
                 while (!thread.findEventById(eventId)) {
@@ -7170,15 +7179,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} loginType The type of SSO login we are doing (sso or cas).
      *     Defaults to 'sso'.
      * @param {string} idpId The ID of the Identity Provider being targeted, optional.
+     * @param {SSOAction} action the SSO flow to indicate to the IdP, optional.
      * @return {string} The HS URL to hit to begin the SSO login process.
      */
-    public getSsoLoginUrl(redirectUrl: string, loginType = "sso", idpId?: string): string {
+    public getSsoLoginUrl(
+        redirectUrl: string,
+        loginType = "sso",
+        idpId?: string,
+        action?: SSOAction,
+    ): string {
         let url = "/login/" + loginType + "/redirect";
         if (idpId) {
             url += "/" + idpId;
         }
 
-        return this.http.getUrl(url, { redirectUrl }, PREFIX_R0);
+        const params = {
+            redirectUrl,
+            [SSO_ACTION_PARAM.unstable!]: action,
+        };
+
+        return this.http.getUrl(url, params, PREFIX_R0);
     }
 
     /**
@@ -7543,9 +7563,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             [ReceiptType.Read]: rrEventId,
         };
 
-        const privateField = await utils.getPrivateReadReceiptField(this);
-        if (privateField) {
-            content[privateField] = rpEventId;
+        if (await this.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) {
+            content[ReceiptType.ReadPrivate] = rpEventId;
         }
 
         return this.http.authedRequest(undefined, Method.Post, path, undefined, content);

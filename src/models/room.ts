@@ -50,7 +50,14 @@ import {
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
-import { MAIN_ROOM_TIMELINE, ReadReceipt, Receipt, ReceiptContent, synthesizeReceipt, WrappedReceipt } from "./read-receipt";
+import {
+    MAIN_ROOM_TIMELINE,
+    ReadReceipt,
+    Receipt,
+    ReceiptContent,
+    synthesizeReceipt,
+    WrappedReceipt,
+} from "./read-receipt";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -1929,14 +1936,6 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 }
             }
         }
-
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.handleRemoteEcho(event, existingEvent);
-            }
-        }
     }
 
     /**
@@ -1944,7 +1943,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * "Room.timeline".
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {IAddLiveEventOptions} options addLiveEvent options
+     * @param {IAddLiveEventOptions} addLiveEventOptions addLiveEvent options
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
@@ -2292,7 +2291,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         fromCache = false,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty = false;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy,
@@ -2331,9 +2330,24 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         const threadRoots = this.findThreadRoots(events);
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
 
+        const options: IAddLiveEventOptions = {
+            duplicateStrategy,
+            fromCache,
+            timelineWasEmpty,
+        };
+
         for (const event of events) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.processLiveEvent(event);
+
+            if (event.getUnsigned().transaction_id) {
+                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id!];
+                if (existingEvent) {
+                    // remote echo of an event we sent earlier
+                    this.handleRemoteEcho(event, existingEvent);
+                    continue; // we can skip adding the event to the timeline sets, it is already there
+                }
+            }
 
             const {
                 shouldLiveInRoom,
@@ -2347,11 +2361,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             eventsByThread[threadId]?.push(event);
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(event, {
-                    duplicateStrategy,
-                    fromCache,
-                    timelineWasEmpty,
-                });
+                this.addLiveEvent(event, options);
             }
         }
 

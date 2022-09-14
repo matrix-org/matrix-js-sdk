@@ -288,11 +288,11 @@ describe("Room", function() {
                 room.addLiveEvents(events);
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[0]],
-                    { timelineWasEmpty: undefined },
+                    { timelineWasEmpty: false },
                 );
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[1]],
-                    { timelineWasEmpty: undefined },
+                    { timelineWasEmpty: false },
                 );
                 expect(events[0].forwardLooking).toBe(true);
                 expect(events[1].forwardLooking).toBe(true);
@@ -425,6 +425,17 @@ describe("Room", function() {
             expect(room.timeline.length).toEqual(1);
             // but without the event ID matching we will still have the local event in pending events
             expect(room.getEventForTxnId(txnId)).toBeUndefined();
+        });
+
+        it("should correctly handle remote echoes from other devices", () => {
+            const remoteEvent = utils.mkMessage({
+                room: roomId, user: userA, event: true,
+            });
+            remoteEvent.event.unsigned = { transaction_id: "TXN_ID" };
+
+            // add the remoteEvent
+            room.addLiveEvents([remoteEvent]);
+            expect(room.timeline.length).toEqual(1);
         });
     });
 
@@ -2441,15 +2452,13 @@ describe("Room", function() {
                     if (receiptType === ReceiptType.ReadPrivate) {
                         return { eventId: "eventId1" } as IWrappedReceipt;
                     }
-                    if (receiptType === ReceiptType.UnstableReadPrivate) {
+                    if (receiptType === ReceiptType.Read) {
                         return { eventId: "eventId2" } as IWrappedReceipt;
                     }
-                    if (receiptType === ReceiptType.Read) {
-                        return { eventId: "eventId3" } as IWrappedReceipt;
-                    }
+                    return null;
                 };
 
-                for (let i = 1; i <= 3; i++) {
+                for (let i = 1; i <= 2; i++) {
                     room.getUnfilteredTimelineSet = () => ({ compareEventOrdering: (event1, event2) => {
                         return (event1 === `eventId${i}`) ? 1 : -1;
                     } } as EventTimelineSet);
@@ -2460,20 +2469,18 @@ describe("Room", function() {
 
             describe("correctly compares by timestamp", () => {
                 it("should correctly compare, if we have all receipts", () => {
-                    for (let i = 1; i <= 3; i++) {
+                    for (let i = 1; i <= 2; i++) {
                         room.getUnfilteredTimelineSet = () => ({
                             compareEventOrdering: (_1, _2) => null,
                         } as EventTimelineSet);
                         room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
                             if (receiptType === ReceiptType.ReadPrivate) {
-                                return { eventId: "eventId1", data: { ts: i === 1 ? 1 : 0 } } as IWrappedReceipt;
-                            }
-                            if (receiptType === ReceiptType.UnstableReadPrivate) {
-                                return { eventId: "eventId2", data: { ts: i === 2 ? 1 : 0 } } as IWrappedReceipt;
+                                return { eventId: "eventId1", data: { ts: i === 1 ? 2 : 1 } } as IWrappedReceipt;
                             }
                             if (receiptType === ReceiptType.Read) {
-                                return { eventId: "eventId3", data: { ts: i === 3 ? 1 : 0 } } as IWrappedReceipt;
+                                return { eventId: "eventId2", data: { ts: i === 2 ? 2 : 1 } } as IWrappedReceipt;
                             }
+                            return null;
                         };
 
                         expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
@@ -2485,12 +2492,10 @@ describe("Room", function() {
                         compareEventOrdering: (_1, _2) => null,
                     } as EventTimelineSet);
                     room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
-                        if (receiptType === ReceiptType.UnstableReadPrivate) {
-                            return { eventId: "eventId1", data: { ts: 0 } } as IWrappedReceipt;
-                        }
                         if (receiptType === ReceiptType.Read) {
                             return { eventId: "eventId2", data: { ts: 1 } } as IWrappedReceipt;
                         }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
@@ -2509,28 +2514,13 @@ describe("Room", function() {
                         if (receiptType === ReceiptType.ReadPrivate) {
                             return { eventId: "eventId1" } as IWrappedReceipt;
                         }
-                        if (receiptType === ReceiptType.UnstableReadPrivate) {
+                        if (receiptType === ReceiptType.Read) {
                             return { eventId: "eventId2" } as IWrappedReceipt;
                         }
-                        if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId3" } as IWrappedReceipt;
-                        }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId1`);
-                });
-
-                it("should give precedence to org.matrix.msc2285.read.private", () => {
-                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
-                        if (receiptType === ReceiptType.UnstableReadPrivate) {
-                            return { eventId: "eventId2" } as IWrappedReceipt;
-                        }
-                        if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId2" } as IWrappedReceipt;
-                        }
-                    };
-
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
                 });
 
                 it("should give precedence to m.read", () => {
@@ -2538,6 +2528,7 @@ describe("Room", function() {
                         if (receiptType === ReceiptType.Read) {
                             return { eventId: "eventId3" } as IWrappedReceipt;
                         }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId3`);
