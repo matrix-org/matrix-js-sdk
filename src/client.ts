@@ -195,7 +195,7 @@ import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
-import { Thread, THREAD_RELATION_TYPE } from "./models/thread";
+import { FeatureSupport, Thread, THREAD_RELATION_TYPE, determineFeatureSupport } from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
@@ -1211,14 +1211,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        try {
-            const { serverSupport, stable } = await this.doesServerSupportThread();
-            Thread.setServerSideSupport(serverSupport, stable);
-        } catch (e) {
-            // Most likely cause is that `doesServerSupportThread` returned `null` (as it
-            // is allowed to do) and thus we enter "degraded mode" on threads.
-            Thread.setServerSideSupport(false, true);
-        }
+        const { threads, list } = await this.doesServerSupportThread();
+        Thread.setServerSideSupport(threads);
+        Thread.setServerSideListSupport(list);
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
@@ -6735,23 +6730,30 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public async doesServerSupportThread(): Promise<{
-        serverSupport: boolean;
-        stable: boolean;
-    } | null> {
+        threads: FeatureSupport;
+        list: FeatureSupport;
+    }> {
         try {
-            const hasUnstableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440");
-            const hasStableSupport = await this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable");
+            const [threadUnstable, threadStable, listUnstable, listStable] = await Promise.all([
+                this.doesServerSupportUnstableFeature("org.matrix.msc3440"),
+                this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable"),
+                this.doesServerSupportUnstableFeature("org.matrix.msc3856"),
+                this.doesServerSupportUnstableFeature("org.matrix.msc3856.stable"),
+            ]);
 
             // TODO: Use `this.isVersionSupported("v1.3")` for whatever spec version includes MSC3440 formally.
 
             return {
-                serverSupport: hasUnstableSupport || hasStableSupport,
-                stable: hasStableSupport,
+                threads: determineFeatureSupport(threadStable, threadUnstable),
+                list: determineFeatureSupport(listStable, listUnstable),
             };
         } catch (e) {
             // Assume server support and stability aren't available: null/no data return.
             // XXX: This should just return an object with `false` booleans instead.
-            return null;
+            return {
+                threads: FeatureSupport.None,
+                list: FeatureSupport.None,
+            };
         }
     }
 
