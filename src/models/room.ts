@@ -356,7 +356,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     }
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
-    public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet]> {
+    public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet] | null> {
         if (this.threadTimelineSetsPromise) {
             return this.threadTimelineSetsPromise;
         }
@@ -369,6 +369,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 ]);
                 const timelineSets = await this.threadTimelineSetsPromise;
                 this.threadsTimelineSets.push(...timelineSets);
+                return timelineSets;
             } catch (e) {
                 this.threadTimelineSetsPromise = null;
             }
