@@ -55,7 +55,6 @@
   "dependencies": {
     "@babel/runtime": "^7.12.5",
     "another-json": "^0.2.0",
-    "await-lock": "^2.2.2",
     "browser-request": "^0.3.3",
     "bs58": "^5.0.0",
     "content-type": "^1.0.4",
