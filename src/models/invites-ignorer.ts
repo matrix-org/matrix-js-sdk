@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import AwaitLock from "await-lock";
 import { UnstableValue } from "matrix-events-sdk";
 
 import { MatrixClient } from "../client";
@@ -78,12 +77,13 @@ export class IgnoredInvites {
     // Used to ensure that only one async task of this class
     // is creating a new target room and modifying the
     // `target` property of account key `IGNORE_INVITES_POLICIES`.
-    private _getOrCreateTargetRoomPromise: Promise<Room> | null = null;
+    private getOrCreateTargetRoomPromise: Promise<Room> | null = null;
 
     // A lock around method `withIgnoreInvitesPoliciesLock`.
     // Used to ensure that only one async task of this class is
     // modifying `IGNORE_INVITES_POLICIES` at any point in time.
-    private _withIgnoreInvitesPoliciesLock = new AwaitLock();
+    private withIgnoreInvitesPoliciesPromise: Promise<{}> = Promise.resolve({});
+
     constructor(
         private readonly client: MatrixClient,
     ) {
@@ -263,15 +263,15 @@ export class IgnoredInvites {
         // If we reach this line, we need to setup the target room.
         // However, it is possible that other callers within this client
         // may be racing with us.
-        if (this._getOrCreateTargetRoomPromise) {
+        if (this.getOrCreateTargetRoomPromise) {
             // Another caller is already calling this method.
             // Merge the calls.
-            return this._getOrCreateTargetRoomPromise;
+            return this.getOrCreateTargetRoomPromise;
         }
         try {
             // Nobody is calling the method at the moment.
             // Register ourselves as the leader and start creating our policy room.
-            this._getOrCreateTargetRoomPromise = (async () => {
+            this.getOrCreateTargetRoomPromise = (async () => {
                 // We need to create our own policy room for ignoring invites.
                 target = (await this.client.createRoom({
                     name: "Individual Policy Room",
@@ -290,14 +290,14 @@ export class IgnoredInvites {
                 // the room during the call to `this.withIgnoreInvitesPolicies`.
                 return this.client.getRoom(target)!;
             })();
-            return await this._getOrCreateTargetRoomPromise;
+            return await this.getOrCreateTargetRoomPromise;
         } finally {
             // Don't forget to release the lock.
             //
             // If, for some reason, the async function has failed (e.g. network
             // errors), the next call to `getOrCreateTargetRoomPromise` needs to
             // be able to retry.
-            this._getOrCreateTargetRoomPromise = null;
+            this.getOrCreateTargetRoomPromise = null;
         }
     }
 
@@ -351,15 +351,12 @@ export class IgnoredInvites {
      * Modify in place the `IGNORE_INVITES_POLICIES` object from account data.
      */
     private async withIgnoreInvitesPolicies(cb: (ignoreInvitesPolicies: {[key: string]: any}) => void) {
-        await this._withIgnoreInvitesPoliciesLock.acquireAsync();
-        try {
-            const { policies, ignoreInvitesPolicies } = this.getPoliciesAndIgnoreInvitesPolicies();
-            cb(ignoreInvitesPolicies);
-            policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name] = ignoreInvitesPolicies;
-            await this.client.setAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name, policies);
-        } finally {
-            this._withIgnoreInvitesPoliciesLock.release();
-        }
+        const { policies, ignoreInvitesPolicies } = this.getPoliciesAndIgnoreInvitesPolicies();
+        cb(ignoreInvitesPolicies);
+        await this.withIgnoreInvitesPoliciesPromise;
+        policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name] = ignoreInvitesPolicies;
+        this.withIgnoreInvitesPoliciesPromise = this.client.setAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name, policies);
+        return this.withIgnoreInvitesPoliciesPromise;
     }
 
     /**
@@ -368,7 +365,7 @@ export class IgnoredInvites {
      */
     private getPoliciesAndIgnoreInvitesPolicies():
         {policies: {[key: string]: any}, ignoreInvitesPolicies: {[key: string]: any}} {
-        let policies = {};
+        let policies: {[key: string]: any} = {};
         for (const key of [POLICIES_ACCOUNT_EVENT_TYPE.name, POLICIES_ACCOUNT_EVENT_TYPE.altName]) {
             if (!key) {
                 continue;
@@ -380,14 +377,14 @@ export class IgnoredInvites {
             }
         }
 
-        let ignoreInvitesPolicies = {};
+        let ignoreInvitesPolicies: {[key: string]: any} = {};
         let hasIgnoreInvitesPolicies = false;
         for (const key of [IGNORE_INVITES_ACCOUNT_EVENT_KEY.name, IGNORE_INVITES_ACCOUNT_EVENT_KEY.altName]) {
             if (!key) {
                 continue;
             }
             const value = policies[key];
-            if (value && typeof value == "object") {
+            if (value && typeof value === "object") {
                 ignoreInvitesPolicies = value;
                 hasIgnoreInvitesPolicies = true;
                 break;
