@@ -24,7 +24,6 @@ import { Room, RoomEvent } from "../../../../src/models/room";
 import { logger } from '../../../../src/logger';
 import { MatrixClient, ClientEvent } from '../../../../src/client';
 
-
 export async function makeTestClients(userInfos, options): Promise<[TestClient[], () => void]> {
     const clients: TestClient[] = [];
     const timeouts: ReturnType<typeof setTimeout>[] = [];
