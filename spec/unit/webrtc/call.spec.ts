@@ -37,7 +37,7 @@ import {
     MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
-import { Callback, EventType, IContent, MatrixEvent, Room } from "../../../src";
+import { Callback, EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
 
 const FAKE_ROOM_ID = "!foo:bar";
 const CALL_LIFETIME = 60000;
@@ -99,7 +99,7 @@ describe('Call', function() {
     let prevDocument: Document;
     let prevWindow: Window & typeof globalThis;
     // We retain a reference to this in the correct Mock type
-    let mockSendEvent: jest.Mock<void, [string, string, IContent, string, Callback<any>]>;
+    let mockSendEvent: jest.Mock<Promise<ISendEventResponse>, [string, string, IContent, string, Callback<any>]>;
 
     beforeEach(function() {
         prevNavigator = global.navigator;
@@ -888,6 +888,8 @@ describe('Call', function() {
     });
 
     describe("answering calls", () => {
+        const realSetTimeout = setTimeout;
+
         beforeEach(async () => {
             await fakeIncomingCall(client, call, "1");
         });
@@ -898,11 +900,14 @@ describe('Call', function() {
             for (let tries = 0; tries < maxTries; ++tries) {
                 if (tries) {
                     await new Promise(resolve => {
-                        setTimeout(resolve, 100);
+                        realSetTimeout(resolve, 100);
                     });
                 }
+                // We might not always be in fake timer mode, but it's
+                // fine to run this if not, so we just call it anyway.
+                jest.runOnlyPendingTimers();
                 try {
-                    expect(client.client.sendEvent).toHaveBeenCalledWith(...args);
+                    expect(mockSendEvent).toHaveBeenCalledWith(...args);
                     return;
                 } catch (e) {
                     if (tries == maxTries - 1) {
@@ -926,35 +931,107 @@ describe('Call', function() {
             );
         });
 
-        it("sends ICE candidates as separate events if they arrive after the answer", async () => {
+        describe("ICE candidate sending", () => {
+            let mockPeerConn;
             const fakeCandidateString = "here is a fake candidate!";
-
-            await call.answer();
-            await untilEventSent(
-                FAKE_ROOM_ID,
-                EventType.CallAnswer,
-                expect.objectContaining({}),
-            );
-
-            const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
-            mockPeerConn.iceCandidateListener!({
+            const fakeCandidateEvent = {
                 candidate: {
                     candidate: fakeCandidateString,
                     sdpMLineIndex: 0,
                     sdpMid: '0',
                     toJSON: jest.fn().mockReturnValue(fakeCandidateString),
                 },
-            } as unknown as RTCPeerConnectionIceEvent);
+            } as unknown as RTCPeerConnectionIceEvent;
 
-            await untilEventSent(
-                FAKE_ROOM_ID,
-                EventType.CallCandidates,
-                expect.objectContaining({
-                    candidates: [
-                        fakeCandidateString,
-                    ],
-                }),
-            );
+            beforeEach(async () => {
+                await call.answer();
+                await untilEventSent(
+                    FAKE_ROOM_ID,
+                    EventType.CallAnswer,
+                    expect.objectContaining({}),
+                );
+                mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+            });
+
+            afterEach(() => {
+                jest.useRealTimers();
+            });
+
+            it("sends ICE candidates as separate events if they arrive after the answer", async () => {
+                mockPeerConn!.iceCandidateListener!(fakeCandidateEvent);
+
+                await untilEventSent(
+                    FAKE_ROOM_ID,
+                    EventType.CallCandidates,
+                    expect.objectContaining({
+                        candidates: [
+                            fakeCandidateString,
+                        ],
+                    }),
+                );
+            });
+
+            it("retries sending ICE candidates", async () => {
+                jest.useFakeTimers();
+
+                mockSendEvent.mockRejectedValueOnce(new Error("Fake error"));
+
+                mockPeerConn!.iceCandidateListener!(fakeCandidateEvent);
+
+                await untilEventSent(
+                    FAKE_ROOM_ID,
+                    EventType.CallCandidates,
+                    expect.objectContaining({
+                        candidates: [
+                            fakeCandidateString,
+                        ],
+                    }),
+                );
+
+                mockSendEvent.mockClear();
+
+                await untilEventSent(
+                    FAKE_ROOM_ID,
+                    EventType.CallCandidates,
+                    expect.objectContaining({
+                        candidates: [
+                            fakeCandidateString,
+                        ],
+                    }),
+                );
+            });
+
+            it("gives up on call after 5 attempts at sending ICE candidates", async () => {
+                jest.useFakeTimers();
+
+                mockSendEvent.mockImplementation((roomId: string, eventType: string) => {
+                    if (eventType === EventType.CallCandidates) {
+                        return Promise.reject(new Error());
+                    } else {
+                        return Promise.resolve({ event_id: "foo" });
+                    }
+                });
+
+                mockPeerConn!.iceCandidateListener!(fakeCandidateEvent);
+
+                while (!call.callHasEnded()) {
+                    jest.runOnlyPendingTimers();
+                    await untilEventSent(
+                        FAKE_ROOM_ID,
+                        EventType.CallCandidates,
+                        expect.objectContaining({
+                            candidates: [
+                                fakeCandidateString,
+                            ],
+                        }),
+                    );
+                    if (!call.callHasEnded) {
+                        mockSendEvent.mockReset();
+                    }
+                }
+
+                expect(call.callHasEnded()).toEqual(true);
+            });
         });
     });
 
@@ -1006,6 +1083,7 @@ describe('Call', function() {
             const sendNegotiatePromise = new Promise<void>(resolve => {
                 mockSendEvent.mockImplementationOnce(() => {
                     resolve();
+                    return Promise.resolve({ event_id: "foo" });
                 });
             });
 
