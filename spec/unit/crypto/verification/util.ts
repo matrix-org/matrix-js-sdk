@@ -19,8 +19,11 @@ import nodeCrypto from "crypto";
 
 import { TestClient } from '../../../TestClient';
 import { MatrixEvent } from "../../../../src/models/event";
+import { IRoomTimelineData } from "../../../../src/models/event-timeline-set";
+import { Room, RoomEvent } from "../../../../src/models/room";
 import { logger } from '../../../../src/logger';
-import { ClientEvent, MatrixClient, RoomEvent } from "../../../../src";
+import { MatrixClient, ClientEvent } from '../../../../src/client';
+
 
 export async function makeTestClients(userInfos, options): Promise<[TestClient[], () => void]> {
     const clients: TestClient[] = [];
@@ -33,7 +36,7 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
                 for (const [deviceId, msg] of Object.entries(devMap)) {
                     if (deviceId in clientMap[userId]) {
                         const event = new MatrixEvent({
-                            sender: matrixClient.getUserId(),
+                            sender: matrixClient.getUserId()!,
                             type: type,
                             content: msg,
                         });
@@ -55,7 +58,7 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
         // make up a unique ID as the event ID
         const eventId = "$" + matrixClient.makeTxnId();
         const rawEvent = {
-            sender: matrixClient.getUserId(),
+            sender: matrixClient.getUserId()!,
             type: type,
             content: content,
             room_id: room,
@@ -71,11 +74,13 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
 
         const timeout = setTimeout(() => {
             for (const tc of clients) {
+                const room = new Room('test', tc.client, tc.client.getUserId()!);
+                const roomTimelineData = {} as unknown as IRoomTimelineData;
                 if (tc.client === matrixClient) {
                     logger.log("sending remote echo!!");
-                    tc.client.emit(RoomEvent.Timeline, remoteEcho, undefined, false, false, undefined);
+                    tc.client.emit(RoomEvent.Timeline, remoteEcho, room, false, false, roomTimelineData);
                 } else {
-                    tc.client.emit(RoomEvent.Timeline, event, undefined, false, false, undefined);
+                    tc.client.emit(RoomEvent.Timeline, event, room, false, false, roomTimelineData);
                 }
             }
         });
@@ -124,5 +129,6 @@ export function setupWebcrypto() {
 }
 
 export function teardownWebcrypto() {
+    // @ts-ignore undefined != Crypto
     global.crypto = undefined;
 }
