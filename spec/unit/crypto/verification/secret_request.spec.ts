@@ -18,6 +18,8 @@ import { CrossSigningInfo } from '../../../../src/crypto/CrossSigning';
 import { encodeBase64 } from "../../../../src/crypto/olmlib";
 import { setupWebcrypto, teardownWebcrypto } from './util';
 import { VerificationBase } from '../../../../src/crypto/verification/Base';
+import { MatrixClient } from '../../../../src';
+import { VerificationRequest } from '../../../../src/crypto/verification/request/VerificationRequest';
 
 jest.useFakeTimers();
 
@@ -54,9 +56,21 @@ describe("self-verifications", () => {
             cacheCallbacks,
         );
         crossSigningInfo.keys = {
-            master: { keys: { X: testKeyPub } },
-            self_signing: { keys: { X: testKeyPub } },
-            user_signing: { keys: { X: testKeyPub } },
+            master: {
+                keys: { X: testKeyPub },
+                usage: [],
+                user_id: 'user-id',
+            },
+            self_signing: {
+                keys: { X: testKeyPub },
+                usage: [],
+                user_id: 'user-id',
+            },
+            user_signing: {
+                keys: { X: testKeyPub },
+                usage: [],
+                user_id: 'user-id',
+            },
         };
 
         const secretStorage = {
@@ -79,11 +93,11 @@ describe("self-verifications", () => {
             getUserId: () => userId,
             getKeyBackupVersion: () => Promise.resolve({}),
             restoreKeyBackupWithCache,
-        };
+        } as unknown as MatrixClient;
 
         const request = {
             onVerifierFinished: () => undefined,
-        };
+        } as unknown as VerificationRequest;
 
         const verification = new VerificationBase(
             undefined, // channel
@@ -93,6 +107,8 @@ describe("self-verifications", () => {
             undefined, // startEvent
             request,
         );
+
+        // @ts-ignore set private property
         verification.resolve = () => undefined;
 
         const result = await verification.done();
