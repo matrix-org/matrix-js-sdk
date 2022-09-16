@@ -133,7 +133,10 @@ function makeRemoteEcho(event) {
 
 async function distributeEvent(ownRequest, theirRequest, event) {
     await ownRequest.channel.handleEvent(
-        makeRemoteEcho(event), ownRequest, true);
+        makeRemoteEcho(event),
+        ownRequest,
+        true,
+    );
     await theirRequest.channel.handleEvent(event, theirRequest, true);
 }
 
@@ -156,10 +159,14 @@ describe("verification request unit tests", function() {
         ) as unknown as Map<string, typeof VerificationBase>;
         const aliceRequest = new VerificationRequest(
             new InRoomChannel(alice, "!room", bob.getUserId()!),
-            verificationMethods, alice);
+            verificationMethods,
+            alice,
+        );
         const bobRequest = new VerificationRequest(
             new InRoomChannel(bob, "!room"),
-            verificationMethods, bob);
+            verificationMethods,
+            bob,
+        );
         expect(aliceRequest.invalid).toBe(true);
         expect(bobRequest.invalid).toBe(true);
 
@@ -211,7 +218,9 @@ describe("verification request unit tests", function() {
             aliceVerificationMethods, alice);
         const bobRequest = new VerificationRequest(
             new InRoomChannel(bob, "!room"),
-            bobVerificationMethods, bob);
+            bobVerificationMethods,
+            bob,
+        );
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
         await distributeEvent(aliceRequest, bobRequest, requestEvent);
@@ -227,13 +236,22 @@ describe("verification request unit tests", function() {
         const bob1 = makeMockClient("@bob:matrix.tld", "device1");
         const bob2 = makeMockClient("@bob:matrix.tld", "device2");
         const aliceRequest = new VerificationRequest(
-            new InRoomChannel(alice, "!room", bob1.getUserId()!), new Map(), alice);
+            new InRoomChannel(alice, "!room", bob1.getUserId()!),
+            new Map(),
+            alice,
+        );
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
         const bob1Request = new VerificationRequest(
-            new InRoomChannel(bob1, "!room"), new Map(), bob1);
+            new InRoomChannel(bob1, "!room"),
+            new Map(),
+            bob1,
+        );
         const bob2Request = new VerificationRequest(
-            new InRoomChannel(bob2, "!room"), new Map(), bob2);
+            new InRoomChannel(bob2, "!room"),
+            new Map(),
+            bob2,
+        );
 
         await bob1Request.channel.handleEvent(requestEvent, bob1Request, true);
         await bob2Request.channel.handleEvent(requestEvent, bob2Request, true);
@@ -252,9 +270,16 @@ describe("verification request unit tests", function() {
             [[MOCK_METHOD, MockVerifier]],
         ) as unknown as Map<string, typeof VerificationBase>;
         const bob1Request = new VerificationRequest(
-            new ToDeviceChannel(bob1, bob1.getUserId()!, ["device1", "device2"],
-                ToDeviceChannel.makeTransactionId(), "device2"),
-            verificationMethods, bob1);
+            new ToDeviceChannel(
+                bob1,
+                bob1.getUserId()!,
+                ["device1", "device2"],
+                ToDeviceChannel.makeTransactionId(),
+                "device2",
+            ),
+            verificationMethods,
+            bob1,
+        );
         const to = { userId: "@bob:matrix.tld", deviceId: "device2" };
         const verifier = bob1Request.beginKeyVerification(MOCK_METHOD, to);
         expect(verifier).toBeInstanceOf(MockVerifier);
@@ -263,7 +288,9 @@ describe("verification request unit tests", function() {
         expect(startEvent.getType()).toBe(START_TYPE);
         const bob2Request = new VerificationRequest(
             new ToDeviceChannel(bob2, bob2.getUserId()!, ["device1"]),
-            verificationMethods, bob2);
+            verificationMethods,
+            bob2,
+        );
 
         await bob2Request.channel.handleEvent(startEvent, bob2Request, true);
         await (bob2Request.verifier as MockVerifier).start();
@@ -282,7 +309,10 @@ describe("verification request unit tests", function() {
         const alice = makeMockClient("@alice:matrix.tld", "device1");
         const bob = makeMockClient("@bob:matrix.tld", "device1");
         const aliceRequest = new VerificationRequest(
-            new InRoomChannel(alice, "!room", bob.getUserId()!), new Map(), alice);
+            new InRoomChannel(alice, "!room", bob.getUserId()!),
+            new Map(),
+            alice,
+        );
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
         await aliceRequest.channel.handleEvent(requestEvent, aliceRequest, true);
@@ -297,11 +327,17 @@ describe("verification request unit tests", function() {
         const alice = makeMockClient("@alice:matrix.tld", "device1");
         const bob = makeMockClient("@bob:matrix.tld", "device1");
         const aliceRequest = new VerificationRequest(
-            new InRoomChannel(alice, "!room", bob.getUserId()!), new Map(), alice);
+            new InRoomChannel(alice, "!room", bob.getUserId()!),
+            new Map(),
+            alice,
+        );
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
         const bobRequest = new VerificationRequest(
-            new InRoomChannel(bob, "!room"), new Map(), bob);
+            new InRoomChannel(bob, "!room"),
+            new Map(),
+            bob,
+        );
 
         await bobRequest.channel.handleEvent(requestEvent, bobRequest, true);
 
