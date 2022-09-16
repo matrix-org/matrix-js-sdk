@@ -19,9 +19,16 @@ import { InRoomChannel } from "../../../../src/crypto/verification/request/InRoo
 import { ToDeviceChannel } from
     "../../../../src/crypto/verification/request/ToDeviceChannel";
 import { MatrixEvent } from "../../../../src/models/event";
+import { MatrixClient } from "../../../../src/client";
 import { setupWebcrypto, teardownWebcrypto } from "./util";
+import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
+import { VerificationBase } from "../../../../src/crypto/verification/Base";
 
-function makeMockClient(userId, deviceId) {
+type MockClient = MatrixClient & {
+    popEvents: () => MatrixEvent[];
+    popDeviceEvents: (userId: string, deviceId: string) => MatrixEvent[];
+};
+function makeMockClient(userId: string, deviceId: string): MockClient {
     let counter = 1;
     let events = [];
     const deviceEvents = {};
@@ -54,16 +61,18 @@ function makeMockClient(userId, deviceId) {
                     deviceEvents[userId][deviceId].push(event);
                 }
             }
-            return Promise.resolve();
+            return Promise.resolve({});
         },
 
-        popEvents() {
+        // @ts-ignore special testing fn
+        popEvents(): MatrixEvent[] {
             const e = events;
             events = [];
             return e;
         },
 
-        popDeviceEvents(userId, deviceId) {
+        // @ts-ignore special testing fn
+        popDeviceEvents(userId: string, deviceId: string): MatrixEvent[] {
             const forDevice = deviceEvents[userId];
             const events = forDevice && forDevice[deviceId];
             const result = events || [];
@@ -72,12 +81,21 @@ function makeMockClient(userId, deviceId) {
             }
             return result;
         },
-    };
+    } as unknown as MockClient;
 }
 
 const MOCK_METHOD = "mock-verify";
-class MockVerifier {
-    constructor(channel, client, userId, deviceId, startEvent) {
+class MockVerifier extends VerificationBase<'', any> {
+    public _channel;
+    public _startEvent;
+    constructor(
+        channel: IVerificationChannel,
+        client: MatrixClient,
+        userId: string,
+        deviceId: string,
+        startEvent: MatrixEvent,
+    ) {
+        super(channel, client, userId, deviceId, startEvent, {} as unknown as VerificationRequest);
         this._channel = channel;
         this._startEvent = startEvent;
     }
@@ -115,7 +133,7 @@ function makeRemoteEcho(event) {
 
 async function distributeEvent(ownRequest, theirRequest, event) {
     await ownRequest.channel.handleEvent(
-            makeRemoteEcho(event), ownRequest, true);
+        makeRemoteEcho(event), ownRequest, true);
     await theirRequest.channel.handleEvent(event, theirRequest, true);
 }
 
@@ -133,12 +151,15 @@ describe("verification request unit tests", function() {
     it("transition from UNSENT to DONE through happy path", async function() {
         const alice = makeMockClient("@alice:matrix.tld", "device1");
         const bob = makeMockClient("@bob:matrix.tld", "device1");
+        const verificationMethods = new Map(
+            [[MOCK_METHOD, MockVerifier]],
+        ) as unknown as Map<string, typeof VerificationBase>;
         const aliceRequest = new VerificationRequest(
             new InRoomChannel(alice, "!room", bob.getUserId()),
-            new Map([[MOCK_METHOD, MockVerifier]]), alice);
+            verificationMethods, alice);
         const bobRequest = new VerificationRequest(
             new InRoomChannel(bob, "!room"),
-            new Map([[MOCK_METHOD, MockVerifier]]), bob);
+            verificationMethods, bob);
         expect(aliceRequest.invalid).toBe(true);
         expect(bobRequest.invalid).toBe(true);
 
@@ -157,7 +178,7 @@ describe("verification request unit tests", function() {
         expect(aliceRequest.ready).toBe(true);
 
         const verifier = aliceRequest.beginKeyVerification(MOCK_METHOD);
-        await verifier.start();
+        await (verifier as MockVerifier).start();
         const [startEvent] = alice.popEvents();
         expect(startEvent.getType()).toBe(START_TYPE);
         await distributeEvent(aliceRequest, bobRequest, startEvent);
@@ -165,8 +186,7 @@ describe("verification request unit tests", function() {
         expect(aliceRequest.verifier).toBeInstanceOf(MockVerifier);
         expect(bobRequest.started).toBe(true);
         expect(bobRequest.verifier).toBeInstanceOf(MockVerifier);
-
-        await bobRequest.verifier.start();
+        await (bobRequest.verifier as MockVerifier).start();
         const [bobDoneEvent] = bob.popEvents();
         expect(bobDoneEvent.getType()).toBe(DONE_TYPE);
         await distributeEvent(bobRequest, aliceRequest, bobDoneEvent);
@@ -180,12 +200,18 @@ describe("verification request unit tests", function() {
     it("methods only contains common methods", async function() {
         const alice = makeMockClient("@alice:matrix.tld", "device1");
         const bob = makeMockClient("@bob:matrix.tld", "device1");
+        const aliceVerificationMethods = new Map(
+            [["c", function() {}], ["a", function() {}]],
+        ) as unknown as Map<string, typeof VerificationBase>;
+        const bobVerificationMethods = new Map(
+            [["c", function() {}], ["b", function() {}]]
+        ) as unknown as Map<string, typeof VerificationBase>;
         const aliceRequest = new VerificationRequest(
             new InRoomChannel(alice, "!room", bob.getUserId()),
-            new Map([["c", function() {}], ["a", function() {}]]), alice);
+            aliceVerificationMethods, alice);
         const bobRequest = new VerificationRequest(
             new InRoomChannel(bob, "!room"),
-            new Map([["c", function() {}], ["b", function() {}]]), bob);
+            bobVerificationMethods, bob);
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
         await distributeEvent(aliceRequest, bobRequest, requestEvent);
@@ -222,22 +248,25 @@ describe("verification request unit tests", function() {
     it("verify own device with to_device messages", async function() {
         const bob1 = makeMockClient("@bob:matrix.tld", "device1");
         const bob2 = makeMockClient("@bob:matrix.tld", "device2");
+        const verificationMethods = new Map(
+            [[MOCK_METHOD, MockVerifier]],
+        ) as unknown as Map<string, typeof VerificationBase>;
         const bob1Request = new VerificationRequest(
             new ToDeviceChannel(bob1, bob1.getUserId(), ["device1", "device2"],
                 ToDeviceChannel.makeTransactionId(), "device2"),
-            new Map([[MOCK_METHOD, MockVerifier]]), bob1);
+            verificationMethods, bob1);
         const to = { userId: "@bob:matrix.tld", deviceId: "device2" };
         const verifier = bob1Request.beginKeyVerification(MOCK_METHOD, to);
         expect(verifier).toBeInstanceOf(MockVerifier);
-        await verifier.start();
+        await (verifier as MockVerifier).start();
         const [startEvent] = bob1.popDeviceEvents(to.userId, to.deviceId);
         expect(startEvent.getType()).toBe(START_TYPE);
         const bob2Request = new VerificationRequest(
             new ToDeviceChannel(bob2, bob2.getUserId(), ["device1"]),
-            new Map([[MOCK_METHOD, MockVerifier]]), bob2);
+            verificationMethods, bob2);
 
         await bob2Request.channel.handleEvent(startEvent, bob2Request, true);
-        await bob2Request.verifier.start();
+        await (bob2Request.verifier as MockVerifier).start();
         const [doneEvent1] = bob2.popDeviceEvents("@bob:matrix.tld", "device1");
         expect(doneEvent1.getType()).toBe(DONE_TYPE);
         await bob1Request.channel.handleEvent(doneEvent1, bob1Request, true);
@@ -256,8 +285,7 @@ describe("verification request unit tests", function() {
             new InRoomChannel(alice, "!room", bob.getUserId()), new Map(), alice);
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
-        await aliceRequest.channel.handleEvent(requestEvent, aliceRequest, true,
-            true, true);
+        await aliceRequest.channel.handleEvent(requestEvent, aliceRequest, true);
 
         expect(aliceRequest.cancelled).toBe(false);
         expect(aliceRequest._cancellingUserId).toBe(undefined);
