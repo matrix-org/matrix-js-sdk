@@ -18,8 +18,9 @@ import { CrossSigningInfo } from '../../../../src/crypto/CrossSigning';
 import { encodeBase64 } from "../../../../src/crypto/olmlib";
 import { setupWebcrypto, teardownWebcrypto } from './util';
 import { VerificationBase } from '../../../../src/crypto/verification/Base';
-import { MatrixClient } from '../../../../src';
+import { MatrixClient, MatrixEvent } from '../../../../src';
 import { VerificationRequest } from '../../../../src/crypto/verification/request/VerificationRequest';
+import { IVerificationChannel } from '../../../../src/crypto/verification/request/Channel';
 
 jest.useFakeTimers();
 
@@ -100,11 +101,11 @@ describe("self-verifications", () => {
         } as unknown as VerificationRequest;
 
         const verification = new VerificationBase(
-            undefined, // channel
+            undefined as unknown as IVerificationChannel, // channel
             client, // baseApis
             userId,
             "ABC", // deviceId
-            undefined, // startEvent
+            undefined as unknown as MatrixEvent, // startEvent
             request,
         );
 
@@ -118,12 +119,12 @@ describe("self-verifications", () => {
         expect(secretStorage.request.mock.calls.length).toBe(4);
 
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls[0][1])
-          .toEqual(testKey);
+            .toEqual(testKey);
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls[1][1])
-          .toEqual(testKey);
+            .toEqual(testKey);
 
         expect(storeSessionBackupPrivateKey.mock.calls[0][0])
-          .toEqual(testKey);
+            .toEqual(testKey);
 
         expect(restoreKeyBackupWithCache).toHaveBeenCalled();
 

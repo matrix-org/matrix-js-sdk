@@ -59,7 +59,8 @@ describe("SAS verification", function() {
             },
         } as unknown as IVerificationChannel;
         const mockClient = {} as unknown as MatrixClient;
-        const sas = new SAS(channel, mockClient, "@alice:example.com", "ABCDEFG", null, request);
+        const event = new MatrixEvent({ type: 'test' });
+        const sas = new SAS(channel, mockClient, "@alice:example.com", "ABCDEFG", event, request);
         sas.handleEvent(new MatrixEvent({
             sender: "@alice:example.com",
             type: "es.inquisition",
@@ -422,7 +423,7 @@ describe("SAS verification", function() {
         });
 
         const aliceVerifier = alice.client.beginKeyVerification(
-            verificationMethods.SAS, bob.client.getUserId(), bob.client.deviceId,
+            verificationMethods.SAS, bob.client.getUserId()!, bob.client.deviceId!,
         );
 
         const aliceSpy = jest.fn();

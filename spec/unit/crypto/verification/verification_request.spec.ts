@@ -30,7 +30,7 @@ type MockClient = MatrixClient & {
 };
 function makeMockClient(userId: string, deviceId: string): MockClient {
     let counter = 1;
-    let events = [];
+    let events: MatrixEvent[] = [];
     const deviceEvents = {};
     return {
         getUserId() { return userId; },
@@ -155,7 +155,7 @@ describe("verification request unit tests", function() {
             [[MOCK_METHOD, MockVerifier]],
         ) as unknown as Map<string, typeof VerificationBase>;
         const aliceRequest = new VerificationRequest(
-            new InRoomChannel(alice, "!room", bob.getUserId()),
+            new InRoomChannel(alice, "!room", bob.getUserId()!),
             verificationMethods, alice);
         const bobRequest = new VerificationRequest(
             new InRoomChannel(bob, "!room"),
@@ -204,10 +204,10 @@ describe("verification request unit tests", function() {
             [["c", function() {}], ["a", function() {}]],
         ) as unknown as Map<string, typeof VerificationBase>;
         const bobVerificationMethods = new Map(
-            [["c", function() {}], ["b", function() {}]]
+            [["c", function() {}], ["b", function() {}]],
         ) as unknown as Map<string, typeof VerificationBase>;
         const aliceRequest = new VerificationRequest(
-            new InRoomChannel(alice, "!room", bob.getUserId()),
+            new InRoomChannel(alice, "!room", bob.getUserId()!),
             aliceVerificationMethods, alice);
         const bobRequest = new VerificationRequest(
             new InRoomChannel(bob, "!room"),
@@ -227,7 +227,7 @@ describe("verification request unit tests", function() {
         const bob1 = makeMockClient("@bob:matrix.tld", "device1");
         const bob2 = makeMockClient("@bob:matrix.tld", "device2");
         const aliceRequest = new VerificationRequest(
-            new InRoomChannel(alice, "!room", bob1.getUserId()), new Map(), alice);
+            new InRoomChannel(alice, "!room", bob1.getUserId()!), new Map(), alice);
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
         const bob1Request = new VerificationRequest(
@@ -252,7 +252,7 @@ describe("verification request unit tests", function() {
             [[MOCK_METHOD, MockVerifier]],
         ) as unknown as Map<string, typeof VerificationBase>;
         const bob1Request = new VerificationRequest(
-            new ToDeviceChannel(bob1, bob1.getUserId(), ["device1", "device2"],
+            new ToDeviceChannel(bob1, bob1.getUserId()!, ["device1", "device2"],
                 ToDeviceChannel.makeTransactionId(), "device2"),
             verificationMethods, bob1);
         const to = { userId: "@bob:matrix.tld", deviceId: "device2" };
@@ -262,7 +262,7 @@ describe("verification request unit tests", function() {
         const [startEvent] = bob1.popDeviceEvents(to.userId, to.deviceId);
         expect(startEvent.getType()).toBe(START_TYPE);
         const bob2Request = new VerificationRequest(
-            new ToDeviceChannel(bob2, bob2.getUserId(), ["device1"]),
+            new ToDeviceChannel(bob2, bob2.getUserId()!, ["device1"]),
             verificationMethods, bob2);
 
         await bob2Request.channel.handleEvent(startEvent, bob2Request, true);
@@ -282,7 +282,7 @@ describe("verification request unit tests", function() {
         const alice = makeMockClient("@alice:matrix.tld", "device1");
         const bob = makeMockClient("@bob:matrix.tld", "device1");
         const aliceRequest = new VerificationRequest(
-            new InRoomChannel(alice, "!room", bob.getUserId()), new Map(), alice);
+            new InRoomChannel(alice, "!room", bob.getUserId()!), new Map(), alice);
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
         await aliceRequest.channel.handleEvent(requestEvent, aliceRequest, true);
@@ -297,7 +297,7 @@ describe("verification request unit tests", function() {
         const alice = makeMockClient("@alice:matrix.tld", "device1");
         const bob = makeMockClient("@bob:matrix.tld", "device1");
         const aliceRequest = new VerificationRequest(
-            new InRoomChannel(alice, "!room", bob.getUserId()), new Map(), alice);
+            new InRoomChannel(alice, "!room", bob.getUserId()!), new Map(), alice);
         await aliceRequest.sendRequest();
         const [requestEvent] = alice.popEvents();
         const bobRequest = new VerificationRequest(
