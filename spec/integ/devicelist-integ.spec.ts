@@ -122,7 +122,7 @@ describe("DeviceList management:", function() {
             aliceTestClient.httpBackend.when(
                 'PUT', '/send/',
             ).respond(200, {
-                    event_id: '$event_id',
+                event_id: '$event_id',
             });
 
             return Promise.all([
@@ -290,8 +290,9 @@ describe("DeviceList management:", function() {
             aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
 
+                // Alice should be tracking bob's device list
                 expect(bobStat).toBeGreaterThan(
-                    0, "Alice should be tracking bob's device list",
+                    0,
                 );
             });
         });
@@ -326,8 +327,9 @@ describe("DeviceList management:", function() {
             aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
 
+                // Alice should have marked bob's device list as untracked
                 expect(bobStat).toEqual(
-                    0, "Alice should have marked bob's device list as untracked",
+                    0,
                 );
             });
         });
@@ -362,8 +364,9 @@ describe("DeviceList management:", function() {
             aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                 const bobStat = data.trackingStatus['@bob:xyz'];
 
+                // Alice should have marked bob's device list as untracked
                 expect(bobStat).toEqual(
-                    0, "Alice should have marked bob's device list as untracked",
+                    0,
                 );
             });
         });
@@ -380,11 +383,13 @@ describe("DeviceList management:", function() {
                 await anotherTestClient.flushSync();
                 await anotherTestClient.client.crypto.deviceList.saveIfDirty();
 
+                // @ts-ignore accessing private property
                 anotherTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
                     const bobStat = data.trackingStatus['@bob:xyz'];
 
+                    // Alice should have marked bob's device list as untracked
                     expect(bobStat).toEqual(
-                        0, "Alice should have marked bob's device list as untracked",
+                        0,
                     );
                 });
             } finally {
