@@ -13,35 +13,48 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
-import { CRYPTO_ENABLED } from "../../src/client";
+import { CRYPTO_ENABLED, MatrixClient, IStoredClientOpts } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import { Filter, MemoryStore, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { IFilterDefinition } from "../../src/filter";
+import { FileType } from "../../src/http-api";
+import { ISearchResults } from "../../src/@types/search";
+import { IStore } from "../../src/store";
 
 describe("MatrixClient", function() {
-    let client = null;
-    let httpBackend = null;
-    let store = null;
     const userId = "@alice:localhost";
     const accessToken = "aseukfgwef";
     const idServerDomain = "identity.localhost"; // not a real server
     const identityAccessToken = "woop-i-am-a-secret";
 
-    beforeEach(function() {
-        store = new MemoryStore();
+    const defaultClientOpts: IStoredClientOpts = {
+        canResetEntireTimeline: roomId => false,
+        experimentalThreadSupport: false,
+        crypto: {} as unknown as IStoredClientOpts['crypto'],
+    };
+    const setupTests = (): [MatrixClient, HttpBackend, MemoryStore] => {
+        const store = new MemoryStore();
 
         const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, {
-            store,
+            store: store as IStore,
             identityServer: {
                 getAccessToken: () => Promise.resolve(identityAccessToken),
             },
             idBaseUrl: `https://${idServerDomain}`,
         });
-        httpBackend = testClient.httpBackend;
-        client = testClient.client;
+
+        return [testClient.client, testClient.httpBackend, store];
+    };
+
+    let [client, httpBackend, store] = setupTests();
+
+    beforeEach(function() {
+        [client, httpBackend, store] = setupTests();
     });
 
     afterEach(function() {
@@ -56,13 +69,15 @@ describe("MatrixClient", function() {
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
                 expect(req.rawData).toEqual(buf);
-                expect(req.queryParams.filename).toEqual("hi.txt");
-                if (!(req.queryParams.access_token == accessToken ||
+                expect(req.queryParams?.filename).toEqual("hi.txt");
+                if (!(req.queryParams?.access_token == accessToken ||
                         req.headers["Authorization"] == "Bearer " + accessToken)) {
                     expect(true).toBe(false);
                 }
                 expect(req.headers["Content-Type"]).toEqual("text/plain");
+                // @ts-ignore private property
                 expect(req.opts.json).toBeFalsy();
+                // @ts-ignore private property
                 expect(req.opts.timeout).toBe(undefined);
             }).respond(200, "content", true);
 
@@ -70,7 +85,7 @@ describe("MatrixClient", function() {
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
-            });
+            } as unknown as FileType);
 
             expect(prom).toBeTruthy();
 
@@ -87,7 +102,7 @@ describe("MatrixClient", function() {
                 expect(uploads.length).toEqual(0);
             });
 
-            httpBackend.flush();
+            httpBackend.flush('');
             return prom2;
         });
 
@@ -95,6 +110,7 @@ describe("MatrixClient", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
+                // @ts-ignore private property
                 expect(req.opts.json).toBeFalsy();
             }).respond(200, { "content_uri": "uri" });
 
@@ -102,13 +118,13 @@ describe("MatrixClient", function() {
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
-            }, {
+            } as unknown as FileType, {
                 rawResponse: false,
             }).then(function(response) {
                 expect(response.content_uri).toEqual("uri");
             });
 
-            httpBackend.flush();
+            httpBackend.flush('');
             return prom;
         });
 
@@ -117,6 +133,7 @@ describe("MatrixClient", function() {
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
                 expect(req.rawData).toEqual(buf);
+                // @ts-ignore private property
                 expect(req.opts.json).toBeFalsy();
             }).respond(400, {
                 "errcode": "M_SNAFU",
@@ -127,7 +144,7 @@ describe("MatrixClient", function() {
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
-            }).then(function(response) {
+            } as unknown as FileType).then(function(response) {
                 throw Error("request not failed");
             }, function(error) {
                 expect(error.httpStatus).toEqual(400);
@@ -135,7 +152,7 @@ describe("MatrixClient", function() {
                 expect(error.message).toEqual("broken");
             });
 
-            httpBackend.flush();
+            httpBackend.flush('');
             return prom;
         });
 
@@ -144,7 +161,7 @@ describe("MatrixClient", function() {
                 stream: buf,
                 name: "hi.txt",
                 type: "text/plain",
-            });
+            } as unknown as FileType);
 
             const uploads = client.getCurrentUploads();
             expect(uploads.length).toEqual(1);
@@ -170,7 +187,10 @@ describe("MatrixClient", function() {
         it("should no-op if you've already joined a room", function() {
             const roomId = "!foo:bar";
             const room = new Room(roomId, client, userId);
-            client.fetchRoomEvent = () => Promise.resolve({});
+            client.fetchRoomEvent = () => Promise.resolve({
+                type: 'test',
+                content: {},
+            });
             room.addLiveEvents([
                 utils.mkMembership({
                     user: userId, room: roomId, mship: "join", event: true,
@@ -217,7 +237,7 @@ describe("MatrixClient", function() {
                 done();
             });
 
-            httpBackend.flush();
+            httpBackend.flush('');
         });
 
         it("should do an HTTP request if nothing is in the cache and then store it",
@@ -236,7 +256,7 @@ describe("MatrixClient", function() {
                 done();
             });
 
-            httpBackend.flush();
+            httpBackend.flush('');
         });
     });
 
@@ -247,7 +267,7 @@ describe("MatrixClient", function() {
             expect(store.getFilter(userId, filterId)).toBe(null);
 
             const filterDefinition = {
-                event_format: "client",
+                event_format: "client" as IFilterDefinition['event_format'],
             };
 
             httpBackend.when(
@@ -264,7 +284,7 @@ describe("MatrixClient", function() {
                 done();
             });
 
-            httpBackend.flush();
+            httpBackend.flush('');
         });
     });
 
@@ -304,7 +324,7 @@ describe("MatrixClient", function() {
                 });
             }).respond(200, response);
 
-            return httpBackend.flush();
+            return httpBackend.flush('');
         });
 
         describe("should filter out context from different timelines (threads)", () => {
@@ -313,11 +333,14 @@ describe("MatrixClient", function() {
                     search_categories: {
                         room_events: {
                             count: 24,
+                            highlights: [],
                             results: [{
                                 rank: 0.1,
                                 result: {
                                     event_id: "$flibble:localhost",
                                     type: "m.room.message",
+                                    sender: '@test:locahost',
+                                    origin_server_ts: 123,
                                     user_id: "@alice:localhost",
                                     room_id: "!feuiwhf:localhost",
                                     content: {
@@ -326,9 +349,12 @@ describe("MatrixClient", function() {
                                     },
                                 },
                                 context: {
+                                    profile_info: {},
                                     events_after: [{
                                         event_id: "$ev-after:server",
                                         type: "m.room.message",
+                                        sender: '@test:locahost',
+                                    origin_server_ts: 123,
                                         user_id: "@alice:localhost",
                                         room_id: "!feuiwhf:localhost",
                                         content: {
@@ -343,6 +369,8 @@ describe("MatrixClient", function() {
                                     events_before: [{
                                         event_id: "$ev-before:server",
                                         type: "m.room.message",
+                                        sender: '@test:locahost',
+                                    origin_server_ts: 123,
                                         user_id: "@alice:localhost",
                                         room_id: "!feuiwhf:localhost",
                                         content: {
@@ -356,15 +384,17 @@ describe("MatrixClient", function() {
                     },
                 };
 
-                const data = {
+                const data: ISearchResults = {
                     results: [],
                     highlights: [],
                 };
                 client.processRoomEventsSearch(data, response);
 
                 expect(data.results).toHaveLength(1);
-                expect(data.results[0].context.timeline).toHaveLength(2);
-                expect(data.results[0].context.timeline.find(e => e.getId() === "$ev-after:server")).toBeFalsy();
+                expect(data.results[0].context.getTimeline()).toHaveLength(2);
+                expect(
+                    data.results[0].context.getTimeline().find(e => e.getId() === "$ev-after:server")
+                ).toBeFalsy();
             });
 
             it("filters out thread replies from threads other than the thread the result replied to", () => {
@@ -372,11 +402,14 @@ describe("MatrixClient", function() {
                     search_categories: {
                         room_events: {
                             count: 24,
+                            highlights: [],
                             results: [{
                                 rank: 0.1,
                                 result: {
                                     event_id: "$flibble:localhost",
                                     type: "m.room.message",
+                                    sender: '@test:locahost',
+                                    origin_server_ts: 123,
                                     user_id: "@alice:localhost",
                                     room_id: "!feuiwhf:localhost",
                                     content: {
@@ -389,9 +422,12 @@ describe("MatrixClient", function() {
                                     },
                                 },
                                 context: {
+                                    profile_info: {},
                                     events_after: [{
                                         event_id: "$ev-after:server",
                                         type: "m.room.message",
+                                        sender: '@test:locahost',
+                                        origin_server_ts: 123,
                                         user_id: "@alice:localhost",
                                         room_id: "!feuiwhf:localhost",
                                         content: {
@@ -410,15 +446,17 @@ describe("MatrixClient", function() {
                     },
                 };
 
-                const data = {
+                const data: ISearchResults = {
                     results: [],
                     highlights: [],
                 };
                 client.processRoomEventsSearch(data, response);
 
                 expect(data.results).toHaveLength(1);
-                expect(data.results[0].context.timeline).toHaveLength(1);
-                expect(data.results[0].context.timeline.find(e => e.getId() === "$flibble:localhost")).toBeTruthy();
+                expect(data.results[0].context.getTimeline()).toHaveLength(1);
+                expect(
+                    data.results[0].context.getTimeline().find(e => e.getId() === "$flibble:localhost")
+                ).toBeTruthy();
             });
 
             it("filters out main timeline events when result is a thread reply", () => {
@@ -426,10 +464,13 @@ describe("MatrixClient", function() {
                     search_categories: {
                         room_events: {
                             count: 24,
+                            highlights: [],
                             results: [{
                                 rank: 0.1,
                                 result: {
                                     event_id: "$flibble:localhost",
+                                    sender: '@test:locahost',
+                                    origin_server_ts: 123,
                                     type: "m.room.message",
                                     user_id: "@alice:localhost",
                                     room_id: "!feuiwhf:localhost",
@@ -445,6 +486,8 @@ describe("MatrixClient", function() {
                                 context: {
                                     events_after: [{
                                         event_id: "$ev-after:server",
+                                        sender: '@test:locahost',
+                                        origin_server_ts: 123,
                                         type: "m.room.message",
                                         user_id: "@alice:localhost",
                                         room_id: "!feuiwhf:localhost",
@@ -454,21 +497,24 @@ describe("MatrixClient", function() {
                                         },
                                     }],
                                     events_before: [],
+                                    profile_info: {},
                                 },
                             }],
                         },
                     },
                 };
 
-                const data = {
+                const data: ISearchResults = {
                     results: [],
                     highlights: [],
                 };
                 client.processRoomEventsSearch(data, response);
 
                 expect(data.results).toHaveLength(1);
-                expect(data.results[0].context.timeline).toHaveLength(1);
-                expect(data.results[0].context.timeline.find(e => e.getId() === "$flibble:localhost")).toBeTruthy();
+                expect(data.results[0].context.getTimeline()).toHaveLength(1);
+                expect(
+                    data.results[0].context.getTimeline().find(e => e.getId() === "$flibble:localhost")
+                ).toBeTruthy();
             });
         });
     });
@@ -564,13 +610,13 @@ describe("MatrixClient", function() {
                 });
             });
 
-            httpBackend.flush();
+            httpBackend.flush('');
             return prom;
         });
     });
 
     describe("deleteDevice", function() {
-        const auth = { a: 1 };
+        const auth = { identifier: 1 };
         it("should pass through an auth dict", function() {
             httpBackend.when(
                 "DELETE", "/_matrix/client/r0/devices/my_device",
@@ -580,7 +626,7 @@ describe("MatrixClient", function() {
 
             const prom = client.deleteDevice("my_device", auth);
 
-            httpBackend.flush();
+            httpBackend.flush('');
             return prom;
         });
     });
@@ -599,7 +645,11 @@ describe("MatrixClient", function() {
         });
 
         it("copies pre-thread in-timeline vote events onto both timelines", function() {
-            client.clientOpts = { experimentalThreadSupport: true };
+            // @ts-ignore setting private property
+            client.clientOpts = {
+                ...defaultClientOpts,
+                experimentalThreadSupport: true,
+            };
 
             const eventPollResponseReference = buildEventPollResponseReference();
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -611,6 +661,7 @@ describe("MatrixClient", function() {
                 eventPollResponseReference,
             ];
             // Vote has no threadId yet
+            // @ts-ignore private property
             expect(eventPollResponseReference.threadId).toBeFalsy();
 
             const [timeline, threaded] = room.partitionThreadedEvents(events);
@@ -634,7 +685,11 @@ describe("MatrixClient", function() {
         });
 
         it("copies pre-thread in-timeline reactions onto both timelines", function() {
-            client.clientOpts = { experimentalThreadSupport: true };
+            // @ts-ignore setting private property
+            client.clientOpts = {
+                ...defaultClientOpts,
+                experimentalThreadSupport: true,
+            };
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
             const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
@@ -661,7 +716,11 @@ describe("MatrixClient", function() {
         });
 
         it("copies post-thread in-timeline vote events onto both timelines", function() {
-            client.clientOpts = { experimentalThreadSupport: true };
+            // @ts-ignore setting private property
+            client.clientOpts = {
+                ...defaultClientOpts,
+                experimentalThreadSupport: true,
+            };
 
             const eventPollResponseReference = buildEventPollResponseReference();
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -688,7 +747,11 @@ describe("MatrixClient", function() {
         });
 
         it("copies post-thread in-timeline reactions onto both timelines", function() {
-            client.clientOpts = { experimentalThreadSupport: true };
+            // @ts-ignore setting private property
+            client.clientOpts = {
+                ...defaultClientOpts,
+                experimentalThreadSupport: true,
+            };
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
             const eventMessageInThread = buildEventMessageInThread(eventPollStartThreadRoot);
@@ -715,7 +778,11 @@ describe("MatrixClient", function() {
         });
 
         it("sends room state events to the main timeline only", function() {
-            client.clientOpts = { experimentalThreadSupport: true };
+            // @ts-ignore setting private property
+            client.clientOpts = {
+                ...defaultClientOpts,
+                experimentalThreadSupport: true,
+            };
             // This is based on recording the events in a real room:
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -768,7 +835,11 @@ describe("MatrixClient", function() {
         });
 
         it("sends redactions of reactions to thread responses to thread timeline only", () => {
-            client.clientOpts = { experimentalThreadSupport: true };
+            // @ts-ignore setting private property
+            client.clientOpts = {
+                ...defaultClientOpts,
+                experimentalThreadSupport: true,
+            };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
             const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
@@ -797,7 +868,11 @@ describe("MatrixClient", function() {
         });
 
         it("sends reply to reply to thread root outside of thread to main timeline only", () => {
-            client.clientOpts = { experimentalThreadSupport: true };
+            // @ts-ignore setting private property
+            client.clientOpts = {
+                ...defaultClientOpts,
+                experimentalThreadSupport: true,
+            };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
             const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
@@ -826,7 +901,11 @@ describe("MatrixClient", function() {
         });
 
         it("sends reply to thread responses to main timeline only", () => {
-            client.clientOpts = { experimentalThreadSupport: true };
+            // @ts-ignore setting private property
+            client.clientOpts = {
+                ...defaultClientOpts,
+                experimentalThreadSupport: true,
+            };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
             const eventMessageInThread = buildEventMessageInThread(threadRootEvent);
@@ -862,7 +941,7 @@ describe("MatrixClient", function() {
 
             const prom = client.getThirdpartyUser("irc", {});
             httpBackend.when("GET", "/thirdparty/user/irc").respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -877,7 +956,7 @@ describe("MatrixClient", function() {
 
             const prom = client.getThirdpartyLocation("irc", {});
             httpBackend.when("GET", "/thirdparty/location/irc").respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -890,7 +969,7 @@ describe("MatrixClient", function() {
 
             const prom = client.getPushers();
             httpBackend.when("GET", "/pushers").respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -904,10 +983,10 @@ describe("MatrixClient", function() {
 
             const prom = client.getKeyChanges("old", "new");
             httpBackend.when("GET", "/keys/changes").check((req) => {
-                expect(req.queryParams.from).toEqual("old");
-                expect(req.queryParams.to).toEqual("new");
+                expect(req.queryParams?.from).toEqual("old");
+                expect(req.queryParams?.to).toEqual("new");
             }).respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -920,7 +999,7 @@ describe("MatrixClient", function() {
 
             const prom = client.getDevices();
             httpBackend.when("GET", "/devices").respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -936,7 +1015,7 @@ describe("MatrixClient", function() {
 
             const prom = client.getDevice("DEADBEEF");
             httpBackend.when("GET", "/devices/DEADBEEF").respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -949,7 +1028,7 @@ describe("MatrixClient", function() {
 
             const prom = client.getThreePids();
             httpBackend.when("GET", "/account/3pid").respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -959,7 +1038,7 @@ describe("MatrixClient", function() {
             const response = {};
             const prom = client.deleteAlias("#foo:bar");
             httpBackend.when("DELETE", "/directory/room/" + encodeURIComponent("#foo:bar")).respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -970,7 +1049,7 @@ describe("MatrixClient", function() {
             const prom = client.deleteRoomTag("!roomId:server", "u.tag");
             const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags/u.tag`;
             httpBackend.when("DELETE", url).respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -988,7 +1067,7 @@ describe("MatrixClient", function() {
             const prom = client.getRoomTags("!roomId:server");
             const url = `/user/${encodeURIComponent(userId)}/rooms/${encodeURIComponent("!roomId:server")}/tags`;
             httpBackend.when("GET", url).respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -1012,7 +1091,7 @@ describe("MatrixClient", function() {
                     send_attempt: 1,
                 });
             }).respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
@@ -1035,7 +1114,7 @@ describe("MatrixClient", function() {
             }).respond(200, {});
 
             const prom = client.inviteByThreePid("!room:example.org", "email", targetEmail);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             await prom; // returns empty object, so no validation needed
         });
     });
@@ -1070,7 +1149,7 @@ describe("MatrixClient", function() {
             }).respond(200, response);
 
             const prom = client.createRoom(input);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
