@@ -19,6 +19,7 @@ import HttpBackend from "matrix-mock-request";
 import {
     ClientEvent,
     HttpApiEvent,
+    IEvent,
     MatrixClient,
     RoomEvent,
     RoomMemberEvent,
@@ -29,18 +30,24 @@ import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient events", function() {
-    let client: MatrixClient;
-    let httpBackend: HttpBackend;
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
 
-    beforeEach(function() {
+    const setupTests = (): [MatrixClient, HttpBackend] => {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
-        client = testClient.client;
-        httpBackend = testClient.httpBackend;
+        const client = testClient.client;
+        const httpBackend = testClient.httpBackend;
         httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+
+        return [client, httpBackend];
+    };
+
+    let [client, httpBackend] = setupTests();
+
+    beforeEach(function() {
+        [client, httpBackend] = setupTests();
     });
 
     afterEach(function() {
@@ -123,7 +130,7 @@ describe("MatrixClient events", function() {
                 httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
                 httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
-                let expectedEvents = [];
+                let expectedEvents: Partial<IEvent>[] = [];
                 expectedEvents = expectedEvents.concat(
                     SYNC_DATA.presence.events,
                     SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
@@ -171,7 +178,7 @@ describe("MatrixClient events", function() {
 
                 expect(event.event).toEqual(SYNC_DATA.presence.events[0]);
                 expect(user.presence).toEqual(
-                    SYNC_DATA.presence.events[0].content.presence,
+                    SYNC_DATA.presence.events[0]?.content?.presence,
                 );
             });
             client.startClient();
