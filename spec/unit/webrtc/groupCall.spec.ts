@@ -1061,7 +1061,7 @@ describe('Group Call', function() {
             groupCall.terminate();
 
             expect(mockClient.getMediaHandler()!.stopScreensharingStream).toHaveBeenCalledWith(
-                screensharingFeed.stream,
+                screensharingFeed!.stream,
             );
             // @ts-ignore Mock
             expect(groupCall.removeScreenshareFeed).toHaveBeenCalledWith(screensharingFeed);
