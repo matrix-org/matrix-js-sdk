@@ -27,6 +27,7 @@ import { GroupCall, GroupCallEvent } from "../../../src/webrtc/groupCall";
 import { MatrixClient } from "../../../src/client";
 import {
     installWebRTCMocks,
+    MockCallFeed,
     MockCallMatrixClient,
     MockMediaStream,
     MockMediaStreamTrack,
@@ -157,6 +158,14 @@ describe('Group Call', function() {
             groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
         });
 
+        it("does not initialize local call feed, if it already is", async () => {
+            await groupCall.initLocalCallFeed();
+            jest.spyOn(groupCall, "initLocalCallFeed");
+            await groupCall.enter();
+
+            expect(groupCall.initLocalCallFeed).not.toHaveBeenCalled();
+        });
+
         it("sends state event to room when creating", async () => {
             await groupCall.create();
 
@@ -278,6 +287,143 @@ describe('Group Call', function() {
             } finally {
                 groupCall.leave();
             }
+        });
+
+        describe("call feeds changing", () => {
+            let call: MockCall;
+            const currentFeed = new MockCallFeed(FAKE_USER_ID_1);
+            const newFeed = new MockCallFeed(FAKE_USER_ID_1);
+
+            beforeEach(async () => {
+                jest.spyOn(groupCall, "getUserMediaFeedByUserId");
+                // @ts-ignore Mock
+                jest.spyOn(groupCall, "addUserMediaFeed");
+                // @ts-ignore Mock
+                jest.spyOn(groupCall, "replaceUserMediaFeed");
+                // @ts-ignore Mock
+                jest.spyOn(groupCall, "removeUserMediaFeed");
+                // @ts-ignore Mock
+                jest.spyOn(groupCall, "addScreenshareFeed");
+                // @ts-ignore Mock
+                jest.spyOn(groupCall, "replaceScreenshareFeed");
+                // @ts-ignore Mock
+                jest.spyOn(groupCall, "removeScreenshareFeed");
+
+                jest.spyOn(currentFeed, "dispose");
+                jest.spyOn(newFeed, "measureVolumeActivity");
+
+                jest.spyOn(groupCall, "emit");
+
+                call = new MockCall(room.roomId, groupCall.groupCallId);
+
+                await groupCall.create();
+            });
+
+            it("ignores changes, if we can't get user id of opponent", async () => {
+                const call = new MockCall(room.roomId, groupCall.groupCallId);
+                call.getOpponentMember = (() => {}) as unknown as any;
+
+                // @ts-ignore Mock
+                expect(() => groupCall.onCallFeedsChanged(call)).toThrowError();
+            });
+
+            describe("usermedia feeds", () => {
+                it("adds new usermedia feed", async () => {
+                    // @ts-ignore Mock
+                    call.remoteUsermediaFeed = newFeed;
+                    // @ts-ignore Mock
+                    groupCall.onCallFeedsChanged(call);
+
+                    // @ts-ignore Mock
+                    expect(groupCall.addUserMediaFeed).toHaveBeenCalledWith(newFeed);
+                });
+
+                it("replaces usermedia feed", async () => {
+                    groupCall.userMediaFeeds = [currentFeed.typed()];
+
+                    // @ts-ignore Mock
+                    call.remoteUsermediaFeed = newFeed;
+                    // @ts-ignore Mock
+                    groupCall.onCallFeedsChanged(call);
+
+                    // @ts-ignore Mock
+                    expect(groupCall.replaceUserMediaFeed).toHaveBeenCalledWith(currentFeed, newFeed);
+                });
+
+                it("removes usermedia feed", async () => {
+                    groupCall.userMediaFeeds = [currentFeed.typed()];
+
+                    // @ts-ignore Mock
+                    groupCall.onCallFeedsChanged(call);
+
+                    // @ts-ignore Mock
+                    expect(groupCall.removeUserMediaFeed).toHaveBeenCalledWith(currentFeed);
+                });
+            });
+
+            describe("screenshare feeds", () => {
+                it("adds new screenshare feed", async () => {
+                    // @ts-ignore Mock
+                    call.remoteScreensharingFeed = newFeed;
+                    // @ts-ignore Mock
+                    groupCall.onCallFeedsChanged(call);
+
+                    // @ts-ignore Mock
+                    expect(groupCall.addScreenshareFeed).toHaveBeenCalledWith(newFeed);
+                });
+
+                it("replaces screenshare feed", async () => {
+                    groupCall.screenshareFeeds = [currentFeed.typed()];
+
+                    // @ts-ignore Mock
+                    call.remoteScreensharingFeed = newFeed;
+                    // @ts-ignore Mock
+                    groupCall.onCallFeedsChanged(call);
+
+                    // @ts-ignore Mock
+                    expect(groupCall.replaceScreenshareFeed).toHaveBeenCalledWith(currentFeed, newFeed);
+                });
+
+                it("removes screenshare feed", async () => {
+                    groupCall.screenshareFeeds = [currentFeed.typed()];
+
+                    // @ts-ignore Mock
+                    groupCall.onCallFeedsChanged(call);
+
+                    // @ts-ignore Mock
+                    expect(groupCall.removeScreenshareFeed).toHaveBeenCalledWith(currentFeed);
+                });
+            });
+
+            describe("feed replacing", () => {
+                it("replaces usermedia feed", async () => {
+                    groupCall.userMediaFeeds = [currentFeed.typed()];
+
+                    // @ts-ignore Mock
+                    groupCall.replaceUserMediaFeed(currentFeed, newFeed);
+
+                    const newFeeds = [newFeed];
+
+                    expect(groupCall.userMediaFeeds).toStrictEqual(newFeeds);
+                    expect(currentFeed.dispose).toHaveBeenCalled();
+                    expect(newFeed.measureVolumeActivity).toHaveBeenCalledWith(true);
+                    expect(groupCall.emit).toHaveBeenCalledWith(GroupCallEvent.UserMediaFeedsChanged, newFeeds);
+                });
+
+                it("replaces screenshare feed", async () => {
+                    groupCall.screenshareFeeds = [currentFeed.typed()];
+
+                    // @ts-ignore Mock
+                    groupCall.replaceScreenshareFeed(currentFeed, newFeed);
+
+                    const newFeeds = [newFeed];
+
+                    expect(groupCall.screenshareFeeds).toStrictEqual(newFeeds);
+                    expect(currentFeed.dispose).toHaveBeenCalled();
+                    expect(newFeed.measureVolumeActivity).toHaveBeenCalledWith(true);
+                    expect(groupCall.emit).toHaveBeenCalledWith(GroupCallEvent.ScreenshareFeedsChanged, newFeeds);
+                });
+            });
         });
 
         describe("PTT calls", () => {
@@ -801,6 +947,19 @@ describe('Group Call', function() {
             expect(newMockCall.answerWithCallFeeds).toHaveBeenCalled();
             expect(groupCall.calls).toEqual([newMockCall]);
         });
+
+        it("starts to process incoming calls when we've entered", async () => {
+            // First we leave the call since we have already entered
+            groupCall.leave();
+
+            const call = new MockCall(room.roomId, groupCall.groupCallId);
+            mockClient.callEventHandler.calls = new Map<string, MatrixCall>([
+                [call.callId, call as unknown as MatrixCall],
+            ]);
+            await groupCall.enter();
+
+            expect(call.answerWithCallFeeds).toHaveBeenCalled();
+        });
     });
 
     describe("screensharing", () => {
@@ -888,6 +1047,23 @@ describe('Group Call', function() {
             expect(groupCall.getScreenshareFeedByUserId(call.invitee)).toBeDefined();
 
             groupCall.terminate();
+        });
+
+        it("cleans up screensharing when terminating", async () => {
+            // @ts-ignore Mock
+            jest.spyOn(groupCall, "removeScreenshareFeed");
+            jest.spyOn(mockClient.getMediaHandler(), "stopScreensharingStream");
+
+            await groupCall.setScreensharingEnabled(true);
+
+            const screensharingFeed = groupCall.localScreenshareFeed;
+
+            groupCall.terminate();
+
+            expect(mockClient.getMediaHandler().stopScreensharingStream).toHaveBeenCalledWith(screensharingFeed.stream);
+            // @ts-ignore Mock
+            expect(groupCall.removeScreenshareFeed).toHaveBeenCalledWith(screensharingFeed);
+            expect(groupCall.localScreenshareFeed).toBeUndefined();
         });
     });
 
