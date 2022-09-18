@@ -14,7 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientEvent, GroupCall, Room, RoomState, RoomStateEvent } from "../../../src";
+import { mocked } from "jest-mock";
+
+import {
+    ClientEvent,
+    GroupCall,
+    GroupCallIntent,
+    GroupCallType,
+    IContent,
+    MatrixEvent,
+    Room,
+    RoomState,
+    RoomStateEvent,
+} from "../../../src";
 import { SyncState } from "../../../src/sync";
 import { GroupCallEventHandler, GroupCallEventHandlerEvent } from "../../../src/webrtc/groupCallEventHandler";
 import { flushPromises } from "../../test-utils/flushPromises";
@@ -137,6 +149,42 @@ describe('Group Call Event Handler', function() {
         mockClient.off(GroupCallEventHandlerEvent.Incoming, onIncomingGroupCall);
     });
 
+    it("handles data channel", async () => {
+        await groupCallEventHandler.start();
+
+        const dataChannelOptions = {
+            "maxPacketLifeTime": "life_time",
+            "maxRetransmits": "retransmits",
+            "ordered": "ordered",
+            "protocol": "protocol",
+        };
+
+        mockClient.emit(
+            RoomStateEvent.Events,
+            makeMockGroupCallStateEvent(
+                FAKE_ROOM_ID,
+                FAKE_GROUP_CALL_ID,
+                {
+                    "m.type": GroupCallType.Video,
+                    "m.intent": GroupCallIntent.Prompt,
+                    "dataChannelsEnabled": true,
+                    dataChannelOptions,
+                },
+            ),
+            {
+                roomId: FAKE_ROOM_ID,
+            } as unknown as RoomState,
+            null,
+        );
+
+        // @ts-ignore Mock
+        expect(groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID)?.dataChannelsEnabled).toBe(true);
+        // @ts-ignore Mock
+        expect(groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID)?.dataChannelOptions).toStrictEqual(
+            dataChannelOptions,
+        );
+    });
+
     it("sends member events to group calls", async () => {
         await groupCallEventHandler.start();
 
@@ -158,5 +206,87 @@ describe('Group Call Event Handler', function() {
         );
 
         expect(mockGroupCall.onMemberStateChanged).toHaveBeenCalledWith(mockStateEvent);
+    });
+
+    describe("ignoring invalid group call state events", () => {
+        let mockClientEmit: jest.Func;
+
+        beforeEach(() => {
+            mockClientEmit = mockClient.emit = jest.fn();
+        });
+
+        afterEach(() => {
+            groupCallEventHandler.stop();
+
+            jest.clearAllMocks();
+        });
+
+        const setupCallAndStart = async (content?: IContent) => {
+            mocked(mockRoom.currentState.getStateEvents).mockReturnValue([
+                makeMockGroupCallStateEvent(
+                    FAKE_ROOM_ID,
+                    FAKE_GROUP_CALL_ID,
+                    content,
+                ),
+            ] as unknown as MatrixEvent);
+            mockClient.getRooms.mockReturnValue([mockRoom]);
+            await groupCallEventHandler.start();
+        };
+
+        it("ignores terminated calls", async () => {
+            await setupCallAndStart({
+                "m.type": GroupCallType.Video,
+                "m.intent": GroupCallIntent.Prompt,
+                "m.terminated": true,
+            });
+
+            expect(mockClientEmit).not.toHaveBeenCalledWith(
+                GroupCallEventHandlerEvent.Incoming,
+                expect.objectContaining({
+                    groupCallId: FAKE_GROUP_CALL_ID,
+                }),
+            );
+        });
+
+        it("ignores calls with invalid type", async () => {
+            await setupCallAndStart({
+                "m.type": "fake_type",
+                "m.intent": GroupCallIntent.Prompt,
+            });
+
+            expect(mockClientEmit).not.toHaveBeenCalledWith(
+                GroupCallEventHandlerEvent.Incoming,
+                expect.objectContaining({
+                    groupCallId: FAKE_GROUP_CALL_ID,
+                }),
+            );
+        });
+
+        it("ignores calls with invalid intent", async () => {
+            await setupCallAndStart({
+                "m.type": GroupCallType.Video,
+                "m.intent": "fake_intent",
+            });
+
+            expect(mockClientEmit).not.toHaveBeenCalledWith(
+                GroupCallEventHandlerEvent.Incoming,
+                expect.objectContaining({
+                    groupCallId: FAKE_GROUP_CALL_ID,
+                }),
+            );
+        });
+
+        it("ignores calls without a room", async () => {
+            (mockClient as any).getRoom = jest.fn().mockReturnValue(undefined);
+
+            await setupCallAndStart();
+
+            expect(mockClientEmit).not.toHaveBeenCalledWith(
+                GroupCallEventHandlerEvent.Incoming,
+                expect.objectContaining({
+                    groupCallId: FAKE_GROUP_CALL_ID,
+                }),
+            );
+        });
     });
 });

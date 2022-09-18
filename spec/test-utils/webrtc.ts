@@ -21,6 +21,7 @@ import {
     GroupCall,
     GroupCallIntent,
     GroupCallType,
+    IContent,
     ISendEventResponse,
     MatrixClient,
     MatrixEvent,
@@ -421,15 +422,16 @@ export function installWebRTCMocks() {
     };
 }
 
-export function makeMockGroupCallStateEvent(roomId: string, groupCallId: string): MatrixEvent {
+export function makeMockGroupCallStateEvent(roomId: string, groupCallId: string, content: IContent = {
+    "m.type": GroupCallType.Video,
+    "m.intent": GroupCallIntent.Prompt,
+    "m.terminated": false,
+}): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallPrefix),
         getRoomId: jest.fn().mockReturnValue(roomId),
         getTs: jest.fn().mockReturnValue(0),
-        getContent: jest.fn().mockReturnValue({
-            "m.type": GroupCallType.Video,
-            "m.intent": GroupCallIntent.Prompt,
-        }),
+        getContent: jest.fn().mockReturnValue(content),
         getStateKey: jest.fn().mockReturnValue(groupCallId),
     } as unknown as MatrixEvent;
 }
