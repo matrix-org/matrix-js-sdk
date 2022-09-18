@@ -1044,7 +1044,7 @@ describe('Group Call', function() {
             ]));
 
             expect(groupCall.screenshareFeeds).toHaveLength(1);
-            expect(groupCall.getScreenshareFeedByUserId(call.invitee)).toBeDefined();
+            expect(groupCall.getScreenshareFeedByUserId(call.invitee!)).toBeDefined();
 
             groupCall.terminate();
         });
@@ -1060,7 +1060,9 @@ describe('Group Call', function() {
 
             groupCall.terminate();
 
-            expect(mockClient.getMediaHandler().stopScreensharingStream).toHaveBeenCalledWith(screensharingFeed.stream);
+            expect(mockClient.getMediaHandler()!.stopScreensharingStream).toHaveBeenCalledWith(
+                screensharingFeed.stream,
+            );
             // @ts-ignore Mock
             expect(groupCall.removeScreenshareFeed).toHaveBeenCalledWith(screensharingFeed);
             expect(groupCall.localScreenshareFeed).toBeUndefined();
