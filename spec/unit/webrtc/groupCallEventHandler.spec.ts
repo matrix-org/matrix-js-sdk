@@ -20,6 +20,7 @@ import {
     ClientEvent,
     GroupCall,
     GroupCallIntent,
+    GroupCallState,
     GroupCallType,
     IContent,
     MatrixEvent,
@@ -63,6 +64,39 @@ describe('Group Call Event Handler', function() {
         } as unknown as Room;
 
         (mockClient as any).getRoom = jest.fn().mockReturnValue(mockRoom);
+    });
+
+    describe("reacts to state changes", () => {
+        it("terminates call", async () => {
+            await groupCallEventHandler.start();
+            mockClient.emit(
+                RoomStateEvent.Events,
+                makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID),
+                { roomId: FAKE_ROOM_ID } as unknown as RoomState,
+                null,
+            );
+
+            const groupCall = groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID);
+
+            expect(groupCall.state).toBe(GroupCallState.LocalCallFeedUninitialized);
+
+            mockClient.emit(
+                RoomStateEvent.Events,
+                makeMockGroupCallStateEvent(
+                    FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, {
+                        "m.type": GroupCallType.Video,
+                        "m.intent": GroupCallIntent.Prompt,
+                        "m.terminated": true,
+                    },
+                ),
+                {
+                    roomId: FAKE_ROOM_ID,
+                } as unknown as RoomState,
+                null,
+            );
+
+            expect(groupCall.state).toBe(GroupCallState.Ended);
+        });
     });
 
     it("waits until client starts syncing", async () => {
