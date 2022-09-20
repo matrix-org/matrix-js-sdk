@@ -24,6 +24,7 @@ import {
     supportsMatrixCall,
     CallType,
     CallState,
+    CallParty,
 } from '../../../src/webrtc/call';
 import { SDPStreamMetadata, SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
 import {
@@ -42,20 +43,20 @@ import { Callback, EventType, IContent, ISendEventResponse, MatrixEvent, Room } 
 const FAKE_ROOM_ID = "!foo:bar";
 const CALL_LIFETIME = 60000;
 
-const startVoiceCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
+const startVoiceCall = async (client: TestClient, call: MatrixCall, userId?: string): Promise<void> => {
     const callPromise = call.placeVoiceCall();
     await client.httpBackend.flush("");
     await callPromise;
 
-    call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
+    call.getOpponentMember = jest.fn().mockReturnValue({ userId: userId ?? "@bob:bar.uk" });
 };
 
-const startVideoCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
+const startVideoCall = async (client: TestClient, call: MatrixCall, userId?: string): Promise<void> => {
     const callPromise = call.placeVideoCall();
     await client.httpBackend.flush("");
     await callPromise;
 
-    call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
+    call.getOpponentMember = jest.fn().mockReturnValue({ userId: userId ?? "@bob:bar.uk" });
 };
 
 const fakeIncomingCall = async (client: TestClient, call: MatrixCall, version: string | number = "1") => {
@@ -127,6 +128,7 @@ describe('Call', function() {
                 },
             } as unknown as Room;
         };
+        client.client.getProfileInfo = jest.fn();
 
         call = new MatrixCall({
             client: client.client,
@@ -1190,5 +1192,88 @@ describe('Call', function() {
         expect(mockReplaceTrack).toHaveBeenCalledWith(expect.objectContaining({
             id: "usermedia_video_track",
         }));
+    });
+
+    describe("call transfers", () => {
+        const ALICE_USER_ID = "@alice:foo";
+        const ALICE_DISPLAY_NAME = "Alice";
+        const ALICE_AVATAR_URL = "avatar.alice.foo";
+
+        const BOB_USER_ID = "@bob:foo";
+        const BOB_DISPLAY_NAME = "Bob";
+        const BOB_AVATAR_URL = "avatar.bob.foo";
+
+        beforeEach(() => {
+            mocked(client.client.getProfileInfo).mockImplementation(async (userId) => {
+                if (userId === ALICE_USER_ID) {
+                    return {
+                        displayname: ALICE_DISPLAY_NAME,
+                        avatar_url: ALICE_AVATAR_URL,
+                    };
+                } else if (userId === BOB_USER_ID) {
+                    return {
+                        displayname: BOB_DISPLAY_NAME,
+                        avatar_url: BOB_AVATAR_URL,
+                    };
+                } else {
+                    return {};
+                }
+            });
+        });
+
+        it("transfers call to another call", async () => {
+            const newCall = new MatrixCall({
+                client: client.client,
+                roomId: FAKE_ROOM_ID,
+            });
+
+            const callHangupListener = jest.fn();
+            const newCallHangupListener = jest.fn();
+
+            call.on(CallEvent.Hangup, callHangupListener);
+            newCall.on(CallEvent.Error, () => { });
+            newCall.on(CallEvent.Hangup, newCallHangupListener);
+
+            await startVoiceCall(client, call, ALICE_USER_ID);
+            await startVoiceCall(client, newCall, BOB_USER_ID);
+
+            await call.transferToCall(newCall);
+
+            expect(mockSendEvent).toHaveBeenCalledWith(FAKE_ROOM_ID, EventType.CallReplaces, expect.objectContaining({
+                target_user: {
+                    id: ALICE_USER_ID,
+                    display_name: ALICE_DISPLAY_NAME,
+                    avatar_url: ALICE_AVATAR_URL,
+                },
+            }));
+            expect(mockSendEvent).toHaveBeenCalledWith(FAKE_ROOM_ID, EventType.CallReplaces, expect.objectContaining({
+                target_user: {
+                    id: BOB_USER_ID,
+                    display_name: BOB_DISPLAY_NAME,
+                    avatar_url: BOB_AVATAR_URL,
+                },
+            }));
+
+            expect(callHangupListener).toHaveBeenCalledWith(call);
+            expect(newCallHangupListener).toHaveBeenCalledWith(newCall);
+        });
+
+        it("transfers a call to another user", async () => {
+            // @ts-ignore Mock
+            jest.spyOn(call, "terminate");
+
+            await startVoiceCall(client, call, ALICE_USER_ID);
+            await call.transfer(BOB_USER_ID);
+
+            expect(mockSendEvent).toHaveBeenCalledWith(FAKE_ROOM_ID, EventType.CallReplaces, expect.objectContaining({
+                target_user: {
+                    id: BOB_USER_ID,
+                    display_name: BOB_DISPLAY_NAME,
+                    avatar_url: BOB_AVATAR_URL,
+                },
+            }));
+            // @ts-ignore Mock
+            expect(call.terminate).toHaveBeenCalledWith(CallParty.Local, CallErrorCode.Transfered, true);
+        });
     });
 });
