@@ -1226,13 +1226,13 @@ describe('Call', function() {
                 client: client.client,
                 roomId: FAKE_ROOM_ID,
             });
-            // call checks one of these is wired up
-            newCall.on(CallEvent.Error, () => { });
 
-            // @ts-ignore Mock
-            jest.spyOn(call, "terminate");
-            // @ts-ignore Mock
-            jest.spyOn(newCall, "terminate");
+            const callHangupListener = jest.fn();
+            const newCallHangupListener = jest.fn();
+
+            call.on(CallEvent.Hangup, callHangupListener);
+            newCall.on(CallEvent.Error, () => { });
+            newCall.on(CallEvent.Hangup, newCallHangupListener);
 
             await startVoiceCall(client, call, ALICE_USER_ID);
             await startVoiceCall(client, newCall, BOB_USER_ID);
@@ -1254,10 +1254,8 @@ describe('Call', function() {
                 },
             }));
 
-            // @ts-ignore Mock
-            expect(call.terminate).toHaveBeenCalledWith(CallParty.Local, CallErrorCode.Transfered, true);
-            // @ts-ignore Mock
-            expect(newCall.terminate).toHaveBeenCalledWith(CallParty.Local, CallErrorCode.Transfered, true);
+            expect(callHangupListener).toHaveBeenCalledWith(call);
+            expect(newCallHangupListener).toHaveBeenCalledWith(newCall);
         });
 
         it("transfers a call to another user", async () => {
