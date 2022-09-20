@@ -335,8 +335,7 @@ describe('Group Call', function() {
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
-                    // @ts-ignore Mock
-                    expect(groupCall.addUserMediaFeed).toHaveBeenCalledWith(newFeed);
+                    expect(groupCall.userMediaFeeds).toStrictEqual([newFeed]);
                 });
 
                 it("replaces usermedia feed", async () => {
@@ -346,8 +345,7 @@ describe('Group Call', function() {
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
-                    // @ts-ignore Mock
-                    expect(groupCall.replaceUserMediaFeed).toHaveBeenCalledWith(currentFeed, newFeed);
+                    expect(groupCall.userMediaFeeds).toStrictEqual([newFeed]);
                 });
 
                 it("removes usermedia feed", async () => {
@@ -356,8 +354,7 @@ describe('Group Call', function() {
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
-                    // @ts-ignore Mock
-                    expect(groupCall.removeUserMediaFeed).toHaveBeenCalledWith(currentFeed);
+                    expect(groupCall.userMediaFeeds).toHaveLength(0);
                 });
             });
 
@@ -367,8 +364,7 @@ describe('Group Call', function() {
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
-                    // @ts-ignore Mock
-                    expect(groupCall.addScreenshareFeed).toHaveBeenCalledWith(newFeed);
+                    expect(groupCall.screenshareFeeds).toStrictEqual([newFeed]);
                 });
 
                 it("replaces screenshare feed", async () => {
@@ -378,8 +374,7 @@ describe('Group Call', function() {
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
-                    // @ts-ignore Mock
-                    expect(groupCall.replaceScreenshareFeed).toHaveBeenCalledWith(currentFeed, newFeed);
+                    expect(groupCall.screenshareFeeds).toStrictEqual([newFeed]);
                 });
 
                 it("removes screenshare feed", async () => {
@@ -388,8 +383,7 @@ describe('Group Call', function() {
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
-                    // @ts-ignore Mock
-                    expect(groupCall.removeScreenshareFeed).toHaveBeenCalledWith(currentFeed);
+                    expect(groupCall.screenshareFeeds).toHaveLength(0);
                 });
             });
 
