@@ -297,20 +297,6 @@ describe('Group Call', function() {
             const newFeed = new MockCallFeed(FAKE_USER_ID_1);
 
             beforeEach(async () => {
-                jest.spyOn(groupCall, "getUserMediaFeedByUserId");
-                // @ts-ignore Mock
-                jest.spyOn(groupCall, "addUserMediaFeed");
-                // @ts-ignore Mock
-                jest.spyOn(groupCall, "replaceUserMediaFeed");
-                // @ts-ignore Mock
-                jest.spyOn(groupCall, "removeUserMediaFeed");
-                // @ts-ignore Mock
-                jest.spyOn(groupCall, "addScreenshareFeed");
-                // @ts-ignore Mock
-                jest.spyOn(groupCall, "replaceScreenshareFeed");
-                // @ts-ignore Mock
-                jest.spyOn(groupCall, "removeScreenshareFeed");
-
                 jest.spyOn(currentFeed, "dispose");
                 jest.spyOn(newFeed, "measureVolumeActivity");
 
