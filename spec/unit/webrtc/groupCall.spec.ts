@@ -321,7 +321,7 @@ describe('Group Call', function() {
 
             it("ignores changes, if we can't get user id of opponent", async () => {
                 const call = new MockCall(room.roomId, groupCall.groupCallId);
-                call.getOpponentMember = (() => {}) as unknown as any;
+                jest.spyOn(call, "getOpponentMember").mockReturnValue({ userId: undefined });
 
                 // @ts-ignore Mock
                 expect(() => groupCall.onCallFeedsChanged(call)).toThrowError();
