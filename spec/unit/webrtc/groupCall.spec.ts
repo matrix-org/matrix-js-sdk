@@ -954,7 +954,7 @@ describe('Group Call', function() {
 
             const call = new MockCall(room.roomId, groupCall.groupCallId);
             mockClient.callEventHandler.calls = new Map<string, MatrixCall>([
-                [call.callId, call as unknown as MatrixCall],
+                [call.callId, call.typed()],
             ]);
             await groupCall.enter();
 
