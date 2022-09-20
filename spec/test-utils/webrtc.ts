@@ -388,6 +388,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 export class MockCallFeed {
     constructor(
         public userId: string,
+        public stream: MockMediaStream,
     ) {}
 
     measureVolumeActivity(val: boolean) {}

@@ -293,8 +293,8 @@ describe('Group Call', function() {
 
         describe("call feeds changing", () => {
             let call: MockCall;
-            const currentFeed = new MockCallFeed(FAKE_USER_ID_1);
-            const newFeed = new MockCallFeed(FAKE_USER_ID_1);
+            const currentFeed = new MockCallFeed(FAKE_USER_ID_1, new MockMediaStream("current"));
+            const newFeed = new MockCallFeed(FAKE_USER_ID_1, new MockMediaStream("new"));
 
             beforeEach(async () => {
                 jest.spyOn(currentFeed, "dispose");
