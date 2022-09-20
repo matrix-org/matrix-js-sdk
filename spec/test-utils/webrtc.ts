@@ -33,6 +33,7 @@ import { ReEmitter } from "../../src/ReEmitter";
 import { SyncState } from "../../src/sync";
 import { CallEvent, CallEventHandlerMap, MatrixCall } from "../../src/webrtc/call";
 import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "../../src/webrtc/callEventHandler";
+import { CallFeed } from "../../src/webrtc/callFeed";
 import { GroupCallEventHandlerMap } from "../../src/webrtc/groupCall";
 import { GroupCallEventHandlerEvent } from "../../src/webrtc/groupCallEventHandler";
 import { IScreensharingOpts, MediaHandler } from "../../src/webrtc/mediaHandler";
@@ -382,6 +383,20 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     getRooms = jest.fn<Room[], []>().mockReturnValue([]);
 
     typed(): MatrixClient { return this as unknown as MatrixClient; }
+}
+
+export class MockCallFeed {
+    constructor(
+        public userId: string,
+        public stream: MockMediaStream,
+    ) {}
+
+    measureVolumeActivity(val: boolean) {}
+    dispose() {}
+
+    typed(): CallFeed {
+        return this as unknown as CallFeed;
+    }
 }
 
 export function installWebRTCMocks() {
