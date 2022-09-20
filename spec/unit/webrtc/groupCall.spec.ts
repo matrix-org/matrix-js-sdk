@@ -116,6 +116,8 @@ class MockCall {
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
         stream: new MockMediaStream("stream"),
     };
+    public remoteUsermediaFeed: CallFeed;
+    public remoteScreensharingFeed: CallFeed;
 
     public reject = jest.fn<void, []>();
     public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
@@ -329,8 +331,7 @@ describe('Group Call', function() {
 
             describe("usermedia feeds", () => {
                 it("adds new usermedia feed", async () => {
-                    // @ts-ignore Mock
-                    call.remoteUsermediaFeed = newFeed;
+                    call.remoteUsermediaFeed = newFeed.typed();
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -341,8 +342,7 @@ describe('Group Call', function() {
                 it("replaces usermedia feed", async () => {
                     groupCall.userMediaFeeds = [currentFeed.typed()];
 
-                    // @ts-ignore Mock
-                    call.remoteUsermediaFeed = newFeed;
+                    call.remoteUsermediaFeed = newFeed.typed();
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -363,8 +363,7 @@ describe('Group Call', function() {
 
             describe("screenshare feeds", () => {
                 it("adds new screenshare feed", async () => {
-                    // @ts-ignore Mock
-                    call.remoteScreensharingFeed = newFeed;
+                    call.remoteScreensharingFeed = newFeed.typed();
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -375,8 +374,7 @@ describe('Group Call', function() {
                 it("replaces screenshare feed", async () => {
                     groupCall.screenshareFeeds = [currentFeed.typed()];
 
-                    // @ts-ignore Mock
-                    call.remoteScreensharingFeed = newFeed;
+                    call.remoteScreensharingFeed = newFeed.typed();
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
