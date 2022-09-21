@@ -250,8 +250,8 @@ describe("Secrets", function() {
 
         osborne2.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
             "VAX": {
-                user_id: "@alice:example.com",
-                device_id: "VAX",
+                verified: 0,
+                known: false,
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
                     "ed25519:VAX": vaxDevice.deviceEd25519Key,
@@ -261,9 +261,9 @@ describe("Secrets", function() {
         });
         vax.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
             "Osborne2": {
-                user_id: "@alice:example.com",
-                device_id: "Osborne2",
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                verified: 0,
+                known: false,
                 keys: {
                     "ed25519:Osborne2": osborne2Device.deviceEd25519Key,
                     "curve25519:Osborne2": osborne2Device.deviceCurve25519Key,

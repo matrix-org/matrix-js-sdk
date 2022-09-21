@@ -13,9 +13,9 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
+import { MatrixClient } from "../../../../src/client";
 import { InRoomChannel } from "../../../../src/crypto/verification/request/InRoomChannel";
 import { MatrixEvent } from "../../../../src/models/event";
-    "../../../../src/crypto/verification/request/ToDeviceChannel";
 
 describe("InRoomChannel tests", function() {
     const ALICE = "@alice:hs.tld";
@@ -23,7 +23,7 @@ describe("InRoomChannel tests", function() {
     const MALORY = "@malory:hs.tld";
     const client = {
         getUserId() { return ALICE; },
-    };
+    } as unknown as MatrixClient;
 
     it("getEventType only returns .request for a message with a msgtype", function() {
         const invalidEvent = new MatrixEvent({
