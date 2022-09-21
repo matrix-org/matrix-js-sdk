@@ -56,7 +56,6 @@ import {
     Receipt,
     ReceiptContent,
     synthesizeReceipt,
-    WrappedReceipt,
 } from "./read-receipt";
 
 // These constants are used as sane defaults when the homeserver doesn't support
@@ -80,11 +79,6 @@ export interface IRecommendedVersion {
     needsUpgrade: boolean;
     urgent: boolean;
 }
-
-// For backwards compatibility purpose
-export {
-    WrappedReceipt as IWrappedReceipt,
-};
 
 // When inserting a visibility event affecting event `eventId`, we
 // need to scan through existing visibility events for `eventId`.
