@@ -24,7 +24,7 @@ import {
     RendezvousCancellationReason, RendezvousTransport, RendezvousChannel, RendezvousCode, RendezvousTransportDetails,
 } from '../index';
 import { SecureRendezvousChannelAlgorithm } from '.';
-import { decodeBase64, encodeBase64 } from '../../crypto/olmlib';
+import { encodeUrlSafeBase64, decodeUrlSafeBase64 } from '../../crypto/olmlib';
 
 export interface ECDHv1RendezvousCode extends RendezvousCode {
     rendezvous: {
@@ -59,7 +59,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         const data = {
             "algorithm": SecureRendezvousChannelAlgorithm.ECDH_V1,
             "key": {
-                "x": encodeBase64(this.ourPublicKey),
+                "x": encodeUrlSafeBase64(this.ourPublicKey),
             },
         };
 
@@ -89,7 +89,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         if (this.cli && this.theirPublicKey) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: { x: encodeBase64(this.ourPublicKey) },
+                key: { x: encodeUrlSafeBase64(this.ourPublicKey) },
             });
         }
 
@@ -110,21 +110,21 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
 
             if (this.theirPublicKey) {
                 // check that the same public key was at the rendezvous point
-                if (key.x !== encodeBase64(this.theirPublicKey)) {
+                if (key.x !== encodeUrlSafeBase64(this.theirPublicKey)) {
                     throw new RendezvousError(
                         'Secure rendezvous key mismatch',
                         RendezvousCancellationReason.DataMismatch,
                     );
                 }
             } else {
-                this.theirPublicKey = decodeBase64(key.x);
+                this.theirPublicKey = decodeUrlSafeBase64(key.x);
             }
         }
 
         if (!this.cli) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: { x: encodeBase64(this.ourPublicKey) },
+                key: { x: encodeUrlSafeBase64(this.ourPublicKey) },
             });
         }
 
