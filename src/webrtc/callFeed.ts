@@ -46,6 +46,7 @@ export interface ICallFeedOpts {
      * This does not show the user as muted.
      */
     setVoiceActivityDetectionMute?: (muted: boolean) => void;
+    VADEnabled?: boolean;
 }
 
 export enum CallFeedEvent {
@@ -77,7 +78,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public speakingVolumeSamples: number[];
     public voiceActivityThreshold: number;
     public setVoiceActivityDetectionMute: (muted: boolean) => void;
-    public VADEnabled = true;
+    public VADEnabled = false;
     public maxVolume = -Infinity;
 
     private client: MatrixClient;
@@ -115,6 +116,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.setVoiceActivityDetectionMute = opts.setVoiceActivityDetectionMute;
 
         this.updateStream(null, opts.stream);
+
+        this.VADEnabled = opts.VADEnabled ?? false;
 
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
