@@ -90,3 +90,19 @@ export enum SSOAction {
     /** The user intends to register for a new account */
     REGISTER = "register",
 }
+
+/**
+ * The result of a successful [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882)
+ * `m.login.token` issuance request.
+ * Note that this is UNSTABLE and subject to breaking changes without notice.
+ */
+export interface ILoginTokenPostResponse {
+    /**
+     * The token to use with `m.login.token` to authenticate.
+     */
+    login_token: string;
+    /**
+     * Expiration in seconds.
+     */
+    expires_in: number;
+}
