@@ -5631,13 +5631,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 this.processBeaconEvents(timelineSet.room, timelineEvents);
                 this.processThreadEvents(room, threadedEvents, backwards);
 
+                const atEnd = res.end === undefined || res.end === res.start;
+
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
                 // we can recover from gappy syncs.
-                if (backwards && res.end == res.start) {
+                if (backwards && atEnd) {
                     eventTimeline.setPaginationToken(null, dir);
                 }
-                return res.end != res.start;
+                return !atEnd;
             }).finally(() => {
                 eventTimeline.paginationRequests[dir] = null;
             });
