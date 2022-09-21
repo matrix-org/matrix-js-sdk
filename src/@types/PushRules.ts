@@ -156,9 +156,13 @@ export interface IPusher {
     lang: string;
     profile_tag?: string;
     pushkey: string;
+    enabled?: boolean | null | undefined;
+    "org.matrix.msc3881.enabled"?: boolean | null | undefined;
+    device_id?: string | null;
+    "org.matrix.msc3881.device_id"?: string | null;
 }
 
-export interface IPusherRequest extends IPusher {
+export interface IPusherRequest extends Omit<IPusher, "device_id" | "org.matrix.msc3881.device_id"> {
     append?: boolean;
 }
 

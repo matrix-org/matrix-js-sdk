@@ -8133,8 +8133,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: Array of objects representing pushers
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
-        return this.http.authedRequest(callback, Method.Get, "/pushers");
+    public async getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
+        const response = await this.http.authedRequest(callback, Method.Get, "/pushers");
+
+        // Migration path for clients that connect to a homeserver that does not support
+        // MSC3881 yet, see https://github.com/matrix-org/matrix-spec-proposals/blob/kerry/remote-push-toggle/proposals/3881-remote-push-notification-toggling.md#migration
+        if (!await this.doesServerSupportUnstableFeature("org.matrix.msc3881")) {
+            response.pushers = response.pushers.map(pusher => {
+                if (!pusher.hasOwnProperty("enabled")) {
+                    pusher.enabled = true;
+                }
+                return pusher;
+            });
+        }
+
+        return response;
     }
 
     /**
