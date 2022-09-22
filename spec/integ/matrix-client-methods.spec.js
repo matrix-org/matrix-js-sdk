@@ -1097,7 +1097,6 @@ describe("MatrixClient", function() {
             expect(await prom).toStrictEqual(response);
         });
     });
-
 });
 
 function withThreadId(event, newThreadId) {
