@@ -159,6 +159,7 @@ import {
 import {
     EventType,
     MsgType,
+    PUSHER_ENABLED,
     RelationType,
     RoomCreateTypeField,
     RoomType,
@@ -188,7 +189,7 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { LoginTokenPostResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
+import { LoginTokenPostResponse, ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
@@ -525,10 +526,16 @@ interface IServerVersions {
     unstable_features: Record<string, boolean>;
 }
 
+export const M_AUTHENTICATION = new UnstableValue(
+    "m.authentication",
+    "org.matrix.msc2965.authentication",
+);
+
 export interface IClientWellKnown {
     [key: string]: any;
     "m.homeserver"?: IWellKnownConfig;
     "m.identity_server"?: IWellKnownConfig;
+    [M_AUTHENTICATION.name]?: IDelegatedAuthConfig; // MSC2965
 }
 
 export interface IWellKnownConfig {
@@ -538,6 +545,13 @@ export interface IWellKnownConfig {
     error?: Error | string;
     // eslint-disable-next-line
     base_url?: string | null;
+}
+
+export interface IDelegatedAuthConfig { // MSC2965
+    /** The OIDC Provider/issuer the client should use */
+    issuer: string;
+    /** The optional URL of the web UI where the user can manage their account */
+    account?: string;
 }
 
 interface IKeyBackupPath {
@@ -7106,10 +7120,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param {module:client.callback} callback Optional.
-     * @return {Promise} Resolves: TODO
+     * @return {Promise<ILoginFlowsResponse>} Resolves to the available login flows
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public loginFlows(callback?: Callback): Promise<any> { // TODO: Types
+    public loginFlows(callback?: Callback): Promise<ILoginFlowsResponse> {
         return this.http.request(callback, Method.Get, "/login");
     }
 
@@ -8157,8 +8171,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: Array of objects representing pushers
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
-        return this.http.authedRequest(callback, Method.Get, "/pushers");
+    public async getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
+        const response = await this.http.authedRequest(callback, Method.Get, "/pushers");
+
+        // Migration path for clients that connect to a homeserver that does not support
+        // MSC3881 yet, see https://github.com/matrix-org/matrix-spec-proposals/blob/kerry/remote-push-toggle/proposals/3881-remote-push-notification-toggling.md#migration
+        if (!await this.doesServerSupportUnstableFeature("org.matrix.msc3881")) {
+            response.pushers = response.pushers.map(pusher => {
+                if (!pusher.hasOwnProperty(PUSHER_ENABLED.name)) {
+                    pusher[PUSHER_ENABLED.name] = true;
+                }
+                return pusher;
+            });
+        }
+
+        return response;
     }
 
     /**
