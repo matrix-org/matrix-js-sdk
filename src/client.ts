@@ -159,6 +159,7 @@ import {
 import {
     EventType,
     MsgType,
+    PUSHER_ENABLED,
     RelationType,
     RoomCreateTypeField,
     RoomType,
@@ -8140,8 +8141,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // MSC3881 yet, see https://github.com/matrix-org/matrix-spec-proposals/blob/kerry/remote-push-toggle/proposals/3881-remote-push-notification-toggling.md#migration
         if (!await this.doesServerSupportUnstableFeature("org.matrix.msc3881")) {
             response.pushers = response.pushers.map(pusher => {
-                if (!pusher.hasOwnProperty("enabled")) {
-                    pusher.enabled = true;
+                if (!pusher.hasOwnProperty(PUSHER_ENABLED.name)) {
+                    pusher[PUSHER_ENABLED.name] = true;
                 }
                 return pusher;
             });
