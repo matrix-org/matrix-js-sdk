@@ -19,20 +19,23 @@ import nodeCrypto from "crypto";
 
 import { TestClient } from '../../../TestClient';
 import { MatrixEvent } from "../../../../src/models/event";
+import { IRoomTimelineData } from "../../../../src/models/event-timeline-set";
+import { Room, RoomEvent } from "../../../../src/models/room";
 import { logger } from '../../../../src/logger';
+import { MatrixClient, ClientEvent } from '../../../../src/client';
 
-export async function makeTestClients(userInfos, options) {
-    const clients = [];
-    const timeouts = [];
-    const clientMap = {};
-    const sendToDevice = function(type, map) {
+export async function makeTestClients(userInfos, options): Promise<[TestClient[], () => void]> {
+    const clients: TestClient[] = [];
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    const clientMap: Record<string, Record<string, MatrixClient>> = {};
+    const makeSendToDevice = (matrixClient: MatrixClient): MatrixClient['sendToDevice'] => async (type, map) => {
         // logger.log(this.getUserId(), "sends", type, map);
         for (const [userId, devMap] of Object.entries(map)) {
             if (userId in clientMap) {
                 for (const [deviceId, msg] of Object.entries(devMap)) {
                     if (deviceId in clientMap[userId]) {
                         const event = new MatrixEvent({
-                            sender: this.getUserId(), // eslint-disable-line @babel/no-invalid-this
+                            sender: matrixClient.getUserId()!,
                             type: type,
                             content: msg,
                         });
@@ -42,18 +45,19 @@ export async function makeTestClients(userInfos, options) {
                             Promise.resolve();
 
                         decryptionPromise.then(
-                            () => client.emit("toDeviceEvent", event),
+                            () => client.emit(ClientEvent.ToDeviceEvent, event),
                         );
                     }
                 }
             }
         }
+        return {};
     };
-    const sendEvent = function(room, type, content) {
+    const makeSendEvent = (matrixClient: MatrixClient) => (room, type, content) => {
         // make up a unique ID as the event ID
-        const eventId = "$" + this.makeTxnId(); // eslint-disable-line @babel/no-invalid-this
+        const eventId = "$" + matrixClient.makeTxnId();
         const rawEvent = {
-            sender: this.getUserId(), // eslint-disable-line @babel/no-invalid-this
+            sender: matrixClient.getUserId()!,
             type: type,
             content: content,
             room_id: room,
@@ -63,22 +67,24 @@ export async function makeTestClients(userInfos, options) {
         const event = new MatrixEvent(rawEvent);
         const remoteEcho = new MatrixEvent(Object.assign({}, rawEvent, {
             unsigned: {
-                transaction_id: this.makeTxnId(), // eslint-disable-line @babel/no-invalid-this
+                transaction_id: matrixClient.makeTxnId(),
             },
         }));
 
         const timeout = setTimeout(() => {
             for (const tc of clients) {
-                if (tc.client === this) { // eslint-disable-line @babel/no-invalid-this
+                const room = new Room('test', tc.client, tc.client.getUserId()!);
+                const roomTimelineData = {} as unknown as IRoomTimelineData;
+                if (tc.client === matrixClient) {
                     logger.log("sending remote echo!!");
-                    tc.client.emit("Room.timeline", remoteEcho);
+                    tc.client.emit(RoomEvent.Timeline, remoteEcho, room, false, false, roomTimelineData);
                 } else {
-                    tc.client.emit("Room.timeline", event);
+                    tc.client.emit(RoomEvent.Timeline, event, room, false, false, roomTimelineData);
                 }
             }
         });
 
-        timeouts.push(timeout);
+        timeouts.push(timeout as unknown as ReturnType<typeof setTimeout>);
 
         return Promise.resolve({ event_id: eventId });
     };
@@ -99,8 +105,8 @@ export async function makeTestClients(userInfos, options) {
             clientMap[userInfo.userId] = {};
         }
         clientMap[userInfo.userId][userInfo.deviceId] = testClient.client;
-        testClient.client.sendToDevice = sendToDevice;
-        testClient.client.sendEvent = sendEvent;
+        testClient.client.sendToDevice = makeSendToDevice(testClient.client);
+        testClient.client.sendEvent = makeSendEvent(testClient.client);
         clients.push(testClient);
     }
 
@@ -116,11 +122,12 @@ export async function makeTestClients(userInfos, options) {
 export function setupWebcrypto() {
     global.crypto = {
         getRandomValues: (buf) => {
-            return nodeCrypto.randomFillSync(buf);
+            return nodeCrypto.randomFillSync(buf as any);
         },
-    };
+    } as unknown as Crypto;
 }
 
 export function teardownWebcrypto() {
+    // @ts-ignore undefined != Crypto
     global.crypto = undefined;
 }
