@@ -436,7 +436,6 @@ export function installWebRTCMocks() {
 export function makeMockGroupCallStateEvent(roomId: string, groupCallId: string, content: IContent = {
     "m.type": GroupCallType.Video,
     "m.intent": GroupCallIntent.Prompt,
-    "m.terminated": false,
 }): MatrixEvent {
     return {
         getType: jest.fn().mockReturnValue(EventType.GroupCallPrefix),

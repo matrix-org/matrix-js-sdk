@@ -28,6 +28,7 @@ import {
     RoomState,
 } from "../../../src";
 import { SyncState } from "../../../src/sync";
+import { GroupCallTerminationReason } from "../../../src/webrtc/groupCall";
 import { GroupCallEventHandler, GroupCallEventHandlerEvent } from "../../../src/webrtc/groupCallEventHandler";
 import { flushPromises } from "../../test-utils/flushPromises";
 import {
@@ -82,7 +83,7 @@ describe('Group Call Event Handler', function() {
                     FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, {
                         "m.type": GroupCallType.Video,
                         "m.intent": GroupCallIntent.Prompt,
-                        "m.terminated": true,
+                        "m.terminated": GroupCallTerminationReason.CallEnded,
                     },
                 ),
                 {
@@ -260,7 +261,7 @@ describe('Group Call Event Handler', function() {
             await setupCallAndStart({
                 "m.type": GroupCallType.Video,
                 "m.intent": GroupCallIntent.Prompt,
-                "m.terminated": true,
+                "m.terminated": GroupCallTerminationReason.CallEnded,
             });
 
             expect(mockClientEmit).not.toHaveBeenCalledWith(
