@@ -211,9 +211,9 @@ describe('Group Call Event Handler', function() {
             null,
         );
 
-        // @ts-ignore Mock
+        // @ts-ignore Mock dataChannelsEnabled is private
         expect(groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID)?.dataChannelsEnabled).toBe(true);
-        // @ts-ignore Mock
+        // @ts-ignore Mock dataChannelOptions is private
         expect(groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID)?.dataChannelOptions).toStrictEqual(
             dataChannelOptions,
         );
