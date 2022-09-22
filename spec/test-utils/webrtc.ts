@@ -26,6 +26,7 @@ import {
     MatrixClient,
     MatrixEvent,
     Room,
+    RoomState,
     RoomStateEvent,
     RoomStateEventHandlerMap,
 } from "../../src";
@@ -384,6 +385,15 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     getRoom = jest.fn();
 
     typed(): MatrixClient { return this as unknown as MatrixClient; }
+
+    emitRoomState(event: MatrixEvent, state: RoomState): void {
+        this.emit(
+            RoomStateEvent.Events,
+            event,
+            state,
+            null,
+        );
+    }
 }
 
 export function installWebRTCMocks() {

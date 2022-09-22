@@ -26,7 +26,6 @@ import {
     MatrixEvent,
     Room,
     RoomState,
-    RoomStateEvent,
 } from "../../../src";
 import { SyncState } from "../../../src/sync";
 import { GroupCallEventHandler, GroupCallEventHandlerEvent } from "../../../src/webrtc/groupCallEventHandler";
@@ -69,19 +68,16 @@ describe('Group Call Event Handler', function() {
     describe("reacts to state changes", () => {
         it("terminates call", async () => {
             await groupCallEventHandler.start();
-            mockClient.emit(
-                RoomStateEvent.Events,
+            mockClient.emitRoomState(
                 makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID),
                 { roomId: FAKE_ROOM_ID } as unknown as RoomState,
-                null,
             );
 
             const groupCall = groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID);
 
             expect(groupCall.state).toBe(GroupCallState.LocalCallFeedUninitialized);
 
-            mockClient.emit(
-                RoomStateEvent.Events,
+            mockClient.emitRoomState(
                 makeMockGroupCallStateEvent(
                     FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, {
                         "m.type": GroupCallType.Video,
@@ -92,7 +88,6 @@ describe('Group Call Event Handler', function() {
                 {
                     roomId: FAKE_ROOM_ID,
                 } as unknown as RoomState,
-                null,
             );
 
             expect(groupCall.state).toBe(GroupCallState.Ended);
@@ -165,15 +160,13 @@ describe('Group Call Event Handler', function() {
         mockClient.on(GroupCallEventHandlerEvent.Incoming, onIncomingGroupCall);
         await groupCallEventHandler.start();
 
-        mockClient.emit(
-            RoomStateEvent.Events,
+        mockClient.emitRoomState(
             makeMockGroupCallStateEvent(
                 FAKE_ROOM_ID, FAKE_GROUP_CALL_ID,
             ),
             {
                 roomId: FAKE_ROOM_ID,
             } as unknown as RoomState,
-            null,
         );
 
         expect(onIncomingGroupCall).toHaveBeenCalledWith(expect.objectContaining({
@@ -193,8 +186,7 @@ describe('Group Call Event Handler', function() {
             "protocol": "protocol",
         };
 
-        mockClient.emit(
-            RoomStateEvent.Events,
+        mockClient.emitRoomState(
             makeMockGroupCallStateEvent(
                 FAKE_ROOM_ID,
                 FAKE_GROUP_CALL_ID,
@@ -208,7 +200,6 @@ describe('Group Call Event Handler', function() {
             {
                 roomId: FAKE_ROOM_ID,
             } as unknown as RoomState,
-            null,
         );
 
         // @ts-ignore Mock dataChannelsEnabled is private
@@ -230,13 +221,11 @@ describe('Group Call Event Handler', function() {
 
         const mockStateEvent = makeMockGroupCallMemberStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID);
 
-        mockClient.emit(
-            RoomStateEvent.Events,
+        mockClient.emitRoomState(
             mockStateEvent,
             {
                 roomId: FAKE_ROOM_ID,
             } as unknown as RoomState,
-            null,
         );
 
         expect(mockGroupCall.onMemberStateChanged).toHaveBeenCalledWith(mockStateEvent);
