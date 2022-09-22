@@ -161,11 +161,17 @@ describe('Group Call', function() {
         });
 
         it("does not initialize local call feed, if it already is", async () => {
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+            } as unknown as RoomMember;
+
             await groupCall.initLocalCallFeed();
             jest.spyOn(groupCall, "initLocalCallFeed");
             await groupCall.enter();
 
             expect(groupCall.initLocalCallFeed).not.toHaveBeenCalled();
+
+            groupCall.leave();
         });
 
         it("sends state event to room when creating", async () => {
