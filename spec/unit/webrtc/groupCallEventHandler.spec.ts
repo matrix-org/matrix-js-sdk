@@ -311,7 +311,7 @@ describe('Group Call Event Handler', function() {
         });
 
         it("ignores calls without a room", async () => {
-            (mockClient as any).getRoom = jest.fn().mockReturnValue(undefined);
+            mockClient.getRoom.mockReturnValue(undefined);
 
             await setupCallAndStart();
 

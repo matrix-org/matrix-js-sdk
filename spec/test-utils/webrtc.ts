@@ -381,6 +381,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     getSyncState = jest.fn<SyncState, []>().mockReturnValue(SyncState.Syncing);
 
     getRooms = jest.fn<Room[], []>().mockReturnValue([]);
+    getRoom = jest.fn();
 
     typed(): MatrixClient { return this as unknown as MatrixClient; }
 }
