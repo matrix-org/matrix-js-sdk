@@ -1714,4 +1714,39 @@ describe("MatrixClient", function() {
             expect(newSourceRoom._state.get(PolicyScope.User)?.[eventId]).toBeFalsy();
         });
     });
+
+    describe("using E2EE in group calls", () => {
+        const opts = {
+            baseUrl: "https://my.home.server",
+            idBaseUrl: identityServerUrl,
+            accessToken: "my.access.token",
+            store: store,
+            scheduler: scheduler,
+            userId: userId,
+        };
+
+        it("enabled E2EE by default", () => {
+            const client = new MatrixClient(opts);
+
+            expect(client.getUseE2eForGroupCall()).toBe(true);
+        });
+
+        it("enables E2EE when enabled explicitly", () => {
+            const client = new MatrixClient({
+                useE2eForGroupCall: true,
+                ...opts,
+            });
+
+            expect(client.getUseE2eForGroupCall()).toBe(true);
+        });
+
+        it("disabled E2EE if disabled explicitly", () => {
+            const client = new MatrixClient({
+                useE2eForGroupCall: false,
+                ...opts,
+            });
+
+            expect(client.getUseE2eForGroupCall()).toBe(false);
+        });
+    });
 });
