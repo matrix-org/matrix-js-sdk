@@ -16,7 +16,7 @@ limitations under the License.
 
 import MockHttpBackend from 'matrix-mock-request';
 
-import { IHttpOpts, MatrixClient } from "../../src/matrix";
+import { IHttpOpts, MatrixClient, PUSHER_ENABLED } from "../../src/matrix";
 import { mkPusher } from '../test-utils/test-utils';
 
 const realSetTimeout = setTimeout;
@@ -49,8 +49,8 @@ describe("Pushers", () => {
             httpBackend.when("GET", "/pushers").respond(200, {
                 pushers: [
                     mkPusher(),
-                    mkPusher({ enabled: true }),
-                    mkPusher({ enabled: false }),
+                    mkPusher({ [PUSHER_ENABLED.name]: true }),
+                    mkPusher({ [PUSHER_ENABLED.name]: false }),
                 ],
             });
 
@@ -61,9 +61,9 @@ describe("Pushers", () => {
 
             const response = await promise;
 
-            expect(response.pushers[0].enabled).toBe(true);
-            expect(response.pushers[1].enabled).toBe(true);
-            expect(response.pushers[2].enabled).toBe(false);
+            expect(response.pushers[0][PUSHER_ENABLED.name]).toBe(true);
+            expect(response.pushers[1][PUSHER_ENABLED.name]).toBe(true);
+            expect(response.pushers[2][PUSHER_ENABLED.name]).toBe(false);
         });
     });
 });
