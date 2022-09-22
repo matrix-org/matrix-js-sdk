@@ -7289,7 +7289,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public requestLoginToken(auth?: IAuthData): Promise<UIAResponse<ILoginTokenPostResponse>> {
         const body: UIARequest<{}> = { auth };
-        return this.http.authedRequest(undefined, Method.Post, "/login/token", undefined, body);
+        return this.http.authedRequest(
+            undefined, // no callback support
+            Method.Post,
+            "/org.matrix.msc3882/login/token",
+            undefined, // no query params
+            body,
+            { prefix: PREFIX_UNSTABLE },
+        );
     }
 
     /**
