@@ -189,7 +189,7 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
+import { LoginTokenPostResponse, ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
@@ -201,6 +201,7 @@ import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
 import { IgnoredInvites } from "./models/invites-ignorer";
+import { UIARequest, UIAResponse } from "./@types/uia";
 
 export type Store = IStore;
 
@@ -7289,6 +7290,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         return this.http.authedRequest(undefined, Method.Post, '/account/deactivate', undefined, body);
+    }
+
+    /**
+     * Make a request for an `m.login.token` to be issued as per
+     * [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882).
+     * The server may require User-Interactive auth.
+     * Note that this is UNSTABLE and subject to breaking changes without notice.
+     * @param {IAuthData} auth Optional. Auth data to supply for User-Interactive auth.
+     * @return {Promise<UIAResponse<LoginTokenPostResponse>>} Resolves: On success, the token response
+     * or UIA auth data.
+     */
+    public requestLoginToken(auth?: IAuthData): Promise<UIAResponse<LoginTokenPostResponse>> {
+        const body: UIARequest<{}> = { auth };
+        return this.http.authedRequest(
+            undefined, // no callback support
+            Method.Post,
+            "/org.matrix.msc3882/login/token",
+            undefined, // no query params
+            body,
+            { prefix: PREFIX_UNSTABLE },
+        );
     }
 
     /**
