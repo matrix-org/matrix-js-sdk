@@ -188,7 +188,7 @@ import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, Rule
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
 import { MediaHandler } from "./webrtc/mediaHandler";
-import { ILoginTokenPostResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
+import { LoginTokenPostResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
@@ -7284,10 +7284,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * The server may require User-Interactive auth.
      * Note that this is UNSTABLE and subject to breaking changes without notice.
      * @param {IAuthData} auth Optional. Auth data to supply for User-Interactive auth.
-     * @return {Promise<UIAResponse<ILoginTokenPostResponse>>} Resolves: On success, the token response
+     * @return {Promise<UIAResponse<LoginTokenPostResponse>>} Resolves: On success, the token response
      * or UIA auth data.
      */
-    public requestLoginToken(auth?: IAuthData): Promise<UIAResponse<ILoginTokenPostResponse>> {
+    public requestLoginToken(auth?: IAuthData): Promise<UIAResponse<LoginTokenPostResponse>> {
         const body: UIARequest<{}> = { auth };
         return this.http.authedRequest(
             undefined, // no callback support

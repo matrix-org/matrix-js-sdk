@@ -96,7 +96,7 @@ export enum SSOAction {
  * `m.login.token` issuance request.
  * Note that this is UNSTABLE and subject to breaking changes without notice.
  */
-export interface ILoginTokenPostResponse {
+export interface LoginTokenPostResponse {
     /**
      * The token to use with `m.login.token` to authenticate.
      */
