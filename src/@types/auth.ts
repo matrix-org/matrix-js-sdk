@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { UnstableValue } from "../NamespacedValue";
+
 // disable lint because these are wire responses
 /* eslint-disable camelcase */
 
@@ -45,6 +47,11 @@ export interface IPasswordFlow extends ILoginFlow {
     type: "m.login.password";
 }
 
+export const DELEGATED_OIDC_COMPATIBILITY = new UnstableValue(
+    "delegated_oidc_compatibility",
+    "org.matrix.msc3824.delegated_oidc_compatibility",
+);
+
 /**
  * Representation of SSO flow as per https://spec.matrix.org/v1.3/client-server-api/#client-login-via-sso
  */
@@ -52,6 +59,7 @@ export interface ISSOFlow extends ILoginFlow {
     type: "m.login.sso" | "m.login.cas";
     // eslint-disable-next-line camelcase
     identity_providers?: IIdentityProvider[];
+    [DELEGATED_OIDC_COMPATIBILITY.name]?: boolean;
 }
 
 export enum IdentityProviderBrand {
