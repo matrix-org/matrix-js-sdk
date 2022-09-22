@@ -1076,7 +1076,7 @@ describe("MatrixClient", function() {
     });
 
     describe("requestLoginToken", () => {
-        it("should hit the expected API endpoin with UIA", async () => {
+        it("should hit the expected API endpoint with UIA", async () => {
             const response = {};
             const uiaData = { foo: "baa" };
             const prom = client.requestLoginToken(uiaData);
@@ -1087,7 +1087,7 @@ describe("MatrixClient", function() {
             expect(await prom).toStrictEqual(response);
         });
 
-        it("should hit the expected API endpoin without UIA", async () => {
+        it("should hit the expected API endpoint without UIA", async () => {
             const response = {};
             const prom = client.requestLoginToken();
             httpBackend
