@@ -1128,7 +1128,7 @@ describe('Group Call', function() {
                 request: (() => {}) as any, // NOP
             });
 
-            jest.spyOn(client, "sendStateEvent").mockReturnValue({} as any);
+            jest.spyOn(client, "sendStateEvent").mockResolvedValue({} as any);
         });
 
         afterEach(() => {
