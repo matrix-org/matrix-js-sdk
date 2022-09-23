@@ -1168,8 +1168,6 @@ describe('Group Call', function() {
             });
 
             it("correctly passes voice ptt room call", async () => {
-                jest.spyOn(client, "getRoom").mockReturnValue(new Room("room_id", client, "my_user_id"));
-
                 const groupCall = await client.createGroupCall(
                     "room_id",
                     GroupCallType.Voice,
