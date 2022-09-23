@@ -341,9 +341,9 @@ export class IgnoredInvites {
      *
      * The result is *not* validated but is guaranteed to be a non-null object.
      *
-     * @returns A non-null object.
+     * @returns A non-null object. NOT validated.
      */
-    private getIgnoreInvitesPolicies(): {[key: string]: any} {
+    private getIgnoreInvitesPolicies(): any {
         return this.getPoliciesAndIgnoreInvitesPolicies().ignoreInvitesPolicies;
     }
 
@@ -361,11 +361,11 @@ export class IgnoredInvites {
 
     /**
      * As `getIgnoreInvitesPolicies` but also return the `POLICIES_ACCOUNT_EVENT_TYPE`
-     * object.
+     * object. Content is NOT validated.
      */
     private getPoliciesAndIgnoreInvitesPolicies():
-        {policies: {[key: string]: any}, ignoreInvitesPolicies: {[key: string]: any}} {
-        let policies: {[key: string]: any} = {};
+        {policies: any, ignoreInvitesPolicies: any} {
+        let policies = {};
         for (const key of [POLICIES_ACCOUNT_EVENT_TYPE.name, POLICIES_ACCOUNT_EVENT_TYPE.altName]) {
             if (!key) {
                 continue;
@@ -377,7 +377,7 @@ export class IgnoredInvites {
             }
         }
 
-        let ignoreInvitesPolicies: {[key: string]: any} = {};
+        let ignoreInvitesPolicies = {};
         let hasIgnoreInvitesPolicies = false;
         for (const key of [IGNORE_INVITES_ACCOUNT_EVENT_KEY.name, IGNORE_INVITES_ACCOUNT_EVENT_KEY.altName]) {
             if (!key) {
