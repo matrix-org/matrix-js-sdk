@@ -1725,7 +1725,7 @@ describe("MatrixClient", function() {
             userId: userId,
         };
 
-        it("enabled E2EE by default", () => {
+        it("enables E2EE by default", () => {
             const client = new MatrixClient(opts);
 
             expect(client.getUseE2eForGroupCall()).toBe(true);
