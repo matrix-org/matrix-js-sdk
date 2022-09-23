@@ -1153,7 +1153,7 @@ describe('Group Call', function() {
             )).rejects.toThrow("room_id already has an existing group call");
         });
 
-        it("throws when there already is a call", async () => {
+        it("throws if the room doesn't exist", async () => {
             await expect(client.createGroupCall(
                 "room_id",
                 GroupCallType.Video,
