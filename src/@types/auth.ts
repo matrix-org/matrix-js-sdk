@@ -29,7 +29,7 @@ export interface IRefreshTokenResponse {
 /* eslint-enable camelcase */
 
 /**
- * Response to GET login flows as per https://spec.matrix.org/latest/client-server-api/#get_matrixclientv3login
+ * Response to GET login flows as per https://spec.matrix.org/v1.3/client-server-api/#get_matrixclientv3login
  */
 export interface ILoginFlowsResponse {
     flows: LoginFlow[];
@@ -46,7 +46,7 @@ export interface IPasswordFlow extends ILoginFlow {
 }
 
 /**
- * Representation of SSO flow as per https://spec.matrix.org/latest/client-server-api/#client-login-via-sso
+ * Representation of SSO flow as per https://spec.matrix.org/v1.3/client-server-api/#client-login-via-sso
  */
 export interface ISSOFlow extends ILoginFlow {
     type: "m.login.sso" | "m.login.cas";
@@ -71,7 +71,7 @@ export interface IIdentityProvider {
 }
 
 /**
- * Parameters to login request as per https://spec.matrix.org/latest/client-server-api/#login
+ * Parameters to login request as per https://spec.matrix.org/v1.3/client-server-api/#login
  */
 /* eslint-disable camelcase */
 export interface ILoginParams {
@@ -89,4 +89,20 @@ export enum SSOAction {
 
     /** The user intends to register for a new account */
     REGISTER = "register",
+}
+
+/**
+ * The result of a successful [MSC3882](https://github.com/matrix-org/matrix-spec-proposals/pull/3882)
+ * `m.login.token` issuance request.
+ * Note that this is UNSTABLE and subject to breaking changes without notice.
+ */
+export interface LoginTokenPostResponse {
+    /**
+     * The token to use with `m.login.token` to authenticate.
+     */
+    login_token: string;
+    /**
+     * Expiration in seconds.
+     */
+    expires_in: number;
 }

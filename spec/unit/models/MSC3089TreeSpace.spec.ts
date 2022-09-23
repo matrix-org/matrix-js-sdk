@@ -565,7 +565,7 @@ describe("MSC3089TreeSpace", () => {
             rooms = {};
             rooms[tree.roomId] = parentRoom;
             (<any>tree).room = parentRoom; // override readonly
-            client.getRoom = (r) => rooms[r];
+            client.getRoom = (r) => rooms[r ?? ""];
 
             clientSendStateFn = jest.fn()
                 .mockImplementation((roomId: string, eventType: EventType, content: any, stateKey: string) => {
