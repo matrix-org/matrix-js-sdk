@@ -889,7 +889,6 @@ describe("MatrixClient", function() {
             };
 
             const prom = client.getPushers();
-            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {});
             httpBackend.when("GET", "/pushers").respond(200, response);
             await httpBackend.flush();
             expect(await prom).toStrictEqual(response);

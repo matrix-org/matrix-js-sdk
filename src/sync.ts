@@ -1235,9 +1235,7 @@ export class SyncApi {
             if (joinObj.isBrandNewRoom) {
                 // set the back-pagination token. Do this *before* adding any
                 // events so that clients can start back-paginating.
-                if (joinObj.timeline.prev_batch !== null) {
-                    room.getLiveTimeline().setPaginationToken(joinObj.timeline.prev_batch, EventTimeline.BACKWARDS);
-                }
+                room.getLiveTimeline().setPaginationToken(joinObj.timeline.prev_batch, EventTimeline.BACKWARDS);
             } else if (joinObj.timeline.limited) {
                 let limited = true;
 

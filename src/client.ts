@@ -147,7 +147,6 @@ import {
 import {
     EventType,
     MsgType,
-    PUSHER_ENABLED,
     RelationType,
     RoomCreateTypeField,
     RoomType,
@@ -203,7 +202,6 @@ import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
-import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
 import { IgnoredInvites } from "./models/invites-ignorer";
 
 export type Store = IStore;
@@ -3435,10 +3433,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} roomId The room ID
      * @return {Room|null} The Room or null if it doesn't exist or there is no data store.
      */
-    public getRoom(roomId: string | undefined): Room | null {
-        if (!roomId) {
-            return null;
-        }
+    public getRoom(roomId: string): Room | null {
         return this.store.getRoom(roomId);
     }
 
@@ -4696,12 +4691,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async sendReceipt(
-        event: MatrixEvent,
-        receiptType: ReceiptType,
-        body: any,
-        callback?: Callback,
-    ): Promise<{}> {
+    public sendReceipt(event: MatrixEvent, receiptType: ReceiptType, body: any, callback?: Callback): Promise<{}> {
         if (typeof (body) === 'function') {
             callback = body as any as Callback; // legacy
             body = {};
@@ -4716,19 +4706,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $receiptType: receiptType,
             $eventId: event.getId(),
         });
-
-        // TODO: Add a check for which spec version this will be released in
-        if (await this.doesServerSupportUnstableFeature("org.matrix.msc3771")) {
-            const isThread = !!event.threadRootId;
-            body.thread_id = isThread
-                ? event.threadRootId
-                : MAIN_ROOM_TIMELINE;
-        }
-
         const promise = this.http.authedRequest(callback, Method.Post, path, undefined, body || {});
 
         const room = this.getRoom(event.getRoomId());
-        if (room && this.credentials.userId) {
+        if (room) {
             room.addLocalEchoReceipt(this.credentials.userId, event, receiptType);
         }
         return promise;
@@ -4742,12 +4723,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async sendReadReceipt(
-        event: MatrixEvent | null,
-        receiptType = ReceiptType.Read,
-        callback?: Callback,
-    ): Promise<{} | undefined> {
-        if (!event) return;
+    public async sendReadReceipt(event: MatrixEvent, receiptType = ReceiptType.Read, callback?: Callback): Promise<{}> {
         const eventId = event.getId();
         const room = this.getRoom(event.getRoomId());
         if (room && room.hasPendingEvent(eventId)) {
@@ -5733,15 +5709,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 this.processBeaconEvents(timelineSet.room, timelineEvents);
                 this.processThreadEvents(room, threadedEvents, backwards);
 
-                const atEnd = res.end === undefined || res.end === res.start;
-
                 // if we've hit the end of the timeline, we need to stop trying to
                 // paginate. We need to keep the 'forwards' token though, to make sure
                 // we can recover from gappy syncs.
-                if (backwards && atEnd) {
+                if (backwards && res.end == res.start) {
                     eventTimeline.setPaginationToken(null, dir);
                 }
-                return !atEnd;
+                return res.end != res.start;
             }).finally(() => {
                 eventTimeline.paginationRequests[dir] = null;
             });
@@ -7474,7 +7448,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 $eventType: eventType,
             });
         return this.http.authedRequest(
-            undefined, Method.Get, path, undefined, undefined, {
+            undefined, Method.Get, path, null, null, {
                 prefix: PREFIX_UNSTABLE,
             },
         );
@@ -7779,7 +7753,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public getLocalAliases(roomId: string): Promise<{ aliases: string[] }> {
         const path = utils.encodeUri("/rooms/$roomId/aliases", { $roomId: roomId });
         const prefix = PREFIX_V3;
-        return this.http.authedRequest(undefined, Method.Get, path, undefined, undefined, { prefix });
+        return this.http.authedRequest(undefined, Method.Get, path, null, null, { prefix });
     }
 
     /**
@@ -8016,7 +7990,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             'bind': bind,
         };
         return this.http.authedRequest(
-            callback, Method.Post, path, undefined, data,
+            callback, Method.Post, path, null, data,
         );
     }
 
@@ -8035,7 +8009,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
         const path = "/account/3pid/add";
         const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
-        return this.http.authedRequest(undefined, Method.Post, path, undefined, data, { prefix });
+        return this.http.authedRequest(undefined, Method.Post, path, null, data, { prefix });
     }
 
     /**
@@ -8057,7 +8031,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const prefix = await this.isVersionSupported("r0.6.0") ?
             PREFIX_R0 : PREFIX_UNSTABLE;
         return this.http.authedRequest(
-            undefined, Method.Post, path, undefined, data, { prefix },
+            undefined, Method.Post, path, null, data, { prefix },
         );
     }
 
@@ -8084,7 +8058,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             id_server: this.getIdentityServerUrl(true),
         };
         const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
-        return this.http.authedRequest(undefined, Method.Post, path, undefined, data, { prefix });
+        return this.http.authedRequest(undefined, Method.Post, path, null, data, { prefix });
     }
 
     /**
@@ -8101,7 +8075,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // eslint-disable-next-line camelcase
     ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
         const path = "/account/3pid/delete";
-        return this.http.authedRequest(undefined, Method.Post, path, undefined, { medium, address });
+        return this.http.authedRequest(undefined, Method.Post, path, null, { medium, address });
     }
 
     /**
@@ -8147,7 +8121,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
 
         return this.http.authedRequest<{}>(
-            callback, Method.Post, path, undefined, data,
+            callback, Method.Post, path, null, data,
         );
     }
 
@@ -8238,21 +8212,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: Array of objects representing pushers
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
-        const response = await this.http.authedRequest(callback, Method.Get, "/pushers");
-
-        // Migration path for clients that connect to a homeserver that does not support
-        // MSC3881 yet, see https://github.com/matrix-org/matrix-spec-proposals/blob/kerry/remote-push-toggle/proposals/3881-remote-push-notification-toggling.md#migration
-        if (!await this.doesServerSupportUnstableFeature("org.matrix.msc3881")) {
-            response.pushers = response.pushers.map(pusher => {
-                if (!pusher.hasOwnProperty(PUSHER_ENABLED.name)) {
-                    pusher[PUSHER_ENABLED.name] = true;
-                }
-                return pusher;
-            });
-        }
-
-        return response;
+    public getPushers(callback?: Callback): Promise<{ pushers: IPusher[] }> {
+        return this.http.authedRequest(callback, Method.Get, "/pushers");
     }
 
     /**
@@ -8265,7 +8226,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setPusher(pusher: IPusherRequest, callback?: Callback): Promise<{}> {
         const path = "/pushers/set";
-        return this.http.authedRequest(callback, Method.Post, path, undefined, pusher);
+        return this.http.authedRequest(callback, Method.Post, path, null, pusher);
     }
 
     /**
@@ -9052,7 +9013,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: eventId,
         });
 
-        return this.http.authedRequest(undefined, Method.Post, path, undefined, { score, reason });
+        return this.http.authedRequest(undefined, Method.Post, path, null, { score, reason });
     }
 
     /**
@@ -9214,7 +9175,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<IRoomSummary> {
         const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-        return this.http.authedRequest(undefined, Method.Get, path, { via }, undefined, {
+        return this.http.authedRequest(undefined, Method.Get, path, { via }, null, {
             qsStringifyOptions: { arrayFormat: 'repeat' },
             prefix: "/_matrix/client/unstable/im.nheko.summary",
         });
