@@ -1740,7 +1740,7 @@ describe("MatrixClient", function() {
             expect(client.getUseE2eForGroupCall()).toBe(true);
         });
 
-        it("disabled E2EE if disabled explicitly", () => {
+        it("disables E2EE if disabled explicitly", () => {
             const client = new MatrixClient({
                 useE2eForGroupCall: false,
                 ...opts,
