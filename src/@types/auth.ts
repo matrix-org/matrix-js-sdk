@@ -60,6 +60,7 @@ export interface ISSOFlow extends ILoginFlow {
     // eslint-disable-next-line camelcase
     identity_providers?: IIdentityProvider[];
     [DELEGATED_OIDC_COMPATIBILITY.name]?: boolean;
+    [DELEGATED_OIDC_COMPATIBILITY.altName]?: boolean;
 }
 
 export enum IdentityProviderBrand {
