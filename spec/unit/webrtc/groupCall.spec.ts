@@ -1118,4 +1118,93 @@ describe('Group Call', function() {
             expect(onActiveSpeakerEvent).toHaveBeenCalledWith(FAKE_USER_ID_3);
         });
     });
+
+    describe("creating group calls", () => {
+        let client: MatrixClient;
+
+        beforeEach(() => {
+            client = new MatrixClient({
+                baseUrl: "base_url",
+                request: (() => {}) as any, // NOP
+            });
+
+            jest.spyOn(client, "sendStateEvent").mockResolvedValue({} as any);
+        });
+
+        afterEach(() => {
+            client.stopClient();
+        });
+
+        it("throws when there already is a call", async () => {
+            jest.spyOn(client, "getRoom").mockReturnValue(new Room("room_id", client, "my_user_id"));
+
+            await client.createGroupCall(
+                "room_id",
+                GroupCallType.Video,
+                false,
+                GroupCallIntent.Prompt,
+            );
+
+            await expect(client.createGroupCall(
+                "room_id",
+                GroupCallType.Video,
+                false,
+                GroupCallIntent.Prompt,
+            )).rejects.toThrow("room_id already has an existing group call");
+        });
+
+        it("throws if the room doesn't exist", async () => {
+            await expect(client.createGroupCall(
+                "room_id",
+                GroupCallType.Video,
+                false,
+                GroupCallIntent.Prompt,
+            )).rejects.toThrow("Cannot find room room_id");
+        });
+
+        describe("correctly passes parameters", () => {
+            beforeEach(() => {
+                jest.spyOn(client, "getRoom").mockReturnValue(new Room("room_id", client, "my_user_id"));
+            });
+
+            it("correctly passes voice ptt room call", async () => {
+                const groupCall = await client.createGroupCall(
+                    "room_id",
+                    GroupCallType.Voice,
+                    true,
+                    GroupCallIntent.Room,
+                );
+
+                expect(groupCall.type).toBe(GroupCallType.Voice);
+                expect(groupCall.isPtt).toBe(true);
+                expect(groupCall.intent).toBe(GroupCallIntent.Room);
+            });
+
+            it("correctly passes voice ringing call", async () => {
+                const groupCall = await client.createGroupCall(
+                    "room_id",
+                    GroupCallType.Voice,
+                    false,
+                    GroupCallIntent.Ring,
+                );
+
+                expect(groupCall.type).toBe(GroupCallType.Voice);
+                expect(groupCall.isPtt).toBe(false);
+                expect(groupCall.intent).toBe(GroupCallIntent.Ring);
+            });
+
+            it("correctly passes video prompt call", async () => {
+                const groupCall = await client.createGroupCall(
+                    "room_id",
+                    GroupCallType.Video,
+                    false,
+                    GroupCallIntent.Prompt,
+                );
+
+                expect(groupCall.type).toBe(GroupCallType.Video);
+                expect(groupCall.isPtt).toBe(false);
+                expect(groupCall.intent).toBe(GroupCallIntent.Prompt);
+            });
+        });
+    });
 });
