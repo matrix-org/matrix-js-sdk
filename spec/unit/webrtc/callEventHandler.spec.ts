@@ -27,6 +27,7 @@ import {
     MatrixEvent,
     Room,
     RoomEvent,
+    RoomMember,
 } from "../../../src";
 import { MatrixClient } from "../../../src/client";
 import { CallEventHandler, CallEventHandlerEvent } from "../../../src/webrtc/callEventHandler";
@@ -181,12 +182,16 @@ describe("CallEventHandler", () => {
 
     describe("handleCallEvent()", () => {
         const incomingCallListener = jest.fn();
-        const room = new Room("!room:id", client, "@user:id");
-        const timelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
+        let timelineData: IRoomTimelineData;
+        let room: Room;
 
         beforeEach(() => {
+            room = new Room("!room:id", client, client.getUserId());
+            timelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
+
             jest.spyOn(client, "checkTurnServers").mockReturnValue(undefined);
             jest.spyOn(client, "getRoom").mockReturnValue(room);
+            jest.spyOn(room, "getMember").mockReturnValue({ user_id: client.getUserId() } as unknown as RoomMember);
 
             client.on(CallEventHandlerEvent.Incoming, incomingCallListener);
         });
@@ -247,6 +252,8 @@ describe("CallEventHandler", () => {
             expect(call.getOpponentSessionId()).toBe(SESSION_ID);
             // @ts-ignore Mock onIncomingCall is private
             expect(groupCall.onIncomingCall).toHaveBeenCalledWith(call);
+
+            groupCall.terminate(false);
         });
 
         it("ignores a call with a different invitee than us", async () => {
