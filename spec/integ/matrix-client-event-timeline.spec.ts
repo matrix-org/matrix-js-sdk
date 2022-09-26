@@ -15,8 +15,19 @@ limitations under the License.
 */
 
 import * as utils from "../test-utils/test-utils";
-import { ClientEvent, EventTimeline, Filter, IEvent, MatrixClient, MatrixEvent, Room } from "../../src/matrix";
+import {
+    ClientEvent,
+    Direction,
+    EventTimeline,
+    EventTimelineSet,
+    Filter,
+    IEvent,
+    MatrixClient,
+    MatrixEvent,
+    Room,
+} from "../../src/matrix";
 import { logger } from "../../src/logger";
+import { encodeUri } from "../../src/utils";
 import { TestClient } from "../TestClient";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
 
@@ -132,6 +143,44 @@ const THREAD_REPLY = utils.mkEvent({
 });
 
 THREAD_ROOT.unsigned["m.relations"]["io.element.thread"].latest_event = THREAD_REPLY;
+
+const STABLE_THREAD_ROOT = utils.mkEvent({
+    room: roomId,
+    user: userId,
+    type: "m.room.message",
+    content: {
+        "body": "thread root",
+        "msgtype": "m.text",
+    },
+    unsigned: {
+        "m.relations": {
+            "m.thread": {
+                //"latest_event": undefined,
+                "count": 1,
+                "current_user_participated": true,
+            },
+        },
+    },
+    event: false,
+});
+
+const STABLE_THREAD_REPLY = utils.mkEvent({
+    room: roomId,
+    user: userId,
+    type: "m.room.message",
+    content: {
+        "body": "thread reply",
+        "msgtype": "m.text",
+        "m.relates_to": {
+            // We can't use the const here because we change server support mode for test
+            rel_type: "m.thread",
+            event_id: THREAD_ROOT.event_id,
+        },
+    },
+    event: false,
+});
+
+STABLE_THREAD_ROOT.unsigned["m.relations"]["m.thread"].latest_event = STABLE_THREAD_REPLY;
 
 const SYNC_THREAD_ROOT = withoutRoomId(THREAD_ROOT);
 const SYNC_THREAD_REPLY = withoutRoomId(THREAD_REPLY);
@@ -922,6 +971,231 @@ describe("MatrixClient event timelines", function() {
                 }),
                 httpBackend.flushAllExpected(),
             ]);
+        });
+    });
+
+    describe("paginateEventTimeline for thread list timeline", function() {
+        async function flushHttp<T>(promise: Promise<T>): Promise<T> {
+            return Promise.all([promise, httpBackend.flushAllExpected()]).then(([result]) => result);
+        }
+
+        describe("with server compatibility", function() {
+            async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
+                const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
+                function respondToThreads() {
+                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
+                        $roomId: roomId,
+                    })).respond(200, {
+                        chunk: [STABLE_THREAD_ROOT],
+                        state: [],
+                        next_batch: RANDOM_TOKEN,
+                    });
+                }
+                function respondToContext() {
+                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
+                        $roomId: roomId,
+                        $eventId: STABLE_THREAD_ROOT.event_id!,
+                    })).respond(200, {
+                        end: "",
+                        start: "",
+                        state: [],
+                        events_before: [],
+                        events_after: [],
+                        event: STABLE_THREAD_ROOT,
+                    });
+                }
+
+                respondToContext();
+                await flushHttp(client.getEventTimeline(timelineSet, STABLE_THREAD_ROOT.event_id!));
+                respondToThreads();
+                const timeline = await flushHttp(client.getLatestTimeline(timelineSet));
+                expect(timeline).not.toBeNull();
+
+                respondToThreads();
+                const success = await flushHttp(client.paginateEventTimeline(timeline!, {
+                    backwards: direction === Direction.Backward,
+                }));
+                expect(success).toBeTruthy();
+                expect(timeline!.getEvents().length).toEqual(1);
+                expect(timeline!.getEvents()[0].event).toEqual(STABLE_THREAD_ROOT);
+                expect(timeline!.getPaginationToken(direction)).toEqual(RANDOM_TOKEN);
+            }
+
+            it("should allow you to paginate all threads backwards", async function() {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.Stable);
+
+                const room = client.getRoom(roomId);
+                const timelineSets = await (room?.createThreadsTimelineSets());
+                expect(timelineSets).not.toBeNull();
+                const [allThreads, myThreads] = timelineSets!;
+                await testPagination(allThreads, Direction.Backward);
+                await testPagination(myThreads, Direction.Backward);
+            });
+
+            it("should allow you to paginate all threads forwards", async function() {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.Stable);
+
+                const room = client.getRoom(roomId);
+                const timelineSets = await (room?.createThreadsTimelineSets());
+                expect(timelineSets).not.toBeNull();
+                const [allThreads, myThreads] = timelineSets!;
+
+                await testPagination(allThreads, Direction.Forward);
+                await testPagination(myThreads, Direction.Forward);
+            });
+
+            it("should allow fetching all threads", async function() {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.Stable);
+
+                const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
+                function respondToThreads() {
+                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
+                        $roomId: roomId,
+                    })).respond(200, {
+                        chunk: [STABLE_THREAD_ROOT],
+                        state: [],
+                        next_batch: RANDOM_TOKEN,
+                    });
+                }
+                const room = client.getRoom(roomId);
+                const timelineSets = await room?.createThreadsTimelineSets();
+                expect(timelineSets).not.toBeNull();
+                respondToThreads();
+                respondToThreads();
+                httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
+                await flushHttp(room.fetchRoomThreads());
+            });
+        });
+
+        describe("without server compatibility", function() {
+            async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
+                const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
+                function respondToMessagesRequest() {
+                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
+                        $roomId: roomId,
+                    })).respond(200, {
+                        chunk: [THREAD_ROOT],
+                        state: [],
+                        start: `${Direction.Forward}${RANDOM_TOKEN}2`,
+                        end: `${Direction.Backward}${RANDOM_TOKEN}2`,
+                    });
+                }
+                function respondToContext() {
+                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
+                        $roomId: roomId,
+                        $eventId: THREAD_ROOT.event_id!,
+                    })).respond(200, {
+                        end: `${Direction.Forward}${RANDOM_TOKEN}1`,
+                        start: `${Direction.Backward}${RANDOM_TOKEN}1`,
+                        state: [],
+                        events_before: [],
+                        events_after: [],
+                        event: THREAD_ROOT,
+                    });
+                }
+                function respondToSync() {
+                    httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
+                }
+
+                respondToContext();
+                respondToSync();
+                await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
+
+                respondToMessagesRequest();
+                const timeline = await flushHttp(client.getLatestTimeline(timelineSet));
+                expect(timeline).not.toBeNull();
+
+                respondToMessagesRequest();
+                const success = await flushHttp(client.paginateEventTimeline(timeline!, {
+                    backwards: direction === Direction.Backward,
+                }));
+
+                expect(success).toBeTruthy();
+                expect(timeline!.getEvents().length).toEqual(1);
+                expect(timeline!.getEvents()[0].event).toEqual(THREAD_ROOT);
+                expect(timeline!.getPaginationToken(direction)).toEqual(`${direction}${RANDOM_TOKEN}2`);
+            }
+
+            it("should allow you to paginate all threads", async function() {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.None);
+
+                function respondToFilter() {
+                    httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+                }
+                function respondToSync() {
+                    httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
+                }
+
+                const room = client.getRoom(roomId);
+
+                respondToFilter();
+                respondToSync();
+                respondToFilter();
+                respondToSync();
+
+                const timelineSetsPromise = room?.createThreadsTimelineSets();
+                expect(timelineSetsPromise).not.toBeNull();
+                const timelineSets = await flushHttp(timelineSetsPromise!);
+                expect(timelineSets).not.toBeNull();
+                const [allThreads, myThreads] = timelineSets!;
+
+                await testPagination(allThreads, Direction.Backward);
+                await testPagination(myThreads, Direction.Backward);
+            });
+
+            it("should allow fetching all threads", async function() {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.None);
+
+                const room = client.getRoom(roomId);
+
+                const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
+                function respondToMessagesRequest() {
+                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
+                        $roomId: roomId,
+                    })).respond(200, {
+                        chunk: [STABLE_THREAD_ROOT],
+                        state: [],
+                        start: `${Direction.Forward}${RANDOM_TOKEN}2`,
+                        end: `${Direction.Backward}${RANDOM_TOKEN}2`,
+                    });
+                }
+                function respondToFilter() {
+                    httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+                }
+                function respondToSync() {
+                    httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
+                }
+
+                respondToFilter();
+                respondToSync();
+                respondToFilter();
+                respondToSync();
+
+                const timelineSetsPromise = room?.createThreadsTimelineSets();
+                expect(timelineSetsPromise).not.toBeNull();
+                await flushHttp(timelineSetsPromise!);
+                respondToFilter();
+                respondToSync();
+                respondToSync();
+                respondToSync();
+                respondToMessagesRequest();
+                await flushHttp(room.fetchRoomThreads());
+            });
         });
     });
 
