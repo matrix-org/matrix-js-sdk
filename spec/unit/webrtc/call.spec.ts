@@ -26,7 +26,13 @@ import {
     CallState,
     CallParty,
 } from '../../../src/webrtc/call';
-import { SDPStreamMetadata, SDPStreamMetadataKey, SDPStreamMetadataPurpose } from '../../../src/webrtc/callEventTypes';
+import {
+    MCallAnswer,
+    MCallHangupReject,
+    SDPStreamMetadata,
+    SDPStreamMetadataKey,
+    SDPStreamMetadataPurpose,
+} from '../../../src/webrtc/callEventTypes';
 import {
     DUMMY_SDP,
     MockMediaHandler,
@@ -102,6 +108,8 @@ describe('Call', function() {
     // We retain a reference to this in the correct Mock type
     let mockSendEvent: jest.Mock<Promise<ISendEventResponse>, [string, string, IContent, string, Callback<any>]>;
 
+    const errorListener = () => {};
+
     beforeEach(function() {
         prevNavigator = global.navigator;
         prevDocument = global.document;
@@ -135,7 +143,7 @@ describe('Call', function() {
             roomId: FAKE_ROOM_ID,
         });
         // call checks one of these is wired up
-        call.on(CallEvent.Error, () => {});
+        call.on(CallEvent.Error, errorListener);
     });
 
     afterEach(function() {
@@ -1274,6 +1282,118 @@ describe('Call', function() {
             }));
             // @ts-ignore Mock
             expect(call.terminate).toHaveBeenCalledWith(CallParty.Local, CallErrorCode.Transfered, true);
+        });
+    });
+
+    describe("onTrack", () => {
+        it("ignores streamless track", async () => {
+            // @ts-ignore Mock pushRemoteFeed() is private
+            jest.spyOn(call, "pushRemoteFeed");
+
+            await call.placeVoiceCall();
+
+            (call.peerConn as unknown as MockRTCPeerConnection).onTrackListener(
+                { streams: [], track: new MockMediaStreamTrack("track_ev", "audio") } as unknown as RTCTrackEvent,
+            );
+
+            // @ts-ignore Mock pushRemoteFeed() is private
+            expect(call.pushRemoteFeed).not.toHaveBeenCalled();
+        });
+
+        it("correctly pushes", async () => {
+            // @ts-ignore Mock pushRemoteFeed() is private
+            jest.spyOn(call, "pushRemoteFeed");
+
+            await call.placeVoiceCall();
+            await call.onAnswerReceived(makeMockEvent("@test:foo", {
+                version: 1,
+                call_id: call.callId,
+                party_id: 'the_correct_party_id',
+                answer: {
+                    sdp: DUMMY_SDP,
+                },
+            }));
+
+            const stream = new MockMediaStream("stream_ev", [new MockMediaStreamTrack("track_ev", "audio")]);
+            (call.peerConn as unknown as MockRTCPeerConnection).onTrackListener(
+                { streams: [stream], track: stream.getAudioTracks()[0] } as unknown as RTCTrackEvent,
+            );
+
+            // @ts-ignore Mock pushRemoteFeed() is private
+            expect(call.pushRemoteFeed).toHaveBeenCalledWith(stream);
+            // @ts-ignore Mock pushRemoteFeed() is private
+            expect(call.removeTrackListeners.has(stream)).toBe(true);
+        });
+    });
+
+    describe("onHangupReceived()", () => {
+        it("ends call on onHangupReceived() if state is ringing", async () => {
+            expect(call.callHasEnded()).toBe(false);
+
+            call.state = CallState.Ringing;
+            call.onHangupReceived({} as MCallHangupReject);
+
+            expect(call.callHasEnded()).toBe(true);
+        });
+
+        it("ends call on onHangupReceived() if party id matches", async () => {
+            expect(call.callHasEnded()).toBe(false);
+
+            await call.initWithInvite({
+                getContent: jest.fn().mockReturnValue({
+                    version: "1",
+                    call_id: "call_id",
+                    party_id: "remote_party_id",
+                    lifetime: CALL_LIFETIME,
+                    offer: {
+                        sdp: DUMMY_SDP,
+                    },
+                }),
+                getSender: () => "@test:foo",
+            } as unknown as MatrixEvent);
+            call.onHangupReceived({ version: "1", party_id: "remote_party_id" } as MCallHangupReject);
+
+            expect(call.callHasEnded()).toBe(true);
+        });
+    });
+
+    it.each(
+        Object.values(CallState),
+    )("ends call on onRejectReceived() if in correct state (state=%s)", async (state: CallState) => {
+        expect(call.callHasEnded()).toBe(false);
+
+        call.state = state;
+        call.onRejectReceived({} as MCallHangupReject);
+
+        expect(call.callHasEnded()).toBe(
+            [CallState.InviteSent, CallState.Ringing, CallState.Ended].includes(state),
+        );
+    });
+
+    it("terminates call when answered elsewhere", async () => {
+        await call.placeVoiceCall();
+
+        expect(call.callHasEnded()).toBe(false);
+
+        call.onAnsweredElsewhere({} as MCallAnswer);
+
+        expect(call.callHasEnded()).toBe(true);
+    });
+
+    it("throws when there is no error listener", async () => {
+        call.off(CallEvent.Error, errorListener);
+
+        expect(call.placeVoiceCall()).rejects.toThrow();
+    });
+
+    describe("hasPeerConnection()", () => {
+        it("hasPeerConnection() returns false if there is no peer connection", () => {
+            expect(call.hasPeerConnection).toBe(false);
+        });
+
+        it("hasPeerConnection() returns true if there is a peer connection", async () => {
+            await call.placeVoiceCall();
+            expect(call.hasPeerConnection).toBe(true);
         });
     });
 });
