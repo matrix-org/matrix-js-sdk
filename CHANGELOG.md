@@ -1,5 +1,5 @@
-Changes in [19.6.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.6.0-rc.1) (2022-09-20)
-============================================================================================================
+Changes in [19.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.6.0) (2022-09-27)
+==================================================================================================
 
 ## ✨ Features
  * Add a property aggregating all names of a NamespacedValue ([\#2656](https://github.com/matrix-org/matrix-js-sdk/pull/2656)).
