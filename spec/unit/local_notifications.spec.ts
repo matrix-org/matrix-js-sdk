@@ -35,7 +35,7 @@ describe("Local notification settings", () => {
             client.setLocalNotificationSettings(deviceId, settings);
 
             expect(client.setAccountData).toHaveBeenCalledWith(
-                `${LOCAL_NOTIFICATION_SETTINGS_PREFIX}.${deviceId}`,
+                `${LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${deviceId}`,
                 settings,
             );
         });
