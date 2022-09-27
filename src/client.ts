@@ -3442,7 +3442,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} eventType The event type
      * @return {?object} The contents of the given account data event
      */
-    public getAccountData(eventType: string): MatrixEvent {
+    public getAccountData(eventType: string): MatrixEvent | undefined {
         return this.store.getAccountData(eventType);
     }
 
