@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "19.5.0",
+  "version": "19.6.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "engines": {
     "node": ">=12.9.0"
@@ -32,7 +32,7 @@
   "keywords": [
     "matrix-org"
   ],
-  "main": "./src/index.ts",
+  "main": "./lib/index.js",
   "browser": "./lib/browser-index.js",
   "matrix_src_main": "./src/index.ts",
   "matrix_src_browser": "./src/browser-index.js",
@@ -125,5 +125,6 @@
   "jestSonar": {
     "reportPath": "coverage",
     "sonar56x": true
-  }
+  },
+  "typings": "./lib/index.d.ts"
 }
