@@ -201,13 +201,22 @@ export const PUSHER_ENABLED = new UnstableValue(
     "org.matrix.msc3881.enabled");
 
 /**
+     * https://github.com/matrix-org/matrix-doc/pull/3881
+     *
+     * @experimental
+     */
+export const PUSHER_DEVICE_ID = new UnstableValue(
+    "device_id",
+    "org.matrix.msc3881.device_id");
+
+/**
  * https://github.com/matrix-org/matrix-doc/pull/3881
  *
  * @experimental
  */
-export const PUSHER_DEVICE_ID = new UnstableValue(
-    "device_id",
-    "org.matrix.msc3881.device_id");
+export const LOCAL_NOTIFICATION_SETTINGS_PREFIX = new UnstableValue(
+    "m.local_notification_settings",
+    "m.msc3890.local_notification_settings");
 
 export interface IEncryptedFile {
     url: string;
