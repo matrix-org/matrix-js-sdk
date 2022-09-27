@@ -2025,6 +2025,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         } else if (this.peerConn.iceConnectionState == 'failed') {
             // Firefox for Android does not yet have support for restartIce()
             if (this.peerConn.restartIce) {
+                this.candidatesEnded = false;
                 this.peerConn.restartIce();
             } else {
                 this.hangup(CallErrorCode.IceFailed, false);
