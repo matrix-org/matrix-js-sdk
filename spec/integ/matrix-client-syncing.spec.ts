@@ -87,6 +87,8 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should emit RoomEvent.MyMembership for invite->leave->invite cycles", async () => {
+            await client.initCrypto();
+
             const roomId = "!cycles:example.org";
 
             // First sync: an invite

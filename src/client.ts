@@ -5287,6 +5287,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {object} [options]
      * @param {boolean} options.preventReEmit don't re-emit events emitted on an event mapped by this mapper on the client
      * @param {boolean} options.decrypt decrypt event proactively
+     * @param {boolean} options.toDevice the event is a to_device event
      * @return {Function}
      */
     public getEventMapper(options?: MapperOpts): EventMapper {

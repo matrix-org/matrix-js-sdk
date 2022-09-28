@@ -1109,7 +1109,20 @@ export class SyncApi {
         if (Array.isArray(data.to_device?.events) && data.to_device.events.length > 0) {
             const cancelledKeyVerificationTxns = [];
             data.to_device.events
-                .map(client.getEventMapper())
+                .filter((eventJSON) => {
+                    if (
+                        eventJSON.type === EventType.RoomMessageEncrypted &&
+                        !(["m.olm.v1.curve25519-aes-sha2"].includes(eventJSON.content?.algorithm))
+                    ) {
+                        logger.log(
+                            'Ignoring invalid encrypted to-device event from ' + eventJSON.sender,
+                        );
+                        return false;
+                    }
+
+                    return true;
+                })
+                .map(client.getEventMapper({ toDevice: true }))
                 .map((toDeviceEvent) => { // map is a cheap inline forEach
                     // We want to flag m.key.verification.start events as cancelled
                     // if there's an accompanying m.key.verification.cancel event, so
@@ -1185,6 +1198,24 @@ export class SyncApi {
             const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
             await this.processRoomEvents(room, stateEvents);
+
+            const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId())?.getSender();
+            const parkedHistory = await client.crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
+            for (const parked of parkedHistory) {
+                if (parked.senderId === inviter) {
+                    await this.client.crypto.olmDevice.addInboundGroupSession(
+                        room.roomId,
+                        parked.senderKey,
+                        parked.forwardingCurve25519KeyChain,
+                        parked.sessionId,
+                        parked.sessionKey,
+                        parked.keysClaimed,
+                        true,
+                        { sharedHistory: true, untrusted: true },
+                    );
+                }
+            }
+
             if (inviteObj.isBrandNewRoom) {
                 room.recalculate();
                 client.store.storeRoom(room);
@@ -1288,7 +1319,11 @@ export class SyncApi {
                 }
             }
 
-            await this.processRoomEvents(room, stateEvents, events, syncEventData.fromCache);
+            try {
+                await this.processRoomEvents(room, stateEvents, events, syncEventData.fromCache);
+            } catch (e) {
+                logger.error(`Failed to process events on room ${room.roomId}:`, e);
+            }
 
             // set summary after processing events,
             // because it will trigger a name calculation
