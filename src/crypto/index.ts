@@ -2105,6 +2105,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param {?boolean} known whether to mark that the user has been made aware of
      *      the existence of this device. Null to leave unchanged
      *
+     * @param {?Record<string, any>} keys The list of keys that was present
+     * during the device verification. This will be double checked with the list
+     * of keys the given device has currently.
+     *
      * @return {Promise<module:crypto/deviceinfo>} updated DeviceInfo
      */
     public async setDeviceVerification(
@@ -2113,6 +2117,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         verified?: boolean,
         blocked?: boolean,
         known?: boolean,
+        keys?: Record<string, string>,
     ): Promise<DeviceInfo | CrossSigningInfo> {
         // get rid of any `undefined`s here so we can just check
         // for null rather than null or undefined
@@ -2130,6 +2135,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
             if (!verified) {
                 throw new Error("Cannot set a cross-signing key as unverified");
+            }
+            const gotKeyId = keys ? Object.values(keys)[0] : null;
+            if (keys && (Object.values(keys).length !== 1 || gotKeyId !== xsk.getId())) {
+                throw new Error(`Key did not match expected value: expected ${xsk.getId()}, got ${gotKeyId}`);
             }
 
             if (!this.crossSigningInfo.getId() && userId === this.crossSigningInfo.userId) {
@@ -2191,6 +2200,13 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         let verificationStatus = dev.verified;
 
         if (verified) {
+            if (keys) {
+                for (const [keyId, key] of Object.entries(keys)) {
+                    if (dev.keys[keyId] !== key) {
+                        throw new Error(`Key did not match expected value: expected ${key}, got ${dev.keys[keyId]}`);
+                    }
+                }
+            }
             verificationStatus = DeviceVerification.VERIFIED;
         } else if (verified !== null && verificationStatus == DeviceVerification.VERIFIED) {
             verificationStatus = DeviceVerification.UNVERIFIED;
@@ -2400,13 +2416,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return null;
         }
 
-        const forwardingChain = event.getForwardingCurve25519KeyChain();
-        if (forwardingChain.length > 0) {
-            // we got the key this event from somewhere else
-            // TODO: check if we can trust the forwarders.
-            return null;
-        }
-
         if (event.isKeySourceUntrusted()) {
             // we got the key for this event from a source that we consider untrusted
             return null;
@@ -2478,8 +2487,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
         ret.encrypted = true;
 
-        const forwardingChain = event.getForwardingCurve25519KeyChain();
-        if (forwardingChain.length > 0 || event.isKeySourceUntrusted()) {
+        if (event.isKeySourceUntrusted()) {
             // we got the key this event from somewhere else
             // TODO: check if we can trust the forwarders.
             ret.authenticated = false;

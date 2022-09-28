@@ -29,6 +29,7 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
+    ParkedSharedHistory,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -55,6 +56,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
     public static STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
     public static STORE_INBOUND_GROUP_SESSIONS_WITHHELD = 'inbound_group_sessions_withheld';
     public static STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS = 'shared_history_inbound_group_sessions';
+    public static STORE_PARKED_SHARED_HISTORY = 'parked_shared_history';
     public static STORE_DEVICE_DATA = 'device_data';
     public static STORE_ROOMS = 'rooms';
     public static STORE_BACKUP = 'sessions_needing_backup';
@@ -667,6 +669,27 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn?: IDBTransaction,
     ): Promise<[senderKey: string, sessionId: string][]> {
         return this.backend.getSharedHistoryInboundGroupSessions(roomId, txn);
+    }
+
+    /**
+     * Park a shared-history group session for a room we may be invited to later.
+     */
+    public addParkedSharedHistory(
+        roomId: string,
+        parkedData: ParkedSharedHistory,
+        txn?: IDBTransaction,
+    ): void {
+        this.backend.addParkedSharedHistory(roomId, parkedData, txn);
+    }
+
+    /**
+     * Pop out all shared-history group sessions for a room.
+     */
+    public takeParkedSharedHistory(
+        roomId: string,
+        txn?: IDBTransaction,
+    ): Promise<ParkedSharedHistory[]> {
+        return this.backend.takeParkedSharedHistory(roomId, txn);
     }
 
     /**

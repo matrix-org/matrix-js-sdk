@@ -110,6 +110,12 @@ describe("MegolmDecryption", function() {
                 senderCurve25519Key: "SENDER_CURVE25519",
                 claimedEd25519Key: "SENDER_ED25519",
             };
+            event.getWireType = () => "m.room.encrypted";
+            event.getWireContent = () => {
+                return {
+                    algorithm: "m.olm.v1.curve25519-aes-sha2",
+                };
+            };
 
             const mockCrypto = {
                 decryptEvent: function() {

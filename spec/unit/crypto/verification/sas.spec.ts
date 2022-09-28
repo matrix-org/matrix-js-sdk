@@ -464,7 +464,7 @@ describe("SAS verification", function() {
                 },
             );
 
-            alice.client.setDeviceVerified = jest.fn();
+            alice.client.crypto.setDeviceVerification = jest.fn();
             alice.client.getDeviceEd25519Key = () => {
                 return "alice+base64+ed25519+key";
             };
@@ -482,7 +482,7 @@ describe("SAS verification", function() {
                 return Promise.resolve();
             };
 
-            bob.client.setDeviceVerified = jest.fn();
+            bob.client.crypto.setDeviceVerification = jest.fn();
             bob.client.getStoredDevice = () => {
                 return DeviceInfo.fromStorage(
                     {
@@ -565,10 +565,24 @@ describe("SAS verification", function() {
             ]);
 
             // make sure Alice and Bob verified each other
-            expect(alice.client.setDeviceVerified)
-                .toHaveBeenCalledWith(bob.client.getUserId(), bob.client.deviceId);
-            expect(bob.client.setDeviceVerified)
-                .toHaveBeenCalledWith(alice.client.getUserId(), alice.client.deviceId);
+            expect(alice.client.crypto.setDeviceVerification)
+                .toHaveBeenCalledWith(
+                    bob.client.getUserId(),
+                    bob.client.deviceId,
+                    true,
+                    null,
+                    null,
+                    { "ed25519:Dynabook": "bob+base64+ed25519+key" },
+            );
+            expect(bob.client.crypto.setDeviceVerification)
+                .toHaveBeenCalledWith(
+                    alice.client.getUserId(),
+                    alice.client.deviceId,
+                    true,
+                    null,
+                    null,
+                    { "ed25519:Osborne2": "alice+base64+ed25519+key" },
+            );
         });
     });
 });

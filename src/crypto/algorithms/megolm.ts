@@ -35,8 +35,10 @@ import { Room } from '../../models/room';
 import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
-import { MatrixEvent } from "../..";
+import { MatrixEvent } from "../../models/event";
 import { IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
+import { RoomKeyRequestState } from '../OutgoingRoomKeyRequestManager';
+import { OlmGroupSessionExtraData } from "../../@types/crypto";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -1189,8 +1191,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
  *     {@link module:crypto/algorithms/DecryptionAlgorithm}
  */
 class MegolmDecryption extends DecryptionAlgorithm {
-    // events which we couldn't decrypt due to unknown sessions / indexes: map from
-    // senderKey|sessionId to Set of MatrixEvents
+    // events which we couldn't decrypt due to unknown sessions /
+    // indexes, or which we could only decrypt with untrusted keys:
+    // map from senderKey|sessionId to Set of MatrixEvents
     private pendingEvents = new Map<string, Map<string, Set<MatrixEvent>>>();
 
     // this gets stubbed out by the unit tests.
@@ -1294,9 +1297,13 @@ class MegolmDecryption extends DecryptionAlgorithm {
             );
         }
 
-        // success. We can remove the event from the pending list, if that hasn't
-        // already happened.
-        this.removeEventFromPendingList(event);
+        // Success. We can remove the event from the pending list, if
+        // that hasn't already happened. However, if the event was
+        // decrypted with an untrusted key, leave it on the pending
+        // list so it will be retried if we find a trusted key later.
+        if (!res.untrusted) {
+            this.removeEventFromPendingList(event);
+        }
 
         const payload = JSON.parse(res.result);
 
@@ -1391,6 +1398,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
         let exportFormat = false;
         let keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>;
 
+        const extraSessionData: OlmGroupSessionExtraData = {};
+
         if (!content.room_id ||
             !content.session_key ||
             !content.session_id ||
@@ -1400,12 +1409,58 @@ class MegolmDecryption extends DecryptionAlgorithm {
             return;
         }
 
-        if (!senderKey) {
-            logger.error("key event has no sender key (not encrypted?)");
+        if (!olmlib.isOlmEncrypted(event)) {
+            logger.error("key event not properly encrypted");
             return;
         }
 
+        if (content["org.matrix.msc3061.shared_history"]) {
+            extraSessionData.sharedHistory = true;
+        }
+
         if (event.getType() == "m.forwarded_room_key") {
+            const deviceInfo = this.crypto.deviceList.getDeviceByIdentityKey(
+                olmlib.OLM_ALGORITHM,
+                senderKey,
+            );
+            const senderKeyUser = this.baseApis.crypto.deviceList.getUserByIdentityKey(
+                olmlib.OLM_ALGORITHM,
+                senderKey,
+            );
+            if (senderKeyUser !== event.getSender()) {
+                logger.error("sending device does not belong to the user it claims to be from");
+                return;
+            }
+            const outgoingRequests = deviceInfo ? await this.crypto.cryptoStore.getOutgoingRoomKeyRequestsByTarget(
+                event.getSender(), deviceInfo.deviceId, [RoomKeyRequestState.Sent],
+            ) : [];
+            const weRequested = outgoingRequests.some((req) => (
+                req.requestBody.room_id === content.room_id && req.requestBody.session_id === content.session_id
+            ));
+            const room = this.baseApis.getRoom(content.room_id);
+            const memberEvent = room?.getMember(this.userId)?.events.member;
+            const fromInviter = memberEvent?.getSender() === event.getSender() ||
+                (memberEvent?.getUnsigned()?.prev_sender === event.getSender() &&
+                    memberEvent?.getPrevContent()?.membership === "invite");
+            const fromUs = event.getSender() === this.baseApis.getUserId();
+
+            if (!weRequested) {
+                // If someone sends us an unsolicited key and it's not
+                // shared history, ignore it
+                if (!extraSessionData.sharedHistory) {
+                    logger.log("forwarded key not shared history - ignoring");
+                    return;
+                }
+
+                // If someone sends us an unsolicited key for a room
+                // we're already in, and they're not one of our other
+                // devices or the one who invited us, ignore it
+                if (room && !fromInviter && !fromUs) {
+                    logger.log("forwarded key not from inviter or from us - ignoring");
+                    return;
+                }
+            }
+
             exportFormat = true;
             forwardingKeyChain = Array.isArray(content.forwarding_curve25519_key_chain) ?
                 content.forwarding_curve25519_key_chain : [];
@@ -1418,7 +1473,6 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 logger.error("forwarded_room_key event is missing sender_key field");
                 return;
             }
-            senderKey = content.sender_key;
 
             const ed25519Key = content.sender_claimed_ed25519_key;
             if (!ed25519Key) {
@@ -1431,11 +1485,45 @@ class MegolmDecryption extends DecryptionAlgorithm {
             keysClaimed = {
                 ed25519: ed25519Key,
             };
+
+            // If this is a key for a room we're not in, don't load it
+            // yet, just park it in case *this sender* invites us to
+            // that room later
+            if (!room) {
+                const parkedData = {
+                    senderId: event.getSender(),
+                    senderKey: content.sender_key,
+                    sessionId: content.session_id,
+                    sessionKey: content.session_key,
+                    keysClaimed,
+                    forwardingCurve25519KeyChain: forwardingKeyChain,
+                };
+                await this.crypto.cryptoStore.doTxn(
+                    'readwrite',
+                    ['parked_shared_history'],
+                    (txn) => this.crypto.cryptoStore.addParkedSharedHistory(content.room_id, parkedData, txn),
+                    logger.withPrefix("[addParkedSharedHistory]"),
+                );
+                return;
+            }
+
+            const sendingDevice = this.crypto.deviceList.getDeviceByIdentityKey(olmlib.OLM_ALGORITHM, senderKey);
+            const deviceTrust = this.crypto.checkDeviceInfoTrust(event.getSender(), sendingDevice);
+
+            if (fromUs && !deviceTrust.isVerified()) {
+                return;
+            }
+
+            // forwarded keys are always untrusted
+            extraSessionData.untrusted = true;
+
+            // replace the sender key with the sender key of the session
+            // creator for storage
+            senderKey = content.sender_key;
         } else {
             keysClaimed = event.getKeysClaimed();
         }
 
-        const extraSessionData: any = {};
         if (content["org.matrix.msc3061.shared_history"]) {
             extraSessionData.sharedHistory = true;
         }
@@ -1453,7 +1541,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             );
 
             // have another go at decrypting events sent with this session.
-            if (await this.retryDecryption(senderKey, content.session_id)) {
+            if (await this.retryDecryption(senderKey, content.session_id, !extraSessionData.untrusted)) {
                 // cancel any outstanding room key requests for this session.
                 // Only do this if we managed to decrypt every message in the
                 // session, because if we didn't, we leave the other key
@@ -1668,7 +1756,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         session: IMegolmSessionData,
         opts: { untrusted?: boolean, source?: string } = {},
     ): Promise<void> {
-        const extraSessionData: any = {};
+        const extraSessionData: OlmGroupSessionExtraData = {};
         if (opts.untrusted || session.untrusted) {
             extraSessionData.untrusted = true;
         }
@@ -1696,7 +1784,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 });
             }
             // have another go at decrypting events sent with this session.
-            this.retryDecryption(session.sender_key, session.session_id);
+            this.retryDecryption(session.sender_key, session.session_id, !extraSessionData.untrusted);
         });
     }
 
@@ -1707,10 +1795,12 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * @private
      * @param {String} senderKey
      * @param {String} sessionId
+     * @param {Boolean} keyTrusted
      *
-     * @return {Boolean} whether all messages were successfully decrypted
+     * @return {Boolean} whether all messages were successfully
+     *     decrypted with trusted keys
      */
-    private async retryDecryption(senderKey: string, sessionId: string): Promise<boolean> {
+    private async retryDecryption(senderKey: string, sessionId: string, keyTrusted?: boolean): Promise<boolean> {
         const senderPendingEvents = this.pendingEvents.get(senderKey);
         if (!senderPendingEvents) {
             return true;
@@ -1725,13 +1815,14 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         await Promise.all([...pending].map(async (ev) => {
             try {
-                await ev.attemptDecryption(this.crypto, { isRetry: true });
+                await ev.attemptDecryption(this.crypto, { isRetry: true, keyTrusted });
             } catch (e) {
                 // don't die if something goes wrong
             }
         }));
 
-        // If decrypted successfully, they'll have been removed from pendingEvents
+        // If decrypted successfully with trusted keys, they'll have
+        // been removed from pendingEvents
         return !this.pendingEvents.get(senderKey)?.has(sessionId);
     }
 
