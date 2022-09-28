@@ -144,44 +144,6 @@ const THREAD_REPLY = utils.mkEvent({
 
 THREAD_ROOT.unsigned["m.relations"]["io.element.thread"].latest_event = THREAD_REPLY;
 
-const STABLE_THREAD_ROOT = utils.mkEvent({
-    room: roomId,
-    user: userId,
-    type: "m.room.message",
-    content: {
-        "body": "thread root",
-        "msgtype": "m.text",
-    },
-    unsigned: {
-        "m.relations": {
-            "m.thread": {
-                //"latest_event": undefined,
-                "count": 1,
-                "current_user_participated": true,
-            },
-        },
-    },
-    event: false,
-});
-
-const STABLE_THREAD_REPLY = utils.mkEvent({
-    room: roomId,
-    user: userId,
-    type: "m.room.message",
-    content: {
-        "body": "thread reply",
-        "msgtype": "m.text",
-        "m.relates_to": {
-            // We can't use the const here because we change server support mode for test
-            rel_type: "m.thread",
-            event_id: THREAD_ROOT.event_id,
-        },
-    },
-    event: false,
-});
-
-STABLE_THREAD_ROOT.unsigned["m.relations"]["m.thread"].latest_event = STABLE_THREAD_REPLY;
-
 const SYNC_THREAD_ROOT = withoutRoomId(THREAD_ROOT);
 const SYNC_THREAD_REPLY = withoutRoomId(THREAD_REPLY);
 SYNC_THREAD_ROOT.unsigned = {
@@ -980,13 +942,20 @@ describe("MatrixClient event timelines", function() {
         }
 
         describe("with server compatibility", function() {
+            beforeEach(() => {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.Stable);
+            });
+
             async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
                 const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
                 function respondToThreads() {
                     httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
                         $roomId: roomId,
                     })).respond(200, {
-                        chunk: [STABLE_THREAD_ROOT],
+                        chunk: [THREAD_ROOT],
                         state: [],
                         next_batch: RANDOM_TOKEN,
                     });
@@ -994,19 +963,19 @@ describe("MatrixClient event timelines", function() {
                 function respondToContext() {
                     httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
                         $roomId: roomId,
-                        $eventId: STABLE_THREAD_ROOT.event_id!,
+                        $eventId: THREAD_ROOT.event_id!,
                     })).respond(200, {
                         end: "",
                         start: "",
                         state: [],
                         events_before: [],
                         events_after: [],
-                        event: STABLE_THREAD_ROOT,
+                        event: THREAD_ROOT,
                     });
                 }
 
                 respondToContext();
-                await flushHttp(client.getEventTimeline(timelineSet, STABLE_THREAD_ROOT.event_id!));
+                await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
                 respondToThreads();
                 const timeline = await flushHttp(client.getLatestTimeline(timelineSet));
                 expect(timeline).not.toBeNull();
@@ -1016,17 +985,11 @@ describe("MatrixClient event timelines", function() {
                     backwards: direction === Direction.Backward,
                 }));
                 expect(success).toBeTruthy();
-                expect(timeline!.getEvents().length).toEqual(1);
-                expect(timeline!.getEvents()[0].event).toEqual(STABLE_THREAD_ROOT);
+                expect(timeline!.getEvents().map(it => it.event)).toEqual([THREAD_ROOT]);
                 expect(timeline!.getPaginationToken(direction)).toEqual(RANDOM_TOKEN);
             }
 
             it("should allow you to paginate all threads backwards", async function() {
-                // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
-                Thread.setServerSideSupport(FeatureSupport.Experimental);
-                Thread.setServerSideListSupport(FeatureSupport.Stable);
-
                 const room = client.getRoom(roomId);
                 const timelineSets = await (room?.createThreadsTimelineSets());
                 expect(timelineSets).not.toBeNull();
@@ -1036,11 +999,6 @@ describe("MatrixClient event timelines", function() {
             });
 
             it("should allow you to paginate all threads forwards", async function() {
-                // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
-                Thread.setServerSideSupport(FeatureSupport.Experimental);
-                Thread.setServerSideListSupport(FeatureSupport.Stable);
-
                 const room = client.getRoom(roomId);
                 const timelineSets = await (room?.createThreadsTimelineSets());
                 expect(timelineSets).not.toBeNull();
@@ -1051,17 +1009,12 @@ describe("MatrixClient event timelines", function() {
             });
 
             it("should allow fetching all threads", async function() {
-                // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
-                Thread.setServerSideSupport(FeatureSupport.Experimental);
-                Thread.setServerSideListSupport(FeatureSupport.Stable);
-
                 const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
                 function respondToThreads() {
                     httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
                         $roomId: roomId,
                     })).respond(200, {
-                        chunk: [STABLE_THREAD_ROOT],
+                        chunk: [THREAD_ROOT],
                         state: [],
                         next_batch: RANDOM_TOKEN,
                     });
@@ -1077,6 +1030,13 @@ describe("MatrixClient event timelines", function() {
         });
 
         describe("without server compatibility", function() {
+            beforeEach(() => {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.None);
+            });
+
             async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
                 const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
                 function respondToMessagesRequest() {
@@ -1120,17 +1080,11 @@ describe("MatrixClient event timelines", function() {
                 }));
 
                 expect(success).toBeTruthy();
-                expect(timeline!.getEvents().length).toEqual(1);
-                expect(timeline!.getEvents()[0].event).toEqual(THREAD_ROOT);
+                expect(timeline!.getEvents().map(it => it.event)).toEqual([THREAD_ROOT]);
                 expect(timeline!.getPaginationToken(direction)).toEqual(`${direction}${RANDOM_TOKEN}2`);
             }
 
             it("should allow you to paginate all threads", async function() {
-                // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
-                Thread.setServerSideSupport(FeatureSupport.Experimental);
-                Thread.setServerSideListSupport(FeatureSupport.None);
-
                 function respondToFilter() {
                     httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
                 }
@@ -1156,11 +1110,6 @@ describe("MatrixClient event timelines", function() {
             });
 
             it("should allow fetching all threads", async function() {
-                // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
-                Thread.setServerSideSupport(FeatureSupport.Experimental);
-                Thread.setServerSideListSupport(FeatureSupport.None);
-
                 const room = client.getRoom(roomId);
 
                 const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
@@ -1168,7 +1117,7 @@ describe("MatrixClient event timelines", function() {
                     httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
                         $roomId: roomId,
                     })).respond(200, {
-                        chunk: [STABLE_THREAD_ROOT],
+                        chunk: [THREAD_ROOT],
                         state: [],
                         start: `${Direction.Forward}${RANDOM_TOKEN}2`,
                         end: `${Direction.Backward}${RANDOM_TOKEN}2`,

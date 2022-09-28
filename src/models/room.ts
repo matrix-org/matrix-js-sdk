@@ -1579,36 +1579,15 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         return filter;
     }
 
-    /**
-     * Add a timelineSet for this room with the given filter
-     * @param {ThreadFilterType?} filterType Thread list type (e.g., All threads or My threads)
-     * @param {Object=} opts Configuration options
-     * @return {EventTimelineSet} The timelineSet
-     */
-    public getOrCreateThreadTimelineSet(
-        filterType?: ThreadFilterType,
-        {
-            pendingEvents = true,
-        }: ICreateFilterOpts = {},
-    ): EventTimelineSet {
-        if (this.threadsTimelineSets[filterType]) {
-            return this.filteredTimelineSets[filterType];
-        }
-        const opts = Object.assign({ pendingEvents }, this.opts);
-        const timelineSet =
-            new EventTimelineSet(this, opts, undefined, undefined, Boolean(Thread.hasServerSideListSupport));
-        this.reEmitter.reEmit(timelineSet, [
-            RoomEvent.Timeline,
-            RoomEvent.TimelineReset,
-        ]);
-
-        return timelineSet;
-    }
-
     private async createThreadTimelineSet(filterType?: ThreadFilterType): Promise<EventTimelineSet> {
         let timelineSet: EventTimelineSet;
         if (Thread.hasServerSideListSupport) {
-            timelineSet = this.getOrCreateThreadTimelineSet(filterType);
+            timelineSet =
+                new EventTimelineSet(this, this.opts, undefined, undefined, Boolean(Thread.hasServerSideListSupport));
+            this.reEmitter.reEmit(timelineSet, [
+                RoomEvent.Timeline,
+                RoomEvent.TimelineReset,
+            ]);
         } else if (Thread.hasServerSideSupport) {
             const filter = await this.getThreadListFilter(filterType);
 
@@ -1642,8 +1621,13 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         return timelineSet;
     }
 
-    public threadsReady = false;
+    private threadsReady = false;
 
+    /**
+     * Takes the given thread root events and creates threads for them.
+     * @param events
+     * @param toStartOfTimeline
+     */
     public processThreadRoots(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         for (const rootEvent of events) {
             EventTimeline.setEventMetadata(
@@ -1657,6 +1641,11 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         }
     }
 
+    /**
+     * Fetch the bare minimum of room threads required for the thread list to work reliably.
+     * With server support that means fetching one page.
+     * Without server support that means fetching as much at once as the server allows us to.
+     */
     public async fetchRoomThreads(): Promise<void> {
         if (this.threadsReady || !this.client.supportsExperimentalThreads()) {
             return;
@@ -1668,72 +1657,74 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 this.fetchRoomThreadList(ThreadFilterType.My),
             ]);
         } else {
-            await this.fetchOldThreadList();
+            const allThreadsFilter = await this.getThreadListFilter();
+
+            const { chunk: events } = await this.client.createMessagesRequest(
+                this.roomId,
+                "",
+                Number.MAX_SAFE_INTEGER,
+                Direction.Backward,
+                allThreadsFilter,
+            );
+
+            if (!events.length) return;
+
+            // Sorted by last_reply origin_server_ts
+            const threadRoots = events
+                .map(this.client.getEventMapper())
+                .sort((eventA, eventB) => {
+                    /**
+                     * `origin_server_ts` in a decentralised world is far from ideal
+                     * but for lack of any better, we will have to use this
+                     * Long term the sorting should be handled by homeservers and this
+                     * is only meant as a short term patch
+                     */
+                    const threadAMetadata = eventA
+                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                    const threadBMetadata = eventB
+                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                    return threadAMetadata.latest_event.origin_server_ts -
+                        threadBMetadata.latest_event.origin_server_ts;
+                });
+
+            let latestMyThreadsRootEvent: MatrixEvent;
+            const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+            for (const rootEvent of threadRoots) {
+                this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
+                    duplicateStrategy: DuplicateStrategy.Ignore,
+                    fromCache: false,
+                    roomState,
+                });
+
+                const threadRelationship = rootEvent
+                    .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                if (threadRelationship.current_user_participated) {
+                    this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
+                        duplicateStrategy: DuplicateStrategy.Ignore,
+                        fromCache: false,
+                        roomState,
+                    });
+                    latestMyThreadsRootEvent = rootEvent;
+                }
+            }
+
+            this.processThreadRoots(threadRoots, true);
+
+            this.client.decryptEventIfNeeded(threadRoots[threadRoots.length -1]);
+            if (latestMyThreadsRootEvent) {
+                this.client.decryptEventIfNeeded(latestMyThreadsRootEvent);
+            }
         }
 
         this.on(ThreadEvent.NewReply, this.onThreadNewReply);
         this.threadsReady = true;
     }
 
-    private async fetchOldThreadList(): Promise<void> {
-        const allThreadsFilter = await this.getThreadListFilter();
-
-        const { chunk: events } = await this.client.createMessagesRequest(
-            this.roomId,
-            "",
-            Number.MAX_SAFE_INTEGER,
-            Direction.Backward,
-            allThreadsFilter,
-        );
-
-        if (!events.length) return;
-
-        // Sorted by last_reply origin_server_ts
-        const threadRoots = events
-            .map(this.client.getEventMapper())
-            .sort((eventA, eventB) => {
-                /**
-                 * `origin_server_ts` in a decentralised world is far from ideal
-                 * but for lack of any better, we will have to use this
-                 * Long term the sorting should be handled by homeservers and this
-                 * is only meant as a short term patch
-                 */
-                const threadAMetadata = eventA
-                    .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
-                const threadBMetadata = eventB
-                    .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
-                return threadAMetadata.latest_event.origin_server_ts - threadBMetadata.latest_event.origin_server_ts;
-            });
-
-        let latestMyThreadsRootEvent: MatrixEvent;
-        const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        for (const rootEvent of threadRoots) {
-            this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
-                duplicateStrategy: DuplicateStrategy.Ignore,
-                fromCache: false,
-                roomState,
-            });
-
-            const threadRelationship = rootEvent
-                .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
-            if (threadRelationship.current_user_participated) {
-                this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
-                    duplicateStrategy: DuplicateStrategy.Ignore,
-                    fromCache: false,
-                    roomState,
-                });
-                latestMyThreadsRootEvent = rootEvent;
-            }
-        }
-
-        this.processThreadRoots(threadRoots, true);
-
-        this.client.decryptEventIfNeeded(threadRoots[threadRoots.length -1]);
-        if (latestMyThreadsRootEvent) {
-            this.client.decryptEventIfNeeded(latestMyThreadsRootEvent);
-        }
-    }
-
+    /**
+     * Fetch a single page of threadlist messages for the specific thread filter
+     * @param filter
+     * @private
+     */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
         const timelineSet = filter === ThreadFilterType.My
             ? this.threadsTimelineSets[1]
