@@ -5357,7 +5357,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 " parameter to true when creating MatrixClient to enable it.");
         }
 
-        if (!timelineSet.room) {
+        if (!timelineSet?.room) {
             throw new Error("getEventTimeline only supports room timelines");
         }
 
@@ -5477,7 +5477,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let res: IMessagesResponse;
-        const roomId = timelineSet.room?.roomId;
+        const roomId = timelineSet.room.roomId;
         if (timelineSet.isThreadTimeline) {
             res = await this.createThreadListMessagesRequest(
                 roomId,
@@ -5731,7 +5731,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 if (backwards && res.end == res.start) {
                     eventTimeline.setPaginationToken(null, dir);
                 }
-                return res.end != res.start;
+                return res.end !== res.start;
             }).finally(() => {
                 eventTimeline.paginationRequests[dir] = null;
             });
@@ -6866,8 +6866,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 list: determineFeatureSupport(listStable, listUnstable),
             };
         } catch (e) {
-            // Assume server support and stability aren't available: null/no data return.
-            // XXX: This should just return an object with `false` booleans instead.
             return {
                 threads: FeatureSupport.None,
                 list: FeatureSupport.None,
