@@ -18,7 +18,7 @@ import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../syn
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
 import { logger } from '../logger';
-import { IStartClientOpts, IStateEventWithRoomId } from "..";
+import { IStartClientOpts, IStateEventWithRoomId } from "../matrix";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";

@@ -35,7 +35,7 @@ import { Room } from '../../models/room';
 import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
-import { MatrixEvent } from "../..";
+import { MatrixEvent } from "../../models/event";
 import { IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
 
 // determine whether the key can be shared with invitees
