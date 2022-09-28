@@ -196,7 +196,7 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should emit ClientEvent.Room when invited", async () => {
-            await client.initCrypto();
+            await client!.initCrypto();
 
             const roomId = "!invite:example.org";
 
