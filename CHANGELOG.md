@@ -1,3 +1,9 @@
+Changes in [20.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.1) (2022-09-28)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix missing return when receiving an invitation without shared history ([\#2710](https://github.com/matrix-org/matrix-js-sdk/pull/2710)).
+
 Changes in [20.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.0) (2022-09-28)
 ==================================================================================================
 
