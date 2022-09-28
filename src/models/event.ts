@@ -151,6 +151,7 @@ interface IKeyRequestRecipient {
 export interface IDecryptOptions {
     emit?: boolean;
     isRetry?: boolean;
+    keyTrusted?: boolean;
 }
 
 /**
@@ -695,7 +696,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
             throw new Error("Attempt to decrypt event which isn't encrypted");
         }
 
-        if (this.clearEvent && !this.isDecryptionFailure()) {
+        if (this.clearEvent && !this.isDecryptionFailure() && !(this.isKeySourceUntrusted() && options.keyTrusted)) {
             // we may want to just ignore this? let's start with rejecting it.
             throw new Error(
                 "Attempt to decrypt event which has already been decrypted",

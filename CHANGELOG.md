@@ -1,3 +1,36 @@
+Changes in [20.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.1) (2022-09-28)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix missing return when receiving an invitation without shared history ([\#2710](https://github.com/matrix-org/matrix-js-sdk/pull/2710)).
+
+Changes in [20.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.0) (2022-09-28)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Bump IDB crypto store version ([\#2705](https://github.com/matrix-org/matrix-js-sdk/pull/2705)).
+
+Changes in [19.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.7.0) (2022-09-28)
+==================================================================================================
+
+## 🔒 Security
+* Fix for [CVE-2022-39249](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D39249)
+* Fix for [CVE-2022-39250](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D39250)
+* Fix for [CVE-2022-39251](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D39251)
+* Fix for [CVE-2022-39236](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D39236)
+
+Changes in [19.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.6.0) (2022-09-27)
+==================================================================================================
+
+## ✨ Features
+ * Add a property aggregating all names of a NamespacedValue ([\#2656](https://github.com/matrix-org/matrix-js-sdk/pull/2656)).
+ * Implementation of MSC3824 to add action= param on SSO login ([\#2398](https://github.com/matrix-org/matrix-js-sdk/pull/2398)). Contributed by @hughns.
+ * Add invited_count and joined_count to sliding sync room responses. ([\#2628](https://github.com/matrix-org/matrix-js-sdk/pull/2628)).
+ * Base support for MSC3847: Ignore invites with policy rooms ([\#2626](https://github.com/matrix-org/matrix-js-sdk/pull/2626)). Contributed by @Yoric.
+
+## 🐛 Bug Fixes
+ * Fix handling of remote echoes doubling up ([\#2639](https://github.com/matrix-org/matrix-js-sdk/pull/2639)). Fixes #2618.
+
 Changes in [19.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.5.0) (2022-09-13)
 ==================================================================================================
 

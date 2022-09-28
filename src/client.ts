@@ -146,6 +146,7 @@ import {
 } from "./@types/requests";
 import {
     EventType,
+    LOCAL_NOTIFICATION_SETTINGS_PREFIX,
     MsgType,
     PUSHER_ENABLED,
     RelationType,
@@ -206,6 +207,7 @@ import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
+import { LocalNotificationSettings } from "./@types/local_notifications";
 
 export type Store = IStore;
 
@@ -3541,7 +3543,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} eventType The event type
      * @return {?object} The contents of the given account data event
      */
-    public getAccountData(eventType: string): MatrixEvent {
+    public getAccountData(eventType: string): MatrixEvent | undefined {
         return this.store.getAccountData(eventType);
     }
 
@@ -5426,6 +5428,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {object} [options]
      * @param {boolean} options.preventReEmit don't re-emit events emitted on an event mapped by this mapper on the client
      * @param {boolean} options.decrypt decrypt event proactively
+     * @param {boolean} options.toDevice the event is a to_device event
      * @return {Function}
      */
     public getEventMapper(options?: MapperOpts): EventMapper {
@@ -8301,6 +8304,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public setPusher(pusher: IPusherRequest, callback?: Callback): Promise<{}> {
         const path = "/pushers/set";
         return this.http.authedRequest(callback, Method.Post, path, undefined, pusher);
+    }
+
+    /**
+     * Persists local notification settings
+     * @param {string} deviceId
+     * @param {LocalNotificationSettings} notificationSettings
+     * @return {Promise} Resolves: an empty object
+     * @return {module:http-api.MatrixError} Rejects: with an error response.
+     */
+    public setLocalNotificationSettings(
+        deviceId: string,
+        notificationSettings: LocalNotificationSettings,
+    ): Promise<{}> {
+        const key = `${LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${deviceId}`;
+        return this.setAccountData(key, notificationSettings);
     }
 
     /**
