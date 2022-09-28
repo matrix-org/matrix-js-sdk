@@ -34,7 +34,7 @@ import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
 import { IEncryptedPayload } from "../aes";
 
-export const VERSION = 10;
+export const VERSION = 11;
 const PROFILE_TRANSACTIONS = false;
 
 /**

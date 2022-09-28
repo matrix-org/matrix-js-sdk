@@ -573,7 +573,7 @@ describe("SAS verification", function() {
                     null,
                     null,
                     { "ed25519:Dynabook": "bob+base64+ed25519+key" },
-            );
+                );
             expect(bob.client.crypto.setDeviceVerification)
                 .toHaveBeenCalledWith(
                     alice.client.getUserId(),
@@ -582,7 +582,7 @@ describe("SAS verification", function() {
                     null,
                     null,
                     { "ed25519:Osborne2": "alice+base64+ed25519+key" },
-            );
+                );
         });
     });
 });

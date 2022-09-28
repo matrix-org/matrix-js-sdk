@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { REFERENCE_RELATION } from "matrix-events-sdk";
+
 import { MatrixEvent } from "../../../src";
 import { M_BEACON_INFO } from "../../../src/@types/beacon";
 import {
@@ -22,7 +24,6 @@ import {
     BeaconEvent,
 } from "../../../src/models/beacon";
 import { makeBeaconEvent, makeBeaconInfoEvent } from "../../test-utils/beacon";
-import { REFERENCE_RELATION } from "matrix-events-sdk";
 
 jest.useFakeTimers();
 
