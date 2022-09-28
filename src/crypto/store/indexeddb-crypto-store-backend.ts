@@ -908,6 +908,7 @@ export class Backend implements CryptoStore {
                 const cursor = cursorReq.result;
                 if (!cursor) {
                     resolve([]);
+                    return;
                 }
                 const data = cursor.value;
                 cursor.delete();
