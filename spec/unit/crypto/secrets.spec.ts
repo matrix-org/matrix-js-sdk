@@ -251,7 +251,6 @@ describe("Secrets", function() {
 
         osborne2.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
             "VAX": {
-                verified: 0,
                 known: false,
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
