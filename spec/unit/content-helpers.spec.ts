@@ -22,6 +22,7 @@ import {
     makeBeaconContent,
     makeBeaconInfoContent,
     makeTopicContent,
+    parseBeaconContent,
     parseTopicContent,
 } from "../../src/content-helpers";
 
@@ -124,6 +125,66 @@ describe('Beacon content helpers', () => {
                     rel_type: REFERENCE_RELATION.name,
                     event_id: '$1234',
                 },
+            });
+        });
+    });
+
+    describe("parseBeaconContent()", () => {
+        it("should not explode when parsing an invalid beacon", () => {
+            // deliberate cast to simulate wire content being invalid
+            const result = parseBeaconContent({} as any);
+            expect(result).toEqual({
+                description: undefined,
+                uri: undefined,
+                timestamp: undefined,
+            });
+        });
+
+        it("should parse unstable values", () => {
+            const uri = "urigoeshere";
+            const description = "descriptiongoeshere";
+            const timestamp = 1234;
+            const result = parseBeaconContent({
+                "org.matrix.msc3488.location": {
+                    uri,
+                    description,
+                },
+                "org.matrix.msc3488.ts": timestamp,
+
+                // relationship not used - just here to satisfy types
+                "m.relates_to": {
+                    rel_type: "m.reference",
+                    event_id: "$unused",
+                },
+            });
+            expect(result).toEqual({
+                description,
+                uri,
+                timestamp,
+            });
+        });
+
+        it("should parse stable values", () => {
+            const uri = "urigoeshere";
+            const description = "descriptiongoeshere";
+            const timestamp = 1234;
+            const result = parseBeaconContent({
+                "m.location": {
+                    uri,
+                    description,
+                },
+                "m.ts": timestamp,
+
+                // relationship not used - just here to satisfy types
+                "m.relates_to": {
+                    rel_type: "m.reference",
+                    event_id: "$unused",
+                },
+            });
+            expect(result).toEqual({
+                description,
+                uri,
+                timestamp,
             });
         });
     });

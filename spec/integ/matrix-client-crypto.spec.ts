@@ -494,6 +494,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
+        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -504,6 +505,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
+        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -567,6 +569,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
+        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -584,6 +587,9 @@ describe("MatrixClient crypto", () => {
         await firstSync(bobTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
+        bobTestClient.httpBackend.when('POST', '/keys/query').respond(
+            200, {},
+        );
         await bobRecvMessage();
         await bobEnablesEncryption();
         const ciphertext = await bobSendsReplyMessage();

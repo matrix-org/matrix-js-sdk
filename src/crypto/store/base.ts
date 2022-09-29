@@ -25,6 +25,7 @@ import { ICrossSigningInfo } from "../CrossSigning";
 import { PrefixedLogger } from "../../logger";
 import { InboundGroupSessionData } from "../OlmDevice";
 import { IEncryptedPayload } from "../aes";
+import { MatrixEvent } from "../../models/event";
 
 /**
  * Internal module. Definitions for storage for the crypto module
@@ -127,6 +128,8 @@ export interface CryptoStore {
         roomId: string,
         txn?: unknown,
     ): Promise<[senderKey: string, sessionId: string][]>;
+    addParkedSharedHistory(roomId: string, data: ParkedSharedHistory, txn?: unknown): void;
+    takeParkedSharedHistory(roomId: string, txn?: unknown): Promise<ParkedSharedHistory[]>;
 
     // Session key backups
     doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T, log?: PrefixedLogger): Promise<T>;
@@ -202,4 +205,13 @@ export interface OutgoingRoomKeyRequest {
     recipients: IRoomKeyRequestRecipient[];
     requestBody: IRoomKeyRequestBody;
     state: RoomKeyRequestState;
+}
+
+export interface ParkedSharedHistory {
+    senderId: string;
+    senderKey: string;
+    sessionId: string;
+    sessionKey: string;
+    keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>; // XXX: Less type dependence on MatrixEvent
+    forwardingCurve25519KeyChain: string[];
 }

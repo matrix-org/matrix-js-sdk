@@ -214,6 +214,12 @@ describe("MegolmBackup", function() {
             const event = new MatrixEvent({
                 type: 'm.room.encrypted',
             });
+            event.getWireType = () => "m.room.encrypted";
+            event.getWireContent = () => {
+                return {
+                    algorithm: "m.olm.v1.curve25519-aes-sha2",
+                };
+            };
             const decryptedData = {
                 clearEvent: {
                     type: 'm.room_key',

@@ -26,6 +26,7 @@ import { logger } from '../../../src/logger';
 import * as utils from "../../../src/utils";
 import { ICreateClientOpts } from '../../../src/client';
 import { ISecretStorageKeyInfo } from '../../../src/crypto/api';
+import { DeviceInfo } from '../../../src/crypto/deviceinfo';
 
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -250,13 +251,13 @@ describe("Secrets", function() {
 
         osborne2.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
             "VAX": {
-                verified: 0,
                 known: false,
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
                     "ed25519:VAX": vaxDevice.deviceEd25519Key,
                     "curve25519:VAX": vaxDevice.deviceCurve25519Key,
                 },
+                verified: DeviceInfo.DeviceVerification.VERIFIED,
             },
         });
         vax.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
@@ -280,10 +281,12 @@ describe("Secrets", function() {
             Object.values(otks)[0],
         );
 
-        const request = await secretStorage.request("foo", ["VAX"]);
-        const secret = await request.promise;
+        osborne2.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+        osborne2.client.crypto.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
-        expect(secret).toBe("bar");
+        const request = await secretStorage.request("foo", ["VAX"]);
+        await request.promise; // return value not used
+
         osborne2.stop();
         vax.stop();
         clearTestClientTimeouts();
