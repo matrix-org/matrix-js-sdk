@@ -385,7 +385,7 @@ describe("DeviceList management:", function() {
 
                 // @ts-ignore accessing private property
                 anotherTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-                    const bobStat = data.trackingStatus['@bob:xyz'];
+                    const bobStat = data!.trackingStatus['@bob:xyz'];
 
                     // Alice should have marked bob's device list as untracked
                     expect(bobStat).toEqual(
