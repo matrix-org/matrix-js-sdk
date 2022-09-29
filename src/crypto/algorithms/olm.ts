@@ -222,6 +222,26 @@ class OlmDecryption extends DecryptionAlgorithm {
             );
         }
 
+        // check that the device that encrypted the event belongs to the user
+        // that the event claims it's from.  We need to make sure that our
+        // device list is up-to-date.  If the device is unknown, we can only
+        // assume that the device logged out.  Some event handlers, such as
+        // secret sharing, may be more strict and reject events that come from
+        // unknown devices.
+        await this.crypto.deviceList.downloadKeys([event.getSender()], false);
+        const senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(
+            olmlib.OLM_ALGORITHM,
+            deviceKey,
+        );
+        if (senderKeyUser !== event.getSender() && senderKeyUser !== undefined) {
+            throw new DecryptionError(
+                "OLM_BAD_SENDER",
+                "Message claimed to be from " + event.getSender(), {
+                    real_sender: senderKeyUser,
+                },
+            );
+        }
+
         // check that the original sender matches what the homeserver told us, to
         // avoid people masquerading as others.
         // (this check is also provided via the sender's embedded ed25519 key,

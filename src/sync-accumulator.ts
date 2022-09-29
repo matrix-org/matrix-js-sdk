@@ -66,7 +66,7 @@ interface IState {
 export interface ITimeline {
     events: Array<IRoomEvent | IStateEvent>;
     limited?: boolean;
-    prev_batch: string;
+    prev_batch: string | null;
 }
 
 export interface IJoinedRoom {
@@ -401,7 +401,7 @@ export class SyncAccumulator {
                 // typing forever until someone really does start typing (which
                 // will prompt Synapse to send down an actual m.typing event to
                 // clobber the one we persisted).
-                if (e.type !== "m.receipt" || !e.content) {
+                if (e.type !== EventType.Receipt || !e.content) {
                     // This means we'll drop unknown ephemeral events but that
                     // seems okay.
                     return;
@@ -528,7 +528,7 @@ export class SyncAccumulator {
         });
         Object.keys(this.joinRooms).forEach((roomId) => {
             const roomData = this.joinRooms[roomId];
-            const roomJson = {
+            const roomJson: IJoinedRoom = {
                 ephemeral: { events: [] },
                 account_data: { events: [] },
                 state: { events: [] },
@@ -541,12 +541,12 @@ export class SyncAccumulator {
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
-                roomJson.account_data.events.push(roomData._accountData[evType]);
+                roomJson.account_data.events.push(roomData._accountData[evType] as IMinimalEvent);
             });
 
             // Add receipt data
             const receiptEvent = {
-                type: "m.receipt",
+                type: EventType.Receipt,
                 room_id: roomId,
                 content: {
                     // $event_id: { "m.read": { $user_id: $json } }
@@ -566,7 +566,7 @@ export class SyncAccumulator {
             });
             // add only if we have some receipt data
             if (Object.keys(receiptEvent.content).length > 0) {
-                roomJson.ephemeral.events.push(receiptEvent);
+                roomJson.ephemeral.events.push(receiptEvent as IMinimalEvent);
             }
 
             // Add timeline data
@@ -609,8 +609,8 @@ export class SyncAccumulator {
             const rollBackState = Object.create(null);
             for (let i = roomJson.timeline.events.length - 1; i >=0; i--) {
                 const timelineEvent = roomJson.timeline.events[i];
-                if (timelineEvent.state_key === null ||
-                        timelineEvent.state_key === undefined) {
+                if ((timelineEvent as IStateEvent).state_key === null ||
+                    (timelineEvent as IStateEvent).state_key === undefined) {
                     continue; // not a state event
                 }
                 // since we're going back in time, we need to use the previous

@@ -18,6 +18,9 @@ import { CrossSigningInfo } from '../../../../src/crypto/CrossSigning';
 import { encodeBase64 } from "../../../../src/crypto/olmlib";
 import { setupWebcrypto, teardownWebcrypto } from './util';
 import { VerificationBase } from '../../../../src/crypto/verification/Base';
+import { MatrixClient, MatrixEvent } from '../../../../src';
+import { VerificationRequest } from '../../../../src/crypto/verification/request/VerificationRequest';
+import { IVerificationChannel } from '../../../../src/crypto/verification/request/Channel';
 
 jest.useFakeTimers();
 
@@ -54,9 +57,21 @@ describe("self-verifications", () => {
             cacheCallbacks,
         );
         crossSigningInfo.keys = {
-            master: { keys: { X: testKeyPub } },
-            self_signing: { keys: { X: testKeyPub } },
-            user_signing: { keys: { X: testKeyPub } },
+            master: {
+                keys: { X: testKeyPub },
+                usage: [],
+                user_id: 'user-id',
+            },
+            self_signing: {
+                keys: { X: testKeyPub },
+                usage: [],
+                user_id: 'user-id',
+            },
+            user_signing: {
+                keys: { X: testKeyPub },
+                usage: [],
+                user_id: 'user-id',
+            },
         };
 
         const secretStorage = {
@@ -79,20 +94,22 @@ describe("self-verifications", () => {
             getUserId: () => userId,
             getKeyBackupVersion: () => Promise.resolve({}),
             restoreKeyBackupWithCache,
-        };
+        } as unknown as MatrixClient;
 
         const request = {
             onVerifierFinished: () => undefined,
-        };
+        } as unknown as VerificationRequest;
 
         const verification = new VerificationBase(
-            undefined, // channel
+            undefined as unknown as IVerificationChannel, // channel
             client, // baseApis
             userId,
             "ABC", // deviceId
-            undefined, // startEvent
+            undefined as unknown as MatrixEvent, // startEvent
             request,
         );
+
+        // @ts-ignore set private property
         verification.resolve = () => undefined;
 
         const result = await verification.done();
@@ -102,12 +119,12 @@ describe("self-verifications", () => {
         expect(secretStorage.request.mock.calls.length).toBe(4);
 
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls[0][1])
-          .toEqual(testKey);
+            .toEqual(testKey);
         expect(cacheCallbacks.storeCrossSigningKeyCache.mock.calls[1][1])
-          .toEqual(testKey);
+            .toEqual(testKey);
 
         expect(storeSessionBackupPrivateKey.mock.calls[0][0])
-          .toEqual(testKey);
+            .toEqual(testKey);
 
         expect(restoreKeyBackupWithCache).toHaveBeenCalled();
 

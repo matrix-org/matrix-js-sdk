@@ -833,6 +833,45 @@ describe("MatrixClient event timelines", function() {
             ]);
         });
 
+        it("should stop paginating when it encounters no `end` token", () => {
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
+                encodeURIComponent(EVENTS[0].event_id))
+                .respond(200, () => ({
+                    start: "start_token0",
+                    events_before: [],
+                    event: EVENTS[0],
+                    events_after: [],
+                    end: "end_token0",
+                    state: [],
+                }));
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .check(function(req) {
+                    const params = req.queryParams;
+                    expect(params.dir).toEqual("b");
+                    expect(params.from).toEqual("start_token0");
+                    expect(params.limit).toEqual("30");
+                }).respond(200, () => ({
+                    start: "start_token0",
+                    chunk: [],
+                }));
+
+            return Promise.all([
+                (async () => {
+                    const tl = await client.getEventTimeline(timelineSet, EVENTS[0].event_id);
+                    const success = await client.paginateEventTimeline(tl, { backwards: true });
+                    expect(success).toBeFalsy();
+                    expect(tl.getEvents().length).toEqual(1);
+                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS)).toEqual(null);
+                    expect(tl.getPaginationToken(EventTimeline.FORWARDS)).toEqual("end_token0");
+                })(),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
         it("should allow you to paginate forwards", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];

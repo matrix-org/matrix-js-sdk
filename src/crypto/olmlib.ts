@@ -30,6 +30,8 @@ import { logger } from '../logger';
 import { IOneTimeKey } from "./dehydration";
 import { IClaimOTKsResult, MatrixClient } from "../client";
 import { ISignatures } from "../@types/signed";
+import { MatrixEvent } from "../models/event";
+import { EventType } from "../@types/event";
 
 enum Algorithm {
     Olm = "m.olm.v1.curve25519-aes-sha2",
@@ -552,6 +554,22 @@ export function pkVerify(obj: IObject, pubKey: string, userId: string) {
         if (unsigned) obj.unsigned = unsigned;
         util.free();
     }
+}
+
+/**
+ * Check that an event was encrypted using olm.
+ */
+export function isOlmEncrypted(event: MatrixEvent): boolean {
+    if (!event.getSenderKey()) {
+        logger.error("Event has no sender key (not encrypted?)");
+        return false;
+    }
+    if (event.getWireType() !== EventType.RoomMessageEncrypted ||
+        !(["m.olm.v1.curve25519-aes-sha2"].includes(event.getWireContent().algorithm))) {
+        logger.error("Event was not encrypted using an appropriate algorithm");
+        return false;
+    }
+    return true;
 }
 
 /**

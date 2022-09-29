@@ -135,7 +135,6 @@ yarn install --ignore-scripts --pure-lockfile
 # ignore leading v on release
 release="${1#v}"
 tag="v${release}"
-rel_branch="release-$tag"
 
 prerelease=0
 # We check if this build is a prerelease by looking to
@@ -150,18 +149,7 @@ else
     read -p "Making a FINAL RELEASE, press enter to continue " REPLY
 fi
 
-# We might already be on the release branch, in which case, yay
-# If we're on any branch starting with 'release', or the staging branch
-# we don't create a separate release branch (this allows us to use the same
-# release branch for releases and release candidates).
-curbranch=$(git symbolic-ref --short HEAD)
-if [[ "$curbranch" != release* && "$curbranch" != "staging" ]]; then
-    echo "Creating release branch"
-    git checkout -b "$rel_branch"
-else
-    echo "Using current branch ($curbranch) for release"
-    rel_branch=$curbranch
-fi
+rel_branch=$(git symbolic-ref --short HEAD)
 
 if [ -z "$skip_changelog" ]; then
     echo "Generating changelog"
