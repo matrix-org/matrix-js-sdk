@@ -219,45 +219,45 @@ describe("MatrixClient", function() {
         });
 
         it("should do an HTTP request if !allowCached even if one exists",
-        function(done) {
-            const httpFilterDefinition = {
-                event_format: "federation",
-            };
+            function(done) {
+                const httpFilterDefinition = {
+                    event_format: "federation",
+                };
 
-            httpBackend.when(
-                "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
-            ).respond(200, httpFilterDefinition);
+                httpBackend.when(
+                    "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
+                ).respond(200, httpFilterDefinition);
 
-            const storeFilter = Filter.fromJson(userId, filterId, {
-                event_format: "client",
+                const storeFilter = Filter.fromJson(userId, filterId, {
+                    event_format: "client",
+                });
+                store.storeFilter(storeFilter);
+                client.getFilter(userId, filterId, false).then(function(gotFilter) {
+                    expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
+                    done();
+                });
+
+                httpBackend.flush('');
             });
-            store.storeFilter(storeFilter);
-            client.getFilter(userId, filterId, false).then(function(gotFilter) {
-                expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
-                done();
-            });
-
-            httpBackend.flush('');
-        });
 
         it("should do an HTTP request if nothing is in the cache and then store it",
-        function(done) {
-            const httpFilterDefinition = {
-                event_format: "federation",
-            };
-            expect(store.getFilter(userId, filterId)).toBe(null);
+            function(done) {
+                const httpFilterDefinition = {
+                    event_format: "federation",
+                };
+                expect(store.getFilter(userId, filterId)).toBe(null);
 
-            httpBackend.when(
-                "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
-            ).respond(200, httpFilterDefinition);
-            client.getFilter(userId, filterId, true).then(function(gotFilter) {
-                expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
-                expect(store.getFilter(userId, filterId)).toBeTruthy();
-                done();
+                httpBackend.when(
+                    "GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId,
+                ).respond(200, httpFilterDefinition);
+                client.getFilter(userId, filterId, true).then(function(gotFilter) {
+                    expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
+                    expect(store.getFilter(userId, filterId)).toBeTruthy();
+                    done();
+                });
+
+                httpBackend.flush('');
             });
-
-            httpBackend.flush('');
-        });
     });
 
     describe("createFilter", function() {
@@ -354,7 +354,7 @@ describe("MatrixClient", function() {
                                         event_id: "$ev-after:server",
                                         type: "m.room.message",
                                         sender: '@test:locahost',
-                                    origin_server_ts: 123,
+                                        origin_server_ts: 123,
                                         user_id: "@alice:localhost",
                                         room_id: "!feuiwhf:localhost",
                                         content: {
@@ -370,7 +370,7 @@ describe("MatrixClient", function() {
                                         event_id: "$ev-before:server",
                                         type: "m.room.message",
                                         sender: '@test:locahost',
-                                    origin_server_ts: 123,
+                                        origin_server_ts: 123,
                                         user_id: "@alice:localhost",
                                         room_id: "!feuiwhf:localhost",
                                         content: {
@@ -393,7 +393,7 @@ describe("MatrixClient", function() {
                 expect(data.results).toHaveLength(1);
                 expect(data.results[0].context.getTimeline()).toHaveLength(2);
                 expect(
-                    data.results[0].context.getTimeline().find(e => e.getId() === "$ev-after:server")
+                    data.results[0].context.getTimeline().find(e => e.getId() === "$ev-after:server"),
                 ).toBeFalsy();
             });
 
@@ -455,7 +455,7 @@ describe("MatrixClient", function() {
                 expect(data.results).toHaveLength(1);
                 expect(data.results[0].context.getTimeline()).toHaveLength(1);
                 expect(
-                    data.results[0].context.getTimeline().find(e => e.getId() === "$flibble:localhost")
+                    data.results[0].context.getTimeline().find(e => e.getId() === "$flibble:localhost"),
                 ).toBeTruthy();
             });
 
@@ -513,7 +513,7 @@ describe("MatrixClient", function() {
                 expect(data.results).toHaveLength(1);
                 expect(data.results[0].context.getTimeline()).toHaveLength(1);
                 expect(
-                    data.results[0].context.getTimeline().find(e => e.getId() === "$flibble:localhost")
+                    data.results[0].context.getTimeline().find(e => e.getId() === "$flibble:localhost"),
                 ).toBeTruthy();
             });
         });
@@ -558,7 +558,7 @@ describe("MatrixClient", function() {
                     keys: { "ed25519:dev2": ed25519key },
                     signatures: {
                         chaz: {
-                           "ed25519:dev2":
+                            "ed25519:dev2":
                                 "FwslH/Q7EYSb7swDJbNB5PSzcbEO1xRRBF1riuijqvL" +
                                 "EkrK9/XVN8jl4h7thGuRITQ01siBQnNmMK9t45QfcCQ",
                         },
@@ -1158,12 +1158,12 @@ describe("MatrixClient", function() {
     describe("requestLoginToken", () => {
         it("should hit the expected API endpoint with UIA", async () => {
             const response = {};
-            const uiaData = { foo: "baa" };
+            const uiaData = {};
             const prom = client.requestLoginToken(uiaData);
             httpBackend
                 .when("POST", "/unstable/org.matrix.msc3882/login/token", { auth: uiaData })
                 .respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
 
@@ -1173,7 +1173,7 @@ describe("MatrixClient", function() {
             httpBackend
                 .when("POST", "/unstable/org.matrix.msc3882/login/token", {})
                 .respond(200, response);
-            await httpBackend.flush();
+            await httpBackend.flush('');
             expect(await prom).toStrictEqual(response);
         });
     });
