@@ -106,6 +106,7 @@ export class TimelineWindow {
             let eventIndex: number;
 
             const events = timeline.getEvents();
+            console.error("load successful", events);
 
             if (!initialEventId) {
                 // we were looking for the live timeline: initialise to the end
@@ -128,13 +129,6 @@ export class TimelineWindow {
         // We avoid delaying the resolution of the promise by a reactor tick if we already have the data we need,
         // which is important to keep room-switching feeling snappy.
         if (initialEventId) {
-            const timeline = this.timelineSet.getTimelineForEvent(initialEventId);
-            if (timeline) {
-                // hot-path optimization to save a reactor tick by replicating the sync check getTimelineForEvent does.
-                initFields(timeline);
-                return Promise.resolve();
-            }
-
             return this.client.getEventTimeline(this.timelineSet, initialEventId).then(initFields);
         } else {
             const tl = this.timelineSet.getLiveTimeline();

@@ -14,19 +14,28 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk";
+import {Optional} from "matrix-events-sdk";
 
-import { MatrixClient, MatrixEventEvent, RelationType, RoomEvent } from "../matrix";
-import { TypedReEmitter } from "../ReEmitter";
-import { IRelationsRequestOpts } from "../@types/requests";
-import { IThreadBundledRelationship, MatrixEvent } from "./event";
-import { Direction, EventTimeline } from "./event-timeline";
-import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
-import { Room } from './room';
-import { RoomState } from "./room-state";
-import { ServerControlledNamespacedValue } from "../NamespacedValue";
-import { logger } from "../logger";
-import { ReadReceipt } from "./read-receipt";
+import {
+    DuplicateStrategy,
+    IContextResponse,
+    MatrixClient,
+    MatrixEventEvent,
+    Method,
+    RelationType,
+    RoomEvent
+} from "../matrix";
+import {TypedReEmitter} from "../ReEmitter";
+import {IRelationsRequestOpts} from "../@types/requests";
+import {IThreadBundledRelationship, MatrixEvent} from "./event";
+import {Direction, EventTimeline} from "./event-timeline";
+import {EventTimelineSet, EventTimelineSetHandlerMap} from './event-timeline-set';
+import {Room} from './room';
+import {RoomState} from "./room-state";
+import {ServerControlledNamespacedValue} from "../NamespacedValue";
+import {logger} from "../logger";
+import {ReadReceipt} from "./read-receipt";
+import * as utils from "../utils";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -171,50 +180,110 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent) => {
         if (event?.isRelation(THREAD_RELATION_TYPE.name) &&
             this.room.eventShouldLiveIn(event).threadId === this.id &&
-            event.getId() !== this.id && // the root event isn't counted in the length so ignore this redaction
             !redaction.status // only respect it when it succeeds
         ) {
-            this.replyCount--;
-            this.emit(ThreadEvent.Update, this);
+            console.error("beforeRedaction", this.id, event);
         }
     };
 
     private onRedaction = (event: MatrixEvent) => {
         if (event.threadRootId !== this.id) return; // ignore redactions for other timelines
-        const events = [...this.timelineSet.getLiveTimeline().getEvents()].reverse();
-        this.lastEvent = events.find(e => (
-            !e.isRedacted() &&
-            e.isRelation(THREAD_RELATION_TYPE.name)
-        )) ?? this.rootEvent;
+
+        this.replyCount--;
+        console.error("redaction", this.id, this.replyCount, event);
+        if (this.replyCount === 0) {
+            console.error("redaction: Removing thread from room");
+            this.room.threads.delete(this.id);
+            console.error("redaction: Removing thread from root event");
+
+            const timeline = this.room.getTimelineForEvent(this.id);
+            const roomEvent = timeline?.getEvents()?.find(it => it.getId() === this.id);
+            if (roomEvent) {
+                roomEvent.setThread(null);
+                delete roomEvent.event?.unsigned?.["m.relations"]?.[THREAD_RELATION_TYPE.name];
+                this.rootEvent = roomEvent;
+
+                console.error("redaction: Removing thread from events");
+                for (const threadEvent of this.events) {
+                    delete threadEvent?.event?.unsigned?.["m.relations"]?.[THREAD_RELATION_TYPE.name];
+                    threadEvent.setThread(null);
+                }
+                console.error("redaction: Removing from thread list");
+                for (const timelineSet of this.room.threadsTimelineSets) {
+                    console.error("removed: ", Boolean(timelineSet.removeEvent(this.id)));
+                }
+                console.error("redaction: Adding thread events to room");
+                this.room.addLiveEvents(this.events);
+                console.error("redaction: Emitting events");
+                this.room.emit(RoomEvent.TimelineRefresh, this.room, timeline.getTimelineSet())
+            } else {
+                console.error("redaction: Could not find root event in room timeline");
+            }
+        }
         this.emit(ThreadEvent.Update, this);
     };
 
-    private onEcho = (event: MatrixEvent) => {
+    private async loadEvent(event: MatrixEvent): Promise<MatrixEvent | null> {
+        const path = utils.encodeUri(
+            "/rooms/$roomId/context/$eventId", {
+                $roomId: this.roomId,
+                $eventId: this.id,
+            },
+        );
+
+        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
+        const res = await this.client.http.authedRequest<IContextResponse>(undefined, Method.Get, path, {
+            limit: "0",
+        });
+        if (!res.event) {
+            throw new Error("'event' not in '/context' result - homeserver too old?");
+        }
+
+        const mapper = this.client.getEventMapper();
+        return mapper(res.event);
+    }
+
+    private onEcho = async (event: MatrixEvent) => {
         if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
         if (this.lastEvent === event) return;
         if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
 
-        // There is a risk that the `localTimestamp` approximation will not be accurate
-        // when threads are used over federation. That could result in the reply
-        // count value drifting away from the value returned by the server
-        const isThreadReply = event.isRelation(THREAD_RELATION_TYPE.name);
-        if (!this.lastEvent || this.lastEvent.isRedacted() || (isThreadReply
-            && (event.getId() !== this.lastEvent.getId())
-            && (event.localTimestamp > this.lastEvent.localTimestamp))
-        ) {
-            this.lastEvent = event;
-            if (this.lastEvent.getId() !== this.id) {
-                // This counting only works when server side support is enabled as we started the counting
-                // from the value returned within the bundled relationship
-                if (Thread.hasServerSideSupport) {
-                    this.replyCount++;
-                }
+        const mapper = this.client.getEventMapper();
+        const mappedEvent = await this.loadEvent(this.rootEvent);
 
-                this.emit(ThreadEvent.NewReply, this, event);
+        const metadata = mappedEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+        if (metadata) {
+            this.replyCount = metadata.count;
+            this.lastEvent = mapper(metadata.latest_event);
+            this.rootEvent = mappedEvent;
+
+            console.error("echo", this.id, event, metadata);
+
+            console.error("echo: Replacing in thread list");
+            for (const timelineSet of this.room.threadsTimelineSets) {
+                timelineSet.removeEvent(this.id);
+                timelineSet.addLiveEvent(mappedEvent, {
+                    duplicateStrategy: DuplicateStrategy.Replace,
+                    fromCache: false,
+                    roomState: this.roomState,
+                });
             }
+            const timeline = this.room.getTimelineForEvent(this.id);
+            const roomEvent = timeline?.getEvents()?.find(it => it.getId() === this.id);
+            if (roomEvent) {
+                roomEvent.event = mappedEvent.event;
+                roomEvent.setThread(this);
+                console.error("echo: Replacing root event in room timeline", roomEvent);
+            } else {
+                console.error("echo: Could not find root event in room timeline");
+            }
+            console.error("redaction: Emitting events");
+            this.room.emit(RoomEvent.TimelineRefresh, this.room, timeline.getTimelineSet())
+            this.emit(ThreadEvent.NewReply, this, event);
+            this.emit(ThreadEvent.Update, this);
+        } else {
+            console.error("echo failed: metadata was falsy", mappedEvent);
         }
-
-        this.emit(ThreadEvent.Update, this);
     };
 
     public get roomState(): RoomState {
@@ -236,8 +305,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     }
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
-        events.forEach(ev => this.addEvent(ev, toStartOfTimeline, false));
-        this.emit(ThreadEvent.Update, this);
+        console.error("addEvents", this.id, events);
     }
 
     /**
@@ -250,6 +318,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * @param {boolean} emit whether to emit the Update event if the thread was updated or not.
      */
     public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): void {
+        console.error("addEvent", this.id, event);
         event.setThread(this);
 
         if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {

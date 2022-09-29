@@ -1538,10 +1538,12 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     /**
      * @experimental
      */
-    public setThread(thread: Thread): void {
+    public setThread(thread: Thread | null): void {
         this.thread = thread;
-        this.setThreadId(thread.id);
-        this.reEmitter.reEmit(thread, [ThreadEvent.Update]);
+        this.setThreadId(thread?.id);
+        if (thread) {
+            this.reEmitter.reEmit(thread, [ThreadEvent.Update]);
+        }
     }
 
     /**

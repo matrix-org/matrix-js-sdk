@@ -18,45 +18,43 @@ limitations under the License.
  * @module models/room
  */
 
-import { EventTimelineSet, DuplicateStrategy, IAddLiveEventOptions } from "./event-timeline-set";
-import { Direction, EventTimeline } from "./event-timeline";
-import { getHttpUriForMxc } from "../content-repo";
+import {DuplicateStrategy, EventTimelineSet, IAddLiveEventOptions} from "./event-timeline-set";
+import {Direction, EventTimeline} from "./event-timeline";
+import {getHttpUriForMxc} from "../content-repo";
 import * as utils from "../utils";
-import { normalize } from "../utils";
-import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
-import { EventStatus } from "./event-status";
-import { RoomMember } from "./room-member";
-import { IRoomSummary, RoomSummary } from "./room-summary";
-import { logger } from '../logger';
-import { TypedReEmitter } from '../ReEmitter';
+import {normalize} from "../utils";
+import {IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap} from "./event";
+import {EventStatus} from "./event-status";
+import {RoomMember} from "./room-member";
+import {IRoomSummary, RoomSummary} from "./room-summary";
+import {logger} from '../logger';
+import {TypedReEmitter} from '../ReEmitter';
 import {
-    EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     EVENT_VISIBILITY_CHANGE_TYPE,
+    EventType,
     RelationType,
+    RoomCreateTypeField,
+    RoomType,
+    UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
 } from "../@types/event";
-import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
-import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
-import { Filter, IFilterDefinition } from "../filter";
-import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
-import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
+import {IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability} from "../client";
+import {GuestAccess, HistoryVisibility, JoinRule, ResizeMethod} from "../@types/partials";
+import {Filter, IFilterDefinition} from "../filter";
+import {RoomState, RoomStateEvent, RoomStateEventHandlerMap} from "./room-state";
+import {BeaconEvent, BeaconEventHandlerMap} from "./beacon";
 import {
-    Thread,
-    ThreadEvent,
     EventHandlerMap as ThreadHandlerMap,
-    FILTER_RELATED_BY_REL_TYPES, THREAD_RELATION_TYPE,
+    FILTER_RELATED_BY_REL_TYPES,
     FILTER_RELATED_BY_SENDERS,
+    Thread,
+    THREAD_RELATION_TYPE,
+    ThreadEvent,
     ThreadFilterType,
 } from "./thread";
-import { ReceiptType } from "../@types/read_receipts";
-import { IStateEventWithRoomId } from "../@types/search";
-import { RelationsContainer } from "./relations-container";
-import {
-    MAIN_ROOM_TIMELINE,
-    ReadReceipt,
-    Receipt,
-    ReceiptContent,
-    synthesizeReceipt,
-} from "./read-receipt";
+import {ReceiptType} from "../@types/read_receipts";
+import {IStateEventWithRoomId} from "../@types/search";
+import {RelationsContainer} from "./relations-container";
+import {MAIN_ROOM_TIMELINE, ReadReceipt, Receipt, ReceiptContent, synthesizeReceipt,} from "./read-receipt";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -249,7 +247,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     /**
      * @experimental
      */
-    private threads = new Map<string, Thread>();
+    public threads = new Map<string, Thread>();
     public lastThread: Thread;
 
     /**
@@ -1000,7 +998,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * timeline which would otherwise be unable to paginate forwards without this token).
      * Removing just the old live timeline whilst preserving previous ones is not supported.
      */
-    public resetLiveTimeline(backPaginationToken: string | null, forwardPaginationToken: string | null): void {
+    public resetLiveTimeline(backPaginationToken?: string | null, forwardPaginationToken?: string | null): void {
         for (let i = 0; i < this.timelineSets.length; i++) {
             this.timelineSets[i].resetLiveTimeline(
                 backPaginationToken, forwardPaginationToken,
@@ -1726,6 +1724,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @private
      */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
+        console.error("fetchRoomThreadList");
         const timelineSet = filter === ThreadFilterType.My
             ? this.threadsTimelineSets[1]
             : this.threadsTimelineSets[0];
@@ -1912,7 +1911,11 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             this.threadsTimelineSets.forEach(timelineSet => {
                 if (thread.rootEvent) {
                     if (Thread.hasServerSideSupport) {
-                        timelineSet.addLiveEvent(thread.rootEvent);
+                        timelineSet.addLiveEvent(thread.rootEvent, {
+                            duplicateStrategy: DuplicateStrategy.Replace,
+                            fromCache: false,
+                            roomState: this.currentState,
+                        });
                     } else {
                         timelineSet.addEventToTimeline(
                             thread.rootEvent,
@@ -1923,6 +1926,14 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 }
             });
         }
+
+        this.timelineSets.forEach(timelineSet => {
+            timelineSet.addLiveEvent(thread.rootEvent, {
+                duplicateStrategy: DuplicateStrategy.Replace,
+                fromCache: false,
+                roomState: this.currentState,
+            });
+        })
 
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);
 
