@@ -209,13 +209,32 @@ export class MediaHandler extends TypedEventEmitter<
             logger.log(`mediaHandler getUserMediaStream streamId ${stream.id} shouldRequestAudio ${
                 shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`, constraints);
 
+            // Save whatever device IDs we actually got as the preferred ones, so that if another
+            // stream is requested, we'll get the same one that was being used before in preference.
+            // ie. if we were previously using the system default device and the user changes the
+            // system default, we'll continue using the same one rather than suddenly switch to the
+            // new default. At least, I assume this is why we do this... I did not write it.
+            // However, "some browsers" (I'm looking at you, Safari) seem to return inconsistent device IDs
+            // between enumerateDevices and track.getSettings().deviceid, in which case we'd end up saving a
+            // junk device ID, so we sanity check the IDs we get against enumerateDevices()
+            const availDevices = await navigator.mediaDevices.enumerateDevices();
             for (const track of stream.getTracks()) {
                 const settings = track.getSettings();
 
-                if (track.kind === "audio") {
-                    this.audioInput = settings.deviceId;
-                } else if (track.kind === "video") {
-                    this.videoInput = settings.deviceId;
+                const dev = availDevices.find(d => d.deviceId === settings.deviceId);
+                if (dev) {
+                    if (track.kind === "audio") {
+                        this.audioInput = settings.deviceId;
+                    } else if (track.kind === "video") {
+                        logger.info(
+                            "mediahandler got video device id " + settings.deviceId, constraints,
+                        );
+                        this.videoInput = settings.deviceId;
+                    }
+                } else {
+                    logger.warn(
+                        "Device ID from track.getSettings() doesn't map to a device from enumerateDevices! Ignoring.",
+                    );
                 }
             }
 
