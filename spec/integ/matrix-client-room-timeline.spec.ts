@@ -93,16 +93,6 @@ describe("MatrixClient room timelines", function() {
                 throw new Error("setNextSyncData only works with one room id");
             }
             if (e.state_key) {
-                if (e.__prev_event === undefined) {
-                    throw new Error(
-                        "setNextSyncData needs the prev state set to '__prev_event' " +
-                        "for " + e.type,
-                    );
-                }
-                if (e.__prev_event !== null) {
-                    // push the previous state for this event type
-                    NEXT_SYNC_DATA.rooms.join[roomId].state.events.push(e.__prev_event);
-                }
                 // push the current
                 NEXT_SYNC_DATA.rooms.join[roomId].timeline.events.push(e);
             } else if (["m.typing", "m.receipt"].indexOf(e.type) !== -1) {
@@ -136,7 +126,7 @@ describe("MatrixClient room timelines", function() {
         client.startClient();
 
         return [client, httpBackend];
-    }
+    };
 
     let [client, httpBackend] = setupTestClient();
 
@@ -200,13 +190,13 @@ describe("MatrixClient room timelines", function() {
                 }
                 const room = client.getRoom(roomId);
                 client.sendTextMessage(roomId, "I am a fish", "txn1").then(
-                function() {
-                    expect(room.timeline[1].getId()).toEqual(eventId);
-                    httpBackend.flush("/sync", 1).then(function() {
+                    function() {
                         expect(room.timeline[1].getId()).toEqual(eventId);
-                        done();
+                        httpBackend.flush("/sync", 1).then(function() {
+                            expect(room.timeline[1].getId()).toEqual(eventId);
+                            done();
+                        });
                     });
-                });
                 httpBackend.flush("/txn1", 1);
             });
             httpBackend.flush("/sync", 1);
@@ -465,7 +455,6 @@ describe("MatrixClient room timelines", function() {
                 }),
                 utils.mkMessage({ user: userId, room: roomId }),
             ];
-            eventData[1].__prev_event = USER_MEMBERSHIP_EVENT;
             setNextSyncData(eventData);
 
             return Promise.all([
@@ -491,7 +480,6 @@ describe("MatrixClient room timelines", function() {
                     name: "Room 2",
                 },
             });
-            secondRoomNameEvent.__prev_event = ROOM_NAME_EVENT;
             setNextSyncData([secondRoomNameEvent]);
 
             return Promise.all([
@@ -516,7 +504,6 @@ describe("MatrixClient room timelines", function() {
                             name: "Room 3",
                         },
                     });
-                    thirdRoomNameEvent.__prev_event = secondRoomNameEvent;
                     setNextSyncData([thirdRoomNameEvent]);
                     httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
                     return Promise.all([
@@ -541,8 +528,6 @@ describe("MatrixClient room timelines", function() {
                     user: userC, room: roomId, mship: "invite", skey: userD,
                 }),
             ];
-            eventData[0].__prev_event = null;
-            eventData[1].__prev_event = null;
             setNextSyncData(eventData);
 
             return Promise.all([
