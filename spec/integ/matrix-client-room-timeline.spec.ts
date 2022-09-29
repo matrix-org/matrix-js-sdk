@@ -1,16 +1,33 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import HttpBackend from "matrix-mock-request";
+
 import * as utils from "../test-utils/test-utils";
 import { EventStatus } from "../../src/models/event";
-import { RoomEvent } from "../../src";
+import { ClientEvent, IEvent, MatrixClient, RoomEvent } from "../../src";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient room timelines", function() {
-    let client = null;
-    let httpBackend = null;
     const userId = "@alice:localhost";
     const userName = "Alice";
     const accessToken = "aseukfgwef";
     const roomId = "!foo:bar";
     const otherUserId = "@bob:localhost";
+
     const USER_MEMBERSHIP_EVENT = utils.mkMembership({
         room: roomId, mship: "join", user: userId, name: userName,
     });
@@ -55,8 +72,7 @@ describe("MatrixClient room timelines", function() {
         },
     };
 
-    function setNextSyncData(events) {
-        events = events || [];
+    function setNextSyncData(events: Partial<IEvent>[] = []) {
         NEXT_SYNC_DATA = {
             next_batch: "n",
             presence: { events: [] },
@@ -97,7 +113,7 @@ describe("MatrixClient room timelines", function() {
         });
     }
 
-    beforeEach(async function() {
+    const setupTestClient = (): [MatrixClient, HttpBackend] => {
         // these tests should work with or without timelineSupport
         const testClient = new TestClient(
             userId,
@@ -106,8 +122,8 @@ describe("MatrixClient room timelines", function() {
             undefined,
             { timelineSupport: true },
         );
-        httpBackend = testClient.httpBackend;
-        client = testClient.client;
+        const httpBackend = testClient.httpBackend;
+        const client = testClient.client;
 
         setNextSyncData();
         httpBackend.when("GET", "/versions").respond(200, {});
@@ -119,6 +135,13 @@ describe("MatrixClient room timelines", function() {
         });
         client.startClient();
 
+        return [client, httpBackend];
+    }
+
+    let [client, httpBackend] = setupTestClient();
+
+    beforeEach(async function() {
+        [client, httpBackend] = setupTestClient();
         await httpBackend.flush("/versions");
         await httpBackend.flush("/pushrules");
         await httpBackend.flush("/filter");
@@ -133,7 +156,7 @@ describe("MatrixClient room timelines", function() {
     describe("local echo events", function() {
         it("should be added immediately after calling MatrixClient.sendEvent " +
         "with EventStatus.SENDING and the right event.sender", function(done) {
-            client.on("sync", function(state) {
+            client.on(ClientEvent.Sync, function(state) {
                 if (state !== "PREPARED") {
                     return;
                 }
@@ -165,13 +188,13 @@ describe("MatrixClient room timelines", function() {
             });
 
             const ev = utils.mkMessage({
-                body: "I am a fish", user: userId, room: roomId,
+                msg: "I am a fish", user: userId, room: roomId,
             });
             ev.event_id = eventId;
             ev.unsigned = { transaction_id: "txn1" };
             setNextSyncData([ev]);
 
-            client.on("sync", function(state) {
+            client.on(ClientEvent.Sync, function(state) {
                 if (state !== "PREPARED") {
                     return;
                 }
@@ -197,13 +220,13 @@ describe("MatrixClient room timelines", function() {
             });
 
             const ev = utils.mkMessage({
-                body: "I am a fish", user: userId, room: roomId,
+                msg: "I am a fish", user: userId, room: roomId,
             });
             ev.event_id = eventId;
             ev.unsigned = { transaction_id: "txn1" };
             setNextSyncData([ev]);
 
-            client.on("sync", function(state) {
+            client.on(ClientEvent.Sync, function(state) {
                 if (state !== "PREPARED") {
                     return;
                 }
@@ -240,7 +263,7 @@ describe("MatrixClient room timelines", function() {
 
         it("should set Room.oldState.paginationToken to null at the start" +
         " of the timeline.", function(done) {
-            client.on("sync", function(state) {
+            client.on(ClientEvent.Sync, function(state) {
                 if (state !== "PREPARED") {
                     return;
                 }
@@ -303,7 +326,7 @@ describe("MatrixClient room timelines", function() {
                 joinMshipEvent,
             ];
 
-            client.on("sync", function(state) {
+            client.on(ClientEvent.Sync, function(state) {
                 if (state !== "PREPARED") {
                     return;
                 }
@@ -342,7 +365,7 @@ describe("MatrixClient room timelines", function() {
                 }),
             ];
 
-            client.on("sync", function(state) {
+            client.on(ClientEvent.Sync, function(state) {
                 if (state !== "PREPARED") {
                     return;
                 }
@@ -373,7 +396,7 @@ describe("MatrixClient room timelines", function() {
                 }),
             ];
 
-            client.on("sync", function(state) {
+            client.on(ClientEvent.Sync, function(state) {
                 if (state !== "PREPARED") {
                     return;
                 }
@@ -410,7 +433,7 @@ describe("MatrixClient room timelines", function() {
                 const room = client.getRoom(roomId);
 
                 let index = 0;
-                client.on("Room.timeline", function(event, rm, toStart) {
+                client.on(RoomEvent.Timeline, function(event, rm, toStart) {
                     expect(toStart).toBe(false);
                     expect(rm).toEqual(room);
                     expect(event.event).toEqual(eventData[index]);
@@ -477,7 +500,7 @@ describe("MatrixClient room timelines", function() {
             ]).then(() => {
                 const room = client.getRoom(roomId);
                 let nameEmitCount = 0;
-                client.on("Room.name", function(rm) {
+                client.on(RoomEvent.Name, function(rm) {
                     nameEmitCount += 1;
                 });
 
@@ -594,7 +617,7 @@ describe("MatrixClient room timelines", function() {
                 const room = client.getRoom(roomId);
 
                 let emitCount = 0;
-                client.on("Room.timelineReset", function(emitRoom) {
+                client.on(RoomEvent.TimelineReset, function(emitRoom) {
                     expect(emitRoom).toEqual(room);
                     emitCount++;
                 });
@@ -700,7 +723,7 @@ describe("MatrixClient room timelines", function() {
             const racingSyncEventData = [
                 utils.mkMessage({ user: userId, room: roomId }),
             ];
-            const waitForRaceySyncAfterResetPromise = new Promise((resolve, reject) => {
+            const waitForRaceySyncAfterResetPromise = new Promise<void>((resolve, reject) => {
                 let eventFired = false;
                 // Throw a more descriptive error if this part of the test times out.
                 const failTimeout = setTimeout(() => {
