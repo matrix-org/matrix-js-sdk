@@ -361,7 +361,7 @@ describe("MatrixClient event timelines", function() {
                 httpBackend.flush("/sync"),
                 utils.syncPromise(client),
             ]).then(function() {
-                return client.getEventTimeline(timelineSet, EVENTS[0].event_id!!);
+                return client.getEventTimeline(timelineSet, EVENTS[0].event_id!);
             }).then(function(tl) {
                 expect(tl!.getEvents().length).toEqual(2);
                 expect(tl!.getEvents()[1].event).toEqual(EVENTS[0]);

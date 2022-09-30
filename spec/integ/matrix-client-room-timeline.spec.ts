@@ -95,7 +95,7 @@ describe("MatrixClient room timelines", function() {
             if (e.state_key) {
                 // push the current
                 NEXT_SYNC_DATA.rooms.join[roomId].timeline.events.push(e);
-            } else if (["m.typing", "m.receipt"].indexOf(e.type) !== -1) {
+            } else if (["m.typing", "m.receipt"].indexOf(e.type!) !== -1) {
                 NEXT_SYNC_DATA.rooms.join[roomId].ephemeral.events.push(e);
             } else {
                 NEXT_SYNC_DATA.rooms.join[roomId].timeline.events.push(e);
@@ -150,7 +150,7 @@ describe("MatrixClient room timelines", function() {
                 if (state !== "PREPARED") {
                     return;
                 }
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 expect(room.timeline.length).toEqual(1);
 
                 client.sendTextMessage(roomId, "I am a fish", "txn1");
@@ -188,7 +188,7 @@ describe("MatrixClient room timelines", function() {
                 if (state !== "PREPARED") {
                     return;
                 }
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 client.sendTextMessage(roomId, "I am a fish", "txn1").then(
                     function() {
                         expect(room.timeline[1].getId()).toEqual(eventId);
@@ -220,7 +220,7 @@ describe("MatrixClient room timelines", function() {
                 if (state !== "PREPARED") {
                     return;
                 }
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 const promise = client.sendTextMessage(roomId, "I am a fish", "txn1");
                 httpBackend.flush("/sync", 1).then(function() {
                     expect(room.timeline.length).toEqual(2);
@@ -257,7 +257,7 @@ describe("MatrixClient room timelines", function() {
                 if (state !== "PREPARED") {
                     return;
                 }
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 expect(room.timeline.length).toEqual(1);
 
                 client.scrollback(room).then(function() {
@@ -288,7 +288,7 @@ describe("MatrixClient room timelines", function() {
             // make an m.room.member event for alice's join
             const joinMshipEvent = utils.mkMembership({
                 mship: "join", user: userId, room: roomId, name: "Old Alice",
-                url: null,
+                url: undefined,
             });
 
             // make an m.room.member event with prev_content for alice's nick
@@ -299,7 +299,7 @@ describe("MatrixClient room timelines", function() {
             });
             oldMshipEvent.prev_content = {
                 displayname: "Old Alice",
-                avatar_url: null,
+                avatar_url: undefined,
                 membership: "join",
             };
 
@@ -320,7 +320,7 @@ describe("MatrixClient room timelines", function() {
                 if (state !== "PREPARED") {
                     return;
                 }
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 // sync response
                 expect(room.timeline.length).toEqual(1);
 
@@ -359,7 +359,7 @@ describe("MatrixClient room timelines", function() {
                 if (state !== "PREPARED") {
                     return;
                 }
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 expect(room.timeline.length).toEqual(1);
 
                 client.scrollback(room).then(function() {
@@ -390,7 +390,7 @@ describe("MatrixClient room timelines", function() {
                 if (state !== "PREPARED") {
                     return;
                 }
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 expect(room.oldState.paginationToken).toBeTruthy();
 
                 client.scrollback(room, 1).then(function() {
@@ -420,7 +420,7 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
 
                 let index = 0;
                 client.on(RoomEvent.Timeline, function(event, rm, toStart) {
@@ -461,7 +461,7 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
@@ -486,7 +486,7 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 let nameEmitCount = 0;
                 client.on(RoomEvent.Name, function(rm) {
                     nameEmitCount += 1;
@@ -534,18 +534,18 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 return Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {
                     expect(room.currentState.getMembers().length).toEqual(4);
-                    expect(room.currentState.getMember(userC).name).toEqual("C");
-                    expect(room.currentState.getMember(userC).membership).toEqual(
+                    expect(room.currentState.getMember(userC)!.name).toEqual("C");
+                    expect(room.currentState.getMember(userC)!.membership).toEqual(
                         "join",
                     );
-                    expect(room.currentState.getMember(userD).name).toEqual(userD);
-                    expect(room.currentState.getMember(userD).membership).toEqual(
+                    expect(room.currentState.getMember(userD)!.name).toEqual(userD);
+                    expect(room.currentState.getMember(userD)!.membership).toEqual(
                         "invite",
                     );
                 });
@@ -566,7 +566,7 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
 
                 httpBackend.flush("/messages", 1);
                 return Promise.all([
@@ -576,12 +576,12 @@ describe("MatrixClient room timelines", function() {
                     expect(room.timeline.length).toEqual(1);
                     expect(room.timeline[0].event).toEqual(eventData[0]);
                     expect(room.currentState.getMembers().length).toEqual(2);
-                    expect(room.currentState.getMember(userId).name).toEqual(userName);
-                    expect(room.currentState.getMember(userId).membership).toEqual(
+                    expect(room.currentState.getMember(userId)!.name).toEqual(userName);
+                    expect(room.currentState.getMember(userId)!.membership).toEqual(
                         "join",
                     );
-                    expect(room.currentState.getMember(otherUserId).name).toEqual("Bob");
-                    expect(room.currentState.getMember(otherUserId).membership).toEqual(
+                    expect(room.currentState.getMember(otherUserId)!.name).toEqual("Bob");
+                    expect(room.currentState.getMember(otherUserId)!.membership).toEqual(
                         "join",
                     );
                 });
@@ -599,7 +599,7 @@ describe("MatrixClient room timelines", function() {
                 httpBackend.flush("/sync", 1),
                 utils.syncPromise(client),
             ]).then(() => {
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
 
                 let emitCount = 0;
                 client.on(RoomEvent.TimelineReset, function(emitRoom) {
@@ -626,7 +626,7 @@ describe("MatrixClient room timelines", function() {
         ];
 
         const contextUrl = `/rooms/${encodeURIComponent(roomId)}/context/` +
-        `${encodeURIComponent(initialSyncEventData[2].event_id)}`;
+        `${encodeURIComponent(initialSyncEventData[2].event_id!)}`;
         const contextResponse = {
             start: "start_token",
             events_before: [initialSyncEventData[1], initialSyncEventData[0]],
@@ -649,7 +649,7 @@ describe("MatrixClient room timelines", function() {
             ]);
 
             // Get the room after the first sync so the room is created
-            room = client.getRoom(roomId);
+            room = client.getRoom(roomId)!;
             expect(room).toBeTruthy();
         });
 
