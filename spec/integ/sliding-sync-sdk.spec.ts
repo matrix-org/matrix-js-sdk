@@ -554,7 +554,7 @@ describe("SlidingSyncSdk", () => {
             // needed else we do some async operations in the background which can cause Jest to whine:
             // "Cannot log after tests are done. Did you forget to wait for something async in your test?"
             // Attempted to log "Saving device tracking data null"."
-            client!.crypto.stop();
+            client!.crypto!.stop();
         });
         it("gets enabled on the initial request only", () => {
             expect(ext.onRequest(true)).toEqual({
@@ -572,30 +572,30 @@ describe("SlidingSyncSdk", () => {
             // TODO: more assertions?
         });
         it("can update OTK counts", () => {
-            client!.crypto.updateOneTimeKeyCount = jest.fn();
+            client!.crypto!.updateOneTimeKeyCount = jest.fn();
             ext.onResponse({
                 device_one_time_keys_count: {
                     signed_curve25519: 42,
                 },
             });
-            expect(client!.crypto.updateOneTimeKeyCount).toHaveBeenCalledWith(42);
+            expect(client!.crypto!.updateOneTimeKeyCount).toHaveBeenCalledWith(42);
             ext.onResponse({
                 device_one_time_keys_count: {
                     not_signed_curve25519: 42,
                     // missing field -> default to 0
                 },
             });
-            expect(client!.crypto.updateOneTimeKeyCount).toHaveBeenCalledWith(0);
+            expect(client!.crypto!.updateOneTimeKeyCount).toHaveBeenCalledWith(0);
         });
         it("can update fallback keys", () => {
             ext.onResponse({
                 device_unused_fallback_key_types: ["signed_curve25519"],
             });
-            expect(client!.crypto.getNeedsNewFallback()).toEqual(false);
+            expect(client!.crypto!.getNeedsNewFallback()).toEqual(false);
             ext.onResponse({
                 device_unused_fallback_key_types: ["not_signed_curve25519"],
             });
-            expect(client!.crypto.getNeedsNewFallback()).toEqual(true);
+            expect(client!.crypto!.getNeedsNewFallback()).toEqual(true);
         });
     });
     describe("ExtensionAccountData", () => {

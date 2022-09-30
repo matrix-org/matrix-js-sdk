@@ -381,7 +381,7 @@ describe("DeviceList management:", function() {
                 anotherTestClient.httpBackend.when('GET', '/sync').respond(
                     200, getSyncResponse([]));
                 await anotherTestClient.flushSync();
-                await anotherTestClient.client.crypto.deviceList.saveIfDirty();
+                await anotherTestClient.client?.crypto?.deviceList?.saveIfDirty();
 
                 // @ts-ignore accessing private property
                 anotherTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {

@@ -115,7 +115,7 @@ describe("megolm key backups", function() {
     beforeEach(async function() {
         [testOlmAccount, aliceTestClient] = setupTestClient();
         await aliceTestClient!.client.initCrypto();
-        aliceTestClient!.client.crypto.backupManager.backupInfo = CURVE25519_BACKUP_INFO;
+        aliceTestClient!.client.crypto!.backupManager.backupInfo = CURVE25519_BACKUP_INFO;
     });
 
     afterEach(function() {
@@ -139,7 +139,7 @@ describe("megolm key backups", function() {
             return createOlmSession(testOlmAccount, aliceTestClient);
         }).then(() => {
             const privkey = decodeRecoveryKey(RECOVERY_KEY);
-            return aliceTestClient!.client.crypto.storeSessionBackupPrivateKey(privkey);
+            return aliceTestClient!.client!.crypto!.storeSessionBackupPrivateKey(privkey);
         }).then(() => {
             aliceTestClient!.httpBackend.when("GET", "/sync").respond(200, syncResponse);
             aliceTestClient!.expectKeyBackupQuery(
