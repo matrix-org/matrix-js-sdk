@@ -144,8 +144,14 @@ describe("IndexedDBStore", () => {
 
     it("should resolve isNewlyCreated to false if database existed already but needs upgrade", async () => {
         const deferred = defer<Event>();
-        // seed db3 to Version 2 so it forces a migration
-        const req = indexedDB.open("matrix-js-sdk:db3", 2);
+        // seed db3 to Version 1 so it forces a migration
+        const req = indexedDB.open("matrix-js-sdk:db3", 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            db.createObjectStore("users", { keyPath: ["userId"] });
+            db.createObjectStore("accountData", { keyPath: ["type"] });
+            db.createObjectStore("sync", { keyPath: ["clobber"] });
+        };
         req.onsuccess = deferred.resolve;
         await deferred.promise;
         req.result.close();
