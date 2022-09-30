@@ -34,6 +34,7 @@ import { IDeferred, sleep } from "./utils";
 import { Callback } from "./client";
 import * as utils from "./utils";
 import { logger } from './logger';
+import { MediaPrefix } from "./http-api/prefix";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 
 /*
@@ -41,42 +42,6 @@ TODO:
 - CS: complete register function (doing stages)
 - Identity server: linkEmail, authEmail, bindEmail, lookup3pid
 */
-
-/**
- * A constant representing the URI path for release 0 of the Client-Server HTTP API.
- */
-export const PREFIX_R0 = "/_matrix/client/r0";
-
-/**
- * A constant representing the URI path for the legacy release v1 of the Client-Server HTTP API.
- */
-export const PREFIX_V1 = "/_matrix/client/v1";
-
-/**
- * A constant representing the URI path for Client-Server API endpoints versioned at v3.
- */
-export const PREFIX_V3 = "/_matrix/client/v3";
-
-/**
- * A constant representing the URI path for as-yet unspecified Client-Server HTTP APIs.
- */
-export const PREFIX_UNSTABLE = "/_matrix/client/unstable";
-
-/**
- * URI path for v1 of the the identity API
- * @deprecated Use v2.
- */
-export const PREFIX_IDENTITY_V1 = "/_matrix/identity/api/v1";
-
-/**
- * URI path for the v2 identity API
- */
-export const PREFIX_IDENTITY_V2 = "/_matrix/identity/v2";
-
-/**
- * URI path for the media repo API
- */
-export const PREFIX_MEDIA_R0 = "/_matrix/media/r0";
 
 type RequestProps = "method"
     | "withCredentials"
@@ -167,6 +132,8 @@ export enum Method {
     Post = "POST",
     Delete = "DELETE",
 }
+
+export * from "./http-api/prefix";
 
 export type FileType = Document | XMLHttpRequestBodyInit;
 
@@ -429,7 +396,7 @@ export class MatrixHttpApi {
                     });
                 }
             });
-            let url = this.opts.baseUrl + "/_matrix/media/r0/upload";
+            let url = this.opts.baseUrl + MediaPrefix.R0 + "/upload";
 
             const queryArgs = [];
 
@@ -474,7 +441,7 @@ export class MatrixHttpApi {
 
             promise = this.authedRequest<UploadContentResponseType<O>>(
                 opts.callback, Method.Post, "/upload", queryParams, body, {
-                    prefix: "/_matrix/media/r0",
+                    prefix: MediaPrefix.R0,
                     headers,
                     json: false,
                     bodyParser,

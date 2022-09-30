@@ -57,14 +57,11 @@ import {
     MatrixError,
     MatrixHttpApi,
     Method,
-    PREFIX_IDENTITY_V2,
-    PREFIX_MEDIA_R0,
-    PREFIX_R0,
-    PREFIX_UNSTABLE,
-    PREFIX_V1,
-    PREFIX_V3,
     retryNetworkOperation,
     UploadContentResponseType,
+    ClientPrefix,
+    MediaPrefix,
+    IdentityPrefix,
 } from "./http-api";
 import {
     Crypto,
@@ -1001,7 +998,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
             request: opts.request,
-            prefix: PREFIX_R0,
+            prefix: ClientPrefix.R0,
             onlyData: true,
             extraParams: opts.queryParams,
             localTimeoutMs: opts.localTimeoutMs,
@@ -2693,7 +2690,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         try {
             res = await this.http.authedRequest<IKeyBackupInfo>(
                 undefined, Method.Get, "/room_keys/version", undefined, undefined,
-                { prefix: PREFIX_UNSTABLE },
+                { prefix: ClientPrefix.Unstable },
             );
         } catch (e) {
             if (e.errcode === 'M_NOT_FOUND') {
@@ -2849,7 +2846,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const res = await this.http.authedRequest<IKeyBackupInfo>(
             undefined, Method.Post, "/room_keys/version", undefined, data,
-            { prefix: PREFIX_UNSTABLE },
+            { prefix: ClientPrefix.Unstable },
         );
 
         // We could assume everything's okay and enable directly, but this ensures
@@ -2881,7 +2878,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.http.authedRequest(
             undefined, Method.Delete, path, undefined, undefined,
-            { prefix: PREFIX_UNSTABLE },
+            { prefix: ClientPrefix.Unstable },
         );
     }
 
@@ -2935,7 +2932,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const path = this.makeKeyBackupPath(roomId, sessionId, version);
         return this.http.authedRequest(
             undefined, Method.Put, path.path, path.queryData, data,
-            { prefix: PREFIX_UNSTABLE },
+            { prefix: ClientPrefix.Unstable },
         );
     }
 
@@ -3226,7 +3223,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
             const res = await this.http.authedRequest<IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession>(
                 undefined, Method.Get, path.path, path.queryData, undefined,
-                { prefix: PREFIX_UNSTABLE },
+                { prefix: ClientPrefix.Unstable },
             );
 
             if ((res as IRoomsKeysResponse).rooms) {
@@ -3291,7 +3288,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const path = this.makeKeyBackupPath(roomId, sessionId, version);
         return this.http.authedRequest(
             undefined, Method.Delete, path.path, path.queryData, undefined,
-            { prefix: PREFIX_UNSTABLE },
+            { prefix: ClientPrefix.Unstable },
         );
     }
 
@@ -3337,7 +3334,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public getMediaConfig(callback?: Callback): Promise<IMediaConfig> {
         return this.http.authedRequest(
             callback, Method.Get, "/config", undefined, undefined, {
-                prefix: PREFIX_MEDIA_R0,
+                prefix: MediaPrefix.R0,
             },
         );
     }
@@ -4760,7 +4757,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 url,
                 ts: ts.toString(),
             }, undefined, {
-                prefix: PREFIX_MEDIA_R0,
+                prefix: MediaPrefix.R0,
             },
         );
         // TODO: Expire the URL preview cache sometimes
@@ -6586,7 +6583,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const res = await this.http.authedRequest<{ joined: string[] }>(
             undefined, Method.Get, path, undefined, undefined,
-            { prefix: PREFIX_UNSTABLE },
+            { prefix: ClientPrefix.Unstable },
         );
         return res.joined;
     }
@@ -6888,7 +6885,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private termsUrlForService(serviceType: SERVICE_TYPES, baseUrl: string) {
         switch (serviceType) {
             case SERVICE_TYPES.IS:
-                return baseUrl + PREFIX_IDENTITY_V2 + '/terms';
+                return baseUrl + IdentityPrefix.V2 + '/terms';
             case SERVICE_TYPES.IM:
                 return baseUrl + '/_matrix/integrations/v1/terms';
             default:
@@ -7115,7 +7112,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             undefined,
             { refresh_token: refreshToken },
             {
-                prefix: PREFIX_V1,
+                prefix: ClientPrefix.V1,
                 inhibitLogoutEmit: true, // we don't want to cause logout loops
             },
         );
@@ -7221,7 +7218,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             [SSO_ACTION_PARAM.unstable!]: action,
         };
 
-        return this.http.getUrl(url, params, PREFIX_R0);
+        return this.http.getUrl(url, params, ClientPrefix.R0);
     }
 
     /**
@@ -7312,7 +7309,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             "/org.matrix.msc3882/login/token",
             undefined, // no query params
             body,
-            { prefix: PREFIX_UNSTABLE },
+            { prefix: ClientPrefix.Unstable },
         );
     }
 
@@ -7331,7 +7328,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.http.getUrl(path, {
             session: authSessionId,
-        }, PREFIX_R0);
+        }, ClientPrefix.R0);
     }
 
     /**
@@ -7411,7 +7408,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         return this.http.authedRequest(
             undefined, Method.Get, path, undefined, undefined, {
-                prefix: PREFIX_UNSTABLE,
+                prefix: ClientPrefix.Unstable,
             },
         );
     }
@@ -7714,7 +7711,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getLocalAliases(roomId: string): Promise<{ aliases: string[] }> {
         const path = utils.encodeUri("/rooms/$roomId/aliases", { $roomId: roomId });
-        const prefix = PREFIX_V3;
+        const prefix = ClientPrefix.V3;
         return this.http.authedRequest(undefined, Method.Get, path, undefined, undefined, { prefix });
     }
 
@@ -7970,7 +7967,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async addThreePidOnly(data: IAddThreePidOnlyBody): Promise<{}> {
         const path = "/account/3pid/add";
-        const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
+        const prefix = await this.isVersionSupported("r0.6.0") ? ClientPrefix.R0 : ClientPrefix.Unstable;
         return this.http.authedRequest(undefined, Method.Post, path, undefined, data, { prefix });
     }
 
@@ -7990,8 +7987,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async bindThreePid(data: IBindThreePidBody): Promise<{}> {
         const path = "/account/3pid/bind";
-        const prefix = await this.isVersionSupported("r0.6.0") ?
-            PREFIX_R0 : PREFIX_UNSTABLE;
+        const prefix = await this.isVersionSupported("r0.6.0") ? ClientPrefix.R0 : ClientPrefix.Unstable;
         return this.http.authedRequest(
             undefined, Method.Post, path, undefined, data, { prefix },
         );
@@ -8019,7 +8015,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             address,
             id_server: this.getIdentityServerUrl(true),
         };
-        const prefix = await this.isVersionSupported("r0.6.0") ? PREFIX_R0 : PREFIX_UNSTABLE;
+        const prefix = await this.isVersionSupported("r0.6.0") ? ClientPrefix.R0 : ClientPrefix.Unstable;
         return this.http.authedRequest(undefined, Method.Post, path, undefined, data, { prefix });
     }
 
@@ -8374,7 +8370,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(
             undefined, Method.Post, '/keys/signatures/upload', undefined,
             content, {
-                prefix: PREFIX_UNSTABLE,
+                prefix: ClientPrefix.Unstable,
             },
         );
     }
@@ -8475,7 +8471,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (auth) Object.assign(data, { auth });
         return this.http.authedRequest(
             undefined, Method.Post, "/keys/device_signing/upload", undefined, data, {
-                prefix: PREFIX_UNSTABLE,
+                prefix: ClientPrefix.Unstable,
             },
         );
     }
@@ -8498,7 +8494,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("No identity server base URL set");
         }
 
-        const uri = this.idBaseUrl + PREFIX_IDENTITY_V2 + "/account/register";
+        const uri = this.idBaseUrl + IdentityPrefix.V2 + "/account/register";
         return this.http.requestOtherUrl(
             undefined, Method.Post, uri,
             null, hsOpenIdToken,
@@ -8546,7 +8542,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.http.idServerRequest(
             callback, Method.Post, "/validate/email/requestToken",
-            params, PREFIX_IDENTITY_V2, identityAccessToken,
+            params, IdentityPrefix.V2, identityAccessToken,
         );
     }
 
@@ -8596,7 +8592,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.http.idServerRequest(
             callback, Method.Post, "/validate/msisdn/requestToken",
-            params, PREFIX_IDENTITY_V2, identityAccessToken,
+            params, IdentityPrefix.V2, identityAccessToken,
         );
     }
 
@@ -8633,7 +8629,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.http.idServerRequest(
             undefined, Method.Post, "/validate/msisdn/submitToken",
-            params, PREFIX_IDENTITY_V2, identityAccessToken,
+            params, IdentityPrefix.V2, identityAccessToken,
         );
     }
 
@@ -8681,7 +8677,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public getIdentityHashDetails(identityAccessToken: string): Promise<any> { // TODO: Types
         return this.http.idServerRequest(
             undefined, Method.Get, "/hash_details",
-            null, PREFIX_IDENTITY_V2, identityAccessToken,
+            null, IdentityPrefix.V2, identityAccessToken,
         );
     }
 
@@ -8750,7 +8746,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const response = await this.http.idServerRequest(
             undefined, Method.Post, "/lookup",
-            params, PREFIX_IDENTITY_V2, identityAccessToken,
+            params, IdentityPrefix.V2, identityAccessToken,
         );
 
         if (!response || !response['mappings']) return []; // no results
@@ -8868,7 +8864,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public getIdentityAccount(identityAccessToken: string): Promise<any> { // TODO: Types
         return this.http.idServerRequest(
             undefined, Method.Get, "/account",
-            undefined, PREFIX_IDENTITY_V2, identityAccessToken,
+            undefined, IdentityPrefix.V2, identityAccessToken,
         );
     }
 
@@ -9035,7 +9031,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
 
         return this.http.authedRequest<IRoomHierarchy>(undefined, Method.Get, path, queryParams, undefined, {
-            prefix: PREFIX_V1,
+            prefix: ClientPrefix.V1,
         }).catch(e => {
             if (e.errcode === "M_UNRECOGNIZED") {
                 // fall back to the prefixed hierarchy API.
