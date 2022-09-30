@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IAuthData } from "..";
+import { IAuthData } from "../interactive-auth";
 
 /**
  * Helper type to represent HTTP request body for a UIA enabled endpoint

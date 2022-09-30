@@ -133,7 +133,7 @@ async function aliDownloadsKeys(): Promise<void> {
     // check that the localStorage is updated as we expect (not sure this is
     // an integration test, but meh)
     await Promise.all([p1(), p2()]);
-    await aliTestClient.client.crypto.deviceList.saveIfDirty();
+    await aliTestClient.client.crypto!.deviceList.saveIfDirty();
     // @ts-ignore - protected
     aliTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
         const devices = data!.devices[bobUserId]!;
@@ -495,7 +495,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -506,7 +506,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -570,7 +570,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
