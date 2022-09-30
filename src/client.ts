@@ -905,7 +905,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public identityServer: IIdentityServerProvider;
     public http: MatrixHttpApi; // XXX: Intended private, used in code.
-    public crypto: Crypto; // XXX: Intended private, used in code.
+    public crypto?: Crypto; // XXX: Intended private, used in code.
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler: CallEventHandler; // XXX: Intended private, used in code.
     public supportsCallTransfer = false; // XXX: Intended private, used in code.
