@@ -98,7 +98,6 @@ describe("megolm key backups", function() {
     let testOlmAccount: Olm.Account;
     let aliceTestClient: TestClient;
 
-
     const setupTestClient = (): [Account, TestClient] => {
         const aliceTestClient = new TestClient(
             "@alice:localhost", "xzcvb", "akjgkrgjs",

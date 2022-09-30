@@ -14,22 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventStatus, RoomEvent, MatrixClient } from "../../src/matrix";
-import { MatrixScheduler } from "../../src/scheduler";
+import HttpBackend from "matrix-mock-request";
+
+import { EventStatus, RoomEvent, MatrixClient, MatrixScheduler } from "../../src/matrix";
 import { Room } from "../../src/models/room";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient retrying", function() {
-    let client: MatrixClient = null;
-    let httpBackend: TestClient["httpBackend"] = null;
-    let scheduler;
     const userId = "@alice:localhost";
     const accessToken = "aseukfgwef";
     const roomId = "!room:here";
-    let room: Room;
 
-    beforeEach(function() {
-        scheduler = new MatrixScheduler();
+    const setupTests = (): [MatrixClient, HttpBackend, Room] => {
+        const scheduler = new MatrixScheduler();
         const testClient = new TestClient(
             userId,
             "DEVICE",
@@ -37,10 +34,18 @@ describe("MatrixClient retrying", function() {
             undefined,
             { scheduler },
         );
-        httpBackend = testClient.httpBackend;
-        client = testClient.client;
-        room = new Room(roomId, client, userId);
+        const httpBackend = testClient.httpBackend;
+        const client = testClient.client;
+        const room = new Room(roomId, client, userId);
         client.store.storeRoom(room);
+
+        return [client, httpBackend, room];
+    }
+
+    let [client, httpBackend, room] = setupTests();
+
+    beforeEach(function() {
+        [client, httpBackend, room] = setupTests();
     });
 
     afterEach(function() {
