@@ -20,6 +20,7 @@ import 'jest-localstorage-mock';
 import { IndexedDBStore, IStateEventWithRoomId, MemoryStore } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
+import { defer } from "../../../src/utils";
 
 describe("IndexedDBStore", () => {
     afterEach(() => {
@@ -134,6 +135,24 @@ describe("IndexedDBStore", () => {
         store = new IndexedDBStore({
             indexedDB,
             dbName: "db2",
+            localStorage,
+        });
+        await store.startup();
+
+        await expect(store.isNewlyCreated()).resolves.toBeFalsy();
+    });
+
+    it("should resolve isNewlyCreated to false if database existed already but needs upgrade", async () => {
+        const deferred = defer<Event>();
+        // seed db3 to Version 2 so it forces a migration
+        const req = indexedDB.open("matrix-js-sdk:db3", 2);
+        req.onsuccess = deferred.resolve;
+        await deferred.promise;
+        req.result.close();
+
+        const store = new IndexedDBStore({
+            indexedDB,
+            dbName: "db3",
             localStorage,
         });
         await store.startup();
