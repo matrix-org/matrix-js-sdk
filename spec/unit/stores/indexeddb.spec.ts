@@ -111,4 +111,33 @@ describe("IndexedDBStore", () => {
         await store.setPendingEvents(roomId, []);
         expect(localStorage.getItem("mx_pending_events_" + roomId)).toBeNull();
     });
+
+    it("should resolve isNewlyCreated to true if no database existed initially", async () => {
+        const store = new IndexedDBStore({
+            indexedDB,
+            dbName: "db1",
+            localStorage,
+        });
+        await store.startup();
+
+        await expect(store.isNewlyCreated()).resolves.toBeTruthy();
+    });
+
+    it("should resolve isNewlyCreated to false if database existed already", async () => {
+        let store = new IndexedDBStore({
+            indexedDB,
+            dbName: "db2",
+            localStorage,
+        });
+        await store.startup();
+
+        store = new IndexedDBStore({
+            indexedDB,
+            dbName: "db2",
+            localStorage,
+        });
+        await store.startup();
+
+        await expect(store.isNewlyCreated()).resolves.toBeFalsy();
+    });
 });
