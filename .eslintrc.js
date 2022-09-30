@@ -1,13 +1,21 @@
 module.exports = {
     plugins: [
         "matrix-org",
+        "import",
     ],
     extends: [
         "plugin:matrix-org/babel",
+        "plugin:import/typescript",
     ],
     env: {
         browser: true,
         node: true,
+    },
+    settings: {
+        "import/resolver": {
+            typescript: true,
+            node: true,
+        },
     },
     // NOTE: These rules are frozen and new rules should not be added here.
     // New changes belong in https://github.com/matrix-org/eslint-plugin-matrix-org/
@@ -36,6 +44,15 @@ module.exports = {
 
         // restrict EventEmitters to force callers to use TypedEventEmitter
         "no-restricted-imports": ["error", "events"],
+
+        "import/no-restricted-paths": ["error", {
+            "zones": [{
+                "target": "./src/",
+                "from": "./src/index.ts",
+                "message": "The package index is dynamic between src and lib depending on " +
+                    "whether release or development, target the specific module or matrix.ts instead",
+            }],
+        }],
     },
     overrides: [{
         files: [

@@ -18,41 +18,36 @@ import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../syn
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
 import { logger } from '../logger';
-import { IStartClientOpts, IStateEventWithRoomId } from "..";
+import { IStartClientOpts, IStateEventWithRoomId } from "../matrix";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
-const VERSION = 4;
+type DbMigration = (db: IDBDatabase) => void;
+const DB_MIGRATIONS: DbMigration[] = [
+    (db) => {
+        // Make user store, clobber based on user ID. (userId property of User objects)
+        db.createObjectStore("users", { keyPath: ["userId"] });
 
-function createDatabase(db: IDBDatabase): void {
-    // Make user store, clobber based on user ID. (userId property of User objects)
-    db.createObjectStore("users", { keyPath: ["userId"] });
+        // Make account data store, clobber based on event type.
+        // (event.type property of MatrixEvent objects)
+        db.createObjectStore("accountData", { keyPath: ["type"] });
 
-    // Make account data store, clobber based on event type.
-    // (event.type property of MatrixEvent objects)
-    db.createObjectStore("accountData", { keyPath: ["type"] });
-
-    // Make /sync store (sync tokens, room data, etc), always clobber (const key).
-    db.createObjectStore("sync", { keyPath: ["clobber"] });
-}
-
-function upgradeSchemaV2(db: IDBDatabase): void {
-    const oobMembersStore = db.createObjectStore(
-        "oob_membership_events", {
-            keyPath: ["room_id", "state_key"],
-        });
-    oobMembersStore.createIndex("room", "room_id");
-}
-
-function upgradeSchemaV3(db: IDBDatabase): void {
-    db.createObjectStore("client_options",
-        { keyPath: ["clobber"] });
-}
-
-function upgradeSchemaV4(db: IDBDatabase): void {
-    db.createObjectStore("to_device_queue", { autoIncrement: true });
-}
+        // Make /sync store (sync tokens, room data, etc), always clobber (const key).
+        db.createObjectStore("sync", { keyPath: ["clobber"] });
+    },
+    (db) => {
+        const oobMembersStore = db.createObjectStore(
+            "oob_membership_events", {
+                keyPath: ["room_id", "state_key"],
+            });
+        oobMembersStore.createIndex("room", "room_id");
+    },
+    (db) => { db.createObjectStore("client_options", { keyPath: ["clobber"] }); },
+    (db) => { db.createObjectStore("to_device_queue", { autoIncrement: true }); },
+    // Expand as needed.
+];
+const VERSION = DB_MIGRATIONS.length;
 
 /**
  * Helper method to collect results from a Cursor and promiseify it.
@@ -172,20 +167,13 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             logger.log(
                 `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
             );
-            if (oldVersion < 1) { // The database did not previously exist.
+            if (oldVersion < 1) {
+                // The database did not previously exist
                 this._isNewlyCreated = true;
-                createDatabase(db);
             }
-            if (oldVersion < 2) {
-                upgradeSchemaV2(db);
-            }
-            if (oldVersion < 3) {
-                upgradeSchemaV3(db);
-            }
-            if (oldVersion < 4) {
-                upgradeSchemaV4(db);
-            }
-            // Expand as needed.
+            DB_MIGRATIONS.forEach((migration, index) => {
+                if (oldVersion <= index) migration(db);
+            });
         };
 
         req.onblocked = () => {

@@ -36,5 +36,6 @@ jobs:
           package=$(cat package.json | jq -er .name)
           npm dist-tag add "$package@$release" latest
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          # JS-DevTools/npm-publish overrides `NODE_AUTH_TOKEN` with `INPUT_TOKEN` in .npmrc
+          INPUT_TOKEN: ${{ secrets.NPM_TOKEN }}
           release: ${{ steps.npm-publish.outputs.version }}

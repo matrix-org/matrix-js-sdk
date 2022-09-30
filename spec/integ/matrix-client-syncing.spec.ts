@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import 'fake-indexeddb/auto';
+
 import { Optional } from "matrix-events-sdk/lib/types";
 import HttpBackend from "matrix-mock-request";
 
@@ -25,6 +27,8 @@ import {
     RoomMemberEvent,
     UNSTABLE_MSC2716_MARKER,
     MatrixClient,
+    ClientEvent,
+    IndexedDBCryptoStore,
 } from "../../src";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
@@ -220,6 +224,44 @@ describe("MatrixClient syncing", () => {
             client!.startClient({ lazyLoadMembers: true });
 
             return httpBackend!.flushAllExpected();
+        });
+
+        it("should emit ClientEvent.Room when invited while crypto is disabled", async () => {
+            const roomId = "!invite:example.org";
+
+            // First sync: an invite
+            const inviteSyncRoomSection = {
+                invite: {
+                    [roomId]: {
+                        invite_state: {
+                            events: [{
+                                type: "m.room.member",
+                                state_key: selfUserId,
+                                content: {
+                                    membership: "invite",
+                                },
+                            }],
+                        },
+                    },
+                },
+            };
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: inviteSyncRoomSection,
+            });
+
+            // First fire: an initial invite
+            let fires = 0;
+            client!.once(ClientEvent.Room, (room) => {
+                fires++;
+                expect(room.roomId).toBe(roomId);
+            });
+
+            // noinspection ES6MissingAwait
+            client!.startClient();
+            await httpBackend!.flushAllExpected();
+
+            expect(fires).toBe(1);
         });
     });
 
@@ -1427,4 +1469,71 @@ describe("MatrixClient syncing", () => {
     function awaitSyncEvent(numSyncs?: number) {
         return utils.syncPromise(client, numSyncs);
     }
+});
+
+describe("MatrixClient syncing (IndexedDB version)", () => {
+    const selfUserId = "@alice:localhost";
+    const selfAccessToken = "aseukfgwef";
+    const syncData = {
+        next_batch: "batch_token",
+        rooms: {},
+        presence: {},
+    };
+
+    it("should emit ClientEvent.Room when invited while using indexeddb crypto store", async () => {
+        const idbTestClient = new TestClient(
+            selfUserId,
+            "DEVICE",
+            selfAccessToken,
+            undefined,
+            { cryptoStore: new IndexedDBCryptoStore(global.indexedDB, "tests") },
+        );
+        const idbHttpBackend = idbTestClient.httpBackend;
+        const idbClient = idbTestClient.client;
+        idbHttpBackend.when("GET", "/versions").respond(200, {});
+        idbHttpBackend.when("GET", "/pushrules").respond(200, {});
+        idbHttpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+
+        await idbClient.initCrypto();
+
+        const roomId = "!invite:example.org";
+
+        // First sync: an invite
+        const inviteSyncRoomSection = {
+            invite: {
+                [roomId]: {
+                    invite_state: {
+                        events: [{
+                            type: "m.room.member",
+                            state_key: selfUserId,
+                            content: {
+                                membership: "invite",
+                            },
+                        }],
+                    },
+                },
+            },
+        };
+        idbHttpBackend.when("GET", "/sync").respond(200, {
+            ...syncData,
+            rooms: inviteSyncRoomSection,
+        });
+
+        // First fire: an initial invite
+        let fires = 0;
+        idbClient.once(ClientEvent.Room, (room) => {
+            fires++;
+            expect(room.roomId).toBe(roomId);
+        });
+
+        // noinspection ES6MissingAwait
+        idbClient.startClient();
+        await idbHttpBackend.flushAllExpected();
+
+        expect(fires).toBe(1);
+
+        idbHttpBackend.verifyNoOutstandingExpectation();
+        idbClient.stopClient();
+        idbHttpBackend.stop();
+    });
 });
