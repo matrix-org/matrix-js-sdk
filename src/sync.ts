@@ -1201,7 +1201,7 @@ export class SyncApi {
 
             const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId())?.getSender();
 
-            if (client.crypto) {
+            if (client.isCryptoEnabled()) {
                 const parkedHistory = await client.crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
                 for (const parked of parkedHistory) {
                     if (parked.senderId === inviter) {
