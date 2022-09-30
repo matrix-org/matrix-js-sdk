@@ -678,6 +678,8 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      * @param {object} options
      * @param {boolean} options.isRetry True if this is a retry (enables more logging)
      * @param {boolean} options.emit Emits "event.decrypted" if set to true
+     * @param {boolean} options.forceRedecryptIfUntrusted whether the message should be
+     *     re-decrypted if it was previously successfully decrypted with an untrusted key
      *
      * @returns {Promise} promise which resolves (to undefined) when the decryption
      * attempt is completed.

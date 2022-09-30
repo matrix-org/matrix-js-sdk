@@ -1795,7 +1795,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * @private
      * @param {String} senderKey
      * @param {String} sessionId
-     * @param {Boolean} forceRedecryptIfUntrusted
+     * @param {Boolean} forceRedecryptIfUntrusted whether messages that were already
+     *     successfully decrypted using untrusted keys should be re-decrypted
      *
      * @return {Boolean} whether all messages were successfully
      *     decrypted with trusted keys
