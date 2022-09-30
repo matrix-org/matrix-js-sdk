@@ -245,21 +245,21 @@ describe("MatrixClient syncing", () => {
                     },
                 },
             };
-            httpBackend.when("GET", "/sync").respond(200, {
+            httpBackend!.when("GET", "/sync").respond(200, {
                 ...syncData,
                 rooms: inviteSyncRoomSection,
             });
 
             // First fire: an initial invite
             let fires = 0;
-            client.once(ClientEvent.Room, (room) => {
+            client!.once(ClientEvent.Room, (room) => {
                 fires++;
                 expect(room.roomId).toBe(roomId);
             });
 
             // noinspection ES6MissingAwait
-            client.startClient();
-            await httpBackend.flushAllExpected();
+            client!.startClient();
+            await httpBackend!.flushAllExpected();
 
             expect(fires).toBe(1);
         });
