@@ -738,7 +738,7 @@ describe("megolm", () => {
         aliceTestClient.httpBackend.when(
             'PUT', '/sendToDevice/m.room.encrypted/',
         ).respond(200, function(_path, content: {
-            messages: { [userId: string]: { [deviceId: string]: Record<string, any> }}
+            messages: { [userId: string]: { [deviceId: string]: Record<string, any> }};
         }) {
             logger.log("sendToDevice: ", content);
             const m = content.messages[aliceTestClient.userId!].DEVICE_ID;

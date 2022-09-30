@@ -40,7 +40,7 @@ describe("MatrixClient retrying", function() {
         client.store.storeRoom(room);
 
         return [client, httpBackend, room];
-    }
+    };
 
     let [client, httpBackend, room] = setupTests();
 

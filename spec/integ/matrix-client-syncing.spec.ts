@@ -55,8 +55,8 @@ describe("MatrixClient syncing", () => {
         httpBackend!.when("GET", "/pushrules").respond(200, {});
         httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
         return [client, httpBackend];
-    }
-    
+    };
+
     let [client, httpBackend] = setupTestClient();
 
     beforeEach(() => {

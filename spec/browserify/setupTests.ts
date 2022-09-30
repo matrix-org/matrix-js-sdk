@@ -20,5 +20,6 @@ global.XMLHttpRequest = jest.fn();
 
 afterAll(() => {
     // clean up XMLHttpRequest mock
+    // @ts-ignore
     global.XMLHttpRequest = undefined;
 });
