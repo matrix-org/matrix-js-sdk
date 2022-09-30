@@ -1200,19 +1200,22 @@ export class SyncApi {
             await this.processRoomEvents(room, stateEvents);
 
             const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId())?.getSender();
-            const parkedHistory = await client.crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
-            for (const parked of parkedHistory) {
-                if (parked.senderId === inviter) {
-                    await this.client.crypto.olmDevice.addInboundGroupSession(
-                        room.roomId,
-                        parked.senderKey,
-                        parked.forwardingCurve25519KeyChain,
-                        parked.sessionId,
-                        parked.sessionKey,
-                        parked.keysClaimed,
-                        true,
-                        { sharedHistory: true, untrusted: true },
-                    );
+
+            if (client.isCryptoEnabled()) {
+                const parkedHistory = await client.crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
+                for (const parked of parkedHistory) {
+                    if (parked.senderId === inviter) {
+                        await client.crypto.olmDevice.addInboundGroupSession(
+                            room.roomId,
+                            parked.senderKey,
+                            parked.forwardingCurve25519KeyChain,
+                            parked.sessionId,
+                            parked.sessionKey,
+                            parked.keysClaimed,
+                            true,
+                            { sharedHistory: true, untrusted: true },
+                        );
+                    }
                 }
             }
 
