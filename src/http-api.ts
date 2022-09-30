@@ -214,7 +214,7 @@ export class MatrixHttpApi {
     ) {
         utils.checkObjectHasKeys(opts, ["baseUrl", "request", "prefix"]);
         opts.onlyData = !!opts.onlyData;
-        opts.useAuthorizationHeader = !!opts.useAuthorizationHeader;
+        opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
     }
 
     /**
