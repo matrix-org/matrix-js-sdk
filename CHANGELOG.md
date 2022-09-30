@@ -1,3 +1,9 @@
+Changes in [20.0.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.2) (2022-09-30)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix issue in sync when crypto is not supported by client ([\#2715](https://github.com/matrix-org/matrix-js-sdk/pull/2715)). Contributed by @stas-demydiuk.
+
 Changes in [20.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.1) (2022-09-28)
 ==================================================================================================
 
