@@ -24,7 +24,7 @@ import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
 import type * as NodeCrypto from "crypto";
-import { MatrixEvent } from ".";
+import { MatrixEvent } from "./models/event";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
 

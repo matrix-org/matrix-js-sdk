@@ -23,7 +23,7 @@ limitations under the License.
 import { MatrixClient } from "../../client";
 import { Room } from "../../models/room";
 import { OlmDevice } from "../OlmDevice";
-import { MatrixEvent, RoomMember } from "../..";
+import { MatrixEvent, RoomMember } from "../../matrix";
 import { Crypto, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "..";
 import { DeviceInfo } from "../deviceinfo";
 import { IRoomEncryption } from "../RoomList";
