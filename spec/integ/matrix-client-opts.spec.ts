@@ -5,10 +5,12 @@ import { MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
+import { ICreateClientOpts } from "../../src/client";
+import { IStore } from "../../src/store";
 
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
-    let httpBackend = null;
+    let httpBackend = new HttpBackend();
     const userId = "@alice:localhost";
     const userB = "@bob:localhost";
     const accessToken = "aseukfgwef";
@@ -67,7 +69,7 @@ describe("MatrixClient opts", function() {
         let client;
         beforeEach(function() {
             client = new MatrixClient({
-                request: httpBackend.requestFn,
+                request: httpBackend.requestFn as unknown as ICreateClientOpts['request'],
                 store: undefined,
                 baseUrl: baseUrl,
                 userId: userId,
@@ -127,8 +129,8 @@ describe("MatrixClient opts", function() {
         let client;
         beforeEach(function() {
             client = new MatrixClient({
-                request: httpBackend.requestFn,
-                store: new MemoryStore(),
+                request: httpBackend.requestFn as unknown as ICreateClientOpts['request'],
+                store: new MemoryStore() as IStore,
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,
