@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
+import { deepCompare, escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
 import { logger } from './logger';
 import { MatrixClient } from "./client";
 import { MatrixEvent } from "./models/event";
@@ -90,6 +90,20 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             },
         ],
         actions: [],
+    },
+    {
+        // For homeservers which don't support MSC3401 yet
+        rule_id: ".org.matrix.msc3401.rule.room.call",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventMatch,
+                key: "type",
+                pattern: "org.matrix.msc3401.call",
+            },
+        ],
+        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Sound, value: "default" }],
     },
 ];
 
@@ -424,13 +438,37 @@ export class PushProcessor {
             return {} as IActionsObject;
         }
 
-        const actionObj = PushProcessor.actionListToActionsObject(rule.actions);
+        let actionObj = PushProcessor.actionListToActionsObject(rule.actions);
 
         // Some actions are implicit in some situations: we add those here
         if (actionObj.tweaks.highlight === undefined) {
             // if it isn't specified, highlight if it's a content
             // rule but otherwise not
             actionObj.tweaks.highlight = (rule.kind == PushRuleKind.ContentSpecific);
+        }
+
+        actionObj = this.performCustomEventHandling(ev, actionObj);
+
+        return actionObj;
+    }
+
+    /**
+     * Some events require custom event handling e.g. due to missing server support
+     */
+    private performCustomEventHandling(ev: MatrixEvent, actionObj: IActionsObject): IActionsObject {
+        switch (ev.getType()) {
+            case "m.call":
+            case "org.matrix.msc3401.call":
+                // Since servers don't support properly sending push notification
+                // about MSC3401 call events, we do the handling ourselves
+                if (
+                    ev.getContent()["m.intent"] === "m.room"
+                    || ("m.terminated" in ev.getContent())
+                    || !("m.terminated" in ev.getPrevContent()) && !deepCompare(ev.getPrevContent(), {})
+                ) {
+                    actionObj.notify = false;
+                    actionObj.tweaks = {};
+                }
         }
 
         return actionObj;
