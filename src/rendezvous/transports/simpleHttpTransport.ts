@@ -21,6 +21,7 @@ import { sleep } from '../../utils';
 import { BaseRendezvousTransport } from "./baseTransport";
 import { RendezvousCancellationFunction, RendezvousCancellationReason } from '../cancellationReason';
 import { RendezvousTransportDetails } from '../transport';
+import { getRequest, MatrixClient, PREFIX_UNSTABLE } from '../../matrix';
 
 export interface SimpleHttpRendezvousTransportDetails extends RendezvousTransportDetails {
     type: 'http.v1';
@@ -28,13 +29,19 @@ export interface SimpleHttpRendezvousTransportDetails extends RendezvousTranspor
 }
 
 export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
+    private uri?: string;
     private etag?: string;
     private expiresAt?: Date;
 
-    constructor(onCancelled: RendezvousCancellationFunction, private defaultRzServer?: string, private uri?: string) {
+    constructor(
+        public onCancelled?: RendezvousCancellationFunction,
+        private client?: MatrixClient,
+        private hsUrl?: string,
+        private fallbackRzServer?: string,
+        rendezvousUri?: string,
+    ) {
         super(onCancelled);
-        this.defaultRzServer = defaultRzServer;
-
+        this.uri = rendezvousUri;
         this.ready = !!this.uri;
     }
 
@@ -45,18 +52,42 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
         };
     }
 
+    private async getPostEndpoint(): Promise<string | undefined> {
+        if (!this.client && this.hsUrl) {
+            this.client = new MatrixClient({
+                baseUrl: this.hsUrl,
+                request: getRequest(),
+            });
+        }
+
+        if (this.client) {
+            try {
+                // eslint-disable-next-line camelcase
+                const { unstable_features } = await this.client.getVersions();
+                // eslint-disable-next-line camelcase
+                if (unstable_features?.['org.matrix.msc3886']) {
+                    return `${this.client.baseUrl}${PREFIX_UNSTABLE}/org.matrix.msc3886/rendezvous`;
+                }
+            } catch (err) {
+                logger.warn('Failed to get unstable features', err);
+            }
+        }
+
+        return this.fallbackRzServer;
+    }
+
     async send(contentType: string, data: any) {
         if (this.cancelled) {
             return;
         }
         const method = this.uri ? "PUT" : "POST";
-        const uri = this.uri ?? this.defaultRzServer;
+        const uri = this.uri ?? await this.getPostEndpoint();
 
         if (!uri) {
             throw new Error('Invalid rendezvous URI');
         }
 
-        logger.info(`Sending data: ${JSON.stringify(data)} as ${data} to ${this.uri}`);
+        logger.info(`Sending data: ${JSON.stringify(data)} as ${data} to ${uri}`);
 
         const headers = this.etag ? { 'if-match': this.etag } : {};
         const res = await fetch(uri, { method,
@@ -68,7 +99,7 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
         }
         this.etag = res.headers.get("etag");
 
-        logger.info(`Posted data to ${this.uri} new etag ${this.etag}`);
+        logger.info(`Posted data to ${uri} new etag ${this.etag}`);
 
         if (method === 'POST') {
             const location = res.headers.get('location');

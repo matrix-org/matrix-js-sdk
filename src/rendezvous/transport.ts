@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RendezvousCancellationReason } from "./cancellationReason";
+import { RendezvousCancellationFunction, RendezvousCancellationReason } from "./cancellationReason";
 
 export interface RendezvousTransportDetails {
   type: string;
@@ -22,6 +22,7 @@ export interface RendezvousTransportDetails {
 
 export interface RendezvousTransport {
   ready: boolean;
+  onCancelled?: RendezvousCancellationFunction;
   details(): Promise<RendezvousTransportDetails>;
   send(contentType: string, data: any): Promise<void>;
   receive(): Promise<any>;

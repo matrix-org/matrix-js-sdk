@@ -22,7 +22,7 @@ export abstract class BaseRendezvousTransport implements RendezvousTransport {
     ready = false;
     cancelled = false;
 
-    constructor(private onCancelled: RendezvousCancellationFunction) {}
+    constructor(public onCancelled?: RendezvousCancellationFunction) {}
 
     abstract details(): Promise<RendezvousTransportDetails>;
 
@@ -36,6 +36,6 @@ export abstract class BaseRendezvousTransport implements RendezvousTransport {
 
         logger.info(reason);
         logger.info('onCancelled');
-        this.onCancelled(reason);
+        this.onCancelled?.(reason);
     }
 }

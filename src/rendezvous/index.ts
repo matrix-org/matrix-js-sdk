@@ -50,7 +50,12 @@ export async function buildChannelFromCode(
         throw new RendezvousError('Invalid code', RendezvousCancellationReason.InvalidCode);
     }
 
-    const transport = new SimpleHttpRendezvousTransport(onCancelled, undefined, transportDetails.uri);
+    const transport = new SimpleHttpRendezvousTransport(
+        onCancelled,
+        undefined, // client
+        undefined, // hsUrl
+        undefined, // fallbackRzServer
+        transportDetails.uri);
 
     if (parsed.rendezvous?.algorithm !=="m.rendezvous.v1.x25519-aes-sha256") {
         throw new RendezvousError('Unsupported transport', RendezvousCancellationReason.UnsupportedAlgorithm);
