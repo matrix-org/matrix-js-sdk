@@ -26,6 +26,7 @@ import { RoomState } from "./room-state";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventType } from "../@types/event";
+import { Membership } from "../@types/partials";
 
 export enum RoomMemberEvent {
     Membership = "RoomMember.membership",
@@ -53,7 +54,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     public powerLevel = 0;
     public powerLevelNorm = 0;
     public user?: User;
-    public membership?: string;
+    public membership?: Membership;
     public disambiguate = false;
     public events: {
         member?: MatrixEvent;
@@ -78,7 +79,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @prop {Number} powerLevelNorm The normalised power level (0-100) for this
      * room member.
      * @prop {User} user The User object for this room member, if one exists.
-     * @prop {string} membership The membership state for this room member e.g. 'join'.
+     * @prop {Membership} membership The membership state for this room member e.g. 'join'.
      * @prop {Object} events The events describing this RoomMember.
      * @prop {MatrixEvent} events.member The m.room.member event for this RoomMember.
      * @prop {boolean} disambiguate True if the member's name is disambiguated.
@@ -409,7 +410,7 @@ function calculateDisplayName(
  * @event module:client~MatrixClient#"RoomMember.membership"
  * @param {MatrixEvent} event The matrix event which caused this event to fire.
  * @param {RoomMember} member The member whose RoomMember.membership changed.
- * @param {string?} oldMembership The previous membership state. Null if it's a
+ * @param {Membership?} oldMembership The previous membership state. Null if it's a
  *    new member.
  * @example
  * matrixClient.on("RoomMember.membership", function(event, member, oldMembership){

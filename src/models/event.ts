@@ -25,6 +25,7 @@ import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 import { logger } from '../logger';
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
 import { EVENT_VISIBILITY_CHANGE_TYPE, EventType, MsgType, RelationType } from "../@types/event";
+import { Membership } from "../@types/partials";
 import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
@@ -42,10 +43,16 @@ export { EventStatus } from "./event-status";
 export interface IContent {
     [key: string]: any;
     msgtype?: MsgType | string;
-    membership?: string;
+    membership?: Membership;
     avatar_url?: string;
     displayname?: string;
     "m.relates_to"?: IEventRelation;
+}
+
+export interface IRoomMemberEventContent extends IContent {
+    displayname: string;
+    membership: Membership;
+    is_direct?: boolean;
 }
 
 type StrippedState = Required<Pick<IEvent, "content" | "state_key" | "type" | "sender">>;
@@ -75,7 +82,7 @@ export interface IEvent {
     origin_server_ts: number;
     txn_id?: string;
     state_key?: string;
-    membership?: string;
+    membership?: Membership;
     unsigned: IUnsigned;
     redacts?: string;
 
@@ -542,9 +549,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * state events which exist in the timeline.
      * @return {Object} The previous event content JSON, or an empty object.
      */
-    public getPrevContent(): IContent {
+    public getPrevContent<T extends IContent = IContent>(): T {
         // v2 then v1 then default
-        return this.getUnsigned().prev_content || this.event.prev_content || {};
+        return (this.getUnsigned().prev_content || this.event.prev_content || {}) as T;
     }
 
     /**
@@ -556,8 +563,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @return {Object} event.content if this event is forward-looking, else
      * event.prev_content.
      */
-    public getDirectionalContent(): IContent {
-        return this.forwardLooking ? this.getContent() : this.getPrevContent();
+    public getDirectionalContent<T extends IContent = IContent>(): T {
+        return this.forwardLooking ? this.getContent<T>() : this.getPrevContent();
     }
 
     /**

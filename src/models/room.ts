@@ -30,19 +30,29 @@ import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { normalize } from "../utils";
-import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, MatrixEventHandlerMap } from "./event";
+import {
+    IEvent,
+    IThreadBundledRelationship,
+    MatrixEvent,
+    MatrixEventEvent,
+    MatrixEventHandlerMap,
+    IRoomMemberEventContent,
+} from "./event";
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
 import { logger } from '../logger';
 import { TypedReEmitter } from '../ReEmitter';
 import {
-    EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     EVENT_VISIBILITY_CHANGE_TYPE,
+    EventType,
     RelationType,
+    RoomCreateTypeField,
+    RoomType,
+    UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
 } from "../@types/event";
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
-import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
+import { GuestAccess, HistoryVisibility, JoinRule, Membership, ResizeMethod } from "../@types/partials";
 import { Filter, IFilterDefinition } from "../filter";
 import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
 import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
@@ -50,7 +60,8 @@ import {
     Thread,
     ThreadEvent,
     EventHandlerMap as ThreadHandlerMap,
-    FILTER_RELATED_BY_REL_TYPES, THREAD_RELATION_TYPE,
+    FILTER_RELATED_BY_REL_TYPES,
+    THREAD_RELATION_TYPE,
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
@@ -154,7 +165,7 @@ export type RoomEmittedEvents = RoomEvent
     | BeaconEvent.LivenessChange;
 
 export type RoomEventHandlerMap = {
-    [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
+    [RoomEvent.MyMembership]: (room: Room, membership: Membership, prevMembership?: Membership) => void;
     [RoomEvent.Tags]: (event: MatrixEvent, room: Room) => void;
     [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, lastEvent?: MatrixEvent) => void;
     [RoomEvent.Receipt]: (event: MatrixEvent, room: Room) => void;
@@ -212,7 +223,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
-    private selfMembership?: string;
+    private selfMembership?: Membership;
     private summaryHeroes: string[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
@@ -676,9 +687,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @return {string} the membership type (join | leave | invite) for the logged in user
+     * @return {Membership} the membership type (join | leave | invite) for the logged in user
      */
-    public getMyMembership(): string {
+    public getMyMembership(): Membership {
         return this.selfMembership ?? "leave";
     }
 
@@ -771,9 +782,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Sets the membership this room was received as during sync
-     * @param {string} membership join | leave | invite
+     * @param {Membership} membership join | leave | invite
      */
-    public updateMyMembership(membership: string): void {
+    public updateMyMembership(membership: Membership): void {
         const prevMembership = this.selfMembership;
         this.selfMembership = membership;
         if (prevMembership !== membership) {
@@ -1495,7 +1506,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {string} membership The membership state.
      * @return {RoomMember[]} A list of members with the given membership state.
      */
-    public getMembersWithMembership(membership: string): RoomMember[] {
+    public getMembersWithMembership(membership: Membership): RoomMember[] {
         return this.currentState.getMembers().filter(function(m) {
             return m.membership === membership;
         });
@@ -1538,10 +1549,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Check if the given user_id has the given membership state.
      * @param {string} userId The user ID to check.
-     * @param {string} membership The membership e.g. <code>'join'</code>
+     * @param {Membership} membership The membership e.g. <code>'join'</code>
      * @return {boolean} True if this user_id has the given membership state.
      */
-    public hasMembershipState(userId: string, membership: string): boolean {
+    public hasMembershipState(userId: string, membership: Membership): boolean {
         const member = this.getMember(userId);
         if (!member) {
             return false;
@@ -2681,8 +2692,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // consistent elsewhere.
         const membershipEvent = this.currentState.getStateEvents(EventType.RoomMember, this.myUserId);
         if (membershipEvent) {
-            const membership = membershipEvent.getContent().membership;
-            this.updateMyMembership(membership!);
+            const membership = membershipEvent.getContent<IRoomMemberEventContent>().membership;
+            this.updateMyMembership(membership);
 
             if (membership === "invite") {
                 const strippedStateEvents = membershipEvent.getUnsigned().invite_room_state || [];
@@ -3343,7 +3354,7 @@ function memberNamesToRoomName(names: string[], count: number): string {
  *
  * @event module:models/room~Room#"Room.myMembership"
  * @param {Room} room The room in which the membership has been updated
- * @param {string} membership The new membership value
- * @param {string} prevMembership The previous membership value
+ * @param {Membership} membership The new membership value
+ * @param {Membership} prevMembership The previous membership value
  */
 

@@ -6,7 +6,7 @@ import '../olm-loader';
 
 import { logger } from '../../src/logger';
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, IPusher, MatrixClient, MsgType } from "../../src";
+import { ClientEvent, EventType, IPusher, MatrixClient, Membership, MsgType } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 
@@ -180,7 +180,7 @@ export function mkPresence(opts: IPresenceOpts & { event?: boolean }): Partial<I
 
 interface IMembershipOpts {
     room?: string;
-    mship: string;
+    mship: Membership;
     sender?: string;
     user?: string;
     skey?: string;
@@ -226,7 +226,7 @@ export function mkMembership(opts: IMembershipOpts & { event?: boolean }): Parti
 }
 
 export function mkMembershipCustom<T>(
-    base: T & { membership: string, sender: string, content?: IContent },
+    base: T & { membership: Membership, sender: string, content?: IContent },
 ): T & { type: EventType, sender: string, state_key: string, content: IContent } & GeneratedMetadata {
     const content = base.content || {};
     return mkEventCustom({

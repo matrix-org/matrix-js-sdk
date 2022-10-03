@@ -166,7 +166,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event";
-import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
+import { IdServerUnbindResult, IImageInfo, Membership, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
@@ -633,7 +633,7 @@ export interface IOpenIDToken {
 
 interface IRoomInitialSyncResponse {
     room_id: string;
-    membership: "invite" | "join" | "leave" | "ban";
+    membership: Membership;
     messages?: {
         start?: string;
         end?: string;
@@ -786,7 +786,7 @@ interface IThirdPartyUser {
 
 interface IRoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
     room_type?: RoomType;
-    membership?: string;
+    membership?: Membership;
     is_encrypted: boolean;
 }
 
@@ -4921,7 +4921,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private membershipChange(
         roomId: string,
         userId: string | undefined,
-        membership: string,
+        membership: Membership | 'forget',
         reason?: string,
     ): Promise<{}> { // API returns an empty object
         const path = utils.encodeUri("/rooms/$room_id/$membership", {
