@@ -1202,8 +1202,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public setThreadUnreadNotificationCount(threadId: string, type: NotificationCountType, count: number): void {
         this.threadNotifications.set(threadId, {
-            highlight: this.threadNotifications.get(threadId)?.highlight ?? 0,
-            total: this.threadNotifications.get(threadId)?.total ?? 0,
+            highlight: this.threadNotifications.get(threadId)?.highlight,
+            total: this.threadNotifications.get(threadId)?.total,
             ...{
                 [type]: count,
             },
