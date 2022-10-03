@@ -36,7 +36,7 @@ import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, suppor
 import { Filter, IFilterDefinition } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from './webrtc/callEventHandler';
 import * as utils from './utils';
-import { fixNotificationCountOnDecryption, sleep } from './utils';
+import { sleep } from './utils';
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -9193,6 +9193,73 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 prefix: "/_matrix/client/unstable/org.matrix.msc3030",
             },
         );
+    }
+}
+
+/**
+ * recalculates an accurate notifications count on event decryption.
+ * Servers do not have enough knowledge about encrypted events to calculate an
+ * accurate notification_count
+ */
+export function fixNotificationCountOnDecryption(cli: MatrixClient, event: MatrixEvent): void {
+    const oldActions = event.getPushActions();
+    const actions = cli.getPushActionsForEvent(event, true);
+
+    const room = cli.getRoom(event.getRoomId());
+    if (!room) return;
+
+    const isThreadEvent = !!event.threadRootId;
+    const currentCount = isThreadEvent
+        ? room.getThreadUnreadNotificationCount(
+            event.threadRootId,
+            NotificationCountType.Highlight,
+        )
+        : room.getUnreadNotificationCount(NotificationCountType.Highlight);
+
+    // Ensure the unread counts are kept up to date if the event is encrypted
+    // We also want to make sure that the notification count goes up if we already
+    // have encrypted events to avoid other code from resetting 'highlight' to zero.
+    const oldHighlight = !!oldActions?.tweaks?.highlight;
+    const newHighlight = !!actions?.tweaks?.highlight;
+    if (oldHighlight !== newHighlight || currentCount > 0) {
+        // TODO: Handle mentions received while the client is offline
+        // See also https://github.com/vector-im/element-web/issues/9069
+        const hasReadEvent = isThreadEvent
+            ? room.getThread(event.threadRootId).hasUserReadEvent(cli.getUserId(), event.getId())
+            : room.hasUserReadEvent(cli.getUserId(), event.getId());
+
+        if (!hasReadEvent) {
+            let newCount = currentCount;
+            if (newHighlight && !oldHighlight) newCount++;
+            if (!newHighlight && oldHighlight) newCount--;
+
+            if (isThreadEvent) {
+                room.setThreadUnreadNotificationCount(
+                    event.threadRootId,
+                    NotificationCountType.Highlight,
+                    newCount,
+                );
+            } else {
+                room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
+            }
+
+            // Fix 'Mentions Only' rooms from not having the right badge count
+            const totalCount = isThreadEvent
+                ? room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total)
+                : room.getUnreadNotificationCount(NotificationCountType.Total);
+
+            if (totalCount < newCount) {
+                if (isThreadEvent) {
+                    room.setThreadUnreadNotificationCount(
+                        event.threadRootId,
+                        NotificationCountType.Total,
+                        newCount,
+                    );
+                } else {
+                    room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
+                }
+            }
+        }
     }
 }
 
