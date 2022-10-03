@@ -38,7 +38,7 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
 
 export class ECDHv1RendezvousChannel implements RendezvousChannel {
     private ourPrivateKey: Uint8Array;
-    private ourPublicKey: Uint8Array;
+    private _ourPublicKey?: Uint8Array;
     private sharedSecret?: Uint8Array;
     public onCancelled?: (reason: RendezvousCancellationReason) => void;
 
@@ -48,7 +48,14 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         private theirPublicKey?: Uint8Array,
     ) {
         this.ourPrivateKey = ed.utils.randomPrivateKey();
-        this.ourPublicKey = ed.curve25519.scalarMultBase(this.ourPrivateKey);
+    }
+
+    private async getPublicKey(): Promise<Uint8Array> {
+        if (!this._ourPublicKey) {
+            this._ourPublicKey = await ed.getPublicKey(this.ourPrivateKey);
+        }
+
+        return this._ourPublicKey;
     }
 
     public async generateCode(): Promise<ECDHv1RendezvousCode> {
@@ -59,7 +66,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         const data = {
             "algorithm": SecureRendezvousChannelAlgorithm.ECDH_V1,
             "key": {
-                "x": encodeUrlSafeBase64(this.ourPublicKey),
+                "x": encodeUrlSafeBase64(await this.getPublicKey()),
             },
         };
 
@@ -89,7 +96,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         if (this.cli && this.theirPublicKey) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: { x: encodeUrlSafeBase64(this.ourPublicKey) },
+                key: { x: encodeUrlSafeBase64(await this.getPublicKey()) },
             });
         }
 
@@ -128,7 +135,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             });
         }
 
-        this.sharedSecret = ed.curve25519.scalarMult(this.ourPrivateKey, this.theirPublicKey);
+        this.sharedSecret = await ed.getSharedSecret(this.ourPrivateKey, this.theirPublicKey);
 
         return await this.digits();
     }
