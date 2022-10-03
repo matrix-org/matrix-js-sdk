@@ -31,7 +31,6 @@ import * as callbacks from "./realtime-callbacks";
 import { IUploadOpts } from "./@types/requests";
 import { IAbortablePromise, IUsageLimit } from "./@types/partials";
 import { IDeferred, sleep } from "./utils";
-import { Callback } from "./client";
 import * as utils from "./utils";
 import { logger } from './logger';
 import { MediaPrefix } from "./http-api/prefix";
@@ -235,10 +234,6 @@ export class MatrixHttpApi {
      *   where it defaults to true for backwards compatibility). Ignored if
      *   opts.rawResponse is true.
      *
-     * @param {Function=} opts.callback Deprecated. Optional. The callback to
-     *    invoke on success/failure. See the promise return values for more
-     *    information.
-     *
      * @param {Function=} opts.progressHandler Optional. Called when a chunk of
      *    data has been uploaded, with an object containing the fields `loaded`
      *    (number of bytes transferred) and `total` (total size, if known).
@@ -249,17 +244,8 @@ export class MatrixHttpApi {
      */
     public uploadContent<O extends IUploadOpts>(
         file: FileType,
-        opts?: O,
+        opts: O = {} as O,
     ): IAbortablePromise<UploadContentResponseType<O>> {
-        if (utils.isFunction(opts)) {
-            // opts used to be callback, backwards compatibility
-            opts = {
-                callback: opts as unknown as IUploadOpts["callback"],
-            } as O;
-        } else if (!opts) {
-            opts = {} as O;
-        }
-
         // default opts.includeFilename to true (ignoring falsey values)
         const includeFilename = opts.includeFilename !== false;
 
@@ -349,7 +335,7 @@ export class MatrixHttpApi {
         if (global.XMLHttpRequest) {
             const defer = utils.defer<UploadContentResponseType<O>>();
             const xhr = new global.XMLHttpRequest();
-            const cb = requestCallback(defer, opts.callback, this.opts.onlyData);
+            const cb = requestCallback(defer, this.opts.onlyData);
 
             const timeoutFn = function() {
                 xhr.abort();
@@ -440,7 +426,7 @@ export class MatrixHttpApi {
             }
 
             promise = this.authedRequest<UploadContentResponseType<O>>(
-                opts.callback, Method.Post, "/upload", queryParams, body, {
+                Method.Post, "/upload", queryParams, body, {
                     prefix: MediaPrefix.R0,
                     headers,
                     json: false,
@@ -479,7 +465,6 @@ export class MatrixHttpApi {
     }
 
     public idServerRequest<T>(
-        callback: Callback<T>,
         method: Method,
         path: string,
         params: Record<string, string | string[]>,
@@ -491,12 +476,6 @@ export class MatrixHttpApi {
         }
 
         const fullUri = this.opts.idBaseUrl + prefix + path;
-
-        if (callback !== undefined && !utils.isFunction(callback)) {
-            throw Error(
-                "Expected callback to be a function but got " + typeof callback,
-            );
-        }
 
         const opts = {
             uri: fullUri,
@@ -518,14 +497,12 @@ export class MatrixHttpApi {
         }
 
         const defer = utils.defer<T>();
-        this.opts.request(opts, requestCallback(defer, callback, this.opts.onlyData));
+        this.opts.request(opts, requestCallback(defer, this.opts.onlyData));
         return defer.promise;
     }
 
     /**
      * Perform an authorised request to the homeserver.
-     * @param {Function} callback Optional. The callback to invoke on
-     * success/failure. See the promise return values for more information.
      * @param {string} method The HTTP method e.g. "GET".
      * @param {string} path The HTTP path <b>after</b> the supplied prefix e.g.
      * "/createRoom".
@@ -557,7 +534,6 @@ export class MatrixHttpApi {
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public authedRequest<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
-        callback: Callback<T> | undefined,
         method: Method,
         path: string,
         queryParams?: Record<string, string | string[] | undefined>,
@@ -588,7 +564,7 @@ export class MatrixHttpApi {
             queryParams.access_token = this.opts.accessToken;
         }
 
-        const requestPromise = this.request<T, O>(callback, method, path, queryParams, data, requestOpts);
+        const requestPromise = this.request<T, O>(method, path, queryParams, data, requestOpts);
 
         requestPromise.catch((err: MatrixError) => {
             if (err.errcode == 'M_UNKNOWN_TOKEN' && !requestOpts?.inhibitLogoutEmit) {
@@ -605,8 +581,6 @@ export class MatrixHttpApi {
 
     /**
      * Perform a request to the homeserver without any credentials.
-     * @param {Function} callback Optional. The callback to invoke on
-     * success/failure. See the promise return values for more information.
      * @param {string} method The HTTP method e.g. "GET".
      * @param {string} path The HTTP path <b>after</b> the supplied prefix e.g.
      * "/createRoom".
@@ -634,7 +608,6 @@ export class MatrixHttpApi {
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public request<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
-        callback: Callback<T> | undefined,
         method: Method,
         path: string,
         queryParams?: CoreOptions["qs"],
@@ -645,13 +618,11 @@ export class MatrixHttpApi {
         const baseUrl = opts?.baseUrl ?? this.opts.baseUrl;
         const fullUri = baseUrl + prefix + path;
 
-        return this.requestOtherUrl<T, O>(callback, method, fullUri, queryParams, data, opts);
+        return this.requestOtherUrl<T, O>(method, fullUri, queryParams, data, opts);
     }
 
     /**
      * Perform a request to an arbitrary URL.
-     * @param {Function} callback Optional. The callback to invoke on
-     * success/failure. See the promise return values for more information.
      * @param {string} method The HTTP method e.g. "GET".
      * @param {string} uri The HTTP URI
      *
@@ -678,7 +649,6 @@ export class MatrixHttpApi {
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public requestOtherUrl<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
-        callback: Callback<T> | undefined,
         method: Method,
         uri: string,
         queryParams?: CoreOptions["qs"],
@@ -693,7 +663,7 @@ export class MatrixHttpApi {
             } as O;
         }
 
-        return this.doRequest<T, O>(callback, method, uri, queryParams, data, requestOpts);
+        return this.doRequest<T, O>(method, uri, queryParams, data, requestOpts);
     }
 
     /**
@@ -718,7 +688,6 @@ export class MatrixHttpApi {
     /**
      * @private
      *
-     * @param {function} callback
      * @param {string} method
      * @param {string} uri
      * @param {object} queryParams
@@ -745,17 +714,12 @@ export class MatrixHttpApi {
      * Generic O should be inferred
      */
     private doRequest<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
-        callback: Callback<T> | undefined,
         method: Method,
         uri: string,
         queryParams?: Record<string, string>,
         data?: CoreOptions["body"],
         opts?: O,
     ): IAbortablePromise<ResponseType<T, O>> {
-        if (callback !== undefined && !utils.isFunction(callback)) {
-            throw Error("Expected callback to be a function but got " + typeof callback);
-        }
-
         if (this.opts.extraParams) {
             queryParams = {
                 ...(queryParams || {}),
@@ -840,7 +804,7 @@ export class MatrixHttpApi {
                         }
                     }
 
-                    const handlerFn = requestCallback(defer, callback, this.opts.onlyData, bodyParser);
+                    const handlerFn = requestCallback(defer, this.opts.onlyData, bodyParser);
                     handlerFn(err, response, body);
                 },
             );
@@ -865,9 +829,6 @@ export class MatrixHttpApi {
             }
         } catch (ex) {
             defer.reject(ex);
-            if (callback) {
-                callback(ex);
-            }
         }
         return reqPromise;
     }
@@ -902,7 +863,6 @@ function getStatusCode(response: XMLHttpRequest | IncomingMessage): number {
  */
 function requestCallback<T>(
     defer: IDeferred<T>,
-    userDefinedCallback?: Callback<T>,
     onlyData = false,
     bodyParser?: (body: string) => T,
 ): RequestCallback {
@@ -935,10 +895,8 @@ function requestCallback<T>(
 
         if (err) {
             defer.reject(err);
-            userDefinedCallback?.(err);
         } else if (onlyData) {
             defer.resolve(data as T);
-            userDefinedCallback?.(null, data as T);
         } else {
             const res: IResponse<T> = {
                 code: getStatusCode(response),
@@ -951,7 +909,6 @@ function requestCallback<T>(
             // XXX: the variations in caller-expected types here are horrible,
             // typescript doesn't do conditional types based on runtime values
             defer.resolve(res as any as T);
-            userDefinedCallback?.(null, res as any as T);
         }
     };
 }

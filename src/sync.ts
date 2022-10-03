@@ -296,9 +296,7 @@ export class SyncApi {
             getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
         ).then(function(filterId) {
             qps.filter = filterId;
-            return client.http.authedRequest<ISyncResponse>(
-                undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
-            );
+            return client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, localTimeoutMs);
         }).then(async (data) => {
             let leaveRooms = [];
             if (data.rooms?.leave) {
@@ -431,7 +429,7 @@ export class SyncApi {
         }
 
         // FIXME: gut wrenching; hard-coded timeout values
-        this.client.http.authedRequest<IEventsResponse>(undefined, Method.Get, "/events", {
+        this.client.http.authedRequest<IEventsResponse>(Method.Get, "/events", {
             room_id: peekRoom.roomId,
             timeout: String(30 * 1000),
             from: token,
@@ -899,7 +897,7 @@ export class SyncApi {
     private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IAbortablePromise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
         return this.client.http.authedRequest<ISyncResponse>(
-            undefined, Method.Get, "/sync", qps as any, undefined,
+            Method.Get, "/sync", qps as any, undefined,
             qps.timeout + BUFFER_PERIOD_MS,
         );
     }
@@ -1492,7 +1490,6 @@ export class SyncApi {
         };
 
         this.client.http.request(
-            undefined, // callback
             Method.Get, "/_matrix/client/versions",
             undefined, // queryParams
             undefined, // data

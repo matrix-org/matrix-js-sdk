@@ -299,7 +299,7 @@ describe("MegolmBackup", function() {
                     let numCalls = 0;
                     return new Promise<void>((resolve, reject) => {
                         client.http.authedRequest = function(
-                            callback, method, path, queryParams, data, opts,
+                            method, path, queryParams, data, opts,
                         ) {
                             ++numCalls;
                             expect(numCalls).toBeLessThanOrEqual(1);
@@ -382,7 +382,7 @@ describe("MegolmBackup", function() {
                     let numCalls = 0;
                     return new Promise<void>((resolve, reject) => {
                         client.http.authedRequest = function(
-                            callback, method, path, queryParams, data, opts,
+                            method, path, queryParams, data, opts,
                         ) {
                             ++numCalls;
                             expect(numCalls).toBeLessThanOrEqual(1);
@@ -439,7 +439,7 @@ describe("MegolmBackup", function() {
                 new Promise<void>((resolve, reject) => {
                     let backupInfo;
                     client.http.authedRequest = function(
-                        callback, method, path, queryParams, data, opts,
+                        method, path, queryParams, data, opts,
                     ) {
                         ++numCalls;
                         expect(numCalls).toBeLessThanOrEqual(2);
@@ -543,7 +543,7 @@ describe("MegolmBackup", function() {
 
             await new Promise<void>((resolve, reject) => {
                 client.http.authedRequest = function(
-                    callback, method, path, queryParams, data, opts,
+                    method, path, queryParams, data, opts,
                 ) {
                     ++numCalls;
                     expect(numCalls).toBeLessThanOrEqual(2);

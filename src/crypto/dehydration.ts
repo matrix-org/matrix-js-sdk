@@ -210,7 +210,6 @@ export class DehydrationManager {
             logger.log("Uploading account to server");
             // eslint-disable-next-line camelcase
             const dehydrateResult = await this.crypto.baseApis.http.authedRequest<{ device_id: string }>(
-                undefined,
                 Method.Put,
                 "/dehydrated_device",
                 undefined,
@@ -273,7 +272,6 @@ export class DehydrationManager {
 
             logger.log("Uploading keys to server");
             await this.crypto.baseApis.http.authedRequest(
-                undefined,
                 Method.Post,
                 "/keys/upload/" + encodeURI(deviceId),
                 undefined,

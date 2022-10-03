@@ -241,7 +241,7 @@ export class EncryptionSetupOperation {
                 // Sign the backup with the cross signing key so the key backup can
                 // be trusted via cross-signing.
                 await baseApis.http.authedRequest(
-                    undefined, Method.Put, "/room_keys/version/" + this.keyBackupInfo.version,
+                    Method.Put, "/room_keys/version/" + this.keyBackupInfo.version,
                     undefined, {
                         algorithm: this.keyBackupInfo.algorithm,
                         auth_data: this.keyBackupInfo.auth_data,
@@ -251,7 +251,7 @@ export class EncryptionSetupOperation {
             } else {
                 // add new key backup
                 await baseApis.http.authedRequest(
-                    undefined, Method.Post, "/room_keys/version",
+                    Method.Post, "/room_keys/version",
                     undefined, this.keyBackupInfo,
                     { prefix: ClientPrefix.Unstable },
                 );

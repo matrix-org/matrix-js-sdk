@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Callback } from "../client";
 import { IContent, IEvent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { IEventWithRoomId, SearchKey } from "./search";
@@ -125,7 +124,6 @@ export interface IUploadOpts {
     type?: string;
     rawResponse?: boolean;
     onlyContentUri?: boolean;
-    callback?: Callback;
     progressHandler?: (state: {loaded: number, total: number}) => void;
 }
 
