@@ -228,7 +228,7 @@ export class Filter {
      * @param {boolean} enabled
      */
     public setUnreadThreadNotifications(enabled: boolean): void {
-        setProp(this.definition, `room.timeline.${UNREAD_THREAD_NOTIFICATIONS.name}`, !!enabled);
+        setProp(this.definition, "room.timeline.unread_thread_notifications", !!enabled);
     }
 
     setLazyLoadMembers(enabled: boolean): void {
