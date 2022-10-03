@@ -186,7 +186,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
-    public threadNotifications: Record<string, NotificationCount> = {};
+    private threadNotifications: Map<string, NotificationCount> = new Map();
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -1191,7 +1191,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      *          for this type.
      */
     public getThreadUnreadNotificationCount(threadId: string, type = NotificationCountType.Total): number | undefined {
-        return this.threadNotifications[threadId]?.[type];
+        return this.threadNotifications.get(threadId)?.[type];
     }
 
     /**
@@ -1201,13 +1201,17 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @returns {void}
      */
     public setThreadUnreadNotificationCount(threadId: string, type: NotificationCountType, count: number): void {
-        this.threadNotifications[threadId] = {
-            highlight: this.threadNotifications[threadId]?.highlight ?? 0,
-            total: this.threadNotifications[threadId]?.total ?? 0,
+        this.threadNotifications.set(threadId, {
+            highlight: this.threadNotifications.get(threadId)?.highlight ?? 0,
+            total: this.threadNotifications.get(threadId)?.total ?? 0,
             ...{
                 [type]: count,
             },
-        };
+        });
+    }
+
+    public resetThreadUnreadNotificationCount(): void {
+        this.threadNotifications.clear();
     }
 
     /**

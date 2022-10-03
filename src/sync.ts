@@ -1268,7 +1268,7 @@ export class SyncApi {
                 }
             }
 
-            room.threadNotifications = {};
+            room.resetThreadUnreadNotificationCount();
             const unreadThreadNotifications = joinObj[UNREAD_THREAD_NOTIFICATIONS.name];
             if (unreadThreadNotifications) {
                 Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
