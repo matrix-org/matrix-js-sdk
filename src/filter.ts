@@ -22,7 +22,6 @@ import {
     EventType,
     RelationType,
 } from "./@types/event";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
