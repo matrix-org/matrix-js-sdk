@@ -131,7 +131,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         if (!this.cli) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: { x: encodeUrlSafeBase64(this.ourPublicKey) },
+                key: { x: encodeUrlSafeBase64(await this.getPublicKey()) },
             });
         }
 
