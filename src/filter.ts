@@ -22,6 +22,7 @@ import {
     EventType,
     RelationType,
 } from "./@types/event";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
@@ -57,6 +58,8 @@ export interface IRoomEventFilter extends IFilterComponent {
     types?: Array<EventType | string>;
     related_by_senders?: Array<RelationType | string>;
     related_by_rel_types?: string[];
+    unread_thread_notifications?: boolean;
+    "org.matrix.msc3773.unread_thread_notifications"?: boolean;
 
     // Unstable values
     "io.element.relation_senders"?: Array<RelationType | string>;
@@ -220,7 +223,15 @@ export class Filter {
         setProp(this.definition, "room.timeline.limit", limit);
     }
 
-    setLazyLoadMembers(enabled: boolean) {
+    /**
+     * Enable threads unread notification
+     * @param {boolean} enabled
+     */
+    public setUnreadThreadNotifications(enabled: boolean): void {
+        setProp(this.definition, `room.state.${UNREAD_THREAD_NOTIFICATIONS.name}`, !!enabled);
+    }
+
+    setLazyLoadMembers(enabled: boolean): void {
         setProp(this.definition, "room.state.lazy_load_members", !!enabled);
     }
 
