@@ -167,6 +167,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             logger.log(
                 `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
             );
+            if (oldVersion < 1) {
+                // The database did not previously exist
+                this._isNewlyCreated = true;
+            }
             DB_MIGRATIONS.forEach((migration, index) => {
                 if (oldVersion <= index) migration(db);
             });
