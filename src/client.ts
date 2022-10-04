@@ -865,7 +865,7 @@ type UserEvents = UserEvent.AvatarUrl
     | UserEvent.CurrentlyActive
     | UserEvent.LastPresenceTs;
 
-type EmittedEvents = ClientEvent
+export type EmittedEvents = ClientEvent
     | RoomEvents
     | RoomStateEvents
     | CryptoEvents
@@ -1080,7 +1080,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // actions for themselves, so we have to kinda help them out when they are encrypted.
         // We do this so that push rules are correctly executed on events in their decrypted
         // state, such as highlights when the user's name is mentioned.
-        this.on(MatrixEventEvent.Decrypted, (event) => fixNotificationCountOnDecryption(this, event));
+        this.on(MatrixEventEvent.Decrypted, (event) => {
+            fixNotificationCountOnDecryption(this, event);
+        });
 
         // Like above, we have to listen for read receipts from ourselves in order to
         // correctly handle notification counts on encrypted rooms.
@@ -9206,15 +9208,15 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     const actions = cli.getPushActionsForEvent(event, true);
 
     const room = cli.getRoom(event.getRoomId());
-    if (!room) return;
+    if (!room || !cli.getUserId()) return;
 
-    const isThreadEvent = !!event.threadRootId;
-    const currentCount = isThreadEvent
+    const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
+    const currentCount = (isThreadEvent
         ? room.getThreadUnreadNotificationCount(
             event.threadRootId,
             NotificationCountType.Highlight,
         )
-        : room.getUnreadNotificationCount(NotificationCountType.Highlight);
+        : room.getUnreadNotificationCount(NotificationCountType.Highlight)) ?? 0;
 
     // Ensure the unread counts are kept up to date if the event is encrypted
     // We also want to make sure that the notification count goes up if we already
@@ -9244,9 +9246,9 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
             }
 
             // Fix 'Mentions Only' rooms from not having the right badge count
-            const totalCount = isThreadEvent
+            const totalCount = (isThreadEvent
                 ? room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total)
-                : room.getUnreadNotificationCount(NotificationCountType.Total);
+                : room.getUnreadNotificationCount(NotificationCountType.Total)) ?? 0;
 
             if (totalCount < newCount) {
                 if (isThreadEvent) {
