@@ -83,6 +83,10 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
     return new Error(`Server returned ${response.status} error`);
 }
 
+function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest {
+    return "getResponseHeader" in response;
+}
+
 /**
  * extract the Content-Type header from the response object, and
  * parse it to a `{type, parameters}` object.
@@ -93,10 +97,10 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
  * @returns {{type: String, parameters: Object}?} parsed content-type header, or null if not found
  */
 function getResponseContentType(response: XMLHttpRequest | Response): ParsedMediaType | null {
-    let contentType: string | null = null;
-    if ((response as XMLHttpRequest).getResponseHeader) {
+    let contentType: string | null;
+    if (isXhr(response)) {
         contentType = (response as XMLHttpRequest).getResponseHeader("Content-Type");
-    } else if ((response as Response).headers) {
+    } else {
         contentType = (response as Response).headers.get("Content-Type");
     }
 
@@ -123,11 +127,10 @@ export async function retryNetworkOperation<T>(maxAttempts: number, callback: ()
         try {
             if (attempts > 0) {
                 const timeout = 1000 * Math.pow(2, attempts);
-                logger.log(`network operation failed ${attempts} times,` +
-                    ` retrying in ${timeout}ms...`);
+                logger.log(`network operation failed ${attempts} times, retrying in ${timeout}ms...`);
                 await sleep(timeout);
             }
-            return callback();
+            return await callback();
         } catch (err) {
             if (err instanceof ConnectionError) {
                 attempts += 1;

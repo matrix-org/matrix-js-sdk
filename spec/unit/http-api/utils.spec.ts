@@ -14,7 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { anySignal, MatrixError, parseErrorResponse, timeoutSignal } from "../../src";
+import { mocked } from "jest-mock";
+
+import {
+    anySignal,
+    ConnectionError,
+    MatrixError,
+    parseErrorResponse,
+    retryNetworkOperation,
+    timeoutSignal,
+} from "../../../src";
+import { sleep } from "../../../src/utils";
+
+jest.mock("../../../src/utils");
 
 describe("timeoutSignal", () => {
     jest.useFakeTimers();
@@ -67,6 +79,13 @@ describe("anySignal", () => {
         expect(signal.aborted).toBeFalsy();
         expect(onabort).not.toHaveBeenCalled();
     });
+
+    it("should abort immediately if passed an aborted signal", () => {
+        const controller = new AbortController();
+        controller.abort();
+        const { signal } = anySignal([controller.signal]);
+        expect(signal.aborted).toBeTruthy();
+    });
 });
 
 describe("parseErrorResponse", () => {
@@ -94,11 +113,22 @@ describe("parseErrorResponse", () => {
         }, 500));
     });
 
-    it("should handle unknown type gracefully", () => {
+    it("should handle no type gracefully", () => {
         expect(parseErrorResponse({
             headers: {
                 get(name: string): string | null {
-                    return name === "Content-Type" ? "application/x-foo" : null;
+                    return null;
+                },
+            },
+            status: 500,
+        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new Error("Server returned 500 error"));
+    });
+
+    it("should handle invalid type gracefully", () => {
+        expect(parseErrorResponse({
+            headers: {
+                get(name: string): string | null {
+                    return name === "Content-Type" ? "application/x-foo;fff=dad12%%" : null;
                 },
             },
             status: 500,
@@ -118,5 +148,35 @@ describe("parseErrorResponse", () => {
 });
 
 describe("retryNetworkOperation", () => {
+    it("should retry given number of times with exponential sleeps", async () => {
+        const err = new ConnectionError("test");
+        const fn = jest.fn().mockRejectedValue(err);
+        mocked(sleep).mockResolvedValue(undefined);
+        await expect(retryNetworkOperation(4, fn)).rejects.toThrow(err);
+        expect(fn).toHaveBeenCalledTimes(4);
+        expect(mocked(sleep)).toHaveBeenCalledTimes(3);
+        expect(mocked(sleep).mock.calls[0][0]).toBe(2000);
+        expect(mocked(sleep).mock.calls[1][0]).toBe(4000);
+        expect(mocked(sleep).mock.calls[2][0]).toBe(8000);
+    });
 
+    it("should bail out on errors other than ConnectionError", async () => {
+        const err = new TypeError("invalid JSON");
+        const fn = jest.fn().mockRejectedValue(err);
+        mocked(sleep).mockResolvedValue(undefined);
+        await expect(retryNetworkOperation(3, fn)).rejects.toThrow(err);
+        expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it("should return newest ConnectionError when giving up", async () => {
+        const err1 = new ConnectionError("test1");
+        const err2 = new ConnectionError("test2");
+        const err3 = new ConnectionError("test3");
+        const errors = [err1, err2, err3];
+        const fn = jest.fn().mockImplementation(() => {
+            throw errors.shift();
+        });
+        mocked(sleep).mockResolvedValue(undefined);
+        await expect(retryNetworkOperation(3, fn)).rejects.toThrow(err3);
+    });
 });
