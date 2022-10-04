@@ -204,7 +204,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             base: this.opts.baseUrl,
             path: MediaPrefix.R0 + "/upload",
             params: {
-                access_token: this.opts.accessToken!,
+                access_token: this.opts.accessToken,
             },
         };
     }
