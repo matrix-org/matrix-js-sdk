@@ -549,7 +549,7 @@ export class SecretStorage {
 
         const senderKeyUser = this.baseApis.crypto.deviceList.getUserByIdentityKey(
             olmlib.OLM_ALGORITHM,
-            content.sender_key,
+            event.getSenderKey() || "",
         );
         if (senderKeyUser !== event.getSender()) {
             logger.error("sending device does not belong to the user it claims to be from");
