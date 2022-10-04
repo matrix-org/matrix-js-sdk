@@ -28,6 +28,7 @@ describe("MatrixHttpApi", () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        // @ts-ignore
         global.XMLHttpRequest = jest.fn().mockReturnValue({
             upload: {},
             open,
