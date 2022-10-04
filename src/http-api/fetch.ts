@@ -22,7 +22,7 @@ limitations under the License.
 import * as utils from "../utils";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { Method } from "./method";
-import { MatrixError } from "./errors";
+import { ConnectionError, MatrixError } from "./errors";
 import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts } from "./interface";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
 import { QueryDict } from "../utils";
@@ -284,6 +284,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 cache: "no-cache",
                 credentials: "omit", // we send credentials via headers
             });
+        } catch (e) {
+            throw new ConnectionError("fetch failed", e);
         } finally {
             cleanup();
         }

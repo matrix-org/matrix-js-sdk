@@ -20,7 +20,7 @@ import { MediaPrefix } from "./prefix";
 import * as utils from "../utils";
 import * as callbacks from "../realtime-callbacks";
 import { Method } from "./method";
-import { MatrixError } from "./errors";
+import { ConnectionError, MatrixError } from "./errors";
 import { parseErrorResponse } from "./utils";
 
 export * from "./interface";
@@ -113,7 +113,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                             }
                         } catch (err) {
                             (<MatrixError>err).httpStatus = xhr.status;
-                            defer.reject(err);
+                            defer.reject(new ConnectionError("request failed", err));
                         }
                         break;
                 }

@@ -37,6 +37,13 @@ describe("utils", function() {
             };
             expect(utils.encodeParams(params).toString()).toEqual("string=foobar&number=12345&boolean=false");
         });
+
+        it("should handle string arrays", () => {
+            const params = {
+                via: ["one", "two", "three"],
+            };
+            expect(utils.encodeParams(params).toString()).toEqual("via=one&via=two&via=three");
+        });
     });
 
     describe("encodeUri", function() {

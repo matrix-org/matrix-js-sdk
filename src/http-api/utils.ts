@@ -23,15 +23,10 @@ import { ConnectionError, MatrixError } from "./errors";
 // Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 export function timeoutSignal(ms: number): AbortSignal {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
+    setTimeout(() => {
         controller.abort();
     }, ms);
 
-    function onAbort() {
-        clearTimeout(timeoutId);
-    }
-
-    controller.signal.addEventListener("abort", onAbort);
     return controller.signal;
 }
 
