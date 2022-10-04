@@ -68,7 +68,7 @@ export class ToDeviceMessageQueue {
         logger.debug("Attempting to send queued to-device messages");
 
         this.sending = true;
-        let headBatch;
+        let headBatch: IndexedToDeviceBatch;
         try {
             while (this.running) {
                 headBatch = await this.client.store.getOldestToDeviceBatch();
@@ -92,7 +92,7 @@ export class ToDeviceMessageQueue {
                 // bored and giving up for now
                 if (Math.floor(e.httpStatus / 100) === 4) {
                     logger.error("Fatal error when sending to-device message - dropping to-device batch!", e);
-                    await this.client.store.removeToDeviceBatch(headBatch.id);
+                    await this.client.store.removeToDeviceBatch(headBatch!.id);
                 } else {
                     logger.info("Automatic retry limit reached for to-device messages.");
                 }

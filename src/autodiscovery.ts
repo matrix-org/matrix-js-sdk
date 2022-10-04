@@ -440,12 +440,13 @@ export class AutoDiscovery {
                     reason: "General failure",
                 };
             }
-        } catch (error) {
+        } catch (err) {
+            const error = err as Error | string | undefined;
             return {
                 error,
                 raw: {},
                 action: AutoDiscoveryAction.FAIL_PROMPT,
-                reason: error?.message || "General failure",
+                reason: (<Error>error)?.message || "General failure",
             };
         }
 
@@ -455,11 +456,12 @@ export class AutoDiscovery {
                 action: AutoDiscoveryAction.SUCCESS,
             };
         } catch (err) {
+            const error = err as Error | string | undefined;
             return {
-                error: err,
+                error,
                 raw: {},
                 action: AutoDiscoveryAction.FAIL_PROMPT,
-                reason: (err as MatrixError)?.name === "SyntaxError"
+                reason: (error as MatrixError)?.name === "SyntaxError"
                     ? AutoDiscovery.ERROR_INVALID_JSON
                     : AutoDiscovery.ERROR_INVALID,
             };

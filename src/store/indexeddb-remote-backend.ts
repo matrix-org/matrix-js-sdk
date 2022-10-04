@@ -138,7 +138,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         return this.doCmd('saveToDeviceBatches', [batches]);
     }
 
-    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
         return this.doCmd('getOldestToDeviceBatch');
     }
 

@@ -25,6 +25,7 @@ const ACCESS_TOKEN = "access_token";
 const ROOM_ID = "!room_id:server.test";
 
 declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace NodeJS {
         interface Global {
             matrixcs: {
@@ -97,7 +98,7 @@ describe("Browserify Test", function() {
 
         client.startClient();
 
-        await httpBackend.flushAllExpected({ timeout: 1 });
+        await httpBackend.flushAllExpected();
         await syncPromise;
         expect(unexpectedErrorFn).not.toHaveBeenCalled();
     }, 20000); // additional timeout as this test can take quite a while

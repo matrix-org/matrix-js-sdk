@@ -197,7 +197,7 @@ describe("MegolmBackup", function() {
             // to tick the clock between the first try and the retry.
             const realSetTimeout = global.setTimeout;
             jest.spyOn(global, 'setTimeout').mockImplementation(function(f, n) {
-                return realSetTimeout(f, n/100);
+                return realSetTimeout(f!, n/100);
             });
         });
 

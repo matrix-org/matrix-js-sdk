@@ -912,9 +912,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public olmVersion: [number, number, number] = null; // populated after initCrypto
     public usingExternalCrypto = false;
     public store: Store;
-    public deviceId?: string;
+    public deviceId: string | null;
     public credentials: { userId?: string };
-    public pickleKey: string;
+    public pickleKey?: string;
     public scheduler: MatrixScheduler;
     public clientRunning = false;
     public timelineSupport = false;
@@ -987,7 +987,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.idBaseUrl = opts.idBaseUrl;
         this.identityServer = opts.identityServer;
 
-        this.usingExternalCrypto = opts.usingExternalCrypto;
+        this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
         this.store = opts.store || new StubStore();
         this.deviceId = opts.deviceId || null;
 
