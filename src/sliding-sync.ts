@@ -783,7 +783,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     reqBody.txn_id = this.txnId;
                     this.txnId = null;
                 }
-                this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl);
+                this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl, this.abortController.signal);
                 resp = await this.pendingReq;
                 logger.debug(resp);
                 currentPos = resp.pos;
