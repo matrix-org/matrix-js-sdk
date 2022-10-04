@@ -128,7 +128,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         };
 
         if (this.cli) {
-            rendezvous.user = this.cli.getUserId();
+            rendezvous.user = this.cli.getUserId() ?? undefined;
         }
 
         return rendezvous;
@@ -136,10 +136,12 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
 
     async connect(): Promise<string> {
         const isInitiator = !this.theirPublicKey;
+        const ourPublicKey = await this.getPublicKey();
+
         if (this.cli && this.theirPublicKey) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: encodeBase64(await this.getPublicKey()),
+                key: encodeBase64(ourPublicKey),
             });
         }
 
@@ -147,7 +149,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             logger.info('Waiting for other device to send their public key');
             const res = await this.receive(); // ack
             if (!res) {
-                return undefined;
+                throw new Error('No response from other device');
             }
             const { key, algorithm } = res;
 
@@ -174,14 +176,14 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         if (!this.cli) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: encodeBase64(await this.getPublicKey()),
+                key: encodeBase64(ourPublicKey),
             });
         }
 
         this.sharedSecret = await ed.getSharedSecret(this.ourPrivateKey, this.theirPublicKey);
 
-        const initiatorKey = isInitiator ? this._ourPublicKey : this.theirPublicKey;
-        const recipientKey = isInitiator ? this.theirPublicKey : this._ourPublicKey;
+        const initiatorKey = isInitiator ? ourPublicKey : this.theirPublicKey;
+        const recipientKey = isInitiator ? this.theirPublicKey : ourPublicKey;
 
         let aesInfo = SecureRendezvousChannelAlgorithm.ECDH_V1.toString();
         aesInfo += `|${encodeBase64(initiatorKey)}`;
@@ -195,7 +197,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
     public async send(data: any) {
         const stringifiedData = JSON.stringify(data);
 
-        if (this.sharedSecret) {
+        if (this.sharedSecret && this.aesInfo) {
             logger.info(`Encrypting: ${stringifiedData}`);
             const body = JSON.stringify(await encryptAESGCM(
                 stringifiedData, this.sharedSecret, this.aesInfo,
@@ -214,7 +216,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         }
 
         if (data.ciphertext) {
-            if (!this.sharedSecret) {
+            if (!this.sharedSecret || !this.aesInfo) {
                 throw new Error('Shared secret not set up');
             }
             const decrypted = await decryptAESGCM(data, this.sharedSecret, this.aesInfo);

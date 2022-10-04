@@ -46,6 +46,10 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
     }
 
     async details(): Promise<SimpleHttpRendezvousTransportDetails> {
+        if (!this.uri) {
+            throw new Error('Rendezvous not set up');
+        }
+
         return {
             type: 'http.v1',
             uri: this.uri,
@@ -89,15 +93,18 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
 
         logger.info(`Sending data: ${JSON.stringify(data)} as ${data} to ${uri}`);
 
-        const headers = this.etag ? { 'if-match': this.etag } : {};
+        const headers: Record<string, string> = { 'content-type': contentType };
+        if (this.etag) {
+            headers['if-match'] = this.etag;
+        }
         const res = await fetch(uri, { method,
-            headers: { 'content-type': contentType, ...headers },
+            headers,
             body: data,
         });
         if (res.status === 404) {
             return this.cancel(RendezvousCancellationReason.Unknown);
         }
-        this.etag = res.headers.get("etag");
+        this.etag = res.headers.get("etag") ?? undefined;
 
         logger.info(`Posted data to ${uri} new etag ${this.etag}`);
 
@@ -106,8 +113,9 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
             if (!location) {
                 throw new Error('No rendezvous URI given');
             }
-            if (res.headers.has('expires')) {
-                this.expiresAt = new Date(res.headers.get('expires'));
+            const expires = res.headers.get('expires');
+            if (expires) {
+                this.expiresAt = new Date(expires);
             }
             // resolve location header which could be relative or absolute
             this.uri = new URL(location, `${res.url}${res.url.endsWith('/') ? '' : '/'}`).href;
@@ -125,7 +133,10 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
                 return;
             }
             logger.debug(`Polling: ${this.uri} after etag ${this.etag}`);
-            const headers = this.etag ? { 'if-none-match': this.etag } : {};
+            const headers: Record<string, string> = {};
+            if (this.etag) {
+                headers['if-none-match'] = this.etag;
+            }
             const poll = await fetch(this.uri, { method: "GET", headers });
 
             logger.debug(`Received polling response: ${poll.status} from ${this.uri}`);
@@ -136,9 +147,9 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
             // rely on server expiring the channel rather than checking ourselves
 
             if (poll.headers.get('content-type') !== 'application/json') {
-                this.etag = poll.headers.get("etag");
+                this.etag = poll.headers.get("etag") ?? undefined;
             } else if (poll.status === 200) {
-                this.etag = poll.headers.get("etag");
+                this.etag = poll.headers.get("etag") ?? undefined;
                 const data = await poll.json();
                 logger.info(`Received data: ${JSON.stringify(data)} from ${this.uri} with etag ${this.etag}`);
                 return data;
