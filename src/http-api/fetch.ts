@@ -75,7 +75,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         path: string,
         params: Record<string, string | string[]>,
         prefix: string,
-        accessToken: string,
+        accessToken?: string,
     ): Promise<ResponseType<T, O>> {
         if (!this.opts.idBaseUrl) {
             throw new Error("No identity server base URL set");
@@ -85,7 +85,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         let body: Record<string, string | string[]> | undefined = undefined;
         if (method === Method.Get) {
             queryParams = params;
-        } else if (typeof params === "object") {
+        } else {
             body = params;
         }
 
@@ -96,7 +96,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             headers: {},
         };
         if (accessToken) {
-            opts.headers!.Authorization = `Bearer ${accessToken}`;
+            opts.headers.Authorization = `Bearer ${accessToken}`;
         }
 
         return this.requestOtherUrl(method, fullUri, body, opts);
