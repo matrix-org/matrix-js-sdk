@@ -1,0 +1,145 @@
+/*
+Copyright 2022 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import { parse as parseContentType, ParsedMediaType } from "content-type";
+
+import { logger } from "../logger";
+import { sleep } from "../utils";
+import { ConnectionError, MatrixError } from "./errors";
+
+// Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
+export function timeoutSignal(ms: number): AbortSignal {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        controller.abort();
+    }, ms);
+
+    function onAbort() {
+        clearTimeout(timeoutId);
+    }
+
+    controller.signal.addEventListener('abort', onAbort);
+    return controller.signal;
+}
+
+export function anySignal(signals: AbortSignal[]): AbortSignal {
+    const controller = new AbortController();
+
+    function onAbort() {
+        controller.abort();
+
+        // Cleanup
+        for (const signal of signals) {
+            signal.removeEventListener('abort', onAbort);
+        }
+    }
+
+    for (const signal of signals) {
+        if (signal.aborted) {
+            onAbort();
+            break;
+        }
+        signal.addEventListener('abort', onAbort);
+    }
+
+    return controller.signal;
+}
+
+/**
+ * Attempt to turn an HTTP error response into a Javascript Error.
+ *
+ * If it is a JSON response, we will parse it into a MatrixError. Otherwise
+ * we return a generic Error.
+ *
+ * @param {XMLHttpRequest|Response} response response object
+ * @param {String} body raw body of the response
+ * @returns {Error}
+ */
+export function parseErrorResponse(response: XMLHttpRequest | Response, body?: string): Error {
+    const contentType = getResponseContentType(response);
+
+    let err: Error;
+    if (contentType) {
+        if (contentType.type === "application/json") {
+            const jsonBody = typeof(body) === "object" ? body : JSON.parse(body);
+            err = new MatrixError(jsonBody, response.status);
+        } else if (contentType.type === "text/plain") {
+            err = new Error(`Server returned ${response.status} error: ${body}`);
+        }
+    }
+
+    if (!err) {
+        err = new Error(`Server returned ${response.status} error`);
+    }
+    return err;
+}
+
+/**
+ * extract the Content-Type header from the response object, and
+ * parse it to a `{type, parameters}` object.
+ *
+ * returns null if no content-type header could be found.
+ *
+ * @param {XMLHttpRequest|Response} response response object
+ * @returns {{type: String, parameters: Object}?} parsed content-type header, or null if not found
+ */
+function getResponseContentType(response: XMLHttpRequest | Response): ParsedMediaType | null {
+    let contentType: string;
+    if ((response as XMLHttpRequest).getResponseHeader) {
+        contentType = (response as XMLHttpRequest).getResponseHeader("Content-Type");
+    } else if ((response as Response).headers) {
+        contentType = (response as Response).headers.get("Content-Type");
+    }
+
+    if (!contentType) return null;
+
+    try {
+        return parseContentType(contentType);
+    } catch (e) {
+        throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
+    }
+}
+
+/**
+ * Retries a network operation run in a callback.
+ * @param  {number}   maxAttempts maximum attempts to try
+ * @param  {Function} callback    callback that returns a promise of the network operation. If rejected with ConnectionError, it will be retried by calling the callback again.
+ * @return {any} the result of the network operation
+ * @throws {ConnectionError} If after maxAttempts the callback still throws ConnectionError
+ */
+export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => Promise<T>): Promise<T> {
+    let attempts = 0;
+    let lastConnectionError = null;
+    while (attempts < maxAttempts) {
+        try {
+            if (attempts > 0) {
+                const timeout = 1000 * Math.pow(2, attempts);
+                logger.log(`network operation failed ${attempts} times,` +
+                    ` retrying in ${timeout}ms...`);
+                await sleep(timeout);
+            }
+            return callback();
+        } catch (err) {
+            if (err instanceof ConnectionError) {
+                attempts += 1;
+                lastConnectionError = err;
+            } else {
+                throw err;
+            }
+        }
+    }
+    throw lastConnectionError;
+}

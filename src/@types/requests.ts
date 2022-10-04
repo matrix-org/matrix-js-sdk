@@ -118,15 +118,6 @@ export interface IRoomDirectoryOptions {
     third_party_instance_id?: string;
 }
 
-export interface IUploadOpts {
-    name?: string;
-    includeFilename?: boolean;
-    type?: string;
-    rawResponse?: boolean;
-    onlyContentUri?: boolean;
-    progressHandler?: (state: {loaded: number, total: number}) => void;
-}
-
 export interface IAddThreePidOnlyBody {
     auth?: {
         type: string;

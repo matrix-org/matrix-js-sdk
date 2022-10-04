@@ -132,7 +132,6 @@ describe("MatrixClient", function() {
                 method: method,
                 path: path,
             };
-            pendingLookup.promise.abort = () => {}; // to make it a valid IAbortablePromise
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
@@ -178,7 +177,7 @@ describe("MatrixClient", function() {
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
             accessToken: "my.access.token",
-            request: function() {} as any, // NOP
+            fetchFn: function() {} as any, // NOP
             store: store,
             scheduler: scheduler,
             userId: userId,

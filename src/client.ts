@@ -49,19 +49,17 @@ import { IRoomEncryption, RoomList } from './crypto/RoomList';
 import { logger } from './logger';
 import { SERVICE_TYPES } from './service-types';
 import {
-    FileType,
     HttpApiEvent,
     HttpApiEventHandlerMap,
-    IHttpOpts,
-    IUpload,
+    Upload,
+    UploadOpts,
     MatrixError,
     MatrixHttpApi,
     Method,
     retryNetworkOperation,
-    UploadContentResponseType,
     ClientPrefix,
     MediaPrefix,
-    IdentityPrefix,
+    IdentityPrefix, IHttpOpts, FileType,
 } from "./http-api";
 import {
     Crypto,
@@ -151,7 +149,6 @@ import {
     IRoomDirectoryOptions,
     ISearchOpts,
     ISendEventResponse,
-    IUploadOpts,
 } from "./@types/requests";
 import {
     EventType,
@@ -165,7 +162,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
 } from "./@types/event";
-import { IAbortablePromise, IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
+import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
 import { randomString } from "./randomstring";
 import { BackupManager, IKeyBackup, IKeyBackupCheck, IPreparedKeyBackupVersion, TrustInfo } from "./crypto/backup";
@@ -251,12 +248,10 @@ export interface ICreateClientOpts {
     scheduler?: MatrixScheduler;
 
     /**
-     * The function to invoke for HTTP
-     * requests. The value of this property is typically <code>require("request")
-     * </code> as it returns a function which meets the required interface. See
-     * {@link requestFunction} for more information.
+     * The function to invoke for HTTP requests.
+     * Most supported environments have a global `fetch` registered to which this will fall back.
      */
-    request?: IHttpOpts["request"];
+    fetchFn?: typeof global.fetch;
 
     userId?: string;
 
@@ -918,7 +913,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public timelineSupport = false;
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public identityServer: IIdentityServerProvider;
-    public http: MatrixHttpApi; // XXX: Intended private, used in code.
+    public http: MatrixHttpApi<IHttpOpts & { onlyData: true }>; // XXX: Intended private, used in code.
     public crypto?: Crypto; // XXX: Intended private, used in code.
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler: CallEventHandler; // XXX: Intended private, used in code.
@@ -993,10 +988,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.credentials = { userId };
 
         this.http = new MatrixHttpApi(this as ConstructorParameters<typeof MatrixHttpApi>[0], {
+            fetchFn: opts.fetchFn,
             baseUrl: opts.baseUrl,
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
-            request: opts.request,
             prefix: ClientPrefix.R0,
             onlyData: true,
             extraParams: opts.queryParams,
@@ -3531,7 +3526,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (opts.inviteSignUrl) {
             signPromise = this.http.requestOtherUrl(
                 Method.Post,
-                opts.inviteSignUrl, { mxid: this.credentials.userId },
+                new URL(opts.inviteSignUrl), { mxid: this.credentials.userId },
             );
         }
 
@@ -3539,8 +3534,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (opts.viaServers) {
             queryString["server_name"] = opts.viaServers;
         }
-
-        const reqOpts = { qsStringifyOptions: { arrayFormat: 'repeat' } };
 
         try {
             const data: IJoinRequestBody = {};
@@ -3550,7 +3543,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             const path = utils.encodeUri("/join/$roomid", { $roomid: roomIdOrAlias });
-            const res = await this.http.authedRequest(Method.Post, path, queryString, data, reqOpts);
+            const res = await this.http.authedRequest(Method.Post, path, queryString, data);
 
             const roomId = res['room_id'];
             const syncApi = new SyncApi(this, this.clientOpts);
@@ -6706,12 +6699,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private termsUrlForService(serviceType: SERVICE_TYPES, baseUrl: string) {
+    private termsUrlForService(serviceType: SERVICE_TYPES, baseUrl: string): URL {
         switch (serviceType) {
             case SERVICE_TYPES.IS:
-                return baseUrl + IdentityPrefix.V2 + '/terms';
+                return this.http.getUrl("/terms", undefined, IdentityPrefix.V2, baseUrl);
             case SERVICE_TYPES.IM:
-                return baseUrl + '/_matrix/integrations/v1/terms';
+                return this.http.getUrl("/terms", undefined, "/_matrix/integrations/v1", baseUrl);
             default:
                 throw new Error('Unsupported service type');
         }
@@ -7025,7 +7018,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             [SSO_ACTION_PARAM.unstable!]: action,
         };
 
-        return this.http.getUrl(url, params, ClientPrefix.R0);
+        return this.http.getUrl(url, params, ClientPrefix.R0).href;
     }
 
     /**
@@ -7126,7 +7119,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.http.getUrl(path, {
             session: authSessionId,
-        }, ClientPrefix.R0);
+        }, ClientPrefix.R0).href;
     }
 
     /**
@@ -7613,20 +7606,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
-    public uploadContent<O extends IUploadOpts>(
-        file: FileType,
-        opts?: O,
-    ): IAbortablePromise<UploadContentResponseType<O>> {
-        return this.http.uploadContent<O>(file, opts);
+    public uploadContent(file: FileType, opts?: UploadOpts): Upload {
+        return this.http.uploadContent(file, opts);
     }
 
     /**
      * Cancel a file upload in progress
-     * @param {Promise} promise The promise returned from uploadContent
+     * @param {Promise} upload The object returned from uploadContent
      * @return {boolean} true if canceled, otherwise false
      */
-    public cancelUpload(promise: IAbortablePromise<any>): boolean {
-        return this.http.cancelUpload(promise);
+    public cancelUpload(upload: Upload): boolean {
+        return this.http.cancelUpload(upload);
     }
 
     /**
@@ -7637,7 +7627,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *  - loaded: Number of bytes uploaded
      *  - total: Total number of bytes to upload
      */
-    public getCurrentUploads(): IUpload[] {
+    public getCurrentUploads(): Upload[] {
         return this.http.getCurrentUploads();
     }
 
@@ -8179,7 +8169,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("No identity server base URL set");
         }
 
-        const uri = this.idBaseUrl + IdentityPrefix.V2 + "/account/register";
+        const uri = this.http.getUrl("/account/register", undefined, IdentityPrefix.V2, this.idBaseUrl);
         return this.http.requestOtherUrl(Method.Post, uri, null, hsOpenIdToken);
     }
 
@@ -8335,13 +8325,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         clientSecret: string,
         msisdnToken: string,
     ): Promise<any> { // TODO: Types
-        const params = {
-            sid: sid,
-            client_secret: clientSecret,
-            token: msisdnToken,
-        };
-
-        return this.http.requestOtherUrl(Method.Post, url, undefined, params);
+        const u = new URL(url);
+        u.searchParams.set("sid", sid);
+        u.searchParams.set("client_secret", clientSecret);
+        u.searchParams.set("token", msisdnToken);
+        return this.http.requestOtherUrl(Method.Post, u);
     }
 
     /**
@@ -8651,10 +8639,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         termsUrls: string[],
     ): Promise<any> { // TODO: Types
         const url = this.termsUrlForService(serviceType, baseUrl);
+        utils.encodeParams({
+            user_accepts: termsUrls,
+        }, url.searchParams);
         const headers = {
             Authorization: "Bearer " + accessToken,
         };
-        return this.http.requestOtherUrl(Method.Post, url, null, { user_accepts: termsUrls }, { headers });
+        return this.http.requestOtherUrl(Method.Post, url, null, { headers });
     }
 
     /**
@@ -8792,7 +8783,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public slidingSync(
         req: MSC3575SlidingSyncRequest, proxyBaseUrl?: string,
-    ): IAbortablePromise<MSC3575SlidingSyncResponse> {
+    ): Promise<MSC3575SlidingSyncResponse> {
         const qps: Record<string, any> = {};
         if (req.pos) {
             qps.pos = req.pos;

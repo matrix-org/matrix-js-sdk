@@ -59,17 +59,23 @@ export function internaliseString(str: string): string {
  * {"foo": "bar", "baz": "taz"}
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
-export function encodeParams(params: Record<string, string | number | boolean>): string {
-    const searchParams = new URLSearchParams();
+export function encodeParams(params: QueryDict, urlSearchParams?: URLSearchParams): URLSearchParams {
+    const searchParams = urlSearchParams ?? new URLSearchParams();
     for (const [key, val] of Object.entries(params)) {
         if (val !== undefined && val !== null) {
-            searchParams.set(key, String(val));
+            if (Array.isArray(val)) {
+                val.forEach(v => {
+                    searchParams.append(key, String(v));
+                });
+            } else {
+                searchParams.append(key, String(val));
+            }
         }
     }
-    return searchParams.toString();
+    return searchParams;
 }
 
-export type QueryDict = Record<string, string | string[]>;
+export type QueryDict = Record<string, string[] | string | number | boolean | undefined>;
 
 /**
  * Decode a query string in `application/x-www-form-urlencoded` format.
@@ -80,8 +86,8 @@ export type QueryDict = Record<string, string | string[]>;
  * This behaviour matches Node's qs.parse but is built on URLSearchParams
  * for native web compatibility
  */
-export function decodeParams(query: string): QueryDict {
-    const o: QueryDict = {};
+export function decodeParams(query: string): Record<string, string | string[]> {
+    const o: Record<string, string | string[]> = {};
     const params = new URLSearchParams(query);
     for (const key of params.keys()) {
         const val = params.getAll(key);

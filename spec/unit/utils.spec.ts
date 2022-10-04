@@ -26,9 +26,7 @@ describe("utils", function() {
                 foo: "bar",
                 baz: "beer@",
             };
-            expect(utils.encodeParams(params)).toEqual(
-                "foo=bar&baz=beer%40",
-            );
+            expect(utils.encodeParams(params).toString()).toEqual("foo=bar&baz=beer%40");
         });
 
         it("should handle boolean and numeric values", function() {
@@ -37,7 +35,7 @@ describe("utils", function() {
                 number: 12345,
                 boolean: false,
             };
-            expect(utils.encodeParams(params)).toEqual("string=foobar&number=12345&boolean=false");
+            expect(utils.encodeParams(params).toString()).toEqual("string=foobar&number=12345&boolean=false");
         });
     });
 

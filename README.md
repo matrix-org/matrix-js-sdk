@@ -34,10 +34,6 @@ In Node.js
 
 Ensure you have the latest LTS version of Node.js installed.
 
-This SDK targets Node 12 for compatibility, which translates to ES6. If you're using
-a bundler like webpack you'll likely have to transpile dependencies, including this
-SDK, to match your target browsers.
-
 Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
 if you do not have it already.
 

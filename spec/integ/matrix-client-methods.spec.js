@@ -51,26 +51,25 @@ describe("MatrixClient", function() {
 
     describe("uploadContent", function() {
         const buf = Buffer.from('hello world');
+        const file = buf;
+        const opts = {
+            type: "text/plain",
+            name: "hi.txt",
+        };
+
         it("should upload the file", function() {
             httpBackend.when(
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
                 expect(req.rawData).toEqual(buf);
                 expect(req.queryParams.filename).toEqual("hi.txt");
-                if (!(req.queryParams.access_token == accessToken ||
-                        req.headers["Authorization"] == "Bearer " + accessToken)) {
-                    expect(true).toBe(false);
-                }
+                expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
                 expect(req.headers["Content-Type"]).toEqual("text/plain");
                 expect(req.opts.json).toBeFalsy();
                 expect(req.opts.timeout).toBe(undefined);
-            }).respond(200, "content", true);
+            }).respond(200, '{"content_uri": "content"}', true);
 
-            const prom = client.uploadContent({
-                stream: buf,
-                name: "hi.txt",
-                type: "text/plain",
-            });
+            const prom = client.uploadContent(file, opts).promise;
 
             expect(prom).toBeTruthy();
 
@@ -80,8 +79,7 @@ describe("MatrixClient", function() {
             expect(uploads[0].loaded).toEqual(0);
 
             const prom2 = prom.then(function(response) {
-                // for backwards compatibility, we return the raw JSON
-                expect(response).toEqual("content");
+                expect(response.content_uri).toEqual("content");
 
                 const uploads = client.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
@@ -89,27 +87,6 @@ describe("MatrixClient", function() {
 
             httpBackend.flush();
             return prom2;
-        });
-
-        it("should parse the response if rawResponse=false", function() {
-            httpBackend.when(
-                "POST", "/_matrix/media/r0/upload",
-            ).check(function(req) {
-                expect(req.opts.json).toBeFalsy();
-            }).respond(200, { "content_uri": "uri" });
-
-            const prom = client.uploadContent({
-                stream: buf,
-                name: "hi.txt",
-                type: "text/plain",
-            }, {
-                rawResponse: false,
-            }).then(function(response) {
-                expect(response.content_uri).toEqual("uri");
-            });
-
-            httpBackend.flush();
-            return prom;
         });
 
         it("should parse errors into a MatrixError", function() {
@@ -123,11 +100,7 @@ describe("MatrixClient", function() {
                 "error": "broken",
             });
 
-            const prom = client.uploadContent({
-                stream: buf,
-                name: "hi.txt",
-                type: "text/plain",
-            }).then(function(response) {
+            const prom = client.uploadContent(file, opts).promise.then(function(response) {
                 throw Error("request not failed");
             }, function(error) {
                 expect(error.httpStatus).toEqual(400);
@@ -139,30 +112,19 @@ describe("MatrixClient", function() {
             return prom;
         });
 
-        it("should return a promise which can be cancelled", function() {
-            const prom = client.uploadContent({
-                stream: buf,
-                name: "hi.txt",
-                type: "text/plain",
-            });
+        it("should return a promise which can be cancelled", async () => {
+            const upload = client.uploadContent(file, opts);
+            const prom = upload.promise;
 
             const uploads = client.getCurrentUploads();
             expect(uploads.length).toEqual(1);
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
 
-            const prom2 = prom.then(function(response) {
-                throw Error("request not aborted");
-            }, function(error) {
-                expect(error).toEqual("aborted");
-
-                const uploads = client.getCurrentUploads();
-                expect(uploads.length).toEqual(0);
-            });
-
-            const r = client.cancelUpload(prom);
+            const r = client.cancelUpload(upload);
             expect(r).toBe(true);
-            return prom2;
+            await expect(prom).rejects.toThrow("Aborted");
+            expect(client.getCurrentUploads()).toHaveLength(0);
         });
     });
 

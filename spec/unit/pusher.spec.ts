@@ -16,7 +16,7 @@ limitations under the License.
 
 import MockHttpBackend from 'matrix-mock-request';
 
-import { IHttpOpts, MatrixClient, PUSHER_ENABLED } from "../../src/matrix";
+import { MatrixClient, PUSHER_ENABLED } from "../../src/matrix";
 import { mkPusher } from '../test-utils/test-utils';
 
 const realSetTimeout = setTimeout;
@@ -35,7 +35,7 @@ describe("Pushers", () => {
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
-            request: httpBackend.requestFn as unknown as IHttpOpts["request"],
+            fetchFn: httpBackend.fetchFn as typeof global.fetch,
         });
     });
 

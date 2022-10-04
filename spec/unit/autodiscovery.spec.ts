@@ -17,13 +17,12 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
-import { request } from "../../src/matrix";
 import { AutoDiscovery } from "../../src/autodiscovery";
 
 describe("AutoDiscovery", function() {
     const getHttpBackend = (): MockHttpBackend => {
         const httpBackend = new MockHttpBackend();
-        request(httpBackend.requestFn);
+        AutoDiscovery.setFetchFn(httpBackend.fetchFn as typeof global.fetch);
         return httpBackend;
     };
 

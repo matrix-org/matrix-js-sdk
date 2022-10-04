@@ -18,7 +18,6 @@ import MockHttpBackend from 'matrix-mock-request';
 
 import { ReceiptType } from '../../src/@types/read_receipts';
 import { MatrixClient } from "../../src/client";
-import { IHttpOpts } from '../../src/http-api';
 import { EventType } from '../../src/matrix';
 import { MAIN_ROOM_TIMELINE } from '../../src/models/read-receipt';
 import { encodeUri } from '../../src/utils';
@@ -87,7 +86,7 @@ describe("Read receipt", () => {
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
-            request: httpBackend.requestFn as unknown as IHttpOpts["request"],
+            fetchFn: httpBackend.fetchFn as typeof global.fetch,
         });
         client.isGuest = () => false;
     });

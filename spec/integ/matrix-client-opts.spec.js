@@ -67,7 +67,7 @@ describe("MatrixClient opts", function() {
         let client;
         beforeEach(function() {
             client = new MatrixClient({
-                request: httpBackend.requestFn,
+                fetchFn: httpBackend.fetchFn,
                 store: undefined,
                 baseUrl: baseUrl,
                 userId: userId,
@@ -127,7 +127,7 @@ describe("MatrixClient opts", function() {
         let client;
         beforeEach(function() {
             client = new MatrixClient({
-                request: httpBackend.requestFn,
+                fetchFn: httpBackend.fetchFn,
                 store: new MemoryStore(),
                 baseUrl: baseUrl,
                 userId: userId,

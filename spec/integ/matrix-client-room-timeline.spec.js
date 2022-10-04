@@ -1,6 +1,6 @@
 import * as utils from "../test-utils/test-utils";
 import { EventStatus } from "../../src/models/event";
-import { RoomEvent } from "../../src";
+import { MatrixError, RoomEvent } from "../../src";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient room timelines", function() {
@@ -794,17 +794,14 @@ describe("MatrixClient room timelines", function() {
         it('Timeline recovers after `/context` request to generate new timeline fails', async () => {
             // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
             // to construct a new timeline from.
-            httpBackend.when("GET", contextUrl)
-                .respond(500, function() {
-                    // The timeline should be cleared at this point in the refresh
-                    expect(room.timeline.length).toEqual(0);
-
-                    return {
-                        errcode: 'TEST_FAKE_ERROR',
-                        error: 'We purposely intercepted this /context request to make it fail ' +
-                                 'in order to test whether the refresh timeline code is resilient',
-                    };
-                });
+            httpBackend.when("GET", contextUrl).check(() => {
+                // The timeline should be cleared at this point in the refresh
+                expect(room.timeline.length).toEqual(0);
+            }).fail(500, new MatrixError({
+                errcode: 'TEST_FAKE_ERROR',
+                error: 'We purposely intercepted this /context request to make it fail ' +
+                    'in order to test whether the refresh timeline code is resilient',
+            }));
 
             // Refresh the timeline and expect it to fail
             const settledFailedRefreshPromises = await Promise.allSettled([

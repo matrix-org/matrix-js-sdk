@@ -57,7 +57,6 @@ import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
-import { IAbortablePromise } from "./@types/partials";
 
 const DEBUG = true;
 
@@ -162,7 +161,8 @@ type WrappedRoom<T> = T & {
  */
 export class SyncApi {
     private _peekRoom: Optional<Room> = null;
-    private currentSyncRequest: Optional<IAbortablePromise<ISyncResponse>> = null;
+    private currentSyncRequest: Optional<Promise<ISyncResponse>> = null;
+    private abortController?: AbortController;
     private syncState: Optional<SyncState> = null;
     private syncStateData: Optional<ISyncStateData> = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
@@ -296,7 +296,9 @@ export class SyncApi {
             getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
         ).then(function(filterId) {
             qps.filter = filterId;
-            return client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, localTimeoutMs);
+            return client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
+                localTimeoutMs,
+            });
         }).then(async (data) => {
             let leaveRooms = [];
             if (data.rooms?.leave) {
@@ -433,7 +435,7 @@ export class SyncApi {
             room_id: peekRoom.roomId,
             timeout: String(30 * 1000),
             from: token,
-        }, undefined, 50 * 1000).then((res) => {
+        }, undefined, { localTimeoutMs: 50 * 1000 }).then((res) => {
             if (this._peekRoom !== peekRoom) {
                 debuglog("Stopped peeking in room %s", peekRoom.roomId);
                 return;
@@ -644,6 +646,7 @@ export class SyncApi {
      */
     public async sync(): Promise<void> {
         this.running = true;
+        this.abortController = new AbortController();
 
         global.window?.addEventListener?.("online", this.onOnline, false);
 
@@ -730,7 +733,7 @@ export class SyncApi {
         // but do not have global.window.removeEventListener.
         global.window?.removeEventListener?.("online", this.onOnline, false);
         this.running = false;
-        this.currentSyncRequest?.abort();
+        this.abortController.abort();
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
             this.keepAliveTimer = null;
@@ -894,12 +897,12 @@ export class SyncApi {
         }
     }
 
-    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IAbortablePromise<ISyncResponse> {
+    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): Promise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
-        return this.client.http.authedRequest<ISyncResponse>(
-            Method.Get, "/sync", qps as any, undefined,
-            qps.timeout + BUFFER_PERIOD_MS,
-        );
+        return this.client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
+            localTimeoutMs: qps.timeout + BUFFER_PERIOD_MS,
+            abortSignal: this.abortController?.signal,
+        });
     }
 
     private getSyncParams(syncOptions: ISyncOptions, syncToken: string): ISyncParams {

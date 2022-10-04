@@ -23,12 +23,13 @@ import { TestClient } from "../TestClient";
 import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
 import {
     MatrixClient, MatrixEvent, NotificationCountType, JoinRule, MatrixError,
-    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent,
+    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent, RoomMemberEvent,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
 import { IStoredClientOpts } from "../../src/client";
 import { logger } from "../../src/logger";
+import { emitPromise } from "../test-utils/test-utils";
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient = null;
@@ -530,6 +531,7 @@ describe("SlidingSyncSdk", () => {
                 ],
             });
             await httpBackend.flush("/profile", 1, 1000);
+            await emitPromise(client, RoomMemberEvent.Name);
             const room = client.getRoom(roomId);
             expect(room).toBeDefined();
             const inviteeMember = room.getMember(invitee);
