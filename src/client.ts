@@ -7608,8 +7608,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
 
         if (
-            await this.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")
-            || await this.isVersionSupported("v1.4")
+            (await this.doesServerSupportUnstableFeature("org.matrix.msc2285.stable"))
+            || (await this.isVersionSupported("v1.4"))
         ) {
             content[ReceiptType.ReadPrivate] = rpEventId;
         }
