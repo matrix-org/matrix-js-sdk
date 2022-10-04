@@ -208,6 +208,11 @@ export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
+export const UNSTABLE_MSC3852_LAST_SEEN_UA = new UnstableValue(
+    "last_seen_user_agent",
+    "org.matrix.msc3852.last_seen_user_agent",
+);
+
 interface IExportedDevice {
     olmDevice: IExportedOlmDevice;
     userId: string;
@@ -679,6 +684,8 @@ export interface IMyDevice {
     display_name?: string;
     last_seen_ip?: string;
     last_seen_ts?: number;
+    [UNSTABLE_MSC3852_LAST_SEEN_UA.stable]?: string;
+    [UNSTABLE_MSC3852_LAST_SEEN_UA.unstable]?: string;
 }
 
 export interface IDownloadKeyResult {
@@ -2680,7 +2687,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         try {
             res = await this.http.authedRequest<IKeyBackupInfo>(
                 Method.Get, "/room_keys/version", undefined, undefined,
-                { prefix: ClientPrefix.Unstable },
+                { prefix: ClientPrefix.V3 },
             );
         } catch (e) {
             if (e.errcode === 'M_NOT_FOUND') {
@@ -2836,7 +2843,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const res = await this.http.authedRequest<IKeyBackupInfo>(
             Method.Post, "/room_keys/version", undefined, data,
-            { prefix: ClientPrefix.Unstable },
+            { prefix: ClientPrefix.V3 },
         );
 
         // We could assume everything's okay and enable directly, but this ensures
@@ -2868,7 +2875,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         await this.http.authedRequest(
             Method.Delete, path, undefined, undefined,
-            { prefix: ClientPrefix.Unstable },
+            { prefix: ClientPrefix.V3 },
         );
     }
 

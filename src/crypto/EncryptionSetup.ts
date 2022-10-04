@@ -246,14 +246,14 @@ export class EncryptionSetupOperation {
                         algorithm: this.keyBackupInfo.algorithm,
                         auth_data: this.keyBackupInfo.auth_data,
                     },
-                    { prefix: ClientPrefix.Unstable },
+                    { prefix: ClientPrefix.V3 },
                 );
             } else {
                 // add new key backup
                 await baseApis.http.authedRequest(
                     Method.Post, "/room_keys/version",
                     undefined, this.keyBackupInfo,
-                    { prefix: ClientPrefix.Unstable },
+                    { prefix: ClientPrefix.V3 },
                 );
             }
         }
