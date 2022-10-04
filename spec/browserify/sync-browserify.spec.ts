@@ -14,47 +14,64 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// load XmlHttpRequest mock
-import "./setupTests";
+import HttpBackend from "matrix-mock-request";
+
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import * as utils from "../test-utils/test-utils";
-import { TestClient } from "../TestClient";
-import { emitPromise } from "../test-utils/test-utils";
+import type { MatrixClient, ClientEvent } from "../../src";
 
 const USER_ID = "@user:test.server";
 const DEVICE_ID = "device_id";
 const ACCESS_TOKEN = "access_token";
 const ROOM_ID = "!room_id:server.test";
 
+declare global {
+    namespace NodeJS {
+        interface Global {
+            matrixcs: {
+                MatrixClient: typeof MatrixClient;
+                ClientEvent: typeof ClientEvent;
+            };
+        }
+    }
+}
+
 describe("Browserify Test", function() {
-    let client;
-    let httpBackend;
+    let client: MatrixClient;
+    let httpBackend: HttpBackend;
 
     beforeEach(() => {
-        const testClient = new TestClient(USER_ID, DEVICE_ID, ACCESS_TOKEN);
-
-        client = testClient.client;
-        httpBackend = testClient.httpBackend;
+        httpBackend = new HttpBackend();
+        client = new global.matrixcs.MatrixClient({
+            baseUrl: "http://test.server",
+            userId: USER_ID,
+            accessToken: ACCESS_TOKEN,
+            deviceId: DEVICE_ID,
+            fetchFn: httpBackend.fetchFn as typeof global.fetch,
+        });
 
         httpBackend.when("GET", "/versions").respond(200, {});
         httpBackend.when("GET", "/pushrules").respond(200, {});
         httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
-
-        client.startClient();
     });
 
     afterEach(async () => {
         client.stopClient();
-        httpBackend.stop();
+        client.http.abort();
+        httpBackend.verifyNoOutstandingRequests();
+        httpBackend.verifyNoOutstandingExpectation();
+        await httpBackend.stop();
     });
 
     it("Sync", async () => {
-        const event = utils.mkMembership({
-            room: ROOM_ID,
-            mship: "join",
-            user: "@other_user:server.test",
-            name: "Displayname",
-        });
+        const event = {
+            type: "m.room.member",
+            room_id: ROOM_ID,
+            content: {
+                membership: "join",
+                name: "Displayname",
+            },
+            event_id: "$foobar",
+        };
 
         const syncData = {
             next_batch: "batch1",
@@ -72,12 +89,15 @@ describe("Browserify Test", function() {
         };
 
         httpBackend.when("GET", "/sync").respond(200, syncData);
+        httpBackend.when("GET", "/sync").respond(200, syncData);
 
-        const syncPromise = emitPromise(client, "sync");
+        const syncPromise = new Promise(r => client.once(global.matrixcs.ClientEvent.Sync, r));
         const unexpectedErrorFn = jest.fn();
-        client.once("sync.unexpectedError", unexpectedErrorFn);
+        client.once(global.matrixcs.ClientEvent.SyncUnexpectedError, unexpectedErrorFn);
 
-        await httpBackend.flushAllExpected();
+        client.startClient();
+
+        await httpBackend.flushAllExpected({ timeout: 1 });
         await syncPromise;
         expect(unexpectedErrorFn).not.toHaveBeenCalled();
     }, 20000); // additional timeout as this test can take quite a while

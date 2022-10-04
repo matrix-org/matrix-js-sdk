@@ -3664,16 +3664,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @param {string} roomId
      * @param {string} tagName name of room tag to be removed
-     * @return {Promise} Resolves: void
+     * @return {Promise} Resolves: to an empty object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public async deleteRoomTag(roomId: string, tagName: string): Promise<void> {
+    public deleteRoomTag(roomId: string, tagName: string): Promise<{}> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId,
             $roomId: roomId,
             $tag: tagName,
         });
-        await this.http.authedRequest(Method.Delete, path);
+        return this.http.authedRequest(Method.Delete, path);
     }
 
     /**
