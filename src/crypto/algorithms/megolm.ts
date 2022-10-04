@@ -1445,8 +1445,8 @@ class MegolmDecryption extends DecryptionAlgorithm {
             const fromUs = event.getSender() === this.baseApis.getUserId();
 
             if (!weRequested && !fromUs) {
-                // If someone sends us an unsolicited key and they're 
-                // not one of our other devices and it's not shared 
+                // If someone sends us an unsolicited key and they're
+                // not one of our other devices and it's not shared
                 // history, ignore it
                 if (!extraSessionData.sharedHistory) {
                     logger.log("forwarded key not shared history - ignoring");
