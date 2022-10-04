@@ -18,7 +18,7 @@ import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
-import { Method, PREFIX_UNSTABLE, PREFIX_V3 } from "../http-api";
+import { Method, PREFIX_V3 } from "../http-api";
 import { Crypto, IBootstrapCrossSigningOpts } from "./index";
 import {
     ClientEvent,
