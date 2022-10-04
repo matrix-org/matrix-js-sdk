@@ -14,16 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { IEncryptedPayload } from './aes';
 import { decodeBase64, encodeBase64 } from './olmlib';
 
 const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
     (window.crypto.subtle || window.crypto.webkitSubtle) : null;
-
-export interface IEncryptedPayload {
-    iv?: string;
-    ciphertext?: string;
-    mac?: string;
-}
 
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);
@@ -37,6 +32,10 @@ const zeroSalt = new Uint8Array(8);
  * @param {string} ivStr the initialization vector to use
  */
 async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
+    if (!subtleCrypto) {
+        throw new Error('Subtle crypto not available');
+    }
+
     let iv: Uint8Array;
     if (ivStr) {
         iv = decodeBase64(ivStr);
@@ -74,6 +73,14 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
  * @param {string} name the name of the secret
  */
 async function decryptBrowser(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
+    if (!subtleCrypto) {
+        throw new Error('Subtle crypto not available');
+    }
+
+    if (!data.ciphertext || !data.iv) {
+        throw new Error('Missing ciphertext and/or iv');
+    }
+
     const aesKey = await deriveKeysBrowser(key, name);
 
     const ciphertext = decodeBase64(data.ciphertext);
@@ -91,6 +98,10 @@ async function decryptBrowser(data: IEncryptedPayload, key: Uint8Array, name: st
 }
 
 async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<CryptoKey> {
+    if (!subtleCrypto) {
+        throw new Error('Subtle crypto not available');
+    }
+
     const hkdfkey = await subtleCrypto.importKey(
         'raw',
         key,
@@ -124,15 +135,9 @@ async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<CryptoK
 }
 
 export function encryptAESGCM(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
-    if (!subtleCrypto) {
-        throw new Error('Subtle crypto not available');
-    }
     return encryptBrowser(data, key, name, ivStr);
 }
 
 export function decryptAESGCM(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
-    if (!subtleCrypto) {
-        throw new Error('Subtle crypto not available');
-    }
     return decryptBrowser(data, key, name);
 }
