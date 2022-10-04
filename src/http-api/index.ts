@@ -20,6 +20,8 @@ import { MediaPrefix } from "./prefix";
 import * as utils from "../utils";
 import * as callbacks from "../realtime-callbacks";
 import { Method } from "./method";
+import { MatrixError } from "./errors";
+import { parseErrorResponse } from "./utils";
 
 export * from "./interface";
 export * from "./prefix";
@@ -103,9 +105,14 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                             if (!xhr.responseText) {
                                 throw new Error('No response body.');
                             }
-                            defer.resolve(JSON.parse(xhr.responseText));
+
+                            if (xhr.status >= 400) {
+                                defer.reject(parseErrorResponse(xhr, xhr.responseText));
+                            } else {
+                                defer.resolve(JSON.parse(xhr.responseText));
+                            }
                         } catch (err) {
-                            err.httpStatus = xhr.status;
+                            (<MatrixError>err).httpStatus = xhr.status;
                             defer.reject(err);
                         }
                         break;
@@ -129,12 +136,12 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 url.searchParams.set("filename", encodeURIComponent(fileName));
             }
 
-            if (!this.opts.useAuthorizationHeader) {
+            if (!this.opts.useAuthorizationHeader && this.opts.accessToken) {
                 url.searchParams.set("access_token", encodeURIComponent(this.opts.accessToken));
             }
 
             xhr.open(Method.Post, url.href);
-            if (this.opts.useAuthorizationHeader) {
+            if (this.opts.useAuthorizationHeader && this.opts.accessToken) {
                 xhr.setRequestHeader("Authorization", "Bearer " + this.opts.accessToken);
             }
             xhr.setRequestHeader("Content-Type", contentType);
@@ -197,7 +204,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             base: this.opts.baseUrl,
             path: MediaPrefix.R0 + "/upload",
             params: {
-                access_token: this.opts.accessToken,
+                access_token: this.opts.accessToken!,
             },
         };
     }

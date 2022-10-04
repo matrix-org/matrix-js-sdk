@@ -738,7 +738,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      */
     public stop(): void {
         this.terminated = true;
-        this.abortController.abort();
+        this.abortController?.abort();
         // remove all listeners so things can be GC'd
         this.removeAllListeners(SlidingSyncEvent.Lifecycle);
         this.removeAllListeners(SlidingSyncEvent.List);

@@ -24,7 +24,7 @@ import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { Method } from "./method";
 import { MatrixError } from "./errors";
 import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, IRequestOpts } from "./interface";
-import { anySignal, timeoutSignal } from "./utils";
+import { anySignal, parseErrorResponse, timeoutSignal } from "./utils";
 import { QueryDict } from "../utils";
 
 type Body = Record<string, any> | BodyInit;
@@ -65,7 +65,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         this.opts.idBaseUrl = url;
     }
 
-    public idServerRequest<T>(
+    public idServerRequest<T extends {}>(
         method: Method,
         path: string,
         params: Record<string, string | string[]>,
@@ -88,6 +88,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
         const opts: IRequestOpts = {
             json: true,
+            headers: {},
         };
         if (accessToken) {
             opts.headers['Authorization'] = `Bearer ${accessToken}`;
@@ -249,7 +250,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             this.abortController.signal,
         ];
         if (timeout !== undefined) {
-            signals.push(timeoutSignal(opts.localTimeoutMs ?? this.opts.localTimeoutMs));
+            signals.push(timeoutSignal(timeout));
         }
         if (opts.abortSignal) {
             signals.push(opts.abortSignal);
@@ -276,7 +277,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         });
 
         if (!res.ok) {
-            throw new MatrixError(await res.json(), res.status);
+            throw parseErrorResponse(res, await res.text());
         }
 
         if (this.opts.onlyData) {

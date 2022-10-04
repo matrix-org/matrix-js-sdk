@@ -73,9 +73,8 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
 
     let err: Error;
     if (contentType) {
-        if (contentType.type === "application/json") {
-            const jsonBody = typeof(body) === "object" ? body : JSON.parse(body);
-            err = new MatrixError(jsonBody, response.status);
+        if (contentType.type === "application/json" && body) {
+            err = new MatrixError(JSON.parse(body), response.status);
         } else if (contentType.type === "text/plain") {
             err = new Error(`Server returned ${response.status} error: ${body}`);
         }
@@ -97,7 +96,7 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
  * @returns {{type: String, parameters: Object}?} parsed content-type header, or null if not found
  */
 function getResponseContentType(response: XMLHttpRequest | Response): ParsedMediaType | null {
-    let contentType: string;
+    let contentType = "";
     if ((response as XMLHttpRequest).getResponseHeader) {
         contentType = (response as XMLHttpRequest).getResponseHeader("Content-Type");
     } else if ((response as Response).headers) {
@@ -122,7 +121,7 @@ function getResponseContentType(response: XMLHttpRequest | Response): ParsedMedi
  */
 export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => Promise<T>): Promise<T> {
     let attempts = 0;
-    let lastConnectionError = null;
+    let lastConnectionError: ConnectionError | null = null;
     while (attempts < maxAttempts) {
         try {
             if (attempts > 0) {

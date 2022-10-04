@@ -34,7 +34,7 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * @prop {number} httpStatus The numeric HTTP status code given
  */
 export class MatrixError extends Error {
-    public readonly errcode: string;
+    public readonly errcode?: string;
     public readonly data: IErrorJson;
 
     constructor(errorJson: IErrorJson = {}, public httpStatus?: number) {
@@ -54,7 +54,7 @@ export class MatrixError extends Error {
  * @constructor
  */
 export class ConnectionError extends Error {
-    constructor(message: string, cause: Error = undefined) {
+    constructor(message: string, cause?: Error) {
         super(message + (cause ? `: ${cause.message}` : ""));
     }
 

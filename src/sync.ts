@@ -733,7 +733,7 @@ export class SyncApi {
         // but do not have global.window.removeEventListener.
         global.window?.removeEventListener?.("online", this.onOnline, false);
         this.running = false;
-        this.abortController.abort();
+        this.abortController?.abort();
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
             this.keepAliveTimer = null;

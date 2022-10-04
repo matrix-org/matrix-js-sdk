@@ -19,7 +19,7 @@ limitations under the License.
 
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from './logger';
-import { Method, timeoutSignal } from "./http-api";
+import { MatrixError, Method, timeoutSignal } from "./http-api";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -459,7 +459,7 @@ export class AutoDiscovery {
                 error: err,
                 raw: {},
                 action: AutoDiscoveryAction.FAIL_PROMPT,
-                reason: err?.name === "SyntaxError"
+                reason: (err as MatrixError)?.name === "SyntaxError"
                     ? AutoDiscovery.ERROR_INVALID_JSON
                     : AutoDiscovery.ERROR_INVALID,
             };

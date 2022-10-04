@@ -28,7 +28,7 @@ const MAX_BATCH_SIZE = 20;
 export class ToDeviceMessageQueue {
     private sending = false;
     private running = true;
-    private retryTimeout: ReturnType<typeof setTimeout> = null;
+    private retryTimeout: ReturnType<typeof setTimeout> | null = null;
     private retryAttempts = 0;
 
     constructor(private client: MatrixClient) {
