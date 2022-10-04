@@ -2700,7 +2700,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         try {
             res = await this.http.authedRequest<IKeyBackupInfo>(
                 undefined, Method.Get, "/room_keys/version", undefined, undefined,
-                { prefix: PREFIX_UNSTABLE },
+                { prefix: PREFIX_V3 },
             );
         } catch (e) {
             if (e.errcode === 'M_NOT_FOUND') {
@@ -2856,7 +2856,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const res = await this.http.authedRequest<IKeyBackupInfo>(
             undefined, Method.Post, "/room_keys/version", undefined, data,
-            { prefix: PREFIX_UNSTABLE },
+            { prefix: PREFIX_V3 },
         );
 
         // We could assume everything's okay and enable directly, but this ensures
@@ -2888,7 +2888,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.http.authedRequest(
             undefined, Method.Delete, path, undefined, undefined,
-            { prefix: PREFIX_UNSTABLE },
+            { prefix: PREFIX_V3 },
         );
     }
 

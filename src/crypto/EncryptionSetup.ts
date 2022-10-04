@@ -18,7 +18,7 @@ import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
-import { Method, PREFIX_UNSTABLE } from "../http-api";
+import { Method, PREFIX_V3 } from "../http-api";
 import { Crypto, IBootstrapCrossSigningOpts } from "./index";
 import {
     ClientEvent,
@@ -246,14 +246,14 @@ export class EncryptionSetupOperation {
                         algorithm: this.keyBackupInfo.algorithm,
                         auth_data: this.keyBackupInfo.auth_data,
                     },
-                    { prefix: PREFIX_UNSTABLE },
+                    { prefix: PREFIX_V3 },
                 );
             } else {
                 // add new key backup
                 await baseApis.http.authedRequest(
                     undefined, Method.Post, "/room_keys/version",
                     undefined, this.keyBackupInfo,
-                    { prefix: PREFIX_UNSTABLE },
+                    { prefix: PREFIX_V3 },
                 );
             }
         }
