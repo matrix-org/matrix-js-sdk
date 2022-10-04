@@ -19,6 +19,7 @@ import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
+import { emitPromise } from "../test-utils/test-utils";
 
 const USER_ID = "@user:test.server";
 const DEVICE_ID = "device_id";
@@ -47,7 +48,7 @@ describe("Browserify Test", function() {
         httpBackend.stop();
     });
 
-    it("Sync", function() {
+    it("Sync", async () => {
         const event = utils.mkMembership({
             room: ROOM_ID,
             mship: "join",
@@ -71,11 +72,13 @@ describe("Browserify Test", function() {
         };
 
         httpBackend.when("GET", "/sync").respond(200, syncData);
-        return Promise.race([
-            httpBackend.flushAllExpected(),
-            new Promise((_, reject) => {
-                client.once("sync.unexpectedError", reject);
-            }),
-        ]);
+
+        const syncPromise = emitPromise(client, "sync");
+        const unexpectedErrorFn = jest.fn();
+        client.once("sync.unexpectedError", unexpectedErrorFn);
+
+        await httpBackend.flushAllExpected();
+        await syncPromise;
+        expect(unexpectedErrorFn).not.toHaveBeenCalled();
     }, 20000); // additional timeout as this test can take quite a while
 });

@@ -29,11 +29,11 @@ import { QueryDict } from "../utils";
 
 type Body = Record<string, any> | BodyInit;
 
-interface TypedResponse<T extends {}> extends Response {
+interface TypedResponse<T> extends Response {
     json(): Promise<T>;
 }
 
-export type ResponseType<T extends {}, O extends IHttpOpts> =
+export type ResponseType<T, O extends IHttpOpts> =
     O extends undefined ? T :
         O extends { onlyData: true } ? T :
             TypedResponse<T>;
@@ -96,7 +96,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             headers: {},
         };
         if (accessToken) {
-            opts.headers['Authorization'] = `Bearer ${accessToken}`;
+            opts.headers!.Authorization = `Bearer ${accessToken}`;
         }
 
         return this.requestOtherUrl(method, fullUri, body, opts);

@@ -79,19 +79,13 @@ export function anySignal(signals: AbortSignal[]): {
 export function parseErrorResponse(response: XMLHttpRequest | Response, body?: string): Error {
     const contentType = getResponseContentType(response);
 
-    let err: Error;
-    if (contentType) {
-        if (contentType.type === "application/json" && body) {
-            err = new MatrixError(JSON.parse(body), response.status);
-        } else if (contentType.type === "text/plain") {
-            err = new Error(`Server returned ${response.status} error: ${body}`);
-        }
+    if (contentType?.type === "application/json" && body) {
+        return new MatrixError(JSON.parse(body), response.status);
     }
-
-    if (!err) {
-        err = new Error(`Server returned ${response.status} error`);
+    if (contentType?.type === "text/plain") {
+        return new Error(`Server returned ${response.status} error: ${body}`);
     }
-    return err;
+    return new Error(`Server returned ${response.status} error`);
 }
 
 /**
@@ -104,7 +98,7 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
  * @returns {{type: String, parameters: Object}?} parsed content-type header, or null if not found
  */
 function getResponseContentType(response: XMLHttpRequest | Response): ParsedMediaType | null {
-    let contentType = "";
+    let contentType: string | null = null;
     if ((response as XMLHttpRequest).getResponseHeader) {
         contentType = (response as XMLHttpRequest).getResponseHeader("Content-Type");
     } else if ((response as Response).headers) {

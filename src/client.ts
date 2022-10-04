@@ -2850,7 +2850,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return res;
     }
 
-    public deleteKeyBackupVersion(version: string): Promise<void> {
+    public async deleteKeyBackupVersion(version: string): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2866,7 +2866,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $version: version,
         });
 
-        return this.http.authedRequest(
+        await this.http.authedRequest(
             Method.Delete, path, undefined, undefined,
             { prefix: ClientPrefix.Unstable },
         );
@@ -2920,7 +2920,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         version: string | undefined,
         data: IKeyBackup,
     ): Promise<void>;
-    public sendKeyBackup(
+    public async sendKeyBackup(
         roomId: string | undefined,
         sessionId: string | undefined,
         version: string | undefined,
@@ -2931,7 +2931,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const path = this.makeKeyBackupPath(roomId, sessionId, version);
-        return this.http.authedRequest(
+        await this.http.authedRequest(
             Method.Put, path.path, path.queryData, data,
             { prefix: ClientPrefix.Unstable },
         );
@@ -3277,13 +3277,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public deleteKeysFromBackup(roomId: undefined, sessionId: undefined, version?: string): Promise<void>;
     public deleteKeysFromBackup(roomId: string, sessionId: undefined, version?: string): Promise<void>;
     public deleteKeysFromBackup(roomId: string, sessionId: string, version?: string): Promise<void>;
-    public deleteKeysFromBackup(roomId?: string, sessionId?: string, version?: string): Promise<void> {
+    public async deleteKeysFromBackup(roomId?: string, sessionId?: string, version?: string): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
 
         const path = this.makeKeyBackupPath(roomId, sessionId, version);
-        return this.http.authedRequest(
+        await this.http.authedRequest(
             Method.Delete, path.path, path.queryData, undefined,
             { prefix: ClientPrefix.Unstable },
         );
@@ -3524,7 +3524,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let signPromise: Promise<IThirdPartySigned | void> = Promise.resolve();
 
         if (opts.inviteSignUrl) {
-            signPromise = this.http.requestOtherUrl(
+            signPromise = this.http.requestOtherUrl<IThirdPartySigned>(
                 Method.Post,
                 new URL(opts.inviteSignUrl), { mxid: this.credentials.userId },
             );
@@ -3660,13 +3660,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: void
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public deleteRoomTag(roomId: string, tagName: string): Promise<void> {
+    public async deleteRoomTag(roomId: string, tagName: string): Promise<void> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/tags/$tag", {
             $userId: this.credentials.userId,
             $roomId: roomId,
             $tag: tagName,
         });
-        return this.http.authedRequest(Method.Delete, path);
+        await this.http.authedRequest(Method.Delete, path);
     }
 
     /**
@@ -4883,7 +4883,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: Object (currently empty)
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public unban(roomId: string, userId: string): Promise<void> {
+    public unban(roomId: string, userId: string): Promise<{}> {
         // unbanning != set their state to leave: this used to be
         // the case, but was then changed so that leaving was always
         // a revoking of privilege, otherwise two people racing to
@@ -5029,7 +5029,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      * @throws If 'presence' isn't a valid presence enum value.
      */
-    public setPresence(opts: IPresenceOpts): Promise<void> {
+    public async setPresence(opts: IPresenceOpts): Promise<void> {
         const path = utils.encodeUri("/presence/$userId/status", {
             $userId: this.credentials.userId,
         });
@@ -5042,7 +5042,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (validStates.indexOf(opts.presence) === -1) {
             throw new Error("Bad presence value: " + opts.presence);
         }
-        return this.http.authedRequest(Method.Put, path, undefined, opts);
+        await this.http.authedRequest(Method.Put, path, undefined, opts);
     }
 
     /**
@@ -8727,7 +8727,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             power_level_content_override: {
                 ...DEFAULT_TREE_POWER_LEVELS_TEMPLATE,
                 users: {
-                    [this.getUserId()]: 100,
+                    [this.getUserId()!]: 100,
                 },
             },
             creation_content: {

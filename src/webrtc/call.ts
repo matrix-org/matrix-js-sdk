@@ -322,7 +322,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private remoteSDPStreamMetadata: SDPStreamMetadata;
 
-    private callLengthInterval: ReturnType<typeof setInterval>;
+    private callLengthInterval?: ReturnType<typeof setInterval>;
     private callLength = 0;
 
     constructor(opts: CallOpts) {
@@ -2008,7 +2008,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
-            this.callLengthInterval = null;
+            this.callLengthInterval = undefined;
         }
 
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
