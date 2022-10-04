@@ -31,20 +31,25 @@ export function timeoutSignal(ms: number): AbortSignal {
         clearTimeout(timeoutId);
     }
 
-    controller.signal.addEventListener('abort', onAbort);
+    controller.signal.addEventListener("abort", onAbort);
     return controller.signal;
 }
 
-export function anySignal(signals: AbortSignal[]): AbortSignal {
+export function anySignal(signals: AbortSignal[]): {
+    signal: AbortSignal;
+    cleanup(): void;
+} {
     const controller = new AbortController();
+
+    function cleanup() {
+        for (const signal of signals) {
+            signal.removeEventListener("abort", onAbort);
+        }
+    }
 
     function onAbort() {
         controller.abort();
-
-        // Cleanup
-        for (const signal of signals) {
-            signal.removeEventListener('abort', onAbort);
-        }
+        cleanup();
     }
 
     for (const signal of signals) {
@@ -52,10 +57,13 @@ export function anySignal(signals: AbortSignal[]): AbortSignal {
             onAbort();
             break;
         }
-        signal.addEventListener('abort', onAbort);
+        signal.addEventListener("abort", onAbort);
     }
 
-    return controller.signal;
+    return {
+        signal: controller.signal,
+        cleanup,
+    };
 }
 
 /**

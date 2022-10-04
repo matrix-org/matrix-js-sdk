@@ -7055,6 +7055,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (stopClient) {
             this.stopClient();
+            this.http.abort();
         }
 
         return this.http.authedRequest(Method.Post, '/logout');

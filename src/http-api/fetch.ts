@@ -50,6 +50,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
     }
 
+    public abort(): void {
+        this.abortController.abort();
+        this.abortController = new AbortController();
+    }
+
     public fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
         if (this.opts.fetchFn) {
             return this.opts.fetchFn(resource, options);
@@ -263,18 +268,25 @@ export class FetchHttpApi<O extends IHttpOpts> {
             data = body as BodyInit;
         }
 
-        const res = await this.fetch(url, {
-            signal: anySignal(signals),
-            method,
-            body: data,
-            headers,
-            mode: "cors",
-            redirect: "follow",
-            referrer: "",
-            referrerPolicy: "no-referrer",
-            cache: "no-cache",
-            credentials: "omit", // we send credentials via headers
-        });
+        const { signal, cleanup } = anySignal(signals);
+
+        let res: Response;
+        try {
+            res = await this.fetch(url, {
+                signal,
+                method,
+                body: data,
+                headers,
+                mode: "cors",
+                redirect: "follow",
+                referrer: "",
+                referrerPolicy: "no-referrer",
+                cache: "no-cache",
+                credentials: "omit", // we send credentials via headers
+            });
+        } finally {
+            cleanup();
+        }
 
         if (!res.ok) {
             throw parseErrorResponse(res, await res.text());

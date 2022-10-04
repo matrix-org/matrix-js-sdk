@@ -4810,10 +4810,10 @@ matrix-events-sdk@^0.0.1-beta.7:
   resolved "https://registry.yarnpkg.com/matrix-events-sdk/-/matrix-events-sdk-0.0.1-beta.7.tgz#5ffe45eba1f67cc8d7c2377736c728b322524934"
   integrity sha512-9jl4wtWanUFSy2sr2lCjErN/oC8KTAtaeaozJtrgot1JiQcEI4Rda9OLgQ7nLKaqb4Z/QUx/fR3XpDzm5Jy1JA==
 
-matrix-mock-request@^2.4.0:
-  version "2.4.0"
-  resolved "https://registry.yarnpkg.com/matrix-mock-request/-/matrix-mock-request-2.4.0.tgz#c91aa4b30cfdbef4fd7e544b2e55327710cd4310"
-  integrity sha512-PPeq2jaTOnmHU4WnnSQmMU2KVBT/AOQVZ06lqqocwgRdyg8LaaJcuU3wp4c8DweLEdxUwjdjMAGCUD86Egk26A==
+matrix-mock-request@^2.4.1:
+  version "2.4.1"
+  resolved "https://registry.yarnpkg.com/matrix-mock-request/-/matrix-mock-request-2.4.1.tgz#a9c7dbb6b466f582ba2ca21f17cf18ceb41c7657"
+  integrity sha512-QMNpKUeHS2RHovSKybUySFTXTJ11EQPkp3bgvEXmNqAc3TYM23gKYqgI288BoBDYwQrK3WJFT0d4bvMiNIS/vA==
   dependencies:
     expect "^28.1.0"
 
