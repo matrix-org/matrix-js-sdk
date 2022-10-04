@@ -141,7 +141,7 @@ describe("MatrixClient opts", function() {
         });
 
         it("shouldn't retry sending events", function(done) {
-            httpBackend.when("PUT", "/txn1").fail(500, new MatrixError({
+            httpBackend.when("PUT", "/txn1").respond(500, new MatrixError({
                 errcode: "M_SOMETHING",
                 error: "Ruh roh",
             }));

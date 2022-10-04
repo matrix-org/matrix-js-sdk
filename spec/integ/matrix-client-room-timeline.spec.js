@@ -797,7 +797,7 @@ describe("MatrixClient room timelines", function() {
             httpBackend.when("GET", contextUrl).check(() => {
                 // The timeline should be cleared at this point in the refresh
                 expect(room.timeline.length).toEqual(0);
-            }).fail(500, new MatrixError({
+            }).respond(500, new MatrixError({
                 errcode: 'TEST_FAKE_ERROR',
                 error: 'We purposely intercepted this /context request to make it fail ' +
                     'in order to test whether the refresh timeline code is resilient',
