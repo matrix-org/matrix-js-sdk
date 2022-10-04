@@ -18,8 +18,22 @@ import { RendezvousCode, RendezvousTransport } from ".";
 
 export interface RendezvousChannel {
     transport: RendezvousTransport;
+    /**
+     * @returns the checksum/confirmation digits to be shown to the user
+     */
     connect(): Promise<string>;
+    /**
+     * Send a payload via the channel.
+     * @param data payload to send
+     */
     send(data: any): Promise<void>;
+    /**
+     * Receive a payload from the channel.
+     * @returns the received payload
+     */
     receive(): Promise<any>;
+    /**
+     * @returns a representation of the channel that can be encoded in a QR or similar
+     */
     generateCode(): Promise<RendezvousCode>;
 }

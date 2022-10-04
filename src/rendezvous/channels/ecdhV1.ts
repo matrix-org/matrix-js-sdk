@@ -16,7 +16,6 @@ limitations under the License.
 
 import * as ed from '@noble/ed25519';
 
-import { decryptAES, encryptAES } from '../../crypto/aes';
 import { logger } from '../../logger';
 import { MatrixClient } from '../../matrix';
 import { RendezvousError } from '../error';
@@ -24,22 +23,73 @@ import {
     RendezvousCancellationReason, RendezvousTransport, RendezvousChannel, RendezvousCode, RendezvousTransportDetails,
 } from '../index';
 import { SecureRendezvousChannelAlgorithm } from '.';
-import { encodeUrlSafeBase64, decodeUrlSafeBase64 } from '../../crypto/olmlib';
+import { encodeBase64, decodeBase64 } from '../../crypto/olmlib';
+import { decryptAESGCM, encryptAESGCM } from '../../crypto/aesGcm';
+
+const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
+    (window.crypto.subtle || window.crypto.webkitSubtle) : null;
 
 export interface ECDHv1RendezvousCode extends RendezvousCode {
     rendezvous: {
         transport: RendezvousTransportDetails;
         algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1;
-        key: {
-            x: string;
-        };
+        key: string;
     };
+}
+
+function generateDecimalSas(sasBytes: number[]): [number, number, number] {
+    /**
+     *      +--------+--------+--------+--------+--------+
+     *      | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 |
+     *      +--------+--------+--------+--------+--------+
+     * bits: 87654321 87654321 87654321 87654321 87654321
+     *       \____________/\_____________/\____________/
+     *         1st number    2nd number     3rd number
+     */
+    return [
+        (sasBytes[0] << 5 | sasBytes[1] >> 3) + 1000,
+        ((sasBytes[1] & 0x7) << 10 | sasBytes[2] << 2 | sasBytes[3] >> 6) + 1000,
+        ((sasBytes[3] & 0x3f) << 7 | sasBytes[4] >> 1) + 1000,
+    ];
+}
+
+// salt for HKDF, with 8 bytes of zeros
+const zeroSalt = new Uint8Array(8);
+
+async function calculateChecksum(sharedSecret: Uint8Array, info: String): Promise<string> {
+    if (!subtleCrypto) {
+        throw new Error('Subtle crypto not available');
+    }
+
+    const hkdfkey = await subtleCrypto.importKey(
+        'raw',
+        sharedSecret,
+        { name: "HKDF" },
+        false,
+        ["deriveBits"],
+    );
+
+    const mac = await subtleCrypto.deriveBits(
+        {
+            name: "HKDF",
+            salt: zeroSalt,
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore: https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/879
+            info: (new TextEncoder().encode(info)),
+            hash: "SHA-256",
+        },
+        hkdfkey,
+        40,
+    );
+
+    return generateDecimalSas(Array.from(new Uint8Array(mac))).join('-');
 }
 
 export class ECDHv1RendezvousChannel implements RendezvousChannel {
     private ourPrivateKey: Uint8Array;
     private _ourPublicKey?: Uint8Array;
     private sharedSecret?: Uint8Array;
+    private aesInfo?: string;
     public onCancelled?: (reason: RendezvousCancellationReason) => void;
 
     constructor(
@@ -65,9 +115,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
 
         const data = {
             "algorithm": SecureRendezvousChannelAlgorithm.ECDH_V1,
-            "key": {
-                "x": encodeUrlSafeBase64(await this.getPublicKey()),
-            },
+            "key": encodeBase64(await this.getPublicKey()),
         };
 
         await this.send(data);
@@ -86,17 +134,12 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         return rendezvous;
     }
 
-    private async digits(): Promise<string> {
-        const hashArray = Array.from(new Uint8Array(this.sharedSecret));
-        const hashHex = hashArray.map((bytes) => bytes.toString(16)).join('').toUpperCase();
-        return `${hashHex.slice(0, 3)}-${hashHex.slice(3, 6)}-${hashHex.slice(6, 9)}-${hashHex.slice(9, 12)}`;
-    }
-
     async connect(): Promise<string> {
+        const isInitiator = !this.theirPublicKey;
         if (this.cli && this.theirPublicKey) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: { x: encodeUrlSafeBase64(await this.getPublicKey()) },
+                key: encodeBase64(await this.getPublicKey()),
             });
         }
 
@@ -108,7 +151,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             }
             const { key, algorithm } = res;
 
-            if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || !key?.x) {
+            if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || !key) {
                 throw new RendezvousError(
                     'Unsupported algorithm: ' + algorithm,
                     RendezvousCancellationReason.UnsupportedAlgorithm,
@@ -117,38 +160,50 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
 
             if (this.theirPublicKey) {
                 // check that the same public key was at the rendezvous point
-                if (key.x !== encodeUrlSafeBase64(this.theirPublicKey)) {
+                if (key !== encodeBase64(this.theirPublicKey)) {
                     throw new RendezvousError(
                         'Secure rendezvous key mismatch',
                         RendezvousCancellationReason.DataMismatch,
                     );
                 }
             } else {
-                this.theirPublicKey = decodeUrlSafeBase64(key.x);
+                this.theirPublicKey = decodeBase64(key);
             }
         }
 
         if (!this.cli) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: { x: encodeUrlSafeBase64(await this.getPublicKey()) },
+                key: encodeBase64(await this.getPublicKey()),
             });
         }
 
         this.sharedSecret = await ed.getSharedSecret(this.ourPrivateKey, this.theirPublicKey);
 
-        return await this.digits();
+        const initiatorKey = isInitiator ? this._ourPublicKey : this.theirPublicKey;
+        const recipientKey = isInitiator ? this.theirPublicKey : this._ourPublicKey;
+
+        let aesInfo = SecureRendezvousChannelAlgorithm.ECDH_V1.toString();
+        aesInfo += `|${encodeBase64(initiatorKey)}`;
+        aesInfo += `|${encodeBase64(recipientKey)}`;
+
+        this.aesInfo = aesInfo;
+
+        return await calculateChecksum(this.sharedSecret, aesInfo);
     }
 
     public async send(data: any) {
         const stringifiedData = JSON.stringify(data);
 
-        const body = this.sharedSecret ?
-            JSON.stringify(await encryptAES(
-                stringifiedData, this.sharedSecret, SecureRendezvousChannelAlgorithm.ECDH_V1,
-            )) : stringifiedData;
-
-        await this.transport.send('application/json', body);
+        if (this.sharedSecret) {
+            logger.info(`Encrypting: ${stringifiedData}`);
+            const body = JSON.stringify(await encryptAESGCM(
+                stringifiedData, this.sharedSecret, this.aesInfo,
+            ));
+            await this.transport.send('application/json', body);
+        } else {
+            await this.transport.send('application/json', stringifiedData);
+        }
     }
 
     public async receive(): Promise<any> {
@@ -162,7 +217,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             if (!this.sharedSecret) {
                 throw new Error('Shared secret not set up');
             }
-            const decrypted = await decryptAES(data, this.sharedSecret, SecureRendezvousChannelAlgorithm.ECDH_V1);
+            const decrypted = await decryptAESGCM(data, this.sharedSecret, this.aesInfo);
             logger.info(`Decrypted data: ${decrypted}`);
             return JSON.parse(decrypted);
         } else if (this.sharedSecret) {

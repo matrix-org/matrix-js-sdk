@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from '..';
+import { MatrixClient } from '../matrix';
 import { RendezvousCancellationFunction, RendezvousCancellationReason } from './cancellationReason';
 import { RendezvousChannel } from './channel';
 import { RendezvousCode } from './code';
 import { RendezvousError } from './error';
 import { SimpleHttpRendezvousTransport, SimpleHttpRendezvousTransportDetails } from './transports';
 import { decodeBase64 } from '../crypto/olmlib';
-import { ECDHv1RendezvousChannel, ECDHv1RendezvousCode } from './channels';
+import { ECDHv1RendezvousChannel, ECDHv1RendezvousCode, SecureRendezvousChannelAlgorithm } from './channels';
 
 export * from './code';
 export * from './cancellationReason';
@@ -57,13 +57,13 @@ export async function buildChannelFromCode(
         undefined, // fallbackRzServer
         transportDetails.uri);
 
-    if (parsed.rendezvous?.algorithm !=="m.rendezvous.v1.x25519-aes-sha256") {
+    if (parsed.rendezvous?.algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1) {
         throw new RendezvousError('Unsupported transport', RendezvousCancellationReason.UnsupportedAlgorithm);
     }
 
     const ecdhCode = parsed as ECDHv1RendezvousCode;
 
-    const theirPublicKey = decodeBase64(ecdhCode.rendezvous.key.x);
+    const theirPublicKey = decodeBase64(ecdhCode.rendezvous.key);
 
     return new ECDHv1RendezvousChannel(transport, cli, theirPublicKey);
 }

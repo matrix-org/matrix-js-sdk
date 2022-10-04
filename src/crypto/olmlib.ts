@@ -598,21 +598,3 @@ export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): stri
 export function decodeBase64(base64: string): Uint8Array {
     return Buffer.from(base64, "base64");
 }
-
-/**
- * Encode a typed array of uint8 as URL-safe base64 as per [RFC4648](https://www.rfc-editor.org/rfc/rfc4648).
- * @param {Uint8Array} uint8Array The data to encode.
- * @return {string} The URL safe base64.
- */
-export function encodeUrlSafeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
-    return encodeUnpaddedBase64(uint8Array).replace(/\+/g, '-').replace(/\//g, '_');
-}
-
-/**
- * Decode a URL-safe base64 string to a typed array of uint8.
- * @param {string} urlSafeBase64 The URL-safe base64 to decode.
- * @return {Uint8Array} The decoded data.
- */
-export function decodeUrlSafeBase64(urlSafeBase64: string): Uint8Array {
-    return decodeBase64(urlSafeBase64.replace(/-/g, '+').replace(/_/g, '/'));
-}

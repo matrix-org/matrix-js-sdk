@@ -18,8 +18,6 @@ import {
     encodeBase64,
     decodeBase64,
     encodeUnpaddedBase64,
-    encodeUrlSafeBase64,
-    decodeUrlSafeBase64,
 } from "../../../src/crypto/olmlib";
 
 function parseAscii(string: string): Uint8Array {
@@ -71,28 +69,6 @@ describe("Base64", function() {
                 const dataAsArray = parseAscii(data);
                 expect(encodeUnpaddedBase64(dataAsArray)).toEqual(encoded);
                 expect(decodeBase64(encoded).toString()).toEqual(data);
-            });
-        }
-    });
-
-    describe("url-safe base64", function() {
-        const urlSafeVectors = [
-            ['', ''],
-            ['f', 'Zg'],
-            ['fo', 'Zm8'],
-            ['foo', 'Zm9v'],
-            ['foob', 'Zm9vYg'],
-            ['fooba', 'Zm9vYmE'],
-            ['foobar', 'Zm9vYmFy'],
-            ['>>>>', 'Pj4-Pg'],
-            ['????', 'Pz8_Pw'],
-        ];
-
-        for (const [data, encoded] of urlSafeVectors) {
-            it(`url-safe base64 round-trips "${encoded}"`, function() {
-                const dataAsArray = parseAscii(data);
-                expect(encodeUrlSafeBase64(dataAsArray)).toEqual(encoded);
-                expect(decodeUrlSafeBase64(encoded).toString()).toEqual(data);
             });
         }
     });
