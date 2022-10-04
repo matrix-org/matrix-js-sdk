@@ -72,7 +72,12 @@ export function anySignal(signals: AbortSignal[]): {
  * @returns {Error}
  */
 export function parseErrorResponse(response: XMLHttpRequest | Response, body?: string): Error {
-    const contentType = getResponseContentType(response);
+    let contentType: ParsedMediaType;
+    try {
+        contentType = getResponseContentType(response);
+    } catch (e) {
+        return e;
+    }
 
     if (contentType?.type === "application/json" && body) {
         return new MatrixError(JSON.parse(body), response.status);
@@ -99,9 +104,9 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
 function getResponseContentType(response: XMLHttpRequest | Response): ParsedMediaType | null {
     let contentType: string | null;
     if (isXhr(response)) {
-        contentType = (response as XMLHttpRequest).getResponseHeader("Content-Type");
+        contentType = response.getResponseHeader("Content-Type");
     } else {
-        contentType = (response as Response).headers.get("Content-Type");
+        contentType = response.headers.get("Content-Type");
     }
 
     if (!contentType) return null;

@@ -128,11 +128,12 @@ describe("parseErrorResponse", () => {
         expect(parseErrorResponse({
             headers: {
                 get(name: string): string | null {
-                    return name === "Content-Type" ? "application/x-foo;fff=dad12%%" : null;
+                    return name === "Content-Type" ? " " : null;
                 },
             },
             status: 500,
-        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new Error("Server returned 500 error"));
+        } as Response, '{"errcode": "TEST"}'))
+            .toStrictEqual(new Error("Error parsing Content-Type ' ': TypeError: invalid media type"));
     });
 
     it("should handle plaintext errors", () => {
