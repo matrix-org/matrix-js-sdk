@@ -215,6 +215,11 @@ export const CRYPTO_ENABLED: boolean = isCryptoAvailable();
 const CAPABILITIES_CACHE_MS = 21600000; // 6 hours - an arbitrary value
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
+export const UNSTABLE_MSC3852_LAST_SEEN_UA = new UnstableValue(
+    "last_seen_user_agent",
+    "org.matrix.msc3852.last_seen_user_agent",
+);
+
 interface IExportedDevice {
     olmDevice: IExportedOlmDevice;
     userId: string;
