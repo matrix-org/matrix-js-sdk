@@ -37,6 +37,8 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
     };
 }
 
+// n.b. this is a copy and paste of:
+// https://github.com/matrix-org/matrix-js-sdk/blob/75204d5cd04d67be100fca399f83b1a66ffb8118/src/crypto/verification/SAS.ts#L54-L68
 function generateDecimalSas(sasBytes: number[]): [number, number, number] {
     /**
      *      +--------+--------+--------+--------+--------+
