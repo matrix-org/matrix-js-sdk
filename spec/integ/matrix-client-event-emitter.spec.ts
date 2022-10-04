@@ -32,28 +32,28 @@ import { TestClient } from "../TestClient";
 describe("MatrixClient events", function() {
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
+    let client: MatrixClient | undefined;
+    let httpBackend: HttpBackend | undefined;
 
     const setupTests = (): [MatrixClient, HttpBackend] => {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         const client = testClient.client;
         const httpBackend = testClient.httpBackend;
-        httpBackend.when("GET", "/versions").respond(200, {});
-        httpBackend.when("GET", "/pushrules").respond(200, {});
-        httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+        httpBackend!.when("GET", "/versions").respond(200, {});
+        httpBackend!.when("GET", "/pushrules").respond(200, {});
+        httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
 
-        return [client, httpBackend];
+        return [client!, httpBackend];
     };
 
-    let [client, httpBackend] = setupTests();
-
     beforeEach(function() {
-        [client, httpBackend] = setupTests();
+        [client!, httpBackend] = setupTests();
     });
 
     afterEach(function() {
-        httpBackend.verifyNoOutstandingExpectation();
-        client.stopClient();
-        return httpBackend.stop();
+        httpBackend?.verifyNoOutstandingExpectation();
+        client?.stopClient();
+        return httpBackend?.stop();
     });
 
     describe("emissions", function() {
@@ -127,8 +127,8 @@ describe("MatrixClient events", function() {
 
         it("should emit events from both the first and subsequent /sync calls",
             function() {
-                httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
-                httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
+                httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
+                httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
                 let expectedEvents: Partial<IEvent>[] = [];
                 expectedEvents = expectedEvents.concat(
@@ -139,7 +139,7 @@ describe("MatrixClient events", function() {
                     NEXT_SYNC_DATA.rooms.join["!erufh:bar"].ephemeral.events,
                 );
 
-                client.on(ClientEvent.Event, function(event) {
+                client!.on(ClientEvent.Event, function(event) {
                     let found = false;
                     for (let i = 0; i < expectedEvents.length; i++) {
                         if (expectedEvents[i].event_id === event.getId()) {
@@ -151,24 +151,24 @@ describe("MatrixClient events", function() {
                     expect(found).toBe(true);
                 });
 
-                client.startClient();
+                client!.startClient();
 
                 return Promise.all([
                 // wait for two SYNCING events
-                    utils.syncPromise(client).then(() => {
-                        return utils.syncPromise(client);
+                    utils.syncPromise(client!).then(() => {
+                        return utils.syncPromise(client!);
                     }),
-                    httpBackend.flushAllExpected(),
+                    httpBackend!.flushAllExpected(),
                 ]).then(() => {
                     expect(expectedEvents.length).toEqual(0);
                 });
             });
 
         it("should emit User events", function(done) {
-            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
-            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
+            httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
             let fired = false;
-            client.on(UserEvent.Presence, function(event, user) {
+            client!.on(UserEvent.Presence, function(event, user) {
                 fired = true;
                 expect(user).toBeTruthy();
                 expect(event).toBeTruthy();
@@ -181,37 +181,37 @@ describe("MatrixClient events", function() {
                     SYNC_DATA.presence.events[0]?.content?.presence,
                 );
             });
-            client.startClient();
+            client!.startClient();
 
-            httpBackend.flushAllExpected().then(function() {
+            httpBackend!.flushAllExpected().then(function() {
                 expect(fired).toBe(true);
                 done();
             });
         });
 
         it("should emit Room events", function() {
-            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
-            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
+            httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
             let roomInvokeCount = 0;
             let roomNameInvokeCount = 0;
             let timelineFireCount = 0;
-            client.on(ClientEvent.Room, function(room) {
+            client!.on(ClientEvent.Room, function(room) {
                 roomInvokeCount++;
                 expect(room.roomId).toEqual("!erufh:bar");
             });
-            client.on(RoomEvent.Timeline, function(event, room) {
+            client!.on(RoomEvent.Timeline, function(event, room) {
                 timelineFireCount++;
                 expect(room.roomId).toEqual("!erufh:bar");
             });
-            client.on(RoomEvent.Name, function(room) {
+            client!.on(RoomEvent.Name, function(room) {
                 roomNameInvokeCount++;
             });
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
-                httpBackend.flushAllExpected(),
-                utils.syncPromise(client, 2),
+                httpBackend!.flushAllExpected(),
+                utils.syncPromise(client!, 2),
             ]).then(function() {
                 expect(roomInvokeCount).toEqual(1);
                 expect(roomNameInvokeCount).toEqual(1);
@@ -220,8 +220,8 @@ describe("MatrixClient events", function() {
         });
 
         it("should emit RoomState events", function() {
-            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
-            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
+            httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
             const roomStateEventTypes = [
                 "m.room.member", "m.room.create",
@@ -229,7 +229,7 @@ describe("MatrixClient events", function() {
             let eventsInvokeCount = 0;
             let membersInvokeCount = 0;
             let newMemberInvokeCount = 0;
-            client.on(RoomStateEvent.Events, function(event, state) {
+            client!.on(RoomStateEvent.Events, function(event, state) {
                 eventsInvokeCount++;
                 const index = roomStateEventTypes.indexOf(event.getType());
                 expect(index).not.toEqual(-1);
@@ -237,24 +237,24 @@ describe("MatrixClient events", function() {
                     roomStateEventTypes.splice(index, 1);
                 }
             });
-            client.on(RoomStateEvent.Members, function(event, state, member) {
+            client!.on(RoomStateEvent.Members, function(event, state, member) {
                 membersInvokeCount++;
                 expect(member.roomId).toEqual("!erufh:bar");
                 expect(member.userId).toEqual("@foo:bar");
                 expect(member.membership).toEqual("join");
             });
-            client.on(RoomStateEvent.NewMember, function(event, state, member) {
+            client!.on(RoomStateEvent.NewMember, function(event, state, member) {
                 newMemberInvokeCount++;
                 expect(member.roomId).toEqual("!erufh:bar");
                 expect(member.userId).toEqual("@foo:bar");
                 expect(member.membership).toBeFalsy();
             });
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
-                httpBackend.flushAllExpected(),
-                utils.syncPromise(client, 2),
+                httpBackend!.flushAllExpected(),
+                utils.syncPromise(client!, 2),
             ]).then(function() {
                 expect(membersInvokeCount).toEqual(1);
                 expect(newMemberInvokeCount).toEqual(1);
@@ -263,33 +263,33 @@ describe("MatrixClient events", function() {
         });
 
         it("should emit RoomMember events", function() {
-            httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
-            httpBackend.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
+            httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
+            httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
             let typingInvokeCount = 0;
             let powerLevelInvokeCount = 0;
             let nameInvokeCount = 0;
             let membershipInvokeCount = 0;
-            client.on(RoomMemberEvent.Name, function(event, member) {
+            client!.on(RoomMemberEvent.Name, function(event, member) {
                 nameInvokeCount++;
             });
-            client.on(RoomMemberEvent.Typing, function(event, member) {
+            client!.on(RoomMemberEvent.Typing, function(event, member) {
                 typingInvokeCount++;
                 expect(member.typing).toBe(true);
             });
-            client.on(RoomMemberEvent.PowerLevel, function(event, member) {
+            client!.on(RoomMemberEvent.PowerLevel, function(event, member) {
                 powerLevelInvokeCount++;
             });
-            client.on(RoomMemberEvent.Membership, function(event, member) {
+            client!.on(RoomMemberEvent.Membership, function(event, member) {
                 membershipInvokeCount++;
                 expect(member.membership).toEqual("join");
             });
 
-            client.startClient();
+            client!.startClient();
 
             return Promise.all([
-                httpBackend.flushAllExpected(),
-                utils.syncPromise(client, 2),
+                httpBackend!.flushAllExpected(),
+                utils.syncPromise(client!, 2),
             ]).then(function() {
                 expect(typingInvokeCount).toEqual(1);
                 expect(powerLevelInvokeCount).toEqual(0);
@@ -300,34 +300,34 @@ describe("MatrixClient events", function() {
 
         it("should emit Session.logged_out on M_UNKNOWN_TOKEN", function() {
             const error = { errcode: 'M_UNKNOWN_TOKEN' };
-            httpBackend.when("GET", "/sync").respond(401, error);
+            httpBackend!.when("GET", "/sync").respond(401, error);
 
             let sessionLoggedOutCount = 0;
-            client.on(HttpApiEvent.SessionLoggedOut, function(errObj) {
+            client!.on(HttpApiEvent.SessionLoggedOut, function(errObj) {
                 sessionLoggedOutCount++;
                 expect(errObj.data).toEqual(error);
             });
 
-            client.startClient();
+            client!.startClient();
 
-            return httpBackend.flushAllExpected().then(function() {
+            return httpBackend!.flushAllExpected().then(function() {
                 expect(sessionLoggedOutCount).toEqual(1);
             });
         });
 
         it("should emit Session.logged_out on M_UNKNOWN_TOKEN (soft logout)", function() {
             const error = { errcode: 'M_UNKNOWN_TOKEN', soft_logout: true };
-            httpBackend.when("GET", "/sync").respond(401, error);
+            httpBackend!.when("GET", "/sync").respond(401, error);
 
             let sessionLoggedOutCount = 0;
-            client.on(HttpApiEvent.SessionLoggedOut, function(errObj) {
+            client!.on(HttpApiEvent.SessionLoggedOut, function(errObj) {
                 sessionLoggedOutCount++;
                 expect(errObj.data).toEqual(error);
             });
 
-            client.startClient();
+            client!.startClient();
 
-            return httpBackend.flushAllExpected().then(function() {
+            return httpBackend!.flushAllExpected().then(function() {
                 expect(sessionLoggedOutCount).toEqual(1);
             });
         });
