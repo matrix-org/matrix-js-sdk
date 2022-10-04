@@ -688,6 +688,8 @@ export interface IMyDevice {
     display_name?: string;
     last_seen_ip?: string;
     last_seen_ts?: number;
+    last_seen_user_agent?: string;
+    "org.matrix.msc3852.last_seen_user_agent"?: string;
 }
 
 export interface IDownloadKeyResult {
