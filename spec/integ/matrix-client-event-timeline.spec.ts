@@ -1242,7 +1242,7 @@ describe("MatrixClient event timelines", function() {
                 chunk: [THREAD_ROOT],
                 state: [],
                 next_batch: null,
-            },).check((request) => {
+            }).check((request) => {
                 expect(request.queryParams.from).toEqual(RANDOM_TOKEN);
             });
 
