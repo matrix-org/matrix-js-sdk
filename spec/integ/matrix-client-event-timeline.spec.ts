@@ -228,7 +228,7 @@ describe("getEventTimeline support", function() {
         });
     });
 
-    it("only works with room timelines", function () {
+    it("only works with room timelines", function() {
         return startClient(httpBackend, client).then(function() {
             const timelineSet = new EventTimelineSet(undefined);
             expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
@@ -768,7 +768,7 @@ describe("MatrixClient event timelines", function() {
             });
         });
 
-        it("only works with room timelines", function () {
+        it("only works with room timelines", function() {
             const testClient = new TestClient(
                 userId,
                 "DEVICE",
