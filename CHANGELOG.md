@@ -1,3 +1,9 @@
+Changes in [20.1.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.1.0-rc.2) (2022-10-05)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Use the correct sender key when checking shared secret ([\#2730](https://github.com/matrix-org/matrix-js-sdk/pull/2730)). Fixes vector-im/element-web#23374.
+
 Changes in [20.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.1.0-rc.1) (2022-10-04)
 ============================================================================================================
 
