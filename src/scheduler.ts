@@ -68,8 +68,6 @@ export class MatrixScheduler<T = ISendEventResponse> {
             // client error; no amount of retrying with save you now.
             return -1;
         }
-        // we ship with browser-request which returns { cors: rejected } when trying
-        // with no connection, so if we match that, give up since they have no conn.
         if (err instanceof ConnectionError) {
             return -1;
         }
