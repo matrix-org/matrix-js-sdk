@@ -156,8 +156,11 @@ SYNC_THREAD_ROOT.unsigned = {
     },
 };
 
+type HttpBackend = TestClient["httpBackend"];
+type ExpectedHttpRequest = ReturnType<HttpBackend["when"]>;
+
 // start the client, and wait for it to initialise
-function startClient(httpBackend: TestClient["httpBackend"], client: MatrixClient) {
+function startClient(httpBackend: HttpBackend, client: MatrixClient) {
     httpBackend.when("GET", "/versions").respond(200, {});
     httpBackend.when("GET", "/pushrules").respond(200, {});
     httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
@@ -183,7 +186,7 @@ function startClient(httpBackend: TestClient["httpBackend"], client: MatrixClien
 }
 
 describe("getEventTimeline support", function() {
-    let httpBackend: TestClient["httpBackend"];
+    let httpBackend: HttpBackend;
     let client: MatrixClient;
 
     beforeEach(function() {
@@ -291,7 +294,7 @@ describe("getEventTimeline support", function() {
 
 describe("MatrixClient event timelines", function() {
     let client: MatrixClient;
-    let httpBackend: TestClient["httpBackend"];
+    let httpBackend: HttpBackend;
 
     beforeEach(function() {
         const testClient = new TestClient(
