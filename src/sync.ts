@@ -707,7 +707,8 @@ export class SyncApi {
                 initialFilter.setDefinition(filter.getDefinition());
                 initialFilter.setTimelineLimit(this.opts.initialSyncLimit);
                 const supportsThreadNotifications =
-                    await this.client.doesServerSupportUnstableFeature("org.matrix.msc3773");
+                    await this.client.doesServerSupportUnstableFeature("org.matrix.msc3773")
+                 || await this.client.isVersionSupported("v1.4");
                 initialFilter.setUnreadThreadNotifications(supportsThreadNotifications);
                 // Use an inline filter, no point uploading it for a single usage
                 firstSyncFilter = JSON.stringify(initialFilter.getDefinition());
