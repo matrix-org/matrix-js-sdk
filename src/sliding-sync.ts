@@ -19,6 +19,7 @@ import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { sleep, IDeferred, defer } from "./utils";
+import { ConnectionError } from "./http-api";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -824,10 +825,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         err,
                     );
                     await sleep(3000);
-                } else if (this.needsResend || err === "aborted") {
-                    // don't sleep as we caused this error by abort()ing the request.
-                    // we check for 'aborted' because that's the error Jest returns and without it
-                    // we get warnings about not exiting fast enough.
+                } else if (this.needsResend || err instanceof ConnectionError) {
                     continue;
                 } else {
                     logger.error(err);

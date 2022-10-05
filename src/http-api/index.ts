@@ -112,6 +112,11 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                                 defer.resolve(JSON.parse(xhr.responseText));
                             }
                         } catch (err) {
+                            if (err.name === "AbortError") {
+                                defer.reject(err);
+                                return;
+                            }
+
                             (<MatrixError>err).httpStatus = xhr.status;
                             defer.reject(new ConnectionError("request failed", err));
                         }
@@ -175,7 +180,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         });
         abortController.signal.addEventListener("abort", () => {
             utils.removeElement(this.uploads, elem => elem === upload);
-            defer.reject(new Error("Aborted"));
+            defer.reject(new DOMException("Aborted", "AbortError"));
         });
         this.uploads.push(upload);
 

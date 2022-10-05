@@ -285,6 +285,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 credentials: "omit", // we send credentials via headers
             });
         } catch (e) {
+            if (e.name === "AbortError") {
+                throw e;
+            }
             throw new ConnectionError("fetch failed", e);
         } finally {
             cleanup();

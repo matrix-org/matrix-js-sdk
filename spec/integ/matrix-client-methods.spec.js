@@ -17,7 +17,7 @@ limitations under the License.
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, MemoryStore, Room } from "../../src/matrix";
+import { ConnectionError, Filter, MemoryStore, Method, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 
@@ -1058,6 +1058,49 @@ describe("MatrixClient", function() {
                 .respond(200, response);
             await httpBackend.flush();
             expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("logout", () => {
+        it("should abort pending requests when called with stopClient=true", async () => {
+            httpBackend.when("POST", "/logout").respond(200, {});
+            const fn = jest.fn();
+            client.http.request(Method.Get, "/test").catch(fn);
+            client.logout(true);
+            await httpBackend.flush();
+            expect(fn).toHaveBeenCalled();
+        });
+    });
+
+    describe("sendHtmlEmote", () => {
+        it("should send valid html emote", async () => {
+            httpBackend.when("PUT", "/send").check(req => {
+                expect(req.data).toStrictEqual({
+                    "msgtype": "m.emote",
+                    "body": "Body",
+                    "formatted_body": "<h1>Body</h1>",
+                    "format": "org.matrix.custom.html",
+                    "org.matrix.msc1767.message": expect.anything(),
+                });
+            }).respond(200, { event_id: "$foobar" });
+            const prom = client.sendHtmlEmote("!room:server", "Body", "<h1>Body</h1>");
+            await httpBackend.flush();
+            await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
+        });
+    });
+
+    describe("forget", () => {
+        it("should remove from store by default", async () => {
+            const room = new Room("!roomId:server", client, userId);
+            client.store.storeRoom(room);
+            expect(client.store.getRooms()).toContain(room);
+
+            httpBackend.when("POST", "/forget").respond(200, {});
+            await Promise.all([
+                client.forget(room.roomId),
+                httpBackend.flushAllExpected(),
+            ]);
+            expect(client.store.getRooms()).not.toContain(room);
         });
     });
 });
