@@ -752,7 +752,9 @@ describe("MatrixClient event timelines", function() {
     });
 
     describe("getLatestTimeline", function() {
-        it("timeline support must be enabled to work", function() {
+        it("timeline support must be enabled to work", async function() {
+            await client.stopClient();
+
             const testClient = new TestClient(
                 userId,
                 "DEVICE",
@@ -762,15 +764,16 @@ describe("MatrixClient event timelines", function() {
             );
             client = testClient.client;
             httpBackend = testClient.httpBackend;
+            await startClient(httpBackend, client);
 
-            return startClient(httpBackend, client).then(() => {
-                const room = client.getRoom(roomId);
-                const timelineSet = room.getTimelineSets()[0];
-                expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
-            });
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+            await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
         });
 
-        it("timeline support works when enabled", function() {
+        it("timeline support works when enabled", async function() {
+            await client.stopClient();
+
             const testClient = new TestClient(
                 userId,
                 "DEVICE",
@@ -788,7 +791,9 @@ describe("MatrixClient event timelines", function() {
             });
         });
 
-        it("only works with room timelines", function() {
+        it("only works with room timelines", async function() {
+            await client.stopClient();
+
             const testClient = new TestClient(
                 userId,
                 "DEVICE",
@@ -798,11 +803,10 @@ describe("MatrixClient event timelines", function() {
             );
             client = testClient.client;
             httpBackend = testClient.httpBackend;
+            await startClient(httpBackend, client);
 
-            return startClient(httpBackend, client).then(() => {
-                const timelineSet = new EventTimelineSet(undefined);
-                expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
-            });
+            const timelineSet = new EventTimelineSet(undefined);
+            await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
         });
 
         it("should create a new timeline for new events", function() {
@@ -1038,15 +1042,17 @@ describe("MatrixClient event timelines", function() {
             return request;
         }
 
-        function respondToThreads(): ExpectedHttpRequest {
-            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
-                $roomId: roomId,
-            }));
-            request.respond(200, {
+        function respondToThreads(
+            response = {
                 chunk: [THREAD_ROOT],
                 state: [],
                 next_batch: RANDOM_TOKEN,
-            });
+            },
+        ): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
+                $roomId: roomId,
+            }));
+            request.respond(200, response);
             return request;
         }
 
@@ -1232,7 +1238,11 @@ describe("MatrixClient event timelines", function() {
             expect(timelineSets).not.toBeNull();
             const [allThreads] = timelineSets!;
 
-            respondToThreads().check((request) => {
+            respondToThreads({
+                chunk: [THREAD_ROOT],
+                state: [],
+                next_batch: null,
+            },).check((request) => {
                 expect(request.queryParams.from).toEqual(RANDOM_TOKEN);
             });
 
