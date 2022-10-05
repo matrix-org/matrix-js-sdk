@@ -228,6 +228,13 @@ describe("getEventTimeline support", function() {
         });
     });
 
+    it("only works with room timelines", function () {
+        return startClient(httpBackend, client).then(function() {
+            const timelineSet = new EventTimelineSet(undefined);
+            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
+        });
+    });
+
     it("scrollback should be able to scroll back to before a gappy /sync", function() {
         // need a client with timelineSupport disabled to make this work
         let room: Room;
@@ -725,6 +732,59 @@ describe("MatrixClient event timelines", function() {
     });
 
     describe("getLatestTimeline", function() {
+        it("timeline support must be enabled to work", function() {
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+
+            return startClient(httpBackend, client).then(() => {
+                const room = client.getRoom(roomId);
+                const timelineSet = room.getTimelineSets()[0];
+                expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
+            });
+        });
+
+        it("timeline support works when enabled", function() {
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+
+            return startClient(httpBackend, client).then(() => {
+                const room = client.getRoom(roomId);
+                const timelineSet = room.getTimelineSets()[0];
+                expect(client.getLatestTimeline(timelineSet)).rejects.toBeFalsy();
+            });
+        });
+
+        it("only works with room timelines", function () {
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+
+            return startClient(httpBackend, client).then(() => {
+                const timelineSet = new EventTimelineSet(undefined);
+                expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
+            });
+        });
+
         it("should create a new timeline for new events", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
