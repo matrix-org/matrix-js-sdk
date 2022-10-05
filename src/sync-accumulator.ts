@@ -25,6 +25,7 @@ import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
 import { ReceiptType } from "./@types/read_receipts";
+import { UNREAD_THREAD_NOTIFICATIONS } from './@types/sync';
 
 interface IOpts {
     maxTimelineEntries?: number;
@@ -41,7 +42,7 @@ export interface IEphemeral {
 }
 
 /* eslint-disable camelcase */
-interface IUnreadNotificationCounts {
+interface UnreadNotificationCounts {
     highlight_count?: number;
     notification_count?: number;
 }
@@ -75,7 +76,9 @@ export interface IJoinedRoom {
     timeline: ITimeline;
     ephemeral: IEphemeral;
     account_data: IAccountData;
-    unread_notifications: IUnreadNotificationCounts;
+    unread_notifications: UnreadNotificationCounts;
+    unread_thread_notifications?: Record<string, UnreadNotificationCounts>;
+    "org.matrix.msc3773.unread_thread_notifications"?: Record<string, UnreadNotificationCounts>;
 }
 
 export interface IStrippedState {
@@ -153,7 +156,8 @@ interface IRoom {
     }[];
     _summary: Partial<IRoomSummary>;
     _accountData: { [eventType: string]: IMinimalEvent };
-    _unreadNotifications: Partial<IUnreadNotificationCounts>;
+    _unreadNotifications: Partial<UnreadNotificationCounts>;
+    _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
     _readReceipts: {
         [userId: string]: {
             data: IMinimalEvent;
@@ -362,6 +366,7 @@ export class SyncAccumulator {
                 _timeline: [],
                 _accountData: Object.create(null),
                 _unreadNotifications: {},
+                _unreadThreadNotifications: {},
                 _summary: {},
                 _readReceipts: {},
             };
@@ -379,6 +384,10 @@ export class SyncAccumulator {
         if (data.unread_notifications) {
             currentData._unreadNotifications = data.unread_notifications;
         }
+        currentData._unreadThreadNotifications = data[UNREAD_THREAD_NOTIFICATIONS.stable]
+            ?? data[UNREAD_THREAD_NOTIFICATIONS.unstable]
+            ?? undefined;
+
         if (data.summary) {
             const HEROES_KEY = "m.heroes";
             const INVITED_COUNT_KEY = "m.invited_member_count";
@@ -537,6 +546,7 @@ export class SyncAccumulator {
                     prev_batch: null,
                 },
                 unread_notifications: roomData._unreadNotifications,
+                unread_thread_notifications: roomData._unreadThreadNotifications,
                 summary: roomData._summary as IRoomSummary,
             };
             // Add account data
