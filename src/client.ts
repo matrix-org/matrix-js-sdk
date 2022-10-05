@@ -5588,13 +5588,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.clientOpts.lazyLoadMembers) {
             // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
             // so the timelineFilter doesn't get written into it below
-            filter = Object.assign({}, Filter.LAZY_LOADING_MESSAGES_FILTER);
+            filter = {
+                ...filter,
+                ...Filter.LAZY_LOADING_MESSAGES_FILTER,
+            };
         }
         if (timelineFilter) {
             // XXX: it's horrific that /messages' filter parameter doesn't match
             // /sync's one - see https://matrix.org/jira/browse/SPEC-451
-            filter = filter || {};
-            Object.assign(filter, timelineFilter.getRoomTimelineFilterComponent()?.toJSON());
+            filter = {
+                ...filter,
+                ...timelineFilter.getRoomTimelineFilterComponent()?.toJSON(),
+            };
         }
         if (filter) {
             params.filter = JSON.stringify(filter);
