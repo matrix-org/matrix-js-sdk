@@ -14,42 +14,66 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientPrefix, MatrixHttpApi, Method } from "../../../src";
+import DOMException from "domexception";
+
+import { ClientPrefix, MatrixHttpApi, Method, Upload } from "../../../src";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
+
+type Writeable<T> = { -readonly [P in keyof T]: T[P] };
 
 describe("MatrixHttpApi", () => {
     const baseUrl = "http://baseUrl";
     const prefix = ClientPrefix.V3;
 
+    let xhr: Partial<Writeable<XMLHttpRequest>>;
+    let upload: Upload;
     const open = jest.fn();
     const send = jest.fn();
     const abort = jest.fn();
     const setRequestHeader = jest.fn();
 
+    const DONE = 0;
+
+    global.DOMException = DOMException;
+
     beforeEach(() => {
         jest.clearAllMocks();
-        // @ts-ignore
-        global.XMLHttpRequest = jest.fn().mockReturnValue({
-            upload: {},
+        xhr = {
+            upload: {} as XMLHttpRequestUpload,
             open,
             send,
             abort,
             setRequestHeader,
-        });
+            onreadystatechange: undefined,
+        };
+        // We stub out XHR here as it is not available in JSDOM
+        // @ts-ignore
+        global.XMLHttpRequest = jest.fn().mockReturnValue(xhr);
+        // @ts-ignore
+        global.XMLHttpRequest.DONE = DONE;
+    });
+
+    afterEach(() => {
+        upload?.promise.catch(() => {});
+        // Abort any remaining requests
+        xhr.readyState = DONE;
+        xhr.status = 0;
+        // @ts-ignore
+        xhr.onreadystatechange?.(new Event("test"));
     });
 
     it("should fall back to `fetch` where xhr is unavailable", () => {
         global.XMLHttpRequest = undefined;
         const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
-        api.uploadContent({} as File);
+        upload = api.uploadContent({} as File);
         expect(fetchFn).toHaveBeenCalled();
     });
 
     it("should prefer xhr where available", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
-        api.uploadContent({} as File);
+        upload = api.uploadContent({} as File);
         expect(fetchFn).not.toHaveBeenCalled();
         expect(open).toHaveBeenCalled();
     });
@@ -61,7 +85,7 @@ describe("MatrixHttpApi", () => {
             accessToken: "token",
             useAuthorizationHeader: false,
         });
-        api.uploadContent({} as File);
+        upload = api.uploadContent({} as File);
         expect(open)
             .toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/r0/upload?access_token=token");
         expect(setRequestHeader).not.toHaveBeenCalledWith("Authorization");
@@ -73,27 +97,27 @@ describe("MatrixHttpApi", () => {
             prefix,
             accessToken: "token",
         });
-        api.uploadContent({} as File);
+        upload = api.uploadContent({} as File);
         expect(open).toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/r0/upload");
         expect(setRequestHeader).toHaveBeenCalledWith("Authorization", "Bearer token");
     });
 
     it("should include filename by default", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
-        api.uploadContent({} as File, { name: "name" });
+        upload = api.uploadContent({} as File, { name: "name" });
         expect(open)
             .toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/r0/upload?filename=name");
     });
 
     it("should allow not sending the filename", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
-        api.uploadContent({} as File, { name: "name", includeFilename: false });
+        upload = api.uploadContent({} as File, { name: "name", includeFilename: false });
         expect(open).toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/r0/upload");
     });
 
     it("should abort xhr when the upload is aborted", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
-        const upload = api.uploadContent({} as File);
+        upload = api.uploadContent({} as File);
         upload.abortController.abort();
         expect(abort).toHaveBeenCalled();
         return expect(upload.promise).rejects.toThrow("Aborted");
