@@ -17,7 +17,7 @@ limitations under the License.
 import * as utils from "../test-utils/test-utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { ConnectionError, Filter, MemoryStore, Method, Room } from "../../src/matrix";
+import { Filter, MemoryStore, Method, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 
