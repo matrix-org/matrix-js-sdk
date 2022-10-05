@@ -26,10 +26,10 @@ import {
     MatrixEvent,
     Room,
 } from "../../src/matrix";
-import {logger} from "../../src/logger";
-import {encodeUri} from "../../src/utils";
-import {TestClient} from "../TestClient";
-import {FeatureSupport, Thread, THREAD_RELATION_TYPE} from "../../src/models/thread";
+import { logger } from "../../src/logger";
+import { encodeUri } from "../../src/utils";
+import { TestClient } from "../TestClient";
+import { FeatureSupport, Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -1128,7 +1128,7 @@ describe("MatrixClient event timelines", function() {
             const room = client.getRoom(roomId);
             const timelineSets = await room?.createThreadsTimelineSets();
             expect(timelineSets).not.toBeNull();
-            const [allThreads,] = timelineSets!;
+            const [allThreads] = timelineSets!;
 
             respondToThreads().check((request) => {
                 expect(request.queryParams.filter).toEqual(JSON.stringify({
@@ -1150,7 +1150,7 @@ describe("MatrixClient event timelines", function() {
             const room = client.getRoom(roomId);
             const timelineSets = await room?.createThreadsTimelineSets();
             expect(timelineSets).not.toBeNull();
-            const [allThreads,] = timelineSets!;
+            const [allThreads] = timelineSets!;
 
             respondToThreads().check((request) => {
                 expect(request.queryParams.from).toEqual(RANDOM_TOKEN);
