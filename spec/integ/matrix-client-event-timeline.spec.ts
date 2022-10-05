@@ -203,6 +203,16 @@ describe("getEventTimeline support", function() {
     });
 
     it("timeline support must be enabled to work", function() {
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            { timelineSupport: false },
+        );
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
+
         return startClient(httpBackend, client).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
@@ -229,6 +239,16 @@ describe("getEventTimeline support", function() {
     });
 
     it("only works with room timelines", function() {
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            { timelineSupport: true },
+        );
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
+
         return startClient(httpBackend, client).then(function() {
             const timelineSet = new EventTimelineSet(undefined);
             expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
@@ -738,7 +758,7 @@ describe("MatrixClient event timelines", function() {
                 "DEVICE",
                 accessToken,
                 undefined,
-                { timelineSupport: true },
+                { timelineSupport: false },
             );
             client = testClient.client;
             httpBackend = testClient.httpBackend;
