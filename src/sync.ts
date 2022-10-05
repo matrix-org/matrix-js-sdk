@@ -58,6 +58,7 @@ import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
 import { IAbortablePromise } from "./@types/partials";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 
 const DEBUG = true;
 
@@ -705,6 +706,10 @@ export class SyncApi {
                 const initialFilter = this.buildDefaultFilter();
                 initialFilter.setDefinition(filter.getDefinition());
                 initialFilter.setTimelineLimit(this.opts.initialSyncLimit);
+                const supportsThreadNotifications =
+                    await this.client.doesServerSupportUnstableFeature("org.matrix.msc3773")
+                 || await this.client.isVersionSupported("v1.4");
+                initialFilter.setUnreadThreadNotifications(supportsThreadNotifications);
                 // Use an inline filter, no point uploading it for a single usage
                 firstSyncFilter = JSON.stringify(initialFilter.getDefinition());
             }
@@ -1262,6 +1267,29 @@ export class SyncApi {
                         joinObj.unread_notifications.highlight_count,
                     );
                 }
+            }
+
+            room.resetThreadUnreadNotificationCount();
+            const unreadThreadNotifications = joinObj[UNREAD_THREAD_NOTIFICATIONS.name]
+                ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName];
+            if (unreadThreadNotifications) {
+                Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
+                    room.setThreadUnreadNotificationCount(
+                        threadId,
+                        NotificationCountType.Total,
+                        unreadNotification.notification_count,
+                    );
+
+                    const hasNoNotifications =
+                        room.getThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight) <= 0;
+                    if (!encrypted || (encrypted && hasNoNotifications)) {
+                        room.setThreadUnreadNotificationCount(
+                            threadId,
+                            NotificationCountType.Highlight,
+                            unreadNotification.highlight_count,
+                        );
+                    }
+                });
             }
 
             joinObj.timeline = joinObj.timeline || {} as ITimeline;

@@ -673,4 +673,3 @@ export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: Mat
 export function isSupportedReceiptType(receiptType: string): boolean {
     return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receiptType as ReceiptType);
 }
-
