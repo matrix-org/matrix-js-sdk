@@ -46,6 +46,16 @@ describe("utils", function() {
         });
     });
 
+    describe("decodeParams", () => {
+        it("should be able to decode multiple values into an array", () => {
+            const params = "foo=bar&via=a&via=b&via=c";
+            expect(utils.decodeParams(params)).toEqual({
+                foo: "bar",
+                via: ["a", "b", "c"],
+            });
+        });
+    });
+
     describe("encodeUri", function() {
         it("should replace based on object keys and url encode", function() {
             const path = "foo/bar/%something/%here";
