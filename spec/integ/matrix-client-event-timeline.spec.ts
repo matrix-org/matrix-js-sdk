@@ -26,10 +26,10 @@ import {
     MatrixEvent,
     Room,
 } from "../../src/matrix";
-import { logger } from "../../src/logger";
-import { encodeUri } from "../../src/utils";
-import { TestClient } from "../TestClient";
-import { FeatureSupport, Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
+import {logger} from "../../src/logger";
+import {encodeUri} from "../../src/utils";
+import {TestClient} from "../TestClient";
+import {FeatureSupport, Thread, THREAD_RELATION_TYPE} from "../../src/models/thread";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -1136,6 +1136,27 @@ describe("MatrixClient event timelines", function() {
                 }));
             });
 
+            await flushHttp(client.paginateEventTimeline(allThreads.getLiveTimeline(), {
+                backwards: true,
+            }));
+        });
+
+        it("should correctly pass pagination token", async () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
+            Thread.setServerSideListSupport(FeatureSupport.Stable);
+
+            const room = client.getRoom(roomId);
+            const timelineSets = await room?.createThreadsTimelineSets();
+            expect(timelineSets).not.toBeNull();
+            const [allThreads,] = timelineSets!;
+
+            respondToThreads().check((request) => {
+                expect(request.queryParams.from).toEqual(RANDOM_TOKEN);
+            });
+
+            allThreads.getLiveTimeline().setPaginationToken(RANDOM_TOKEN, Direction.Backward);
             await flushHttp(client.paginateEventTimeline(allThreads.getLiveTimeline(), {
                 backwards: true,
             }));
