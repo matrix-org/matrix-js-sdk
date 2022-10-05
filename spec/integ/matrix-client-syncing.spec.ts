@@ -33,7 +33,9 @@ import {
     IJoinedRoom,
     IStateEvent,
     IMinimalEvent,
+    NotificationCountType,
 } from "../../src";
+import { UNREAD_THREAD_NOTIFICATIONS } from '../../src/@types/sync';
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 
@@ -1371,6 +1373,73 @@ describe("MatrixClient syncing", () => {
                         ts: 176592842636,
                     },
                 }]);
+            });
+        });
+    });
+
+    describe("unread notifications", () => {
+        const THREAD_ID = "$ThisIsARandomEventId";
+
+        const syncData = {
+            rooms: {
+                join: {
+                    [roomOne]: {
+                        timeline: {
+                            events: [
+                                utils.mkMessage({
+                                    room: roomOne, user: otherUserId, msg: "hello",
+                                }),
+                                utils.mkMessage({
+                                    room: roomOne, user: otherUserId, msg: "world",
+                                }),
+                            ],
+                        },
+                        state: {
+                            events: [
+                                utils.mkEvent({
+                                    type: "m.room.name", room: roomOne, user: otherUserId,
+                                    content: {
+                                        name: "Room name",
+                                    },
+                                }),
+                                utils.mkMembership({
+                                    room: roomOne, mship: "join", user: otherUserId,
+                                }),
+                                utils.mkMembership({
+                                    room: roomOne, mship: "join", user: selfUserId,
+                                }),
+                                utils.mkEvent({
+                                    type: "m.room.create", room: roomOne, user: selfUserId,
+                                    content: {
+                                        creator: selfUserId,
+                                    },
+                                }),
+                            ],
+                        },
+                    },
+                },
+            },
+        };
+        it("should sync unread notifications.", () => {
+            syncData.rooms.join[roomOne][UNREAD_THREAD_NOTIFICATIONS.name] = {
+                [THREAD_ID]: {
+                    "highlight_count": 2,
+                    "notification_count": 5,
+                },
+            };
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+
+            client!.startClient();
+
+            return Promise.all([
+                httpBackend!.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(() => {
+                const room = client!.getRoom(roomOne);
+
+                expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(5);
+                expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(2);
             });
         });
     });

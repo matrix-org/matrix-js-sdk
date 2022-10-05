@@ -1444,9 +1444,10 @@ class MegolmDecryption extends DecryptionAlgorithm {
                     memberEvent?.getPrevContent()?.membership === "invite");
             const fromUs = event.getSender() === this.baseApis.getUserId();
 
-            if (!weRequested) {
-                // If someone sends us an unsolicited key and it's not
-                // shared history, ignore it
+            if (!weRequested && !fromUs) {
+                // If someone sends us an unsolicited key and they're
+                // not one of our other devices and it's not shared
+                // history, ignore it
                 if (!extraSessionData.sharedHistory) {
                     logger.log("forwarded key not shared history - ignoring");
                     return;
@@ -1455,7 +1456,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 // If someone sends us an unsolicited key for a room
                 // we're already in, and they're not one of our other
                 // devices or the one who invited us, ignore it
-                if (room && !fromInviter && !fromUs) {
+                if (room && !fromInviter) {
                     logger.log("forwarded key not from inviter or from us - ignoring");
                     return;
                 }
