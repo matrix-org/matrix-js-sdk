@@ -97,7 +97,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     // XXX: Should be read-only
     public members: Record<string, RoomMember> = {}; // userId: RoomMember
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
-    public paginationToken: string = null;
+    public paginationToken: string | null = null;
 
     public readonly beacons = new Map<BeaconIdentifier, Beacon>();
     private _liveBeaconIds: BeaconIdentifier[] = [];

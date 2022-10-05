@@ -51,11 +51,28 @@ interface IThreadOpts {
     client: MatrixClient;
 }
 
+export enum FeatureSupport {
+    None = 0,
+    Experimental = 1,
+    Stable = 2
+}
+
+export function determineFeatureSupport(stable: boolean, unstable: boolean): FeatureSupport {
+    if (stable) {
+        return FeatureSupport.Stable;
+    } else if (unstable) {
+        return FeatureSupport.Experimental;
+    } else {
+        return FeatureSupport.None;
+    }
+}
+
 /**
  * @experimental
  */
 export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
-    public static hasServerSideSupport: boolean;
+    public static hasServerSideSupport = FeatureSupport.None;
+    public static hasServerSideListSupport = FeatureSupport.None;
 
     /**
      * A reference to all the events ID at the bottom of the threads
@@ -134,13 +151,21 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.emit(ThreadEvent.Update, this);
     }
 
-    public static setServerSideSupport(hasServerSideSupport: boolean, useStable: boolean): void {
-        Thread.hasServerSideSupport = hasServerSideSupport;
-        if (!useStable) {
+    public static setServerSideSupport(
+        status: FeatureSupport,
+    ): void {
+        Thread.hasServerSideSupport = status;
+        if (status !== FeatureSupport.Stable) {
             FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
             FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
             THREAD_RELATION_TYPE.setPreferUnstable(true);
         }
+    }
+
+    public static setServerSideListSupport(
+        status: FeatureSupport,
+    ): void {
+        Thread.hasServerSideListSupport = status;
     }
 
     private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent) => {

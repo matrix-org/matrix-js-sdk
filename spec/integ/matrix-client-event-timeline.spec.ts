@@ -15,10 +15,21 @@ limitations under the License.
 */
 
 import * as utils from "../test-utils/test-utils";
-import { ClientEvent, EventTimeline, Filter, IEvent, MatrixClient, MatrixEvent, Room } from "../../src/matrix";
+import {
+    ClientEvent,
+    Direction,
+    EventTimeline,
+    EventTimelineSet,
+    Filter,
+    IEvent,
+    MatrixClient,
+    MatrixEvent,
+    Room,
+} from "../../src/matrix";
 import { logger } from "../../src/logger";
+import { encodeUri } from "../../src/utils";
 import { TestClient } from "../TestClient";
-import { Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { FeatureSupport, Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
 
 const userId = "@alice:localhost";
 const userName = "Alice";
@@ -145,8 +156,11 @@ SYNC_THREAD_ROOT.unsigned = {
     },
 };
 
+type HttpBackend = TestClient["httpBackend"];
+type ExpectedHttpRequest = ReturnType<HttpBackend["when"]>;
+
 // start the client, and wait for it to initialise
-function startClient(httpBackend: TestClient["httpBackend"], client: MatrixClient) {
+function startClient(httpBackend: HttpBackend, client: MatrixClient) {
     httpBackend.when("GET", "/versions").respond(200, {});
     httpBackend.when("GET", "/pushrules").respond(200, {});
     httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
@@ -172,7 +186,7 @@ function startClient(httpBackend: TestClient["httpBackend"], client: MatrixClien
 }
 
 describe("getEventTimeline support", function() {
-    let httpBackend: TestClient["httpBackend"];
+    let httpBackend: HttpBackend;
     let client: MatrixClient;
 
     beforeEach(function() {
@@ -189,6 +203,16 @@ describe("getEventTimeline support", function() {
     });
 
     it("timeline support must be enabled to work", function() {
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            { timelineSupport: false },
+        );
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
+
         return startClient(httpBackend, client).then(function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
@@ -211,6 +235,23 @@ describe("getEventTimeline support", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
             expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeFalsy();
+        });
+    });
+
+    it("only works with room timelines", function() {
+        const testClient = new TestClient(
+            userId,
+            "DEVICE",
+            accessToken,
+            undefined,
+            { timelineSupport: true },
+        );
+        client = testClient.client;
+        httpBackend = testClient.httpBackend;
+
+        return startClient(httpBackend, client).then(function() {
+            const timelineSet = new EventTimelineSet(undefined);
+            expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
         });
     });
 
@@ -280,7 +321,7 @@ describe("getEventTimeline support", function() {
 
 describe("MatrixClient event timelines", function() {
     let client: MatrixClient;
-    let httpBackend: TestClient["httpBackend"];
+    let httpBackend: HttpBackend;
 
     beforeEach(function() {
         const testClient = new TestClient(
@@ -299,7 +340,7 @@ describe("MatrixClient event timelines", function() {
     afterEach(function() {
         httpBackend.verifyNoOutstandingExpectation();
         client.stopClient();
-        Thread.setServerSideSupport(false, false);
+        Thread.setServerSideSupport(FeatureSupport.None);
     });
 
     describe("getEventTimeline", function() {
@@ -552,7 +593,7 @@ describe("MatrixClient event timelines", function() {
         it("should handle thread replies with server support by fetching a contiguous thread timeline", async () => {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
-            Thread.setServerSideSupport(true, false);
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
             const thread = room.createThread(THREAD_ROOT.event_id, undefined, [], false);
@@ -598,7 +639,7 @@ describe("MatrixClient event timelines", function() {
         it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
-            Thread.setServerSideSupport(true, false);
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
             const threadRoot = new MatrixEvent(THREAD_ROOT);
@@ -630,7 +671,7 @@ describe("MatrixClient event timelines", function() {
         it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
-            Thread.setServerSideSupport(true, false);
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
             const threadRoot = new MatrixEvent(THREAD_ROOT);
@@ -658,7 +699,7 @@ describe("MatrixClient event timelines", function() {
         it("should return undefined when event is within a thread but timelineSet is not", () => {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
-            Thread.setServerSideSupport(true, false);
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
@@ -711,6 +752,63 @@ describe("MatrixClient event timelines", function() {
     });
 
     describe("getLatestTimeline", function() {
+        it("timeline support must be enabled to work", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: false },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+            await startClient(httpBackend, client);
+
+            const room = client.getRoom(roomId);
+            const timelineSet = room.getTimelineSets()[0];
+            await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
+        });
+
+        it("timeline support works when enabled", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+
+            return startClient(httpBackend, client).then(() => {
+                const room = client.getRoom(roomId);
+                const timelineSet = room.getTimelineSets()[0];
+                expect(client.getLatestTimeline(timelineSet)).rejects.toBeFalsy();
+            });
+        });
+
+        it("only works with room timelines", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+            await startClient(httpBackend, client);
+
+            const timelineSet = new EventTimelineSet(undefined);
+            await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
+        });
+
         it("should create a new timeline for new events", function() {
             const room = client.getRoom(roomId);
             const timelineSet = room.getTimelineSets()[0];
@@ -925,6 +1023,236 @@ describe("MatrixClient event timelines", function() {
         });
     });
 
+    describe("paginateEventTimeline for thread list timeline", function() {
+        async function flushHttp<T>(promise: Promise<T>): Promise<T> {
+            return Promise.all([promise, httpBackend.flushAllExpected()]).then(([result]) => result);
+        }
+
+        const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
+
+        function respondToFilter(): ExpectedHttpRequest {
+            const request = httpBackend.when("POST", "/filter");
+            request.respond(200, { filter_id: "fid" });
+            return request;
+        }
+
+        function respondToSync(): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", "/sync");
+            request.respond(200, INITIAL_SYNC_DATA);
+            return request;
+        }
+
+        function respondToThreads(
+            response = {
+                chunk: [THREAD_ROOT],
+                state: [],
+                next_batch: RANDOM_TOKEN,
+            },
+        ): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
+                $roomId: roomId,
+            }));
+            request.respond(200, response);
+            return request;
+        }
+
+        function respondToContext(): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
+                $roomId: roomId,
+                $eventId: THREAD_ROOT.event_id!,
+            }));
+            request.respond(200, {
+                end: `${Direction.Forward}${RANDOM_TOKEN}1`,
+                start: `${Direction.Backward}${RANDOM_TOKEN}1`,
+                state: [],
+                events_before: [],
+                events_after: [],
+                event: THREAD_ROOT,
+            });
+            return request;
+        }
+        function respondToMessagesRequest(): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
+                $roomId: roomId,
+            }));
+            request.respond(200, {
+                chunk: [THREAD_ROOT],
+                state: [],
+                start: `${Direction.Forward}${RANDOM_TOKEN}2`,
+                end: `${Direction.Backward}${RANDOM_TOKEN}2`,
+            });
+            return request;
+        }
+
+        describe("with server compatibility", function() {
+            beforeEach(() => {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.Stable);
+            });
+
+            async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
+                respondToContext();
+                await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
+                respondToThreads();
+                const timeline = await flushHttp(client.getLatestTimeline(timelineSet));
+                expect(timeline).not.toBeNull();
+
+                respondToThreads();
+                const success = await flushHttp(client.paginateEventTimeline(timeline!, {
+                    backwards: direction === Direction.Backward,
+                }));
+                expect(success).toBeTruthy();
+                expect(timeline!.getEvents().map(it => it.event)).toEqual([THREAD_ROOT]);
+                expect(timeline!.getPaginationToken(direction)).toEqual(RANDOM_TOKEN);
+            }
+
+            it("should allow you to paginate all threads backwards", async function() {
+                const room = client.getRoom(roomId);
+                const timelineSets = await (room?.createThreadsTimelineSets());
+                expect(timelineSets).not.toBeNull();
+                const [allThreads, myThreads] = timelineSets!;
+                await testPagination(allThreads, Direction.Backward);
+                await testPagination(myThreads, Direction.Backward);
+            });
+
+            it("should allow you to paginate all threads forwards", async function() {
+                const room = client.getRoom(roomId);
+                const timelineSets = await (room?.createThreadsTimelineSets());
+                expect(timelineSets).not.toBeNull();
+                const [allThreads, myThreads] = timelineSets!;
+
+                await testPagination(allThreads, Direction.Forward);
+                await testPagination(myThreads, Direction.Forward);
+            });
+
+            it("should allow fetching all threads", async function() {
+                const room = client.getRoom(roomId);
+                const timelineSets = await room?.createThreadsTimelineSets();
+                expect(timelineSets).not.toBeNull();
+                respondToThreads();
+                respondToThreads();
+                httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
+                await flushHttp(room.fetchRoomThreads());
+            });
+        });
+
+        describe("without server compatibility", function() {
+            beforeEach(() => {
+                // @ts-ignore
+                client.clientOpts.experimentalThreadSupport = true;
+                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideListSupport(FeatureSupport.None);
+            });
+
+            async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
+                respondToContext();
+                respondToSync();
+                await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
+
+                respondToMessagesRequest();
+                const timeline = await flushHttp(client.getLatestTimeline(timelineSet));
+                expect(timeline).not.toBeNull();
+
+                respondToMessagesRequest();
+                const success = await flushHttp(client.paginateEventTimeline(timeline!, {
+                    backwards: direction === Direction.Backward,
+                }));
+
+                expect(success).toBeTruthy();
+                expect(timeline!.getEvents().map(it => it.event)).toEqual([THREAD_ROOT]);
+                expect(timeline!.getPaginationToken(direction)).toEqual(`${direction}${RANDOM_TOKEN}2`);
+            }
+
+            it("should allow you to paginate all threads", async function() {
+                const room = client.getRoom(roomId);
+
+                respondToFilter();
+                respondToSync();
+                respondToFilter();
+                respondToSync();
+
+                const timelineSetsPromise = room?.createThreadsTimelineSets();
+                expect(timelineSetsPromise).not.toBeNull();
+                const timelineSets = await flushHttp(timelineSetsPromise!);
+                expect(timelineSets).not.toBeNull();
+                const [allThreads, myThreads] = timelineSets!;
+
+                await testPagination(allThreads, Direction.Backward);
+                await testPagination(myThreads, Direction.Backward);
+            });
+
+            it("should allow fetching all threads", async function() {
+                const room = client.getRoom(roomId);
+
+                respondToFilter();
+                respondToSync();
+                respondToFilter();
+                respondToSync();
+
+                const timelineSetsPromise = room?.createThreadsTimelineSets();
+                expect(timelineSetsPromise).not.toBeNull();
+                await flushHttp(timelineSetsPromise!);
+                respondToFilter();
+                respondToSync();
+                respondToSync();
+                respondToSync();
+                respondToMessagesRequest();
+                await flushHttp(room.fetchRoomThreads());
+            });
+        });
+
+        it("should add lazy loading filter", async () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
+            Thread.setServerSideListSupport(FeatureSupport.Stable);
+            // @ts-ignore
+            client.clientOpts.lazyLoadMembers = true;
+
+            const room = client.getRoom(roomId);
+            const timelineSets = await room?.createThreadsTimelineSets();
+            expect(timelineSets).not.toBeNull();
+            const [allThreads] = timelineSets!;
+
+            respondToThreads().check((request) => {
+                expect(request.queryParams.filter).toEqual(JSON.stringify({
+                    "lazy_load_members": true,
+                }));
+            });
+
+            await flushHttp(client.paginateEventTimeline(allThreads.getLiveTimeline(), {
+                backwards: true,
+            }));
+        });
+
+        it("should correctly pass pagination token", async () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
+            Thread.setServerSideListSupport(FeatureSupport.Stable);
+
+            const room = client.getRoom(roomId);
+            const timelineSets = await room?.createThreadsTimelineSets();
+            expect(timelineSets).not.toBeNull();
+            const [allThreads] = timelineSets!;
+
+            respondToThreads({
+                chunk: [THREAD_ROOT],
+                state: [],
+                next_batch: null,
+            }).check((request) => {
+                expect(request.queryParams.from).toEqual(RANDOM_TOKEN);
+            });
+
+            allThreads.getLiveTimeline().setPaginationToken(RANDOM_TOKEN, Direction.Backward);
+            await flushHttp(client.paginateEventTimeline(allThreads.getLiveTimeline(), {
+                backwards: true,
+            }));
+        });
+    });
+
     describe("event timeline for sent events", function() {
         const TXN_ID = "txn1";
         const event = utils.mkMessage({
@@ -1092,7 +1420,7 @@ describe("MatrixClient event timelines", function() {
     it("should re-insert room IDs for bundled thread relation events", async () => {
         // @ts-ignore
         client.clientOpts.experimentalThreadSupport = true;
-        Thread.setServerSideSupport(true, false);
+        Thread.setServerSideSupport(FeatureSupport.Experimental);
 
         httpBackend.when("GET", "/sync").respond(200, {
             next_batch: "s_5_4",
