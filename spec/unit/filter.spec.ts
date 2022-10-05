@@ -43,4 +43,17 @@ describe("Filter", function() {
             expect(filter.getDefinition()).toEqual(definition);
         });
     });
+
+    describe("setUnreadThreadNotifications", function() {
+        it("setUnreadThreadNotifications", function() {
+            filter.setUnreadThreadNotifications(true);
+            expect(filter.getDefinition()).toEqual({
+                room: {
+                    timeline: {
+                        unread_thread_notifications: true,
+                    },
+                },
+            });
+        });
+    });
 });
