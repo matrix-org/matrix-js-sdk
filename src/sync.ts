@@ -1269,7 +1269,8 @@ export class SyncApi {
             }
 
             room.resetThreadUnreadNotificationCount();
-            const unreadThreadNotifications = joinObj[UNREAD_THREAD_NOTIFICATIONS.name];
+            const unreadThreadNotifications = joinObj[UNREAD_THREAD_NOTIFICATIONS.name]
+                ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName];
             if (unreadThreadNotifications) {
                 Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
                     room.setThreadUnreadNotificationCount(
@@ -1278,9 +1279,9 @@ export class SyncApi {
                         unreadNotification.notification_count,
                     );
 
-                    const hasUnreadNotification =
+                    const hasNoNotifications =
                         room.getThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight) <= 0;
-                    if (!encrypted || (encrypted && hasUnreadNotification)) {
+                    if (!encrypted || (encrypted && hasNoNotifications)) {
                         room.setThreadUnreadNotificationCount(
                             threadId,
                             NotificationCountType.Highlight,
