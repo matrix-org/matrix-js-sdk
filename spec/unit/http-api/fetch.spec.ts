@@ -16,7 +16,8 @@ limitations under the License.
 
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
-import { ClientPrefix, IdentityPrefix, IHttpOpts, Method } from "../../../src";
+import { ClientPrefix, HttpApiEvent, HttpApiEventHandlerMap, IdentityPrefix, IHttpOpts, Method } from "../../../src";
+import { emitPromise } from "../../test-utils/test-utils";
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
@@ -196,5 +197,27 @@ describe("FetchHttpApi", () => {
             headers: { Accept: "text/html" },
         });
         expect(fetchFn.mock.calls[0][1].headers["Accept"]).toBe("text/html");
+    });
+
+    it("should emit NoConsent when given errcode=M_CONTENT_NOT_GIVEN", async () => {
+        const fetchFn = jest.fn().mockResolvedValue({
+            ok: false,
+            headers: {
+                get(name: string): string | null {
+                    return name === "Content-Type" ? "application/json" : null;
+                },
+            },
+            text: jest.fn().mockResolvedValue(JSON.stringify({
+                errcode: "M_CONSENT_NOT_GIVEN",
+                error: "Ye shall ask for consent",
+            })),
+        });
+        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+        const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn });
+
+        await Promise.all([
+            emitPromise(emitter, HttpApiEvent.NoConsent),
+            expect(api.authedRequest(Method.Get, "/path")).rejects.toThrow("Ye shall ask for consent"),
+        ]);
     });
 });

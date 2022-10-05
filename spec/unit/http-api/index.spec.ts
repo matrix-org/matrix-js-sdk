@@ -176,4 +176,53 @@ describe("MatrixHttpApi", () => {
 
         return expect(upload.promise).rejects.toThrow("Not found");
     });
+
+    it("should return response on successful upload", () => {
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        upload = api.uploadContent({} as File);
+
+        xhr.readyState = DONE;
+        xhr.responseText = '{"content_uri": "mxc://server/foobar"}';
+        xhr.status = 200;
+        mocked(xhr.getResponseHeader).mockReturnValue("application/json");
+        // @ts-ignore
+        xhr.onreadystatechange?.(new Event("test"));
+
+        return expect(upload.promise).resolves.toStrictEqual({ content_uri: "mxc://server/foobar" });
+    });
+
+    it("should abort xhr when calling `cancelUpload`", () => {
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        upload = api.uploadContent({} as File);
+        expect(api.cancelUpload(upload)).toBeTruthy();
+        expect(xhr.abort).toHaveBeenCalled();
+    });
+
+    it("should return false when `cancelUpload` is called but unsuccessful", async () => {
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        upload = api.uploadContent({} as File);
+
+        xhr.readyState = DONE;
+        xhr.status = 500;
+        mocked(xhr.getResponseHeader).mockReturnValue("application/json");
+        // @ts-ignore
+        xhr.onreadystatechange?.(new Event("test"));
+        await upload.promise.catch(() => {});
+
+        expect(api.cancelUpload(upload)).toBeFalsy();
+        expect(xhr.abort).not.toHaveBeenCalled();
+    });
+
+    it("should return active uploads in `getCurrentUploads`", () => {
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
+        upload = api.uploadContent({} as File);
+        expect(api.getCurrentUploads()).toContain(upload);
+        api.cancelUpload(upload);
+        expect(api.getCurrentUploads()).not.toContain(upload);
+    });
+
+    it("should return expected object from `getContentUri`", () => {
+        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, accessToken: "token" });
+        expect(api.getContentUri()).toMatchSnapshot();
+    });
 });
