@@ -1116,6 +1116,30 @@ describe("MatrixClient event timelines", function() {
                 await flushHttp(room.fetchRoomThreads());
             });
         });
+
+        it("should add lazy loading filter", async () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
+            Thread.setServerSideListSupport(FeatureSupport.Stable);
+            // @ts-ignore
+            client.clientOpts.lazyLoadMembers = true;
+
+            const room = client.getRoom(roomId);
+            const timelineSets = await room?.createThreadsTimelineSets();
+            expect(timelineSets).not.toBeNull();
+            const [allThreads,] = timelineSets!;
+
+            respondToThreads().check((request) => {
+                expect(request.queryParams.filter).toEqual(JSON.stringify({
+                    "lazy_load_members": true,
+                }));
+            });
+
+            await flushHttp(client.paginateEventTimeline(allThreads.getLiveTimeline(), {
+                backwards: true,
+            }));
+        });
     });
 
     describe("event timeline for sent events", function() {
