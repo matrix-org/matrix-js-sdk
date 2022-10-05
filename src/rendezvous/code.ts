@@ -17,9 +17,12 @@ limitations under the License.
 import { SecureRendezvousChannelAlgorithm } from "./channels";
 import { RendezvousTransportDetails } from "./transport";
 
+export enum RendezvousIntent {
+    LOGIN_START = "m.login.start",
+}
+
 export interface RendezvousCode {
-    user?: string;
-    initiator?: 'new_device' | 'existing_device';
+    intent?: RendezvousIntent;
     rendezvous?: {
         transport: RendezvousTransportDetails;
         algorithm: SecureRendezvousChannelAlgorithm;

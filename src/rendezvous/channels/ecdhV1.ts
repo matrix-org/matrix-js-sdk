@@ -20,7 +20,12 @@ import { logger } from '../../logger';
 import { MatrixClient } from '../../matrix';
 import { RendezvousError } from '../error';
 import {
-    RendezvousCancellationReason, RendezvousTransport, RendezvousChannel, RendezvousCode, RendezvousTransportDetails,
+    RendezvousCode,
+    RendezvousIntent,
+    RendezvousChannel,
+    RendezvousTransportDetails,
+    RendezvousTransport,
+    RendezvousCancellationReason,
 } from '../index';
 import { SecureRendezvousChannelAlgorithm } from '.';
 import { encodeBase64, decodeBase64 } from '../../crypto/olmlib';
@@ -110,7 +115,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         return this._ourPublicKey;
     }
 
-    public async generateCode(): Promise<ECDHv1RendezvousCode> {
+    public async generateCode(intent?: RendezvousIntent): Promise<ECDHv1RendezvousCode> {
         if (this.transport.ready) {
             throw new Error('Code already generated');
         }
@@ -127,11 +132,8 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
                 transport: await this.transport.details(),
                 ...data,
             },
+            intent,
         };
-
-        if (this.cli) {
-            rendezvous.user = this.cli.getUserId() ?? undefined;
-        }
 
         return rendezvous;
     }
