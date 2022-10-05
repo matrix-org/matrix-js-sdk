@@ -944,6 +944,60 @@ describe("MatrixClient event timelines", function() {
             return Promise.all([promise, httpBackend.flushAllExpected()]).then(([result]) => result);
         }
 
+        const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
+
+        function respondToFilter(): ExpectedHttpRequest {
+            const request = httpBackend.when("POST", "/filter");
+            request.respond(200, { filter_id: "fid" });
+            return request;
+        }
+
+        function respondToSync(): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", "/sync");
+            request.respond(200, INITIAL_SYNC_DATA);
+            return request;
+        }
+
+        function respondToThreads(): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
+                $roomId: roomId,
+            }));
+            request.respond(200, {
+                chunk: [THREAD_ROOT],
+                state: [],
+                next_batch: RANDOM_TOKEN,
+            });
+            return request;
+        }
+
+        function respondToContext(): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
+                $roomId: roomId,
+                $eventId: THREAD_ROOT.event_id!,
+            }));
+            request.respond(200, {
+                end: `${Direction.Forward}${RANDOM_TOKEN}1`,
+                start: `${Direction.Backward}${RANDOM_TOKEN}1`,
+                state: [],
+                events_before: [],
+                events_after: [],
+                event: THREAD_ROOT,
+            });
+            return request;
+        }
+        function respondToMessagesRequest(): ExpectedHttpRequest {
+            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
+                $roomId: roomId,
+            }));
+            request.respond(200, {
+                chunk: [THREAD_ROOT],
+                state: [],
+                start: `${Direction.Forward}${RANDOM_TOKEN}2`,
+                end: `${Direction.Backward}${RANDOM_TOKEN}2`,
+            });
+            return request;
+        }
+
         describe("with server compatibility", function() {
             beforeEach(() => {
                 // @ts-ignore
@@ -953,30 +1007,6 @@ describe("MatrixClient event timelines", function() {
             });
 
             async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
-                const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
-                function respondToThreads() {
-                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
-                        $roomId: roomId,
-                    })).respond(200, {
-                        chunk: [THREAD_ROOT],
-                        state: [],
-                        next_batch: RANDOM_TOKEN,
-                    });
-                }
-                function respondToContext() {
-                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
-                        $roomId: roomId,
-                        $eventId: THREAD_ROOT.event_id!,
-                    })).respond(200, {
-                        end: "",
-                        start: "",
-                        state: [],
-                        events_before: [],
-                        events_after: [],
-                        event: THREAD_ROOT,
-                    });
-                }
-
                 respondToContext();
                 await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
                 respondToThreads();
@@ -1012,16 +1042,6 @@ describe("MatrixClient event timelines", function() {
             });
 
             it("should allow fetching all threads", async function() {
-                const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
-                function respondToThreads() {
-                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
-                        $roomId: roomId,
-                    })).respond(200, {
-                        chunk: [THREAD_ROOT],
-                        state: [],
-                        next_batch: RANDOM_TOKEN,
-                    });
-                }
                 const room = client.getRoom(roomId);
                 const timelineSets = await room?.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
@@ -1041,34 +1061,6 @@ describe("MatrixClient event timelines", function() {
             });
 
             async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
-                const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
-                function respondToMessagesRequest() {
-                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
-                        $roomId: roomId,
-                    })).respond(200, {
-                        chunk: [THREAD_ROOT],
-                        state: [],
-                        start: `${Direction.Forward}${RANDOM_TOKEN}2`,
-                        end: `${Direction.Backward}${RANDOM_TOKEN}2`,
-                    });
-                }
-                function respondToContext() {
-                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/context/$eventId", {
-                        $roomId: roomId,
-                        $eventId: THREAD_ROOT.event_id!,
-                    })).respond(200, {
-                        end: `${Direction.Forward}${RANDOM_TOKEN}1`,
-                        start: `${Direction.Backward}${RANDOM_TOKEN}1`,
-                        state: [],
-                        events_before: [],
-                        events_after: [],
-                        event: THREAD_ROOT,
-                    });
-                }
-                function respondToSync() {
-                    httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
-                }
-
                 respondToContext();
                 respondToSync();
                 await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
@@ -1088,13 +1080,6 @@ describe("MatrixClient event timelines", function() {
             }
 
             it("should allow you to paginate all threads", async function() {
-                function respondToFilter() {
-                    httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
-                }
-                function respondToSync() {
-                    httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
-                }
-
                 const room = client.getRoom(roomId);
 
                 respondToFilter();
@@ -1114,24 +1099,6 @@ describe("MatrixClient event timelines", function() {
 
             it("should allow fetching all threads", async function() {
                 const room = client.getRoom(roomId);
-
-                const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
-                function respondToMessagesRequest() {
-                    httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/messages", {
-                        $roomId: roomId,
-                    })).respond(200, {
-                        chunk: [THREAD_ROOT],
-                        state: [],
-                        start: `${Direction.Forward}${RANDOM_TOKEN}2`,
-                        end: `${Direction.Backward}${RANDOM_TOKEN}2`,
-                    });
-                }
-                function respondToFilter() {
-                    httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
-                }
-                function respondToSync() {
-                    httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
-                }
 
                 respondToFilter();
                 respondToSync();
