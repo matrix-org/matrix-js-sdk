@@ -44,6 +44,9 @@ export interface IRequestOpts {
     // This is intended for use on endpoints where M_UNKNOWN_TOKEN is a valid/notable error response,
     // such as with token refreshes.
     inhibitLogoutEmit?: boolean;
+
+    // allow override of onlyData for a particular request
+    onlyData?: boolean;
 }
 
 export interface IContentUri {

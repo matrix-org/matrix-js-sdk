@@ -234,12 +234,13 @@ export class FetchHttpApi<O extends IHttpOpts> {
         method: Method,
         url: URL | string,
         body?: Body,
-        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "abortSignal"> = {},
+        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "abortSignal" | "onlyData"> = {},
     ): Promise<ResponseType<T, O>> {
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
         // We can't use getPrototypeOf here as objects made in other contexts e.g. over postMessage won't have same ref
         const jsonBody = json && body?.constructor?.name === Object.name;
+        const onlyData = typeof opts.onlyData === "boolean" ? opts.onlyData : this.opts.onlyData;
 
         if (json) {
             if (jsonBody && !headers["Content-Type"]) {
@@ -298,7 +299,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             throw parseErrorResponse(res, await res.text());
         }
 
-        if (this.opts.onlyData) {
+        if (onlyData) {
             return json ? res.json() : res.text();
         }
         return res as ResponseType<T, O>;

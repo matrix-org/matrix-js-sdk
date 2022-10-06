@@ -110,6 +110,20 @@ describe("FetchHttpApi", () => {
         })).resolves.toBe(text);
     });
 
+    it("should return the Response object if onlyData=false on the request", async () => {
+        const res = { ok: true };
+        const fetchFn = jest.fn().mockResolvedValue(res);
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
+        await expect(api.requestOtherUrl(Method.Get, "http://url", undefined, { onlyData: false })).resolves.toBe(res);
+    });
+
+    it("should return text if onlyData=true set on the request", async () => {
+        const json = { a: "b" };
+        const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue(json) });
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: false });
+        await expect(api.requestOtherUrl(Method.Get, "http://url", undefined, { onlyData: true })).resolves.toBe(json);
+    });
+
     it("should send token via query params if useAuthorizationHeader=false", () => {
         const fetchFn = jest.fn().mockResolvedValue({ ok: true });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {

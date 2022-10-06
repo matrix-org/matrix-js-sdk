@@ -168,10 +168,10 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                     prefix: MediaPrefix.R0,
                     headers,
                     abortSignal: abortController.signal,
+                    onlyData: true,
                 },
-            ).then(response => {
-                return this.opts.onlyData ? <UploadResponse>response : response.json();
-            }).then(defer.resolve, defer.reject);
+            ).then(response => <UploadResponse>response, // explicit cast as we have set onlyData above
+            ).then(defer.resolve, defer.reject);
         }
 
         // remove the upload from the list on completion
