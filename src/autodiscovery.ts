@@ -394,10 +394,17 @@ export class AutoDiscovery {
         }
     }
 
-    private static fetch = global.fetch;
+    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+        if (this.fetchFn) {
+            return this.fetchFn(resource, options);
+        }
+        return global.fetch(resource, options);
+    }
+
+    private static fetchFn?: typeof global.fetch;
 
     public static setFetchFn(fetchFn: typeof global.fetch): void {
-        AutoDiscovery.fetch = fetchFn;
+        AutoDiscovery.fetchFn = fetchFn;
     }
 
     /**

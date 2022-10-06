@@ -238,7 +238,8 @@ export class FetchHttpApi<O extends IHttpOpts> {
     ): Promise<ResponseType<T, O>> {
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
-        const jsonBody = json && body && Object.getPrototypeOf(body) === Object.prototype;
+        // We can't use getPrototypeOf here as objects made in other contexts e.g. over postMessage won't have same ref
+        const jsonBody = json && body?.constructor?.name === Object.name;
 
         if (json) {
             if (jsonBody && !headers["Content-Type"]) {
