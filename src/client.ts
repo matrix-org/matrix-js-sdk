@@ -2248,7 +2248,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Counts the number of end to end session keys that are waiting to be backed up
-     * @returns {Promise<int>} Resolves to the number of sessions requiring backup
+     * @returns {Promise<number>} Resolves to the number of sessions requiring backup
      */
     public countSessionsNeedingBackup(): Promise<number> {
         if (!this.crypto) {
@@ -2933,7 +2933,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Marks all group sessions as needing to be backed up without scheduling
      * them to upload in the background.
-     * @returns {Promise<int>} Resolves to the number of sessions requiring a backup.
+     * @returns {Promise<number>} Resolves to the number of sessions requiring a backup.
      */
     public flagAllGroupSessionsForBackup(): Promise<number> {
         if (!this.crypto) {

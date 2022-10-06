@@ -22,7 +22,6 @@ import { Filter, MemoryStore, Method, Room } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
-import { FileType } from "../../src/http-api";
 import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 
@@ -162,6 +161,30 @@ describe("MatrixClient", function() {
             store!.storeRoom(room);
             client!.joinRoom(roomId);
             httpBackend!.verifyNoOutstandingRequests();
+        });
+
+        it("should send request to inviteSignUrl if specified", async () => {
+            const roomId = "!roomId:server";
+            const inviteSignUrl = "https://id.server/sign/this/for/me";
+            const viaServers = ["a", "b", "c"];
+            const signature = {
+                sender: "sender",
+                mxid: "@sender:foo",
+                token: "token",
+                signatures: {},
+            };
+
+            httpBackend!.when("POST", inviteSignUrl).respond(200, signature);
+            httpBackend!.when("POST", "/join/" + encodeURIComponent(roomId)).check(request => {
+                expect(request.data.third_party_signed).toEqual(signature);
+            }).respond(200, { room_id: roomId });
+
+            const prom = client.joinRoom(roomId, {
+                inviteSignUrl,
+                viaServers,
+            });
+            await httpBackend!.flushAllExpected();
+            expect((await prom).roomId).toBe(roomId);
         });
     });
 
@@ -637,7 +660,7 @@ describe("MatrixClient", function() {
             // The vote event has been copied into the thread
             const eventRefWithThreadId = withThreadId(
                 eventPollResponseReference, eventPollStartThreadRoot.getId());
-            expect(eventRefWithThreadId.threadId).toBeTruthy();
+            expect(eventRefWithThreadId.threadRootId).toBeTruthy();
 
             expect(threaded).toEqual([
                 eventPollStartThreadRoot,
@@ -1146,7 +1169,7 @@ describe("MatrixClient", function() {
             const fn = jest.fn();
             client.http.request(Method.Get, "/test").catch(fn);
             client.logout(true);
-            await httpBackend.flush();
+            await httpBackend.flush(undefined);
             expect(fn).toHaveBeenCalled();
         });
     });
@@ -1163,7 +1186,7 @@ describe("MatrixClient", function() {
                 });
             }).respond(200, { event_id: "$foobar" });
             const prom = client.sendHtmlEmote("!room:server", "Body", "<h1>Body</h1>");
-            await httpBackend.flush();
+            await httpBackend.flush(undefined);
             await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
         });
     });
@@ -1182,15 +1205,31 @@ describe("MatrixClient", function() {
             expect(client.store.getRooms()).not.toContain(room);
         });
     });
+
+    describe("getCapabilities", () => {
+        it("should cache by default", async () => {
+            httpBackend!.when("GET", "/capabilities").respond(200, {
+                capabilities: {
+                    "m.change_password": false,
+                },
+            });
+            const prom = httpBackend!.flushAllExpected();
+            const capabilities1 = await client!.getCapabilities();
+            const capabilities2 = await client!.getCapabilities();
+            await prom;
+
+            expect(capabilities1).toStrictEqual(capabilities2);
+        });
+    });
 });
 
-function withThreadId(event, newThreadId) {
+function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
     const ret = event.toSnapshot();
     ret.setThreadId(newThreadId);
     return ret;
 }
 
-const buildEventMessageInThread = (root) => new MatrixEvent({
+const buildEventMessageInThread = (root: MatrixEvent) => new MatrixEvent({
     "age": 80098509,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -1237,7 +1276,7 @@ const buildEventPollResponseReference = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const buildEventReaction = (event) => new MatrixEvent({
+const buildEventReaction = (event: MatrixEvent) => new MatrixEvent({
     "content": {
         "m.relates_to": {
             "event_id": event.getId(),
@@ -1256,7 +1295,7 @@ const buildEventReaction = (event) => new MatrixEvent({
     "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
 });
 
-const buildEventRedaction = (event) => new MatrixEvent({
+const buildEventRedaction = (event: MatrixEvent) => new MatrixEvent({
     "content": {
 
     },
@@ -1290,7 +1329,7 @@ const buildEventPollStartThreadRoot = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const buildEventReply = (target) => new MatrixEvent({
+const buildEventReply = (target: MatrixEvent) => new MatrixEvent({
     "age": 80098509,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -1456,7 +1495,7 @@ const buildEventCreate = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-function assertObjectContains(obj, expected) {
+function assertObjectContains(obj: object, expected: any): void {
     for (const k in expected) {
         if (expected.hasOwnProperty(k)) {
             expect(obj[k]).toEqual(expected[k]);

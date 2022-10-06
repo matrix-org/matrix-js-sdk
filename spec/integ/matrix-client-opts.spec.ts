@@ -5,7 +5,6 @@ import { MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
-import { ICreateClientOpts } from "../../src/client";
 import { IStore } from "../../src/store";
 
 describe("MatrixClient opts", function() {
@@ -69,7 +68,7 @@ describe("MatrixClient opts", function() {
         let client;
         beforeEach(function() {
             client = new MatrixClient({
-                fetchFn: httpBackend.fetchFn,
+                fetchFn: httpBackend.fetchFn as typeof global.fetch,
                 store: undefined,
                 baseUrl: baseUrl,
                 userId: userId,
@@ -129,7 +128,7 @@ describe("MatrixClient opts", function() {
         let client;
         beforeEach(function() {
             client = new MatrixClient({
-                fetchFn: httpBackend.fetchFn,
+                fetchFn: httpBackend.fetchFn as typeof global.fetch,
                 store: new MemoryStore() as IStore,
                 baseUrl: baseUrl,
                 userId: userId,
