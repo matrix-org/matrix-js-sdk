@@ -122,13 +122,14 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
 
         const data = {
             "algorithm": SecureRendezvousChannelAlgorithm.ECDH_V1,
-            "key": encodeBase64(await this.getPublicKey()),
         };
 
-        await this.send(data);
+        await this.send({ algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1 });
 
         const rendezvous: ECDHv1RendezvousCode = {
             "rendezvous": {
+                algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
+                key: encodeBase64(await this.getPublicKey()),
                 transport: await this.transport.details(),
                 ...data,
             },
@@ -142,42 +143,44 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         const isInitiator = !this.theirPublicKey;
         const ourPublicKey = await this.getPublicKey();
 
-        if (this.cli && this.theirPublicKey) {
+        if (!isInitiator) {
+            // send our public key unencrypted
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
                 key: encodeBase64(ourPublicKey),
             });
         }
 
-        if (this.cli || !this.theirPublicKey) {
-            logger.info('Waiting for other device to send their public key');
-            const res = await this.receive(); // ack
-            if (!res) {
-                throw new Error('No response from other device');
-            }
-            const { key, algorithm } = res;
+        // wait for the other side to send us their public key
+        logger.info('Waiting for other device to send their public key');
+        const res = await this.receive(); // ack
+        if (!res) {
+            throw new Error('No response from other device');
+        }
+        const { key, algorithm } = res;
 
-            if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || !key) {
-                throw new RendezvousError(
-                    'Unsupported algorithm: ' + algorithm,
-                    RendezvousCancellationReason.UnsupportedAlgorithm,
-                );
-            }
-
-            if (this.theirPublicKey) {
-                // check that the same public key was at the rendezvous point
-                if (key !== encodeBase64(this.theirPublicKey)) {
-                    throw new RendezvousError(
-                        'Secure rendezvous key mismatch',
-                        RendezvousCancellationReason.DataMismatch,
-                    );
-                }
-            } else {
-                this.theirPublicKey = decodeBase64(key);
-            }
+        if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || !key) {
+            throw new RendezvousError(
+                'Unsupported algorithm: ' + algorithm,
+                RendezvousCancellationReason.UnsupportedAlgorithm,
+            );
         }
 
-        if (!this.cli) {
+        if (isInitiator) {
+            this.theirPublicKey = decodeBase64(key);
+        } else {
+            // check that the same public key was at the rendezvous point
+            if (key !== encodeBase64(this.theirPublicKey)) {
+                throw new RendezvousError(
+                    'Secure rendezvous key mismatch',
+                    RendezvousCancellationReason.DataMismatch,
+                );
+            }
+            logger.info('Public key from channel matches that from provided code');
+        }
+
+        if (isInitiator) {
+            // send our public key encrypted
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
                 key: encodeBase64(ourPublicKey),
