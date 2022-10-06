@@ -145,5 +145,23 @@ describe("Read receipt", () => {
             await httpBackend.flushAllExpected();
             await flushPromises();
         });
+
+        it("sends a valid room read receipt even when body omitted", async () => {
+            httpBackend.when(
+                "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                    $roomId: ROOM_ID,
+                    $receiptType: ReceiptType.Read,
+                    $eventId: threadEvent.getId(),
+                }),
+            ).check((request) => {
+                expect(request.data).toEqual({});
+            }).respond(200, {});
+
+            mockServerSideSupport(client, false);
+            client.sendReceipt(threadEvent, ReceiptType.Read, undefined);
+
+            await httpBackend.flushAllExpected();
+            await flushPromises();
+        });
     });
 });

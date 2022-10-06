@@ -16,9 +16,9 @@ limitations under the License.
 import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
-import { CRYPTO_ENABLED, MatrixClient, IStoredClientOpts } from "../../src/client";
+import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, MemoryStore, Method, Room } from "../../src/matrix";
+import { Filter, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
@@ -1191,6 +1191,23 @@ describe("MatrixClient", function() {
         });
     });
 
+    describe("sendHtmlMessage", () => {
+        it("should send valid html message", async () => {
+            httpBackend.when("PUT", "/send").check(req => {
+                expect(req.data).toStrictEqual({
+                    "msgtype": "m.text",
+                    "body": "Body",
+                    "formatted_body": "<h1>Body</h1>",
+                    "format": "org.matrix.custom.html",
+                    "org.matrix.msc1767.message": expect.anything(),
+                });
+            }).respond(200, { event_id: "$foobar" });
+            const prom = client.sendHtmlMessage("!room:server", "Body", "<h1>Body</h1>");
+            await httpBackend.flush(undefined);
+            await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
+        });
+    });
+
     describe("forget", () => {
         it("should remove from store by default", async () => {
             const room = new Room("!roomId:server", client, userId);
@@ -1219,6 +1236,46 @@ describe("MatrixClient", function() {
             await prom;
 
             expect(capabilities1).toStrictEqual(capabilities2);
+        });
+    });
+
+    describe("getTerms", () => {
+        it("should return Identity Server terms", async () => {
+            httpBackend!.when("GET", "/terms").respond(200, { foo: "bar" });
+            const prom = client!.getTerms(SERVICE_TYPES.IS, "http://identity.server");
+            await httpBackend!.flushAllExpected();
+            await expect(prom).resolves.toEqual({ foo: "bar" });
+        });
+
+        it("should return Integrations Manager terms", async () => {
+            httpBackend!.when("GET", "/terms").respond(200, { foo: "bar" });
+            const prom = client!.getTerms(SERVICE_TYPES.IM, "http://im.server");
+            await httpBackend!.flushAllExpected();
+            await expect(prom).resolves.toEqual({ foo: "bar" });
+        });
+    });
+
+    describe("publicRooms", () => {
+        it("should use GET request if no server or filter is specified", () => {
+            httpBackend!.when("GET", "/publicRooms").respond(200, {});
+            client!.publicRooms({});
+            return httpBackend!.flushAllExpected();
+        });
+
+        it("should use GET request if only server is specified", () => {
+            httpBackend!.when("GET", "/publicRooms").check(request => {
+                expect(request.queryParams.server).toBe("server1");
+            }).respond(200, {});
+            client!.publicRooms({ server: "server1" });
+            return httpBackend!.flushAllExpected();
+        });
+
+        it("should use POST request if filter is specified", () => {
+            httpBackend!.when("POST", "/publicRooms").check(request => {
+                expect(request.data.filter.generic_search_term).toBe("foobar");
+            }).respond(200, {});
+            client!.publicRooms({ filter: { generic_search_term: "foobar" } });
+            return httpBackend!.flushAllExpected();
         });
     });
 });

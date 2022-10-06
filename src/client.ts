@@ -36,7 +36,7 @@ import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, suppor
 import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from './webrtc/callEventHandler';
 import * as utils from './utils';
-import { sleep } from './utils';
+import { QueryDict, sleep } from './utils';
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -7514,18 +7514,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} options.since Token to paginate from
      * @param {object} options.filter Filter parameters
      * @param {string} options.filter.generic_search_term String to search for
-     * @return {Promise} Resolves: TODO
+     * @return {Promise} Resolves: IPublicRoomsResponse
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public publicRooms(options: IRoomDirectoryOptions = {}): Promise<IPublicRoomsResponse> {
-        const queryParams: any = {};
-        if (options.server) {
-            queryParams.server = options.server;
-            delete options.server;
-        }
-
-        if (Object.keys(options).length === 0 && Object.keys(queryParams).length === 0) {
-            return this.http.authedRequest(Method.Get, "/publicRooms");
+    public publicRooms(
+        { server, limit, since, ...options }: IRoomDirectoryOptions = {},
+    ): Promise<IPublicRoomsResponse> {
+        const queryParams: QueryDict = { server, limit, since };
+        if (Object.keys(options).length === 0) {
+            return this.http.authedRequest(Method.Get, "/publicRooms", queryParams);
         } else {
             return this.http.authedRequest(Method.Post, "/publicRooms", queryParams, options);
         }
