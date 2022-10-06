@@ -528,16 +528,12 @@ export class GroupCall extends TypedEventEmitter<
 
         for (const call of this.calls) {
             call.localUsermediaFeed.setVoiceActivityDetectionMuteLocal(muted, null);
+            setTracksEnabled(call.localUsermediaFeed.stream.getAudioTracks(), !muted);
         }
 
         if (this.localCallFeed) {
             this.localCallFeed.setVoiceActivityDetectionMuteLocal(muted, null);
-
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
-        }
-
-        for (const call of this.calls) {
-            setTracksEnabled(call.localUsermediaFeed.stream.getAudioTracks(), !muted);
         }
 
         return true;
