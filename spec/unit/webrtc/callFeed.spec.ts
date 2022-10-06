@@ -87,7 +87,7 @@ describe("CallFeed", () => {
         });
 
         describe("voice activity detection", () => {
-            it("should disable track", () => {
+            it("voice activity should disable audio track", () => {
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),
@@ -100,7 +100,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("should enable track", () => {
+            it("voice activity should enable audio track", () => {
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),
@@ -112,7 +112,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("should enable track", () => {
+            it("voice activity should enable audio track", () => {
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),
@@ -126,7 +126,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("should disable track", () => {
+            it("voice activity should disable audio track", () => {
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),

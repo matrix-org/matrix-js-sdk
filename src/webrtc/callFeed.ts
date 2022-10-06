@@ -307,16 +307,16 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
                 this.VADCooldownStarted = new Date();
 
                 if (this.vadAudioMuted) {
-                    //this.emit(CallFeedEvent.VADMuteStateChanged, false)
-                    this.setVoiceActivityDetectionMute?.(false);
+                    this.emit(CallFeedEvent.VADMuteStateChanged, false);
+                    // this.setVoiceActivityDetectionMute?.(false);
                 }
             } else if (!this.vadAudioMuted) {
                 // User stops speaking
 
                 if (!this.isVADinCooldown()) {
                     // user has been silent for X milliseconds
-                    //this.emit(CallFeedEvent.VADMuteStateChanged, true)
-                    this.setVoiceActivityDetectionMute?.(true);
+                    this.emit(CallFeedEvent.VADMuteStateChanged, true);
+                    // this.setVoiceActivityDetectionMute?.(true);
                 }
             }
         }

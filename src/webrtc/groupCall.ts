@@ -1,5 +1,5 @@
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
+import { CallFeed, CallFeedEvent, SPEAKING_THRESHOLD } from "./callFeed";
 import { MatrixClient } from "../client";
 import { CallErrorCode,
     CallEvent,
@@ -277,9 +277,9 @@ export class GroupCall extends TypedEventEmitter<
             purpose: SDPStreamMetadataPurpose.Usermedia,
             audioMuted: stream.getAudioTracks().length === 0 || this.isPtt,
             videoMuted: stream.getVideoTracks().length === 0,
-            setVoiceActivityDetectionMute: (muted: boolean) => this.setVadMicrophoneMuted(muted),
             VADEnabled: !this.isPtt,
         });
+        this.localCallFeed.on(CallFeedEvent.VADMuteStateChanged, (muted: boolean) => this.setVadMicrophoneMuted(muted));
 
         this.localCallFeed = callFeed;
         this.addUserMediaFeed(callFeed);
@@ -519,20 +519,18 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public async setVadMicrophoneMuted(muted: boolean): Promise<boolean> {
-        // hasAudioDevice can block indefinitely if the window has lost focus,
-        // and it doesn't make much sense to keep a device from being muted, so
-        // we always allow muted = true changes to go through
+        // hasAudioDevice can block indefinitely if the window has lost focus
         if (!(await this.client.getMediaHandler().hasAudioDevice())) {
             return false;
         }
 
         for (const call of this.calls) {
-            call.localUsermediaFeed.setVoiceActivityDetectionMuteLocal(muted, null);
+            call.localUsermediaFeed.setVoiceActivityDetectionMuteLocal(muted);
             setTracksEnabled(call.localUsermediaFeed.stream.getAudioTracks(), !muted);
         }
 
         if (this.localCallFeed) {
-            this.localCallFeed.setVoiceActivityDetectionMuteLocal(muted, null);
+            this.localCallFeed.setVoiceActivityDetectionMuteLocal(muted);
             setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
         }
 
