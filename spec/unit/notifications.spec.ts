@@ -23,6 +23,7 @@ import {
     NotificationCountType,
     RelationType,
     Room,
+    RoomEvent,
 } from "../../src/matrix";
 import { IActionsObject } from "../../src/pushprocessor";
 import { ReEmitter } from "../../src/ReEmitter";
@@ -110,5 +111,19 @@ describe("fixNotificationCountOnDecryption", () => {
 
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(1);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(1);
+    });
+
+    it("emits events", () => {
+        const cb = jest.fn();
+        room.on(RoomEvent.UnreadNotifications, cb);
+
+        room.setUnreadNotificationCount(NotificationCountType.Total, 1);
+        expect(cb).toHaveBeenLastCalledWith({ highlight: 0, total: 1 });
+
+        room.setUnreadNotificationCount(NotificationCountType.Highlight, 5);
+        expect(cb).toHaveBeenLastCalledWith({ highlight: 5, total: 1 });
+
+        room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 5);
+        expect(cb).toHaveBeenLastCalledWith({ highlight: 5 }, "$123");
     });
 });

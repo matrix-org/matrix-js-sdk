@@ -96,7 +96,7 @@ export interface IRecommendedVersion {
 // price to pay to keep matrix-js-sdk responsive.
 const MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH = 30;
 
-type NotificationCount = Partial<Record<NotificationCountType, number>>;
+export type NotificationCount = Partial<Record<NotificationCountType, number>>;
 
 export enum NotificationCountType {
     Highlight = "highlight",
@@ -127,6 +127,7 @@ export enum RoomEvent {
     OldStateUpdated = "Room.OldStateUpdated",
     CurrentStateUpdated = "Room.CurrentStateUpdated",
     HistoryImportedWithinTimeline = "Room.historyImportedWithinTimeline",
+    UnreadNotifications = "Room.UnreadNotifications",
 }
 
 type EmittedEvents = RoomEvent
@@ -163,6 +164,10 @@ export type RoomEventHandlerMap = {
     [RoomEvent.HistoryImportedWithinTimeline]: (
         markerEvent: MatrixEvent,
         room: Room,
+    ) => void;
+    [RoomEvent.UnreadNotifications]: (
+        unreadNotifications: NotificationCount,
+        threadId?: string,
     ) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
@@ -1211,6 +1216,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 [type]: count,
             },
         });
+
+        this.emit(
+            RoomEvent.UnreadNotifications,
+            this.threadNotifications.get(threadId),
+            threadId,
+        );
     }
 
     public resetThreadUnreadNotificationCount(): void {
@@ -1224,6 +1235,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public setUnreadNotificationCount(type: NotificationCountType, count: number): void {
         this.notificationCounts[type] = count;
+        this.emit(RoomEvent.UnreadNotifications, this.notificationCounts);
     }
 
     public setSummary(summary: IRoomSummary): void {
