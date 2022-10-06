@@ -70,7 +70,7 @@ type EventHandlerMap = {
 };
 export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
     public stream: MediaStream;
-    public secondStream: MediaStream;
+    public volumeLooperStream: MediaStream;
     public audioDelay: DelayNode;
     public sdpMetadataStreamId: string;
     public userId: string;
@@ -103,7 +103,6 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     constructor(opts: ICallFeedOpts) {
         super();
 
-        this.stream = opts.stream;
         this.client = opts.client;
         this.roomId = opts.roomId;
         this.userId = opts.userId;
@@ -167,8 +166,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.analyser.fftSize = 512;
         this.analyser.smoothingTimeConstant = 0.1;
 
-        this.secondStream = this.stream.clone();
-        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.secondStream);
+        this.volumeLooperStream = this.stream.clone();
+        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.volumeLooperStream);
         mediaStreamAudioSourceNode.connect(this.analyser);
 
         const streamNode = this.audioContext.createMediaStreamSource(this.stream);
