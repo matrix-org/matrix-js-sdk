@@ -17,11 +17,12 @@ limitations under the License.
 import { MatrixClient } from '../matrix';
 import { RendezvousCancellationFunction, RendezvousCancellationReason } from './cancellationReason';
 import { RendezvousChannel } from './channel';
-import { RendezvousCode } from './code';
+import { RendezvousCode, RendezvousIntent } from './code';
 import { RendezvousError } from './error';
 import { SimpleHttpRendezvousTransport, SimpleHttpRendezvousTransportDetails } from './transports';
 import { decodeBase64 } from '../crypto/olmlib';
 import { ECDHv1RendezvousChannel, ECDHv1RendezvousCode, SecureRendezvousChannelAlgorithm } from './channels';
+import { logger } from '../logger';
 
 export * from './code';
 export * from './cancellationReason';
@@ -32,7 +33,7 @@ export async function buildChannelFromCode(
     code: string,
     onCancelled: RendezvousCancellationFunction,
     cli?: MatrixClient,
-): Promise<RendezvousChannel> {
+): Promise<{ channel: RendezvousChannel, intent: RendezvousIntent }> {
     let parsed: RendezvousCode;
     try {
         parsed = JSON.parse(code) as RendezvousCode;
@@ -40,14 +41,20 @@ export async function buildChannelFromCode(
         throw new RendezvousError('Invalid code', RendezvousCancellationReason.InvalidCode);
     }
 
-    if (parsed.rendezvous?.transport.type !== 'http.v1') {
+    const { intent, rendezvous } = parsed;
+
+    if (rendezvous?.transport.type !== 'http.v1') {
         throw new RendezvousError('Unsupported transport', RendezvousCancellationReason.UnsupportedTransport);
     }
 
-    const transportDetails = parsed.rendezvous.transport as SimpleHttpRendezvousTransportDetails;
+    const transportDetails = rendezvous.transport as SimpleHttpRendezvousTransportDetails;
 
     if (typeof transportDetails.uri !== 'string') {
         throw new RendezvousError('Invalid code', RendezvousCancellationReason.InvalidCode);
+    }
+
+    if (!intent || !Object.values(RendezvousIntent).includes(intent)) {
+        throw new RendezvousError('Invalid intent', RendezvousCancellationReason.InvalidCode);
     }
 
     const transport = new SimpleHttpRendezvousTransport(
@@ -57,7 +64,7 @@ export async function buildChannelFromCode(
         undefined, // fallbackRzServer
         transportDetails.uri);
 
-    if (parsed.rendezvous?.algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1) {
+    if (rendezvous?.algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1) {
         throw new RendezvousError('Unsupported transport', RendezvousCancellationReason.UnsupportedAlgorithm);
     }
 
@@ -65,5 +72,9 @@ export async function buildChannelFromCode(
 
     const theirPublicKey = decodeBase64(ecdhCode.rendezvous.key);
 
-    return new ECDHv1RendezvousChannel(transport, cli, theirPublicKey);
+    logger.info(`Building ECDHv1 rendezvous via HTTP from: ${code}`);
+    return {
+        channel: new ECDHv1RendezvousChannel(transport, cli, theirPublicKey),
+        intent,
+    };
 }

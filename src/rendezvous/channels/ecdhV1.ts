@@ -115,7 +115,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         return this._ourPublicKey;
     }
 
-    public async generateCode(intent?: RendezvousIntent): Promise<ECDHv1RendezvousCode> {
+    public async generateCode(intent: RendezvousIntent): Promise<ECDHv1RendezvousCode> {
         if (this.transport.ready) {
             throw new Error('Code already generated');
         }
@@ -231,5 +231,9 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         }
 
         return data;
+    }
+
+    public async cancel(reason: RendezvousCancellationReason) {
+        return this.transport.cancel(reason);
     }
 }

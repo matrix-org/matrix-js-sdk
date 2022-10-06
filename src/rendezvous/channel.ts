@@ -14,7 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RendezvousCode, RendezvousTransport, RendezvousIntent } from ".";
+import {
+    RendezvousCode,
+    RendezvousTransport,
+    RendezvousIntent,
+    RendezvousCancellationReason,
+} from ".";
 
 export interface RendezvousChannel {
     transport: RendezvousTransport;
@@ -35,5 +40,6 @@ export interface RendezvousChannel {
     /**
      * @returns a representation of the channel that can be encoded in a QR or similar
      */
-    generateCode(intent?: RendezvousIntent): Promise<RendezvousCode>;
+    generateCode(intent: RendezvousIntent): Promise<RendezvousCode>;
+    cancel(reason: RendezvousCancellationReason): Promise<void>;
 }

@@ -18,11 +18,12 @@ import { SecureRendezvousChannelAlgorithm } from "./channels";
 import { RendezvousTransportDetails } from "./transport";
 
 export enum RendezvousIntent {
-    LOGIN_START = "m.login.start",
+    LOGIN_ON_NEW_DEVICE = "login.start",
+    RECIPROCATE_LOGIN_ON_EXISTING_DEVICE = "login.reciprocate",
 }
 
 export interface RendezvousCode {
-    intent?: RendezvousIntent;
+    intent: RendezvousIntent;
     rendezvous?: {
         transport: RendezvousTransportDetails;
         algorithm: SecureRendezvousChannelAlgorithm;
