@@ -14,14 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetch from 'cross-fetch';
-
 import { logger } from '../../logger';
 import { sleep } from '../../utils';
 import { BaseRendezvousTransport } from "./baseTransport";
 import { RendezvousCancellationFunction, RendezvousCancellationReason } from '../cancellationReason';
 import { RendezvousTransportDetails } from '../transport';
-import { getRequest, MatrixClient, PREFIX_UNSTABLE } from '../../matrix';
+import { ClientPrefix, MatrixClient } from '../../matrix';
 
 export interface SimpleHttpRendezvousTransportDetails extends RendezvousTransportDetails {
     type: 'http.v1';
@@ -58,9 +56,9 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
 
     private async getPostEndpoint(): Promise<string | undefined> {
         if (!this.client && this.hsUrl) {
+            // TODO: this will use the default fetch function which might not work in Node.js
             this.client = new MatrixClient({
                 baseUrl: this.hsUrl,
-                request: getRequest(),
             });
         }
 
@@ -70,7 +68,7 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
                 const { unstable_features } = await this.client.getVersions();
                 // eslint-disable-next-line camelcase
                 if (unstable_features?.['org.matrix.msc3886']) {
-                    return `${this.client.baseUrl}${PREFIX_UNSTABLE}/org.matrix.msc3886/rendezvous`;
+                    return `${this.client.baseUrl}${ClientPrefix.Unstable}/org.matrix.msc3886/rendezvous`;
                 }
             } catch (err) {
                 logger.warn('Failed to get unstable features', err);
@@ -97,6 +95,7 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
         if (this.etag) {
             headers['if-match'] = this.etag;
         }
+
         const res = await fetch(uri, { method,
             headers,
             body: data,
