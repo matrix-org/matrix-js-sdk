@@ -101,7 +101,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
 
     constructor(
         public transport: RendezvousTransport,
-        private cli?: MatrixClient,
+        private client: MatrixClient,
         private theirPublicKey?: Uint8Array,
     ) {
         this.ourPrivateKey = ed.utils.randomPrivateKey();
@@ -138,18 +138,22 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         return rendezvous;
     }
 
+    private isLoggedIn(): boolean {
+        return !!this.client.getAccessToken();
+    }
+
     async connect(): Promise<string> {
         const isInitiator = !this.theirPublicKey;
         const ourPublicKey = await this.getPublicKey();
 
-        if (this.cli && this.theirPublicKey) {
+        if (this.isLoggedIn && this.theirPublicKey) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
                 key: encodeBase64(ourPublicKey),
             });
         }
 
-        if (this.cli || !this.theirPublicKey) {
+        if (this.isLoggedIn || !this.theirPublicKey) {
             logger.info('Waiting for other device to send their public key');
             const res = await this.receive(); // ack
             if (!res) {
@@ -177,7 +181,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             }
         }
 
-        if (!this.cli) {
+        if (!this.isLoggedIn) {
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
                 key: encodeBase64(ourPublicKey),

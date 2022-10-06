@@ -29,10 +29,18 @@ export * from './cancellationReason';
 export * from './transport';
 export * from './channel';
 
+/**
+ * Build a rendezvous channel from the a scanned code. e.g. from a QR
+ *
+ * @param code the scanned rendezvous code
+ * @param onCancelled cancellation callback
+ * @param client the client is needed even if it is only a temp one
+ * @returns the created channel and the intent of the initiator
+ */
 export async function buildChannelFromCode(
     code: string,
     onCancelled: RendezvousCancellationFunction,
-    cli?: MatrixClient,
+    client: MatrixClient,
 ): Promise<{ channel: RendezvousChannel, intent: RendezvousIntent }> {
     let parsed: RendezvousCode;
     try {
@@ -59,9 +67,8 @@ export async function buildChannelFromCode(
 
     const transport = new SimpleHttpRendezvousTransport(
         onCancelled,
-        undefined, // client
-        undefined, // hsUrl
-        undefined, // fallbackRzServer
+        client,
+        undefined, // fallbackRzServer not needed as we are parsing a code
         transportDetails.uri);
 
     if (rendezvous?.algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1) {
@@ -74,7 +81,7 @@ export async function buildChannelFromCode(
 
     logger.info(`Building ECDHv1 rendezvous via HTTP from: ${code}`);
     return {
-        channel: new ECDHv1RendezvousChannel(transport, cli, theirPublicKey),
+        channel: new ECDHv1RendezvousChannel(transport, client, theirPublicKey),
         intent,
     };
 }
