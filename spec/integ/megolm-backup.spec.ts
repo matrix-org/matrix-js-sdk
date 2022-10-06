@@ -95,26 +95,31 @@ describe("megolm key backups", function() {
         return;
     }
     const Olm = global.Olm;
-
-    let testOlmAccount: Account;
+    let testOlmAccount: Olm.Account;
     let aliceTestClient: TestClient;
+
+    const setupTestClient = (): [Account, TestClient] => {
+        const aliceTestClient = new TestClient(
+            "@alice:localhost", "xzcvb", "akjgkrgjs",
+        );
+        const testOlmAccount = new Olm.Account();
+        testOlmAccount!.create();
+
+        return [testOlmAccount, aliceTestClient];
+    };
 
     beforeAll(function() {
         return Olm.init();
     });
 
     beforeEach(async function() {
-        aliceTestClient = new TestClient(
-            "@alice:localhost", "xzcvb", "akjgkrgjs",
-        );
-        testOlmAccount = new Olm.Account();
-        testOlmAccount.create();
-        await aliceTestClient.client.initCrypto();
-        aliceTestClient.client.crypto.backupManager.backupInfo = CURVE25519_BACKUP_INFO;
+        [testOlmAccount, aliceTestClient] = setupTestClient();
+        await aliceTestClient!.client.initCrypto();
+        aliceTestClient!.client.crypto!.backupManager.backupInfo = CURVE25519_BACKUP_INFO;
     });
 
     afterEach(function() {
-        return aliceTestClient.stop();
+        return aliceTestClient!.stop();
     });
 
     it("Alice checks key backups when receiving a message she can't decrypt", function() {
@@ -130,22 +135,22 @@ describe("megolm key backups", function() {
             },
         };
 
-        return aliceTestClient.start().then(() => {
+        return aliceTestClient!.start().then(() => {
             return createOlmSession(testOlmAccount, aliceTestClient);
         }).then(() => {
             const privkey = decodeRecoveryKey(RECOVERY_KEY);
-            return aliceTestClient.client.crypto.storeSessionBackupPrivateKey(privkey);
+            return aliceTestClient!.client!.crypto!.storeSessionBackupPrivateKey(privkey);
         }).then(() => {
-            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-            aliceTestClient.expectKeyBackupQuery(
+            aliceTestClient!.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+            aliceTestClient!.expectKeyBackupQuery(
                 ROOM_ID,
                 SESSION_ID,
                 200,
                 CURVE25519_KEY_BACKUP_DATA,
             );
-            return aliceTestClient.httpBackend.flushAllExpected();
+            return aliceTestClient!.httpBackend.flushAllExpected();
         }).then(function(): Promise<MatrixEvent> {
-            const room = aliceTestClient.client.getRoom(ROOM_ID);
+            const room = aliceTestClient!.client.getRoom(ROOM_ID)!;
             const event = room.getLiveTimeline().getEvents()[0];
 
             if (event.getContent()) {

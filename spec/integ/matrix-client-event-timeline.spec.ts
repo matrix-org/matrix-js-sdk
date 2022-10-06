@@ -142,6 +142,7 @@ const THREAD_REPLY = utils.mkEvent({
     event: false,
 });
 
+// @ts-ignore we know this is a defined path for THREAD ROOT
 THREAD_ROOT.unsigned["m.relations"]["io.element.thread"].latest_event = THREAD_REPLY;
 
 const SYNC_THREAD_ROOT = withoutRoomId(THREAD_ROOT);
@@ -214,8 +215,8 @@ describe("getEventTimeline support", function() {
         httpBackend = testClient.httpBackend;
 
         return startClient(httpBackend, client).then(function() {
-            const room = client.getRoom(roomId);
-            const timelineSet = room.getTimelineSets()[0];
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room!.getTimelineSets()[0];
             expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
         });
     });
@@ -232,8 +233,8 @@ describe("getEventTimeline support", function() {
         httpBackend = testClient.httpBackend;
 
         return startClient(httpBackend, client).then(() => {
-            const room = client.getRoom(roomId);
-            const timelineSet = room.getTimelineSets()[0];
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room!.getTimelineSets()[0];
             expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeFalsy();
         });
     });
@@ -257,10 +258,10 @@ describe("getEventTimeline support", function() {
 
     it("scrollback should be able to scroll back to before a gappy /sync", function() {
         // need a client with timelineSupport disabled to make this work
-        let room: Room;
+        let room: Room | undefined;
 
         return startClient(httpBackend, client).then(function() {
-            room = client.getRoom(roomId);
+            room = client.getRoom(roomId)!;
 
             httpBackend.when("GET", "/sync").respond(200, {
                 next_batch: "s_5_4",
@@ -300,8 +301,8 @@ describe("getEventTimeline support", function() {
                 utils.syncPromise(client, 2),
             ]);
         }).then(function() {
-            expect(room.timeline.length).toEqual(1);
-            expect(room.timeline[0].event).toEqual(EVENTS[1]);
+            expect(room!.timeline.length).toEqual(1);
+            expect(room!.timeline[0].event).toEqual(EVENTS[1]);
 
             httpBackend.when("GET", "/messages").respond(200, {
                 chunk: [EVENTS[0]],
@@ -309,12 +310,12 @@ describe("getEventTimeline support", function() {
                 end: "pagin_end",
             });
             httpBackend.flush("/messages", 1);
-            return client.scrollback(room);
+            return client.scrollback(room!);
         }).then(function() {
-            expect(room.timeline.length).toEqual(2);
-            expect(room.timeline[0].event).toEqual(EVENTS[0]);
-            expect(room.timeline[1].event).toEqual(EVENTS[1]);
-            expect(room.oldState.paginationToken).toEqual("pagin_end");
+            expect(room!.timeline.length).toEqual(2);
+            expect(room!.timeline[0].event).toEqual(EVENTS[0]);
+            expect(room!.timeline[1].event).toEqual(EVENTS[1]);
+            expect(room!.oldState.paginationToken).toEqual("pagin_end");
         });
     });
 });
@@ -345,7 +346,7 @@ describe("MatrixClient event timelines", function() {
 
     describe("getEventTimeline", function() {
         it("should create a new timeline for new events", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/event1%3Abar")
                 .respond(200, function() {
@@ -364,14 +365,14 @@ describe("MatrixClient event timelines", function() {
 
             return Promise.all([
                 client.getEventTimeline(timelineSet, "event1:bar").then(function(tl) {
-                    expect(tl.getEvents().length).toEqual(4);
+                    expect(tl!.getEvents().length).toEqual(4);
                     for (let i = 0; i < 4; i++) {
-                        expect(tl.getEvents()[i].event).toEqual(EVENTS[i]);
-                        expect(tl.getEvents()[i].sender.name).toEqual(userName);
+                        expect(tl!.getEvents()[i].event).toEqual(EVENTS[i]);
+                        expect(tl!.getEvents()[i]?.sender.name).toEqual(userName);
                     }
-                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                         .toEqual("start_token");
-                    expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token");
                 }),
                 httpBackend.flushAllExpected(),
@@ -379,7 +380,7 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should return existing timeline for known events", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
             httpBackend.when("GET", "/sync").respond(200, {
                 next_batch: "s_5_4",
@@ -401,12 +402,12 @@ describe("MatrixClient event timelines", function() {
                 httpBackend.flush("/sync"),
                 utils.syncPromise(client),
             ]).then(function() {
-                return client.getEventTimeline(timelineSet, EVENTS[0].event_id);
+                return client.getEventTimeline(timelineSet, EVENTS[0].event_id!);
             }).then(function(tl) {
-                expect(tl.getEvents().length).toEqual(2);
-                expect(tl.getEvents()[1].event).toEqual(EVENTS[0]);
-                expect(tl.getEvents()[1].sender.name).toEqual(userName);
-                expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                expect(tl!.getEvents().length).toEqual(2);
+                expect(tl!.getEvents()[1].event).toEqual(EVENTS[0]);
+                expect(tl!.getEvents()[1]?.sender.name).toEqual(userName);
+                expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                     .toEqual("f_1_1");
                 // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                 //    .toEqual("s_5_4");
@@ -414,7 +415,7 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should update timelines where they overlap a previous /sync", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
             httpBackend.when("GET", "/sync").respond(200, {
                 next_batch: "s_5_4",
@@ -433,7 +434,7 @@ describe("MatrixClient event timelines", function() {
             });
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
-                             encodeURIComponent(EVENTS[2].event_id))
+                             encodeURIComponent(EVENTS[2].event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token",
@@ -447,13 +448,13 @@ describe("MatrixClient event timelines", function() {
 
             const prom = new Promise((resolve, reject) => {
                 client.on(ClientEvent.Sync, function() {
-                    client.getEventTimeline(timelineSet, EVENTS[2].event_id,
+                    client.getEventTimeline(timelineSet, EVENTS[2].event_id!,
                     ).then(function(tl) {
-                        expect(tl.getEvents().length).toEqual(4);
-                        expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
-                        expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
-                        expect(tl.getEvents()[3].event).toEqual(EVENTS[3]);
-                        expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                        expect(tl!.getEvents().length).toEqual(4);
+                        expect(tl!.getEvents()[0].event).toEqual(EVENTS[1]);
+                        expect(tl!.getEvents()[1].event).toEqual(EVENTS[2]);
+                        expect(tl!.getEvents()[3].event).toEqual(EVENTS[3]);
+                        expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                             .toEqual("start_token");
                         // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
                         //    .toEqual("s_5_4");
@@ -468,13 +469,13 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should join timelines where they overlap a previous /context", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
             // we fetch event 0, then 2, then 3, and finally 1. 1 is returned
             // with context which joins them all up.
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
-                             encodeURIComponent(EVENTS[0].event_id))
+                             encodeURIComponent(EVENTS[0].event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token0",
@@ -487,7 +488,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
-                             encodeURIComponent(EVENTS[2].event_id))
+                             encodeURIComponent(EVENTS[2].event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token2",
@@ -500,7 +501,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
-                             encodeURIComponent(EVENTS[3].event_id))
+                             encodeURIComponent(EVENTS[3].event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token3",
@@ -513,7 +514,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
-                             encodeURIComponent(EVENTS[1].event_id))
+                             encodeURIComponent(EVENTS[1].event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token4",
@@ -528,26 +529,26 @@ describe("MatrixClient event timelines", function() {
             let tl0;
             let tl3;
             return Promise.all([
-                client.getEventTimeline(timelineSet, EVENTS[0].event_id,
+                client.getEventTimeline(timelineSet, EVENTS[0].event_id!,
                 ).then(function(tl) {
-                    expect(tl.getEvents().length).toEqual(1);
+                    expect(tl!.getEvents().length).toEqual(1);
                     tl0 = tl;
-                    return client.getEventTimeline(timelineSet, EVENTS[2].event_id);
+                    return client.getEventTimeline(timelineSet, EVENTS[2].event_id!);
                 }).then(function(tl) {
-                    expect(tl.getEvents().length).toEqual(1);
-                    return client.getEventTimeline(timelineSet, EVENTS[3].event_id);
+                    expect(tl!.getEvents().length).toEqual(1);
+                    return client.getEventTimeline(timelineSet, EVENTS[3].event_id!);
                 }).then(function(tl) {
-                    expect(tl.getEvents().length).toEqual(1);
+                    expect(tl!.getEvents().length).toEqual(1);
                     tl3 = tl;
-                    return client.getEventTimeline(timelineSet, EVENTS[1].event_id);
+                    return client.getEventTimeline(timelineSet, EVENTS[1].event_id!);
                 }).then(function(tl) {
                     // we expect it to get merged in with event 2
-                    expect(tl.getEvents().length).toEqual(2);
-                    expect(tl.getEvents()[0].event).toEqual(EVENTS[1]);
-                    expect(tl.getEvents()[1].event).toEqual(EVENTS[2]);
-                    expect(tl.getNeighbouringTimeline(EventTimeline.BACKWARDS))
+                    expect(tl!.getEvents().length).toEqual(2);
+                    expect(tl!.getEvents()[0].event).toEqual(EVENTS[1]);
+                    expect(tl!.getEvents()[1].event).toEqual(EVENTS[2]);
+                    expect(tl!.getNeighbouringTimeline(EventTimeline.BACKWARDS))
                         .toBe(tl0);
-                    expect(tl.getNeighbouringTimeline(EventTimeline.FORWARDS))
+                    expect(tl!.getNeighbouringTimeline(EventTimeline.FORWARDS))
                         .toBe(tl3);
                     expect(tl0.getPaginationToken(EventTimeline.BACKWARDS))
                         .toEqual("start_token0");
@@ -563,7 +564,7 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should fail gracefully if there is no event field", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
             // we fetch event 0, then 2, then 3, and finally 1. 1 is returned
             // with context which joins them all up.
@@ -595,11 +596,11 @@ describe("MatrixClient event timelines", function() {
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
-            const room = client.getRoom(roomId);
-            const thread = room.createThread(THREAD_ROOT.event_id, undefined, [], false);
+            const room = client.getRoom(roomId)!;
+            const thread = room.createThread(THREAD_ROOT.event_id!, undefined, [], false);
             const timelineSet = thread.timelineSet;
 
-            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id))
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token0",
@@ -611,13 +612,13 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id))
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, function() {
                     return THREAD_ROOT;
                 });
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
-                encodeURIComponent(THREAD_ROOT.event_id) + "/" +
+                encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
                 encodeURIComponent(THREAD_RELATION_TYPE.name) + "?limit=20")
                 .respond(200, function() {
                     return {
@@ -627,13 +628,13 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id);
+            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!);
             await httpBackend.flushAllExpected();
 
             const timeline = await timelinePromise;
 
-            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
-            expect(timeline.getEvents().find(e => e.getId() === THREAD_REPLY.event_id)).toBeTruthy();
+            expect(timeline!.getEvents().find(e => e.getId() === THREAD_ROOT.event_id!)).toBeTruthy();
+            expect(timeline!.getEvents().find(e => e.getId() === THREAD_REPLY.event_id!)).toBeTruthy();
         });
 
         it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
@@ -641,12 +642,12 @@ describe("MatrixClient event timelines", function() {
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const threadRoot = new MatrixEvent(THREAD_ROOT);
-            const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
-            const timelineSet = room.getTimelineSets()[0];
+            const thread = room.createThread(THREAD_ROOT.event_id!, threadRoot, [threadRoot], false)!;
+            const timelineSet = room.getTimelineSets()[0]!;
 
-            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id))
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token0",
@@ -659,13 +660,13 @@ describe("MatrixClient event timelines", function() {
                 });
 
             const [timeline] = await Promise.all([
-                client.getEventTimeline(timelineSet, THREAD_ROOT.event_id),
+                client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!),
                 httpBackend.flushAllExpected(),
             ]);
 
-            expect(timeline).not.toBe(thread.liveTimeline);
+            expect(timeline!).not.toBe(thread.liveTimeline);
             expect(timelineSet.getTimelines()).toContain(timeline);
-            expect(timeline.getEvents().find(e => e.getId() === THREAD_ROOT.event_id)).toBeTruthy();
+            expect(timeline!.getEvents().find(e => e.getId() === THREAD_ROOT.event_id!)).toBeTruthy();
         });
 
         it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
@@ -673,12 +674,12 @@ describe("MatrixClient event timelines", function() {
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const threadRoot = new MatrixEvent(THREAD_ROOT);
-            const thread = room.createThread(THREAD_ROOT.event_id, threadRoot, [threadRoot], false);
+            const thread = room.createThread(THREAD_ROOT.event_id!, threadRoot, [threadRoot], false);
             const timelineSet = thread.timelineSet;
 
-            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id))
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token0",
@@ -691,7 +692,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             return Promise.all([
-                expect(client.getEventTimeline(timelineSet, EVENTS[0].event_id)).resolves.toBeUndefined(),
+                expect(client.getEventTimeline(timelineSet, EVENTS[0].event_id!)).resolves.toBeUndefined(),
                 httpBackend.flushAllExpected(),
             ]);
         });
@@ -701,10 +702,10 @@ describe("MatrixClient event timelines", function() {
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
-            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id))
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token0",
@@ -717,7 +718,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             return Promise.all([
-                expect(client.getEventTimeline(timelineSet, THREAD_REPLY.event_id)).resolves.toBeUndefined(),
+                expect(client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!)).resolves.toBeUndefined(),
                 httpBackend.flushAllExpected(),
             ]);
         });
@@ -726,10 +727,10 @@ describe("MatrixClient event timelines", function() {
             // @ts-ignore
             client.clientOpts.lazyLoadMembers = true;
             client.stopClient(); // we don't need the client to be syncing at this time
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
-            const req = httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id));
+            const req = httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id!));
             req.respond(200, function() {
                 return {
                     start: "start_token0",
@@ -741,11 +742,11 @@ describe("MatrixClient event timelines", function() {
                 };
             });
             req.check((request) => {
-                expect(request.queryParams.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
+                expect(request.queryParams?.filter).toEqual(JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER));
             });
 
             await Promise.all([
-                client.getEventTimeline(timelineSet, EVENTS[0].event_id),
+                client.getEventTimeline(timelineSet, EVENTS[0].event_id!),
                 httpBackend.flushAllExpected(),
             ]);
         });
@@ -810,7 +811,7 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should create a new timeline for new events", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
             const latestMessageId = 'event1:bar';
@@ -845,14 +846,14 @@ describe("MatrixClient event timelines", function() {
                     // for `getEventTimeline` and make sure it's called with the
                     // correct parameters. This doesn't feel too bad to make sure
                     // `getLatestTimeline` is doing the right thing though.
-                    expect(tl.getEvents().length).toEqual(4);
+                    expect(tl!.getEvents().length).toEqual(4);
                     for (let i = 0; i < 4; i++) {
-                        expect(tl.getEvents()[i].event).toEqual(EVENTS[i]);
-                        expect(tl.getEvents()[i].sender.name).toEqual(userName);
+                        expect(tl!.getEvents()[i].event).toEqual(EVENTS[i]);
+                        expect(tl!.getEvents()[i]?.sender.name).toEqual(userName);
                     }
-                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                         .toEqual("start_token");
-                    expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token");
                 }),
                 httpBackend.flushAllExpected(),
@@ -860,7 +861,7 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should throw error when /messages does not return a message", () => {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
@@ -881,11 +882,11 @@ describe("MatrixClient event timelines", function() {
 
     describe("paginateEventTimeline", function() {
         it("should allow you to paginate backwards", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
-                             encodeURIComponent(EVENTS[0].event_id))
+                             encodeURIComponent(EVENTS[0].event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token0",
@@ -899,7 +900,7 @@ describe("MatrixClient event timelines", function() {
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
                 .check(function(req) {
-                    const params = req.queryParams;
+                    const params = req.queryParams!;
                     expect(params.dir).toEqual("b");
                     expect(params.from).toEqual("start_token0");
                     expect(params.limit).toEqual("30");
@@ -912,19 +913,19 @@ describe("MatrixClient event timelines", function() {
 
             let tl;
             return Promise.all([
-                client.getEventTimeline(timelineSet, EVENTS[0].event_id,
+                client.getEventTimeline(timelineSet, EVENTS[0].event_id!,
                 ).then(function(tl0) {
                     tl = tl0;
                     return client.paginateEventTimeline(tl, { backwards: true });
                 }).then(function(success) {
                     expect(success).toBeTruthy();
-                    expect(tl.getEvents().length).toEqual(3);
-                    expect(tl.getEvents()[0].event).toEqual(EVENTS[2]);
-                    expect(tl.getEvents()[1].event).toEqual(EVENTS[1]);
-                    expect(tl.getEvents()[2].event).toEqual(EVENTS[0]);
-                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    expect(tl!.getEvents().length).toEqual(3);
+                    expect(tl!.getEvents()[0].event).toEqual(EVENTS[2]);
+                    expect(tl!.getEvents()[1].event).toEqual(EVENTS[1]);
+                    expect(tl!.getEvents()[2].event).toEqual(EVENTS[0]);
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                         .toEqual("start_token1");
-                    expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token0");
                 }),
                 httpBackend.flushAllExpected(),
@@ -932,11 +933,11 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should stop paginating when it encounters no `end` token", () => {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
-                encodeURIComponent(EVENTS[0].event_id))
+                encodeURIComponent(EVENTS[0].event_id!))
                 .respond(200, () => ({
                     start: "start_token0",
                     events_before: [],
@@ -948,7 +949,7 @@ describe("MatrixClient event timelines", function() {
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
                 .check(function(req) {
-                    const params = req.queryParams;
+                    const params = req.queryParams!;
                     expect(params.dir).toEqual("b");
                     expect(params.from).toEqual("start_token0");
                     expect(params.limit).toEqual("30");
@@ -959,23 +960,23 @@ describe("MatrixClient event timelines", function() {
 
             return Promise.all([
                 (async () => {
-                    const tl = await client.getEventTimeline(timelineSet, EVENTS[0].event_id);
-                    const success = await client.paginateEventTimeline(tl, { backwards: true });
+                    const tl = await client.getEventTimeline(timelineSet, EVENTS[0].event_id!);
+                    const success = await client.paginateEventTimeline(tl!, { backwards: true });
                     expect(success).toBeFalsy();
-                    expect(tl.getEvents().length).toEqual(1);
-                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS)).toEqual(null);
-                    expect(tl.getPaginationToken(EventTimeline.FORWARDS)).toEqual("end_token0");
+                    expect(tl!.getEvents().length).toEqual(1);
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS)).toEqual(null);
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS)).toEqual("end_token0");
                 })(),
                 httpBackend.flushAllExpected(),
             ]);
         });
 
         it("should allow you to paginate forwards", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" +
-                             encodeURIComponent(EVENTS[0].event_id))
+                             encodeURIComponent(EVENTS[0].event_id!))
                 .respond(200, function() {
                     return {
                         start: "start_token0",
@@ -989,7 +990,7 @@ describe("MatrixClient event timelines", function() {
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
                 .check(function(req) {
-                    const params = req.queryParams;
+                    const params = req.queryParams!;
                     expect(params.dir).toEqual("f");
                     expect(params.from).toEqual("end_token0");
                     expect(params.limit).toEqual("20");
@@ -1002,20 +1003,20 @@ describe("MatrixClient event timelines", function() {
 
             let tl;
             return Promise.all([
-                client.getEventTimeline(timelineSet, EVENTS[0].event_id,
+                client.getEventTimeline(timelineSet, EVENTS[0].event_id!,
                 ).then(function(tl0) {
                     tl = tl0;
                     return client.paginateEventTimeline(
                         tl, { backwards: false, limit: 20 });
                 }).then(function(success) {
                     expect(success).toBeTruthy();
-                    expect(tl.getEvents().length).toEqual(3);
-                    expect(tl.getEvents()[0].event).toEqual(EVENTS[0]);
-                    expect(tl.getEvents()[1].event).toEqual(EVENTS[1]);
-                    expect(tl.getEvents()[2].event).toEqual(EVENTS[2]);
-                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    expect(tl!.getEvents().length).toEqual(3);
+                    expect(tl!.getEvents()[0].event).toEqual(EVENTS[0]);
+                    expect(tl!.getEvents()[1].event).toEqual(EVENTS[1]);
+                    expect(tl!.getEvents()[2].event).toEqual(EVENTS[2]);
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                         .toEqual("start_token0");
-                    expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token1");
                 }),
                 httpBackend.flushAllExpected(),
@@ -1285,17 +1286,17 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should work when /send returns before /sync", function() {
-            const room = client.getRoom(roomId);
-            const timelineSet = room.getTimelineSets()[0];
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0]!;
 
             return Promise.all([
                 client.sendTextMessage(roomId, "a body", TXN_ID).then(function(res) {
-                    expect(res.event_id).toEqual(event.event_id);
-                    return client.getEventTimeline(timelineSet, event.event_id);
+                    expect(res.event_id).toEqual(event.event_id!);
+                    return client.getEventTimeline(timelineSet, event.event_id!);
                 }).then(function(tl) {
                     // 2 because the initial sync contained an event
-                    expect(tl.getEvents().length).toEqual(2);
-                    expect(tl.getEvents()[1].getContent().body).toEqual("a body");
+                    expect(tl!.getEvents().length).toEqual(2);
+                    expect(tl!.getEvents()[1].getContent().body).toEqual("a body");
 
                     // now let the sync complete, and check it again
                     return Promise.all([
@@ -1303,10 +1304,10 @@ describe("MatrixClient event timelines", function() {
                         utils.syncPromise(client),
                     ]);
                 }).then(function() {
-                    return client.getEventTimeline(timelineSet, event.event_id);
+                    return client.getEventTimeline(timelineSet, event.event_id!);
                 }).then(function(tl) {
-                    expect(tl.getEvents().length).toEqual(2);
-                    expect(tl.getEvents()[1].event).toEqual(event);
+                    expect(tl!.getEvents().length).toEqual(2);
+                    expect(tl!.getEvents()[1].event).toEqual(event);
                 }),
 
                 httpBackend.flush("/send/m.room.message/" + TXN_ID, 1),
@@ -1314,7 +1315,7 @@ describe("MatrixClient event timelines", function() {
         });
 
         it("should work when /send returns after /sync", function() {
-            const room = client.getRoom(roomId);
+            const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0];
 
             return Promise.all([
@@ -1322,23 +1323,23 @@ describe("MatrixClient event timelines", function() {
                 // - but note that it won't complete until after the /sync does, below.
                 client.sendTextMessage(roomId, "a body", TXN_ID).then(function(res) {
                     logger.log("sendTextMessage completed");
-                    expect(res.event_id).toEqual(event.event_id);
-                    return client.getEventTimeline(timelineSet, event.event_id);
+                    expect(res.event_id).toEqual(event.event_id!);
+                    return client.getEventTimeline(timelineSet, event.event_id!);
                 }).then(function(tl) {
                     logger.log("getEventTimeline completed (2)");
-                    expect(tl.getEvents().length).toEqual(2);
-                    expect(tl.getEvents()[1].getContent().body).toEqual("a body");
+                    expect(tl!.getEvents().length).toEqual(2);
+                    expect(tl!.getEvents()[1].getContent().body).toEqual("a body");
                 }),
 
                 Promise.all([
                     httpBackend.flush("/sync", 1),
                     utils.syncPromise(client),
                 ]).then(function() {
-                    return client.getEventTimeline(timelineSet, event.event_id);
+                    return client.getEventTimeline(timelineSet, event.event_id!);
                 }).then(function(tl) {
                     logger.log("getEventTimeline completed (1)");
-                    expect(tl.getEvents().length).toEqual(2);
-                    expect(tl.getEvents()[1].event).toEqual(event);
+                    expect(tl!.getEvents().length).toEqual(2);
+                    expect(tl!.getEvents()[1].event).toEqual(event);
 
                     // now let the send complete.
                     return httpBackend.flush("/send/m.room.message/" + TXN_ID, 1);
@@ -1382,10 +1383,10 @@ describe("MatrixClient event timelines", function() {
             httpBackend.flushAllExpected(),
             utils.syncPromise(client),
         ]).then(function() {
-            const room = client.getRoom(roomId);
-            const tl = room.getLiveTimeline();
-            expect(tl.getEvents().length).toEqual(3);
-            expect(tl.getEvents()[1].isRedacted()).toBe(true);
+            const room = client.getRoom(roomId)!;
+            const tl = room.getLiveTimeline()!;
+            expect(tl!.getEvents().length).toEqual(3);
+            expect(tl!.getEvents()[1].isRedacted()).toBe(true);
 
             const sync2 = {
                 next_batch: "batch2",
@@ -1411,8 +1412,8 @@ describe("MatrixClient event timelines", function() {
                 utils.syncPromise(client),
             ]);
         }).then(function() {
-            const room = client.getRoom(roomId);
-            const tl = room.getLiveTimeline();
+            const room = client.getRoom(roomId)!;
+            const tl = room.getLiveTimeline()!;
             expect(tl.getEvents().length).toEqual(1);
         });
     });
@@ -1439,11 +1440,11 @@ describe("MatrixClient event timelines", function() {
         });
         await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
 
-        const room = client.getRoom(roomId);
-        const thread = room.getThread(THREAD_ROOT.event_id);
+        const room = client.getRoom(roomId)!;
+        const thread = room.getThread(THREAD_ROOT.event_id!)!;
         const timelineSet = thread.timelineSet;
 
-        httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id))
+        httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
             .respond(200, {
                 start: "start_token",
                 events_before: [],
@@ -1453,7 +1454,7 @@ describe("MatrixClient event timelines", function() {
                 end: "end_token",
             });
         httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
-            encodeURIComponent(THREAD_ROOT.event_id) + "/" +
+            encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
             encodeURIComponent(THREAD_RELATION_TYPE.name) + "?limit=20")
             .respond(200, function() {
                 return {
@@ -1463,7 +1464,7 @@ describe("MatrixClient event timelines", function() {
                 };
             });
         await Promise.all([
-            client.getEventTimeline(timelineSet, THREAD_ROOT.event_id),
+            client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!),
             httpBackend.flushAllExpected(),
         ]);
 

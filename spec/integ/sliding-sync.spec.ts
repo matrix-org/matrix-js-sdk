@@ -30,8 +30,8 @@ import { sleep } from "../../src/utils";
  * Each test will call different functions on SlidingSync which may depend on state from previous tests.
  */
 describe("SlidingSync", () => {
-    let client: MatrixClient = null;
-    let httpBackend: MockHttpBackend = null;
+    let client: MatrixClient | undefined;
+    let httpBackend: MockHttpBackend | undefined;
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
     const proxyBaseUrl = "http://localhost:8008";
@@ -46,9 +46,9 @@ describe("SlidingSync", () => {
 
     // tear down client/httpBackend globals
     const teardownClient = () => {
-        httpBackend.verifyNoOutstandingExpectation();
-        client.stopClient();
-        return httpBackend.stop();
+        httpBackend!.verifyNoOutstandingExpectation();
+        client!.stopClient();
+        return httpBackend!.stop();
     };
 
     describe("start/stop", () => {
@@ -57,14 +57,14 @@ describe("SlidingSync", () => {
         let slidingSync: SlidingSync;
 
         it("should start the sync loop upon calling start()", async () => {
-            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client!, 1);
             const fakeResp = {
                 pos: "a",
                 lists: [],
                 rooms: {},
                 extensions: {},
             };
-            httpBackend.when("POST", syncUrl).respond(200, fakeResp);
+            httpBackend!.when("POST", syncUrl).respond(200, fakeResp);
             const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
                 expect(state).toEqual(SlidingSyncState.RequestFinished);
                 expect(resp).toEqual(fakeResp);
@@ -72,13 +72,13 @@ describe("SlidingSync", () => {
                 return true;
             });
             slidingSync.start();
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await p;
         });
 
         it("should stop the sync loop upon calling stop()", () => {
             slidingSync.stop();
-            httpBackend.verifyNoOutstandingExpectation();
+            httpBackend!.verifyNoOutstandingExpectation();
         });
     });
 
@@ -103,9 +103,9 @@ describe("SlidingSync", () => {
 
         it("should be able to subscribe to a room", async () => {
             // add the subscription
-            slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
+            slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client!, 1);
             slidingSync.modifyRoomSubscriptions(new Set([roomId]));
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("room sub", body);
                 expect(body.room_subscriptions).toBeTruthy();
@@ -125,7 +125,7 @@ describe("SlidingSync", () => {
                 return true;
             });
             slidingSync.start();
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await p;
         });
 
@@ -137,7 +137,7 @@ describe("SlidingSync", () => {
                     ["m.room.member", "*"],
                 ],
             };
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("adjusted sub", body);
                 expect(body.room_subscriptions).toBeTruthy();
@@ -158,7 +158,7 @@ describe("SlidingSync", () => {
             });
 
             slidingSync.modifyRoomSubscriptionInfo(newSubInfo);
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await p;
             // need to set what the new subscription info is for subsequent tests
             roomSubInfo = newSubInfo;
@@ -179,7 +179,7 @@ describe("SlidingSync", () => {
                 required_state: [],
                 timeline: [],
             };
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("new subs", body);
                 expect(body.room_subscriptions).toBeTruthy();
@@ -204,12 +204,12 @@ describe("SlidingSync", () => {
             const subs = slidingSync.getRoomSubscriptions();
             subs.add(anotherRoomID);
             slidingSync.modifyRoomSubscriptions(subs);
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await p;
         });
 
         it("should be able to unsubscribe from a room", async () => {
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("unsub request", body);
                 expect(body.room_subscriptions).toBeFalsy();
@@ -226,7 +226,7 @@ describe("SlidingSync", () => {
             // remove the subscription for the first room
             slidingSync.modifyRoomSubscriptions(new Set([anotherRoomID]));
 
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await p;
 
             slidingSync.stop();
@@ -273,8 +273,8 @@ describe("SlidingSync", () => {
                     is_dm: true,
                 },
             };
-            slidingSync = new SlidingSync(proxyBaseUrl, [listReq], {}, client, 1);
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            slidingSync = new SlidingSync(proxyBaseUrl, [listReq], {}, client!, 1);
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("list", body);
                 expect(body.lists).toBeTruthy();
@@ -301,7 +301,7 @@ describe("SlidingSync", () => {
                 return state === SlidingSyncState.Complete;
             });
             slidingSync.start();
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
 
             expect(listenerData[roomA]).toEqual(rooms[roomA]);
@@ -327,7 +327,7 @@ describe("SlidingSync", () => {
 
         it("should be possible to adjust list ranges", async () => {
             // modify the list ranges
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("next ranges", body.lists[0].ranges);
                 expect(body.lists).toBeTruthy();
@@ -351,7 +351,7 @@ describe("SlidingSync", () => {
                 return state === SlidingSyncState.RequestFinished;
             });
             slidingSync.setListRanges(0, newRanges);
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
         });
 
@@ -364,7 +364,7 @@ describe("SlidingSync", () => {
                     "is_dm": true,
                 },
             };
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("extra list", body);
                 expect(body.lists).toBeTruthy();
@@ -403,13 +403,13 @@ describe("SlidingSync", () => {
                 return state === SlidingSyncState.Complete;
             });
             slidingSync.setList(1, extraListReq);
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
         });
 
         it("should be possible to get list DELETE/INSERTs", async () => {
             // move C (2) to A (0)
-            httpBackend.when("POST", syncUrl).respond(200, {
+            httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "e",
                 lists: [{
                     count: 500,
@@ -440,12 +440,12 @@ describe("SlidingSync", () => {
             let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
 
             // move C (0) back to A (2)
-            httpBackend.when("POST", syncUrl).respond(200, {
+            httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "f",
                 lists: [{
                     count: 500,
@@ -476,13 +476,13 @@ describe("SlidingSync", () => {
             responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
         });
 
         it("should ignore invalid list indexes", async () => {
-            httpBackend.when("POST", syncUrl).respond(200, {
+            httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "e",
                 lists: [{
                     count: 500,
@@ -509,13 +509,13 @@ describe("SlidingSync", () => {
             const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
         });
 
         it("should be possible to update a list", async () => {
-            httpBackend.when("POST", syncUrl).respond(200, {
+            httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "g",
                 lists: [{
                     count: 42,
@@ -555,7 +555,7 @@ describe("SlidingSync", () => {
             const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
         });
@@ -567,7 +567,7 @@ describe("SlidingSync", () => {
                 1: roomC,
             };
             expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual(indexToRoomId);
-            httpBackend.when("POST", syncUrl).respond(200, {
+            httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "f",
                 // currently the list is [B,C] so we will insert D then immediately delete it
                 lists: [{
@@ -598,7 +598,7 @@ describe("SlidingSync", () => {
             const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
         });
@@ -608,7 +608,7 @@ describe("SlidingSync", () => {
                 0: roomB,
                 1: roomC,
             });
-            httpBackend.when("POST", syncUrl).respond(200, {
+            httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "g",
                 lists: [{
                     count: 499,
@@ -634,7 +634,7 @@ describe("SlidingSync", () => {
             const responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
         });
@@ -643,7 +643,7 @@ describe("SlidingSync", () => {
             expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual({
                 0: roomC,
             });
-            httpBackend.when("POST", syncUrl).respond(200, {
+            httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "h",
                 lists: [{
                     count: 500,
@@ -670,11 +670,11 @@ describe("SlidingSync", () => {
             let responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
 
-            httpBackend.when("POST", syncUrl).respond(200, {
+            httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "h",
                 lists: [{
                     count: 501,
@@ -702,7 +702,7 @@ describe("SlidingSync", () => {
             responseProcessed = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
             slidingSync.stop();
@@ -725,11 +725,11 @@ describe("SlidingSync", () => {
                 ],
             };
             // add the subscription
-            slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client, 1);
+            slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client!, 1);
             // modification before SlidingSync.start()
             const subscribePromise = slidingSync.modifyRoomSubscriptions(new Set([roomId]));
             let txnId;
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeTruthy();
@@ -752,7 +752,7 @@ describe("SlidingSync", () => {
                 };
             });
             slidingSync.start();
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await subscribePromise;
         });
         it("should resolve setList during a connection", async () => {
@@ -761,7 +761,7 @@ describe("SlidingSync", () => {
             };
             const promise = slidingSync.setList(0, newList);
             let txnId;
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
@@ -776,14 +776,14 @@ describe("SlidingSync", () => {
                     extensions: {},
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await promise;
             expect(txnId).toBeDefined();
         });
         it("should resolve setListRanges during a connection", async () => {
             const promise = slidingSync.setListRanges(0, [[20, 40]]);
             let txnId;
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
@@ -800,7 +800,7 @@ describe("SlidingSync", () => {
                     extensions: {},
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await promise;
             expect(txnId).toBeDefined();
         });
@@ -809,7 +809,7 @@ describe("SlidingSync", () => {
                 timeline_limit: 99,
             });
             let txnId;
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeTruthy();
@@ -825,22 +825,22 @@ describe("SlidingSync", () => {
                     extensions: {},
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await promise;
             expect(txnId).toBeDefined();
         });
         it("should reject earlier pending promises if a later transaction is acknowledged", async () => {
             // i.e if we have [A,B,C] and see txn_id=C then A,B should be rejected.
-            const gotTxnIds = [];
+            const gotTxnIds: any[] = [];
             const pushTxn = function(req) {
                 gotTxnIds.push(req.data.txn_id);
             };
             const failPromise = slidingSync.setListRanges(0, [[20, 40]]);
-            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "e" }); // missing txn_id
-            await httpBackend.flushAllExpected();
+            httpBackend!.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "e" }); // missing txn_id
+            await httpBackend!.flushAllExpected();
             const failPromise2 = slidingSync.setListRanges(0, [[60, 70]]);
-            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "f" }); // missing txn_id
-            await httpBackend.flushAllExpected();
+            httpBackend!.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "f" }); // missing txn_id
+            await httpBackend!.flushAllExpected();
 
             // attach rejection handlers now else if we do it later Jest treats that as an unhandled rejection
             // which is a fail.
@@ -849,7 +849,7 @@ describe("SlidingSync", () => {
 
             const okPromise = slidingSync.setListRanges(0, [[0, 20]]);
             let txnId;
-            httpBackend.when("POST", syncUrl).check((req) => {
+            httpBackend!.when("POST", syncUrl).check((req) => {
                 txnId = req.data.txn_id;
             }).respond(200, () => {
                 // include the txn_id, earlier requests should now be reject()ed.
@@ -858,23 +858,23 @@ describe("SlidingSync", () => {
                     txn_id: txnId,
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await okPromise;
 
             expect(txnId).toBeDefined();
         });
         it("should not reject later pending promises if an earlier transaction is acknowledged", async () => {
             // i.e if we have [A,B,C] and see txn_id=B then C should not be rejected but A should.
-            const gotTxnIds = [];
+            const gotTxnIds: any[] = [];
             const pushTxn = function(req) {
-                gotTxnIds.push(req.data.txn_id);
+                gotTxnIds.push(req.data?.txn_id);
             };
             const A = slidingSync.setListRanges(0, [[20, 40]]);
-            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "A" });
-            await httpBackend.flushAllExpected();
+            httpBackend!.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "A" });
+            await httpBackend!.flushAllExpected();
             const B = slidingSync.setListRanges(0, [[60, 70]]);
-            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "B" }); // missing txn_id
-            await httpBackend.flushAllExpected();
+            httpBackend!.when("POST", syncUrl).check(pushTxn).respond(200, { pos: "B" }); // missing txn_id
+            await httpBackend!.flushAllExpected();
 
             // attach rejection handlers now else if we do it later Jest treats that as an unhandled rejection
             // which is a fail.
@@ -885,14 +885,14 @@ describe("SlidingSync", () => {
             C.finally(() => {
                 pendingC = false;
             });
-            httpBackend.when("POST", syncUrl).check(pushTxn).respond(200, () => {
+            httpBackend!.when("POST", syncUrl).check(pushTxn).respond(200, () => {
                 // include the txn_id for B, so C's promise is outstanding
                 return {
                     pos: "C",
                     txn_id: gotTxnIds[1],
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             // A is rejected, see above
             expect(B).resolves.toEqual(gotTxnIds[1]); // B is resolved
             expect(pendingC).toBe(true); // C is pending still
@@ -904,7 +904,7 @@ describe("SlidingSync", () => {
                 pending = false;
             });
             let txnId;
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
@@ -921,7 +921,7 @@ describe("SlidingSync", () => {
                     extensions: {},
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             expect(txnId).toBeDefined();
             expect(pending).toBe(true);
             slidingSync.stop();
@@ -963,10 +963,10 @@ describe("SlidingSync", () => {
         };
 
         it("should be able to register an extension", async () => {
-            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client!, 1);
             slidingSync.registerExtension(extPre);
 
-            const callbackOrder = [];
+            const callbackOrder: string[] = [];
             let extensionOnResponseCalled = false;
             onPreExtensionRequest = () => {
                 return extReq;
@@ -977,7 +977,7 @@ describe("SlidingSync", () => {
                 expect(resp).toEqual(extResp);
             };
 
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("ext req", body);
                 expect(body.extensions).toBeTruthy();
@@ -998,7 +998,7 @@ describe("SlidingSync", () => {
                 }
             });
             slidingSync.start();
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await p;
             expect(extensionOnResponseCalled).toBe(true);
             expect(callbackOrder).toEqual(["onPreExtensionResponse", "Lifecycle"]);
@@ -1012,7 +1012,7 @@ describe("SlidingSync", () => {
             onPreExtensionResponse = (resp) => {
                 responseCalled = true;
             };
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("ext req nothing", body);
                 expect(body.extensions).toBeTruthy();
@@ -1030,7 +1030,7 @@ describe("SlidingSync", () => {
             const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state, resp, err) => {
                 return state === SlidingSyncState.Complete;
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await p;
             expect(responseCalled).toBe(false);
         });
@@ -1041,13 +1041,13 @@ describe("SlidingSync", () => {
                 return extReq;
             };
             let responseCalled = false;
-            const callbackOrder = [];
+            const callbackOrder: string[] = [];
             onPostExtensionResponse = (resp) => {
                 expect(resp).toEqual(extResp);
                 responseCalled = true;
                 callbackOrder.push("onPostExtensionResponse");
             };
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.log("ext req after start", body);
                 expect(body.extensions).toBeTruthy();
@@ -1071,7 +1071,7 @@ describe("SlidingSync", () => {
                     return true;
                 }
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             await p;
             expect(responseCalled).toBe(true);
             expect(callbackOrder).toEqual(["Lifecycle", "onPostExtensionResponse"]);
@@ -1079,7 +1079,7 @@ describe("SlidingSync", () => {
         });
 
         it("is not possible to register the same extension name twice", async () => {
-            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client!, 1);
             slidingSync.registerExtension(extPre);
             expect(() => { slidingSync.registerExtension(extPre); }).toThrow();
         });
@@ -1106,7 +1106,7 @@ function listenUntil<T>(
     callback: (...args: any[]) => T,
     timeoutMs = 500,
 ): Promise<T> {
-    const trace = new Error().stack.split(`\n`)[2];
+    const trace = new Error().stack?.split(`\n`)[2];
     return Promise.race([new Promise<T>((resolve, reject) => {
         const wrapper = (...args) => {
             try {
