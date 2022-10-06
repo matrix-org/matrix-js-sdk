@@ -255,7 +255,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.VADEnabled = !audioMuted;
     }
 
-    public setVoiceActivityDetectionMuteLocal(audioMuted: boolean | null, videoMuted: boolean | null): void {
+    public setVoiceActivityDetectionMuteLocal(audioMuted: boolean | null): void {
         if (audioMuted !== null) {
             this.vadAudioMuted = audioMuted;
         }
