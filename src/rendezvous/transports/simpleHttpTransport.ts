@@ -19,7 +19,7 @@ import { sleep } from '../../utils';
 import { BaseRendezvousTransport } from "./baseTransport";
 import { RendezvousCancellationFunction, RendezvousCancellationReason } from '../cancellationReason';
 import { RendezvousTransportDetails } from '../transport';
-import { ClientPrefix, MatrixClient, Method } from '../../matrix';
+import { ClientPrefix, MatrixClient } from '../../matrix';
 
 export interface SimpleHttpRendezvousTransportDetails extends RendezvousTransportDetails {
     type: 'http.v1';
