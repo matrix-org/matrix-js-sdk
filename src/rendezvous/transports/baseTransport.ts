@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from "../../logger";
 import { RendezvousCancellationFunction, RendezvousCancellationReason } from "../cancellationReason";
 import { RendezvousTransport, RendezvousTransportDetails } from "../transport";
 
@@ -33,9 +32,6 @@ export abstract class BaseRendezvousTransport implements RendezvousTransport {
     async cancel(reason: RendezvousCancellationReason) {
         this.cancelled = true;
         this.ready = false;
-
-        logger.info(reason);
-        logger.info('onCancelled');
         this.onCancelled?.(reason);
     }
 }
