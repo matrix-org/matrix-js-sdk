@@ -279,9 +279,9 @@ export class GroupCall extends TypedEventEmitter<
             videoMuted: stream.getVideoTracks().length === 0,
             VADEnabled: !this.isPtt,
         });
+        this.localCallFeed = callFeed;
         this.localCallFeed.on(CallFeedEvent.VADMuteStateChanged, (muted: boolean) => this.setVadMicrophoneMuted(muted));
 
-        this.localCallFeed = callFeed;
         this.addUserMediaFeed(callFeed);
 
         this.setState(GroupCallState.LocalCallFeedInitialized);
