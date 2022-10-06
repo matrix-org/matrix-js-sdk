@@ -33,6 +33,8 @@ In Node.js
 ----------
 
 Ensure you have the latest LTS version of Node.js installed.
+This library relies on `fetch` which is available in Node from v18.0.0 - it should work fine also with polyfills.
+If you wish to use a ponyfill or adapter of some sort then pass it as `fetchFn` to the MatrixClient constructor options.
 
 Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
 if you do not have it already.
