@@ -16,6 +16,7 @@ limitations under the License.
 
 import HttpBackend from "matrix-mock-request";
 
+import "./setupTests";
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
 import type { MatrixClient, ClientEvent } from "../../src";
 

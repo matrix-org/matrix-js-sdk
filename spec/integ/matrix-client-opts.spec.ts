@@ -5,10 +5,12 @@ import { MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
+import { ICreateClientOpts } from "../../src/client";
+import { IStore } from "../../src/store";
 
 describe("MatrixClient opts", function() {
     const baseUrl = "http://localhost.or.something";
-    let httpBackend = null;
+    let httpBackend = new HttpBackend();
     const userId = "@alice:localhost";
     const userB = "@bob:localhost";
     const accessToken = "aseukfgwef";
@@ -99,7 +101,7 @@ describe("MatrixClient opts", function() {
             ];
             client.on("event", function(event) {
                 expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(
-                    -1, "Recv unexpected event type: " + event.getType(),
+                    -1,
                 );
                 expectedEventTypes.splice(
                     expectedEventTypes.indexOf(event.getType()), 1,
@@ -118,7 +120,7 @@ describe("MatrixClient opts", function() {
                 utils.syncPromise(client),
             ]);
             expect(expectedEventTypes.length).toEqual(
-                0, "Expected to see event types: " + expectedEventTypes,
+                0,
             );
         });
     });
@@ -128,7 +130,7 @@ describe("MatrixClient opts", function() {
         beforeEach(function() {
             client = new MatrixClient({
                 fetchFn: httpBackend.fetchFn,
-                store: new MemoryStore(),
+                store: new MemoryStore() as IStore,
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,
@@ -146,7 +148,7 @@ describe("MatrixClient opts", function() {
                 error: "Ruh roh",
             }));
             client.sendTextMessage("!foo:bar", "a body", "txn1").then(function(res) {
-                expect(false).toBe(true, "sendTextMessage resolved but shouldn't");
+                expect(false).toBe(true);
             }, function(err) {
                 expect(err.errcode).toEqual("M_SOMETHING");
                 done();
