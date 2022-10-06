@@ -17,7 +17,6 @@ limitations under the License.
 import * as ed from '@noble/ed25519';
 
 import { logger } from '../../logger';
-import { MatrixClient } from '../../matrix';
 import { RendezvousError } from '../error';
 import {
     RendezvousCode,
@@ -101,7 +100,6 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
 
     constructor(
         public transport: RendezvousTransport,
-        private cli?: MatrixClient,
         private theirPublicKey?: Uint8Array,
     ) {
         this.ourPrivateKey = ed.utils.randomPrivateKey();

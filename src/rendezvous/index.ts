@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from '../matrix';
 import { RendezvousCancellationFunction, RendezvousCancellationReason } from './cancellationReason';
 import { RendezvousChannel } from './channel';
 import { RendezvousCode, RendezvousIntent } from './code';
@@ -32,7 +31,6 @@ export * from './channel';
 export async function buildChannelFromCode(
     code: string,
     onCancelled: RendezvousCancellationFunction,
-    cli?: MatrixClient,
 ): Promise<{ channel: RendezvousChannel, intent: RendezvousIntent }> {
     let parsed: RendezvousCode;
     try {
@@ -74,7 +72,7 @@ export async function buildChannelFromCode(
 
     logger.info(`Building ECDHv1 rendezvous via HTTP from: ${code}`);
     return {
-        channel: new ECDHv1RendezvousChannel(transport, cli, theirPublicKey),
+        channel: new ECDHv1RendezvousChannel(transport, theirPublicKey),
         intent,
     };
 }
