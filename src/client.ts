@@ -7059,6 +7059,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     userId: response.user_id,
                 };
             }
+            return response;
         });
     }
 
