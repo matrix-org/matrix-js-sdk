@@ -32,13 +32,13 @@ import {
     RoomEvent,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
-import { Room } from "../../src/models/room";
+import { NotificationCountType, Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType } from "../../src/@types/read_receipts";
-import { Thread, ThreadEvent } from "../../src/models/thread";
+import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { WrappedReceipt } from "../../src/models/read-receipt";
 
 describe("Room", function() {
@@ -2408,7 +2408,7 @@ describe("Room", function() {
         });
 
         it("should aggregate relations in thread event timeline set", () => {
-            Thread.setServerSideSupport(true, true);
+            Thread.setServerSideSupport(FeatureSupport.Stable);
             const threadRoot = mkMessage();
             const rootReaction = mkReaction(threadRoot);
             const threadResponse = mkThreadResponse(threadRoot);
@@ -2560,6 +2560,42 @@ describe("Room", function() {
             (client.roomNameGenerator as jest.Mock).mockClear();
             room.recalculate();
             expect(client.roomNameGenerator).toHaveBeenCalled();
+        });
+    });
+
+    describe("thread notifications", () => {
+        let room;
+
+        beforeEach(() => {
+            const client = new TestClient(userA).client;
+            room = new Room(roomId, client, userA);
+        });
+
+        it("defaults to undefined", () => {
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBeUndefined();
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBeUndefined();
+        });
+
+        it("lets you set values", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 1);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(1);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBeUndefined();
+
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 10);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(1);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(10);
+        });
+
+        it("lets you reset threads notifications", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 123);
+
+            room.resetThreadUnreadNotificationCount();
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBeUndefined();
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBeUndefined();
         });
     });
 });

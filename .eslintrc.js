@@ -43,7 +43,10 @@ module.exports = {
         "no-console": "error",
 
         // restrict EventEmitters to force callers to use TypedEventEmitter
-        "no-restricted-imports": ["error", "events"],
+        "no-restricted-imports": ["error", {
+            name: "events",
+            message: "Please use TypedEventEmitter instead"
+        }],
 
         "import/no-restricted-paths": ["error", {
             "zones": [{

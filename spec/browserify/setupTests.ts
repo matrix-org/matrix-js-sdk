@@ -15,9 +15,11 @@ limitations under the License.
 */
 
 // stub for browser-matrix browserify tests
+// @ts-ignore
 global.XMLHttpRequest = jest.fn();
 
 afterAll(() => {
     // clean up XMLHttpRequest mock
+    // @ts-ignore
     global.XMLHttpRequest = undefined;
 });
