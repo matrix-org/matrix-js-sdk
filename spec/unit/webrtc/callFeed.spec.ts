@@ -139,6 +139,75 @@ describe("CallFeed", () => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(false);
                 }, 1000);
             });
+
+            it("voice activity should not disable audio track after a few milliseconds", async () => {
+                // Someone speaking
+                // Stops speaking for a few milliseconds
+                // Starts speaking again
+                // -> Is not muted in between (VAD_COOLDOWN)
+
+                feed.stream.addTrack(
+                    //@ts-ignore Mock
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
+
+                feed.setVoiceActivityThreshold(-50);
+                feed.speakingVolumeSamples = [-60];
+
+                setTimeout(() => {
+                    feed.speakingVolumeSamples = [-Infinity];
+                }, 100);
+
+                setTimeout(() => {
+                    expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
+                }, 150);
+            });
+
+            it("voice activity should disable audio track after cooldown", async () => {
+                // Someone speaking
+                // Stops speaking
+                // -> Is muted after some time (VAD_COOLDOWN)
+
+                feed.stream.addTrack(
+                    //@ts-ignore Mock
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
+
+                feed.setVoiceActivityThreshold(-50);
+                feed.speakingVolumeSamples = [-60];
+
+                setTimeout(() => {
+                    feed.speakingVolumeSamples = [-Infinity];
+                }, 100);
+
+                setTimeout(() => {
+                    expect(feed.stream.getAudioTracks()[0].enabled).toBe(false);
+                }, 310);
+            });
+
+            it("voice activity cooldown should be reseted when speaking", async () => {
+                // Cooldown is reseted after speaking again
+
+                feed.stream.addTrack(
+                    //@ts-ignore Mock
+                    new MockMediaStreamTrack("track", "audio", true),
+                );
+
+                feed.setVoiceActivityThreshold(-50);
+                feed.speakingVolumeSamples = [-60];
+
+                setTimeout(() => {
+                    feed.speakingVolumeSamples = [-Infinity];
+                }, 100);
+
+                setTimeout(() => {
+                    feed.speakingVolumeSamples = [-50];
+                }, 200);
+
+                setTimeout(() => {
+                    expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
+                }, 310);
+            });
         });
     });
 });
