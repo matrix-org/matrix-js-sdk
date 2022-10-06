@@ -27,4 +27,5 @@ export enum RendezvousCancellationReason {
   UnsupportedAlgorithm = 'unsupported_algorithm',
   DataMismatch = 'data_mismatch',
   UnsupportedTransport = 'unsupported_transport',
+  HomeserverLacksSupport = 'homeserver_lacks_support',
 }
