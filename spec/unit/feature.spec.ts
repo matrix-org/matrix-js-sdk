@@ -35,7 +35,7 @@ describe("Feature detection", () => {
                 "org.matrix.msc3773": true,
             },
         });
-        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(ServerSupport.Experimental);
+        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(ServerSupport.Unstable);
     });
 
     it("requires two MSCs to pass", async () => {

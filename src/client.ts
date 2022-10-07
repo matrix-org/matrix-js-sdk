@@ -204,10 +204,8 @@ import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
-import { ServerSupport } from "./feature";
-import { Feature } from "./feature";
-import { buildFeatureSupportMap } from "./feature";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
+import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 
 export type Store = IStore;
 
@@ -1207,7 +1205,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.canSupport = await buildFeatureSupportMap(serverVersions);
 
         const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
-        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Experimental);
+        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
 
         const { threads, list } = await this.doesServerSupportThread();
         Thread.setServerSideSupport(threads);

@@ -18,7 +18,7 @@ import { IServerVersions } from "./client";
 
 export enum ServerSupport {
     Stable,
-    Experimental,
+    Unstable,
     Unsupported
 }
 
@@ -53,7 +53,7 @@ export async function buildFeatureSupportMap(versions: IServerVersions): Promise
         if (supportMatrixVersion) {
             supportMap.set(feature as Feature, ServerSupport.Stable);
         } else if (supportUnstablePrefixes) {
-            supportMap.set(feature as Feature, ServerSupport.Experimental);
+            supportMap.set(feature as Feature, ServerSupport.Unstable);
         } else {
             supportMap.set(feature as Feature, ServerSupport.Unsupported);
         }
