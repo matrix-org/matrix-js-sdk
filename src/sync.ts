@@ -59,6 +59,7 @@ import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
 import { IAbortablePromise } from "./@types/partials";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
+import { Feature } from "./feature";
 
 const DEBUG = true;
 
@@ -562,7 +563,11 @@ export class SyncApi {
     };
 
     private buildDefaultFilter = () => {
-        return new Filter(this.client.credentials.userId);
+        const filter = new Filter(this.client.credentials.userId);
+        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications)) {
+            filter.setUnreadThreadNotifications(true);
+        }
+        return filter;
     };
 
     private checkLazyLoadStatus = async () => {
@@ -706,10 +711,6 @@ export class SyncApi {
                 const initialFilter = this.buildDefaultFilter();
                 initialFilter.setDefinition(filter.getDefinition());
                 initialFilter.setTimelineLimit(this.opts.initialSyncLimit);
-                const supportsThreadNotifications =
-                    await this.client.doesServerSupportUnstableFeature("org.matrix.msc3773")
-                 || await this.client.isVersionSupported("v1.4");
-                initialFilter.setUnreadThreadNotifications(supportsThreadNotifications);
                 // Use an inline filter, no point uploading it for a single usage
                 firstSyncFilter = JSON.stringify(initialFilter.getDefinition());
             }
