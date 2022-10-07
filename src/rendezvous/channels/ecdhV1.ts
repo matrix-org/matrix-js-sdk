@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as ed from '@noble/ed25519';
+import { curve25519, utils } from '@noble/ed25519';
 
 import { logger } from '../../logger';
 import { RendezvousError } from '../error';
@@ -93,7 +93,7 @@ async function calculateChecksum(sharedSecret: Uint8Array, info: String): Promis
 
 export class ECDHv1RendezvousChannel implements RendezvousChannel {
     private ourPrivateKey: Uint8Array;
-    private _ourPublicKey?: Uint8Array;
+    private ourPublicKey: Uint8Array;
     private sharedSecret?: Uint8Array;
     private aesInfo?: string;
     public onCancelled?: (reason: RendezvousCancellationReason) => void;
@@ -102,15 +102,8 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         public transport: RendezvousTransport,
         private theirPublicKey?: Uint8Array,
     ) {
-        this.ourPrivateKey = ed.utils.randomPrivateKey();
-    }
-
-    private async getPublicKey(): Promise<Uint8Array> {
-        if (!this._ourPublicKey) {
-            this._ourPublicKey = await ed.getPublicKey(this.ourPrivateKey);
-        }
-
-        return this._ourPublicKey;
+        this.ourPrivateKey = utils.randomPrivateKey();
+        this.ourPublicKey = curve25519.scalarMultBase(this.ourPrivateKey);
     }
 
     public async generateCode(intent: RendezvousIntent): Promise<ECDHv1RendezvousCode> {
@@ -127,7 +120,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         const rendezvous: ECDHv1RendezvousCode = {
             "rendezvous": {
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: encodeBase64(await this.getPublicKey()),
+                key: encodeBase64(this.ourPublicKey),
                 transport: await this.transport.details(),
                 ...data,
             },
@@ -139,7 +132,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
 
     async connect(): Promise<string> {
         const isInitiator = !this.theirPublicKey;
-        const ourPublicKey = await this.getPublicKey();
+        const ourPublicKey = this.ourPublicKey;
 
         if (!isInitiator) {
             // send our public key unencrypted
@@ -185,7 +178,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             });
         }
 
-        this.sharedSecret = await ed.getSharedSecret(this.ourPrivateKey, this.theirPublicKey);
+        this.sharedSecret = curve25519.scalarMult(this.ourPrivateKey, this.theirPublicKey);
 
         const initiatorKey = isInitiator ? ourPublicKey : this.theirPublicKey;
         const recipientKey = isInitiator ? this.theirPublicKey : ourPublicKey;
