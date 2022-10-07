@@ -84,7 +84,7 @@ describe("MatrixClient", function() {
                 expect(req.opts.timeout).toBe(undefined);
             }).respond(200, '{"content_uri": "content"}', true);
 
-            const prom = client!.uploadContent(file, opts).promise;
+            const prom = client!.uploadContent(file, opts);
 
             expect(prom).toBeTruthy();
 
@@ -116,7 +116,7 @@ describe("MatrixClient", function() {
                 "error": "broken",
             });
 
-            const prom = client!.uploadContent(file, opts).promise.then(function(response) {
+            const prom = client!.uploadContent(file, opts).then(function(response) {
                 throw Error("request not failed");
             }, function(error) {
                 expect(error.httpStatus).toEqual(400);
@@ -129,15 +129,14 @@ describe("MatrixClient", function() {
         });
 
         it("should return a promise which can be cancelled", async () => {
-            const upload = client!.uploadContent(file, opts);
-            const prom = upload.promise;
+            const prom = client!.uploadContent(file, opts);
 
             const uploads = client!.getCurrentUploads();
             expect(uploads.length).toEqual(1);
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
 
-            const r = client!.cancelUpload(upload);
+            const r = client!.cancelUpload(prom);
             expect(r).toBe(true);
             await expect(prom).rejects.toThrow("Aborted");
             expect(client.getCurrentUploads()).toHaveLength(0);

@@ -68,14 +68,14 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
-    public uploadContent(file: FileType, opts: UploadOpts = {}): Upload {
+    public uploadContent(file: FileType, opts: UploadOpts = {}): Promise<UploadResponse> {
         const includeFilename = opts.includeFilename ?? true;
+        const abortController = opts.abortController ?? new AbortController();
 
         // If the file doesn't have a mime type, use a default since the HS errors if we don't supply one.
         const contentType = opts.type ?? (file as File).type ?? 'application/octet-stream';
         const fileName = opts.name ?? (file as File).name;
 
-        const abortController = new AbortController();
         const upload = {
             loaded: 0,
             total: 0,
@@ -183,12 +183,12 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             defer.reject(new DOMException("Aborted", "AbortError"));
         });
         this.uploads.push(upload);
-
-        return upload;
+        return upload.promise;
     }
 
-    public cancelUpload(upload: Upload): boolean {
-        if (this.uploads.includes(upload)) {
+    public cancelUpload(promise: Promise<UploadResponse>): boolean {
+        const upload = this.uploads.find(u => u.promise === promise);
+        if (upload) {
             upload.abortController.abort();
             return true;
         }

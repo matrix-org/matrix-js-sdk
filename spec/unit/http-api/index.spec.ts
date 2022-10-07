@@ -17,7 +17,7 @@ limitations under the License.
 import DOMException from "domexception";
 import { mocked } from "jest-mock";
 
-import { ClientPrefix, MatrixHttpApi, Method, Upload } from "../../../src";
+import { ClientPrefix, MatrixHttpApi, Method, UploadResponse } from "../../../src";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 
 type Writeable<T> = { -readonly [P in keyof T]: T[P] };
@@ -29,7 +29,7 @@ describe("MatrixHttpApi", () => {
     const prefix = ClientPrefix.V3;
 
     let xhr: Partial<Writeable<XMLHttpRequest>>;
-    let upload: Upload;
+    let upload: Promise<UploadResponse>;
 
     const DONE = 0;
 
@@ -53,7 +53,7 @@ describe("MatrixHttpApi", () => {
     });
 
     afterEach(() => {
-        upload?.promise.catch(() => {});
+        upload?.catch(() => {});
         // Abort any remaining requests
         xhr.readyState = DONE;
         xhr.status = 0;
@@ -117,9 +117,9 @@ describe("MatrixHttpApi", () => {
     it("should abort xhr when the upload is aborted", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
         upload = api.uploadContent({} as File);
-        upload.abortController.abort();
+        api.cancelUpload(upload);
         expect(xhr.abort).toHaveBeenCalled();
-        return expect(upload.promise).rejects.toThrow("Aborted");
+        return expect(upload).rejects.toThrow("Aborted");
     });
 
     it("should timeout if no progress in 30s", () => {
@@ -160,7 +160,7 @@ describe("MatrixHttpApi", () => {
         // @ts-ignore
         xhr.onreadystatechange?.(new Event("test"));
 
-        return expect(upload.promise).rejects.toThrow("No response body.");
+        return expect(upload).rejects.toThrow("No response body.");
     });
 
     it("should error on a 400-code", () => {
@@ -174,7 +174,7 @@ describe("MatrixHttpApi", () => {
         // @ts-ignore
         xhr.onreadystatechange?.(new Event("test"));
 
-        return expect(upload.promise).rejects.toThrow("Not found");
+        return expect(upload).rejects.toThrow("Not found");
     });
 
     it("should return response on successful upload", () => {
@@ -188,7 +188,7 @@ describe("MatrixHttpApi", () => {
         // @ts-ignore
         xhr.onreadystatechange?.(new Event("test"));
 
-        return expect(upload.promise).resolves.toStrictEqual({ content_uri: "mxc://server/foobar" });
+        return expect(upload).resolves.toStrictEqual({ content_uri: "mxc://server/foobar" });
     });
 
     it("should abort xhr when calling `cancelUpload`", () => {
@@ -207,7 +207,7 @@ describe("MatrixHttpApi", () => {
         mocked(xhr.getResponseHeader).mockReturnValue("application/json");
         // @ts-ignore
         xhr.onreadystatechange?.(new Event("test"));
-        await upload.promise.catch(() => {});
+        await upload.catch(() => {});
 
         expect(api.cancelUpload(upload)).toBeFalsy();
         expect(xhr.abort).not.toHaveBeenCalled();
@@ -216,9 +216,9 @@ describe("MatrixHttpApi", () => {
     it("should return active uploads in `getCurrentUploads`", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
         upload = api.uploadContent({} as File);
-        expect(api.getCurrentUploads()).toContain(upload);
+        expect(api.getCurrentUploads().find(u => u.promise === upload)).toBeTruthy();
         api.cancelUpload(upload);
-        expect(api.getCurrentUploads()).not.toContain(upload);
+        expect(api.getCurrentUploads().find(u => u.promise === upload)).toBeFalsy();
     });
 
     it("should return expected object from `getContentUri`", () => {

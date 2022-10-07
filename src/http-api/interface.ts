@@ -75,6 +75,7 @@ export interface UploadOpts {
     type?: string;
     includeFilename?: boolean;
     progressHandler?(progress: UploadProgress): void;
+    abortController?: AbortController;
 }
 
 export interface Upload {

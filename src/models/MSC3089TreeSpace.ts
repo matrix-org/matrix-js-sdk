@@ -476,10 +476,9 @@ export class MSC3089TreeSpace {
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
-        const upload = this.client.uploadContent(encryptedContents, {
+        const { content_uri: mxc } = await this.client.uploadContent(encryptedContents, {
             includeFilename: false,
         });
-        const { content_uri: mxc } = await upload.promise;
         info.url = mxc;
 
         const fileContent = {

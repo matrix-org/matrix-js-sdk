@@ -891,7 +891,7 @@ describe("MSC3089TreeSpace", () => {
             expect(opts).toMatchObject({
                 includeFilename: false,
             });
-            return { promise: Promise.resolve({ content_uri: mxc }) };
+            return Promise.resolve({ content_uri: mxc });
         });
         client.uploadContent = uploadFn;
 
@@ -950,7 +950,7 @@ describe("MSC3089TreeSpace", () => {
             expect(opts).toMatchObject({
                 includeFilename: false,
             });
-            return { promise: Promise.resolve({ content_uri: mxc }) };
+            return Promise.resolve({ content_uri: mxc });
         });
         client.uploadContent = uploadFn;
 

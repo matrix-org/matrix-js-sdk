@@ -59,7 +59,7 @@ import {
     retryNetworkOperation,
     ClientPrefix,
     MediaPrefix,
-    IdentityPrefix, IHttpOpts, FileType,
+    IdentityPrefix, IHttpOpts, FileType, UploadResponse,
 } from "./http-api";
 import {
     Crypto,
@@ -7710,7 +7710,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
-    public uploadContent(file: FileType, opts?: UploadOpts): Upload {
+    public uploadContent(file: FileType, opts?: UploadOpts): Promise<UploadResponse> {
         return this.http.uploadContent(file, opts);
     }
 
@@ -7719,7 +7719,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {Promise} upload The object returned from uploadContent
      * @return {boolean} true if canceled, otherwise false
      */
-    public cancelUpload(upload: Upload): boolean {
+    public cancelUpload(upload: Promise<UploadResponse>): boolean {
         return this.http.cancelUpload(upload);
     }
 
