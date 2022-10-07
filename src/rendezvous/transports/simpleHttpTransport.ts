@@ -89,7 +89,7 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
             throw new Error('Invalid rendezvous URI');
         }
 
-        logger.info(`Sending data: ${JSON.stringify(data)} as ${data} to ${uri}`);
+        logger.info(`Sending data: ${data} to ${uri}`);
 
         const headers: Record<string, string> = { 'content-type': contentType };
         if (this.etag) {
