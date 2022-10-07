@@ -1206,7 +1206,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const serverVersions = await this.getVersions();
         this.canSupport = await buildFeatureSupportMap(serverVersions);
 
-        const support = this.canSupport.get(ServerSupport.ThreadUnreadNotifications);
+        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
         UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Experimental);
 
         const { threads, list } = await this.doesServerSupportThread();
