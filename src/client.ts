@@ -204,7 +204,10 @@ import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
-import { buildFeatureSupportMap, Feature } from "./feature";
+import { ServerSupport } from "./feature";
+import { Feature } from "./feature";
+import { buildFeatureSupportMap } from "./feature";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 
 export type Store = IStore;
 
@@ -968,7 +971,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected clientWellKnownIntervalID: ReturnType<typeof setInterval>;
     protected canResetTimelineCallback: ResetTimelineCallback;
 
-    public canSupport = new Map<Feature, boolean>();
+    public canSupport = new Map<Feature, ServerSupport>();
 
     // The pushprocessor caches useful things, so keep one and re-use it
     protected pushProcessor = new PushProcessor(this);
@@ -1202,6 +1205,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const serverVersions = await this.getVersions();
         this.canSupport = await buildFeatureSupportMap(serverVersions);
+
+        const support = this.canSupport.get(ServerSupport.ThreadUnreadNotifications);
+        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Experimental);
 
         const { threads, list } = await this.doesServerSupportThread();
         Thread.setServerSideSupport(threads);

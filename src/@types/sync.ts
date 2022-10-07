@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UnstableValue } from "matrix-events-sdk/lib/NamespacedValue";
+import { ServerControlledNamespacedValue } from "../NamespacedValue";
 
 /**
  * https://github.com/matrix-org/matrix-doc/pull/3773
  *
  * @experimental
  */
-export const UNREAD_THREAD_NOTIFICATIONS = new UnstableValue(
+export const UNREAD_THREAD_NOTIFICATIONS = new ServerControlledNamespacedValue(
     "unread_thread_notifications",
     "org.matrix.msc3773.unread_thread_notifications");

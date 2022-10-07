@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { buildFeatureSupportMap, Feature } from "../../src/feature";
+import { buildFeatureSupportMap, Feature, ServerSupport } from "../../src/feature";
 
 describe("Feature detection", () => {
     it("checks the matrix version", async () => {
@@ -23,8 +23,8 @@ describe("Feature detection", () => {
             unstable_features: {},
         });
 
-        expect(support.get(Feature.Thread)).toBe(true);
-        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(false);
+        expect(support.get(Feature.Thread)).toBe(ServerSupport.Stable);
+        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(ServerSupport.Unsupported);
     });
 
     it("checks the matrix msc number", async () => {
@@ -35,7 +35,7 @@ describe("Feature detection", () => {
                 "org.matrix.msc3773": true,
             },
         });
-        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(true);
+        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(ServerSupport.Experimental);
     });
 
     it("requires two MSCs to pass", async () => {
@@ -46,7 +46,7 @@ describe("Feature detection", () => {
                 "org.matrix.msc3773": true,
             },
         });
-        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(false);
+        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(ServerSupport.Unsupported);
     });
 
     it("requires two MSCs OR matrix versions to pass", async () => {
@@ -57,6 +57,6 @@ describe("Feature detection", () => {
                 "org.matrix.msc3773": true,
             },
         });
-        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(true);
+        expect(support.get(Feature.ThreadUnreadNotifications)).toBe(ServerSupport.Stable);
     });
 });

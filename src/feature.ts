@@ -16,6 +16,12 @@ limitations under the License.
 
 import { IServerVersions } from "./client";
 
+export enum ServerSupport {
+    Stable,
+    Experimental,
+    Unsupported
+}
+
 export enum Feature {
     Thread = "Thread",
     ThreadUnreadNotifications = "ThreadUnreadNotifications",
@@ -37,20 +43,20 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     },
 };
 
-export async function buildFeatureSupportMap(versions: IServerVersions): Promise<Map<Feature, boolean>> {
-    const supportMap = new Map<Feature, boolean>();
-
+export async function buildFeatureSupportMap(versions: IServerVersions): Promise<Map<Feature, ServerSupport>> {
+    const supportMap = new Map<Feature, ServerSupport>();
     for (const [feature, supportCondition] of Object.entries(featureSupportResolver)) {
+        const supportMatrixVersion = versions.versions?.includes(supportCondition.matrixVersion || "") ?? false;
         const supportUnstablePrefixes = supportCondition.unstablePrefixes?.every(unstablePrefix => {
             return versions.unstable_features?.[unstablePrefix] === true;
         }) ?? false;
-
-        const supportMatrixVersion = versions.versions?.includes(supportCondition.matrixVersion || "") ?? false;
-        supportMap.set(
-            feature as Feature,
-            supportUnstablePrefixes || supportMatrixVersion,
-        );
+        if (supportMatrixVersion) {
+            supportMap.set(feature as Feature, ServerSupport.Stable);
+        } else if (supportUnstablePrefixes) {
+            supportMap.set(feature as Feature, ServerSupport.Experimental);
+        } else {
+            supportMap.set(feature as Feature, ServerSupport.Unsupported);
+        }
     }
-
     return supportMap;
 }

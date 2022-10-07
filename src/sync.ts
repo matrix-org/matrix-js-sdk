@@ -59,7 +59,7 @@ import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
 import { IAbortablePromise } from "./@types/partials";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
-import { Feature } from "./feature";
+import { Feature, ServerSupport } from "./feature";
 
 const DEBUG = true;
 
@@ -564,7 +564,7 @@ export class SyncApi {
 
     private buildDefaultFilter = () => {
         const filter = new Filter(this.client.credentials.userId);
-        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications)) {
+        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
             filter.setUnreadThreadNotifications(true);
         }
         return filter;
