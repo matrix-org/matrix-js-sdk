@@ -340,8 +340,9 @@ export function normalize(str: string): string {
 // Arabic Letter RTL mark U+061C
 // Combining characters U+0300 - U+036F
 // Zero width no-break space (BOM) U+FEFF
+// Blank/invisible characters (U2800, U2062-U2063)
 // eslint-disable-next-line no-misleading-character-class
-const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036F\uFEFF\u061C\s]/g;
+const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036F\uFEFF\u061C\u2800\u2062-\u2063\s]/g;
 
 export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

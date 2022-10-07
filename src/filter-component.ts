@@ -73,7 +73,7 @@ export interface IFilterComponent {
  * @param {Object} filterJson the definition of this filter JSON, e.g. { 'contains_url': true }
  */
 export class FilterComponent {
-    constructor(private filterJson: IFilterComponent, public readonly userId?: string) {}
+    constructor(private filterJson: IFilterComponent, public readonly userId?: string | undefined | null) {}
 
     /**
      * Checks with the filter component matches the given event
