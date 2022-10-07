@@ -227,7 +227,7 @@ export class MemoryStore implements IStore {
      * @param {Filter} filter
      */
     public storeFilter(filter: Filter): void {
-        if (!filter || !filter.userId) {
+        if (!filter?.userId) {
             return;
         }
         if (!this.filters[filter.userId]) {
