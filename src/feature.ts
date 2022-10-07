@@ -45,7 +45,7 @@ export async function buildFeatureSupportMap(versions: IServerVersions): Promise
             return versions.unstable_features?.[unstablePrefix] === true;
         }) ?? false;
 
-        const supportMatrixVersion = versions.versions?.includes(supportCondition.matrixVersion) ?? false;
+        const supportMatrixVersion = versions.versions?.includes(supportCondition.matrixVersion || "") ?? false;
         supportMap.set(
             feature as Feature,
             supportUnstablePrefixes || supportMatrixVersion,
