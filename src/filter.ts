@@ -99,7 +99,7 @@ export class Filter {
      * @param {Object} jsonObj
      * @return {Filter}
      */
-    public static fromJson(userId: string, filterId: string, jsonObj: IFilterDefinition): Filter {
+    public static fromJson(userId: string | undefined | null, filterId: string, jsonObj: IFilterDefinition): Filter {
         const filter = new Filter(userId, filterId);
         filter.setDefinition(jsonObj);
         return filter;
@@ -109,7 +109,7 @@ export class Filter {
     private roomFilter: FilterComponent;
     private roomTimelineFilter: FilterComponent;
 
-    constructor(public readonly userId: string | undefined, public filterId?: string) {}
+    constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
 
     /**
      * Get the ID of this filter on your homeserver (if known)
