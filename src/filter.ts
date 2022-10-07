@@ -22,6 +22,7 @@ import {
     EventType,
     RelationType,
 } from "./@types/event";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
@@ -227,7 +228,16 @@ export class Filter {
      * @param {boolean} enabled
      */
     public setUnreadThreadNotifications(enabled: boolean): void {
-        setProp(this.definition, "room.timeline.unread_thread_notifications", !!enabled);
+        this.definition = {
+            ...this.definition,
+            room: {
+                ...this.definition?.room,
+                timeline: {
+                    ...this.definition?.room?.timeline,
+                    [UNREAD_THREAD_NOTIFICATIONS.name]: !!enabled,
+                },
+            },
+        };
     }
 
     setLazyLoadMembers(enabled: boolean): void {
