@@ -204,6 +204,8 @@ import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
+import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 
 export type Store = IStore;
 
@@ -528,7 +530,7 @@ export interface ITurnServer {
     credential: string;
 }
 
-interface IServerVersions {
+export interface IServerVersions {
     versions: string[];
     unstable_features: Record<string, boolean>;
 }
@@ -967,6 +969,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected clientWellKnownIntervalID: ReturnType<typeof setInterval>;
     protected canResetTimelineCallback: ResetTimelineCallback;
 
+    public canSupport = new Map<Feature, ServerSupport>();
+
     // The pushprocessor caches useful things, so keep one and re-use it
     protected pushProcessor = new PushProcessor(this);
 
@@ -1196,6 +1200,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logger.error("Still have sync object whilst not running: stopping old one");
             this.syncApi.stop();
         }
+
+        const serverVersions = await this.getVersions();
+        this.canSupport = await buildFeatureSupportMap(serverVersions);
+
+        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
+        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
 
         const { threads, list } = await this.doesServerSupportThread();
         Thread.setServerSideSupport(threads);
