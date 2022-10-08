@@ -106,6 +106,8 @@ describe("CallFeed", () => {
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
+                //set threshold to infinity, this ensures we hit the threshold.
+                //then we check if the user is unmuted.
                 feed.setVoiceActivityThreshold(-Infinity);
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
@@ -118,9 +120,11 @@ describe("CallFeed", () => {
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityThreshold(-50);
-                feed.speakingVolumeSamples = [-40];
+                //set the threshold and the samples to ensure the user is unmuted at the start.
+                feed.setVoiceActivityThreshold(-80);
+                feed.speakingVolumeSamples = [-60];
 
+                //user has -40db which is louder than -50db, so the user should be unmuted.
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
                 }, 1000);
@@ -132,54 +136,63 @@ describe("CallFeed", () => {
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityThreshold(-50);
-                feed.speakingVolumeSamples = [-60];
+                //set the threshold and the samples to ensure the user is muted at the start.
+                feed.setVoiceActivityThreshold(-80);
+                feed.speakingVolumeSamples = [-90];
 
+                //the user is too quiet, user should be muted.
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(false);
                 }, 1000);
             });
 
             it("voice activity should not disable audio track after a few milliseconds", async () => {
-                // Someone speaking
+                // Someone speaks
                 // Stops speaking for a few milliseconds
-                // Starts speaking again
-                // -> Is not muted in between (VAD_COOLDOWN)
+                // -> Is not muted before cooldown -> (VAD_COOLDOWN)
 
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityThreshold(-50);
+                //set the threshold and the samples to ensure the user is unmuted at the start.
+                feed.setVoiceActivityThreshold(-80);
                 feed.speakingVolumeSamples = [-60];
 
+                //pretend the user is silent after 100ms
                 setTimeout(() => {
                     feed.speakingVolumeSamples = [-Infinity];
                 }, 100);
 
+                //the user should still be unmuted after another 50ms.
+                //Cooldown is 200ms, so this is within the range.
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
                 }, 150);
             });
 
             it("voice activity should disable audio track after cooldown", async () => {
-                // Someone speaking
+                // Someone speaks
                 // Stops speaking
-                // -> Is muted after some time (VAD_COOLDOWN)
+                // -> Is muted after cooldown -> (VAD_COOLDOWN)
 
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityThreshold(-50);
+                //set the threshold and the samples to ensure the user is unmuted at the start.
+                feed.setVoiceActivityThreshold(-80);
                 feed.speakingVolumeSamples = [-60];
 
+                //pretend the user is silent after 100ms
                 setTimeout(() => {
                     feed.speakingVolumeSamples = [-Infinity];
                 }, 100);
 
+                //The user should be muted after another 210ms.
+                //200ms is the cooldown, so we are outside of that range.
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(false);
                 }, 310);
@@ -193,17 +206,21 @@ describe("CallFeed", () => {
                     new MockMediaStreamTrack("track", "audio", true),
                 );
 
-                feed.setVoiceActivityThreshold(-50);
+                //set the threshold and the samples to ensure the user is unmuted at the start.
+                feed.setVoiceActivityThreshold(-80);
                 feed.speakingVolumeSamples = [-60];
 
+                //pretend the user is silent after 100ms
                 setTimeout(() => {
                     feed.speakingVolumeSamples = [-Infinity];
                 }, 100);
 
+                //pretend the user starts speaking again after another 100ms
                 setTimeout(() => {
-                    feed.speakingVolumeSamples = [-50];
+                    feed.speakingVolumeSamples = [-60];
                 }, 200);
 
+                //after yet another 100ms check if the user is still unmuted.
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
                 }, 310);
