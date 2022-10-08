@@ -88,10 +88,8 @@ describe("CallFeed", () => {
 
         describe("voice activity detection", () => {
             it("voice activity should disable audio track", () => {
-                feed.stream.addTrack(
-                    //@ts-ignore Mock
-                    new MockMediaStreamTrack("track", "audio", true),
-                );
+                //@ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
                 feed.setVoiceActivityThreshold(Infinity);
 
@@ -101,10 +99,8 @@ describe("CallFeed", () => {
             });
 
             it("voice activity should enable audio track", () => {
-                feed.stream.addTrack(
-                    //@ts-ignore Mock
-                    new MockMediaStreamTrack("track", "audio", true),
-                );
+                //@ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
                 //set threshold to infinity, this ensures we hit the threshold.
                 //then we check if the user is unmuted.
@@ -115,10 +111,8 @@ describe("CallFeed", () => {
             });
 
             it("enables track when volume is above threshold", () => {
-                feed.stream.addTrack(
-                    //@ts-ignore Mock
-                    new MockMediaStreamTrack("track", "audio", true),
-                );
+                //@ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
                 //set the threshold and the samples to ensure the user is unmuted at the start.
                 feed.setVoiceActivityThreshold(-80);
@@ -131,10 +125,8 @@ describe("CallFeed", () => {
             });
 
             it("disables track when volume is below threshold", () => {
-                feed.stream.addTrack(
-                    //@ts-ignore Mock
-                    new MockMediaStreamTrack("track", "audio", true),
-                );
+                //@ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
                 //set the threshold and the samples to ensure the user is muted at the start.
                 feed.setVoiceActivityThreshold(-80);
@@ -151,10 +143,8 @@ describe("CallFeed", () => {
                 // Stops speaking for a few milliseconds
                 // -> Is not muted before cooldown -> (VAD_COOLDOWN)
 
-                feed.stream.addTrack(
-                    //@ts-ignore Mock
-                    new MockMediaStreamTrack("track", "audio", true),
-                );
+                //@ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
                 //set the threshold and the samples to ensure the user is unmuted at the start.
                 feed.setVoiceActivityThreshold(-80);
@@ -177,10 +167,8 @@ describe("CallFeed", () => {
                 // Stops speaking
                 // -> Is muted after cooldown -> (VAD_COOLDOWN)
 
-                feed.stream.addTrack(
-                    //@ts-ignore Mock
-                    new MockMediaStreamTrack("track", "audio", true),
-                );
+                //@ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
                 //set the threshold and the samples to ensure the user is unmuted at the start.
                 feed.setVoiceActivityThreshold(-80);
@@ -201,10 +189,8 @@ describe("CallFeed", () => {
             it("voice activity cooldown should be reset when speaking", async () => {
                 // Cooldown is reset after speaking again
 
-                feed.stream.addTrack(
-                    //@ts-ignore Mock
-                    new MockMediaStreamTrack("track", "audio", true),
-                );
+                //@ts-ignore Mock
+                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
                 //set the threshold and the samples to ensure the user is unmuted at the start.
                 feed.setVoiceActivityThreshold(-80);
