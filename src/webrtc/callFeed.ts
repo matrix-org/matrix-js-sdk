@@ -45,7 +45,6 @@ export interface ICallFeedOpts {
      * set the Tracks to muted when volume threshold has not been reached
      * This does not show the user as muted.
      */
-    setVoiceActivityDetectionMute?: (muted: boolean) => void;
     VADEnabled?: boolean;
 }
 
@@ -73,13 +72,11 @@ type EventHandlerMap = {
 export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
     public stream: MediaStream;
     public volumeLooperStream: MediaStream;
-    public audioDelay: DelayNode;
     public sdpMetadataStreamId: string;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
     public speakingVolumeSamples: number[];
     public voiceActivityThreshold: number;
-    public setVoiceActivityDetectionMute: (muted: boolean) => void;
     public VADEnabled = false;
     public maxVolume = -Infinity;
 
@@ -115,7 +112,6 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
         this.sdpMetadataStreamId = opts.stream.id;
         this.voiceActivityThreshold = VAD_THRESHOLD;
-        this.setVoiceActivityDetectionMute = opts.setVoiceActivityDetectionMute;
 
         this.updateStream(null, opts.stream);
 
@@ -130,7 +126,6 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.voiceActivityThreshold = threshold;
         if (threshold === -100) {
             this.VADEnabled = false;
-            this.setVoiceActivityDetectionMute?.(false);
         } else {
             this.VADEnabled = true;
         }
@@ -174,12 +169,12 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         mediaStreamAudioSourceNode.connect(this.analyser);
 
         const streamNode = this.audioContext.createMediaStreamSource(this.stream);
-        this.audioDelay = this.audioContext.createDelay(0.001);
+        const audioDelay = this.audioContext.createDelay(0.001);
         const gainNode = this.audioContext.createGain();
         streamNode.connect(gainNode);
-        gainNode.connect(this.audioDelay);
+        gainNode.connect(audioDelay);
         const destination = this.audioContext.createMediaStreamDestination();
-        this.audioDelay.connect(destination);
+        audioDelay.connect(destination);
         this.stream = destination.stream;
 
         this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
