@@ -185,7 +185,7 @@ describe("CallFeed", () => {
                 }, 310);
             });
 
-            it("voice activity cooldown should be reseted when speaking", async () => {
+            it("voice activity cooldown should be reset when speaking", async () => {
                 // Cooldown is reseted after speaking again
 
                 feed.stream.addTrack(
