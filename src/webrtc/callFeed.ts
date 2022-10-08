@@ -25,7 +25,7 @@ const POLLING_INTERVAL = 1; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
 const VAD_THRESHOLD = -100; //dB
 const SPEAKING_SAMPLE_COUNT = 8; // samples
-const VADCOOLDOWN = 200; // ms
+const VAD_COOLDOWN = 200; // ms
 
 export interface ICallFeedOpts {
     client: MatrixClient;
@@ -311,7 +311,6 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
                 if (this.vadAudioMuted) {
                     this.emit(CallFeedEvent.VADMuteStateChanged, false);
-                    // this.setVoiceActivityDetectionMute?.(false);
                 }
             } else if (!this.vadAudioMuted) {
                 // User stops speaking
@@ -319,7 +318,6 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
                 if (!this.isVADinCooldown()) {
                     // user has been silent for X milliseconds
                     this.emit(CallFeedEvent.VADMuteStateChanged, true);
-                    // this.setVoiceActivityDetectionMute?.(true);
                 }
             }
         }
@@ -345,7 +343,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     private isVADinCooldown(): boolean {
         return (
-            new Date().getTime() - this.VADCooldownStarted.getTime() < VADCOOLDOWN);
+            new Date().getTime() - this.VADCooldownStarted.getTime() < VAD_COOLDOWN);
     }
 
     public clone(): CallFeed {
