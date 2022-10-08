@@ -551,6 +551,9 @@ export class GroupCall extends TypedEventEmitter<
         return true;
     }
 
+    public async setVoiceActivityThreshold(threshold: number): Promise<void> {
+        return this.localCallFeed.setVoiceActivityThreshold(threshold);
+    }
     /**
      * Sets the mute state of the local participants's video.
      * @param {boolean} muted Whether to mute the video
