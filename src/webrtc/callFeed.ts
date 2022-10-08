@@ -92,6 +92,9 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private frequencyBinCount: Float32Array;
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
+    private vadSpeaking = false;
+    private audioDelay: DelayNode;
+    private gainNode: GainNode;
     private volumeLooperTimeout: ReturnType<typeof setTimeout>;
     /**
      * Cooldown for voice activity detection, so that we don't mute immediately when the user stops speaking
@@ -169,12 +172,12 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         mediaStreamAudioSourceNode.connect(this.analyser);
 
         const streamNode = this.audioContext.createMediaStreamSource(this.stream);
-        const audioDelay = this.audioContext.createDelay(0.001);
-        const gainNode = this.audioContext.createGain();
-        streamNode.connect(gainNode);
-        gainNode.connect(audioDelay);
+        this.audioDelay = this.audioContext.createDelay(0.001);
+        this.gainNode = this.audioContext.createGain();
+        streamNode.connect(this.gainNode);
+        this.gainNode.connect(this.audioDelay);
         const destination = this.audioContext.createMediaStreamDestination();
-        audioDelay.connect(destination);
+        this.audioDelay.connect(destination);
         this.stream = destination.stream;
 
         this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
@@ -302,7 +305,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         if (this.VADEnabled) {
             // If the user is speaking
             if (this.maxVolume > this.voiceActivityThreshold) {
-                this.VADCooldownStarted = new Date();
+                this.vadSpeaking = true;
 
                 if (this.vadAudioMuted) {
                     this.emit(CallFeedEvent.VADMuteStateChanged, false);
@@ -310,7 +313,10 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             } else if (!this.vadAudioMuted) {
                 // User stops speaking
 
-                if (!this.isVADinCooldown()) {
+                if (this.vadSpeaking) {
+                    this.VADCooldownStarted = new Date();
+                    this.vadSpeaking = false;
+                } else if (!this.isVADInCooldown()) {
                     // user has been silent for X milliseconds
                     this.emit(CallFeedEvent.VADMuteStateChanged, true);
                 }
@@ -336,7 +342,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.volumeLooperTimeout = setTimeout(this.volumeLooper, POLLING_INTERVAL);
     };
 
-    private isVADinCooldown(): boolean {
+    private isVADInCooldown(): boolean {
         return (
             new Date().getTime() - this.VADCooldownStarted.getTime() < VAD_COOLDOWN);
     }

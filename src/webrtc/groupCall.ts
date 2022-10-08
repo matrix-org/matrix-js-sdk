@@ -286,11 +286,12 @@ export class GroupCall extends TypedEventEmitter<
         setTracksEnabled(stream.getVideoTracks(), !callFeed.isVideoMuted());
 
         this.localCallFeed = callFeed;
-        this.localCallFeed.on(CallFeedEvent.VADMuteStateChanged, (muted: boolean) => this.setVadMicrophoneMuted(muted));
 
         this.addUserMediaFeed(callFeed);
 
         this.setState(GroupCallState.LocalCallFeedInitialized);
+
+        this.localCallFeed.on(CallFeedEvent.VADMuteStateChanged, (muted: boolean) => this.setVadMicrophoneMuted(muted));
 
         return callFeed;
     }
@@ -534,7 +535,7 @@ export class GroupCall extends TypedEventEmitter<
 
     public async setVadMicrophoneMuted(muted: boolean): Promise<boolean> {
         // hasAudioDevice can block indefinitely if the window has lost focus
-        if (!(await this.client.getMediaHandler().hasAudioDevice())) {
+        if (!muted && !(await this.client.getMediaHandler().hasAudioDevice())) {
             return false;
         }
 
