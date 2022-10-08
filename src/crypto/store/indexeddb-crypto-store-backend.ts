@@ -25,15 +25,16 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
+    ParkedSharedHistory,
 } from "./base";
-import { IRoomKeyRequestBody } from "../index";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
 import { IEncryptedPayload } from "../aes";
 
-export const VERSION = 10;
+export const VERSION = 11;
 const PROFILE_TRANSACTIONS = false;
 
 /**
@@ -261,7 +262,9 @@ export class Backend implements CryptoStore {
             const cursor = this.result;
             if (cursor) {
                 const keyReq = cursor.value;
-                if (keyReq.recipients.includes({ userId, deviceId })) {
+                if (keyReq.recipients.some((recipient: IRoomKeyRequestRecipient) =>
+                    recipient.userId === userId && recipient.deviceId === deviceId,
+                )) {
                     results.push(keyReq);
                 }
                 cursor.continue();
@@ -871,6 +874,50 @@ export class Backend implements CryptoStore {
         });
     }
 
+    public addParkedSharedHistory(
+        roomId: string,
+        parkedData: ParkedSharedHistory,
+        txn?: IDBTransaction,
+    ): void {
+        if (!txn) {
+            txn = this.db.transaction(
+                "parked_shared_history", "readwrite",
+            );
+        }
+        const objectStore = txn.objectStore("parked_shared_history");
+        const req = objectStore.get([roomId]);
+        req.onsuccess = () => {
+            const { parked } = req.result || { parked: [] };
+            parked.push(parkedData);
+            objectStore.put({ roomId, parked });
+        };
+    }
+
+    public takeParkedSharedHistory(
+        roomId: string,
+        txn?: IDBTransaction,
+    ): Promise<ParkedSharedHistory[]> {
+        if (!txn) {
+            txn = this.db.transaction(
+                "parked_shared_history", "readwrite",
+            );
+        }
+        const cursorReq = txn.objectStore("parked_shared_history").openCursor(roomId);
+        return new Promise((resolve, reject) => {
+            cursorReq.onsuccess = () => {
+                const cursor = cursorReq.result;
+                if (!cursor) {
+                    resolve([]);
+                    return;
+                }
+                const data = cursor.value;
+                cursor.delete();
+                resolve(data);
+            };
+            cursorReq.onerror = reject;
+        });
+    }
+
     public doTxn<T>(
         mode: Mode,
         stores: string | string[],
@@ -953,6 +1000,11 @@ export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
     }
     if (oldVersion < 10) {
         db.createObjectStore("shared_history_inbound_group_sessions", {
+            keyPath: ["roomId"],
+        });
+    }
+    if (oldVersion < 11) {
+        db.createObjectStore("parked_shared_history", {
             keyPath: ["roomId"],
         });
     }

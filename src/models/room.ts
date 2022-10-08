@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -37,7 +37,8 @@ import {
 import { IRoomVersionsCapability, MatrixClient, PendingEventOrdering, RoomVersionStability } from "../client";
 import { GuestAccess, HistoryVisibility, JoinRule, ResizeMethod } from "../@types/partials";
 import { Filter, IFilterDefinition } from "../filter";
-import { RoomState } from "./room-state";
+import { RoomState, RoomStateEvent, RoomStateEventHandlerMap } from "./room-state";
+import { BeaconEvent, BeaconEventHandlerMap } from "./beacon";
 import {
     Thread,
     ThreadEvent,
@@ -46,10 +47,16 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { TypedEventEmitter } from "./typed-event-emitter";
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
+import {
+    MAIN_ROOM_TIMELINE,
+    ReadReceipt,
+    Receipt,
+    ReceiptContent,
+    synthesizeReceipt,
+} from "./read-receipt";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -59,23 +66,6 @@ import { RelationsContainer } from "./relations-container";
 // return an m.room_versions capability.
 export const KNOWN_SAFE_ROOM_VERSION = '9';
 const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
-function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
-    // console.log("synthesizing receipt for "+event.getId());
-    return new MatrixEvent({
-        content: {
-            [event.getId()]: {
-                [receiptType]: {
-                    [userId]: {
-                        ts: event.getTs(),
-                    },
-                },
-            },
-        },
-        type: EventType.Receipt,
-        room_id: event.getRoomId(),
-    });
-}
 
 interface IOpts {
     storageToken?: string;
@@ -89,40 +79,6 @@ export interface IRecommendedVersion {
     needsUpgrade: boolean;
     urgent: boolean;
 }
-
-interface IReceipt {
-    ts: number;
-}
-
-export interface IWrappedReceipt {
-    eventId: string;
-    data: IReceipt;
-}
-
-interface ICachedReceipt {
-    type: ReceiptType;
-    userId: string;
-    data: IReceipt;
-}
-
-type ReceiptCache = {[eventId: string]: ICachedReceipt[]};
-
-interface IReceiptContent {
-    [eventId: string]: {
-        [key in ReceiptType]: {
-            [userId: string]: IReceipt;
-        };
-    };
-}
-
-const ReceiptPairRealIndex = 0;
-const ReceiptPairSyntheticIndex = 1;
-// We will only hold a synthetic receipt if we do not have a real receipt or the synthetic is newer.
-type Receipts = {
-    [receiptType: string]: {
-        [userId: string]: [IWrappedReceipt, IWrappedReceipt]; // Pair<real receipt, synthetic receipt> (both nullable)
-    };
-};
 
 // When inserting a visibility event affecting event `eventId`, we
 // need to scan through existing visibility events for `eventId`.
@@ -172,16 +128,19 @@ export enum RoomEvent {
 }
 
 type EmittedEvents = RoomEvent
+    | RoomStateEvent.Events
+    | RoomStateEvent.Members
+    | RoomStateEvent.NewMember
+    | RoomStateEvent.Update
+    | RoomStateEvent.Marker
     | ThreadEvent.New
     | ThreadEvent.Update
     | ThreadEvent.NewReply
-    | RoomEvent.Timeline
-    | RoomEvent.TimelineReset
-    | RoomEvent.TimelineRefresh
-    | RoomEvent.HistoryImportedWithinTimeline
-    | RoomEvent.OldStateUpdated
-    | RoomEvent.CurrentStateUpdated
-    | MatrixEventEvent.BeforeRedaction;
+    | MatrixEventEvent.BeforeRedaction
+    | BeaconEvent.New
+    | BeaconEvent.Update
+    | BeaconEvent.Destroy
+    | BeaconEvent.LivenessChange;
 
 export type RoomEventHandlerMap = {
     [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
@@ -205,17 +164,25 @@ export type RoomEventHandlerMap = {
     ) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
-} & ThreadHandlerMap & MatrixEventHandlerMap;
+} & ThreadHandlerMap
+    & MatrixEventHandlerMap
+    & Pick<
+        RoomStateEventHandlerMap,
+        RoomStateEvent.Events
+            | RoomStateEvent.Members
+            | RoomStateEvent.NewMember
+            | RoomStateEvent.Update
+            | RoomStateEvent.Marker
+            | BeaconEvent.New
+    >
+    & Pick<
+        BeaconEventHandlerMap,
+        BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange
+    >;
 
-export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> {
+export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
-    // receipts should clobber based on receipt_type and user_id pairs hence
-    // the form of this structure. This is sub-optimal for the exposed APIs
-    // which pass in an event ID and get back some receipts, so we also store
-    // a pre-cached list for this purpose.
-    private receipts: Receipts = {}; // { receipt_type: { user_id: IReceipt } }
-    private receiptCacheByEventId: ReceiptCache = {}; // { event_id: ICachedReceipt[] }
     private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
@@ -1068,6 +1035,32 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
 
         if (previousCurrentState !== this.currentState) {
             this.emit(RoomEvent.CurrentStateUpdated, this, previousCurrentState, this.currentState);
+
+            // Re-emit various events on the current room state
+            // TODO: If currentState really only exists for backwards
+            // compatibility, shouldn't we be doing this some other way?
+            this.reEmitter.stopReEmitting(previousCurrentState, [
+                RoomStateEvent.Events,
+                RoomStateEvent.Members,
+                RoomStateEvent.NewMember,
+                RoomStateEvent.Update,
+                RoomStateEvent.Marker,
+                BeaconEvent.New,
+                BeaconEvent.Update,
+                BeaconEvent.Destroy,
+                BeaconEvent.LivenessChange,
+            ]);
+            this.reEmitter.reEmit(this.currentState, [
+                RoomStateEvent.Events,
+                RoomStateEvent.Members,
+                RoomStateEvent.NewMember,
+                RoomStateEvent.Update,
+                RoomStateEvent.Marker,
+                BeaconEvent.New,
+                BeaconEvent.Update,
+                BeaconEvent.Destroy,
+                BeaconEvent.LivenessChange,
+            ]);
         }
     }
 
@@ -1937,14 +1930,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 }
             }
         }
-
-        if (event.getUnsigned().transaction_id) {
-            const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id];
-            if (existingEvent) {
-                // remote echo of an event we sent earlier
-                this.handleRemoteEcho(event, existingEvent);
-            }
-        }
     }
 
     /**
@@ -1952,7 +1937,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
      * "Room.timeline".
      *
      * @param {MatrixEvent} event Event to be added
-     * @param {IAddLiveEventOptions} options addLiveEvent options
+     * @param {IAddLiveEventOptions} addLiveEventOptions addLiveEvent options
      * @fires module:client~MatrixClient#event:"Room.timeline"
      * @private
      */
@@ -2300,7 +2285,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         fromCache = false,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty = false;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy,
@@ -2339,9 +2324,24 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const threadRoots = this.findThreadRoots(events);
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
 
+        const options: IAddLiveEventOptions = {
+            duplicateStrategy,
+            fromCache,
+            timelineWasEmpty,
+        };
+
         for (const event of events) {
             // TODO: We should have a filter to say "only add state event types X Y Z to the timeline".
             this.processLiveEvent(event);
+
+            if (event.getUnsigned().transaction_id) {
+                const existingEvent = this.txnToEvent[event.getUnsigned().transaction_id!];
+                if (existingEvent) {
+                    // remote echo of an event we sent earlier
+                    this.handleRemoteEcho(event, existingEvent);
+                    continue; // we can skip adding the event to the timeline sets, it is already there
+                }
+            }
 
             const {
                 shouldLiveInRoom,
@@ -2349,17 +2349,13 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 threadId,
             } = this.eventShouldLiveIn(event, events, threadRoots);
 
-            if (shouldLiveInThread && !eventsByThread[threadId]) {
-                eventsByThread[threadId] = [];
+            if (shouldLiveInThread && !eventsByThread[threadId ?? ""]) {
+                eventsByThread[threadId ?? ""] = [];
             }
-            eventsByThread[threadId]?.push(event);
+            eventsByThread[threadId ?? ""]?.push(event);
 
             if (shouldLiveInRoom) {
-                this.addLiveEvent(event, {
-                    duplicateStrategy,
-                    fromCache,
-                    timelineWasEmpty,
-                });
+                this.addLiveEvent(event, options);
             }
         }
 
@@ -2389,17 +2385,17 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                 }
 
                 if (shouldLiveInThread) {
-                    event.setThreadId(threadId);
+                    event.setThreadId(threadId ?? "");
                     memo[THREAD].push(event);
                 }
 
                 return memo;
-            }, [[], []]);
+            }, [[] as MatrixEvent[], [] as MatrixEvent[]]);
         } else {
             // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
             return [
-                events,
-                [],
+                events as MatrixEvent[],
+                [] as MatrixEvent[],
             ];
         }
     }
@@ -2411,10 +2407,41 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         const threadRoots = new Set<string>();
         for (const event of events) {
             if (event.isRelation(THREAD_RELATION_TYPE.name)) {
-                threadRoots.add(event.relationEventId);
+                threadRoots.add(event.relationEventId ?? "");
             }
         }
         return threadRoots;
+    }
+
+    /**
+     * Add a receipt event to the room.
+     * @param {MatrixEvent} event The m.receipt event.
+     * @param {Boolean} synthetic True if this event is implicit.
+     */
+    public addReceipt(event: MatrixEvent, synthetic = false): void {
+        const content = event.getContent<ReceiptContent>();
+        Object.keys(content).forEach((eventId: string) => {
+            Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
+                Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
+                    const receipt = content[eventId][receiptType][userId] as Receipt;
+                    const receiptForMainTimeline = !receipt.thread_id || receipt.thread_id === MAIN_ROOM_TIMELINE;
+                    const receiptDestination: Thread | this | undefined = receiptForMainTimeline
+                        ? this
+                        : this.threads.get(receipt.thread_id ?? "");
+                    receiptDestination?.addReceiptToStructure(
+                        eventId,
+                        receiptType as ReceiptType,
+                        userId,
+                        receipt,
+                        synthetic,
+                    );
+                });
+            });
+        });
+
+        // send events after we've regenerated the structure & cache, otherwise things that
+        // listened for the event would read stale data.
+        this.emit(RoomEvent.Receipt, event, this);
     }
 
     /**
@@ -2505,276 +2532,6 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         if (oldName !== this.name) {
             this.emit(RoomEvent.Name, this);
         }
-    }
-
-    /**
-     * Get a list of user IDs who have <b>read up to</b> the given event.
-     * @param {MatrixEvent} event the event to get read receipts for.
-     * @return {String[]} A list of user IDs.
-     */
-    public getUsersReadUpTo(event: MatrixEvent): string[] {
-        return this.getReceiptsForEvent(event).filter(function(receipt) {
-            return utils.isSupportedReceiptType(receipt.type);
-        }).map(function(receipt) {
-            return receipt.userId;
-        });
-    }
-
-    /**
-     * Gets the latest receipt for a given user in the room
-     * @param userId The id of the user for which we want the receipt
-     * @param ignoreSynthesized Whether to ignore synthesized receipts or not
-     * @param receiptType Optional. The type of the receipt we want to get
-     * @returns the latest receipts of the chosen type for the chosen user
-     */
-    public getReadReceiptForUserId(
-        userId: string, ignoreSynthesized = false, receiptType = ReceiptType.Read,
-    ): IWrappedReceipt | null {
-        const [realReceipt, syntheticReceipt] = this.receipts[receiptType]?.[userId] ?? [];
-        if (ignoreSynthesized) {
-            return realReceipt;
-        }
-
-        return syntheticReceipt ?? realReceipt;
-    }
-
-    /**
-     * Get the ID of the event that a given user has read up to, or null if we
-     * have received no read receipts from them.
-     * @param {String} userId The user ID to get read receipt event ID for
-     * @param {Boolean} ignoreSynthesized If true, return only receipts that have been
-     *                                    sent by the server, not implicit ones generated
-     *                                    by the JS SDK.
-     * @return {String} ID of the latest event that the given user has read, or null.
-     */
-    public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
-        // XXX: This is very very ugly and I hope I won't have to ever add a new
-        // receipt type here again. IMHO this should be done by the server in
-        // some more intelligent manner or the client should just use timestamps
-
-        const timelineSet = this.getUnfilteredTimelineSet();
-        const publicReadReceipt = this.getReadReceiptForUserId(
-            userId,
-            ignoreSynthesized,
-            ReceiptType.Read,
-        );
-        const privateReadReceipt = this.getReadReceiptForUserId(
-            userId,
-            ignoreSynthesized,
-            ReceiptType.ReadPrivate,
-        );
-        const unstablePrivateReadReceipt = this.getReadReceiptForUserId(
-            userId,
-            ignoreSynthesized,
-            ReceiptType.UnstableReadPrivate,
-        );
-
-        // If we have all, compare them
-        if (publicReadReceipt?.eventId && privateReadReceipt?.eventId && unstablePrivateReadReceipt?.eventId) {
-            const comparison1 = timelineSet.compareEventOrdering(
-                publicReadReceipt.eventId,
-                privateReadReceipt.eventId,
-            );
-            const comparison2 = timelineSet.compareEventOrdering(
-                publicReadReceipt.eventId,
-                unstablePrivateReadReceipt.eventId,
-            );
-            const comparison3 = timelineSet.compareEventOrdering(
-                privateReadReceipt.eventId,
-                unstablePrivateReadReceipt.eventId,
-            );
-            if (comparison1 && comparison2 && comparison3) {
-                return (comparison1 > 0)
-                    ? ((comparison2 > 0) ? publicReadReceipt.eventId : unstablePrivateReadReceipt.eventId)
-                    : ((comparison3 > 0) ? privateReadReceipt.eventId : unstablePrivateReadReceipt.eventId);
-            }
-        }
-
-        let latest = privateReadReceipt;
-        [unstablePrivateReadReceipt, publicReadReceipt].forEach((receipt) => {
-            if (receipt?.data?.ts > latest?.data?.ts) {
-                latest = receipt;
-            }
-        });
-        if (latest?.eventId) return latest?.eventId;
-
-        // The more less likely it is for a read receipt to drift out of date
-        // the bigger is its precedence
-        return (
-            privateReadReceipt?.eventId ??
-            unstablePrivateReadReceipt?.eventId ??
-            publicReadReceipt?.eventId ??
-            null
-        );
-    }
-
-    /**
-     * Determines if the given user has read a particular event ID with the known
-     * history of the room. This is not a definitive check as it relies only on
-     * what is available to the room at the time of execution.
-     * @param {String} userId The user ID to check the read state of.
-     * @param {String} eventId The event ID to check if the user read.
-     * @returns {Boolean} True if the user has read the event, false otherwise.
-     */
-    public hasUserReadEvent(userId: string, eventId: string): boolean {
-        const readUpToId = this.getEventReadUpTo(userId, false);
-        if (readUpToId === eventId) return true;
-
-        if (this.timeline.length
-            && this.timeline[this.timeline.length - 1].getSender()
-            && this.timeline[this.timeline.length - 1].getSender() === userId) {
-            // It doesn't matter where the event is in the timeline, the user has read
-            // it because they've sent the latest event.
-            return true;
-        }
-
-        for (let i = this.timeline.length - 1; i >= 0; --i) {
-            const ev = this.timeline[i];
-
-            // If we encounter the target event first, the user hasn't read it
-            // however if we encounter the readUpToId first then the user has read
-            // it. These rules apply because we're iterating bottom-up.
-            if (ev.getId() === eventId) return false;
-            if (ev.getId() === readUpToId) return true;
-        }
-
-        // We don't know if the user has read it, so assume not.
-        return false;
-    }
-
-    /**
-     * Get a list of receipts for the given event.
-     * @param {MatrixEvent} event the event to get receipts for
-     * @return {Object[]} A list of receipts with a userId, type and data keys or
-     * an empty list.
-     */
-    public getReceiptsForEvent(event: MatrixEvent): ICachedReceipt[] {
-        return this.receiptCacheByEventId[event.getId()] || [];
-    }
-
-    /**
-     * Add a receipt event to the room.
-     * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} synthetic True if this event is implicit.
-     */
-    public addReceipt(event: MatrixEvent, synthetic = false): void {
-        this.addReceiptsToStructure(event, synthetic);
-        // send events after we've regenerated the structure & cache, otherwise things that
-        // listened for the event would read stale data.
-        this.emit(RoomEvent.Receipt, event, this);
-    }
-
-    /**
-     * Add a receipt event to the room.
-     * @param {MatrixEvent} event The m.receipt event.
-     * @param {Boolean} synthetic True if this event is implicit.
-     */
-    private addReceiptsToStructure(event: MatrixEvent, synthetic: boolean): void {
-        const content = event.getContent<IReceiptContent>();
-        Object.keys(content).forEach((eventId) => {
-            Object.keys(content[eventId]).forEach((receiptType) => {
-                Object.keys(content[eventId][receiptType]).forEach((userId) => {
-                    const receipt = content[eventId][receiptType][userId];
-
-                    if (!this.receipts[receiptType]) {
-                        this.receipts[receiptType] = {};
-                    }
-                    if (!this.receipts[receiptType][userId]) {
-                        this.receipts[receiptType][userId] = [null, null];
-                    }
-
-                    const pair = this.receipts[receiptType][userId];
-
-                    let existingReceipt = pair[ReceiptPairRealIndex];
-                    if (synthetic) {
-                        existingReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
-                    }
-
-                    if (existingReceipt) {
-                        // we only want to add this receipt if we think it is later than the one we already have.
-                        // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
-                        const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            existingReceipt.eventId,
-                            eventId,
-                        );
-                        if (ordering !== null && ordering >= 0) {
-                            return;
-                        }
-                    }
-
-                    const wrappedReceipt: IWrappedReceipt = {
-                        eventId,
-                        data: receipt,
-                    };
-
-                    const realReceipt = synthetic ? pair[ReceiptPairRealIndex] : wrappedReceipt;
-                    const syntheticReceipt = synthetic ? wrappedReceipt : pair[ReceiptPairSyntheticIndex];
-
-                    let ordering: number | null = null;
-                    if (realReceipt && syntheticReceipt) {
-                        ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                            realReceipt.eventId,
-                            syntheticReceipt.eventId,
-                        );
-                    }
-
-                    const preferSynthetic = ordering === null || ordering < 0;
-
-                    // we don't bother caching just real receipts by event ID as there's nothing that would read it.
-                    // Take the current cached receipt before we overwrite the pair elements.
-                    const cachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
-
-                    if (synthetic && preferSynthetic) {
-                        pair[ReceiptPairSyntheticIndex] = wrappedReceipt;
-                    } else if (!synthetic) {
-                        pair[ReceiptPairRealIndex] = wrappedReceipt;
-
-                        if (!preferSynthetic) {
-                            pair[ReceiptPairSyntheticIndex] = null;
-                        }
-                    }
-
-                    const newCachedReceipt = pair[ReceiptPairSyntheticIndex] ?? pair[ReceiptPairRealIndex];
-                    if (cachedReceipt === newCachedReceipt) return;
-
-                    // clean up any previous cache entry
-                    if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
-                        const previousEventId = cachedReceipt.eventId;
-                        // Remove the receipt we're about to clobber out of existence from the cache
-                        this.receiptCacheByEventId[previousEventId] = (
-                            this.receiptCacheByEventId[previousEventId].filter(r => {
-                                return r.type !== receiptType || r.userId !== userId;
-                            })
-                        );
-
-                        if (this.receiptCacheByEventId[previousEventId].length < 1) {
-                            delete this.receiptCacheByEventId[previousEventId]; // clean up the cache keys
-                        }
-                    }
-
-                    // cache the new one
-                    if (!this.receiptCacheByEventId[eventId]) {
-                        this.receiptCacheByEventId[eventId] = [];
-                    }
-                    this.receiptCacheByEventId[eventId].push({
-                        userId: userId,
-                        type: receiptType as ReceiptType,
-                        data: receipt,
-                    });
-                });
-            });
-        });
-    }
-
-    /**
-     * Add a temporary local-echo receipt to the room to reflect in the
-     * client the fact that we've sent one.
-     * @param {string} userId The user ID if the receipt sender
-     * @param {MatrixEvent} e The event that is to be acknowledged
-     * @param {ReceiptType} receiptType The type of receipt
-     */
-    public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: ReceiptType): void {
-        this.addReceipt(synthesizeReceipt(userId, e, receiptType), true);
     }
 
     /**
@@ -2914,6 +2671,33 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         return this.getType() === RoomType.ElementVideo;
     }
 
+    private roomNameGenerator(state: RoomNameState): string {
+        if (this.client.roomNameGenerator) {
+            const name = this.client.roomNameGenerator(this.roomId, state);
+            if (name !== null) {
+                return name;
+            }
+        }
+
+        switch (state.type) {
+            case RoomNameType.Actual:
+                return state.name;
+            case RoomNameType.Generated:
+                switch (state.subtype) {
+                    case "Inviting":
+                        return `Inviting ${memberNamesToRoomName(state.names, state.count)}`;
+                    default:
+                        return memberNamesToRoomName(state.names, state.count);
+                }
+            case RoomNameType.EmptyRoom:
+                if (state.oldName) {
+                    return `Empty room (was ${state.oldName})`;
+                } else {
+                    return "Empty room";
+                }
+        }
+    }
+
     /**
      * This is an internal method. Calculates the name of the room from the current
      * room state.
@@ -2928,14 +2712,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             // check for an alias, if any. for now, assume first alias is the
             // official one.
             const mRoomName = this.currentState.getStateEvents(EventType.RoomName, "");
-            if (mRoomName && mRoomName.getContent() && mRoomName.getContent().name) {
-                return mRoomName.getContent().name;
+            if (mRoomName?.getContent().name) {
+                return this.roomNameGenerator({
+                    type: RoomNameType.Actual,
+                    name: mRoomName.getContent().name,
+                });
             }
         }
 
         const alias = this.getCanonicalAlias();
         if (alias) {
-            return alias;
+            return this.roomNameGenerator({
+                type: RoomNameType.Actual,
+                name: alias,
+            });
         }
 
         const joinedMemberCount = this.currentState.getJoinedMemberCount();
@@ -2967,8 +2757,7 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
-                return m.userId !== userId &&
-                    (m.membership === "invite" || m.membership === "join");
+                return m.userId !== userId && (m.membership === "invite" || m.membership === "join");
             });
             otherMembers = otherMembers.filter(({ userId }) => {
                 // filter service members
@@ -2986,24 +2775,33 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
         }
 
         if (inviteJoinCount) {
-            return memberNamesToRoomName(otherNames, inviteJoinCount);
+            return this.roomNameGenerator({
+                type: RoomNameType.Generated,
+                names: otherNames,
+                count: inviteJoinCount,
+            });
         }
 
         const myMembership = this.getMyMembership();
         // if I have created a room and invited people through
         // 3rd party invites
         if (myMembership == 'join') {
-            const thirdPartyInvites =
-                this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
+            const thirdPartyInvites = this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
 
-            if (thirdPartyInvites && thirdPartyInvites.length) {
+            if (thirdPartyInvites?.length) {
                 const thirdPartyNames = thirdPartyInvites.map((i) => {
                     return i.getContent().display_name;
                 });
 
-                return `Inviting ${memberNamesToRoomName(thirdPartyNames)}`;
+                return this.roomNameGenerator({
+                    type: RoomNameType.Generated,
+                    subtype: "Inviting",
+                    names: thirdPartyNames,
+                    count: thirdPartyNames.length + 1,
+                });
             }
         }
+
         // let's try to figure out who was here before
         let leftNames = otherNames;
         // if we didn't have heroes, try finding them in the room state
@@ -3014,11 +2812,20 @@ export class Room extends TypedEventEmitter<EmittedEvents, RoomEventHandlerMap> 
                     m.membership !== "join";
             }).map((m) => m.name);
         }
+
+        let oldName: string;
         if (leftNames.length) {
-            return `Empty room (was ${memberNamesToRoomName(leftNames)})`;
-        } else {
-            return "Empty room";
+            oldName = this.roomNameGenerator({
+                type: RoomNameType.Generated,
+                names: leftNames,
+                count: leftNames.length + 1,
+            });
         }
+
+        return this.roomNameGenerator({
+            type: RoomNameType.EmptyRoom,
+            oldName,
+        });
     }
 
     /**
@@ -3203,8 +3010,33 @@ const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
     [EventStatus.CANCELLED]: [],
 };
 
-// TODO i18n
-function memberNamesToRoomName(names: string[], count = (names.length + 1)) {
+export enum RoomNameType {
+    EmptyRoom,
+    Generated,
+    Actual,
+}
+
+export interface EmptyRoomNameState {
+    type: RoomNameType.EmptyRoom;
+    oldName?: string;
+}
+
+export interface GeneratedRoomNameState {
+    type: RoomNameType.Generated;
+    subtype?: "Inviting";
+    names: string[];
+    count: number;
+}
+
+export interface ActualRoomNameState {
+    type: RoomNameType.Actual;
+    name: string;
+}
+
+export type RoomNameState = EmptyRoomNameState | GeneratedRoomNameState | ActualRoomNameState;
+
+// Can be overriden by IMatrixClientCreateOpts::memberNamesToRoomNameFn
+function memberNamesToRoomName(names: string[], count: number): string {
     const countWithoutMe = count - 1;
     if (!names.length) {
         return "Empty room";

@@ -28,6 +28,7 @@ import {
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
 import { IStoredClientOpts } from "../../src/client";
+import { logger } from "../../src/logger";
 
 describe("SlidingSyncSdk", () => {
     let client: MatrixClient = null;
@@ -167,6 +168,7 @@ describe("SlidingSyncSdk", () => {
             const roomD = "!d_with_notif_count:localhost";
             const roomE = "!e_with_invite:localhost";
             const roomF = "!f_calc_room_name:localhost";
+            const roomG = "!g_join_invite_counts:localhost";
             const data: Record<string, MSC3575RoomData> = {
                 [roomA]: {
                     name: "A",
@@ -260,12 +262,25 @@ describe("SlidingSyncSdk", () => {
                     ],
                     initial: true,
                 },
+                [roomG]: {
+                    name: "G",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    ],
+                    joined_count: 5,
+                    invited_count: 2,
+                    initial: true,
+                },
             };
 
             it("can be created with required_state and timeline", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, data[roomA]);
                 const gotRoom = client.getRoom(roomA);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(gotRoom.name).toEqual(data[roomA].name);
                 expect(gotRoom.getMyMembership()).toEqual("join");
                 assertTimelineEvents(gotRoom.getLiveTimeline().getEvents().slice(-2), data[roomA].timeline);
@@ -275,6 +290,7 @@ describe("SlidingSyncSdk", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomB, data[roomB]);
                 const gotRoom = client.getRoom(roomB);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(gotRoom.name).toEqual(data[roomB].name);
                 expect(gotRoom.getMyMembership()).toEqual("join");
                 assertTimelineEvents(gotRoom.getLiveTimeline().getEvents().slice(-5), data[roomB].timeline);
@@ -284,6 +300,7 @@ describe("SlidingSyncSdk", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomC, data[roomC]);
                 const gotRoom = client.getRoom(roomC);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(
                     gotRoom.getUnreadNotificationCount(NotificationCountType.Highlight),
                 ).toEqual(data[roomC].highlight_count);
@@ -293,15 +310,26 @@ describe("SlidingSyncSdk", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomD, data[roomD]);
                 const gotRoom = client.getRoom(roomD);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(
                     gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
                 ).toEqual(data[roomD].notification_count);
+            });
+
+            it("can be created with an invited/joined_count", () => {
+                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomG, data[roomG]);
+                const gotRoom = client.getRoom(roomG);
+                expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
+                expect(gotRoom.getInvitedMemberCount()).toEqual(data[roomG].invited_count);
+                expect(gotRoom.getJoinedMemberCount()).toEqual(data[roomG].joined_count);
             });
 
             it("can be created with invite_state", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomE, data[roomE]);
                 const gotRoom = client.getRoom(roomE);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(gotRoom.getMyMembership()).toEqual("invite");
                 expect(gotRoom.currentState.getJoinRule()).toEqual(JoinRule.Invite);
             });
@@ -310,6 +338,7 @@ describe("SlidingSyncSdk", () => {
                 mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomF, data[roomF]);
                 const gotRoom = client.getRoom(roomF);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(
                     gotRoom.name,
                 ).toEqual(data[roomF].name);
@@ -325,6 +354,7 @@ describe("SlidingSyncSdk", () => {
                     });
                     const gotRoom = client.getRoom(roomA);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     const newTimeline = data[roomA].timeline;
                     newTimeline.push(newEvent);
                     assertTimelineEvents(gotRoom.getLiveTimeline().getEvents().slice(-3), newTimeline);
@@ -332,6 +362,8 @@ describe("SlidingSyncSdk", () => {
 
                 it("can update with a new required_state event", async () => {
                     let gotRoom = client.getRoom(roomB);
+                    expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(gotRoom.getJoinRule()).toEqual(JoinRule.Invite); // default
                     mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomB, {
                         required_state: [
@@ -342,6 +374,7 @@ describe("SlidingSyncSdk", () => {
                     });
                     gotRoom = client.getRoom(roomB);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(gotRoom.getJoinRule()).toEqual(JoinRule.Restricted);
                 });
 
@@ -354,6 +387,7 @@ describe("SlidingSyncSdk", () => {
                     });
                     const gotRoom = client.getRoom(roomC);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(
                         gotRoom.getUnreadNotificationCount(NotificationCountType.Highlight),
                     ).toEqual(1);
@@ -368,9 +402,54 @@ describe("SlidingSyncSdk", () => {
                     });
                     const gotRoom = client.getRoom(roomD);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(
                         gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
                     ).toEqual(1);
+                });
+
+                it("can update with a new joined_count", () => {
+                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomG, {
+                        name: data[roomD].name,
+                        required_state: [],
+                        timeline: [],
+                        joined_count: 1,
+                    });
+                    const gotRoom = client.getRoom(roomG);
+                    expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
+                    expect(gotRoom.getJoinedMemberCount()).toEqual(1);
+                });
+
+                // Regression test for a bug which caused the timeline entries to be out-of-order
+                // when the same room appears twice with different timeline limits. E.g appears in
+                // the list with timeline_limit:1 then appears again as a room subscription with
+                // timeline_limit:50
+                it("can return history with a larger timeline_limit", async () => {
+                    const timeline = data[roomA].timeline;
+                    const oldTimeline = [
+                        mkOwnEvent(EventType.RoomMessage, { body: "old event A" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "old event B" }),
+                        mkOwnEvent(EventType.RoomMessage, { body: "old event C" }),
+                        ...timeline,
+                    ];
+                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, {
+                        timeline: oldTimeline,
+                        required_state: [],
+                        name: data[roomA].name,
+                        initial: true, // e.g requested via room subscription
+                    });
+                    const gotRoom = client.getRoom(roomA);
+                    expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
+
+                    logger.log("want:", oldTimeline.map((e) => (e.type + " : " + (e.content || {}).body)));
+                    logger.log("got:", gotRoom.getLiveTimeline().getEvents().map(
+                        (e) => (e.getType() + " : " + e.getContent().body)),
+                    );
+
+                    // we expect the timeline now to be oldTimeline (so the old events are in fact old)
+                    assertTimelineEvents(gotRoom.getLiveTimeline().getEvents(), oldTimeline);
                 });
             });
         });

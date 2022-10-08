@@ -431,7 +431,6 @@ export class BackupManager {
                 )
             );
         });
-        ret.usable = ret.usable || ret.trusted_locally;
         return ret;
     }
 

@@ -182,7 +182,9 @@ export class GroupCall extends TypedEventEmitter<
     private reEmitter: ReEmitter;
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
     private memberStateExpirationTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
-    private resendMemberStateTimer: ReturnType<typeof setTimeout> | null = null;
+    private resendMemberStateTimer: ReturnType<typeof setInterval> | null = null;
+    private initWithAudioMuted = false;
+    private initWithVideoMuted = false;
 
     constructor(
         private client: MatrixClient,
@@ -267,7 +269,7 @@ export class GroupCall extends TypedEventEmitter<
             this.localCallFeed.VADEnabled = false;
         }
 
-        const userId = this.client.getUserId();
+        const userId = this.client.getUserId()!;
 
         const callFeed = new CallFeed({
             client: this.client,
@@ -275,10 +277,14 @@ export class GroupCall extends TypedEventEmitter<
             userId,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: stream.getAudioTracks().length === 0 || this.isPtt,
-            videoMuted: stream.getVideoTracks().length === 0,
             VADEnabled: !this.isPtt,
+            audioMuted: this.initWithAudioMuted || stream.getAudioTracks().length === 0 || this.isPtt,
+            videoMuted: this.initWithVideoMuted || stream.getVideoTracks().length === 0,
         });
+
+        setTracksEnabled(stream.getAudioTracks(), !callFeed.isAudioMuted());
+        setTracksEnabled(stream.getVideoTracks(), !callFeed.isVideoMuted());
+
         this.localCallFeed = callFeed;
         this.localCallFeed.on(CallFeedEvent.VADMuteStateChanged, (muted: boolean) => this.setVadMicrophoneMuted(muted));
 
@@ -375,6 +381,11 @@ export class GroupCall extends TypedEventEmitter<
 
         this.retryCallCounts.clear();
         clearTimeout(this.retryCallLoopTimeout);
+
+        for (const [userId] of this.memberStateExpirationTimers) {
+            clearTimeout(this.memberStateExpirationTimers.get(userId));
+            this.memberStateExpirationTimers.delete(userId);
+        }
 
         if (this.transmitTimer !== null) {
             clearTimeout(this.transmitTimer);
@@ -474,7 +485,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         for (const call of this.calls) {
-            call.localUsermediaFeed.setAudioVideoMuted(muted, null);
+            call.localUsermediaFeed?.setAudioVideoMuted(muted, null);
         }
 
         if (sendUpdatesBefore) {
@@ -500,6 +511,9 @@ export class GroupCall extends TypedEventEmitter<
             if (!this.isPtt) {
                 this.localCallFeed.VADEnabled = !muted;
             }
+        } else {
+            logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted no stream muted ${muted}`);
+            this.initWithAudioMuted = muted;
         }
 
         for (const call of this.calls) {
@@ -555,6 +569,9 @@ export class GroupCall extends TypedEventEmitter<
                 this.localCallFeed.stream.id} muted ${muted}`);
             this.localCallFeed.setAudioVideoMuted(null, muted);
             setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+        } else {
+            logger.log(`groupCall ${this.groupCallId} setLocalVideoMuted no stream muted ${muted}`);
+            this.initWithVideoMuted = muted;
         }
 
         for (const call of this.calls) {
@@ -721,6 +738,8 @@ export class GroupCall extends TypedEventEmitter<
 
         const res = await send();
 
+        // Clear the old interval first, so that it isn't forgot
+        clearInterval(this.resendMemberStateTimer);
         // Resend the state event every so often so it doesn't become stale
         this.resendMemberStateTimer = setInterval(async () => {
             logger.log("Resending call member state");
@@ -769,11 +788,21 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public onMemberStateChanged = async (event: MatrixEvent) => {
+        // If we haven't entered the call yet, we don't care
+        if (this.state !== GroupCallState.Entered) {
+            return;
+        }
+
         // The member events may be received for another room, which we will ignore.
         if (event.getRoomId() !== this.room.roomId) return;
 
         const member = this.room.getMember(event.getStateKey());
-        if (!member) return;
+        if (!member) {
+            logger.warn(`Couldn't find room member for ${event.getStateKey()}: ignoring member state event!`);
+            return;
+        }
+
+        logger.debug(`Processing member state event for ${member.userId}`);
 
         const ignore = () => {
             this.removeParticipant(member);
@@ -787,7 +816,7 @@ export class GroupCall extends TypedEventEmitter<
             : []; // Ignore expired device data
 
         if (callsState.length === 0) {
-            logger.log(`Ignoring member state from ${member.userId} member not in any calls.`);
+            logger.info(`Ignoring member state from ${member.userId} member not in any calls.`);
             ignore();
             return;
         }
@@ -823,14 +852,10 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        if (this.state !== GroupCallState.Entered) {
-            return;
-        }
-
         // Only initiate a call with a user who has a userId that is lexicographically
         // less than your own. Otherwise, that user will call you.
         if (member.userId < localUserId) {
-            logger.log(`Waiting for ${member.userId} to send call invite.`);
+            logger.debug(`Waiting for ${member.userId} to send call invite.`);
             return;
         }
 
@@ -865,10 +890,22 @@ export class GroupCall extends TypedEventEmitter<
             },
         );
 
+        if (existingCall) {
+            logger.debug(`Replacing call ${existingCall.callId} to ${member.userId} with ${newCall.callId}`);
+            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
+        } else {
+            logger.debug(`Adding call ${newCall.callId} to ${member.userId}`);
+            this.addCall(newCall);
+        }
+
         newCall.isPtt = this.isPtt;
 
         const requestScreenshareFeed = opponentDevice.feeds.some(
             (feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+
+        logger.debug(
+            `Placing call to ${member.userId}/${opponentDevice.device_id} session ID ${opponentDevice.session_id}.`,
+        );
 
         try {
             await newCall.placeCallWithCallFeeds(
@@ -888,17 +925,12 @@ export class GroupCall extends TypedEventEmitter<
                     ),
                 );
             }
+            this.removeCall(newCall, CallErrorCode.SignallingFailed);
             return;
         }
 
         if (this.dataChannelsEnabled) {
             newCall.createDataChannel("datachannel", this.dataChannelOptions);
-        }
-
-        if (existingCall) {
-            this.replaceCall(existingCall, newCall, CallErrorCode.NewSession);
-        } else {
-            this.addCall(newCall);
         }
     };
 

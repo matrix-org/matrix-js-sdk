@@ -195,6 +195,33 @@ export const EVENT_VISIBILITY_CHANGE_TYPE = new UnstableValue(
     "m.visibility",
     "org.matrix.msc3531.visibility");
 
+/**
+ * https://github.com/matrix-org/matrix-doc/pull/3881
+ *
+ * @experimental
+ */
+export const PUSHER_ENABLED = new UnstableValue(
+    "enabled",
+    "org.matrix.msc3881.enabled");
+
+/**
+     * https://github.com/matrix-org/matrix-doc/pull/3881
+     *
+     * @experimental
+     */
+export const PUSHER_DEVICE_ID = new UnstableValue(
+    "device_id",
+    "org.matrix.msc3881.device_id");
+
+/**
+ * https://github.com/matrix-org/matrix-doc/pull/3890
+ *
+ * @experimental
+ */
+export const LOCAL_NOTIFICATION_SETTINGS_PREFIX = new UnstableValue(
+    "m.local_notification_settings",
+    "org.matrix.msc3890.local_notification_settings");
+
 export interface IEncryptedFile {
     url: string;
     mimetype?: string;

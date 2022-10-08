@@ -1,3 +1,86 @@
+Changes in [20.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.1) (2022-09-28)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix missing return when receiving an invitation without shared history ([\#2710](https://github.com/matrix-org/matrix-js-sdk/pull/2710)).
+
+Changes in [20.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.0) (2022-09-28)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Bump IDB crypto store version ([\#2705](https://github.com/matrix-org/matrix-js-sdk/pull/2705)).
+
+Changes in [19.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.7.0) (2022-09-28)
+==================================================================================================
+
+## 🔒 Security
+* Fix for [CVE-2022-39249](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D39249)
+* Fix for [CVE-2022-39250](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D39250)
+* Fix for [CVE-2022-39251](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D39251)
+* Fix for [CVE-2022-39236](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D39236)
+
+Changes in [19.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.6.0) (2022-09-27)
+==================================================================================================
+
+## ✨ Features
+ * Add a property aggregating all names of a NamespacedValue ([\#2656](https://github.com/matrix-org/matrix-js-sdk/pull/2656)).
+ * Implementation of MSC3824 to add action= param on SSO login ([\#2398](https://github.com/matrix-org/matrix-js-sdk/pull/2398)). Contributed by @hughns.
+ * Add invited_count and joined_count to sliding sync room responses. ([\#2628](https://github.com/matrix-org/matrix-js-sdk/pull/2628)).
+ * Base support for MSC3847: Ignore invites with policy rooms ([\#2626](https://github.com/matrix-org/matrix-js-sdk/pull/2626)). Contributed by @Yoric.
+
+## 🐛 Bug Fixes
+ * Fix handling of remote echoes doubling up ([\#2639](https://github.com/matrix-org/matrix-js-sdk/pull/2639)). Fixes #2618.
+
+Changes in [19.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.5.0) (2022-09-13)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix bug in deepCompare which would incorrectly return objects with disjoint keys as equal ([\#2586](https://github.com/matrix-org/matrix-js-sdk/pull/2586)). Contributed by @3nprob.
+ * Refactor Sync and fix `initialSyncLimit` ([\#2587](https://github.com/matrix-org/matrix-js-sdk/pull/2587)).
+ * Use deep equality comparisons when searching for outgoing key requests by target ([\#2623](https://github.com/matrix-org/matrix-js-sdk/pull/2623)). Contributed by @duxovni.
+ * Fix room membership race with PREPARED event ([\#2613](https://github.com/matrix-org/matrix-js-sdk/pull/2613)). Contributed by @jotto.
+
+Changes in [19.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.4.0) (2022-08-31)
+==================================================================================================
+
+## 🔒 Security
+* Fix for [CVE-2022-36059](https://cve.mitre.org/cgi-bin/cvekey.cgi?keyword=CVE%2D2022%2D36059)
+
+Find more details at https://matrix.org/blog/2022/08/31/security-releases-matrix-js-sdk-19-4-0-and-matrix-react-sdk-3-53-0
+
+## ✨ Features
+ * Re-emit room state events on rooms ([\#2607](https://github.com/matrix-org/matrix-js-sdk/pull/2607)).
+ * Add ability to override built in room name generator for an i18n'able one ([\#2609](https://github.com/matrix-org/matrix-js-sdk/pull/2609)).
+ * Add txn_id support to sliding sync ([\#2567](https://github.com/matrix-org/matrix-js-sdk/pull/2567)).
+
+## 🐛 Bug Fixes
+ * Refactor Sync and fix `initialSyncLimit` ([\#2587](https://github.com/matrix-org/matrix-js-sdk/pull/2587)).
+ * Use deep equality comparisons when searching for outgoing key requests by target ([\#2623](https://github.com/matrix-org/matrix-js-sdk/pull/2623)). Contributed by @duxovni.
+ * Fix room membership race with PREPARED event ([\#2613](https://github.com/matrix-org/matrix-js-sdk/pull/2613)). Contributed by @jotto.
+ * fixed a sliding sync bug which could cause the `roomIndexToRoomId` map to be incorrect when a new room is added in the middle of the list or when an existing room is deleted from the middle of the list. ([\#2610](https://github.com/matrix-org/matrix-js-sdk/pull/2610)).
+ * Fix: Handle parsing of a beacon info event without asset ([\#2591](https://github.com/matrix-org/matrix-js-sdk/pull/2591)). Fixes vector-im/element-web#23078. Contributed by @kerryarchibald.
+ * Fix finding event read up to if stable private read receipts is missing ([\#2585](https://github.com/matrix-org/matrix-js-sdk/pull/2585)). Fixes vector-im/element-web#23027.
+ * fixed a sliding sync issue where history could be interpreted as live events. ([\#2583](https://github.com/matrix-org/matrix-js-sdk/pull/2583)).
+
+Changes in [19.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.3.0) (2022-08-16)
+==================================================================================================
+
+## ✨ Features
+ * Add txn_id support to sliding sync ([\#2567](https://github.com/matrix-org/matrix-js-sdk/pull/2567)).
+ * Emit an event when the client receives TURN servers ([\#2529](https://github.com/matrix-org/matrix-js-sdk/pull/2529)).
+ * Add support for stable prefixes for MSC2285 ([\#2524](https://github.com/matrix-org/matrix-js-sdk/pull/2524)).
+ * Remove stream-replacement ([\#2551](https://github.com/matrix-org/matrix-js-sdk/pull/2551)).
+ * Add support for sending user-defined encrypted to-device messages ([\#2528](https://github.com/matrix-org/matrix-js-sdk/pull/2528)).
+ * Retry to-device messages ([\#2549](https://github.com/matrix-org/matrix-js-sdk/pull/2549)). Fixes vector-im/element-web#12851.
+ * Sliding sync: add missing filters from latest MSC ([\#2555](https://github.com/matrix-org/matrix-js-sdk/pull/2555)).
+ * Use stable prefixes for MSC3827 ([\#2537](https://github.com/matrix-org/matrix-js-sdk/pull/2537)).
+
+## 🐛 Bug Fixes
+ * Fix: Handle parsing of a beacon info event without asset ([\#2591](https://github.com/matrix-org/matrix-js-sdk/pull/2591)). Fixes vector-im/element-web#23078.
+ * Fix finding event read up to if stable private read receipts is missing ([\#2585](https://github.com/matrix-org/matrix-js-sdk/pull/2585)). Fixes vector-im/element-web#23027.
+ * Fixed a sliding sync issue where history could be interpreted as live events. ([\#2583](https://github.com/matrix-org/matrix-js-sdk/pull/2583)).
+ * Don't load the sync accumulator if there's already a sync persist in flight ([\#2569](https://github.com/matrix-org/matrix-js-sdk/pull/2569)).
+
 Changes in [19.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v19.2.0) (2022-08-02)
 ==================================================================================================
 

@@ -47,6 +47,8 @@ export interface MSC3575Filter {
     room_types?: string[];
     not_room_types?: string[];
     spaces?: string[];
+    tags?: string[];
+    not_tags?: string[];
 }
 
 /**
@@ -82,6 +84,8 @@ export interface MSC3575RoomData {
     timeline: (IRoomEvent | IStateEvent)[];
     notification_count?: number;
     highlight_count?: number;
+    joined_count?: number;
+    invited_count?: number;
     invite_state?: IStateEvent[];
     initial?: boolean;
     limited?: boolean;
@@ -318,7 +322,9 @@ export enum SlidingSyncEvent {
 
 export type SlidingSyncEventHandlerMap = {
     [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
-    [SlidingSyncEvent.Lifecycle]: (state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void;
+    [SlidingSyncEvent.Lifecycle]: (
+        state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error | null,
+    ) => void;
     [SlidingSyncEvent.List]: (
         listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number, string>,
     ) => void;
@@ -530,6 +536,65 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
     }
 
+    private shiftRight(listIndex: number, hi: number, low: number) {
+        //     l   h
+        // 0,1,2,3,4 <- before
+        // 0,1,2,2,3 <- after, hi is deleted and low is duplicated
+        for (let i = hi; i > low; i--) {
+            if (this.lists[listIndex].isIndexInRange(i)) {
+                this.lists[listIndex].roomIndexToRoomId[i] =
+                    this.lists[listIndex].roomIndexToRoomId[
+                        i - 1
+                    ];
+            }
+        }
+    }
+
+    private shiftLeft(listIndex: number, hi: number, low: number) {
+        //     l   h
+        // 0,1,2,3,4 <- before
+        // 0,1,3,4,4 <- after, low is deleted and hi is duplicated
+        for (let i = low; i < hi; i++) {
+            if (this.lists[listIndex].isIndexInRange(i)) {
+                this.lists[listIndex].roomIndexToRoomId[i] =
+                    this.lists[listIndex].roomIndexToRoomId[
+                        i + 1
+                    ];
+            }
+        }
+    }
+
+    private removeEntry(listIndex: number, index: number) {
+        // work out the max index
+        let max = -1;
+        for (const n in this.lists[listIndex].roomIndexToRoomId) {
+            if (Number(n) > max) {
+                max = Number(n);
+            }
+        }
+        if (max < 0 || index > max) {
+            return;
+        }
+        // Everything higher than the gap needs to be shifted left.
+        this.shiftLeft(listIndex, max, index);
+        delete this.lists[listIndex].roomIndexToRoomId[max];
+    }
+
+    private addEntry(listIndex: number, index: number) {
+        // work out the max index
+        let max = -1;
+        for (const n in this.lists[listIndex].roomIndexToRoomId) {
+            if (Number(n) > max) {
+                max = Number(n);
+            }
+        }
+        if (max < 0 || index > max) {
+            return;
+        }
+        // Everything higher than the gap needs to be shifted right, +1 so we don't delete the highest element
+        this.shiftRight(listIndex, max+1, index);
+    }
+
     private processListOps(list: ListResponse, listIndex: number): void {
         let gapIndex = -1;
         list.ops.forEach((op: Operation) => {
@@ -537,6 +602,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 case "DELETE": {
                     logger.debug("DELETE", listIndex, op.index, ";");
                     delete this.lists[listIndex].roomIndexToRoomId[op.index];
+                    if (gapIndex !== -1) {
+                        // we already have a DELETE operation to process, so process it.
+                        this.removeEntry(listIndex, gapIndex);
+                    }
                     gapIndex = op.index;
                     break;
                 }
@@ -551,20 +620,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     if (this.lists[listIndex].roomIndexToRoomId[op.index]) {
                         // something is in this space, shift items out of the way
                         if (gapIndex < 0) {
-                            logger.debug(
-                                "cannot work out where gap is, INSERT without previous DELETE! List: ",
-                                listIndex,
-                            );
-                            return;
-                        }
-                        //  0,1,2,3  index
-                        // [A,B,C,D]
-                        //   DEL 3
-                        // [A,B,C,_]
-                        //   INSERT E 0
-                        // [E,A,B,C]
-                        // gapIndex=3, op.index=0
-                        if (gapIndex > op.index) {
+                            // we haven't been told where to shift from, so make way for a new room entry.
+                            this.addEntry(listIndex, op.index);
+                        } else if (gapIndex > op.index) {
                             // the gap is further down the list, shift every element to the right
                             // starting at the gap so we can just shift each element in turn:
                             // [A,B,C,_] gapIndex=3, op.index=0
@@ -572,26 +630,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             // [A,B,B,C] i=2
                             // [A,A,B,C] i=1
                             // Terminate. We'll assign into op.index next.
-                            for (let i = gapIndex; i > op.index; i--) {
-                                if (this.lists[listIndex].isIndexInRange(i)) {
-                                    this.lists[listIndex].roomIndexToRoomId[i] =
-                                        this.lists[listIndex].roomIndexToRoomId[
-                                            i - 1
-                                        ];
-                                }
-                            }
+                            this.shiftRight(listIndex, gapIndex, op.index);
                         } else if (gapIndex < op.index) {
                             // the gap is further up the list, shift every element to the left
                             // starting at the gap so we can just shift each element in turn
-                            for (let i = gapIndex; i < op.index; i++) {
-                                if (this.lists[listIndex].isIndexInRange(i)) {
-                                    this.lists[listIndex].roomIndexToRoomId[i] =
-                                        this.lists[listIndex].roomIndexToRoomId[
-                                            i + 1
-                                        ];
-                                }
-                            }
+                            this.shiftLeft(listIndex, op.index, gapIndex);
                         }
+                        gapIndex = -1; // forget the gap, we don't need it anymore.
                     }
                     this.lists[listIndex].roomIndexToRoomId[op.index] = op.room_id;
                     break;
@@ -631,6 +676,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
             }
         });
+        if (gapIndex !== -1) {
+            // we already have a DELETE operation to process, so process it
+            // Everything higher than the gap needs to be shifted left.
+            this.removeEntry(listIndex, gapIndex);
+        }
     }
 
     /**

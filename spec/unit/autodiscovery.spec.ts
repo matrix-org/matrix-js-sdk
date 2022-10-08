@@ -153,27 +153,26 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_PROMPT when .well-known returns not-JSON", function() {
+    it("should return FAIL_PROMPT when .well-known returns not-JSON", async () => {
         const httpBackend = getHttpBackend();
-        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "abc");
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "abc", true);
+        const expected = {
+            "m.homeserver": {
+                state: "FAIL_PROMPT",
+                error: AutoDiscovery.ERROR_INVALID,
+                base_url: null,
+            },
+            "m.identity_server": {
+                state: "PROMPT",
+                error: null,
+                base_url: null,
+            },
+        };
         return Promise.all([
             httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then((conf) => {
-                const expected = {
-                    "m.homeserver": {
-                        state: "FAIL_PROMPT",
-                        error: AutoDiscovery.ERROR_INVALID,
-                        base_url: null,
-                    },
-                    "m.identity_server": {
-                        state: "PROMPT",
-                        error: null,
-                        base_url: null,
-                    },
-                };
-
-                expect(conf).toEqual(expected);
-            }),
+            AutoDiscovery.findClientConfig("example.org").then(
+                expect(expected).toEqual,
+            ),
         ]);
     });
 

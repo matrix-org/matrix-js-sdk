@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { MBeaconEventContent } from "../@types/beacon";
-import { M_TIMESTAMP } from "../@types/location";
 import { BeaconInfoState, BeaconLocationState, parseBeaconContent, parseBeaconInfoContent } from "../content-helpers";
 import { MatrixEvent } from "./event";
 import { sortEventsByLatestContentTimestamp } from "../utils";
@@ -161,7 +160,9 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
 
         const validLocationEvents = beaconLocationEvents.filter(event => {
             const content = event.getContent<MBeaconEventContent>();
-            const timestamp = M_TIMESTAMP.findIn<number>(content);
+            const parsed = parseBeaconContent(content);
+            if (!parsed.uri || !parsed.timestamp) return false; // we won't be able to process these
+            const { timestamp } = parsed;
             return (
                 // only include positions that were taken inside the beacon's live period
                 isTimestampInDuration(this._beaconInfo.timestamp, this._beaconInfo.timeout, timestamp) &&
@@ -197,7 +198,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         const startTimestamp = this._beaconInfo?.timestamp > Date.now() ?
             this._beaconInfo?.timestamp - 360000 /* 6min */ :
             this._beaconInfo?.timestamp;
-        this._isLive = this._beaconInfo?.live &&
+        this._isLive = !!this._beaconInfo?.live &&
             isTimestampInDuration(startTimestamp, this._beaconInfo?.timeout, Date.now());
 
         if (prevLiveness !== this.isLive) {

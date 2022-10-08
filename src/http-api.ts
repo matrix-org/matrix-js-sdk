@@ -365,7 +365,7 @@ export class MatrixHttpApi {
         // we're setting opts.json=false so that it doesn't JSON-encode the
         // request, which also means it doesn't JSON-decode the response. Either
         // way, we have to JSON-parse the response ourselves.
-        let bodyParser = null;
+        let bodyParser: ((body: string) => any) | undefined;
         if (!rawResponse) {
             bodyParser = function(rawBody: string) {
                 let body = JSON.parse(rawBody);
@@ -472,7 +472,7 @@ export class MatrixHttpApi {
                 headers["Content-Length"] = "0";
             }
 
-            promise = this.authedRequest(
+            promise = this.authedRequest<UploadContentResponseType<O>>(
                 opts.callback, Method.Post, "/upload", queryParams, body, {
                     prefix: "/_matrix/media/r0",
                     headers,
@@ -590,10 +590,10 @@ export class MatrixHttpApi {
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public authedRequest<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
-        callback: Callback<T>,
+        callback: Callback<T> | undefined,
         method: Method,
         path: string,
-        queryParams?: Record<string, string | string[]>,
+        queryParams?: Record<string, string | string[] | undefined>,
         data?: CoreOptions["body"],
         opts?: O | number, // number is legacy
     ): IAbortablePromise<ResponseType<T, O>> {
@@ -667,7 +667,7 @@ export class MatrixHttpApi {
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public request<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
-        callback: Callback<T>,
+        callback: Callback<T> | undefined,
         method: Method,
         path: string,
         queryParams?: CoreOptions["qs"],
@@ -711,7 +711,7 @@ export class MatrixHttpApi {
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public requestOtherUrl<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
-        callback: Callback<T>,
+        callback: Callback<T> | undefined,
         method: Method,
         uri: string,
         queryParams?: CoreOptions["qs"],
@@ -778,7 +778,7 @@ export class MatrixHttpApi {
      * Generic O should be inferred
      */
     private doRequest<T, O extends IRequestOpts<T> = IRequestOpts<T>>(
-        callback: Callback<T>,
+        callback: Callback<T> | undefined,
         method: Method,
         uri: string,
         queryParams?: Record<string, string>,

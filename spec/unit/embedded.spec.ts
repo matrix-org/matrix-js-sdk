@@ -42,6 +42,7 @@ class MockWidgetApi extends EventEmitter {
     public start = jest.fn();
     public requestCapability = jest.fn();
     public requestCapabilities = jest.fn();
+    public requestCapabilityForRoomTimeline = jest.fn();
     public requestCapabilityToSendState = jest.fn();
     public requestCapabilityToReceiveState = jest.fn();
     public requestCapabilityToSendToDevice = jest.fn();
@@ -86,20 +87,17 @@ describe("RoomWidgetClient", () => {
 
         it("sends", async () => {
             await makeClient({ sendState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
             expect(widgetApi.requestCapabilityToSendState).toHaveBeenCalledWith("org.example.foo", "bar");
             await client.sendStateEvent("!1:example.org", "org.example.foo", { hello: "world" }, "bar");
-            expect(widgetApi.sendStateEvent).toHaveBeenCalledWith("org.example.foo", "bar", { hello: "world" });
-        });
-
-        it("refuses to send to other rooms", async () => {
-            await makeClient({ sendState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
-            expect(widgetApi.requestCapabilityToSendState).toHaveBeenCalledWith("org.example.foo", "bar");
-            await expect(client.sendStateEvent("!2:example.org", "org.example.foo", { hello: "world" }, "bar"))
-                .rejects.toBeDefined();
+            expect(widgetApi.sendStateEvent).toHaveBeenCalledWith(
+                "org.example.foo", "bar", { hello: "world" }, "!1:example.org",
+            );
         });
 
         it("receives", async () => {
             await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
             expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
 
             const emittedEvent = new Promise<MatrixEvent>(resolve => client.once(ClientEvent.Event, resolve));
@@ -114,7 +112,8 @@ describe("RoomWidgetClient", () => {
             expect(await emittedSync).toEqual(SyncState.Syncing);
             // It should've also inserted the event into the room object
             const room = client.getRoom("!1:example.org");
-            expect(room.currentState.getStateEvents("org.example.foo", "bar").getEffectiveEvent()).toEqual(event);
+            expect(room).not.toBeNull();
+            expect(room!.currentState.getStateEvents("org.example.foo", "bar").getEffectiveEvent()).toEqual(event);
         });
 
         it("backfills", async () => {
@@ -125,10 +124,12 @@ describe("RoomWidgetClient", () => {
             );
 
             await makeClient({ receiveState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
             expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
 
             const room = client.getRoom("!1:example.org");
-            expect(room.currentState.getStateEvents("org.example.foo", "bar").getEffectiveEvent()).toEqual(event);
+            expect(room).not.toBeNull();
+            expect(room!.currentState.getStateEvents("org.example.foo", "bar").getEffectiveEvent()).toEqual(event);
         });
     });
 
@@ -257,7 +258,7 @@ describe("RoomWidgetClient", () => {
         const emittedServer = new Promise<IClientTurnServer[]>(resolve =>
             client.once(ClientEvent.TurnServers, resolve),
         );
-        emitServer2();
+        emitServer2!();
         expect(await emittedServer).toEqual([clientServer2]);
         expect(client.getTurnServers()).toEqual([clientServer2]);
     });

@@ -247,7 +247,7 @@ export const makeBeaconInfoContent: MakeBeaconInfoContent = (
 });
 
 export type BeaconInfoState = MBeaconInfoContent & {
-    assetType: LocationAssetType;
+    assetType?: LocationAssetType;
     timestamp: number;
 };
 /**
@@ -255,14 +255,14 @@ export type BeaconInfoState = MBeaconInfoContent & {
  */
 export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
     const { description, timeout, live } = content;
-    const { type: assetType } = M_ASSET.findIn<MAssetContent>(content);
     const timestamp = M_TIMESTAMP.findIn<number>(content);
+    const asset = M_ASSET.findIn<MAssetContent>(content);
 
     return {
         description,
         timeout,
         live,
-        assetType,
+        assetType: asset?.type,
         timestamp,
     };
 };
@@ -292,16 +292,17 @@ export const makeBeaconContent: MakeBeaconContent = (
 });
 
 export type BeaconLocationState = MLocationContent & {
-    timestamp: number;
+    uri?: string; // override from MLocationContent to allow optionals
+    timestamp?: number;
 };
 
 export const parseBeaconContent = (content: MBeaconEventContent): BeaconLocationState => {
-    const { description, uri } = M_LOCATION.findIn<MLocationContent>(content);
+    const location = M_LOCATION.findIn<MLocationContent>(content);
     const timestamp = M_TIMESTAMP.findIn<number>(content);
 
     return {
-        description,
-        uri,
+        description: location?.description,
+        uri: location?.uri,
         timestamp,
     };
 };

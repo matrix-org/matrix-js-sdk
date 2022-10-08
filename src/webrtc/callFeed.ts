@@ -57,6 +57,7 @@ export enum CallFeedEvent {
     Speaking = "speaking",
     VoiceActivityThresholdChanged = "voice_activity_threshold_changed",
     VADMuteStateChanged = "vad_mute_state_changed",
+    Disposed = "disposed",
 }
 
 type EventHandlerMap = {
@@ -67,6 +68,7 @@ type EventHandlerMap = {
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
     [CallFeedEvent.VoiceActivityThresholdChanged]: (threshold: number) => void;
     [CallFeedEvent.VADMuteStateChanged]: (VADMuted: boolean) => void;
+    [CallFeedEvent.Disposed]: () => void;
 };
 export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
     public stream: MediaStream;
@@ -99,6 +101,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      * But when he has been silent 200ms
      */
     private VADCooldownStarted = new Date();
+    private _disposed = false;
 
     constructor(opts: ICallFeedOpts) {
         super();
@@ -375,6 +378,16 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             this.analyser = null;
             releaseContext();
         }
+        this._disposed = true;
+        this.emit(CallFeedEvent.Disposed);
+    }
+
+    public get disposed(): boolean {
+        return this._disposed;
+    }
+
+    private set disposed(value: boolean) {
+        this._disposed = value;
     }
 
     public getLocalVolume(): number {

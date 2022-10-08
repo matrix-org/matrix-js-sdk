@@ -3,19 +3,16 @@
 # Script to perform a release of matrix-js-sdk and downstream projects.
 #
 # Requires:
-#   github-changelog-generator; install via:
-#     pip install git+https://github.com/matrix-org/github-changelog-generator.git
 #   jq; install from your distribution's package manager (https://stedolan.github.io/jq/)
 #   hub; install via brew (macOS) or source/pre-compiled binaries (debian) (https://github.com/github/hub) - Tested on v2.2.9
-#   npm; typically installed by Node.js
 #   yarn; install via brew (macOS) or similar (https://yarnpkg.com/docs/install/)
 #
-# Note: this script is also used to release matrix-react-sdk and element-web.
+# Note: this script is also used to release matrix-react-sdk, element-web, and element-desktop.
 
 set -e
 
 jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
-if [[ `command -v hub` ]] && [[ `hub --version` =~ hub[[:space:]]version[[:space:]]([0-9]*).([0-9]*) ]]; then
+if [[ $(command -v hub) ]] && [[ $(hub --version) =~ hub[[:space:]]version[[:space:]]([0-9]*).([0-9]*) ]]; then
     HUB_VERSION_MAJOR=${BASH_REMATCH[1]}
     HUB_VERSION_MINOR=${BASH_REMATCH[2]}
     if [[ $HUB_VERSION_MAJOR -lt 2 ]] || [[ $HUB_VERSION_MAJOR -eq 2 && $HUB_VERSION_MINOR -lt 5 ]]; then
@@ -26,7 +23,6 @@ else
     echo "hub is required: please install it"
     exit
 fi
-npm --version > /dev/null || (echo "npm is required: please install it"; kill $$)
 yarn --version > /dev/null || (echo "yarn is required: please install it"; kill $$)
 
 USAGE="$0 [-x] [-c changelog_file] vX.Y.Z"
@@ -37,16 +33,8 @@ $USAGE
 
     -c changelog_file:  specify name of file containing changelog
     -x:                 skip updating the changelog
-    -n:                 skip publish to NPM
 EOF
 }
-
-ret=0
-cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
-if [ "$ret" -eq 0 ]; then
-    echo "package.json contains develop dependencies. Refusing to release."
-    exit
-fi
 
 if ! git diff-index --quiet --cached HEAD; then
     echo "this git checkout has staged (uncommitted) changes. Refusing to release."
@@ -59,10 +47,8 @@ if ! git diff-files --quiet; then
 fi
 
 skip_changelog=
-skip_npm=
 changelog_file="CHANGELOG.md"
-expected_npm_user="matrixdotorg"
-while getopts hc:u:xzn f; do
+while getopts hc:x f; do
     case $f in
         h)
             help
@@ -74,19 +60,68 @@ while getopts hc:u:xzn f; do
         x)
             skip_changelog=1
             ;;
-        n)
-            skip_npm=1
-            ;;
-        u)
-            expected_npm_user="$OPTARG"
-            ;;
     esac
 done
-shift `expr $OPTIND - 1`
+shift $(expr $OPTIND - 1)
 
 if [ $# -ne 1 ]; then
     echo "Usage: $USAGE" >&2
     exit 1
+fi
+
+function check_dependency {
+    local depver=$(cat package.json | jq -r .dependencies[\"$1\"])
+    if [ "$depver" == "null" ]; then return 0; fi
+
+    echo "Checking version of $1..."
+    local latestver=$(yarn info -s "$1" dist-tags.next)
+    if [ "$depver" != "$latestver" ]
+    then
+        echo "The latest version of $1 is $latestver but package.json depends on $depver."
+        echo -n "Type 'u' to auto-upgrade, 'c' to continue anyway, or 'a' to abort:"
+        read resp
+        if [ "$resp" != "u" ] && [ "$resp" != "c" ]
+        then
+            echo "Aborting."
+            exit 1
+        fi
+        if [ "$resp" == "u" ]
+        then
+            echo "Upgrading $1 to $latestver..."
+            yarn add -E "$1@$latestver"
+            git add -u
+            git commit -m "Upgrade $1 to $latestver"
+        fi
+    fi
+}
+
+function reset_dependency {
+    local depver=$(cat package.json | jq -r .dependencies[\"$1\"])
+    if [ "$depver" == "null" ]; then return 0; fi
+
+    echo "Resetting $1 to develop branch..."
+    yarn add "github:matrix-org/$1#develop"
+    git add -u
+    git commit -m "Reset $1 back to develop branch"
+}
+
+has_subprojects=0
+if [ -f release_config.yaml ]; then
+    subprojects=$(cat release_config.yaml | python -c "import yaml; import sys; print(' '.join(list(yaml.load(sys.stdin)['subprojects'].keys())))" 2> /dev/null)
+    if [ "$?" -eq 0 ]; then
+        has_subprojects=1
+        echo "Checking subprojects for upgrades"
+        for proj in $subprojects; do
+            check_dependency "$proj"
+        done
+    fi
+fi
+
+ret=0
+cat package.json | jq '.dependencies[]' | grep -q '#develop' || ret=$?
+if [ "$ret" -eq 0 ]; then
+    echo "package.json contains develop dependencies. Refusing to release."
+    exit
 fi
 
 # We use Git branch / commit dependencies for some packages, and Yarn seems
@@ -97,20 +132,9 @@ yarn cache clean
 # Ensure all dependencies are updated
 yarn install --ignore-scripts --pure-lockfile
 
-# Login and publish continues to use `npm`, as it seems to have more clearly
-# defined options and semantics than `yarn` for writing to the registry.
-if [ -z "$skip_npm" ]; then
-    actual_npm_user=`npm whoami`;
-    if [ $expected_npm_user != $actual_npm_user ]; then
-        echo "you need to be logged into npm as $expected_npm_user, but you are logged in as $actual_npm_user" >&2
-        exit 1
-    fi
-fi
-
 # ignore leading v on release
 release="${1#v}"
 tag="v${release}"
-rel_branch="release-$tag"
 
 prerelease=0
 # We check if this build is a prerelease by looking to
@@ -125,18 +149,7 @@ else
     read -p "Making a FINAL RELEASE, press enter to continue " REPLY
 fi
 
-# We might already be on the release branch, in which case, yay
-# If we're on any branch starting with 'release', or the staging branch
-# we don't create a separate release branch (this allows us to use the same
-# release branch for releases and release candidates).
-curbranch=$(git symbolic-ref --short HEAD)
-if [[ "$curbranch" != release* && "$curbranch" != "staging" ]]; then
-    echo "Creating release branch"
-    git checkout -b "$rel_branch"
-else
-    echo "Using current branch ($curbranch) for release"
-    rel_branch=$curbranch
-fi
+rel_branch=$(git symbolic-ref --short HEAD)
 
 if [ -z "$skip_changelog" ]; then
     echo "Generating changelog"
@@ -148,8 +161,8 @@ if [ -z "$skip_changelog" ]; then
         git commit "$changelog_file" -m "Prepare changelog for $tag"
     fi
 fi
-latest_changes=`mktemp`
-cat "${changelog_file}" | `dirname $0`/scripts/changelog_head.py > "${latest_changes}"
+latest_changes=$(mktemp)
+cat "${changelog_file}" | "$(dirname "$0")/scripts/changelog_head.py" > "${latest_changes}"
 
 set -x
 
@@ -176,7 +189,7 @@ do
 done
 
 # commit yarn.lock if it exists, is versioned, and is modified
-if [[ -f yarn.lock && `git status --porcelain yarn.lock | grep '^ M'` ]];
+if [[ -f yarn.lock && $(git status --porcelain yarn.lock | grep '^ M') ]];
 then
     pkglock='yarn.lock'
 else
@@ -188,7 +201,7 @@ git commit package.json $pkglock -m "$tag"
 # figure out if we should be signing this release
 signing_id=
 if [ -f release_config.yaml ]; then
-    result=`cat release_config.yaml | python -c "import yaml; import sys; print yaml.load(sys.stdin)['signing_id']" 2> /dev/null || true`
+    result=$(cat release_config.yaml | python -c "import yaml; import sys; print(yaml.load(sys.stdin)['signing_id'])" 2> /dev/null || true)
     if [ "$?" -eq 0 ]; then
         signing_id=$result
     fi
@@ -206,8 +219,8 @@ assets=''
 dodist=0
 jq -e .scripts.dist package.json 2> /dev/null || dodist=$?
 if [ $dodist -eq 0 ]; then
-    projdir=`pwd`
-    builddir=`mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir'`
+    projdir=$(pwd)
+    builddir=$(mktemp -d 2>/dev/null || mktemp -d -t 'mytmpdir')
     echo "Building distribution copy in $builddir"
     pushd "$builddir"
     git clone "$projdir" .
@@ -232,7 +245,7 @@ fi
 if [ -n "$signing_id" ]; then
     # make a signed tag
     # gnupg seems to fail to get the right tty device unless we set it here
-    GIT_COMMITTER_EMAIL="$signing_id" GPG_TTY=`tty` git tag -u "$signing_id" -F "${latest_changes}" "$tag"
+    GIT_COMMITTER_EMAIL="$signing_id" GPG_TTY=$(tty) git tag -u "$signing_id" -F "${latest_changes}" "$tag"
 else
     git tag -a -F "${latest_changes}" "$tag"
 fi
@@ -298,7 +311,7 @@ if [ $prerelease -eq 1 ]; then
     hubflags='-p'
 fi
 
-release_text=`mktemp`
+release_text=$(mktemp)
 echo "$tag" > "${release_text}"
 echo >> "${release_text}"
 cat "${latest_changes}" >> "${release_text}"
@@ -309,19 +322,6 @@ if [ $dodist -eq 0 ]; then
 fi
 rm "${release_text}"
 rm "${latest_changes}"
-
-# Login and publish continues to use `npm`, as it seems to have more clearly
-# defined options and semantics than `yarn` for writing to the registry.
-# Tag both releases and prereleases as `next` so the last stable release remains
-# the default.
-if [ -z "$skip_npm" ]; then
-    npm publish --tag next
-    if [ $prerelease -eq 0 ]; then
-        # For a release, also add the default `latest` tag.
-        package=$(cat package.json | jq -er .name)
-        npm dist-tag add "$package@$release" latest
-    fi
-fi
 
 # if it is a pre-release, leave it on the release branch for now.
 if [ $prerelease -eq 1 ]; then
@@ -339,34 +339,19 @@ git merge "$rel_branch" --no-edit
 git push origin master
 
 # finally, merge master back onto develop (if it exists)
-if [ $(git branch -lr | grep origin/develop -c) -ge 1 ]; then
+if [ "$(git branch -lr | grep origin/develop -c)" -ge 1 ]; then
     git checkout develop
     git pull
     git merge master --no-edit
+    git push origin develop
+fi
 
-    # When merging to develop, we need revert the `main` and `typings` fields if
-    # we adjusted them previously.
-    for i in main typings
-    do
-        # If a `lib` prefixed value is present, it means we adjusted the field
-        # earlier at publish time, so we should revert it now.
-        if [ "$(jq -r ".matrix_lib_$i" package.json)" != "null" ]; then
-            # If there's a `src` prefixed value, use that, otherwise delete.
-            # This is used to delete the `typings` field and reset `main` back
-            # to the TypeScript source.
-            src_value=$(jq -r ".matrix_src_$i" package.json)
-            if [ "$src_value" != "null" ]; then
-                jq ".$i = .matrix_src_$i" package.json > package.json.new && mv package.json.new package.json
-            else
-                jq "del(.$i)" package.json > package.json.new && mv package.json.new package.json
-            fi
-        fi
+[ -x ./post-release.sh ] && ./post-release.sh
+
+if [ $has_subprojects -eq 1 ] && [ $prerelease -eq 0 ]; then
+    echo "Resetting subprojects to develop"
+    for proj in $subprojects; do
+        reset_dependency "$proj"
     done
-
-    if [ -n "$(git ls-files --modified package.json)" ]; then
-        echo "Committing develop package.json"
-        git commit package.json -m "Resetting package fields for development"
-    fi
-
     git push origin develop
 fi

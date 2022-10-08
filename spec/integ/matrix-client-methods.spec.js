@@ -889,6 +889,7 @@ describe("MatrixClient", function() {
             };
 
             const prom = client.getPushers();
+            httpBackend.when("GET", "/_matrix/client/versions").respond(200, {});
             httpBackend.when("GET", "/pushers").respond(200, response);
             await httpBackend.flush();
             expect(await prom).toStrictEqual(response);
@@ -1070,6 +1071,29 @@ describe("MatrixClient", function() {
             }).respond(200, response);
 
             const prom = client.createRoom(input);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+    });
+
+    describe("requestLoginToken", () => {
+        it("should hit the expected API endpoint with UIA", async () => {
+            const response = {};
+            const uiaData = { foo: "baa" };
+            const prom = client.requestLoginToken(uiaData);
+            httpBackend
+                .when("POST", "/unstable/org.matrix.msc3882/login/token", { auth: uiaData })
+                .respond(200, response);
+            await httpBackend.flush();
+            expect(await prom).toStrictEqual(response);
+        });
+
+        it("should hit the expected API endpoint without UIA", async () => {
+            const response = {};
+            const prom = client.requestLoginToken();
+            httpBackend
+                .when("POST", "/unstable/org.matrix.msc3882/login/token", {})
+                .respond(200, response);
             await httpBackend.flush();
             expect(await prom).toStrictEqual(response);
         });
