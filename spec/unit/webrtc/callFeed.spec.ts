@@ -126,7 +126,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("voice activity should disable audio track", () => {
+            it("disables track when volume is below threshold", () => {
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),
