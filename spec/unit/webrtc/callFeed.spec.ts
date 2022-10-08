@@ -112,7 +112,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("voice activity should enable audio track", () => {
+            it("enables track when volume is above threshold", () => {
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),
@@ -126,7 +126,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("voice activity should disable audio track", () => {
+            it("disables track when volume is below threshold", () => {
                 feed.stream.addTrack(
                     //@ts-ignore Mock
                     new MockMediaStreamTrack("track", "audio", true),
@@ -185,8 +185,8 @@ describe("CallFeed", () => {
                 }, 310);
             });
 
-            it("voice activity cooldown should be reseted when speaking", async () => {
-                // Cooldown is reseted after speaking again
+            it("voice activity cooldown should be reset when speaking", async () => {
+                // Cooldown is reset after speaking again
 
                 feed.stream.addTrack(
                     //@ts-ignore Mock
