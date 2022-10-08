@@ -171,6 +171,9 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.volumeLooperStream);
         mediaStreamAudioSourceNode.connect(this.analyser);
 
+        //if we handle audio manually then we need a gainnode, streamnode and a destination
+        //in this case we also add a delaynode to ensure we enable / disable vad at the right time.
+        //The delaynode needs to be created in the class to ensure functionality.
         const streamNode = this.audioContext.createMediaStreamSource(this.stream);
         this.audioDelay = this.audioContext.createDelay(0.001);
         this.gainNode = this.audioContext.createGain();
