@@ -138,7 +138,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("voice activity should not disable audio track after a few milliseconds", async () => {
+            it("should not disable audio track after a few milliseconds", async () => {
                 // Someone speaks
                 // Stops speaking for a few milliseconds
                 // -> Is not muted before cooldown -> (VAD_COOLDOWN)
@@ -162,7 +162,7 @@ describe("CallFeed", () => {
                 }, 150);
             });
 
-            it("voice activity should disable audio track after cooldown", async () => {
+            it("should disable audio track after cooldown", async () => {
                 // Someone speaks
                 // Stops speaking
                 // -> Is muted after cooldown -> (VAD_COOLDOWN)
@@ -186,7 +186,7 @@ describe("CallFeed", () => {
                 }, 310);
             });
 
-            it("voice activity cooldown should be reset when speaking", async () => {
+            it("cooldown should be reset when speaking", async () => {
                 // Cooldown is reset after speaking again
 
                 //@ts-ignore Mock
