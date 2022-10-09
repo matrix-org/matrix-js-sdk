@@ -186,7 +186,7 @@ describe("CallFeed", () => {
                 }, 310);
             });
 
-            it("voice activity cooldown should be reset when speaking", async () => {
+            it("cooldown should be reset when speaking", async () => {
                 // Cooldown is reset after speaking again
 
                 //@ts-ignore Mock
