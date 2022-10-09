@@ -87,7 +87,7 @@ describe("CallFeed", () => {
         });
 
         describe("voice activity detection", () => {
-            it("If voice activity is disabled we should not mute/unmute with it", () => {
+            it("should not mute/unmute if voice activity is disabled", () => {
                 // @ts-ignore Mock
                 feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
