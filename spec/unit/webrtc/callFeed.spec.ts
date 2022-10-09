@@ -138,7 +138,7 @@ describe("CallFeed", () => {
                 }, 1000);
             });
 
-            it("voice activity should not disable audio track after a few milliseconds", async () => {
+            it("should not disable audio track after a few milliseconds", async () => {
                 // Someone speaks
                 // Stops speaking for a few milliseconds
                 // -> Is not muted before cooldown -> (VAD_COOLDOWN)
