@@ -123,6 +123,8 @@ async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<CryptoK
         256,
     );
 
+    console.log(`aesKey: ${encodeBase64(aesKey)}`);
+
     const aesProm = subtleCrypto.importKey(
         'raw',
         aesKey,

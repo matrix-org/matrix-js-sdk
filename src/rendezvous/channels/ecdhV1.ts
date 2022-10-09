@@ -150,7 +150,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         }
         const { key, algorithm } = res;
 
-        if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || !key) {
+        if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || (isInitiator && !key)) {
             throw new RendezvousError(
                 'Unsupported algorithm: ' + algorithm,
                 RendezvousCancellationReason.UnsupportedAlgorithm,
