@@ -26,6 +26,7 @@ export const SPEAKING_THRESHOLD = -60; // dB
 const VAD_THRESHOLD = -100; //dB
 const SPEAKING_SAMPLE_COUNT = 8; // samples
 const VAD_COOLDOWN = 200; // ms
+const VAD_AUDIO_DELAY = 0.001; // ms
 
 export interface ICallFeedOpts {
     client: MatrixClient;
@@ -171,11 +172,11 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.volumeLooperStream);
         mediaStreamAudioSourceNode.connect(this.analyser);
 
-        //if we handle audio manually then we need a gainnode, streamnode and a destination
-        //in this case we also add a delaynode to ensure we enable / disable vad at the right time.
-        //The delaynode needs to be created in the class to ensure functionality.
+        // if we handle audio manually then we need a gainnode, streamnode and a destination
+        // in this case we also add a delaynode to ensure we enable / disable vad at the right time.
+        // The delaynode needs to be created in the class to ensure functionality.
         const streamNode = this.audioContext.createMediaStreamSource(this.stream);
-        this.audioDelay = this.audioContext.createDelay(0.001);
+        this.audioDelay = this.audioContext.createDelay(VAD_AUDIO_DELAY);
         this.gainNode = this.audioContext.createGain();
         streamNode.connect(this.gainNode);
         this.gainNode.connect(this.audioDelay);
