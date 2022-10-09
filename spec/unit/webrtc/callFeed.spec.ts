@@ -162,7 +162,7 @@ describe("CallFeed", () => {
                 }, 150);
             });
 
-            it("voice activity should disable audio track after cooldown", async () => {
+            it("should disable audio track after cooldown", async () => {
                 // Someone speaks
                 // Stops speaking
                 // -> Is muted after cooldown -> (VAD_COOLDOWN)
