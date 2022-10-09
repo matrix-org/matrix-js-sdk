@@ -91,12 +91,12 @@ describe("CallFeed", () => {
                 // @ts-ignore Mock
                 feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
 
+                // we expect no mute/unmute behavior from vad from here on.
+                feed.VADEnabled = false;
                 // set threshold to infinity, this ensures we never hit the threshold.
                 feed.setVoiceActivityThreshold(Infinity);
                 // the number doesn't matter, anything below infinity is ok.
                 feed.speakingVolumeSamples = [-60];
-                // we expect no mute/unmute behavior from vad from here on.
-                feed.VADEnabled = false;
 
                 setTimeout(() => {
                     expect(feed.stream.getAudioTracks()[0].enabled).toBe(true);
