@@ -25,8 +25,8 @@ const POLLING_INTERVAL = 1; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
 const VAD_THRESHOLD = -100; //dB
 const SPEAKING_SAMPLE_COUNT = 8; // samples
-const VAD_COOLDOWN = 200; // ms
-const VAD_AUDIO_DELAY = 0.001; // ms
+const VAD_COOLDOWN = 400; // ms
+const VAD_AUDIO_DELAY = 0.005; // ms
 
 export interface ICallFeedOpts {
     client: MatrixClient;
