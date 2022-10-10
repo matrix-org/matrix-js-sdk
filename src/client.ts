@@ -611,7 +611,7 @@ export interface IUploadKeysRequest {
     "org.matrix.msc2732.fallback_keys"?: Record<string, IOneTimeKey>;
 }
 
-interface IOpenIDToken {
+export interface IOpenIDToken {
     access_token: string;
     token_type: "Bearer" | string;
     matrix_server_name: string;
