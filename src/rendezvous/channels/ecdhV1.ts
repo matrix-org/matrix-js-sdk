@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { curve25519, utils } from '@noble/ed25519';
+import { SAS } from '@matrix-org/olm';
 
 import { logger } from '../../logger';
 import { RendezvousError } from '../error';
@@ -29,9 +29,6 @@ import {
 import { SecureRendezvousChannelAlgorithm } from '.';
 import { encodeBase64, decodeBase64 } from '../../crypto/olmlib';
 import { decryptAESGCM, encryptAESGCM } from '../../crypto/aesGcm';
-
-const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
-    (window.crypto.subtle || window.crypto.webkitSubtle) : null;
 
 export interface ECDHv1RendezvousCode extends RendezvousCode {
     rendezvous: {
@@ -59,51 +56,18 @@ function generateDecimalSas(sasBytes: number[]): [number, number, number] {
     ];
 }
 
-// salt for HKDF, with 8 bytes of zeros
-const zeroSalt = new Uint8Array(8);
-
-async function calculateChecksum(sharedSecret: Uint8Array, info: String): Promise<string> {
-    if (!subtleCrypto) {
-        throw new Error('Subtle crypto not available');
-    }
-
-    const hkdfkey = await subtleCrypto.importKey(
-        'raw',
-        sharedSecret,
-        { name: "HKDF" },
-        false,
-        ["deriveBits"],
-    );
-
-    const mac = await subtleCrypto.deriveBits(
-        {
-            name: "HKDF",
-            salt: zeroSalt,
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-            // @ts-ignore: https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/879
-            info: (new TextEncoder().encode(info)),
-            hash: "SHA-256",
-        },
-        hkdfkey,
-        40,
-    );
-
-    return generateDecimalSas(Array.from(new Uint8Array(mac))).join('-');
-}
-
 export class ECDHv1RendezvousChannel implements RendezvousChannel {
-    private ourPrivateKey: Uint8Array;
+    private olmSAS: SAS;
     private ourPublicKey: Uint8Array;
-    private sharedSecret?: Uint8Array;
-    private aesInfo?: string;
+    private aesKey: Uint8Array;
     public onCancelled?: (reason: RendezvousCancellationReason) => void;
 
     constructor(
         public transport: RendezvousTransport,
         private theirPublicKey?: Uint8Array,
     ) {
-        this.ourPrivateKey = utils.randomPrivateKey();
-        this.ourPublicKey = curve25519.scalarMultBase(this.ourPrivateKey);
+        this.olmSAS = new global.Olm.SAS();
+        this.ourPublicKey = decodeBase64(this.olmSAS.get_pubkey());
     }
 
     public async generateCode(intent: RendezvousIntent): Promise<ECDHv1RendezvousCode> {
@@ -178,8 +142,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             });
         }
 
-        this.sharedSecret = curve25519.scalarMult(this.ourPrivateKey, this.theirPublicKey);
-
+        this.olmSAS.set_their_key(this.theirPublicKey.toString());
         const initiatorKey = isInitiator ? ourPublicKey : this.theirPublicKey;
         const recipientKey = isInitiator ? this.theirPublicKey : ourPublicKey;
 
@@ -187,18 +150,24 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         aesInfo += `|${encodeBase64(initiatorKey)}`;
         aesInfo += `|${encodeBase64(recipientKey)}`;
 
-        this.aesInfo = aesInfo;
+        this.aesKey = this.olmSAS.generate_bytes(aesInfo, 32);
+        // logger.debug(`Our public key: ${encodeBase64(ourPublicKey)}`);
+        // logger.debug(`Their public key: ${encodeBase64(this.theirPublicKey)}`);
+        // logger.debug(`AES info: ${aesInfo}`);
+        // logger.debug(`AES key: ${encodeBase64(this.aesKey)}`);
 
-        return await calculateChecksum(this.sharedSecret, aesInfo);
+        const rawChecksum = this.olmSAS.generate_bytes(aesInfo, 5);
+
+        return generateDecimalSas(Array.from(rawChecksum)).join('-');
     }
 
     public async send(data: any) {
         const stringifiedData = JSON.stringify(data);
 
-        if (this.sharedSecret && this.aesInfo) {
+        if (this.aesKey) {
             logger.info(`Encrypting: ${stringifiedData}`);
             const body = JSON.stringify(await encryptAESGCM(
-                stringifiedData, this.sharedSecret, this.aesInfo,
+                stringifiedData, this.aesKey,
             ));
             await this.transport.send('application/json', body);
         } else {
@@ -214,13 +183,13 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         }
 
         if (data.ciphertext) {
-            if (!this.sharedSecret || !this.aesInfo) {
+            if (!this.aesKey) {
                 throw new Error('Shared secret not set up');
             }
-            const decrypted = await decryptAESGCM(data, this.sharedSecret, this.aesInfo);
+            const decrypted = await decryptAESGCM(data, this.aesKey);
             logger.info(`Decrypted data: ${decrypted}`);
             return JSON.parse(decrypted);
-        } else if (this.sharedSecret) {
+        } else if (this.aesKey) {
             throw new Error('Data received but no ciphertext');
         }
 
