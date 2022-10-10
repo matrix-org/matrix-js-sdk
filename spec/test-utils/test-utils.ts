@@ -74,6 +74,7 @@ interface IEventOpts {
     sender?: string;
     skey?: string;
     content: IContent;
+    prev_content?: IContent;
     user?: string;
     unsigned?: IUnsigned;
     redacts?: string;
@@ -103,6 +104,7 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
+        prev_content: opts.prev_content,
         unsigned: opts.unsigned || {},
         event_id: "$" + testEventIndex++ + "-" + Math.random() + "-" + Math.random(),
         txn_id: "~" + Math.random(),

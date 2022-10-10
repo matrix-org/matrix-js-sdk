@@ -1,3 +1,4 @@
+import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import { Filter, IFilterDefinition } from "../../src/filter";
 
 describe("Filter", function() {
@@ -50,7 +51,7 @@ describe("Filter", function() {
             expect(filter.getDefinition()).toEqual({
                 room: {
                     timeline: {
-                        unread_thread_notifications: true,
+                        [UNREAD_THREAD_NOTIFICATIONS.name]: true,
                     },
                 },
             });

@@ -22,6 +22,7 @@ import {
     EventType,
     RelationType,
 } from "./@types/event";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
@@ -99,7 +100,7 @@ export class Filter {
      * @param {Object} jsonObj
      * @return {Filter}
      */
-    public static fromJson(userId: string, filterId: string, jsonObj: IFilterDefinition): Filter {
+    public static fromJson(userId: string | undefined | null, filterId: string, jsonObj: IFilterDefinition): Filter {
         const filter = new Filter(userId, filterId);
         filter.setDefinition(jsonObj);
         return filter;
@@ -109,7 +110,7 @@ export class Filter {
     private roomFilter: FilterComponent;
     private roomTimelineFilter: FilterComponent;
 
-    constructor(public readonly userId: string, public filterId?: string) {}
+    constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
 
     /**
      * Get the ID of this filter on your homeserver (if known)
@@ -227,7 +228,16 @@ export class Filter {
      * @param {boolean} enabled
      */
     public setUnreadThreadNotifications(enabled: boolean): void {
-        setProp(this.definition, "room.timeline.unread_thread_notifications", !!enabled);
+        this.definition = {
+            ...this.definition,
+            room: {
+                ...this.definition?.room,
+                timeline: {
+                    ...this.definition?.room?.timeline,
+                    [UNREAD_THREAD_NOTIFICATIONS.name]: !!enabled,
+                },
+            },
+        };
     }
 
     setLazyLoadMembers(enabled: boolean): void {

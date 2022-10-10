@@ -21,7 +21,7 @@ import { IRoomEventFilter } from "../filter";
 import { Direction } from "../models/event-timeline";
 import { PushRuleAction } from "./PushRules";
 import { IRoomEvent } from "../sync-accumulator";
-import { RoomType } from "./event";
+import { EventType, RoomType } from "./event";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -97,7 +97,18 @@ export interface ICreateRoomOpts {
     name?: string;
     topic?: string;
     preset?: Preset;
-    power_level_content_override?: object;
+    power_level_content_override?: {
+        ban?: number;
+        events?: Record<EventType | string, number>;
+        events_default?: number;
+        invite?: number;
+        kick?: number;
+        notifications?: Record<string, number>;
+        redact?: number;
+        state_default?: number;
+        users?: Record<string, number>;
+        users_default?: number;
+    };
     creation_content?: object;
     initial_state?: ICreateRoomStateEvent[];
     invite?: string[];
