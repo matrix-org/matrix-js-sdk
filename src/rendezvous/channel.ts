@@ -38,6 +38,10 @@ export interface RendezvousChannel {
      */
     receive(): Promise<any>;
     /**
+     * Close the channel and clear up any resources.
+     */
+    close(): Promise<void>;
+    /**
      * @returns a representation of the channel that can be encoded in a QR or similar
      */
     generateCode(intent: RendezvousIntent): Promise<RendezvousCode>;

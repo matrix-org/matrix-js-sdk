@@ -57,7 +57,7 @@ function generateDecimalSas(sasBytes: number[]): [number, number, number] {
 }
 
 export class ECDHv1RendezvousChannel implements RendezvousChannel {
-    private olmSAS: SAS;
+    private olmSAS?: SAS;
     private ourPublicKey: Uint8Array;
     private aesKey: Uint8Array;
     public onCancelled?: (reason: RendezvousCancellationReason) => void;
@@ -95,73 +95,61 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
     }
 
     async connect(): Promise<string> {
-        const isInitiator = !this.theirPublicKey;
-        const ourPublicKey = this.ourPublicKey;
+        if (!this.olmSAS) {
+            throw new Error('Channel closed');
+        }
 
-        if (!isInitiator) {
+        const isInitiator = !this.theirPublicKey;
+
+        if (isInitiator) {
+            // wait for the other side to send us their public key
+            logger.info('Waiting for other device to send their public key');
+            const res = await this.receive();
+            if (!res) {
+                throw new Error('No response from other device');
+            }
+            const { key, algorithm } = res;
+
+            if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || (isInitiator && !key)) {
+                throw new RendezvousError(
+                    'Unsupported algorithm: ' + algorithm,
+                    RendezvousCancellationReason.UnsupportedAlgorithm,
+                );
+            }
+
+            this.theirPublicKey = decodeBase64(key);
+        } else {
             // send our public key unencrypted
             await this.send({
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: encodeBase64(ourPublicKey),
+                key: encodeBase64(this.ourPublicKey),
             });
         }
 
-        // wait for the other side to send us their public key
-        logger.info('Waiting for other device to send their public key');
-        const res = await this.receive(); // ack
-        if (!res) {
-            throw new Error('No response from other device');
-        }
-        const { key, algorithm } = res;
+        this.olmSAS.set_their_key(encodeBase64(this.theirPublicKey));
 
-        if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || (isInitiator && !key)) {
-            throw new RendezvousError(
-                'Unsupported algorithm: ' + algorithm,
-                RendezvousCancellationReason.UnsupportedAlgorithm,
-            );
-        }
-
-        if (isInitiator) {
-            this.theirPublicKey = decodeBase64(key);
-        } else {
-            // check that the same public key was at the rendezvous point
-            if (key !== encodeBase64(this.theirPublicKey)) {
-                throw new RendezvousError(
-                    'Secure rendezvous key mismatch',
-                    RendezvousCancellationReason.DataMismatch,
-                );
-            }
-            logger.info('Public key from channel matches that from provided code');
-        }
-
-        if (isInitiator) {
-            // send our public key encrypted
-            await this.send({
-                algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
-                key: encodeBase64(ourPublicKey),
-            });
-        }
-
-        this.olmSAS.set_their_key(this.theirPublicKey.toString());
-        const initiatorKey = isInitiator ? ourPublicKey : this.theirPublicKey;
-        const recipientKey = isInitiator ? this.theirPublicKey : ourPublicKey;
-
+        const initiatorKey = isInitiator ? this.ourPublicKey : this.theirPublicKey;
+        const recipientKey = isInitiator ? this.theirPublicKey : this.ourPublicKey;
         let aesInfo = SecureRendezvousChannelAlgorithm.ECDH_V1.toString();
         aesInfo += `|${encodeBase64(initiatorKey)}`;
         aesInfo += `|${encodeBase64(recipientKey)}`;
 
         this.aesKey = this.olmSAS.generate_bytes(aesInfo, 32);
-        // logger.debug(`Our public key: ${encodeBase64(ourPublicKey)}`);
-        // logger.debug(`Their public key: ${encodeBase64(this.theirPublicKey)}`);
-        // logger.debug(`AES info: ${aesInfo}`);
-        // logger.debug(`AES key: ${encodeBase64(this.aesKey)}`);
+
+        logger.debug(`Our public key: ${encodeBase64(this.ourPublicKey)}`);
+        logger.debug(`Their public key: ${encodeBase64(this.theirPublicKey)}`);
+        logger.debug(`AES info: ${aesInfo}`);
+        logger.debug(`AES key: ${encodeBase64(this.aesKey)}`);
 
         const rawChecksum = this.olmSAS.generate_bytes(aesInfo, 5);
-
         return generateDecimalSas(Array.from(rawChecksum)).join('-');
     }
 
     public async send(data: any) {
+        if (!this.olmSAS) {
+            throw new Error('Channel closed');
+        }
+
         const stringifiedData = JSON.stringify(data);
 
         if (this.aesKey) {
@@ -176,6 +164,10 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
     }
 
     public async receive(): Promise<any> {
+        if (!this.olmSAS) {
+            throw new Error('Channel closed');
+        }
+
         const data = await this.transport.receive();
         logger.info(`Received data: ${JSON.stringify(data)}`);
         if (!data) {
@@ -196,7 +188,18 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         return data;
     }
 
+    public async close() {
+        if (this.olmSAS) {
+            this.olmSAS.free();
+            this.olmSAS = undefined;
+        }
+    }
+
     public async cancel(reason: RendezvousCancellationReason) {
-        return this.transport.cancel(reason);
+        try {
+            await this.transport.cancel(reason);
+        } finally {
+            await this.close();
+        }
     }
 }
