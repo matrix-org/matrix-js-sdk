@@ -6660,6 +6660,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         threads: FeatureSupport;
         list: FeatureSupport;
     }> {
+        if (await this.isVersionSupported("v1.4")) {
+            return {
+                threads: FeatureSupport.Stable,
+                list: FeatureSupport.Stable,
+            }
+        }
+
         try {
             const [threadUnstable, threadStable, listUnstable, listStable] = await Promise.all([
                 this.doesServerSupportUnstableFeature("org.matrix.msc3440"),
