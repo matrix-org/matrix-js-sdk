@@ -38,9 +38,9 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
     };
 }
 
-// n.b. this is a copy and paste of:
+// The underlying algorithm is the same as:
 // https://github.com/matrix-org/matrix-js-sdk/blob/75204d5cd04d67be100fca399f83b1a66ffb8118/src/crypto/verification/SAS.ts#L54-L68
-function generateDecimalSas(sasBytes: number[]): [number, number, number] {
+function generateDecimalSas(sasBytes: number[]): string {
     /**
      *      +--------+--------+--------+--------+--------+
      *      | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 |
@@ -49,11 +49,13 @@ function generateDecimalSas(sasBytes: number[]): [number, number, number] {
      *       \____________/\_____________/\____________/
      *         1st number    2nd number     3rd number
      */
-    return [
+    const digits = [
         (sasBytes[0] << 5 | sasBytes[1] >> 3) + 1000,
         ((sasBytes[1] & 0x7) << 10 | sasBytes[2] << 2 | sasBytes[3] >> 6) + 1000,
         ((sasBytes[3] & 0x3f) << 7 | sasBytes[4] >> 1) + 1000,
     ];
+
+    return digits.join('-');
 }
 
 export class ECDHv1RendezvousChannel implements RendezvousChannel {
@@ -142,7 +144,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         logger.debug(`AES key: ${encodeBase64(this.aesKey)}`);
 
         const rawChecksum = this.olmSAS.generate_bytes(aesInfo, 5);
-        return generateDecimalSas(Array.from(rawChecksum)).join('-');
+        return generateDecimalSas(Array.from(rawChecksum));
     }
 
     public async send(data: any) {
