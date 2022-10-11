@@ -99,7 +99,7 @@ export class TimelineWindow {
      *
      * @return {Promise}
      */
-    public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
+    public async load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
         const initFields = (timeline: EventTimeline) => {
@@ -127,20 +127,11 @@ export class TimelineWindow {
 
         // We avoid delaying the resolution of the promise by a reactor tick if we already have the data we need,
         // which is important to keep room-switching feeling snappy.
-        if (initialEventId) {
-            const timeline = this.timelineSet.getTimelineForEvent(initialEventId);
-            if (timeline) {
-                // hot-path optimization to save a reactor tick by replicating the sync check getTimelineForEvent does.
-                initFields(timeline);
-                return Promise.resolve();
-            }
+        const timeline = initialEventId
+            ? await this.client.getEventTimeline(this.timelineSet, initialEventId)
+            : this.timelineSet.getLiveTimeline();
 
-            return this.client.getEventTimeline(this.timelineSet, initialEventId).then(initFields);
-        } else {
-            const tl = this.timelineSet.getLiveTimeline();
-            initFields(tl);
-            return Promise.resolve();
-        }
+        return initFields(timeline);
     }
 
     /**
@@ -257,7 +248,7 @@ export class TimelineWindow {
      * @return {Promise} Resolves to a boolean which is true if more events
      *    were successfully retrieved.
      */
-    public paginate(
+    public async paginate(
         direction: Direction,
         size: number,
         makeRequest = true,
@@ -269,7 +260,7 @@ export class TimelineWindow {
 
         if (!tl) {
             debuglog("TimelineWindow: no timeline yet");
-            return Promise.resolve(false);
+            return false;
         }
 
         if (tl.pendingPaginate) {
@@ -278,20 +269,20 @@ export class TimelineWindow {
 
         // try moving the cap
         if (this.extend(direction, size)) {
-            return Promise.resolve(true);
+            return true;
         }
 
         if (!makeRequest || requestLimit === 0) {
             // todo: should we return something different to indicate that there
             // might be more events out there, but we haven't found them yet?
-            return Promise.resolve(false);
+            return false;
         }
 
         // try making a pagination request
         const token = tl.timeline.getPaginationToken(direction);
         if (!token) {
             debuglog("TimelineWindow: no token");
-            return Promise.resolve(false);
+            return false;
         }
 
         debuglog("TimelineWindow: starting request");
