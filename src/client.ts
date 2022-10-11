@@ -2924,7 +2924,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const path = this.makeKeyBackupPath(roomId, sessionId, version);
         await this.http.authedRequest(
             Method.Put, path.path, path.queryData, data,
-            { prefix: ClientPrefix.Unstable },
+            { prefix: ClientPrefix.V3 },
         );
     }
 
@@ -3215,7 +3215,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
             const res = await this.http.authedRequest<IRoomsKeysResponse | IRoomKeysResponse | IKeyBackupSession>(
                 Method.Get, path.path, path.queryData, undefined,
-                { prefix: ClientPrefix.Unstable },
+                { prefix: ClientPrefix.V3 },
             );
 
             if ((res as IRoomsKeysResponse).rooms) {
@@ -3276,7 +3276,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const path = this.makeKeyBackupPath(roomId, sessionId, version);
         await this.http.authedRequest(
             Method.Delete, path.path, path.queryData, undefined,
-            { prefix: ClientPrefix.Unstable },
+            { prefix: ClientPrefix.V3 },
         );
     }
 
