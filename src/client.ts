@@ -5423,6 +5423,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest<IThreadedMessagesResponse>(Method.Get, path, params, undefined, opts)
             .then(res => ({
                 ...res,
+                chunk: res.chunk?.reverse(),
                 start: res.prev_batch,
                 end: res.next_batch,
             }));
