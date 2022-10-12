@@ -30,7 +30,6 @@ import { MockStorageApi } from "./MockStorageApi";
 import { encodeUri } from "../src/utils";
 import { IDeviceKeys, IOneTimeKey } from "../src/crypto/dehydration";
 import { IKeyBackupSession } from "../src/crypto/keybackup";
-import { IHttpOpts } from "../src/http-api";
 import { IKeysUploadResponse, IUploadKeysRequest } from '../src/client';
 
 /**
@@ -56,11 +55,11 @@ export class TestClient {
         this.httpBackend = new MockHttpBackend();
 
         const fullOptions: ICreateClientOpts = {
-            baseUrl: "http://" + userId + ".test.server",
+            baseUrl: "http://" + userId?.slice(1).replace(":", ".") + ".test.server",
             userId: userId,
             accessToken: accessToken,
             deviceId: deviceId,
-            request: this.httpBackend.requestFn as IHttpOpts["request"],
+            fetchFn: this.httpBackend.fetchFn as typeof global.fetch,
             ...options,
         };
         if (!fullOptions.cryptoStore) {

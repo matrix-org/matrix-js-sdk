@@ -18,7 +18,6 @@ import MockHttpBackend from 'matrix-mock-request';
 
 import { ReceiptType } from '../../src/@types/read_receipts';
 import { MatrixClient } from "../../src/client";
-import { IHttpOpts } from '../../src/http-api';
 import { EventType } from '../../src/matrix';
 import { MAIN_ROOM_TIMELINE } from '../../src/models/read-receipt';
 import { encodeUri } from '../../src/utils';
@@ -87,7 +86,7 @@ describe("Read receipt", () => {
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
-            request: httpBackend.requestFn as unknown as IHttpOpts["request"],
+            fetchFn: httpBackend.fetchFn as typeof global.fetch,
         });
         client.isGuest = () => false;
     });
@@ -142,6 +141,24 @@ describe("Read receipt", () => {
 
             mockServerSideSupport(client, false);
             client.sendReceipt(threadEvent, ReceiptType.Read, {});
+
+            await httpBackend.flushAllExpected();
+            await flushPromises();
+        });
+
+        it("sends a valid room read receipt even when body omitted", async () => {
+            httpBackend.when(
+                "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                    $roomId: ROOM_ID,
+                    $receiptType: ReceiptType.Read,
+                    $eventId: threadEvent.getId(),
+                }),
+            ).check((request) => {
+                expect(request.data).toEqual({});
+            }).respond(200, {});
+
+            mockServerSideSupport(client, false);
+            client.sendReceipt(threadEvent, ReceiptType.Read, undefined);
 
             await httpBackend.flushAllExpected();
             await flushPromises();

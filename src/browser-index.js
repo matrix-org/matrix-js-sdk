@@ -14,25 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import request from "browser-request";
-import queryString from "qs";
-
 import * as matrixcs from "./matrix";
 
-if (matrixcs.getRequest()) {
+if (global.__js_sdk_entrypoint) {
     throw new Error("Multiple matrix-js-sdk entrypoints detected!");
 }
-
-matrixcs.request(function(opts, fn) {
-    // We manually fix the query string for browser-request because
-    // it doesn't correctly handle cases like ?via=one&via=two. Instead
-    // we mimic `request`'s query string interface to make it all work
-    // as expected.
-    // browser-request will happily take the constructed string as the
-    // query string without trying to modify it further.
-    opts.qs = queryString.stringify(opts.qs || {}, opts.qsStringifyOptions);
-    return request(opts, fn);
-});
+global.__js_sdk_entrypoint = true;
 
 // just *accessing* indexedDB throws an exception in firefox with
 // indexeddb disabled.

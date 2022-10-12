@@ -5,7 +5,6 @@ import { MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
-import { ICreateClientOpts } from "../../src/client";
 import { IStore } from "../../src/store";
 
 describe("MatrixClient opts", function() {
@@ -69,7 +68,7 @@ describe("MatrixClient opts", function() {
         let client;
         beforeEach(function() {
             client = new MatrixClient({
-                request: httpBackend.requestFn as unknown as ICreateClientOpts['request'],
+                fetchFn: httpBackend.fetchFn as typeof global.fetch,
                 store: undefined,
                 baseUrl: baseUrl,
                 userId: userId,
@@ -129,7 +128,7 @@ describe("MatrixClient opts", function() {
         let client;
         beforeEach(function() {
             client = new MatrixClient({
-                request: httpBackend.requestFn as unknown as ICreateClientOpts['request'],
+                fetchFn: httpBackend.fetchFn as typeof global.fetch,
                 store: new MemoryStore() as IStore,
                 baseUrl: baseUrl,
                 userId: userId,
@@ -143,7 +142,7 @@ describe("MatrixClient opts", function() {
         });
 
         it("shouldn't retry sending events", function(done) {
-            httpBackend.when("PUT", "/txn1").fail(500, new MatrixError({
+            httpBackend.when("PUT", "/txn1").respond(500, new MatrixError({
                 errcode: "M_SOMETHING",
                 error: "Ruh roh",
             }));
