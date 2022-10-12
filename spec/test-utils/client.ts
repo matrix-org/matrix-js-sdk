@@ -17,6 +17,7 @@ limitations under the License.
 import { MethodKeysOf, mocked, MockedObject } from "jest-mock";
 
 import { ClientEventHandlerMap, EmittedEvents, MatrixClient } from "../../src/client";
+import { Feature, ServerSupport } from "../../src/feature";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 import { User } from "../../src/models/user";
 

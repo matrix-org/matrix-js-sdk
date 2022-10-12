@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ServerSupport } from "../../src/feature";
+import { Feature, ServerSupport } from "../../src/feature";
 import {
     EventType,
     fixNotificationCountOnDecryption,
@@ -56,11 +56,12 @@ describe("fixNotificationCountOnDecryption", () => {
             getRoom: jest.fn().mockImplementation(() => room),
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
             supportsExperimentalThreads: jest.fn().mockReturnValue(true),
-            canSupport: {
-                get: jest.fn().mockReturnValue(ServerSupport.Stable),
-            },
         });
         mockClient.reEmitter = mock(ReEmitter, 'ReEmitter');
+        mockClient.canSupport = new Map();
+        Object.keys(Feature).forEach(feature => {
+            mockClient.canSupport.set(feature as Feature, ServerSupport.Stable);
+        });
 
         room = new Room(ROOM_ID, mockClient, mockClient.getUserId());
         room.setUnreadNotificationCount(NotificationCountType.Total, 1);
