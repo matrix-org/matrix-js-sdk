@@ -144,6 +144,7 @@ export type RoomEmittedEvents = RoomEvent
     | ThreadEvent.New
     | ThreadEvent.Update
     | ThreadEvent.NewReply
+    | ThreadEvent.Delete
     | MatrixEventEvent.BeforeRedaction
     | BeaconEvent.New
     | BeaconEvent.Update
@@ -178,7 +179,7 @@ export type RoomEventHandlerMap = {
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & Pick<
         ThreadHandlerMap,
-        ThreadEvent.Update | ThreadEvent.NewReply
+        ThreadEvent.Update | ThreadEvent.NewReply | ThreadEvent.Delete
     >
     & EventTimelineSetHandlerMap
     & Pick<MatrixEventHandlerMap, MatrixEventEvent.BeforeRedaction>
@@ -262,7 +263,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * @experimental
      */
-    private threads = new Map<string, Thread>();
+    public threads = new Map<string, Thread>();
     public lastThread?: Thread;
 
     /**
@@ -1786,6 +1787,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         this.on(ThreadEvent.NewReply, this.onThreadNewReply);
+        this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
     }
 
@@ -1832,6 +1834,21 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 fromCache: false,
                 roomState,
             });
+        }
+    }
+
+    private onThreadDelete(thread: Thread): void {
+        this.threads.delete(thread.id);
+
+        const timeline = this.getTimelineForEvent(thread.id);
+        const roomEvent = timeline?.getEvents()?.find(it => it.getId() === thread.id);
+        if (roomEvent) {
+            thread.clearEventMetadata(roomEvent);
+        } else {
+            logger.debug("onThreadDelete: Could not find root event in room timeline");
+        }
+        for (const timelineSet of this.threadsTimelineSets) {
+            timelineSet.removeEvent(thread.id);
         }
     }
 
@@ -1966,6 +1983,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // If we managed to create a thread and figure out its `id` then we can use it
         this.threads.set(thread.id, thread);
         this.reEmitter.reEmit(thread, [
+            ThreadEvent.Delete,
             ThreadEvent.Update,
             ThreadEvent.NewReply,
             RoomEvent.Timeline,

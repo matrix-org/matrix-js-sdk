@@ -5176,7 +5176,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return timelineSet.getTimelineForEvent(eventId);
         }
 
-        if (this.supportsExperimentalThreads()) {
+        if (timelineSet.thread && this.supportsExperimentalThreads()) {
             return this.getThreadTimeline(timelineSet, eventId);
         }
 
@@ -5243,6 +5243,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("could not get thread timeline: no client support");
         }
 
+        if (!timelineSet.thread) {
+            throw new Error("could not get thread timeline: not a thread timeline");
+        }
+
         const path = utils.encodeUri(
             "/rooms/$roomId/context/$eventId", {
                 $roomId: timelineSet.room.roomId,
@@ -5295,7 +5299,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     event,
                     ...resOlder.chunk.map(mapper),
                 ];
-                await timelineSet.thread?.fetchEditsWhereNeeded(...events);
+                for (const event of events) {
+                    await timelineSet.thread?.processEvent(event);
+                }
 
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
                 let timeline = timelineSet.getTimelineForEvent(event.getId());
@@ -5354,8 +5360,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     event,
                     ...resOlder.chunk.map(mapper),
                 ];
-
-                await timelineSet.thread?.fetchEditsWhereNeeded(...events);
+                for (const event of events) {
+                    await timelineSet.thread?.processEvent(event);
+                }
 
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread
                 // summaries.
@@ -5695,10 +5702,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 THREAD_RELATION_TYPE.name,
                 null,
                 { dir, limit: opts.limit, from: token },
-            ).then((res) => {
+            ).then(async (res) => {
                 const mapper = this.getEventMapper();
                 const matrixEvents = res.chunk.map(mapper);
-                eventTimeline.getTimelineSet().thread?.fetchEditsWhereNeeded(...matrixEvents);
+                for (const event of matrixEvents) {
+                    await eventTimeline.getTimelineSet()?.thread?.processEvent(event);
+                }
 
                 const newToken = res.next_batch;
 
@@ -5741,10 +5750,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const matrixEvents = res.chunk.map(this.getEventMapper());
 
                 const timelineSet = eventTimeline.getTimelineSet();
-                const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
+                const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                 this.processBeaconEvents(room, timelineEvents);
-                this.processThreadEvents(room, threadedEvents, backwards);
+                this.processThreadRoots(room,
+                    timelineEvents.filter(it => it.isRelation(THREAD_RELATION_TYPE.name)),
+                    false);
 
                 const atEnd = res.end === undefined || res.end === res.start;
 
