@@ -109,4 +109,19 @@ describe("MatrixClient relations", () => {
 
         expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
     });
+
+    it('should use default direction in the fetchRelations endpoint', async () => {
+        const response = client!.fetchRelations(roomId, '$event-0', null, null);
+
+        httpBackend!
+            .when(
+                "GET",
+                "/rooms/!room%3Ahere/relations/%24event-0?dir=b",
+            )
+            .respond(200, { chunk: [], next_batch: 'NEXT' });
+
+        await httpBackend!.flushAllExpected();
+
+        expect(await response).toEqual({ "chunk": [], "next_batch": "NEXT" });
+    });
 });
