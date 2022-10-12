@@ -160,7 +160,7 @@ export interface IRelationsRequestOpts {
     from?: string;
     to?: string;
     limit?: number;
-    direction?: Direction;
+    dir?: Direction;
 }
 
 export interface IRelationsResponse {
