@@ -5267,26 +5267,111 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (Thread.hasServerSideSupport) {
-            const thread = timelineSet.thread;
-            const opts: IRelationsRequestOpts = {
-                dir: Direction.Backward,
-                limit: 50,
-            };
-
-            await thread.fetchInitialEvents();
-            let nextBatch: string | null | undefined = thread.liveTimeline.getPaginationToken(Direction.Backward);
-
-            // Fetch events until we find the one we were asked for, or we run out of pages
-            while (!thread.findEventById(eventId)) {
-                if (nextBatch) {
-                    opts.from = nextBatch;
+            if (Thread.hasServerSideFwdPaginationSupport) {
+                if (!timelineSet.thread) {
+                    throw new Error("could not get thread timeline: not a thread timeline");
                 }
 
-                ({ nextBatch } = await thread.fetchEvents(opts));
-                if (!nextBatch) break;
-            }
+                const thread = timelineSet.thread;
+                const resOlder = await this.fetchRelations(
+                    timelineSet.room.roomId,
+                    thread.id,
+                    THREAD_RELATION_TYPE.name,
+                    null,
+                    { dir: Direction.Backward, from: res.start },
+                );
+                const resNewer = await this.fetchRelations(
+                    timelineSet.room.roomId,
+                    thread.id,
+                    THREAD_RELATION_TYPE.name,
+                    null,
+                    { dir: Direction.Forward, from: res.end },
+                );
+                const events = [
+                    // Order events from most recent to oldest (reverse-chronological).
+                    // We start with the last event, since that's the point at which we have known state.
+                    // events_after is already backwards; events_before is forwards.
+                    ...resNewer.chunk.reverse().map(mapper),
+                    event,
+                    ...resOlder.chunk.map(mapper),
+                ];
+                await timelineSet.thread?.fetchEditsWhereNeeded(...events);
 
-            return thread.liveTimeline;
+                // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
+                let timeline = timelineSet.getTimelineForEvent(event.getId());
+                if (timeline) {
+                    timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+                } else {
+                    timeline = timelineSet.addTimeline();
+                    timeline.initialiseState(res.state.map(mapper));
+                }
+
+                timelineSet.addEventsToTimeline(events, true, timeline, resNewer.next_batch);
+                if (!resOlder.next_batch) {
+                    timelineSet.addEventsToTimeline([mapper(resOlder.original_event)], true, timeline, null);
+                }
+                timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
+                timeline.setPaginationToken(resNewer.next_batch ?? null, Direction.Forward);
+                this.processBeaconEvents(timelineSet.room, events);
+
+                // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
+                // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
+                // anywhere, if it was later redacted, so we just return the timeline we first thought of.
+                return timelineSet.getTimelineForEvent(eventId)
+                    ?? timeline;
+            } else {
+                // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
+                // functions contiguously, so we have to jump through some hoops to get our target event in it.
+                // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
+
+                const thread = timelineSet.thread;
+
+                const resOlder = await this.fetchRelations(
+                    timelineSet.room.roomId,
+                    thread.id,
+                    THREAD_RELATION_TYPE.name,
+                    null,
+                    { dir: Direction.Backward, from: res.start },
+                );
+                const eventsNewer = [];
+                let nextBatch: Optional<string> = res.end;
+                while (nextBatch) {
+                    const resNewer = await this.fetchRelations(
+                        timelineSet.room.roomId,
+                        thread.id,
+                        THREAD_RELATION_TYPE.name,
+                        null,
+                        { dir: Direction.Forward, from: nextBatch },
+                    );
+                    nextBatch = resNewer.next_batch ?? null;
+                    eventsNewer.push(...resNewer.chunk);
+                }
+                const events = [
+                    // Order events from most recent to oldest (reverse-chronological).
+                    // We start with the last event, since that's the point at which we have known state.
+                    // events_after is already backwards; events_before is forwards.
+                    ...eventsNewer.reverse().map(mapper),
+                    event,
+                    ...resOlder.chunk.map(mapper),
+                ];
+
+                await timelineSet.thread?.fetchEditsWhereNeeded(...events);
+
+                // Here we handle non-thread timelines only, but still process any thread events to populate thread
+                // summaries.
+                const timeline = timelineSet.getLiveTimeline();
+                timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+
+                timelineSet.addEventsToTimeline(events, true, timeline, null);
+                if (!resOlder.next_batch) {
+                    timelineSet.addEventsToTimeline([mapper(resOlder.original_event)], true, timeline, null);
+                }
+                timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
+                timeline.setPaginationToken(null, Direction.Forward);
+                this.processBeaconEvents(timelineSet.room, events);
+
+                return timeline;
+            }
         }
     }
 
@@ -5599,8 +5684,38 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
             eventTimeline.paginationRequests[dir] = promise;
         } else if (isThreadTimeline) {
-            promise = eventTimeline.getTimelineSet().thread.fetchEvents({...opts, dir}).then(res => {
-                return Boolean(res.nextBatch);
+            const room = this.getRoom(eventTimeline.getRoomId());
+            if (!room) {
+                throw new Error("Unknown room " + eventTimeline.getRoomId());
+            }
+
+            promise = this.fetchRelations(
+                eventTimeline.getRoomId(),
+                eventTimeline.getTimelineSet().thread?.id,
+                THREAD_RELATION_TYPE.name,
+                null,
+                { dir, limit: opts.limit, from: token },
+            ).then((res) => {
+                const mapper = this.getEventMapper();
+                const matrixEvents = res.chunk.map(mapper);
+                eventTimeline.getTimelineSet().thread?.fetchEditsWhereNeeded(...matrixEvents);
+
+                const newToken = res.next_batch;
+
+                const timelineSet = eventTimeline.getTimelineSet();
+                timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, newToken ?? null);
+                if (!newToken && backwards) {
+                    timelineSet.addEventsToTimeline([mapper(res.original_event)], true, eventTimeline, null);
+                }
+                this.processBeaconEvents(timelineSet.room, matrixEvents);
+
+                // if we've hit the end of the timeline, we need to stop trying to
+                // paginate. We need to keep the 'forwards' token though, to make sure
+                // we can recover from gappy syncs.
+                if (backwards && !newToken) {
+                    eventTimeline.setPaginationToken(null, dir);
+                }
+                return Boolean(newToken);
             }).finally(() => {
                 eventTimeline.paginationRequests[dir] = null;
             });
