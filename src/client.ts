@@ -6671,20 +6671,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         try {
-            const [threadUnstable, threadStable, listUnstable, listStable, threadPagination] = await Promise.all([
+            const [
+                threadUnstable, threadStable,
+                listUnstable, listStable,
+                fwdPaginationUnstable, fwdPaginationStable,
+            ] = await Promise.all([
                 this.doesServerSupportUnstableFeature("org.matrix.msc3440"),
                 this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable"),
                 this.doesServerSupportUnstableFeature("org.matrix.msc3856"),
                 this.doesServerSupportUnstableFeature("org.matrix.msc3856.stable"),
                 this.doesServerSupportUnstableFeature("org.matrix.msc3715"),
+                this.doesServerSupportUnstableFeature("org.matrix.msc3715.stable"),
             ]);
-
-            // TODO: Use `this.isVersionSupported("v1.3")` for whatever spec version includes MSC3440 formally.
 
             return {
                 threads: determineFeatureSupport(threadStable, threadUnstable),
                 list: determineFeatureSupport(listStable, listUnstable),
-                fwdPagination: determineFeatureSupport(false, threadPagination),
+                fwdPagination: this.http.opts.baseUrl.includes("threads-dev.lab.element.dev")
+                    ? FeatureSupport.Stable
+                    : determineFeatureSupport(fwdPaginationStable, fwdPaginationUnstable),
             };
         } catch (e) {
             return {
