@@ -40,19 +40,7 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
     private client?: MatrixClient;
     private hsUrl?: string;
     private fallbackRzServer?: string;
-
-    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
-        if (this.fetchFn) {
-            return this.fetchFn(resource, options);
-        }
-        return global.fetch(resource, options);
-    }
-
-    private static fetchFn?: typeof global.fetch;
-
-    public static setFetchFn(fetchFn: typeof global.fetch): void {
-        SimpleHttpRendezvousTransport.fetchFn = fetchFn;
-    }
+    private fetch: typeof global.fetch;
 
     constructor({
         onFailure,
@@ -60,13 +48,16 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
         hsUrl,
         fallbackRzServer,
         rendezvousUri,
+        fetch,
     }: {
+        fetch: typeof global.fetch;
         onFailure?: RendezvousFailureListener;
         client?: MatrixClient;
         hsUrl?: string;
         fallbackRzServer?: string;
         rendezvousUri?: string;
     }) {
+        this.fetch = fetch;
         this.onFailure = onFailure;
         this.client = client;
         this.hsUrl = hsUrl;
@@ -124,7 +115,7 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
             headers['if-match'] = this.etag;
         }
 
-        const res = await SimpleHttpRendezvousTransport.fetch(uri, { method,
+        const res = await this.fetch(uri, { method,
             headers,
             body: data,
         });
@@ -167,7 +158,7 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
             if (this.etag) {
                 headers['if-none-match'] = this.etag;
             }
-            const poll = await SimpleHttpRendezvousTransport.fetch(this.uri, { method: "GET", headers });
+            const poll = await this.fetch(this.uri, { method: "GET", headers });
 
             logger.debug(`Received polling response: ${poll.status} from ${this.uri}`);
             if (poll.status === 404) {
@@ -201,7 +192,7 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
         if (this.uri && reason === RendezvousFailureReason.UserDeclined) {
             try {
                 logger.debug(`Deleting channel: ${this.uri}`);
-                await SimpleHttpRendezvousTransport.fetch(this.uri, { method: "DELETE" });
+                await this.fetch(this.uri, { method: "DELETE" });
             } catch (e) {
                 logger.warn(e);
             }
