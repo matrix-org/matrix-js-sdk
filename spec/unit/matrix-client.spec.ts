@@ -103,7 +103,7 @@ describe("MatrixClient", function() {
     ];
     let acceptKeepalives: boolean;
     let pendingLookup = null;
-    function httpReq(cb, method, path, qp, data, prefix) {
+    function httpReq(method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
                 unstable_features: {
@@ -132,7 +132,6 @@ describe("MatrixClient", function() {
                 method: method,
                 path: path,
             };
-            pendingLookup.promise.abort = () => {}; // to make it a valid IAbortablePromise
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
@@ -178,7 +177,7 @@ describe("MatrixClient", function() {
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
             accessToken: "my.access.token",
-            request: function() {} as any, // NOP
+            fetchFn: function() {} as any, // NOP
             store: store,
             scheduler: scheduler,
             userId: userId,
@@ -1153,8 +1152,7 @@ describe("MatrixClient", function() {
 
             // event type combined
             const expectedEventType = M_BEACON_INFO.name;
-            const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
-            expect(callback).toBeFalsy();
+            const [method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(method).toBe('PUT');
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
@@ -1168,7 +1166,7 @@ describe("MatrixClient", function() {
             await client.unstable_setLiveBeacon(roomId, content);
 
             // event type combined
-            const [, , path, , requestContent] = client.http.authedRequest.mock.calls[0];
+            const [, path, , requestContent] = client.http.authedRequest.mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
                 `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
@@ -1229,7 +1227,7 @@ describe("MatrixClient", function() {
         it("is called with plain text topic and callback and sends state event", async () => {
             const sendStateEvent = createSendStateEventMock("pizza");
             client.sendStateEvent = sendStateEvent;
-            await client.setRoomTopic(roomId, "pizza", () => {});
+            await client.setRoomTopic(roomId, "pizza");
             expect(sendStateEvent).toHaveBeenCalledTimes(1);
         });
 
@@ -1244,15 +1242,9 @@ describe("MatrixClient", function() {
     describe("setPassword", () => {
         const auth = { session: 'abcdef', type: 'foo' };
         const newPassword = 'newpassword';
-        const callback = () => {};
 
-        const passwordTest = (expectedRequestContent: any, expectedCallback?: Function) => {
-            const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
-            if (expectedCallback) {
-                expect(callback).toBe(expectedCallback);
-            } else {
-                expect(callback).toBeFalsy();
-            }
+        const passwordTest = (expectedRequestContent: any) => {
+            const [method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(method).toBe('POST');
             expect(path).toEqual('/account/password');
             expect(queryParams).toBeFalsy();
@@ -1269,8 +1261,8 @@ describe("MatrixClient", function() {
         });
 
         it("no logout_devices specified + callback", async () => {
-            await client.setPassword(auth, newPassword, callback);
-            passwordTest({ auth, new_password: newPassword }, callback);
+            await client.setPassword(auth, newPassword);
+            passwordTest({ auth, new_password: newPassword });
         });
 
         it("overload logoutDevices=true", async () => {
@@ -1279,8 +1271,8 @@ describe("MatrixClient", function() {
         });
 
         it("overload logoutDevices=true + callback", async () => {
-            await client.setPassword(auth, newPassword, true, callback);
-            passwordTest({ auth, new_password: newPassword, logout_devices: true }, callback);
+            await client.setPassword(auth, newPassword, true);
+            passwordTest({ auth, new_password: newPassword, logout_devices: true });
         });
 
         it("overload logoutDevices=false", async () => {
@@ -1289,8 +1281,8 @@ describe("MatrixClient", function() {
         });
 
         it("overload logoutDevices=false + callback", async () => {
-            await client.setPassword(auth, newPassword, false, callback);
-            passwordTest({ auth, new_password: newPassword, logout_devices: false }, callback);
+            await client.setPassword(auth, newPassword, false);
+            passwordTest({ auth, new_password: newPassword, logout_devices: false });
         });
     });
 
@@ -1305,8 +1297,7 @@ describe("MatrixClient", function() {
             const result = await client.getLocalAliases(roomId);
 
             // Current version of the endpoint we support is v3
-            const [callback, method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
-            expect(callback).toBeFalsy();
+            const [method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
             expect(data).toBeFalsy();
             expect(method).toBe('GET');
             expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);

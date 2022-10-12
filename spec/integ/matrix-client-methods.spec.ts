@@ -16,13 +16,12 @@ limitations under the License.
 import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
-import { CRYPTO_ENABLED, MatrixClient, IStoredClientOpts } from "../../src/client";
+import { CRYPTO_ENABLED, IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
-import { Filter, MemoryStore, Room } from "../../src/matrix";
+import { Filter, MemoryStore, Method, Room, SERVICE_TYPES } from "../../src/matrix";
 import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { IFilterDefinition } from "../../src/filter";
-import { FileType } from "../../src/http-api";
 import { ISearchResults } from "../../src/@types/search";
 import { IStore } from "../../src/store";
 
@@ -65,28 +64,27 @@ describe("MatrixClient", function() {
 
     describe("uploadContent", function() {
         const buf = Buffer.from('hello world');
+        const file = buf;
+        const opts = {
+            type: "text/plain",
+            name: "hi.txt",
+        };
+
         it("should upload the file", function() {
             httpBackend!.when(
                 "POST", "/_matrix/media/r0/upload",
             ).check(function(req) {
                 expect(req.rawData).toEqual(buf);
                 expect(req.queryParams?.filename).toEqual("hi.txt");
-                if (!(req.queryParams?.access_token == accessToken ||
-                        req.headers["Authorization"] == "Bearer " + accessToken)) {
-                    expect(true).toBe(false);
-                }
+                expect(req.headers["Authorization"]).toBe("Bearer " + accessToken);
                 expect(req.headers["Content-Type"]).toEqual("text/plain");
                 // @ts-ignore private property
                 expect(req.opts.json).toBeFalsy();
                 // @ts-ignore private property
                 expect(req.opts.timeout).toBe(undefined);
-            }).respond(200, "content", true);
+            }).respond(200, '{"content_uri": "content"}', true);
 
-            const prom = client!.uploadContent({
-                stream: buf,
-                name: "hi.txt",
-                type: "text/plain",
-            } as unknown as FileType);
+            const prom = client!.uploadContent(file, opts);
 
             expect(prom).toBeTruthy();
 
@@ -96,8 +94,7 @@ describe("MatrixClient", function() {
             expect(uploads[0].loaded).toEqual(0);
 
             const prom2 = prom.then(function(response) {
-                // for backwards compatibility, we return the raw JSON
-                expect(response).toEqual("content");
+                expect(response.content_uri).toEqual("content");
 
                 const uploads = client!.getCurrentUploads();
                 expect(uploads.length).toEqual(0);
@@ -105,28 +102,6 @@ describe("MatrixClient", function() {
 
             httpBackend!.flush('');
             return prom2;
-        });
-
-        it("should parse the response if rawResponse=false", function() {
-            httpBackend!.when(
-                "POST", "/_matrix/media/r0/upload",
-            ).check(function(req) {
-                // @ts-ignore private property
-                expect(req.opts.json).toBeFalsy();
-            }).respond(200, { "content_uri": "uri" });
-
-            const prom = client!.uploadContent({
-                stream: buf,
-                name: "hi.txt",
-                type: "text/plain",
-            } as unknown as FileType, {
-                rawResponse: false,
-            }).then(function(response) {
-                expect(response.content_uri).toEqual("uri");
-            });
-
-            httpBackend!.flush('');
-            return prom;
         });
 
         it("should parse errors into a MatrixError", function() {
@@ -141,11 +116,7 @@ describe("MatrixClient", function() {
                 "error": "broken",
             });
 
-            const prom = client!.uploadContent({
-                stream: buf,
-                name: "hi.txt",
-                type: "text/plain",
-            } as unknown as FileType).then(function(response) {
+            const prom = client!.uploadContent(file, opts).then(function(response) {
                 throw Error("request not failed");
             }, function(error) {
                 expect(error.httpStatus).toEqual(400);
@@ -157,30 +128,18 @@ describe("MatrixClient", function() {
             return prom;
         });
 
-        it("should return a promise which can be cancelled", function() {
-            const prom = client!.uploadContent({
-                stream: buf,
-                name: "hi.txt",
-                type: "text/plain",
-            } as unknown as FileType);
+        it("should return a promise which can be cancelled", async () => {
+            const prom = client!.uploadContent(file, opts);
 
             const uploads = client!.getCurrentUploads();
             expect(uploads.length).toEqual(1);
             expect(uploads[0].promise).toBe(prom);
             expect(uploads[0].loaded).toEqual(0);
 
-            const prom2 = prom.then(function(response) {
-                throw Error("request not aborted");
-            }, function(error) {
-                expect(error).toEqual("aborted");
-
-                const uploads = client!.getCurrentUploads();
-                expect(uploads.length).toEqual(0);
-            });
-
             const r = client!.cancelUpload(prom);
             expect(r).toBe(true);
-            return prom2;
+            await expect(prom).rejects.toThrow("Aborted");
+            expect(client.getCurrentUploads()).toHaveLength(0);
         });
     });
 
@@ -201,6 +160,30 @@ describe("MatrixClient", function() {
             store!.storeRoom(room);
             client!.joinRoom(roomId);
             httpBackend!.verifyNoOutstandingRequests();
+        });
+
+        it("should send request to inviteSignUrl if specified", async () => {
+            const roomId = "!roomId:server";
+            const inviteSignUrl = "https://id.server/sign/this/for/me";
+            const viaServers = ["a", "b", "c"];
+            const signature = {
+                sender: "sender",
+                mxid: "@sender:foo",
+                token: "token",
+                signatures: {},
+            };
+
+            httpBackend!.when("POST", inviteSignUrl).respond(200, signature);
+            httpBackend!.when("POST", "/join/" + encodeURIComponent(roomId)).check(request => {
+                expect(request.data.third_party_signed).toEqual(signature);
+            }).respond(200, { room_id: roomId });
+
+            const prom = client.joinRoom(roomId, {
+                inviteSignUrl,
+                viaServers,
+            });
+            await httpBackend!.flushAllExpected();
+            expect((await prom).roomId).toBe(roomId);
         });
     });
 
@@ -676,7 +659,7 @@ describe("MatrixClient", function() {
             // The vote event has been copied into the thread
             const eventRefWithThreadId = withThreadId(
                 eventPollResponseReference, eventPollStartThreadRoot.getId());
-            expect(eventRefWithThreadId.threadId).toBeTruthy();
+            expect(eventRefWithThreadId.threadRootId).toBeTruthy();
 
             expect(threaded).toEqual([
                 eventPollStartThreadRoot,
@@ -1178,15 +1161,150 @@ describe("MatrixClient", function() {
             expect(await prom).toStrictEqual(response);
         });
     });
+
+    describe("logout", () => {
+        it("should abort pending requests when called with stopClient=true", async () => {
+            httpBackend.when("POST", "/logout").respond(200, {});
+            const fn = jest.fn();
+            client.http.request(Method.Get, "/test").catch(fn);
+            client.logout(true);
+            await httpBackend.flush(undefined);
+            expect(fn).toHaveBeenCalled();
+        });
+    });
+
+    describe("sendHtmlEmote", () => {
+        it("should send valid html emote", async () => {
+            httpBackend.when("PUT", "/send").check(req => {
+                expect(req.data).toStrictEqual({
+                    "msgtype": "m.emote",
+                    "body": "Body",
+                    "formatted_body": "<h1>Body</h1>",
+                    "format": "org.matrix.custom.html",
+                    "org.matrix.msc1767.message": expect.anything(),
+                });
+            }).respond(200, { event_id: "$foobar" });
+            const prom = client.sendHtmlEmote("!room:server", "Body", "<h1>Body</h1>");
+            await httpBackend.flush(undefined);
+            await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
+        });
+    });
+
+    describe("sendHtmlMessage", () => {
+        it("should send valid html message", async () => {
+            httpBackend.when("PUT", "/send").check(req => {
+                expect(req.data).toStrictEqual({
+                    "msgtype": "m.text",
+                    "body": "Body",
+                    "formatted_body": "<h1>Body</h1>",
+                    "format": "org.matrix.custom.html",
+                    "org.matrix.msc1767.message": expect.anything(),
+                });
+            }).respond(200, { event_id: "$foobar" });
+            const prom = client.sendHtmlMessage("!room:server", "Body", "<h1>Body</h1>");
+            await httpBackend.flush(undefined);
+            await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
+        });
+    });
+
+    describe("forget", () => {
+        it("should remove from store by default", async () => {
+            const room = new Room("!roomId:server", client, userId);
+            client.store.storeRoom(room);
+            expect(client.store.getRooms()).toContain(room);
+
+            httpBackend.when("POST", "/forget").respond(200, {});
+            await Promise.all([
+                client.forget(room.roomId),
+                httpBackend.flushAllExpected(),
+            ]);
+            expect(client.store.getRooms()).not.toContain(room);
+        });
+    });
+
+    describe("getCapabilities", () => {
+        it("should cache by default", async () => {
+            httpBackend!.when("GET", "/capabilities").respond(200, {
+                capabilities: {
+                    "m.change_password": false,
+                },
+            });
+            const prom = httpBackend!.flushAllExpected();
+            const capabilities1 = await client!.getCapabilities();
+            const capabilities2 = await client!.getCapabilities();
+            await prom;
+
+            expect(capabilities1).toStrictEqual(capabilities2);
+        });
+    });
+
+    describe("getTerms", () => {
+        it("should return Identity Server terms", async () => {
+            httpBackend!.when("GET", "/terms").respond(200, { foo: "bar" });
+            const prom = client!.getTerms(SERVICE_TYPES.IS, "http://identity.server");
+            await httpBackend!.flushAllExpected();
+            await expect(prom).resolves.toEqual({ foo: "bar" });
+        });
+
+        it("should return Integrations Manager terms", async () => {
+            httpBackend!.when("GET", "/terms").respond(200, { foo: "bar" });
+            const prom = client!.getTerms(SERVICE_TYPES.IM, "http://im.server");
+            await httpBackend!.flushAllExpected();
+            await expect(prom).resolves.toEqual({ foo: "bar" });
+        });
+    });
+
+    describe("publicRooms", () => {
+        it("should use GET request if no server or filter is specified", () => {
+            httpBackend!.when("GET", "/publicRooms").respond(200, {});
+            client!.publicRooms({});
+            return httpBackend!.flushAllExpected();
+        });
+
+        it("should use GET request if only server is specified", () => {
+            httpBackend!.when("GET", "/publicRooms").check(request => {
+                expect(request.queryParams.server).toBe("server1");
+            }).respond(200, {});
+            client!.publicRooms({ server: "server1" });
+            return httpBackend!.flushAllExpected();
+        });
+
+        it("should use POST request if filter is specified", () => {
+            httpBackend!.when("POST", "/publicRooms").check(request => {
+                expect(request.data.filter.generic_search_term).toBe("foobar");
+            }).respond(200, {});
+            client!.publicRooms({ filter: { generic_search_term: "foobar" } });
+            return httpBackend!.flushAllExpected();
+        });
+    });
+
+    describe("login", () => {
+        it("should persist values to the client opts", async () => {
+            const token = "!token&";
+            const userId = "@m:t";
+
+            httpBackend!.when("POST", "/login").respond(200, {
+                access_token: token,
+                user_id: userId,
+            });
+            const prom = client!.login("fake.login", {});
+            await httpBackend!.flushAllExpected();
+            const resp = await prom;
+            expect(resp.access_token).toBe(token);
+            expect(resp.user_id).toBe(userId);
+            expect(client.getUserId()).toBe(userId);
+            expect(client.http.opts.accessToken).toBe(token);
+        });
+    });
 });
 
-function withThreadId(event, newThreadId) {
+function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
     const ret = event.toSnapshot();
     ret.setThreadId(newThreadId);
     return ret;
 }
 
-const buildEventMessageInThread = (root) => new MatrixEvent({
+const buildEventMessageInThread = (root: MatrixEvent) => new MatrixEvent({
     "age": 80098509,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -1233,7 +1351,7 @@ const buildEventPollResponseReference = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const buildEventReaction = (event) => new MatrixEvent({
+const buildEventReaction = (event: MatrixEvent) => new MatrixEvent({
     "content": {
         "m.relates_to": {
             "event_id": event.getId(),
@@ -1252,7 +1370,7 @@ const buildEventReaction = (event) => new MatrixEvent({
     "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
 });
 
-const buildEventRedaction = (event) => new MatrixEvent({
+const buildEventRedaction = (event: MatrixEvent) => new MatrixEvent({
     "content": {
 
     },
@@ -1286,7 +1404,7 @@ const buildEventPollStartThreadRoot = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-const buildEventReply = (target) => new MatrixEvent({
+const buildEventReply = (target: MatrixEvent) => new MatrixEvent({
     "age": 80098509,
     "content": {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -1452,7 +1570,7 @@ const buildEventCreate = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-function assertObjectContains(obj, expected) {
+function assertObjectContains(obj: object, expected: any): void {
     for (const k in expected) {
         if (expected.hasOwnProperty(k)) {
             expect(obj[k]).toEqual(expected[k]);

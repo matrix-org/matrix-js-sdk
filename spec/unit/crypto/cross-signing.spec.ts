@@ -141,7 +141,7 @@ describe("Cross Signing", function() {
         };
         alice.uploadKeySignatures = async () => ({ failures: {} });
         alice.setAccountData = async () => ({});
-        alice.getAccountDataFromServer = async <T extends {[k: string]: any}>(): Promise<T> => ({} as T);
+        alice.getAccountDataFromServer = async <T extends {[k: string]: any}>(): Promise<T | null> => ({} as T);
         const authUploadDeviceSigningKeys = async func => await func({});
 
         // Try bootstrap, expecting `authUploadDeviceSigningKeys` to pass

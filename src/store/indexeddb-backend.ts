@@ -33,7 +33,7 @@ export interface IIndexedDBBackend {
     getClientOptions(): Promise<IStartClientOpts>;
     storeClientOptions(options: IStartClientOpts): Promise<void>;
     saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void>;
-    getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch>;
+    getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
     removeToDeviceBatch(id: number): Promise<void>;
 }
 

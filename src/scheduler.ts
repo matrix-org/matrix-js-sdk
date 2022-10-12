@@ -24,7 +24,7 @@ import { logger } from './logger';
 import { MatrixEvent } from "./models/event";
 import { EventType } from "./@types/event";
 import { IDeferred } from "./utils";
-import { MatrixError } from "./http-api";
+import { ConnectionError, MatrixError } from "./http-api";
 import { ISendEventResponse } from "./@types/requests";
 
 const DEBUG = false;  // set true to enable console logging.
@@ -68,9 +68,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
             // client error; no amount of retrying with save you now.
             return -1;
         }
-        // we ship with browser-request which returns { cors: rejected } when trying
-        // with no connection, so if we match that, give up since they have no conn.
-        if (err["cors"] === "rejected") {
+        if (err instanceof ConnectionError) {
             return -1;
         }
 

@@ -1572,7 +1572,7 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         const idbHttpBackend = idbTestClient.httpBackend;
         const idbClient = idbTestClient.client;
         idbHttpBackend.when("GET", "/versions").respond(200, {});
-        idbHttpBackend.when("GET", "/pushrules").respond(200, {});
+        idbHttpBackend.when("GET", "/pushrules/").respond(200, {});
         idbHttpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
 
         await idbClient.initCrypto();
