@@ -60,7 +60,7 @@ class DummyTransport implements RendezvousTransport {
         while (true) {
             if (!this.etag || this.otherParty?.etag !== this.etag) {
                 this.etag = this.otherParty?.etag;
-                return JSON.parse(this.otherParty.data);
+                return this.otherParty?.data ? JSON.parse(this.otherParty.data) : undefined;
             }
             await sleep(100);
         }

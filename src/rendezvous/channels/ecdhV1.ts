@@ -67,7 +67,7 @@ async function importKey(key: Uint8Array): Promise<CryptoKey | Uint8Array> {
     }
 
     if (!subtleCrypto) {
-        throw new Error('Neither Web Crypto nor Node.js crypto available');
+        throw new Error('Neither Web Crypto nor Node.js crypto are available');
     }
 
     const imported = subtleCrypto.importKey(
@@ -104,10 +104,6 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             throw new Error('Code already generated');
         }
 
-        const data = {
-            "algorithm": SecureRendezvousChannelAlgorithm.ECDH_V1,
-        };
-
         await this.send({ algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1 });
 
         const rendezvous: ECDHv1RendezvousCode = {
@@ -115,7 +111,6 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
                 algorithm: SecureRendezvousChannelAlgorithm.ECDH_V1,
                 key: encodeBase64(this.ourPublicKey),
                 transport: await this.transport.details(),
-                ...data,
             },
             intent,
         };
@@ -155,10 +150,10 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             });
         }
 
-        this.olmSAS.set_their_key(encodeBase64(this.theirPublicKey));
+        this.olmSAS.set_their_key(encodeBase64(this.theirPublicKey!));
 
-        const initiatorKey = isInitiator ? this.ourPublicKey : this.theirPublicKey;
-        const recipientKey = isInitiator ? this.theirPublicKey : this.ourPublicKey;
+        const initiatorKey = isInitiator ? this.ourPublicKey : this.theirPublicKey!;
+        const recipientKey = isInitiator ? this.theirPublicKey! : this.ourPublicKey;
         let aesInfo = SecureRendezvousChannelAlgorithm.ECDH_V1.toString();
         aesInfo += `|${encodeBase64(initiatorKey)}`;
         aesInfo += `|${encodeBase64(recipientKey)}`;
@@ -168,7 +163,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
         this.aesKey = await importKey(aesKeyBytes);
 
         logger.debug(`Our public key: ${encodeBase64(this.ourPublicKey)}`);
-        logger.debug(`Their public key: ${encodeBase64(this.theirPublicKey)}`);
+        logger.debug(`Their public key: ${encodeBase64(this.theirPublicKey!)}`);
         logger.debug(`AES info: ${aesInfo}`);
         logger.debug(`AES key: ${encodeBase64(aesKeyBytes)}`);
 
@@ -192,6 +187,10 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
                 iv: encodeBase64(iv),
                 ciphertext: encodeBase64(ciphertext),
             });
+        }
+
+        if (!subtleCrypto) {
+            throw new Error('Neither Web Crypto nor Node.js crypto are available');
         }
 
         const iv = new Uint8Array(32);
@@ -247,6 +246,10 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             );
             decipher.setAuthTag(authTag);
             return decipher.update(encodeBase64(ciphertextOnly), "base64", "utf-8") + decipher.final("utf-8");
+        }
+
+        if (!subtleCrypto) {
+            throw new Error('Neither Web Crypto nor Node.js crypto are available');
         }
 
         const plaintext = await subtleCrypto.decrypt(
