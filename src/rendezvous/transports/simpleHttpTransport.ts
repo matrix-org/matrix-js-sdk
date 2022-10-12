@@ -19,7 +19,7 @@ import { sleep } from '../../utils';
 import { RendezvousFailureListener, RendezvousFailureReason } from '../cancellationReason';
 import { RendezvousTransport, RendezvousTransportDetails } from '../transport';
 import { MatrixClient } from '../../matrix';
-import { PREFIX_UNSTABLE } from '../../http-api';
+import { ClientPrefix } from '../../http-api';
 
 export interface SimpleHttpRendezvousTransportDetails extends RendezvousTransportDetails {
     type: 'http.v1';
@@ -96,7 +96,7 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
         if (this.client) {
             try {
                 if (await this.client.doesServerSupportUnstableFeature('org.matrix.msc3886')) {
-                    return `${this.client.baseUrl}${PREFIX_UNSTABLE}/org.matrix.msc3886/rendezvous`;
+                    return `${this.client.baseUrl}${ClientPrefix.Unstable}/org.matrix.msc3886/rendezvous`;
                 }
             } catch (err) {
                 logger.warn('Failed to get unstable features', err);
