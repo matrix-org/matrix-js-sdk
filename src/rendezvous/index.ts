@@ -27,6 +27,7 @@ export * from './code';
 export * from './cancellationReason';
 export * from './transport';
 export * from './channel';
+export * from './rendezvous';
 
 /**
  * Attempts to parse the given code as a rendezvous and return a channel and transport.
