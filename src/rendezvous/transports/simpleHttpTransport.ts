@@ -31,6 +31,19 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
     private etag?: string;
     private expiresAt?: Date;
 
+    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+        if (this.fetchFn) {
+            return this.fetchFn(resource, options);
+        }
+        return global.fetch(resource, options);
+    }
+
+    private static fetchFn?: typeof global.fetch;
+
+    public static setFetchFn(fetchFn: typeof global.fetch): void {
+        SimpleHttpRendezvousTransport.fetchFn = fetchFn;
+    }
+
     constructor(
         public onCancelled?: RendezvousCancellationFunction,
         private client?: MatrixClient,
@@ -96,7 +109,7 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
             headers['if-match'] = this.etag;
         }
 
-        const res = await fetch(uri, { method,
+        const res = await SimpleHttpRendezvousTransport.fetch(uri, { method,
             headers,
             body: data,
         });
@@ -136,7 +149,7 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
             if (this.etag) {
                 headers['if-none-match'] = this.etag;
             }
-            const poll = await fetch(this.uri, { method: "GET", headers });
+            const poll = await SimpleHttpRendezvousTransport.fetch(this.uri, { method: "GET", headers });
 
             logger.debug(`Received polling response: ${poll.status} from ${this.uri}`);
             if (poll.status === 404) {
@@ -168,7 +181,7 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
         if (this.uri && reason === RendezvousCancellationReason.UserDeclined) {
             try {
                 logger.info(`Deleting channel: ${this.uri}`);
-                await fetch(this.uri, { method: "DELETE" });
+                await SimpleHttpRendezvousTransport.fetch(this.uri, { method: "DELETE" });
             } catch (e) {
                 logger.warn(e);
             }
