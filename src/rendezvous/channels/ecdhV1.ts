@@ -28,6 +28,7 @@ import {
 } from '../index';
 import { SecureRendezvousChannelAlgorithm } from '.';
 import { encodeBase64, decodeBase64 } from '../../crypto/olmlib';
+import { getCrypto } from '../../utils';
 
 const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
     (window.crypto.subtle || window.crypto.webkitSubtle) : null;
@@ -60,9 +61,13 @@ function generateDecimalSas(sasBytes: number[]): string {
     return digits.join('-');
 }
 
-async function importKey(key: Uint8Array): Promise<CryptoKey> {
+async function importKey(key: Uint8Array): Promise<CryptoKey | Uint8Array> {
+    if (getCrypto()) {
+        return key;
+    }
+
     if (!subtleCrypto) {
-        throw new Error('Subtle crypto not available');
+        throw new Error('Neither Web Crypto nor Node.js crypto available');
     }
 
     const imported = subtleCrypto.importKey(
@@ -83,7 +88,7 @@ async function importKey(key: Uint8Array): Promise<CryptoKey> {
 export class ECDHv1RendezvousChannel implements RendezvousChannel {
     private olmSAS?: SAS;
     private ourPublicKey: Uint8Array;
-    private aesKey?: CryptoKey;
+    private aesKey?: CryptoKey | Uint8Array;
     public onFailure?: (reason: RendezvousFailureReason) => void;
 
     constructor(
@@ -172,8 +177,21 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
     }
 
     private async encrypt(data: any): Promise<string> {
-        if (!subtleCrypto) {
-            throw new Error('Subtle crypto not available');
+        if (this.aesKey instanceof Uint8Array) {
+            const crypto = getCrypto();
+
+            const iv = crypto.randomBytes(32);
+            const cipher = crypto.createCipheriv("aes-256-gcm", this.aesKey as Uint8Array, iv, { authTagLength: 16 });
+            const ciphertext = Buffer.concat([
+                cipher.update(data, "utf8"),
+                cipher.final(),
+                cipher.getAuthTag(),
+            ]);
+
+            return JSON.stringify({
+                iv: encodeBase64(iv),
+                ciphertext: encodeBase64(ciphertext),
+            });
         }
 
         const iv = new Uint8Array(32);
@@ -185,8 +203,9 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             {
                 name: "AES-GCM",
                 iv,
+                tagLength: 128,
             },
-            this.aesKey,
+            this.aesKey as CryptoKey,
             encodedData,
         );
 
@@ -212,22 +231,31 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
     }
 
     private async decrypt({ iv, ciphertext }: { iv: string, ciphertext: string }): Promise<any> {
-        if (!subtleCrypto) {
-            throw new Error('Subtle crypto not available');
-        }
-
         if (!ciphertext || !iv) {
             throw new Error('Missing ciphertext and/or iv');
         }
 
         const ciphertextBytes = decodeBase64(ciphertext);
 
+        if (this.aesKey instanceof Uint8Array) {
+            const crypto = getCrypto();
+            // in contrast to Web Crypto API, Node's crypto needs the auth tag split off the cipher text
+            const ciphertextOnly = ciphertextBytes.slice(0, ciphertextBytes.length - 16);
+            const authTag = ciphertextBytes.slice(ciphertextBytes.length - 16);
+            const decipher = crypto.createDecipheriv(
+                "aes-256-gcm", this.aesKey as Uint8Array, decodeBase64(iv), { authTagLength: 16 },
+            );
+            decipher.setAuthTag(authTag);
+            return decipher.update(encodeBase64(ciphertextOnly), "base64", "utf-8") + decipher.final("utf-8");
+        }
+
         const plaintext = await subtleCrypto.decrypt(
             {
                 name: "AES-GCM",
                 iv: decodeBase64(iv),
+                tagLength: 128,
             },
-            this.aesKey,
+            this.aesKey as CryptoKey,
             ciphertextBytes,
         );
 
@@ -251,7 +279,7 @@ export class ECDHv1RendezvousChannel implements RendezvousChannel {
             }
             const decrypted = await this.decrypt(data);
             logger.info(`Decrypted data: ${JSON.stringify(decrypted)}`);
-            return decrypted;
+            return JSON.parse(decrypted);
         } else if (this.aesKey) {
             throw new Error('Data received but no ciphertext');
         }
