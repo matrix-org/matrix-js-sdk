@@ -36,7 +36,7 @@ export * from './channel';
  */
 export async function buildChannelFromCode(
     code: string,
-    onCancelled: RendezvousFailureListener,
+    onFailure: RendezvousFailureListener,
 ): Promise<{ channel: RendezvousChannel, intent: RendezvousIntent }> {
     let parsed: RendezvousCode;
     try {
@@ -61,12 +61,7 @@ export async function buildChannelFromCode(
         throw new RendezvousError('Invalid intent', RendezvousFailureReason.InvalidCode);
     }
 
-    const transport = new SimpleHttpRendezvousTransport(
-        onCancelled,
-        undefined, // client
-        undefined, // hsUrl
-        undefined, // fallbackRzServer
-        transportDetails.uri);
+    const transport = new SimpleHttpRendezvousTransport({ onFailure, rendezvousUri: transportDetails.uri });
 
     if (rendezvous?.algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1) {
         throw new RendezvousError('Unsupported transport', RendezvousFailureReason.UnsupportedAlgorithm);
