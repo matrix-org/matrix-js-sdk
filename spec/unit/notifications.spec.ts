@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { ServerSupport } from "../../src/feature";
 import {
     EventType,
     fixNotificationCountOnDecryption,
@@ -55,6 +56,9 @@ describe("fixNotificationCountOnDecryption", () => {
             getRoom: jest.fn().mockImplementation(() => room),
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
             supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+            canSupport: {
+                get: jest.fn().mockReturnValue(ServerSupport.Stable),
+            },
         });
         mockClient.reEmitter = mock(ReEmitter, 'ReEmitter');
 
@@ -94,12 +98,12 @@ describe("fixNotificationCountOnDecryption", () => {
     });
 
     it("changes the room count to highlight on decryption", () => {
-        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(1);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
 
         fixNotificationCountOnDecryption(mockClient, event);
 
-        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(1);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
     });
 

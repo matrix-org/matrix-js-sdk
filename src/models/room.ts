@@ -57,6 +57,7 @@ import {
     ReceiptContent,
     synthesizeReceipt,
 } from "./read-receipt";
+import { Feature, ServerSupport } from "../feature";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -191,7 +192,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
-    private threadNotifications: Map<string, NotificationCount> = new Map();
+    private readonly threadNotifications: Map<string, NotificationCount> = new Map();
+    private roomThreadsNotificationType: NotificationCountType | null = null;
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -1187,8 +1189,14 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @return {Number} The notification count, or undefined if there is no count
      *                  for this type.
      */
-    public getUnreadNotificationCount(type = NotificationCountType.Total): number | undefined {
-        return this.notificationCounts[type];
+    public getUnreadNotificationCount(type = NotificationCountType.Total): number {
+        let count = this.notificationCounts[type] ?? 0;
+        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
+            for (const threadNotification of this.threadNotifications.values()) {
+                count += threadNotification[type] ?? 0;
+            }
+        }
+        return count;
     }
 
     /**
@@ -1198,8 +1206,17 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @returns The notification count, or undefined if there is no count
      *          for this type.
      */
-    public getThreadUnreadNotificationCount(threadId: string, type = NotificationCountType.Total): number | undefined {
-        return this.threadNotifications.get(threadId)?.[type];
+    public getThreadUnreadNotificationCount(threadId: string, type = NotificationCountType.Total): number {
+        return this.threadNotifications.get(threadId)?.[type] ?? 0;
+    }
+
+    public hasThreadUnreadNotification(): boolean {
+        for (const notification of this.threadNotifications.values()) {
+            if (notification.highlight > 0 || notification.total > 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1217,6 +1234,22 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             },
         });
 
+        // Remember what the global threads notification count type is
+        // for all the threads in the room
+        if (count > 0) {
+            switch (this.roomThreadsNotificationType) {
+                case NotificationCountType.Highlight:
+                    break;
+                case NotificationCountType.Total:
+                    if (type === NotificationCountType.Highlight) {
+                        this.roomThreadsNotificationType = type;
+                    }
+                    break;
+                default:
+                    this.roomThreadsNotificationType = type;
+            }
+        }
+
         this.emit(
             RoomEvent.UnreadNotifications,
             this.threadNotifications.get(threadId),
@@ -1224,7 +1257,18 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         );
     }
 
+    /**
+     * @returns the notification count type for all the threads in the room
+     */
+    public getThreadsAggregateNotificationType(): NotificationCountType | null {
+        return this.roomThreadsNotificationType;
+    }
+
+    /**
+     * Resets the thread notifications for this room
+     */
     public resetThreadUnreadNotificationCount(): void {
+        this.roomThreadsNotificationType = null;
         this.threadNotifications.clear();
     }
 

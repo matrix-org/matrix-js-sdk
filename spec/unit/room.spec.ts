@@ -2572,15 +2572,15 @@ describe("Room", function() {
         });
 
         it("defaults to undefined", () => {
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBeUndefined();
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBeUndefined();
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(0);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(0);
         });
 
         it("lets you set values", () => {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 1);
 
             expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(1);
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBeUndefined();
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(0);
 
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 10);
 
@@ -2592,10 +2592,23 @@ describe("Room", function() {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 123);
 
+            expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Highlight);
+
             room.resetThreadUnreadNotificationCount();
 
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBeUndefined();
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBeUndefined();
+            expect(room.getThreadsAggregateNotificationType()).toBe(null);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(0);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(0);
+        });
+
+        it("sets the room threads notification type", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
+            expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Total);
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 123);
+            expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Highlight);
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 333);
+            expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Highlight);
         });
     });
 });
