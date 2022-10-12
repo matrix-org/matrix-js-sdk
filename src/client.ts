@@ -5160,6 +5160,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return timelineSet.getTimelineForEvent(eventId);
         }
 
+        if (this.supportsExperimentalThreads()) {
+            return this.getThreadTimeline(timelineSet, eventId);
+        }
+
         const path = utils.encodeUri(
             "/rooms/$roomId/context/$eventId", {
                 $roomId: timelineSet.room.roomId,
@@ -5194,38 +5198,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ...res.events_before.map(mapper),
         ];
 
-        if (this.supportsExperimentalThreads()) {
-            if (!timelineSet.canContain(event)) {
-                return undefined;
-            }
-
-            // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
-            // functions contiguously, so we have to jump through some hoops to get our target event in it.
-            // XXX: workaround for https://github.com/vector-im/element-meta/issues/150
-            if (Thread.hasServerSideSupport && timelineSet.thread) {
-                const thread = timelineSet.thread;
-                const opts: IRelationsRequestOpts = {
-                    dir: Direction.Backward,
-                    limit: 50,
-                };
-
-                await thread.fetchInitialEvents();
-                let nextBatch: string | null | undefined = thread.liveTimeline.getPaginationToken(Direction.Backward);
-
-                // Fetch events until we find the one we were asked for, or we run out of pages
-                while (!thread.findEventById(eventId)) {
-                    if (nextBatch) {
-                        opts.from = nextBatch;
-                    }
-
-                    ({ nextBatch } = await thread.fetchEvents(opts));
-                    if (!nextBatch) break;
-                }
-
-                return thread.liveTimeline;
-            }
-        }
-
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
         let timeline = timelineSet.getTimelineForEvent(events[0].getId());
         if (timeline) {
@@ -5250,6 +5222,58 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ?? timeline;
     }
 
+    public async getThreadTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline | undefined> {
+        if (!this.supportsExperimentalThreads()) {
+            throw new Error("could not get thread timeline: no client support");
+        }
+
+        const path = utils.encodeUri(
+            "/rooms/$roomId/context/$eventId", {
+                $roomId: timelineSet.room.roomId,
+                $eventId: eventId,
+            },
+        );
+
+        const params: Record<string, string | string[]> = {
+            limit: "0",
+        };
+        if (this.clientOpts.lazyLoadMembers) {
+            params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+        }
+
+        // TODO: we should implement a backoff (as per scrollback()) to deal more nicely with HTTP errors.
+        const res = await this.http.authedRequest<IContextResponse>(Method.Get, path, params);
+        const mapper = this.getEventMapper();
+        const event = mapper(res.event);
+
+        if (!timelineSet.canContain(event)) {
+            return undefined;
+        }
+
+        if (Thread.hasServerSideSupport) {
+            const thread = timelineSet.thread;
+            const opts: IRelationsRequestOpts = {
+                dir: Direction.Backward,
+                limit: 50,
+            };
+
+            await thread.fetchInitialEvents();
+            let nextBatch: string | null | undefined = thread.liveTimeline.getPaginationToken(Direction.Backward);
+
+            // Fetch events until we find the one we were asked for, or we run out of pages
+            while (!thread.findEventById(eventId)) {
+                if (nextBatch) {
+                    opts.from = nextBatch;
+                }
+
+                ({ nextBatch } = await thread.fetchEvents(opts));
+                if (!nextBatch) break;
+            }
+
+            return thread.liveTimeline;
+        }
+    }
+
     /**
      * Get an EventTimeline for the latest events in the room. This will just
      * call `/messages` to get the latest message in the room, then use
@@ -5271,28 +5295,44 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("getLatestTimeline only supports room timelines");
         }
 
-        let res: IMessagesResponse;
-        const roomId = timelineSet.room.roomId;
+        let event;
         if (timelineSet.isThreadTimeline) {
-            res = await this.createThreadListMessagesRequest(
-                roomId,
+            const res = await this.createThreadListMessagesRequest(
+                timelineSet.room.roomId,
                 null,
                 1,
                 Direction.Backward,
                 timelineSet.getFilter(),
             );
+            event = res.chunk?.[0];
+        } else if (timelineSet.thread && Thread.hasServerSideSupport) {
+            const res = await this.fetchRelations(
+                timelineSet.room.roomId,
+                timelineSet.thread.id,
+                THREAD_RELATION_TYPE.name,
+                null,
+                { dir: Direction.Backward, limit: 1 },
+            );
+            event = res.chunk?.[0];
         } else {
-            res = await this.createMessagesRequest(
-                roomId,
-                null,
-                1,
-                Direction.Backward,
-                timelineSet.getFilter(),
+            const messagesPath = utils.encodeUri(
+                "/rooms/$roomId/messages", {
+                    $roomId: timelineSet.room.roomId,
+                },
             );
+
+            const params: Record<string, string | string[]> = {
+                dir: 'b',
+            };
+            if (this.clientOpts.lazyLoadMembers) {
+                params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+            }
+
+            const res = await this.http.authedRequest<IMessagesResponse>(Method.Get, messagesPath, params);
+            event = res.chunk?.[0];
         }
-        const event = res.chunk?.[0];
         if (!event) {
-            throw new Error("No message returned from /messages when trying to construct getLatestTimeline");
+            throw new Error("No message returned when trying to construct getLatestTimeline");
         }
 
         return this.getEventTimeline(timelineSet, event.event_id);
@@ -5430,7 +5470,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public paginateEventTimeline(eventTimeline: EventTimeline, opts: IPaginateOpts): Promise<boolean> {
         const isNotifTimeline = (eventTimeline.getTimelineSet() === this.notifTimelineSet);
         const room = this.getRoom(eventTimeline.getRoomId()!);
-        const isThreadTimeline = eventTimeline.getTimelineSet().isThreadTimeline;
+        const isThreadListTimeline = eventTimeline.getTimelineSet().isThreadTimeline;
+        const isThreadTimeline = (eventTimeline.getTimelineSet().thread);
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more
         // nicely with HTTP errors.
@@ -5501,9 +5542,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.paginationRequests[dir] = null;
             });
             eventTimeline.paginationRequests[dir] = promise;
-        } else if (isThreadTimeline) {
+        } else if (isThreadListTimeline) {
             if (!room) {
                 throw new Error("Unknown room " + eventTimeline.getRoomId());
+            }
+
+            if (!Thread.hasServerSideFwdPaginationSupport && dir === Direction.Forward) {
+                throw new Error("Cannot paginate threads forwards without server-side support for MSC 3715");
             }
 
             promise = this.createThreadListMessagesRequest(
@@ -5533,6 +5578,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     eventTimeline.setPaginationToken(null, dir);
                 }
                 return res.end !== res.start;
+            }).finally(() => {
+                eventTimeline.paginationRequests[dir] = null;
+            });
+            eventTimeline.paginationRequests[dir] = promise;
+        } else if (isThreadTimeline) {
+            promise = eventTimeline.getTimelineSet().thread.fetchEvents({...opts, dir}).then(res => {
+                return Boolean(res.nextBatch);
             }).finally(() => {
                 eventTimeline.paginationRequests[dir] = null;
             });
