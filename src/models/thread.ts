@@ -406,7 +406,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         return this.timelineSet.getLiveTimeline();
     }
 
-    public async fetchEvents(opts: IRelationsRequestOpts = { limit: 20, direction: Direction.Backward }): Promise<{
+    public async fetchEvents(opts: IRelationsRequestOpts = { limit: 20, dir: Direction.Backward }): Promise<{
         originalEvent: MatrixEvent;
         events: MatrixEvent[];
         nextBatch?: string | null;
@@ -438,7 +438,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             return this.client.decryptEventIfNeeded(event);
         }));
 
-        const prependEvents = (opts.direction ?? Direction.Backward) === Direction.Backward;
+        const prependEvents = (opts.dir ?? Direction.Backward) === Direction.Backward;
 
         this.timelineSet.addEventsToTimeline(
             events,

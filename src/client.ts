@@ -5220,7 +5220,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (Thread.hasServerSideSupport && timelineSet.thread) {
                 const thread = timelineSet.thread;
                 const opts: IRelationsRequestOpts = {
-                    direction: Direction.Backward,
+                    dir: Direction.Backward,
                     limit: 50,
                 };
 
@@ -6734,7 +6734,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventId: string,
         relationType?: RelationType | string | null,
         eventType?: EventType | string | null,
-        opts: IRelationsRequestOpts = { direction: Direction.Backward },
+        opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<{
         originalEvent: MatrixEvent;
         events: MatrixEvent[];
@@ -7284,7 +7284,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventId: string,
         relationType?: RelationType | string | null,
         eventType?: EventType | string | null,
-        opts: IRelationsRequestOpts = { direction: Direction.Backward },
+        opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<IRelationsResponse> {
         const queryString = utils.encodeParams(opts as Record<string, string | number>);
 
