@@ -126,8 +126,8 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
         if (!this.uri) {
             throw new Error('Rendezvous not set up');
         }
-        let done = false;
-        while (!done) {
+        // eslint-disable-next-line no-constant-condition
+        while (true) {
             if (this.cancelled) {
                 return;
             }
@@ -140,7 +140,7 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
 
             logger.debug(`Received polling response: ${poll.status} from ${this.uri}`);
             if (poll.status === 404) {
-                return await this.cancel(RendezvousCancellationReason.Unknown);
+                return this.cancel(RendezvousCancellationReason.Unknown);
             }
 
             // rely on server expiring the channel rather than checking ourselves
@@ -153,8 +153,6 @@ export class SimpleHttpRendezvousTransport extends BaseRendezvousTransport {
                 logger.info(`Received data: ${JSON.stringify(data)} from ${this.uri} with etag ${this.etag}`);
                 return data;
             }
-
-            done = false;
             await sleep(1000);
         }
     }
