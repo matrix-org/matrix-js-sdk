@@ -1212,7 +1212,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
     public hasThreadUnreadNotification(): boolean {
         for (const notification of this.threadNotifications.values()) {
-            if (notification.highlight > 0 || notification.total > 0) {
+            if ((notification.highlight ?? 0) > 0 || (notification.total ?? 0) > 0) {
                 return true;
             }
         }
@@ -1226,13 +1226,15 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @returns {void}
      */
     public setThreadUnreadNotificationCount(threadId: string, type: NotificationCountType, count: number): void {
-        this.threadNotifications.set(threadId, {
+        const notification: NotificationCount = {
             highlight: this.threadNotifications.get(threadId)?.highlight,
             total: this.threadNotifications.get(threadId)?.total,
             ...{
                 [type]: count,
             },
-        });
+        };
+
+        this.threadNotifications.set(threadId, notification);
 
         // Remember what the global threads notification count type is
         // for all the threads in the room
@@ -1252,7 +1254,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
         this.emit(
             RoomEvent.UnreadNotifications,
-            this.threadNotifications.get(threadId),
+            notification,
             threadId,
         );
     }

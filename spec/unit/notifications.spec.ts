@@ -63,7 +63,7 @@ describe("fixNotificationCountOnDecryption", () => {
             mockClient.canSupport.set(feature as Feature, ServerSupport.Stable);
         });
 
-        room = new Room(ROOM_ID, mockClient, mockClient.getUserId());
+        room = new Room(ROOM_ID, mockClient, mockClient.getUserId() ?? "");
         room.setUnreadNotificationCount(NotificationCountType.Total, 1);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
