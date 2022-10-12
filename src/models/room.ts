@@ -1210,6 +1210,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         return this.threadNotifications.get(threadId)?.[type] ?? 0;
     }
 
+    /**
+     * Checks if the current room has unread thread notifications
+     * @returns {boolean}
+     */
     public hasThreadUnreadNotification(): boolean {
         for (const notification of this.threadNotifications.values()) {
             if ((notification.highlight ?? 0) > 0 || (notification.total ?? 0) > 0) {
