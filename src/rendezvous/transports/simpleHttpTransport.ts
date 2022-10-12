@@ -36,6 +36,10 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
     private uri?: string;
     private etag?: string;
     private expiresAt?: Date;
+    public onFailure?: RendezvousFailureListener;
+    private client?: MatrixClient;
+    private hsUrl?: string;
+    private fallbackRzServer?: string;
 
     private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
         if (this.fetchFn) {
@@ -50,13 +54,23 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
         SimpleHttpRendezvousTransport.fetchFn = fetchFn;
     }
 
-    constructor(
-        public onFailure?: RendezvousFailureListener,
-        private client?: MatrixClient,
-        private hsUrl?: string,
-        private fallbackRzServer?: string,
-        rendezvousUri?: string,
-    ) {
+    constructor({
+        onFailure,
+        client,
+        hsUrl,
+        fallbackRzServer,
+        rendezvousUri,
+    }: {
+        onFailure?: RendezvousFailureListener;
+        client?: MatrixClient;
+        hsUrl?: string;
+        fallbackRzServer?: string;
+        rendezvousUri?: string;
+    }) {
+        this.onFailure = onFailure;
+        this.client = client;
+        this.hsUrl = hsUrl;
+        this.fallbackRzServer = fallbackRzServer;
         this.uri = rendezvousUri;
         this.ready = !!this.uri;
     }
@@ -130,8 +144,11 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
             if (expires) {
                 this.expiresAt = new Date(expires);
             }
+            // we would usually expect the final `url` to be set by a proper fetch implementation.
+            // however, if a polyfill based on XHR is used it won't be set, we we use existing URI as fallback
+            const baseUrl = res.url ?? uri;
             // resolve location header which could be relative or absolute
-            this.uri = new URL(location, `${res.url}${res.url.endsWith('/') ? '' : '/'}`).href;
+            this.uri = new URL(location, `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}`).href;
             this.ready =true;
         }
     }
