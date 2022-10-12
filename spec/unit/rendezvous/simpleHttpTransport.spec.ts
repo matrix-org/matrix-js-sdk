@@ -209,8 +209,9 @@ describe("SimpleHttpRendezvousTransport", function() {
         }
         { // first PUT without etag
             const prom = simpleHttpTransport.send("application/json", JSON.stringify({ a: "b" }));
-            httpBackend.when("PUT", "https://fallbackserver/rz/123").check(({ headers }) => {
+            httpBackend.when("PUT", "https://fallbackserver/rz/123").check(({ headers, data }) => {
                 expect(headers["if-match"]).toBeUndefined();
+                expect(data).toEqual({ a: "b" });
             }).response = {
                 body: null,
                 response: {
@@ -224,7 +225,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             await prom;
         }
         { // subsequent PUT which should have etag from previous request
-            const prom = simpleHttpTransport.receive();
+            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ c: "d" }));
             httpBackend.when("PUT", "https://fallbackserver/rz/123").check(({ headers }) => {
                 expect(headers["if-match"]).toEqual("aaa");
             }).response = {
