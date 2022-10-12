@@ -86,7 +86,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     private readonly displayPendingEvents: boolean;
     private liveTimeline: EventTimeline;
     private timelines: EventTimeline[];
-    private _eventIdToTimeline: Record<string, EventTimeline>;
+    private _eventIdToTimeline = new Map<string, EventTimeline>();
     private filter?: Filter;
 
     /**
@@ -123,12 +123,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {MatrixClient=} client the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
      * @param {Thread=} thread the thread to which this timeline set relates.
+     * @param {boolean} isThreadTimeline Whether this timeline set relates to a thread list timeline
+     * (e.g., All threads or My threads)
      */
     constructor(
         public readonly room: Room | undefined,
         opts: IOpts = {},
         client?: MatrixClient,
         public readonly thread?: Thread,
+        public readonly isThreadTimeline: boolean = false,
     ) {
         super();
 
@@ -138,7 +141,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         // just a list - *not* ordered.
         this.timelines = [this.liveTimeline];
-        this._eventIdToTimeline = {};
+        this._eventIdToTimeline = new Map<string, EventTimeline>();
 
         this.filter = opts.filter;
 
@@ -210,7 +213,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @return {module:models/event-timeline~EventTimeline} timeline
      */
     public eventIdToTimeline(eventId: string): EventTimeline {
-        return this._eventIdToTimeline[eventId];
+        return this._eventIdToTimeline.get(eventId);
     }
 
     /**
@@ -220,10 +223,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {String} newEventId  event ID of the replacement event
      */
     public replaceEventId(oldEventId: string, newEventId: string): void {
-        const existingTimeline = this._eventIdToTimeline[oldEventId];
+        const existingTimeline = this._eventIdToTimeline.get(oldEventId);
         if (existingTimeline) {
-            delete this._eventIdToTimeline[oldEventId];
-            this._eventIdToTimeline[newEventId] = existingTimeline;
+            this._eventIdToTimeline.delete(oldEventId);
+            this._eventIdToTimeline.set(newEventId, existingTimeline);
         }
     }
 
@@ -257,7 +260,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         if (resetAllTimelines) {
             this.timelines = [newTimeline];
-            this._eventIdToTimeline = {};
+            this._eventIdToTimeline = new Map<string, EventTimeline>();
         } else {
             this.timelines.push(newTimeline);
         }
@@ -287,8 +290,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @return {?module:models/event-timeline~EventTimeline} timeline containing
      * the given event, or null if unknown
      */
-    public getTimelineForEvent(eventId: string): EventTimeline | null {
-        const res = this._eventIdToTimeline[eventId];
+    public getTimelineForEvent(eventId: string | null): EventTimeline | null {
+        if (eventId === null) { return null; }
+        const res = this._eventIdToTimeline.get(eventId);
         return (res === undefined) ? null : res;
     }
 
@@ -450,7 +454,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             const event = events[i];
             const eventId = event.getId();
 
-            const existingTimeline = this._eventIdToTimeline[eventId];
+            const existingTimeline = this._eventIdToTimeline.get(eventId);
 
             if (!existingTimeline) {
                 // we don't know about this event yet. Just add it to the timeline.
@@ -601,7 +605,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             }
         }
 
-        const timeline = this._eventIdToTimeline[event.getId()];
+        const timeline = this._eventIdToTimeline.get(event.getId());
         if (timeline) {
             if (duplicateStrategy === DuplicateStrategy.Replace) {
                 debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " + event.getId());
@@ -697,7 +701,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             roomState,
             timelineWasEmpty,
         });
-        this._eventIdToTimeline[eventId] = timeline;
+        this._eventIdToTimeline.set(eventId, timeline);
 
         this.relations.aggregateParentEvent(event);
         this.relations.aggregateChildEvent(event, this);
@@ -725,22 +729,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         newEventId: string,
     ): void {
         // XXX: why don't we infer newEventId from localEvent?
-        const existingTimeline = this._eventIdToTimeline[oldEventId];
+        const existingTimeline = this._eventIdToTimeline.get(oldEventId);
         if (existingTimeline) {
-            delete this._eventIdToTimeline[oldEventId];
-            this._eventIdToTimeline[newEventId] = existingTimeline;
-        } else {
-            if (this.filter) {
-                if (this.filter.filterRoomTimeline([localEvent]).length) {
-                    this.addEventToTimeline(localEvent, this.liveTimeline, {
-                        toStartOfTimeline: false,
-                    });
-                }
-            } else {
-                this.addEventToTimeline(localEvent, this.liveTimeline, {
-                    toStartOfTimeline: false,
-                });
-            }
+            this._eventIdToTimeline.delete(oldEventId);
+            this._eventIdToTimeline.set(newEventId, existingTimeline);
+        } else if (!this.filter || this.filter.filterRoomTimeline([localEvent]).length) {
+            this.addEventToTimeline(localEvent, this.liveTimeline, {
+                toStartOfTimeline: false,
+            });
         }
     }
 
@@ -753,14 +749,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * in this room.
      */
     public removeEvent(eventId: string): MatrixEvent | null {
-        const timeline = this._eventIdToTimeline[eventId];
+        const timeline = this._eventIdToTimeline.get(eventId);
         if (!timeline) {
             return null;
         }
 
         const removed = timeline.removeEvent(eventId);
         if (removed) {
-            delete this._eventIdToTimeline[eventId];
+            this._eventIdToTimeline.delete(eventId);
             const data = {
                 timeline: timeline,
             };
@@ -787,8 +783,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             return 0;
         }
 
-        const timeline1 = this._eventIdToTimeline[eventId1];
-        const timeline2 = this._eventIdToTimeline[eventId2];
+        const timeline1 = this._eventIdToTimeline.get(eventId1);
+        const timeline2 = this._eventIdToTimeline.get(eventId2);
 
         if (timeline1 === undefined) {
             return null;

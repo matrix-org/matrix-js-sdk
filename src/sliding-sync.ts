@@ -84,6 +84,8 @@ export interface MSC3575RoomData {
     timeline: (IRoomEvent | IStateEvent)[];
     notification_count?: number;
     highlight_count?: number;
+    joined_count?: number;
+    invited_count?: number;
     invite_state?: IStateEvent[];
     initial?: boolean;
     limited?: boolean;
@@ -320,7 +322,9 @@ export enum SlidingSyncEvent {
 
 export type SlidingSyncEventHandlerMap = {
     [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
-    [SlidingSyncEvent.Lifecycle]: (state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void;
+    [SlidingSyncEvent.Lifecycle]: (
+        state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error | null,
+    ) => void;
     [SlidingSyncEvent.List]: (
         listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number, string>,
     ) => void;

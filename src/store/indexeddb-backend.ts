@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { ISavedSync } from "./index";
-import { IEvent, IStartClientOpts, IStateEventWithRoomId, ISyncResponse } from "..";
+import { IEvent, IStartClientOpts, IStateEventWithRoomId, ISyncResponse } from "../matrix";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 export interface IIndexedDBBackend {

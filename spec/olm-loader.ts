@@ -20,6 +20,7 @@ import * as utils from "../src/utils";
 
 // try to load the olm library.
 try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     global.Olm = require('@matrix-org/olm');
     logger.log('loaded libolm');
 } catch (e) {
@@ -28,6 +29,7 @@ try {
 
 // also try to set node crypto
 try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     const crypto = require('crypto');
     utils.setCrypto(crypto);
 } catch (err) {

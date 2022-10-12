@@ -34,7 +34,7 @@ import { IAbortablePromise, MatrixScheduler } from '../../../src';
 
 const Olm = global.Olm;
 
-const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
+const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
 
 const ROOM_ID = '!ROOM:ID';
 
@@ -214,6 +214,12 @@ describe("MegolmBackup", function() {
             const event = new MatrixEvent({
                 type: 'm.room.encrypted',
             });
+            event.getWireType = () => "m.room.encrypted";
+            event.getWireContent = () => {
+                return {
+                    algorithm: "m.olm.v1.curve25519-aes-sha2",
+                };
+            };
             const decryptedData = {
                 clearEvent: {
                     type: 'm.room_key',

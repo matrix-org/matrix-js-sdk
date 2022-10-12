@@ -23,6 +23,16 @@ jobs:
       - name: Typecheck
         run: "yarn run lint:types"
 
+      - name: Switch js-sdk to release mode
+        run: |
+          scripts/switch_package_to_release.js
+          yarn install
+          yarn run build:compile
+          yarn run build:types
+
+      - name: Typecheck (release mode)
+        run: "yarn run lint:types"
+
   js_lint:
     name: "ESLint"
     runs-on: ubuntu-latest
@@ -73,7 +83,7 @@ jobs:
 
       - name: Detecting files changed
         id: files
-        uses: futuratrepadeira/changed-files@v3.2.1
+        uses: futuratrepadeira/changed-files@v4.0.0
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: '^.*\.tsx?$'
@@ -81,7 +91,7 @@ jobs:
       - uses: t3chguy/typescript-check-action@main
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-          use-check: true
+          use-check: false
           check-fail-mode: added
           output-behaviour: annotate
           ts-extra-args: '--strict'
