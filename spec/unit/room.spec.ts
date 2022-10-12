@@ -2611,4 +2611,29 @@ describe("Room", function() {
             expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Highlight);
         });
     });
+
+    describe("hasThreadUnreadNotification", () => {
+        it('has no notifications by default', () => {
+            expect(room.hasThreadUnreadNotification()).toBe(false);
+        });
+
+        it('main timeline notification does not affect this', () => {
+            room.setUnreadNotificationCount(NotificationCountType.Highlight, 1);
+            expect(room.hasThreadUnreadNotification()).toBe(false);
+            room.setUnreadNotificationCount(NotificationCountType.Total, 1);
+            expect(room.hasThreadUnreadNotification()).toBe(false);
+
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 1);
+            expect(room.hasThreadUnreadNotification()).toBe(true);
+        });
+
+        it('lets you reset', () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 1);
+            expect(room.hasThreadUnreadNotification()).toBe(true);
+
+            room.resetThreadUnreadNotificationCount();
+
+            expect(room.hasThreadUnreadNotification()).toBe(false);
+        });
+    });
 });
