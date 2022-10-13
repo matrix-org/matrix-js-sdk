@@ -17,59 +17,11 @@ limitations under the License.
 import crypto from 'crypto';
 
 import '../../olm-loader';
-import {
-    RendezvousFailureListener,
-    RendezvousFailureReason,
-    RendezvousIntent,
-    RendezvousTransport,
-    RendezvousTransportDetails,
-} from "../../../src/rendezvous";
+import { RendezvousIntent } from "../../../src/rendezvous";
 import { MSC3903ECDHv1RendezvousChannel } from '../../../src/rendezvous/channels';
 import { decodeBase64 } from '../../../src/crypto/olmlib';
-import { setCrypto, sleep } from '../../../src/utils';
-
-class DummyTransport implements RendezvousTransport {
-    otherParty?: DummyTransport;
-    etag?: string;
-    data = null;
-
-    ready = false;
-
-    onCancelled?: RendezvousFailureListener;
-
-    details(): Promise<RendezvousTransportDetails> {
-        return Promise.resolve({
-            type: 'dummy',
-        });
-    }
-
-    async send(contentType: string, data: any): Promise<void> {
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            if (!this.etag || this.otherParty?.etag === this.etag) {
-                this.data = data;
-                this.etag = Math.random().toString();
-                return;
-            }
-            await sleep(100);
-        }
-    }
-
-    async receive(): Promise<any> {
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
-            if (!this.etag || this.otherParty?.etag !== this.etag) {
-                this.etag = this.otherParty?.etag;
-                return this.otherParty?.data ? JSON.parse(this.otherParty.data) : undefined;
-            }
-            await sleep(100);
-        }
-    }
-
-    cancel(reason: RendezvousFailureReason): Promise<void> {
-        throw new Error("Method not implemented.");
-    }
-}
+import { setCrypto } from '../../../src/utils';
+import { DummyTransport } from './DummyTransport';
 
 describe("ECDHv1", function() {
     beforeAll(async function() {
@@ -78,8 +30,8 @@ describe("ECDHv1", function() {
     });
 
     it("initiator wants to sign in", async function() {
-        const aliceTransport = new DummyTransport();
-        const bobTransport = new DummyTransport();
+        const aliceTransport = new DummyTransport({ type: 'dummy' });
+        const bobTransport = new DummyTransport({ type: 'dummy' });
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
@@ -100,8 +52,8 @@ describe("ECDHv1", function() {
     });
 
     it("initiator wants to reciprocate", async function() {
-        const aliceTransport = new DummyTransport();
-        const bobTransport = new DummyTransport();
+        const aliceTransport = new DummyTransport({ type: 'dummy' });
+        const bobTransport = new DummyTransport({ type: 'dummy' });
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
