@@ -37,11 +37,17 @@ export class MatrixError extends Error {
     public readonly errcode?: string;
     public readonly data: IErrorJson;
 
-    constructor(errorJson: IErrorJson = {}, public httpStatus?: number) {
-        super(`MatrixError: ${errorJson.errcode}`);
+    constructor(errorJson: IErrorJson = {}, public httpStatus?: number, public url?: string) {
+        let message = errorJson.error || "Unknown message";
+        if (httpStatus) {
+            message = `[${httpStatus}] ${message}`;
+        }
+        if (url) {
+            message = `${message} (${url})`;
+        }
+        super(`MatrixError: ${message}`);
         this.errcode = errorJson.errcode;
         this.name = errorJson.errcode || "Unknown error code";
-        this.message = errorJson.error || "Unknown message";
         this.data = errorJson;
     }
 }

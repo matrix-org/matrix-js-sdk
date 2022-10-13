@@ -80,7 +80,11 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
     }
 
     if (contentType?.type === "application/json" && body) {
-        return new MatrixError(JSON.parse(body), response.status);
+        return new MatrixError(
+            JSON.parse(body),
+            response.status,
+            isXhr(response) ? response.responseURL : response.url,
+        );
     }
     if (contentType?.type === "text/plain") {
         return new Error(`Server returned ${response.status} error: ${body}`);
