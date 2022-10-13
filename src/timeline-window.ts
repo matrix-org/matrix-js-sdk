@@ -99,7 +99,7 @@ export class TimelineWindow {
      *
      * @return {Promise}
      */
-    public async load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
+    public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
         const initFields = (timeline: EventTimeline) => {
@@ -127,11 +127,16 @@ export class TimelineWindow {
 
         // We avoid delaying the resolution of the promise by a reactor tick if we already have the data we need,
         // which is important to keep room-switching feeling snappy.
-        const timeline = initialEventId
-            ? await this.client.getEventTimeline(this.timelineSet, initialEventId)
-            : this.timelineSet.getLiveTimeline();
-
-        return initFields(timeline);
+        if (this.timelineSet.getTimelineForEvent(initialEventId)) {
+            initFields(this.timelineSet.getTimelineForEvent(initialEventId));
+            return Promise.resolve();
+        } else if (initialEventId) {
+            return this.client.getEventTimeline(this.timelineSet, initialEventId)
+                .then(initFields);
+        } else {
+            initFields(this.timelineSet.getLiveTimeline());
+            return Promise.resolve();
+        }
     }
 
     /**
@@ -295,8 +300,7 @@ export class TimelineWindow {
         }).then((r) => {
             debuglog("TimelineWindow: request completed with result " + r);
             if (!r) {
-                // end of timeline
-                return false;
+                return this.paginate(direction, size, false, 0);
             }
 
             // recurse to advance the index into the results.
