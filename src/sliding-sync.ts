@@ -763,7 +763,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.confirmedRoomSubscriptions = new Set<string>(); // leave desired ones alone though!
         // reset the connection as we might be wedged
         this.needsResend = true;
-        this.pendingReq?.abort();
+        this.abortController?.abort();
+        this.abortController = new AbortController();
     }
 
     /**
