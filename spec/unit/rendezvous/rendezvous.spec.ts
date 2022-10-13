@@ -25,44 +25,45 @@ describe("Rendezvous", function() {
     });
 
     let httpBackend: MockHttpBackend;
-    let fetch: typeof global.fetch;
+    let fetchFn: typeof global.fetchFn;
 
     beforeEach(function() {
         httpBackend = new MockHttpBackend();
-        fetch = httpBackend.fetchFn as typeof global.fetch;
+        fetchFn = httpBackend.fetchFn as typeof global.fetch;
     });
 
     describe("buildChannelFromCode", function() {
         it("non-JSON", function() {
-            expect(buildChannelFromCode("xyz", () => {}, fetch)).rejects.toThrow("Invalid code");
+            expect(buildChannelFromCode("xyz", () => {}, fetchFn)).rejects.toThrow("Invalid code");
         });
 
         it("invalid JSON", function() {
-            expect(buildChannelFromCode(JSON.stringify({}), () => {}, fetch)).rejects.toThrow("Unsupported transport");
+            expect(buildChannelFromCode(JSON.stringify({}), () => {}, fetchFn))
+                .rejects.toThrow("Unsupported transport");
         });
 
         it("invalid transport type", function() {
             expect(buildChannelFromCode(JSON.stringify({
                 rendezvous: { transport: { type: "foo" } },
-            }), () => {}, fetch)).rejects.toThrow("Unsupported transport");
+            }), () => {}, fetchFn)).rejects.toThrow("Unsupported transport");
         });
 
         it("missing URI", function() {
             expect(buildChannelFromCode(JSON.stringify({
                 rendezvous: { transport: { type: "http.v1" } },
-            }), () => {}, fetch)).rejects.toThrow("Invalid code");
+            }), () => {}, fetchFn)).rejects.toThrow("Invalid code");
         });
 
         it("invalid URI field", function() {
             expect(buildChannelFromCode(JSON.stringify({
                 rendezvous: { transport: { type: "http.v1", uri: false } },
-            }), () => {}, fetch)).rejects.toThrow("Invalid code");
+            }), () => {}, fetchFn)).rejects.toThrow("Invalid code");
         });
 
         it("missing intent", function() {
             expect(buildChannelFromCode(JSON.stringify({
                 rendezvous: { transport: { type: "http.v1", uri: "something" } },
-            }), () => {}, fetch)).rejects.toThrow("Invalid intent");
+            }), () => {}, fetchFn)).rejects.toThrow("Invalid intent");
         });
 
         it("invalid intent", function() {
@@ -73,7 +74,7 @@ describe("Rendezvous", function() {
                     key: "",
                     transport: { type: "http.v1", uri: "something" },
                 },
-            }), () => {}, fetch)).rejects.toThrow("Invalid intent");
+            }), () => {}, fetchFn)).rejects.toThrow("Invalid intent");
         });
 
         it("login.reciprocate", async function() {
@@ -84,7 +85,7 @@ describe("Rendezvous", function() {
                     key: "",
                     transport: { type: "http.v1", uri: "something" },
                 },
-            }), () => {}, fetch);
+            }), () => {}, fetchFn);
             expect(x.intent).toBe("login.reciprocate");
         });
 
@@ -96,7 +97,7 @@ describe("Rendezvous", function() {
                     key: "",
                     transport: { type: "http.v1", uri: "something" },
                 },
-            }), () => {}, fetch);
+            }), () => {}, fetchFn);
             expect(x.intent).toBe("login.start");
         });
 
@@ -108,7 +109,7 @@ describe("Rendezvous", function() {
                     key: "",
                     transport: { type: "http.v1", uri: "https://rz.server/123456" },
                 },
-            }), () => {}, fetch);
+            }), () => {}, fetchFn);
             expect(x.intent).toBe("login.start");
 
             const prom = x.channel.receive();

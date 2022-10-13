@@ -38,7 +38,7 @@ export * from './rendezvous';
 export async function buildChannelFromCode(
     code: string,
     onFailure: RendezvousFailureListener,
-    fetch: typeof global.fetch,
+    fetchFn?: typeof global.fetch,
 ): Promise<{ channel: RendezvousChannel, intent: RendezvousIntent }> {
     let parsed: RendezvousCode;
     try {
@@ -63,7 +63,7 @@ export async function buildChannelFromCode(
         throw new RendezvousError('Invalid intent', RendezvousFailureReason.InvalidCode);
     }
 
-    const transport = new SimpleHttpRendezvousTransport({ onFailure, rendezvousUri: transportDetails.uri, fetch });
+    const transport = new SimpleHttpRendezvousTransport({ onFailure, rendezvousUri: transportDetails.uri, fetchFn });
 
     if (rendezvous?.algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1) {
         throw new RendezvousError('Unsupported transport', RendezvousFailureReason.UnsupportedAlgorithm);

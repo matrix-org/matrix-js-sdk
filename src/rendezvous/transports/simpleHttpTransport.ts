@@ -40,7 +40,7 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
     private client?: MatrixClient;
     private hsUrl?: string;
     private fallbackRzServer?: string;
-    private fetch: typeof global.fetch;
+    private fetchFn: typeof global.fetch;
 
     constructor({
         onFailure,
@@ -48,16 +48,16 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
         hsUrl,
         fallbackRzServer,
         rendezvousUri,
-        fetch,
+        fetchFn,
     }: {
-        fetch: typeof global.fetch;
+        fetchFn?: typeof global.fetch;
         onFailure?: RendezvousFailureListener;
         client?: MatrixClient;
         hsUrl?: string;
         fallbackRzServer?: string;
         rendezvousUri?: string;
     }) {
-        this.fetch = fetch;
+        this.fetchFn = fetchFn;
         this.onFailure = onFailure;
         this.client = client;
         this.hsUrl = hsUrl;
@@ -75,6 +75,13 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
             type: 'http.v1',
             uri: this.uri,
         };
+    }
+
+    private fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+        if (this.fetchFn) {
+            return this.fetchFn(resource, options);
+        }
+        return global.fetch(resource, options);
     }
 
     private async getPostEndpoint(): Promise<string | undefined> {
