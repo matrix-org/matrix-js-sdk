@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import MockHttpBackend from "matrix-mock-request";
+import { RendezvousFailureReason } from "../../../src/rendezvous";
 
 import { MSC3886SimpleHttpRendezvousTransport } from "../../../src/rendezvous/transports/simpleHttpTransport";
 
@@ -283,6 +284,42 @@ describe("SimpleHttpRendezvousTransport", function() {
             };
             await httpBackend.flush('');
             expect(await prom).toEqual({ foo: "baa" });
+        }
+    });
+
+    it("POST and DELETE", async function() {
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            fallbackRzServer: "https://fallbackserver/rz",
+            fetchFn,
+        });
+        { // Create
+            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ foo: "baa" }));
+            httpBackend.when("POST", "https://fallbackserver/rz").check(({ headers, data }) => {
+                expect(headers["content-type"]).toEqual("application/json");
+                expect(data).toEqual({ foo: "baa" });
+            }).response = {
+                body: null,
+                response: {
+                    statusCode: 201,
+                    headers: {
+                        location: "https://fallbackserver/rz/123",
+                    },
+                },
+            };
+            await httpBackend.flush('');
+            expect(await prom).toStrictEqual(undefined);
+        }
+        { // Cancel
+            const prom = simpleHttpTransport.cancel(RendezvousFailureReason.UserDeclined);
+            httpBackend.when("DELETE", "https://fallbackserver/rz/123").response = {
+                body: null,
+                response: {
+                    statusCode: 204,
+                    headers: {},
+                },
+            };
+            await httpBackend.flush('');
+            await prom;
         }
     });
 });
