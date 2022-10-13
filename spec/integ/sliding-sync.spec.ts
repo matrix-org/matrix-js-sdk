@@ -22,7 +22,6 @@ import { SlidingSync, SlidingSyncState, ExtensionState, SlidingSyncEvent } from 
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
 import { MatrixClient } from "../../src";
-import { sleep } from "../../src/utils";
 
 /**
  * Tests for sliding sync. These tests are broken down into sub-tests which are reliant upon one another.
@@ -1198,8 +1197,8 @@ function timeout(delayMs: number, reason: string): { promise: Promise<never>, ca
             if (timeoutId) {
                 clearTimeout(timeoutId);
             }
-        }
-    }
+        },
+    };
 }
 
 /**
