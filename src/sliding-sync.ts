@@ -19,7 +19,6 @@ import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { sleep, IDeferred, defer } from "./utils";
-import { ConnectionError } from "./http-api";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -747,6 +746,27 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
+     * Re-setup this connection e.g in the event of an expired session.
+     */
+    private resetup(): void {
+        logger.warn("SlidingSync: resetting connection info");
+        // any pending txn ID defers will be forgotten already by the server, so clear them out
+        this.txnIdDefers.forEach((d) => {
+            d.reject(d.txnId);
+        });
+        this.txnIdDefers = [];
+        // resend sticky params and de-confirm all subscriptions
+        this.lists.forEach((l) => {
+            l.setModified(true);
+        });
+        this.confirmedRoomSubscriptions = new Set<string>(); // leave desired ones alone though!
+        // reset the connection as we might be wedged
+        this.needsResend = true;
+        this.abortController?.abort();
+        this.abortController = new AbortController();
+    }
+
+    /**
      * Start syncing with the server. Blocks until stopped.
      */
     public async start() {
@@ -786,7 +806,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
                 this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl, this.abortController.signal);
                 resp = await this.pendingReq;
-                logger.debug(resp);
                 currentPos = resp.pos;
                 // update what we think we're subscribed to.
                 for (const roomId of newSubscriptions) {
@@ -824,13 +843,19 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         null,
                         err,
                     );
-                    await sleep(3000);
-                } else if (this.needsResend || err instanceof ConnectionError) {
-                    continue;
-                } else {
-                    logger.error(err);
-                    await sleep(3000);
+                    if (err.httpStatus === 400) {
+                        // session probably expired TODO: assign an errcode
+                        // so drop state and re-request
+                        this.resetup();
+                        currentPos = undefined;
+                        await sleep(50); // in case the 400 was for something else; don't tightloop
+                        continue;
+                    } // else fallthrough to generic error handling
+                } else if (this.needsResend || err.name === "AbortError") {
+                    continue; // don't sleep as we caused this error by abort()ing the request.
                 }
+                logger.error(err);
+                await sleep(5000);
             }
             if (!resp) {
                 continue;

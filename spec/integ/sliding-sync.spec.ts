@@ -22,7 +22,6 @@ import { SlidingSync, SlidingSyncState, ExtensionState, SlidingSyncEvent } from 
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
 import { MatrixClient } from "../../src";
-import { sleep } from "../../src/utils";
 
 /**
  * Tests for sliding sync. These tests are broken down into sub-tests which are reliant upon one another.
@@ -79,6 +78,106 @@ describe("SlidingSync", () => {
         it("should stop the sync loop upon calling stop()", () => {
             slidingSync.stop();
             httpBackend!.verifyNoOutstandingExpectation();
+        });
+
+        it("should reset the connection on HTTP 400 and send everything again", async () => {
+            // seed the connection with some lists, extensions and subscriptions to verify they are sent again
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            const roomId = "!sub:localhost";
+            const subInfo = {
+                timeline_limit: 42,
+                required_state: [["m.room.create", ""]],
+            };
+            const listInfo = {
+                ranges: [[0, 10]],
+                filters: {
+                    is_dm: true,
+                },
+            };
+            const ext = {
+                name: () => "custom_extension",
+                onRequest: (initial) => { return { initial: initial }; },
+                onResponse: (res) => { return {}; },
+                when: () => ExtensionState.PreProcess,
+            };
+            slidingSync.modifyRoomSubscriptions(new Set([roomId]));
+            slidingSync.modifyRoomSubscriptionInfo(subInfo);
+            slidingSync.setList(0, listInfo);
+            slidingSync.registerExtension(ext);
+            slidingSync.start();
+
+            // expect everything to be sent
+            let txnId;
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toEqual({
+                    [roomId]: subInfo,
+                });
+                expect(body.lists[0]).toEqual(listInfo);
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions["custom_extension"]).toEqual({ initial: true });
+                expect(req.queryParams["pos"]).toBeUndefined();
+                txnId = body.txn_id;
+            }).respond(200, function() {
+                return {
+                    pos: "11",
+                    lists: [{ count: 5 }],
+                    extensions: {},
+                    txn_id: txnId,
+                };
+            });
+            await httpBackend.flushAllExpected();
+
+            // expect nothing but ranges and non-initial extensions to be sent
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toBeFalsy();
+                expect(body.lists[0]).toEqual({
+                    ranges: [[0, 10]],
+                });
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions["custom_extension"]).toEqual({ initial: false });
+                expect(req.queryParams["pos"]).toEqual("11");
+            }).respond(200, function() {
+                return {
+                    pos: "12",
+                    lists: [{ count: 5 }],
+                    extensions: {},
+                };
+            });
+            await httpBackend.flushAllExpected();
+
+            // now we expire the session
+            httpBackend.when("POST", syncUrl).respond(400, function() {
+                logger.debug("sending session expired 400");
+                return {
+                    error: "HTTP 400 : session expired",
+                };
+            });
+            await httpBackend.flushAllExpected();
+
+            // ...and everything should be sent again
+            httpBackend.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.debug("got ", body);
+                expect(body.room_subscriptions).toEqual({
+                    [roomId]: subInfo,
+                });
+                expect(body.lists[0]).toEqual(listInfo);
+                expect(body.extensions).toBeTruthy();
+                expect(body.extensions["custom_extension"]).toEqual({ initial: true });
+                expect(req.queryParams["pos"]).toBeUndefined();
+            }).respond(200, function() {
+                return {
+                    pos: "1",
+                    lists: [{ count: 6 }],
+                    extensions: {},
+                };
+            });
+            await httpBackend.flushAllExpected();
+            slidingSync.stop();
         });
     });
 
@@ -1086,9 +1185,20 @@ describe("SlidingSync", () => {
     });
 });
 
-async function timeout(delayMs: number, reason: string): Promise<never> {
-    await sleep(delayMs);
-    throw new Error(`timeout: ${delayMs}ms - ${reason}`);
+function timeout(delayMs: number, reason: string): { promise: Promise<never>, cancel: () => void } {
+    let timeoutId;
+    return {
+        promise: new Promise((resolve, reject) => {
+            timeoutId = setTimeout(() => {
+                reject(new Error(`timeout: ${delayMs}ms - ${reason}`));
+            }, delayMs);
+        }),
+        cancel: () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        },
+    };
 }
 
 /**
@@ -1107,18 +1217,21 @@ function listenUntil<T>(
     timeoutMs = 500,
 ): Promise<T> {
     const trace = new Error().stack?.split(`\n`)[2];
+    const t = timeout(timeoutMs, "timed out waiting for event " + eventName + " " + trace);
     return Promise.race([new Promise<T>((resolve, reject) => {
         const wrapper = (...args) => {
             try {
                 const data = callback(...args);
                 if (data) {
                     emitter.off(eventName, wrapper);
+                    t.cancel();
                     resolve(data);
                 }
             } catch (err) {
                 reject(err);
+                t.cancel();
             }
         };
         emitter.on(eventName, wrapper);
-    }), timeout(timeoutMs, "timed out waiting for event " + eventName + " " + trace)]);
+    }), t.promise]);
 }
