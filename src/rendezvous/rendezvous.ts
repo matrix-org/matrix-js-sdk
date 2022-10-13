@@ -87,7 +87,7 @@ export class MSC3906Rendezvous {
 
         const checksum = await this.channel.connect();
 
-        logger.info(`Connected to secure channel with checksum: ${checksum}`);
+        logger.info(`Connected to secure channel with checksum: ${checksum} our intent is ${this.ourIntent}`);
 
         if (didScan) {
             if (await this.areIntentsIncompatible(theirIntent)) {
@@ -156,7 +156,7 @@ export class MSC3906Rendezvous {
         return checksum;
     }
 
-    async send({ type, ...payload }: { type: PayloadType, [key: string]: any }) {
+    private async send({ type, ...payload }: { type: PayloadType, [key: string]: any }) {
         await this.channel.send({ type, ...payload });
     }
 
@@ -290,7 +290,7 @@ export class MSC3906Rendezvous {
         return deviceId;
     }
 
-    private async checkAndCrossSignDevice(deviceInfo: DeviceInfo) {
+    private async verifyAndCrossSignDevice(deviceInfo: DeviceInfo) {
         if (!this.cli) {
             throw new Error('No client set');
         }
@@ -336,7 +336,7 @@ export class MSC3906Rendezvous {
         return info;
     }
 
-    async crossSign(timeout = 10 * 1000): Promise<DeviceInfo | CrossSigningInfo | undefined> {
+    async verifyNewDeviceOnExistingDevice(timeout = 10 * 1000): Promise<DeviceInfo | CrossSigningInfo | undefined> {
         if (!this.newDeviceId) {
             throw new Error('No new device to sign');
         }
@@ -365,7 +365,7 @@ export class MSC3906Rendezvous {
             const deviceInfo = client.crypto.getStoredDevice(userId, this.newDeviceId);
 
             if (deviceInfo) {
-                return await this.checkAndCrossSignDevice(deviceInfo);
+                return await this.verifyAndCrossSignDevice(deviceInfo);
             }
         }
 
@@ -376,7 +376,7 @@ export class MSC3906Rendezvous {
             const deviceInfo = client.crypto.getStoredDevice(userId, this.newDeviceId);
 
             if (deviceInfo) {
-                return await this.checkAndCrossSignDevice(deviceInfo);
+                return await this.verifyAndCrossSignDevice(deviceInfo);
             }
         }
 
