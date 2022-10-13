@@ -505,6 +505,8 @@ export class GroupCall extends TypedEventEmitter<
             setTracksEnabled(call.localUsermediaFeed.stream.getAudioTracks(), !muted);
         }
 
+        this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
+
         if (!sendUpdatesBefore) {
             try {
                 await Promise.all(this.calls.map(c => c.sendMetadataUpdate()));
@@ -513,7 +515,6 @@ export class GroupCall extends TypedEventEmitter<
             }
         }
 
-        this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
         return true;
     }
 
