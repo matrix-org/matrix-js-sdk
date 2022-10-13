@@ -85,7 +85,7 @@ async function importKey(key: Uint8Array): Promise<CryptoKey | Uint8Array> {
  * Implementation of the unstable [MSC3903](https://github.com/matrix-org/matrix-spec-proposals/pull/3903)
  * X25519/ECDH key agreement based secure rendezvous channel.
  */
-export class ECDHv1RendezvousChannel implements RendezvousChannel {
+export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     private olmSAS?: SAS;
     private ourPublicKey: Uint8Array;
     private aesKey?: CryptoKey | Uint8Array;

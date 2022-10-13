@@ -21,7 +21,7 @@ import { RendezvousTransport, RendezvousTransportDetails } from '../transport';
 import { MatrixClient } from '../../matrix';
 import { ClientPrefix } from '../../http-api';
 
-export interface SimpleHttpRendezvousTransportDetails extends RendezvousTransportDetails {
+export interface MSC3886SimpleHttpRendezvousTransportDetails extends RendezvousTransportDetails {
     type: 'http.v1';
     uri: string;
 }
@@ -30,7 +30,7 @@ export interface SimpleHttpRendezvousTransportDetails extends RendezvousTranspor
  * Implementation of the unstable [MSC3886](https://github.com/matrix-org/matrix-spec-proposals/pull/3886)
  * simple HTTP rendezvous protocol.
  */
-export class SimpleHttpRendezvousTransport implements RendezvousTransport {
+export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport {
     ready = false;
     cancelled = false;
     private uri?: string;
@@ -66,7 +66,7 @@ export class SimpleHttpRendezvousTransport implements RendezvousTransport {
         this.ready = !!this.uri;
     }
 
-    async details(): Promise<SimpleHttpRendezvousTransportDetails> {
+    async details(): Promise<MSC3886SimpleHttpRendezvousTransportDetails> {
         if (!this.uri) {
             throw new Error('Rendezvous not set up');
         }

@@ -26,13 +26,13 @@ import { sleep } from "../utils";
 import { RendezvousFailureReason } from "./cancellationReason";
 import { RendezvousIntent } from "./code";
 
-export enum PayloadType {
+enum PayloadType {
     Start = 'm.login.start',
     Finish = 'm.login.finish',
     Progress = 'm.login.progress',
 }
 
-export class Rendezvous {
+export class MSC3906Rendezvous {
     private cli?: MatrixClient;
     private newDeviceId?: string;
     private newDeviceKey?: string;
