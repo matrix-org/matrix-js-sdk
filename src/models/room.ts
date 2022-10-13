@@ -18,7 +18,12 @@ limitations under the License.
  * @module models/room
  */
 
-import { EventTimelineSet, DuplicateStrategy, IAddLiveEventOptions } from "./event-timeline-set";
+import {
+    EventTimelineSet,
+    DuplicateStrategy,
+    IAddLiveEventOptions,
+    EventTimelineSetHandlerMap,
+} from "./event-timeline-set";
 import { Direction, EventTimeline } from "./event-timeline";
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
@@ -130,7 +135,7 @@ export enum RoomEvent {
     UnreadNotifications = "Room.UnreadNotifications",
 }
 
-type EmittedEvents = RoomEvent
+export type RoomEmittedEvents = RoomEvent
     | RoomStateEvent.Events
     | RoomStateEvent.Members
     | RoomStateEvent.NewMember
@@ -171,8 +176,12 @@ export type RoomEventHandlerMap = {
     ) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
-} & ThreadHandlerMap
-    & MatrixEventHandlerMap
+} & Pick<
+        ThreadHandlerMap,
+        ThreadEvent.Update | ThreadEvent.NewReply
+    >
+    & EventTimelineSetHandlerMap
+    & Pick<MatrixEventHandlerMap, MatrixEventEvent.BeforeRedaction>
     & Pick<
         RoomStateEventHandlerMap,
         RoomStateEvent.Events
@@ -187,8 +196,8 @@ export type RoomEventHandlerMap = {
         BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange
     >;
 
-export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
-    public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
+export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
+    public readonly reEmitter: TypedReEmitter<RoomEmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
