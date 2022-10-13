@@ -222,26 +222,31 @@ export class MSC3906Rendezvous {
             verifying_device_key: verifyingDeviceKey,
         } = await this.channel.receive();
 
+        if (!verifyingDeviceId || !verifyingDeviceKey) {
+            logger.warn("No verifying_device_id or verifying_device_key received");
+            return;
+        }
+
         const userId = client.getUserId()!;
         const verifyingDeviceFromServer =
-            client.crypto.deviceList.getStoredDevice(userId, verifyingDeviceId);
+            client.crypto?.deviceList.getStoredDevice(userId, verifyingDeviceId);
 
-        if (verifyingDeviceFromServer?.getFingerprint() === verifyingDeviceKey) {
-            // set other device as verified
-            logger.info(`Setting device ${verifyingDeviceId} as verified`);
-            await client.setDeviceVerified(userId, verifyingDeviceId, true);
-
-            if (masterKey) {
-                // set master key as trusted
-                await client.setDeviceVerified(userId, masterKey, true);
-            }
-
-            // request secrets from the verifying device
-            logger.info(`Requesting secrets from ${verifyingDeviceId}`);
-            await requestKeysDuringVerification(client, userId, verifyingDeviceId);
-        } else {
-            logger.info(`Verifying device ${verifyingDeviceId} doesn't match: ${verifyingDeviceFromServer}`);
+        if (verifyingDeviceFromServer?.getFingerprint() !== verifyingDeviceKey) {
+            logger.warn(`Verifying device ${verifyingDeviceId} doesn't match: ${verifyingDeviceFromServer}`);
+            return;
         }
+        // set other device as verified
+        logger.info(`Setting device ${verifyingDeviceId} as verified`);
+        await client.setDeviceVerified(userId, verifyingDeviceId, true);
+
+        if (masterKey) {
+            // set master key as trusted
+            await client.setDeviceVerified(userId, masterKey, true);
+        }
+
+        // request secrets from the verifying device
+        logger.info(`Requesting secrets from ${verifyingDeviceId}`);
+        await requestKeysDuringVerification(client, userId, verifyingDeviceId);
     }
 
     async declineLoginOnExistingDevice() {
@@ -250,6 +255,10 @@ export class MSC3906Rendezvous {
     }
 
     async confirmLoginOnExistingDevice(): Promise<string | undefined> {
+        if (!this.cli) {
+            throw new Error('No client set');
+        }
+
         const client = this.cli;
 
         logger.info("Requesting login token");
@@ -284,6 +293,18 @@ export class MSC3906Rendezvous {
     }
 
     private async checkAndCrossSignDevice(deviceInfo: DeviceInfo) {
+        if (!this.cli) {
+            throw new Error('No client set');
+        }
+
+        if (!this.cli.crypto) {
+            throw new Error('Crypto not available on client');
+        }
+
+        if (!this.newDeviceId) {
+            throw new Error('No new device ID set');
+        }
+
         // check that keys received from the server for the new device match those received from the device itself
         if (deviceInfo.getFingerprint() !== this.newDeviceKey) {
             throw new Error(
@@ -291,10 +312,15 @@ export class MSC3906Rendezvous {
             );
         }
 
+        const userId = this.cli.getUserId();
+
+        if (!userId) {
+            throw new Error('No user ID set');
+        }
         // mark the device as verified locally + cross sign
         logger.info(`Marking device ${this.newDeviceId} as verified`);
         const info = await this.cli.crypto.setDeviceVerification(
-            this.cli.getUserId(),
+            userId,
             this.newDeviceId,
             true, false, true,
         );
@@ -321,11 +347,24 @@ export class MSC3906Rendezvous {
             logger.info("No new device key to sign");
             return undefined;
         }
+        const client = this.cli;
 
-        const cli = this.cli;
+        if (!client) {
+            throw new Error('No client set');
+        }
+
+        if (!client.crypto) {
+            throw new Error('Crypto not available on client');
+        }
+
+        const userId = client.getUserId();
+
+        if (!userId) {
+            throw new Error('No user ID set');
+        }
 
         {
-            const deviceInfo = cli.crypto.getStoredDevice(cli.getUserId(), this.newDeviceId);
+            const deviceInfo = client.crypto.getStoredDevice(userId, this.newDeviceId);
 
             if (deviceInfo) {
                 return await this.checkAndCrossSignDevice(deviceInfo);
@@ -338,7 +377,7 @@ export class MSC3906Rendezvous {
         logger.info("Going to wait for new device to be online");
 
         {
-            const deviceInfo = cli.crypto.getStoredDevice(cli.getUserId(), this.newDeviceId);
+            const deviceInfo = client.crypto.getStoredDevice(userId, this.newDeviceId);
 
             if (deviceInfo) {
                 return await this.checkAndCrossSignDevice(deviceInfo);

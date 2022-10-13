@@ -40,7 +40,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
     private client?: MatrixClient;
     private hsUrl?: string;
     private fallbackRzServer?: string;
-    private fetchFn: typeof global.fetch;
+    private fetchFn?: typeof global.fetch;
 
     constructor({
         onFailure,
