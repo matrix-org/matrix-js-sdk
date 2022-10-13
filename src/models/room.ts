@@ -1200,6 +1200,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * @experimental
      * Get one of the notification counts for a thread
      * @param threadId the root event ID
      * @param type The type of notification count to get. default: 'total'
@@ -1211,6 +1212,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * @experimental
      * Checks if the current room has unread thread notifications
      * @returns {boolean}
      */
@@ -1224,6 +1226,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * @experimental
      * Swet one of the notification count for a thread
      * @param threadId the root event ID
      * @param type The type of notification count to get. default: 'total'
@@ -1264,6 +1267,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * @experimental
      * @returns the notification count type for all the threads in the room
      */
     public getThreadsAggregateNotificationType(): NotificationCountType | null {
@@ -1271,6 +1275,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * @experimental
      * Resets the thread notifications for this room
      */
     public resetThreadUnreadNotificationCount(): void {
