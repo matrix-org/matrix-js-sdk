@@ -16,7 +16,7 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
-import { SimpleHttpRendezvousTransport } from "../../../src/rendezvous/transports/simpleHttpTransport";
+import { MSC3886SimpleHttpRendezvousTransport } from "../../../src/rendezvous/transports/simpleHttpTransport";
 
 describe("SimpleHttpRendezvousTransport", function() {
     let httpBackend: MockHttpBackend;
@@ -32,7 +32,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         locationResponse: string,
         expectedFinalLocation: string,
     ) {
-        const simpleHttpTransport = new SimpleHttpRendezvousTransport({ fallbackRzServer, fetchFn });
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ fallbackRzServer, fetchFn });
         { // initial POST
             const prom = simpleHttpTransport.send("application/json", {});
             httpBackend.when("POST", fallbackRzServer).response = {
@@ -65,12 +65,12 @@ describe("SimpleHttpRendezvousTransport", function() {
         }
     }
     it("should throw an error when no server available", function() {
-        const simpleHttpTransport = new SimpleHttpRendezvousTransport({ fetchFn });
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ fetchFn });
         expect(simpleHttpTransport.send("application/json", {})).rejects.toThrow("Invalid rendezvous URI");
     });
 
     it("POST to fallback server", async function() {
-        const simpleHttpTransport = new SimpleHttpRendezvousTransport({
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
@@ -101,7 +101,7 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST to follow 307 to other server", async function() {
-        const simpleHttpTransport = new SimpleHttpRendezvousTransport({
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
@@ -130,7 +130,7 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST and GET", async function() {
-        const simpleHttpTransport = new SimpleHttpRendezvousTransport({
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
@@ -186,7 +186,7 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST and PUTs", async function() {
-        const simpleHttpTransport = new SimpleHttpRendezvousTransport({
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
@@ -243,7 +243,7 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("init with URI", async function() {
-        const simpleHttpTransport = new SimpleHttpRendezvousTransport({
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             rendezvousUri: "https://server/rz/123",
             fetchFn,
         });
@@ -265,7 +265,7 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("init from HS", async function() {
-        const simpleHttpTransport = new SimpleHttpRendezvousTransport({
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             rendezvousUri: "https://server/rz/123",
             fetchFn,
         });

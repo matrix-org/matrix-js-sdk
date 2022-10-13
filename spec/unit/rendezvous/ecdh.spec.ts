@@ -24,7 +24,7 @@ import {
     RendezvousTransport,
     RendezvousTransportDetails,
 } from "../../../src/rendezvous";
-import { ECDHv1RendezvousChannel } from '../../../src/rendezvous/channels';
+import { MSC3903ECDHv1RendezvousChannel } from '../../../src/rendezvous/channels';
 import { decodeBase64 } from '../../../src/crypto/olmlib';
 import { setCrypto, sleep } from '../../../src/utils';
 
@@ -84,9 +84,9 @@ describe("ECDHv1", function() {
         bobTransport.otherParty = aliceTransport;
 
         // alice is signing in initiates and generates a code
-        const alice = new ECDHv1RendezvousChannel(aliceTransport);
+        const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
         const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-        const bob = new ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+        const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
         const bobChecksum = await bob.connect();
         const aliceChecksum = await alice.connect();
@@ -106,9 +106,9 @@ describe("ECDHv1", function() {
         bobTransport.otherParty = aliceTransport;
 
         // alice is signing in initiates and generates a code
-        const alice = new ECDHv1RendezvousChannel(aliceTransport);
+        const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
         const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-        const bob = new ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+        const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
         const bobChecksum = await bob.connect();
         const aliceChecksum = await alice.connect();

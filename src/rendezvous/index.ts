@@ -18,9 +18,9 @@ import { RendezvousFailureListener, RendezvousFailureReason } from './cancellati
 import { RendezvousChannel } from './channel';
 import { RendezvousCode, RendezvousIntent } from './code';
 import { RendezvousError } from './error';
-import { SimpleHttpRendezvousTransport, SimpleHttpRendezvousTransportDetails } from './transports';
+import { MSC3886SimpleHttpRendezvousTransport, MSC3886SimpleHttpRendezvousTransportDetails } from './transports';
 import { decodeBase64 } from '../crypto/olmlib';
-import { ECDHv1RendezvousChannel, ECDHv1RendezvousCode, SecureRendezvousChannelAlgorithm } from './channels';
+import { MSC3903ECDHv1RendezvousChannel, ECDHv1RendezvousCode, SecureRendezvousChannelAlgorithm } from './channels';
 import { logger } from '../logger';
 
 export * from './code';
@@ -53,7 +53,7 @@ export async function buildChannelFromCode(
         throw new RendezvousError('Unsupported transport', RendezvousFailureReason.UnsupportedTransport);
     }
 
-    const transportDetails = rendezvous.transport as SimpleHttpRendezvousTransportDetails;
+    const transportDetails = rendezvous.transport as MSC3886SimpleHttpRendezvousTransportDetails;
 
     if (typeof transportDetails.uri !== 'string') {
         throw new RendezvousError('Invalid code', RendezvousFailureReason.InvalidCode);
@@ -63,7 +63,7 @@ export async function buildChannelFromCode(
         throw new RendezvousError('Invalid intent', RendezvousFailureReason.InvalidCode);
     }
 
-    const transport = new SimpleHttpRendezvousTransport({ onFailure, rendezvousUri: transportDetails.uri, fetchFn });
+    const transport = new MSC3886SimpleHttpRendezvousTransport({ onFailure, rendezvousUri: transportDetails.uri, fetchFn });
 
     if (rendezvous?.algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1) {
         throw new RendezvousError('Unsupported transport', RendezvousFailureReason.UnsupportedAlgorithm);
@@ -75,7 +75,7 @@ export async function buildChannelFromCode(
 
     logger.info(`Building ECDHv1 rendezvous via HTTP from: ${code}`);
     return {
-        channel: new ECDHv1RendezvousChannel(transport, theirPublicKey),
+        channel: new MSC3903ECDHv1RendezvousChannel(transport, theirPublicKey),
         intent,
     };
 }
