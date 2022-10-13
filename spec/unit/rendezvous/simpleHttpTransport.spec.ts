@@ -19,19 +19,19 @@ import MockHttpBackend from "matrix-mock-request";
 import { SimpleHttpRendezvousTransport } from "../../../src/rendezvous/transports/simpleHttpTransport";
 
 describe("SimpleHttpRendezvousTransport", function() {
-    const getHttpBackend = (): MockHttpBackend => {
-        const httpBackend = new MockHttpBackend();
-        return httpBackend;
-    };
+    let httpBackend: MockHttpBackend;
+    let fetch: typeof global.fetch;
 
-    const fetch = getHttpBackend().fetchFn as typeof global.fetch;
+    beforeEach(function() {
+        httpBackend = new MockHttpBackend();
+        fetch = httpBackend.fetchFn as typeof global.fetch;
+    });
 
     async function postAndCheckLocation(
         fallbackRzServer: string,
         locationResponse: string,
         expectedFinalLocation: string,
     ) {
-        const httpBackend = getHttpBackend();
         const simpleHttpTransport = new SimpleHttpRendezvousTransport({ fallbackRzServer, fetch });
         { // initial POST
             const prom = simpleHttpTransport.send("application/json", {});
@@ -65,13 +65,11 @@ describe("SimpleHttpRendezvousTransport", function() {
         }
     }
     it("should throw an error when no server available", function() {
-        getHttpBackend();
         const simpleHttpTransport = new SimpleHttpRendezvousTransport({ fetch });
         expect(simpleHttpTransport.send("application/json", {})).rejects.toThrow("Invalid rendezvous URI");
     });
 
     it("POST to fallback server", async function() {
-        const httpBackend = getHttpBackend();
         const simpleHttpTransport = new SimpleHttpRendezvousTransport({
             fallbackRzServer: "https://fallbackserver/rz",
             fetch,
@@ -103,7 +101,6 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST to follow 307 to other server", async function() {
-        const httpBackend = getHttpBackend();
         const simpleHttpTransport = new SimpleHttpRendezvousTransport({
             fallbackRzServer: "https://fallbackserver/rz",
             fetch,
@@ -133,7 +130,6 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST and GET", async function() {
-        const httpBackend = getHttpBackend();
         const simpleHttpTransport = new SimpleHttpRendezvousTransport({
             fallbackRzServer: "https://fallbackserver/rz",
             fetch,
@@ -172,7 +168,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         }
         { // subsequent GET which should have etag from previous request
             const prom = simpleHttpTransport.receive();
-            httpBackend.when("GET", "https://fallbackserver/rz/123").check(({ headers, data }) => {
+            httpBackend.when("GET", "https://fallbackserver/rz/123").check(({ headers }) => {
                 expect(headers["if-none-match"]).toEqual("aaa");
             }).response = {
                 body: { foo: "baa" },
@@ -190,7 +186,6 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST and PUTs", async function() {
-        const httpBackend = getHttpBackend();
         const simpleHttpTransport = new SimpleHttpRendezvousTransport({
             fallbackRzServer: "https://fallbackserver/rz",
             fetch,
@@ -248,7 +243,6 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("init with URI", async function() {
-        const httpBackend = getHttpBackend();
         const simpleHttpTransport = new SimpleHttpRendezvousTransport({
             rendezvousUri: "https://server/rz/123",
             fetch,
@@ -271,7 +265,6 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("init from HS", async function() {
-        const httpBackend = getHttpBackend();
         const simpleHttpTransport = new SimpleHttpRendezvousTransport({
             rendezvousUri: "https://server/rz/123",
             fetch,
