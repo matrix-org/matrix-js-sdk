@@ -14,6 +14,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           cache: 'yarn'
+          node-version: 16
 
       - name: Upgrade
         run: yarn upgrade && yarn install
@@ -29,7 +30,7 @@ jobs:
           labels: |
             Dependencies
             T-Task
-          
+
       - name: Enable automerge
         uses: peter-evans/enable-pull-request-automerge@v2
         if: steps.cpr.outputs.pull-request-operation == 'created'

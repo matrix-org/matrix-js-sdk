@@ -16,6 +16,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           cache: 'yarn'
+          node-version: 16
 
       - name: Install Deps
         run: "yarn install"
@@ -42,6 +43,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           cache: 'yarn'
+          node-version: 16
 
       - name: Install Deps
         run: "yarn install"
@@ -58,6 +60,7 @@ jobs:
       - uses: actions/setup-node@v3
         with:
           cache: 'yarn'
+          node-version: 16
 
       - name: Install Deps
         run: "yarn install"
