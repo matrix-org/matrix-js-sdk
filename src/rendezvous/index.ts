@@ -63,7 +63,11 @@ export async function buildChannelFromCode(
         throw new RendezvousError('Invalid intent', RendezvousFailureReason.InvalidCode);
     }
 
-    const transport = new MSC3886SimpleHttpRendezvousTransport({ onFailure, rendezvousUri: transportDetails.uri, fetchFn });
+    const transport = new MSC3886SimpleHttpRendezvousTransport({
+        onFailure,
+        rendezvousUri: transportDetails.uri,
+        fetchFn,
+    });
 
     if (rendezvous?.algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1) {
         throw new RendezvousError('Unsupported transport', RendezvousFailureReason.UnsupportedAlgorithm);
