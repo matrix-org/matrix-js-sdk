@@ -17,7 +17,7 @@ limitations under the License.
 import MockHttpBackend from 'matrix-mock-request';
 import { indexedDB as fakeIndexedDB } from 'fake-indexeddb';
 
-import { IHttpOpts, IndexedDBStore, MatrixEvent, MemoryStore, Room } from "../../src";
+import { IndexedDBStore, MatrixEvent, MemoryStore, Room } from "../../src";
 import { MatrixClient } from "../../src/client";
 import { ToDeviceBatch } from '../../src/models/ToDeviceMessage';
 import { logger } from '../../src/logger';
@@ -89,7 +89,7 @@ describe.each([
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
-            request: httpBackend.requestFn as IHttpOpts["request"],
+            fetchFn: httpBackend.fetchFn as typeof global.fetch,
             store,
         });
     });

@@ -890,9 +890,8 @@ describe("MSC3089TreeSpace", () => {
             expect(contents.length).toEqual(fileContents.length);
             expect(opts).toMatchObject({
                 includeFilename: false,
-                onlyContentUri: true, // because the tests rely on this - we shouldn't really be testing  for this.
             });
-            return Promise.resolve(mxc);
+            return Promise.resolve({ content_uri: mxc });
         });
         client.uploadContent = uploadFn;
 
@@ -950,9 +949,8 @@ describe("MSC3089TreeSpace", () => {
             expect(contents.length).toEqual(fileContents.length);
             expect(opts).toMatchObject({
                 includeFilename: false,
-                onlyContentUri: true, // because the tests rely on this - we shouldn't really be testing  for this.
             });
-            return Promise.resolve(mxc);
+            return Promise.resolve({ content_uri: mxc });
         });
         client.uploadContent = uploadFn;
 

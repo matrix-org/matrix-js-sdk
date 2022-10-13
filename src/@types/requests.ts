@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Callback } from "../client";
 import { IContent, IEvent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { IEventWithRoomId, SearchKey } from "./search";
@@ -128,16 +127,6 @@ export interface IRoomDirectoryOptions {
     };
     include_all_networks?: boolean;
     third_party_instance_id?: string;
-}
-
-export interface IUploadOpts {
-    name?: string;
-    includeFilename?: boolean;
-    type?: string;
-    rawResponse?: boolean;
-    onlyContentUri?: boolean;
-    callback?: Callback;
-    progressHandler?: (state: {loaded: number, total: number}) => void;
 }
 
 export interface IAddThreePidOnlyBody {

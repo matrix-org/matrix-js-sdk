@@ -247,7 +247,7 @@ export interface IStore {
      /**
       * Fetches the oldest batch of to-device messages in the queue
       */
-     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch>;
+     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
 
      /**
       * Removes a specific batch of to-device messages from the queue
