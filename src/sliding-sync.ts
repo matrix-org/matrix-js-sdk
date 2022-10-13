@@ -19,7 +19,6 @@ import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { sleep, IDeferred, defer } from "./utils";
-import { ConnectionError } from "./http-api";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -852,7 +851,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         await sleep(50); // in case the 400 was for something else; don't tightloop
                         continue;
                     } // else fallthrough to generic error handling
-                } else if (this.needsResend || err instanceof ConnectionError) {
+                } else if (this.needsResend || err.name === "AbortError") {
                     continue; // don't sleep as we caused this error by abort()ing the request.
                 }
                 logger.error(err);
