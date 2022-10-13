@@ -16,7 +16,6 @@ limitations under the License.
 
 import { SAS } from '@matrix-org/olm';
 
-import { logger } from '../../logger';
 import { RendezvousError } from '../error';
 import {
     RendezvousCode,
@@ -127,7 +126,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
 
         if (isInitiator) {
             // wait for the other side to send us their public key
-            logger.info('Waiting for other device to send their public key');
+            // logger.info('Waiting for other device to send their public key');
             const res = await this.receive();
             if (!res) {
                 throw new Error('No response from other device');
@@ -162,10 +161,10 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
 
         this.aesKey = await importKey(aesKeyBytes);
 
-        logger.debug(`Our public key: ${encodeBase64(this.ourPublicKey)}`);
-        logger.debug(`Their public key: ${encodeBase64(this.theirPublicKey!)}`);
-        logger.debug(`AES info: ${aesInfo}`);
-        logger.debug(`AES key: ${encodeBase64(aesKeyBytes)}`);
+        // logger.debug(`Our public key: ${encodeBase64(this.ourPublicKey)}`);
+        // logger.debug(`Their public key: ${encodeBase64(this.theirPublicKey!)}`);
+        // logger.debug(`AES info: ${aesInfo}`);
+        // logger.debug(`AES key: ${encodeBase64(aesKeyBytes)}`);
 
         const rawChecksum = this.olmSAS.generate_bytes(aesInfo, 5);
         return generateDecimalSas(Array.from(rawChecksum));
@@ -222,7 +221,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         const stringifiedData = JSON.stringify(data);
 
         if (this.aesKey) {
-            logger.info(`Encrypting: ${stringifiedData}`);
+            // logger.info(`Encrypting: ${stringifiedData}`);
             await this.transport.send('application/json', await this.encrypt(stringifiedData));
         } else {
             await this.transport.send('application/json', stringifiedData);
@@ -271,7 +270,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         }
 
         const data = await this.transport.receive();
-        logger.info(`Received data: ${JSON.stringify(data)}`);
+        // logger.info(`Received data: ${JSON.stringify(data)}`);
         if (!data) {
             return data;
         }
@@ -281,7 +280,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
                 throw new Error('Shared secret not set up');
             }
             const decrypted = await this.decrypt(data);
-            logger.info(`Decrypted data: ${JSON.stringify(decrypted)}`);
+            // logger.info(`Decrypted data: ${JSON.stringify(decrypted)}`);
             return JSON.parse(decrypted);
         } else if (this.aesKey) {
             throw new Error('Data received but no ciphertext');

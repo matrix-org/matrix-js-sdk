@@ -62,8 +62,6 @@ export class MSC3906Rendezvous {
     private async areIntentsIncompatible(theirIntent: RendezvousIntent): Promise<boolean> {
         const incompatible = theirIntent === this.ourIntent;
 
-        logger.info(`ourIntent: ${this.ourIntent}, theirIntent: ${theirIntent}, incompatible: ${incompatible}`);
-
         if (incompatible) {
             await this.send({ type: PayloadType.Finish, intent: this.ourIntent });
             await this.channel.cancel(
@@ -250,7 +248,7 @@ export class MSC3906Rendezvous {
     }
 
     async declineLoginOnExistingDevice() {
-        logger.info('User declined linking');
+        logger.info('User declined sign in');
         await this.send({ type: PayloadType.Finish, outcome: 'declined' });
     }
 
@@ -371,10 +369,8 @@ export class MSC3906Rendezvous {
             }
         }
 
-        logger.info("New device is not online");
-        await sleep(timeout);
-
         logger.info("Going to wait for new device to be online");
+        await sleep(timeout);
 
         {
             const deviceInfo = client.crypto.getStoredDevice(userId, this.newDeviceId);
