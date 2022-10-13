@@ -24,12 +24,13 @@ describe("Rendezvous", function() {
         await global.Olm.init();
     });
 
-    const getHttpBackend = (): MockHttpBackend => {
-        const httpBackend = new MockHttpBackend();
-        return httpBackend;
-    };
+    let httpBackend: MockHttpBackend;
+    let fetch: typeof global.fetch;
 
-    const fetch = getHttpBackend().fetchFn as typeof global.fetch;
+    beforeEach(function() {
+        httpBackend = new MockHttpBackend();
+        fetch = httpBackend.fetchFn as typeof global.fetch;
+    });
 
     describe("buildChannelFromCode", function() {
         it("non-JSON", function() {
@@ -100,7 +101,6 @@ describe("Rendezvous", function() {
         });
 
         it("parse and get", async function() {
-            const httpBackend = getHttpBackend();
             const x = await buildChannelFromCode(JSON.stringify({
                 intent: 'login.start',
                 rendezvous: {
