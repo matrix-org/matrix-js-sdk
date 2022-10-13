@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { Feature, ServerSupport } from "../../src/feature";
 import {
     EventType,
     fixNotificationCountOnDecryption,
@@ -23,6 +24,7 @@ import {
     NotificationCountType,
     RelationType,
     Room,
+    RoomEvent,
 } from "../../src/matrix";
 import { IActionsObject } from "../../src/pushprocessor";
 import { ReEmitter } from "../../src/ReEmitter";
@@ -56,8 +58,12 @@ describe("fixNotificationCountOnDecryption", () => {
             supportsExperimentalThreads: jest.fn().mockReturnValue(true),
         });
         mockClient.reEmitter = mock(ReEmitter, 'ReEmitter');
+        mockClient.canSupport = new Map();
+        Object.keys(Feature).forEach(feature => {
+            mockClient.canSupport.set(feature as Feature, ServerSupport.Stable);
+        });
 
-        room = new Room(ROOM_ID, mockClient, mockClient.getUserId());
+        room = new Room(ROOM_ID, mockClient, mockClient.getUserId() ?? "");
         room.setUnreadNotificationCount(NotificationCountType.Total, 1);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
@@ -93,12 +99,12 @@ describe("fixNotificationCountOnDecryption", () => {
     });
 
     it("changes the room count to highlight on decryption", () => {
-        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(1);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
 
         fixNotificationCountOnDecryption(mockClient, event);
 
-        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(1);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
     });
 
@@ -110,5 +116,19 @@ describe("fixNotificationCountOnDecryption", () => {
 
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(1);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(1);
+    });
+
+    it("emits events", () => {
+        const cb = jest.fn();
+        room.on(RoomEvent.UnreadNotifications, cb);
+
+        room.setUnreadNotificationCount(NotificationCountType.Total, 1);
+        expect(cb).toHaveBeenLastCalledWith({ highlight: 0, total: 1 });
+
+        room.setUnreadNotificationCount(NotificationCountType.Highlight, 5);
+        expect(cb).toHaveBeenLastCalledWith({ highlight: 5, total: 1 });
+
+        room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 5);
+        expect(cb).toHaveBeenLastCalledWith({ highlight: 5 }, "$123");
     });
 });
