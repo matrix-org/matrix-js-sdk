@@ -116,8 +116,6 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                                 defer.reject(err);
                                 return;
                             }
-
-                            (<MatrixError>err).httpStatus = xhr.status;
                             defer.reject(new ConnectionError("request failed", err));
                         }
                         break;
