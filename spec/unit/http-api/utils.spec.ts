@@ -114,6 +114,32 @@ describe("parseErrorResponse", () => {
         }, 500));
     });
 
+    it("should resolve Matrix Errors from XHR with urls", () => {
+        expect(parseErrorResponse({
+            responseURL: "https://example.com",
+            getResponseHeader(name: string): string | null {
+                return name === "Content-Type" ? "application/json" : null;
+            },
+            status: 500,
+        } as XMLHttpRequest, '{"errcode": "TEST"}')).toStrictEqual(new MatrixError({
+            errcode: "TEST",
+        }, 500, "https://example.com"));
+    });
+
+    it("should resolve Matrix Errors from fetch with urls", () => {
+        expect(parseErrorResponse({
+            url: "https://example.com",
+            headers: {
+                get(name: string): string | null {
+                    return name === "Content-Type" ? "application/json" : null;
+                },
+            },
+            status: 500,
+        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new MatrixError({
+            errcode: "TEST",
+        }, 500, "https://example.com"));
+    });
+
     it("should handle no type gracefully", () => {
         expect(parseErrorResponse({
             headers: {
