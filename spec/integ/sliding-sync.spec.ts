@@ -1186,9 +1186,20 @@ describe("SlidingSync", () => {
     });
 });
 
-async function timeout(delayMs: number, reason: string): Promise<never> {
-    await sleep(delayMs);
-    throw new Error(`timeout: ${delayMs}ms - ${reason}`);
+function timeout(delayMs: number, reason: string): { promise: Promise<never>, cancel: () => void } {
+    let timeoutId;
+    return {
+        promise: new Promise((resolve, reject) => {
+            timeoutId = setTimeout(() => {
+                reject(new Error(`timeout: ${delayMs}ms - ${reason}`));
+            }, delayMs);
+        }),
+        cancel: () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+            }
+        }
+    }
 }
 
 /**
@@ -1207,18 +1218,21 @@ function listenUntil<T>(
     timeoutMs = 500,
 ): Promise<T> {
     const trace = new Error().stack?.split(`\n`)[2];
+    const t = timeout(timeoutMs, "timed out waiting for event " + eventName + " " + trace);
     return Promise.race([new Promise<T>((resolve, reject) => {
         const wrapper = (...args) => {
             try {
                 const data = callback(...args);
                 if (data) {
                     emitter.off(eventName, wrapper);
+                    t.cancel();
                     resolve(data);
                 }
             } catch (err) {
                 reject(err);
+                t.cancel();
             }
         };
         emitter.on(eventName, wrapper);
-    }), timeout(timeoutMs, "timed out waiting for event " + eventName + " " + trace)]);
+    }), t.promise]);
 }
