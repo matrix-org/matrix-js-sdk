@@ -19,6 +19,7 @@ import { mocked } from "jest-mock";
 import {
     anySignal,
     ConnectionError,
+    HTTPError,
     MatrixError,
     parseErrorResponse,
     retryNetworkOperation,
@@ -121,7 +122,7 @@ describe("parseErrorResponse", () => {
                 },
             },
             status: 500,
-        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new Error("Server returned 500 error"));
+        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new HTTPError("Server returned 500 error", 500));
     });
 
     it("should handle invalid type gracefully", () => {
@@ -144,7 +145,7 @@ describe("parseErrorResponse", () => {
                 },
             },
             status: 418,
-        } as Response, "I'm a teapot")).toStrictEqual(new Error("Server returned 418 error: I'm a teapot"));
+        } as Response, "I'm a teapot")).toStrictEqual(new HTTPError("Server returned 418 error: I'm a teapot", 418));
     });
 });
 
