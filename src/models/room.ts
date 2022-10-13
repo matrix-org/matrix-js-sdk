@@ -1980,6 +1980,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             client: this.client,
         });
 
+        // This is necessary to be able to jump to events in threads:
+        // If we jump to an event in a thread where neither the event, nor the root,
+        // nor any thread event are loaded yet, we'll load the event as well as the thread root, create the thread,
+        // and pass the event through this.
+        for (const event of events) {
+            thread.setEventMetadata(event);
+        }
+
         // If we managed to create a thread and figure out its `id` then we can use it
         this.threads.set(thread.id, thread);
         this.reEmitter.reEmit(thread, [
