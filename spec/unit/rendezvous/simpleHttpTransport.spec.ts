@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import MockHttpBackend from "matrix-mock-request";
-import { RendezvousFailureReason } from "../../../src/rendezvous";
 
+import { RendezvousFailureReason } from "../../../src/rendezvous";
 import { MSC3886SimpleHttpRendezvousTransport } from "../../../src/rendezvous/transports/simpleHttpTransport";
 
 describe("SimpleHttpRendezvousTransport", function() {
