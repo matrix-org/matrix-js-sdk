@@ -18,6 +18,8 @@ limitations under the License.
  * @module models/room
  */
 
+import { Optional } from "matrix-events-sdk";
+
 import {
     EventTimelineSet,
     DuplicateStrategy,
@@ -1767,7 +1769,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             let latestMyThreadsRootEvent: MatrixEvent;
             const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
             for (const rootEvent of threadRoots) {
-                this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
+                this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, {
                     duplicateStrategy: DuplicateStrategy.Ignore,
                     fromCache: false,
                     roomState,
@@ -1776,7 +1778,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 const threadRelationship = rootEvent
                     .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
                 if (threadRelationship?.current_user_participated) {
-                    this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
+                    this.threadsTimelineSets[1]?.addLiveEvent(rootEvent, {
                         duplicateStrategy: DuplicateStrategy.Ignore,
                         fromCache: false,
                         roomState,
@@ -1832,14 +1834,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private onThreadNewReply(thread: Thread): void {
-        const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        for (const timelineSet of this.threadsTimelineSets) {
-            timelineSet.removeEvent(thread.id);
-            timelineSet.addLiveEvent(thread.rootEvent, {
-                duplicateStrategy: DuplicateStrategy.Replace,
-                fromCache: false,
-                roomState,
-            });
+        if (thread.length && thread.rootEvent) {
+            this.updateThreadRootEvents(thread, false);
         }
     }
 
@@ -1951,6 +1947,33 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         ));
     }
 
+    private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean) => {
+        this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline);
+        if (thread.hasCurrentUserParticipated) {
+            this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline);
+        }
+    };
+
+    private updateThreadRootEvent = (
+        timelineSet: Optional<EventTimelineSet>,
+        thread: Thread,
+        toStartOfTimeline: boolean,
+    ) => {
+        if (Thread.hasServerSideSupport) {
+            timelineSet.addLiveEvent(thread.rootEvent, {
+                duplicateStrategy: DuplicateStrategy.Replace,
+                fromCache: false,
+                roomState: this.currentState,
+            });
+        } else {
+            timelineSet.addEventToTimeline(
+                thread.rootEvent,
+                timelineSet.getLiveTimeline(),
+                { toStartOfTimeline },
+            );
+        }
+    };
+
     public createThread(
         threadId: string,
         rootEvent: MatrixEvent | undefined,
@@ -1985,19 +2008,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         if (this.threadsReady) {
-            this.threadsTimelineSets.forEach(timelineSet => {
-                if (thread.rootEvent) {
-                    if (Thread.hasServerSideSupport) {
-                        timelineSet.addLiveEvent(thread.rootEvent);
-                    } else {
-                        timelineSet.addEventToTimeline(
-                            thread.rootEvent,
-                            timelineSet.getLiveTimeline(),
-                            toStartOfTimeline,
-                        );
-                    }
-                }
-            });
+            if (thread.length && thread.rootEvent) {
+                this.updateThreadRootEvents(thread, toStartOfTimeline);
+            }
         }
 
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);
