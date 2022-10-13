@@ -121,7 +121,7 @@ describe("MatrixClient", function() {
             }, function(error) {
                 expect(error.httpStatus).toEqual(400);
                 expect(error.errcode).toEqual("M_SNAFU");
-                expect(error.message).toEqual("broken");
+                expect(error.message).toEqual("MatrixError: [400] broken");
             });
 
             httpBackend!.flush('');
