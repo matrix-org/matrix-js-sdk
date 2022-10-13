@@ -18,7 +18,7 @@ import { parse as parseContentType, ParsedMediaType } from "content-type";
 
 import { logger } from "../logger";
 import { sleep } from "../utils";
-import { ConnectionError, MatrixError } from "./errors";
+import { ConnectionError, HTTPError, MatrixError } from "./errors";
 
 // Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 export function timeoutSignal(ms: number): AbortSignal {
@@ -87,9 +87,9 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
         );
     }
     if (contentType?.type === "text/plain") {
-        return new Error(`Server returned ${response.status} error: ${body}`);
+        return new HTTPError(`Server returned ${response.status} error: ${body}`, response.status);
     }
-    return new Error(`Server returned ${response.status} error`);
+    return new HTTPError(`Server returned ${response.status} error`, response.status);
 }
 
 function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest {
