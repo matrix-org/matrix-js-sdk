@@ -846,17 +846,15 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         currentPos = undefined;
                         await sleep(50); // in case the 400 was for something else; don't tightloop
                         continue;
-                    }
-                    await sleep(5000);
+                    } // else fallthrough to generic error handling
                 } else if (this.needsResend || err === "aborted") {
                     // don't sleep as we caused this error by abort()ing the request.
                     // we check for 'aborted' because that's the error Jest returns and without it
                     // we get warnings about not exiting fast enough.
                     continue;
-                } else {
-                    logger.error(err);
-                    await sleep(5000);
                 }
+                logger.error(err);
+                await sleep(5000);
             }
             if (!resp) {
                 continue;
