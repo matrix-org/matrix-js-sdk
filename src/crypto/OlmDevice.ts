@@ -1101,7 +1101,7 @@ export class OlmDevice {
         forwardingCurve25519KeyChain: string[],
         sessionId: string,
         sessionKey: string,
-        keysClaimed: Record<string, string | null>,
+        keysClaimed: Record<string, string>,
         exportFormat: boolean,
         extraSessionData: OlmGroupSessionExtraData = {},
     ): Promise<void> {

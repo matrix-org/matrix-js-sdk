@@ -939,7 +939,9 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *
      * @return {Object<string, string>}
      */
-    public getKeysClaimed(): Record<"ed25519", string | null> {
+    public getKeysClaimed(): Partial<Record<"ed25519", string>> {
+        if (!this.claimedEd25519Key) return {};
+
         return {
             ed25519: this.claimedEd25519Key,
         };
