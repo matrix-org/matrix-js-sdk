@@ -157,7 +157,7 @@ export type RoomEventHandlerMap = {
         event: MatrixEvent,
         room: Room,
         oldEventId?: string,
-        oldStatus?: EventStatus,
+        oldStatus?: EventStatus | null,
     ) => void;
     [RoomEvent.OldStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
     [RoomEvent.CurrentStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
@@ -198,7 +198,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
     private timelineNeedsRefresh = false;
-    private readonly pendingEventList: MatrixEvent[] = [];
+    private readonly pendingEventList?: MatrixEvent[];
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
     private selfMembership?: string;
@@ -337,6 +337,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         this.fixUpLegacyTimelineFields();
 
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
+            this.pendingEventList = [];
             this.client.store.getPendingEvents(this.roomId).then(events => {
                 events.forEach(async (serializedEvent: Partial<IEvent>) => {
                     const event = new MatrixEvent(serializedEvent);
@@ -2176,7 +2177,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS), false);
 
         this.txnToEvent[txnId] = event;
-        if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
+        if (this.pendingEventList) {
             if (this.pendingEventList.some((e) => e.status === EventStatus.NOT_SENT)) {
                 logger.warn("Setting event as NOT_SENT due to messages in the same state");
                 event.setStatus(EventStatus.NOT_SENT);
@@ -2192,7 +2193,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
             if (event.isRedaction()) {
                 const redactId = event.event.redacts;
-                let redactedEvent = this.pendingEventList?.find(e => e.getId() === redactId);
+                let redactedEvent = this.pendingEventList.find(e => e.getId() === redactId);
                 if (!redactedEvent && redactId) {
                     redactedEvent = this.findEventById(redactId);
                 }
@@ -2220,7 +2221,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        this.emit(RoomEvent.LocalEchoUpdated, event, this, undefined, undefined);
+        this.emit(RoomEvent.LocalEchoUpdated, event, this);
     }
 
     /**

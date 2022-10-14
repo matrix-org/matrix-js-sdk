@@ -337,12 +337,12 @@ describe("Room", function() {
                             expect(event.getId()).toEqual(localEventId);
                             expect(event.status).toEqual(EventStatus.SENDING);
                             expect(emitRoom).toEqual(room);
-                            expect(oldEventId).toBe(null);
-                            expect(oldStatus).toBe(null);
+                            expect(oldEventId).toBeUndefined();
+                            expect(oldStatus).toBeUndefined();
                             break;
                         case 1:
                             expect(event.getId()).toEqual(remoteEventId);
-                            expect(event.status).toBe(null);
+                            expect(event.status).toBeUndefined();
                             expect(emitRoom).toEqual(room);
                             expect(oldEventId).toEqual(localEventId);
                             expect(oldStatus).toBe(EventStatus.SENDING);
@@ -1721,7 +1721,7 @@ describe("Room", function() {
                 });
                 room.updateMyMembership(JoinRule.Invite);
                 expect(room.getMyMembership()).toEqual(JoinRule.Invite);
-                expect(events[0]).toEqual({ membership: "invite", oldMembership: null });
+                expect(events[0]).toEqual({ membership: "invite", oldMembership: undefined });
                 events.splice(0);   //clear
                 room.updateMyMembership(JoinRule.Invite);
                 expect(events.length).toEqual(0);

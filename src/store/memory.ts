@@ -61,7 +61,7 @@ export class MemoryStore implements IStore {
     // }
     private filters: Record<string, Record<string, Filter>> = {};
     public accountData: Record<string, MatrixEvent> = {}; // type : content
-    protected readonly localStorage: Storage;
+    protected readonly localStorage?: Storage;
     private oobMembers: Record<string, IStateEventWithRoomId[]> = {}; // roomId: [member events]
     private pendingEvents: { [roomId: string]: Partial<IEvent>[] } = {};
     private clientOptions = {};
@@ -69,7 +69,7 @@ export class MemoryStore implements IStore {
     private nextToDeviceBatchId = 0;
 
     constructor(opts: IOpts = {}) {
-        this.localStorage = opts.localStorage ?? global.localStorage;
+        this.localStorage = opts.localStorage;
     }
 
     /**
