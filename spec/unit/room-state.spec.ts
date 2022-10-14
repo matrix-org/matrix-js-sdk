@@ -295,7 +295,7 @@ describe("RoomState", function() {
                 }),
             ];
             let emitCount = 0;
-            state.on(RoomStateEvent.Marker, function (markerEvent, markerFoundOptions) {
+            state.on(RoomStateEvent.Marker, function(markerEvent, markerFoundOptions) {
                 expect(markerEvent).toEqual(events[emitCount]);
                 expect(markerFoundOptions).toEqual({ timelineWasEmpty: true });
                 emitCount += 1;

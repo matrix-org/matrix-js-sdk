@@ -1537,6 +1537,36 @@ describe("Room", function() {
                 [eventA, eventB, eventC],
             );
         });
+
+        it("should apply redactions eagerly in the pending event list", () => {
+            const client = (new TestClient("@alice:example.com", "alicedevice")).client;
+            const room = new Room(roomId, client, userA, {
+                pendingEventOrdering: PendingEventOrdering.Detached,
+            });
+
+            const eventA = utils.mkMessage({
+                room: roomId,
+                user: userA,
+                msg: "remote 1",
+                event: true,
+            });
+            eventA.status = EventStatus.SENDING;
+            const redactA = utils.mkEvent({
+                room: roomId,
+                user: userA,
+                type: EventType.RoomRedaction,
+                content: {},
+                redacts: eventA.getId(),
+                event: true,
+            });
+            redactA.status = EventStatus.SENDING;
+
+            room.addPendingEvent(eventA, "TXN1");
+            expect(room.getPendingEvents()).toEqual([eventA]);
+            room.addPendingEvent(redactA, "TXN2");
+            expect(room.getPendingEvents()).toEqual([eventA, redactA]);
+            expect(eventA.isRedacted()).toBeTruthy();
+        });
     });
 
     describe("updatePendingEvent", function() {
