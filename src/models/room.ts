@@ -339,8 +339,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
             this.client.store.getPendingEvents(this.roomId).then(events => {
+                const mapper = this.client.getEventMapper({
+                    toDevice: false,
+                    decrypt: false,
+                });
                 events.forEach(async (serializedEvent: Partial<IEvent>) => {
-                    const event = new MatrixEvent(serializedEvent);
+                    const event = mapper(serializedEvent);
                     if (event.getType() === EventType.RoomMessageEncrypted && this.client.isCryptoEnabled()) {
                         await event.attemptDecryption(this.client.crypto!);
                     }

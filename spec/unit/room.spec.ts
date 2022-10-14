@@ -27,6 +27,7 @@ import {
     EventType,
     JoinRule,
     MatrixEvent,
+    MatrixEventEvent,
     PendingEventOrdering,
     RelationType,
     RoomEvent,
@@ -40,6 +41,7 @@ import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { WrappedReceipt } from "../../src/models/read-receipt";
+import { Crypto } from "../../src/crypto";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -2635,5 +2637,43 @@ describe("Room", function() {
 
             expect(room.hasThreadUnreadNotification()).toBe(false);
         });
+    });
+
+    it("should load pending events from from the store and decrypt if needed", async () => {
+        const client = new TestClient(userA).client;
+        client.crypto = {
+            decryptEvent: jest.fn().mockResolvedValue({ clearEvent: { body: "enc" } }),
+        } as unknown as Crypto;
+        client.store.getPendingEvents = jest.fn(async roomId => [{
+            event_id: "$1:server",
+            type: "m.room.message",
+            content: { body: "1" },
+            sender: "@1:server",
+            room_id: roomId,
+            origin_server_ts: 1,
+            txn_id: "txn1",
+        }, {
+            event_id: "$2:server",
+            type: "m.room.encrypted",
+            content: { body: "2" },
+            sender: "@2:server",
+            room_id: roomId,
+            origin_server_ts: 2,
+            txn_id: "txn2",
+        }]);
+        const room = new Room(roomId, client, userA, {
+            pendingEventOrdering: PendingEventOrdering.Detached,
+        });
+        await emitPromise(room, RoomEvent.LocalEchoUpdated);
+        await emitPromise(client, MatrixEventEvent.Decrypted);
+        await emitPromise(room, RoomEvent.LocalEchoUpdated);
+        const pendingEvents = room.getPendingEvents();
+        expect(pendingEvents).toHaveLength(2);
+        expect(pendingEvents[1].isDecryptionFailure()).toBeFalsy();
+        expect(pendingEvents[1].isBeingDecrypted()).toBeFalsy();
+        expect(pendingEvents[1].isEncrypted()).toBeTruthy();
+        for (const ev of pendingEvents) {
+            expect(room.getPendingEvent(ev.getId())).toBe(ev);
+        }
     });
 });
