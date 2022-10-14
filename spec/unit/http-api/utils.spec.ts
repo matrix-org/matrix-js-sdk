@@ -19,6 +19,7 @@ import { mocked } from "jest-mock";
 import {
     anySignal,
     ConnectionError,
+    HTTPError,
     MatrixError,
     parseErrorResponse,
     retryNetworkOperation,
@@ -113,6 +114,41 @@ describe("parseErrorResponse", () => {
         }, 500));
     });
 
+    it("should resolve Matrix Errors from XHR with urls", () => {
+        expect(parseErrorResponse({
+            responseURL: "https://example.com",
+            getResponseHeader(name: string): string | null {
+                return name === "Content-Type" ? "application/json" : null;
+            },
+            status: 500,
+        } as XMLHttpRequest, '{"errcode": "TEST"}')).toStrictEqual(new MatrixError({
+            errcode: "TEST",
+        }, 500, "https://example.com"));
+    });
+
+    it("should resolve Matrix Errors from fetch with urls", () => {
+        expect(parseErrorResponse({
+            url: "https://example.com",
+            headers: {
+                get(name: string): string | null {
+                    return name === "Content-Type" ? "application/json" : null;
+                },
+            },
+            status: 500,
+        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new MatrixError({
+            errcode: "TEST",
+        }, 500, "https://example.com"));
+    });
+
+    it("should set a sensible default error message on MatrixError", () => {
+        let err = new MatrixError();
+        expect(err.message).toEqual("MatrixError: Unknown message");
+        err = new MatrixError({
+            error: "Oh no",
+        });
+        expect(err.message).toEqual("MatrixError: Oh no");
+    });
+
     it("should handle no type gracefully", () => {
         expect(parseErrorResponse({
             headers: {
@@ -121,7 +157,7 @@ describe("parseErrorResponse", () => {
                 },
             },
             status: 500,
-        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new Error("Server returned 500 error"));
+        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new HTTPError("Server returned 500 error", 500));
     });
 
     it("should handle invalid type gracefully", () => {
@@ -144,7 +180,7 @@ describe("parseErrorResponse", () => {
                 },
             },
             status: 418,
-        } as Response, "I'm a teapot")).toStrictEqual(new Error("Server returned 418 error: I'm a teapot"));
+        } as Response, "I'm a teapot")).toStrictEqual(new HTTPError("Server returned 418 error: I'm a teapot", 418));
     });
 });
 
