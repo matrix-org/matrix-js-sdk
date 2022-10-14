@@ -14,7 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../../../src/models/event";
+import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
+import { emitPromise } from "../../test-utils/test-utils";
+import { EventType } from "../../../src";
+import { Crypto } from "../../../src/crypto";
 
 describe('MatrixEvent', () => {
     it('should create copies of itself', () => {
@@ -83,5 +86,37 @@ describe('MatrixEvent', () => {
         expect(ev.getContent().body).toBeUndefined();
         expect(ev.getWireContent().body).toBeUndefined();
         expect(ev.getWireContent().ciphertext).toBeUndefined();
+    });
+
+    it("should abort decryption if fails with an error other than a DecryptionError", async () => {
+        const ev = new MatrixEvent({
+            type: EventType.RoomMessageEncrypted,
+            content: {
+                body: "Test",
+            },
+            event_id: "$event1:server",
+        });
+        await ev.attemptDecryption({
+            decryptEvent: jest.fn().mockRejectedValue(new Error("Not a DecryptionError")),
+        } as unknown as Crypto);
+        expect(ev.isEncrypted()).toBeTruthy();
+        expect(ev.isBeingDecrypted()).toBeFalsy();
+        expect(ev.isDecryptionFailure()).toBeFalsy();
+    });
+
+    describe("applyVisibilityEvent", () => {
+        it("should emit VisibilityChange if a change was made", async () => {
+            const ev = new MatrixEvent({
+                type: "m.room.message",
+                content: {
+                    body: "Test",
+                },
+                event_id: "$event1:server",
+            });
+
+            const prom = emitPromise(ev, MatrixEventEvent.VisibilityChange);
+            ev.applyVisibilityEvent({ visible: false, eventId: ev.getId(), reason: null });
+            await prom;
+        });
     });
 });
