@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Callback } from "../client";
 import { IContent, IEvent } from "../models/event";
 import { Preset, Visibility } from "./partials";
 import { IEventWithRoomId, SearchKey } from "./search";
@@ -22,7 +21,7 @@ import { IRoomEventFilter } from "../filter";
 import { Direction } from "../models/event-timeline";
 import { PushRuleAction } from "./PushRules";
 import { IRoomEvent } from "../sync-accumulator";
-import { RoomType } from "./event";
+import { EventType, RoomType } from "./event";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -98,7 +97,18 @@ export interface ICreateRoomOpts {
     name?: string;
     topic?: string;
     preset?: Preset;
-    power_level_content_override?: object;
+    power_level_content_override?: {
+        ban?: number;
+        events?: Record<EventType | string, number>;
+        events_default?: number;
+        invite?: number;
+        kick?: number;
+        notifications?: Record<string, number>;
+        redact?: number;
+        state_default?: number;
+        users?: Record<string, number>;
+        users_default?: number;
+    };
     creation_content?: object;
     initial_state?: ICreateRoomStateEvent[];
     invite?: string[];
@@ -117,16 +127,6 @@ export interface IRoomDirectoryOptions {
     };
     include_all_networks?: boolean;
     third_party_instance_id?: string;
-}
-
-export interface IUploadOpts {
-    name?: string;
-    includeFilename?: boolean;
-    type?: string;
-    rawResponse?: boolean;
-    onlyContentUri?: boolean;
-    callback?: Callback;
-    progressHandler?: (state: {loaded: number, total: number}) => void;
 }
 
 export interface IAddThreePidOnlyBody {
@@ -149,7 +149,7 @@ export interface IRelationsRequestOpts {
     from?: string;
     to?: string;
     limit?: number;
-    direction?: Direction;
+    dir?: Direction;
 }
 
 export interface IRelationsResponse {

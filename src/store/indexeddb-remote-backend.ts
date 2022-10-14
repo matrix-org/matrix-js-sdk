@@ -18,7 +18,7 @@ import { logger } from "../logger";
 import { defer, IDeferred } from "../utils";
 import { ISavedSync } from "./index";
 import { IStartClientOpts } from "../client";
-import { IStateEventWithRoomId, ISyncResponse } from "..";
+import { IStateEventWithRoomId, ISyncResponse } from "../matrix";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
@@ -138,7 +138,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         return this.doCmd('saveToDeviceBatches', [batches]);
     }
 
-    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
         return this.doCmd('getOldestToDeviceBatch');
     }
 

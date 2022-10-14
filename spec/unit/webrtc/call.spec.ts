@@ -44,7 +44,7 @@ import {
     MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
-import { Callback, EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
+import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
 
 const FAKE_ROOM_ID = "!foo:bar";
 const CALL_LIFETIME = 60000;
@@ -106,7 +106,7 @@ describe('Call', function() {
     let prevDocument: Document;
     let prevWindow: Window & typeof globalThis;
     // We retain a reference to this in the correct Mock type
-    let mockSendEvent: jest.Mock<Promise<ISendEventResponse>, [string, string, IContent, string, Callback<any>]>;
+    let mockSendEvent: jest.Mock<Promise<ISendEventResponse>, [string, string, IContent, string]>;
 
     const errorListener = () => {};
 

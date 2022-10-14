@@ -20,6 +20,7 @@ import 'jest-localstorage-mock';
 import { IndexedDBStore, IStateEventWithRoomId, MemoryStore } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
+import { defer } from "../../../src/utils";
 
 describe("IndexedDBStore", () => {
     afterEach(() => {
@@ -110,5 +111,58 @@ describe("IndexedDBStore", () => {
         expect(localStorage.getItem("mx_pending_events_" + roomId)).toBe(JSON.stringify(events));
         await store.setPendingEvents(roomId, []);
         expect(localStorage.getItem("mx_pending_events_" + roomId)).toBeNull();
+    });
+
+    it("should resolve isNewlyCreated to true if no database existed initially", async () => {
+        const store = new IndexedDBStore({
+            indexedDB,
+            dbName: "db1",
+            localStorage,
+        });
+        await store.startup();
+
+        await expect(store.isNewlyCreated()).resolves.toBeTruthy();
+    });
+
+    it("should resolve isNewlyCreated to false if database existed already", async () => {
+        let store = new IndexedDBStore({
+            indexedDB,
+            dbName: "db2",
+            localStorage,
+        });
+        await store.startup();
+
+        store = new IndexedDBStore({
+            indexedDB,
+            dbName: "db2",
+            localStorage,
+        });
+        await store.startup();
+
+        await expect(store.isNewlyCreated()).resolves.toBeFalsy();
+    });
+
+    it("should resolve isNewlyCreated to false if database existed already but needs upgrade", async () => {
+        const deferred = defer<Event>();
+        // seed db3 to Version 1 so it forces a migration
+        const req = indexedDB.open("matrix-js-sdk:db3", 1);
+        req.onupgradeneeded = () => {
+            const db = req.result;
+            db.createObjectStore("users", { keyPath: ["userId"] });
+            db.createObjectStore("accountData", { keyPath: ["type"] });
+            db.createObjectStore("sync", { keyPath: ["clobber"] });
+        };
+        req.onsuccess = deferred.resolve;
+        await deferred.promise;
+        req.result.close();
+
+        const store = new IndexedDBStore({
+            indexedDB,
+            dbName: "db3",
+            localStorage,
+        });
+        await store.startup();
+
+        await expect(store.isNewlyCreated()).resolves.toBeFalsy();
     });
 });

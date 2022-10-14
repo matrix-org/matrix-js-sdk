@@ -30,7 +30,7 @@ import {
     registerAlgorithm,
 } from "./base";
 import { Room } from '../../models/room';
-import { MatrixEvent } from "../..";
+import { MatrixEvent } from "../../models/event";
 import { IEventDecryptionResult } from "../index";
 import { IInboundSession } from "../OlmDevice";
 

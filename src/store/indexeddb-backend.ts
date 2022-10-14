@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { ISavedSync } from "./index";
-import { IEvent, IStartClientOpts, IStateEventWithRoomId, ISyncResponse } from "..";
+import { IEvent, IStartClientOpts, IStateEventWithRoomId, ISyncResponse } from "../matrix";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 export interface IIndexedDBBackend {
@@ -33,7 +33,7 @@ export interface IIndexedDBBackend {
     getClientOptions(): Promise<IStartClientOpts>;
     storeClientOptions(options: IStartClientOpts): Promise<void>;
     saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void>;
-    getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch>;
+    getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
     removeToDeviceBatch(id: number): Promise<void>;
 }
 

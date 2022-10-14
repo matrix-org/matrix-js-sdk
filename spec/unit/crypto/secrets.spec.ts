@@ -109,16 +109,13 @@ describe("Secrets", function() {
         const secretStorage = alice.crypto.secretStorage;
 
         jest.spyOn(alice, 'setAccountData').mockImplementation(
-            async function(eventType, contents, callback) {
+            async function(eventType, contents) {
                 alice.store.storeAccountDataEvents([
                     new MatrixEvent({
                         type: eventType,
                         content: contents,
                     }),
                 ]);
-                if (callback) {
-                    callback(undefined, undefined);
-                }
                 return {};
             });
 
@@ -192,7 +189,7 @@ describe("Secrets", function() {
                 },
             },
         );
-        alice.setAccountData = async function(eventType, contents, callback) {
+        alice.setAccountData = async function(eventType, contents) {
             alice.store.storeAccountDataEvents([
                 new MatrixEvent({
                     type: eventType,
@@ -332,7 +329,7 @@ describe("Secrets", function() {
             );
             bob.uploadDeviceSigningKeys = async () => ({});
             bob.uploadKeySignatures = jest.fn().mockResolvedValue(undefined);
-            bob.setAccountData = async function(eventType, contents, callback) {
+            bob.setAccountData = async function(eventType, contents) {
                 const event = new MatrixEvent({
                     type: eventType,
                     content: contents,

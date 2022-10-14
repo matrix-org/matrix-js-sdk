@@ -733,7 +733,7 @@ export class SlidingSyncSdk {
             member._requestedProfileInfo = true;
             // try to get a cached copy first.
             const user = client.getUser(member.userId);
-            let promise;
+            let promise: ReturnType<MatrixClient["getProfileInfo"]>;
             if (user) {
                 promise = Promise.resolve({
                     avatar_url: user.avatarUrl,

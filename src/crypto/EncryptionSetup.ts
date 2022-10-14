@@ -18,7 +18,7 @@ import { logger } from "../logger";
 import { MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
-import { Method, PREFIX_UNSTABLE } from "../http-api";
+import { Method, ClientPrefix } from "../http-api";
 import { Crypto, ICryptoCallbacks, IBootstrapCrossSigningOpts } from "./index";
 import {
     ClientEvent,
@@ -240,19 +240,19 @@ export class EncryptionSetupOperation {
                 // Sign the backup with the cross signing key so the key backup can
                 // be trusted via cross-signing.
                 await baseApis.http.authedRequest(
-                    undefined, Method.Put, "/room_keys/version/" + this.keyBackupInfo.version,
+                    Method.Put, "/room_keys/version/" + this.keyBackupInfo.version,
                     undefined, {
                         algorithm: this.keyBackupInfo.algorithm,
                         auth_data: this.keyBackupInfo.auth_data,
                     },
-                    { prefix: PREFIX_UNSTABLE },
+                    { prefix: ClientPrefix.V3 },
                 );
             } else {
                 // add new key backup
                 await baseApis.http.authedRequest(
-                    undefined, Method.Post, "/room_keys/version",
+                    Method.Post, "/room_keys/version",
                     undefined, this.keyBackupInfo,
-                    { prefix: PREFIX_UNSTABLE },
+                    { prefix: ClientPrefix.V3 },
                 );
             }
         }

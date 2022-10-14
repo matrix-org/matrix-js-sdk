@@ -1123,10 +1123,7 @@ describe('Group Call', function() {
         let client: MatrixClient;
 
         beforeEach(() => {
-            client = new MatrixClient({
-                baseUrl: "base_url",
-                request: (() => {}) as any, // NOP
-            });
+            client = new MatrixClient({ baseUrl: "base_url" });
 
             jest.spyOn(client, "sendStateEvent").mockResolvedValue({} as any);
         });

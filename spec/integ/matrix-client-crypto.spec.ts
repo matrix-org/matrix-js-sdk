@@ -31,8 +31,9 @@ import '../olm-loader';
 import { logger } from '../../src/logger';
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
-import { CRYPTO_ENABLED } from "../../src/client";
+import { CRYPTO_ENABLED, IUploadKeysRequest } from "../../src/client";
 import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent } from "../../src/matrix";
+import { DeviceInfo } from '../../src/crypto/deviceinfo';
 
 let aliTestClient: TestClient;
 const roomId = "!room:localhost";
@@ -71,12 +72,12 @@ function expectQueryKeys(querier: TestClient, uploader: TestClient): Promise<num
     expect(uploader.deviceKeys).toBeTruthy();
 
     const uploaderKeys = {};
-    uploaderKeys[uploader.deviceId] = uploader.deviceKeys;
+    uploaderKeys[uploader.deviceId!] = uploader.deviceKeys;
     querier.httpBackend.when("POST", "/keys/query")
-        .respond(200, function(_path, content) {
-            expect(content.device_keys[uploader.userId]).toEqual([]);
+        .respond(200, function(_path, content: IUploadKeysRequest) {
+            expect(content.device_keys![uploader.userId!]).toEqual([]);
             const result = {};
-            result[uploader.userId] = uploaderKeys;
+            result[uploader.userId!] = uploaderKeys;
             return { device_keys: result };
         });
     return querier.httpBackend.flush("/keys/query", 1);
@@ -93,10 +94,10 @@ async function expectAliClaimKeys(): Promise<void> {
     const keys = await bobTestClient.awaitOneTimeKeyUpload();
     aliTestClient.httpBackend.when(
         "POST", "/keys/claim",
-    ).respond(200, function(_path, content) {
-        const claimType = content.one_time_keys[bobUserId][bobDeviceId];
+    ).respond(200, function(_path, content: IUploadKeysRequest) {
+        const claimType = content.one_time_keys![bobUserId][bobDeviceId];
         expect(claimType).toEqual("signed_curve25519");
-        let keyId = null;
+        let keyId = '';
         for (keyId in keys) {
             if (bobTestClient.oneTimeKeys.hasOwnProperty(keyId)) {
                 if (keyId.indexOf(claimType + ":") === 0) {
@@ -132,13 +133,13 @@ async function aliDownloadsKeys(): Promise<void> {
     // check that the localStorage is updated as we expect (not sure this is
     // an integration test, but meh)
     await Promise.all([p1(), p2()]);
-    await aliTestClient.client.crypto.deviceList.saveIfDirty();
+    await aliTestClient.client.crypto!.deviceList.saveIfDirty();
     // @ts-ignore - protected
     aliTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-        const devices = data.devices[bobUserId];
+        const devices = data!.devices[bobUserId]!;
         expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
         expect(devices[bobDeviceId].verified).
-            toBe(0); // DeviceVerification.UNVERIFIED
+            toBe(DeviceInfo.DeviceVerification.UNVERIFIED);
     });
 }
 
@@ -237,7 +238,7 @@ function sendMessage(client: MatrixClient): Promise<ISendEventResponse> {
 
 async function expectSendMessageRequest(httpBackend: TestClient["httpBackend"]): Promise<IContent> {
     const path = "/send/m.room.encrypted/";
-    const prom = new Promise((resolve) => {
+    const prom = new Promise<IContent>((resolve) => {
         httpBackend.when("PUT", path).respond(200, function(_path, content) {
             resolve(content);
             return {
@@ -252,14 +253,14 @@ async function expectSendMessageRequest(httpBackend: TestClient["httpBackend"]):
 }
 
 function aliRecvMessage(): Promise<void> {
-    const message = bobMessages.shift();
+    const message = bobMessages.shift()!;
     return recvMessage(
         aliTestClient.httpBackend, aliTestClient.client, bobUserId, message,
     );
 }
 
 function bobRecvMessage(): Promise<void> {
-    const message = aliMessages.shift();
+    const message = aliMessages.shift()!;
     return recvMessage(
         bobTestClient.httpBackend, bobTestClient.client, aliUserId, message,
     );
@@ -494,7 +495,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -505,11 +506,11 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
-        const message = aliMessages.shift();
+        const message = aliMessages.shift()!;
         const syncData = {
             next_batch: "x",
             rooms: {
@@ -569,7 +570,7 @@ describe("MatrixClient crypto", () => {
         aliTestClient.expectKeyQuery({ device_keys: { [aliUserId]: {} }, failures: {} });
         await aliTestClient.start();
         await bobTestClient.start();
-        bobTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+        bobTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         await firstSync(aliTestClient);
         await aliEnablesEncryption();
         await aliSendsFirstMessage();
@@ -664,11 +665,10 @@ describe("MatrixClient crypto", () => {
         ]);
         logger.log(aliTestClient + ': started');
         httpBackend.when("POST", "/keys/upload")
-            .respond(200, (_path, content) => {
+            .respond(200, (_path, content: IUploadKeysRequest) => {
                 expect(content.one_time_keys).toBeTruthy();
                 expect(content.one_time_keys).not.toEqual({});
-                expect(Object.keys(content.one_time_keys).length).toBeGreaterThanOrEqual(1);
-                logger.log('received %i one-time keys', Object.keys(content.one_time_keys).length);
+                expect(Object.keys(content.one_time_keys!).length).toBeGreaterThanOrEqual(1);
                 // cancel futher calls by telling the client
                 // we have more than we need
                 return {

@@ -357,7 +357,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentPartyId: string;
     private opponentCaps: CallCapabilities;
     private iceDisconnectedTimeout: ReturnType<typeof setTimeout>;
-    private inviteTimeout: ReturnType<typeof setTimeout>;
+    private inviteTimeout?: ReturnType<typeof setTimeout>;
     private readonly removeTrackListeners = new Map<MediaStream, () => void>();
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
@@ -384,7 +384,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private remoteSDPStreamMetadata: SDPStreamMetadata;
 
-    private callLengthInterval: ReturnType<typeof setInterval>;
+    private callLengthInterval?: ReturnType<typeof setInterval>;
     private callLength = 0;
 
     private opponentDeviceId: string;
@@ -1962,7 +1962,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.inviteOrAnswerSent = true;
             this.setState(CallState.InviteSent);
             this.inviteTimeout = setTimeout(() => {
-                this.inviteTimeout = null;
+                this.inviteTimeout = undefined;
                 if (this.state === CallState.InviteSent) {
                     this.hangup(CallErrorCode.InviteTimeout, false);
                 }
@@ -2377,11 +2377,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
-            this.inviteTimeout = null;
+            this.inviteTimeout = undefined;
         }
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
-            this.callLengthInterval = null;
+            this.callLengthInterval = undefined;
         }
 
         for (const [stream, listener] of this.removeTrackListeners) {

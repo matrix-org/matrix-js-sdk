@@ -57,6 +57,7 @@ import {
     ReceiptContent,
     synthesizeReceipt,
 } from "./read-receipt";
+import { Feature, ServerSupport } from "../feature";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -96,6 +97,8 @@ export interface IRecommendedVersion {
 // price to pay to keep matrix-js-sdk responsive.
 const MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH = 30;
 
+export type NotificationCount = Partial<Record<NotificationCountType, number>>;
+
 export enum NotificationCountType {
     Highlight = "highlight",
     Total = "total",
@@ -125,6 +128,7 @@ export enum RoomEvent {
     OldStateUpdated = "Room.OldStateUpdated",
     CurrentStateUpdated = "Room.CurrentStateUpdated",
     HistoryImportedWithinTimeline = "Room.historyImportedWithinTimeline",
+    UnreadNotifications = "Room.UnreadNotifications",
 }
 
 type EmittedEvents = RoomEvent
@@ -162,6 +166,10 @@ export type RoomEventHandlerMap = {
         markerEvent: MatrixEvent,
         room: Room,
     ) => void;
+    [RoomEvent.UnreadNotifications]: (
+        unreadNotifications: NotificationCount,
+        threadId?: string,
+    ) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & ThreadHandlerMap
@@ -183,7 +191,9 @@ export type RoomEventHandlerMap = {
 export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
-    private notificationCounts: Partial<Record<NotificationCountType, number>> = {};
+    private notificationCounts: NotificationCount = {};
+    private readonly threadNotifications = new Map<string, NotificationCount>();
+    private roomThreadsNotificationType: NotificationCountType | null = null;
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -356,7 +366,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     }
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
-    public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet]> {
+    public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet] | null> {
         if (this.threadTimelineSetsPromise) {
             return this.threadTimelineSetsPromise;
         }
@@ -369,10 +379,13 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 ]);
                 const timelineSets = await this.threadTimelineSetsPromise;
                 this.threadsTimelineSets.push(...timelineSets);
+                return timelineSets;
             } catch (e) {
                 this.threadTimelineSetsPromise = null;
+                return null;
             }
         }
+        return null;
     }
 
     /**
@@ -1176,8 +1189,98 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @return {Number} The notification count, or undefined if there is no count
      *                  for this type.
      */
-    public getUnreadNotificationCount(type = NotificationCountType.Total): number | undefined {
-        return this.notificationCounts[type];
+    public getUnreadNotificationCount(type = NotificationCountType.Total): number {
+        let count = this.notificationCounts[type] ?? 0;
+        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
+            for (const threadNotification of this.threadNotifications.values()) {
+                count += threadNotification[type] ?? 0;
+            }
+        }
+        return count;
+    }
+
+    /**
+     * @experimental
+     * Get one of the notification counts for a thread
+     * @param threadId the root event ID
+     * @param type The type of notification count to get. default: 'total'
+     * @returns The notification count, or undefined if there is no count
+     *          for this type.
+     */
+    public getThreadUnreadNotificationCount(threadId: string, type = NotificationCountType.Total): number {
+        return this.threadNotifications.get(threadId)?.[type] ?? 0;
+    }
+
+    /**
+     * @experimental
+     * Checks if the current room has unread thread notifications
+     * @returns {boolean}
+     */
+    public hasThreadUnreadNotification(): boolean {
+        for (const notification of this.threadNotifications.values()) {
+            if ((notification.highlight ?? 0) > 0 || (notification.total ?? 0) > 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @experimental
+     * Swet one of the notification count for a thread
+     * @param threadId the root event ID
+     * @param type The type of notification count to get. default: 'total'
+     * @returns {void}
+     */
+    public setThreadUnreadNotificationCount(threadId: string, type: NotificationCountType, count: number): void {
+        const notification: NotificationCount = {
+            highlight: this.threadNotifications.get(threadId)?.highlight,
+            total: this.threadNotifications.get(threadId)?.total,
+            ...{
+                [type]: count,
+            },
+        };
+
+        this.threadNotifications.set(threadId, notification);
+
+        // Remember what the global threads notification count type is
+        // for all the threads in the room
+        if (count > 0) {
+            switch (this.roomThreadsNotificationType) {
+                case NotificationCountType.Highlight:
+                    break;
+                case NotificationCountType.Total:
+                    if (type === NotificationCountType.Highlight) {
+                        this.roomThreadsNotificationType = type;
+                    }
+                    break;
+                default:
+                    this.roomThreadsNotificationType = type;
+            }
+        }
+
+        this.emit(
+            RoomEvent.UnreadNotifications,
+            notification,
+            threadId,
+        );
+    }
+
+    /**
+     * @experimental
+     * @returns the notification count type for all the threads in the room
+     */
+    public getThreadsAggregateNotificationType(): NotificationCountType | null {
+        return this.roomThreadsNotificationType;
+    }
+
+    /**
+     * @experimental
+     * Resets the thread notifications for this room
+     */
+    public resetThreadUnreadNotificationCount(): void {
+        this.roomThreadsNotificationType = null;
+        this.threadNotifications.clear();
     }
 
     /**
@@ -1187,6 +1290,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public setUnreadNotificationCount(type: NotificationCountType, count: number): void {
         this.notificationCounts[type] = count;
+        this.emit(RoomEvent.UnreadNotifications, this.notificationCounts);
     }
 
     public setSummary(summary: IRoomSummary): void {
@@ -1578,7 +1682,14 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
     private async createThreadTimelineSet(filterType?: ThreadFilterType): Promise<EventTimelineSet> {
         let timelineSet: EventTimelineSet;
-        if (Thread.hasServerSideSupport) {
+        if (Thread.hasServerSideListSupport) {
+            timelineSet =
+                new EventTimelineSet(this, this.opts, undefined, undefined, Boolean(Thread.hasServerSideListSupport));
+            this.reEmitter.reEmit(timelineSet, [
+                RoomEvent.Timeline,
+                RoomEvent.TimelineReset,
+            ]);
+        } else if (Thread.hasServerSideSupport) {
             const filter = await this.getThreadListFilter(filterType);
 
             timelineSet = this.getOrCreateFilteredTimelineSet(
@@ -1611,81 +1722,148 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         return timelineSet;
     }
 
-    public threadsReady = false;
+    private threadsReady = false;
 
+    /**
+     * Takes the given thread root events and creates threads for them.
+     * @param events
+     * @param toStartOfTimeline
+     */
+    public processThreadRoots(events: MatrixEvent[], toStartOfTimeline: boolean): void {
+        for (const rootEvent of events) {
+            EventTimeline.setEventMetadata(
+                rootEvent,
+                this.currentState,
+                toStartOfTimeline,
+            );
+            if (!this.getThread(rootEvent.getId())) {
+                this.createThread(rootEvent.getId(), rootEvent, [], toStartOfTimeline);
+            }
+        }
+    }
+
+    /**
+     * Fetch the bare minimum of room threads required for the thread list to work reliably.
+     * With server support that means fetching one page.
+     * Without server support that means fetching as much at once as the server allows us to.
+     */
     public async fetchRoomThreads(): Promise<void> {
         if (this.threadsReady || !this.client.supportsExperimentalThreads()) {
             return;
         }
 
-        const allThreadsFilter = await this.getThreadListFilter();
+        if (Thread.hasServerSideListSupport) {
+            await Promise.all([
+                this.fetchRoomThreadList(ThreadFilterType.All),
+                this.fetchRoomThreadList(ThreadFilterType.My),
+            ]);
+        } else {
+            const allThreadsFilter = await this.getThreadListFilter();
 
-        const { chunk: events } = await this.client.createMessagesRequest(
-            this.roomId,
-            "",
-            Number.MAX_SAFE_INTEGER,
-            Direction.Backward,
-            allThreadsFilter,
-        );
+            const { chunk: events } = await this.client.createMessagesRequest(
+                this.roomId,
+                "",
+                Number.MAX_SAFE_INTEGER,
+                Direction.Backward,
+                allThreadsFilter,
+            );
 
-        if (!events.length) return;
+            if (!events.length) return;
 
-        // Sorted by last_reply origin_server_ts
-        const threadRoots = events
-            .map(this.client.getEventMapper())
-            .sort((eventA, eventB) => {
-                /**
-                 * `origin_server_ts` in a decentralised world is far from ideal
-                 * but for lack of any better, we will have to use this
-                 * Long term the sorting should be handled by homeservers and this
-                 * is only meant as a short term patch
-                 */
-                const threadAMetadata = eventA
-                    .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
-                const threadBMetadata = eventB
-                    .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
-                return threadAMetadata.latest_event.origin_server_ts - threadBMetadata.latest_event.origin_server_ts;
-            });
+            // Sorted by last_reply origin_server_ts
+            const threadRoots = events
+                .map(this.client.getEventMapper())
+                .sort((eventA, eventB) => {
+                    /**
+                     * `origin_server_ts` in a decentralised world is far from ideal
+                     * but for lack of any better, we will have to use this
+                     * Long term the sorting should be handled by homeservers and this
+                     * is only meant as a short term patch
+                     */
+                    const threadAMetadata = eventA
+                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                    const threadBMetadata = eventB
+                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                    return threadAMetadata.latest_event.origin_server_ts -
+                        threadBMetadata.latest_event.origin_server_ts;
+                });
 
-        let latestMyThreadsRootEvent: MatrixEvent;
-        const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
-        for (const rootEvent of threadRoots) {
-            this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
-                duplicateStrategy: DuplicateStrategy.Ignore,
-                fromCache: false,
-                roomState,
-            });
-
-            const threadRelationship = rootEvent
-                .getServerAggregatedRelation<IThreadBundledRelationship>(RelationType.Thread);
-            if (threadRelationship.current_user_participated) {
-                this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
+            let latestMyThreadsRootEvent: MatrixEvent;
+            const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+            for (const rootEvent of threadRoots) {
+                this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
                     duplicateStrategy: DuplicateStrategy.Ignore,
                     fromCache: false,
                     roomState,
                 });
-                latestMyThreadsRootEvent = rootEvent;
+
+                const threadRelationship = rootEvent
+                    .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                if (threadRelationship.current_user_participated) {
+                    this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
+                        duplicateStrategy: DuplicateStrategy.Ignore,
+                        fromCache: false,
+                        roomState,
+                    });
+                    latestMyThreadsRootEvent = rootEvent;
+                }
             }
 
-            if (!this.getThread(rootEvent.getId())) {
-                this.createThread(rootEvent.getId(), rootEvent, [], true);
+            this.processThreadRoots(threadRoots, true);
+
+            this.client.decryptEventIfNeeded(threadRoots[threadRoots.length -1]);
+            if (latestMyThreadsRootEvent) {
+                this.client.decryptEventIfNeeded(latestMyThreadsRootEvent);
             }
         }
-
-        this.client.decryptEventIfNeeded(threadRoots[threadRoots.length -1]);
-        if (latestMyThreadsRootEvent) {
-            this.client.decryptEventIfNeeded(latestMyThreadsRootEvent);
-        }
-
-        this.threadsReady = true;
 
         this.on(ThreadEvent.NewReply, this.onThreadNewReply);
+        this.threadsReady = true;
+    }
+
+    /**
+     * Fetch a single page of threadlist messages for the specific thread filter
+     * @param filter
+     * @private
+     */
+    private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
+        const timelineSet = filter === ThreadFilterType.My
+            ? this.threadsTimelineSets[1]
+            : this.threadsTimelineSets[0];
+
+        const { chunk: events, end } = await this.client.createThreadListMessagesRequest(
+            this.roomId,
+            null,
+            undefined,
+            Direction.Backward,
+            timelineSet.getFilter(),
+        );
+
+        timelineSet.getLiveTimeline().setPaginationToken(end, Direction.Backward);
+
+        if (!events.length) return;
+
+        const matrixEvents = events.map(this.client.getEventMapper());
+        this.processThreadRoots(matrixEvents, true);
+        const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        for (const rootEvent of matrixEvents) {
+            timelineSet.addLiveEvent(rootEvent, {
+                duplicateStrategy: DuplicateStrategy.Replace,
+                fromCache: false,
+                roomState,
+            });
+        }
     }
 
     private onThreadNewReply(thread: Thread): void {
+        const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         for (const timelineSet of this.threadsTimelineSets) {
             timelineSet.removeEvent(thread.id);
-            timelineSet.addLiveEvent(thread.rootEvent);
+            timelineSet.addLiveEvent(thread.rootEvent, {
+                duplicateStrategy: DuplicateStrategy.Replace,
+                fromCache: false,
+                roomState,
+            });
         }
     }
 
@@ -1831,8 +2009,6 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             this.lastThread = thread;
         }
 
-        this.emit(ThreadEvent.New, thread, toStartOfTimeline);
-
         if (this.threadsReady) {
             this.threadsTimelineSets.forEach(timelineSet => {
                 if (thread.rootEvent) {
@@ -1848,6 +2024,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 }
             });
         }
+
+        this.emit(ThreadEvent.New, thread, toStartOfTimeline);
 
         return thread;
     }

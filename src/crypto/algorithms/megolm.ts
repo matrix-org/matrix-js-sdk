@@ -1438,9 +1438,10 @@ class MegolmDecryption extends DecryptionAlgorithm {
                     memberEvent?.getPrevContent()?.membership === "invite");
             const fromUs = event.getSender() === this.baseApis.getUserId();
 
-            if (!weRequested) {
-                // If someone sends us an unsolicited key and it's not
-                // shared history, ignore it
+            if (!weRequested && !fromUs) {
+                // If someone sends us an unsolicited key and they're
+                // not one of our other devices and it's not shared
+                // history, ignore it
                 if (!extraSessionData.sharedHistory) {
                     logger.log("forwarded key not shared history - ignoring");
                     return;
@@ -1449,7 +1450,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 // If someone sends us an unsolicited key for a room
                 // we're already in, and they're not one of our other
                 // devices or the one who invited us, ignore it
-                if (room && !fromInviter && !fromUs) {
+                if (room && !fromInviter) {
                     logger.log("forwarded key not from inviter or from us - ignoring");
                     return;
                 }
@@ -1794,12 +1795,17 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * @private
      * @param {String} senderKey
      * @param {String} sessionId
-     * @param {Boolean} keyTrusted
+     * @param {Boolean} forceRedecryptIfUntrusted whether messages that were already
+     *     successfully decrypted using untrusted keys should be re-decrypted
      *
      * @return {Boolean} whether all messages were successfully
      *     decrypted with trusted keys
      */
-    private async retryDecryption(senderKey: string, sessionId: string, keyTrusted?: boolean): Promise<boolean> {
+    private async retryDecryption(
+        senderKey: string,
+        sessionId: string,
+        forceRedecryptIfUntrusted?: boolean,
+    ): Promise<boolean> {
         const senderPendingEvents = this.pendingEvents.get(senderKey);
         if (!senderPendingEvents) {
             return true;
@@ -1814,7 +1820,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         await Promise.all([...pending].map(async (ev) => {
             try {
-                await ev.attemptDecryption(this.crypto, { isRetry: true, keyTrusted });
+                await ev.attemptDecryption(this.crypto, { isRetry: true, forceRedecryptIfUntrusted });
             } catch (e) {
                 // don't die if something goes wrong
             }

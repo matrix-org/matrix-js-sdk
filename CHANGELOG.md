@@ -1,3 +1,25 @@
+Changes in [20.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.1.0) (2022-10-11)
+============================================================================================================
+
+## ✨ Features
+ * Add local notification settings capability ([\#2700](https://github.com/matrix-org/matrix-js-sdk/pull/2700)).
+ * Implementation of MSC3882 login token request ([\#2687](https://github.com/matrix-org/matrix-js-sdk/pull/2687)). Contributed by @hughns.
+ * Typings for MSC2965 OIDC provider discovery ([\#2424](https://github.com/matrix-org/matrix-js-sdk/pull/2424)). Contributed by @hughns.
+ * Support to remotely toggle push notifications ([\#2686](https://github.com/matrix-org/matrix-js-sdk/pull/2686)).
+ * Read receipts for threads ([\#2635](https://github.com/matrix-org/matrix-js-sdk/pull/2635)).
+
+## 🐛 Bug Fixes
+ * Use the correct sender key when checking shared secret ([\#2730](https://github.com/matrix-org/matrix-js-sdk/pull/2730)). Fixes vector-im/element-web#23374.
+ * Unexpected ignored self key request when it's not shared history ([\#2724](https://github.com/matrix-org/matrix-js-sdk/pull/2724)). Contributed by @mcalinghee.
+ * Fix IDB initial migration handling causing spurious lazy loading upgrade loops ([\#2718](https://github.com/matrix-org/matrix-js-sdk/pull/2718)). Fixes vector-im/element-web#23377.
+ * Fix backpagination at end logic being spec non-conforming ([\#2680](https://github.com/matrix-org/matrix-js-sdk/pull/2680)). Fixes vector-im/element-web#22784.
+
+Changes in [20.0.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.2) (2022-09-30)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix issue in sync when crypto is not supported by client ([\#2715](https://github.com/matrix-org/matrix-js-sdk/pull/2715)). Contributed by @stas-demydiuk.
+
 Changes in [20.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.0.1) (2022-09-28)
 ==================================================================================================
 

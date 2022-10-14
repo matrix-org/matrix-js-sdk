@@ -99,7 +99,7 @@ export class EventTimeline {
     private endState: RoomState;
     private prevTimeline?: EventTimeline;
     private nextTimeline?: EventTimeline;
-    public paginationRequests: Record<Direction, Promise<boolean>> = {
+    public paginationRequests: Record<Direction, Promise<boolean> | null> = {
         [Direction.Backward]: null,
         [Direction.Forward]: null,
     };
@@ -311,7 +311,7 @@ export class EventTimeline {
      *   token for going backwards in time; EventTimeline.FORWARDS to set the
      *   pagination token for going forwards in time.
      */
-    public setPaginationToken(token: string, direction: Direction): void {
+    public setPaginationToken(token: string | null, direction: Direction): void {
         this.getState(direction).paginationToken = token;
     }
 

@@ -123,12 +123,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {MatrixClient=} client the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
      * @param {Thread=} thread the thread to which this timeline set relates.
+     * @param {boolean} isThreadTimeline Whether this timeline set relates to a thread list timeline
+     * (e.g., All threads or My threads)
      */
     constructor(
         public readonly room: Room | undefined,
         opts: IOpts = {},
         client?: MatrixClient,
         public readonly thread?: Thread,
+        public readonly isThreadTimeline: boolean = false,
     ) {
         super();
 

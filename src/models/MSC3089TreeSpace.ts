@@ -476,10 +476,8 @@ export class MSC3089TreeSpace {
         info: Partial<IEncryptedFile>,
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
-        const mxc = await this.client.uploadContent(encryptedContents, {
+        const { content_uri: mxc } = await this.client.uploadContent(encryptedContents, {
             includeFilename: false,
-            onlyContentUri: true,
-            rawResponse: false, // make this explicit otherwise behaviour is different on browser vs NodeJS
         });
         info.url = mxc;
 
