@@ -1449,8 +1449,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     /**
      * @experimental
      */
-    public getThread(eventId: string): Thread | undefined {
-        return this.threads.get(eventId);
+    public getThread(eventId: string): Thread | null {
+        return this.threads.get(eventId) ?? null;
     }
 
     /**
@@ -2026,7 +2026,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             const redactId = event.event.redacts;
 
             // if we know about this event, redact its contents now.
-            const redactedEvent = this.findEventById(redactId);
+            const redactedEvent = redactId ? this.findEventById(redactId) : undefined;
             if (redactedEvent) {
                 redactedEvent.makeRedacted(event);
 
@@ -2339,18 +2339,17 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
         // if the message was sent, we expect an event id
         if (newStatus == EventStatus.SENT && !newEventId) {
-            throw new Error("updatePendingEvent called with status=SENT, " +
-                "but no new event id");
+            throw new Error("updatePendingEvent called with status=SENT, but no new event id");
         }
 
         // SENT races against /sync, so we have to special-case it.
         if (newStatus == EventStatus.SENT) {
-            const timeline = this.getTimelineForEvent(newEventId);
+            const timeline = this.getTimelineForEvent(newEventId!);
             if (timeline) {
                 // we've already received the event via the event stream.
                 // nothing more to do here, assuming the transaction ID was correctly matched.
                 // Let's check that.
-                const remoteEvent = this.findEventById(newEventId);
+                const remoteEvent = this.findEventById(newEventId!);
                 const remoteTxnId = remoteEvent?.getUnsigned().transaction_id;
                 if (!remoteTxnId && remoteEvent) {
                     // This code path is mostly relevant for the Sliding Sync proxy.
@@ -2386,18 +2385,18 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
         if (newStatus == EventStatus.SENT) {
             // update the event id
-            event.replaceLocalEventId(newEventId);
+            event.replaceLocalEventId(newEventId!);
 
             const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(event);
             const thread = this.getThread(threadId);
-            thread?.timelineSet.replaceEventId(oldEventId, newEventId);
+            thread?.timelineSet.replaceEventId(oldEventId, newEventId!);
 
             if (shouldLiveInRoom) {
                 // if the event was already in the timeline (which will be the case if
                 // opts.pendingEventOrdering==chronological), we need to update the
                 // timeline map.
                 for (let i = 0; i < this.timelineSets.length; i++) {
-                    this.timelineSets[i].replaceEventId(oldEventId, newEventId);
+                    this.timelineSets[i].replaceEventId(oldEventId, newEventId!);
                 }
             }
         } else if (newStatus == EventStatus.CANCELLED) {

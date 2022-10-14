@@ -9036,8 +9036,8 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
         const hasReadEvent = isThreadEvent
-            ? room.getThread(event.threadRootId).hasUserReadEvent(cli.getUserId(), event.getId())
-            : room.hasUserReadEvent(cli.getUserId(), event.getId());
+            ? room.getThread(event.threadRootId)?.hasUserReadEvent(cli.getUserId()!, event.getId())
+            : room.hasUserReadEvent(cli.getUserId()!, event.getId());
 
         if (!hasReadEvent) {
             let newCount = currentCount;
