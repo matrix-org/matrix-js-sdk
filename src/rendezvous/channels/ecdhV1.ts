@@ -133,7 +133,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
             }
             const { key, algorithm } = res;
 
-            if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || (isInitiator && !key)) {
+            if (algorithm !== SecureRendezvousChannelAlgorithm.ECDH_V1 || !key) {
                 throw new RendezvousError(
                     'Unsupported algorithm: ' + algorithm,
                     RendezvousFailureReason.UnsupportedAlgorithm,
