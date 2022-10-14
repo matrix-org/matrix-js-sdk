@@ -75,13 +75,22 @@ export interface IAddLiveEventOptions
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;
 
 export type EventTimelineSetHandlerMap = {
-    [RoomEvent.Timeline]:
-        (event: MatrixEvent, room: Room, toStartOfTimeline: boolean, removed: boolean, data: IRoomTimelineData) => void;
-    [RoomEvent.TimelineReset]: (room: Room, eventTimelineSet: EventTimelineSet, resetAllTimelines: boolean) => void;
+    [RoomEvent.Timeline]: (
+        event: MatrixEvent,
+        room: Room | undefined,
+        toStartOfTimeline: boolean | undefined,
+        removed: boolean,
+        data: IRoomTimelineData,
+    ) => void;
+    [RoomEvent.TimelineReset]: (
+        room: Room | undefined,
+        eventTimelineSet: EventTimelineSet,
+        resetAllTimelines: boolean,
+    ) => void;
 };
 
 export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTimelineSetHandlerMap> {
-    public readonly relations?: RelationsContainer;
+    public readonly relations: RelationsContainer;
     private readonly timelineSupport: boolean;
     private readonly displayPendingEvents: boolean;
     private liveTimeline: EventTimeline;
@@ -145,7 +154,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         this.filter = opts.filter;
 
-        this.relations = this.room?.relations ?? new RelationsContainer(room?.client ?? client);
+        this.relations = this.room?.relations ?? new RelationsContainer(room?.client ?? client!);
     }
 
     /**
@@ -212,7 +221,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {String} eventId the eventId being sought
      * @return {module:models/event-timeline~EventTimeline} timeline
      */
-    public eventIdToTimeline(eventId: string): EventTimeline {
+    public eventIdToTimeline(eventId: string): EventTimeline | undefined {
         return this._eventIdToTimeline.get(eventId);
     }
 
@@ -268,15 +277,13 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         if (forwardPaginationToken) {
             // Now set the forward pagination token on the old live timeline
             // so it can be forward-paginated.
-            oldTimeline.setPaginationToken(
-                forwardPaginationToken, EventTimeline.FORWARDS,
-            );
+            oldTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
         }
 
         // make sure we set the pagination token before firing timelineReset,
         // otherwise clients which start back-paginating will fail, and then get
         // stuck without realising that they *can* back-paginate.
-        newTimeline.setPaginationToken(backPaginationToken, EventTimeline.BACKWARDS);
+        newTimeline.setPaginationToken(backPaginationToken ?? null, EventTimeline.BACKWARDS);
 
         // Now we can swap the live timeline to the new one.
         this.liveTimeline = newTimeline;
@@ -579,7 +586,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         roomState?: RoomState,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy || DuplicateStrategy.Ignore;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty: boolean | undefined;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy = DuplicateStrategy.Ignore,
@@ -681,7 +688,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         roomState?: RoomState,
     ): void {
         let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty: boolean | undefined;
         if (typeof (toStartOfTimelineOrOpts) === 'object') {
             ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
         } else if (toStartOfTimelineOrOpts !== undefined) {
@@ -794,10 +801,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         }
 
         if (timeline1 === timeline2) {
-            // both events are in the same timeline - figure out their
-            // relative indices
-            let idx1: number;
-            let idx2: number;
+            // both events are in the same timeline - figure out their relative indices
+            let idx1: number | undefined = undefined;
+            let idx2: number | undefined = undefined;
             const events = timeline1.getEvents();
             for (let idx = 0; idx < events.length &&
             (idx1 === undefined || idx2 === undefined); idx++) {
@@ -809,7 +815,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                     idx2 = idx;
                 }
             }
-            return idx1 - idx2;
+            return idx1! - idx2!;
         }
 
         // the events are in different timelines. Iterate through the
