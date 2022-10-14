@@ -342,7 +342,7 @@ describe("Room", function() {
                             break;
                         case 1:
                             expect(event.getId()).toEqual(remoteEventId);
-                            expect(event.status).toBeUndefined();
+                            expect(event.status).toBeNull();
                             expect(emitRoom).toEqual(room);
                             expect(oldEventId).toEqual(localEventId);
                             expect(oldStatus).toBe(EventStatus.SENDING);
@@ -371,7 +371,7 @@ describe("Room", function() {
             delete eventJson["event_id"];
             const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp" }, eventJson));
             localEvent.status = EventStatus.SENDING;
-            expect(localEvent.getTxnId()).toBeNull();
+            expect(localEvent.getTxnId()).toBeUndefined();
             expect(room.timeline.length).toEqual(0);
 
             // first add the local echo. This is done before the /send request is even sent.
@@ -386,7 +386,7 @@ describe("Room", function() {
 
             // then /sync returns the remoteEvent, it should de-dupe based on the event ID.
             const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
-            expect(remoteEvent.getTxnId()).toBeNull();
+            expect(remoteEvent.getTxnId()).toBeUndefined();
             room.addLiveEvents([remoteEvent]);
             // the duplicate strategy code should ensure we don't add a 2nd event to the live timeline
             expect(room.timeline.length).toEqual(1);
