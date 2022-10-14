@@ -140,6 +140,15 @@ describe("parseErrorResponse", () => {
         }, 500, "https://example.com"));
     });
 
+    it("should set a sensible default error message on MatrixError", () => {
+        let err = new MatrixError();
+        expect(err.message).toEqual("MatrixError: Unknown message");
+        err = new MatrixError({
+            error: "Oh no",
+        });
+        expect(err.message).toEqual("MatrixError: Oh no");
+    });
+
     it("should handle no type gracefully", () => {
         expect(parseErrorResponse({
             headers: {
