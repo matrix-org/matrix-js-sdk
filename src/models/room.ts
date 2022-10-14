@@ -340,8 +340,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             this.client.store.getPendingEvents(this.roomId).then(events => {
                 events.forEach(async (serializedEvent: Partial<IEvent>) => {
                     const event = new MatrixEvent(serializedEvent);
-                    if (event.getType() === EventType.RoomMessageEncrypted) {
-                        await event.attemptDecryption(this.client.crypto);
+                    if (event.getType() === EventType.RoomMessageEncrypted && this.client.isCryptoEnabled()) {
+                        await event.attemptDecryption(this.client.crypto!);
                     }
                     event.setStatus(EventStatus.NOT_SENT);
                     this.addPendingEvent(event, event.getTxnId());
@@ -391,8 +391,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      *
      * @returns {Promise} Signals when all events have been decrypted
      */
-    public decryptCriticalEvents(): Promise<void> {
-        const readReceiptEventId = this.getEventReadUpTo(this.client.getUserId(), true);
+    public async decryptCriticalEvents(): Promise<void> {
+        if (!this.client.isCryptoEnabled()) return;
+
+        const readReceiptEventId = this.getEventReadUpTo(this.client.getUserId()!, true);
         const events = this.getLiveTimeline().getEvents();
         const readReceiptTimelineIndex = events.findIndex(matrixEvent => {
             return matrixEvent.event.event_id === readReceiptEventId;
@@ -402,9 +404,9 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             .slice(readReceiptTimelineIndex)
             .filter(event => event.shouldAttemptDecryption())
             .reverse()
-            .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
+            .map(event => event.attemptDecryption(this.client.crypto!, { isRetry: true }));
 
-        return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
+        await Promise.allSettled(decryptionPromises);
     }
 
     /**
@@ -412,16 +414,18 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      *
      * @returns {Promise} Signals when all events have been decrypted
      */
-    public decryptAllEvents(): Promise<void> {
+    public async decryptAllEvents(): Promise<void> {
+        if (!this.client.isCryptoEnabled()) return;
+
         const decryptionPromises = this
             .getUnfilteredTimelineSet()
             .getLiveTimeline()
             .getEvents()
             .filter(event => event.shouldAttemptDecryption())
             .reverse()
-            .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
+            .map(event => event.attemptDecryption(this.client.crypto!, { isRetry: true }));
 
-        return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
+        await Promise.allSettled(decryptionPromises);
     }
 
     /**
@@ -437,7 +441,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * Gets the version of the room
      * @returns {string} The version of the room, or null if it could not be determined
      */
-    public getVersion(): string | null {
+    public getVersion(): string {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
         if (!createEvent) {
             if (!this.getVersionWarning) {
@@ -446,9 +450,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             }
             return '1';
         }
-        const ver = createEvent.getContent()['room_version'];
-        if (ver === undefined) return '1';
-        return ver;
+        return createEvent.getContent()['room_version'] ?? '1';
     }
 
     /**
@@ -527,7 +529,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         logger.log(`[${this.roomId}] Current version: ${currentVersion}`);
         logger.log(`[${this.roomId}] Version capability: `, versionCap);
 
-        const result = {
+        const result: IRecommendedVersion = {
             version: currentVersion,
             needsUpgrade: false,
             urgent: false,
@@ -637,7 +639,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             return null;
         }
 
-        return this.pendingEventList.find(event => event.getId() === eventId);
+        return this.pendingEventList.find(event => event.getId() === eventId) ?? null;
     }
 
     /**
@@ -828,12 +830,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             this.currentState.setOutOfBandMembers(result.memberEvents);
             // now the members are loaded, start to track the e2e devices if needed
             if (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId)) {
-                this.client.crypto.trackRoomDevices(this.roomId);
+                this.client.crypto!.trackRoomDevices(this.roomId);
             }
             return result.fromServer;
         }).catch((err) => {
             // allow retries on fail
-            this.membersPromise = null;
+            this.membersPromise = undefined;
             this.currentState.markOutOfBandMembersFailed();
             throw err;
         });
@@ -842,7 +844,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             if (fromServer) {
                 const oobMembers = this.currentState.getMembers()
                     .filter((m) => m.isOutOfBand())
-                    .map((m) => m.events.member.event as IStateEventWithRoomId);
+                    .map((m) => m.events.member?.event as IStateEventWithRoomId);
                 logger.log(`LL: telling store to write ${oobMembers.length}`
                     + ` members for room ${this.roomId}`);
                 const store = this.client.store;
@@ -873,7 +875,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             await this.loadMembersIfNeeded();
             await this.client.store.clearOutOfBandMembers(this.roomId);
             this.currentState.clearOutOfBandMembers();
-            this.membersPromise = null;
+            this.membersPromise = undefined;
         }
     }
 
@@ -2050,7 +2052,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 // they are based on are changed.
 
                 // Remove any visibility change on this event.
-                this.visibilityEvents.delete(redactId);
+                this.visibilityEvents.delete(redactId!);
 
                 // If this event is a visibility change event, remove it from the
                 // list of visibility changes and update any event affected by it.
@@ -2191,7 +2193,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             if (event.isRedaction()) {
                 const redactId = event.event.redacts;
                 let redactedEvent = this.pendingEventList?.find(e => e.getId() === redactId);
-                if (!redactedEvent) {
+                if (!redactedEvent && redactId) {
                     redactedEvent = this.findEventById(redactId);
                 }
                 if (redactedEvent) {
@@ -2203,7 +2205,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             for (let i = 0; i < this.timelineSets.length; i++) {
                 const timelineSet = this.timelineSets[i];
                 if (timelineSet.getFilter()) {
-                    if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
+                    if (timelineSet.getFilter()!.filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event,
                             timelineSet.getLiveTimeline(), {
                                 toStartOfTimeline: false,
@@ -2218,7 +2220,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        this.emit(RoomEvent.LocalEchoUpdated, event, this, null, null);
+        this.emit(RoomEvent.LocalEchoUpdated, event, this, undefined, undefined);
     }
 
     /**
@@ -2388,7 +2390,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             event.replaceLocalEventId(newEventId!);
 
             const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(event);
-            const thread = this.getThread(threadId);
+            const thread = threadId ? this.getThread(threadId) : undefined;
             thread?.timelineSet.replaceEventId(oldEventId, newEventId!);
 
             if (shouldLiveInRoom) {
@@ -2909,11 +2911,9 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         }
 
         // get members that are NOT ourselves and are actually in the room.
-        let otherNames: string[] = null;
+        let otherNames: string[] = [];
         if (this.summaryHeroes) {
-            // if we have a summary, the member state events
-            // should be in the room state
-            otherNames = [];
+            // if we have a summary, the member state events should be in the room state
             this.summaryHeroes.forEach((userId) => {
                 // filter service members
                 if (excludedUserIds.includes(userId)) {
