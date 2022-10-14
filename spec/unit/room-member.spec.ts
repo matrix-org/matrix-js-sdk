@@ -273,6 +273,79 @@ describe("RoomMember", function() {
         });
     });
 
+    describe("isKicked", () => {
+        it("should return false if membership is not `leave`", () => {
+            const member1 = new RoomMember(roomId, userA);
+            member1.membership = "join";
+            expect(member1.isKicked()).toBeFalsy();
+
+            const member2 = new RoomMember(roomId, userA);
+            member2.membership = "invite";
+            expect(member2.isKicked()).toBeFalsy();
+
+            const member3 = new RoomMember(roomId, userA);
+            expect(member3.isKicked()).toBeFalsy();
+        });
+
+        it("should return false if the membership event is unknown", () => {
+            const member = new RoomMember(roomId, userA);
+            member.membership = "leave";
+            expect(member.isKicked()).toBeFalsy();
+        });
+
+        it("should return false if the member left of their own accord", () => {
+            const member = new RoomMember(roomId, userA);
+            member.membership = "leave";
+            member.events.member = utils.mkMembership({
+                event: true,
+                sender: userA,
+                mship: "leave",
+                skey: userA,
+            });
+            expect(member.isKicked()).toBeFalsy();
+        });
+
+        it("should return true if the member's leave was sent by another user", () => {
+            const member = new RoomMember(roomId, userA);
+            member.membership = "leave";
+            member.events.member = utils.mkMembership({
+                event: true,
+                sender: userB,
+                mship: "leave",
+                skey: userA,
+            });
+            expect(member.isKicked()).toBeTruthy();
+        });
+    });
+
+    describe("getDMInviter", () => {
+        it("should return userId of the sender of the invite if is_direct=true", () => {
+            const member = new RoomMember(roomId, userA);
+            member.membership = "invite";
+            member.events.member = utils.mkMembership({
+                event: true,
+                sender: userB,
+                mship: "invite",
+                skey: userA,
+            });
+            member.events.member.event.content!.is_direct = true;
+            expect(member.getDMInviter()).toBe(userB);
+        });
+
+        it("should not return userId of the sender of the invite if is_direct=false", () => {
+            const member = new RoomMember(roomId, userA);
+            member.membership = "invite";
+            member.events.member = utils.mkMembership({
+                event: true,
+                sender: userB,
+                mship: "invite",
+                skey: userA,
+            });
+            member.events.member.event.content!.is_direct = false;
+            expect(member.getDMInviter()).toBeUndefined();
+        });
+    });
+
     describe("setMembershipEvent", function() {
         const joinEvent = utils.mkMembership({
             event: true,
