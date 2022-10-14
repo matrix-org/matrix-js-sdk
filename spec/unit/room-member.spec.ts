@@ -185,7 +185,7 @@ describe("RoomMember", function() {
                 skey: "invalid",
                 event: true,
             }));
-            member.setPowerLevelEvent(utils.mkEvent({
+            const nonStateEv = utils.mkEvent({
                 type: EventType.RoomPowerLevels,
                 room: roomId,
                 user: userA,
@@ -195,9 +195,10 @@ describe("RoomMember", function() {
                         "@alice:bar": "5",
                     },
                 },
-                skey: null,
                 event: true,
-            }));
+            });
+            delete nonStateEv.event.state_key;
+            member.setPowerLevelEvent(nonStateEv);
             member.setPowerLevelEvent(utils.mkEvent({
                 type: EventType.Sticker,
                 room: roomId,
