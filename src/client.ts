@@ -5208,7 +5208,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             event,
             ...res.events_before.map(mapper),
         ];
-        
+
         if (this.supportsExperimentalThreads()) {
             // Where the event is a thread reply (not a root) and running in MSC-enabled mode the Thread timeline only
             // functions contiguously, so we have to jump through some hoops to get our target event in it.

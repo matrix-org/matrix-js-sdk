@@ -744,7 +744,7 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id);
+            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!);
             await httpBackend.flushAllExpected();
 
             const timeline = await timelinePromise;
@@ -803,7 +803,7 @@ describe("MatrixClient event timelines", function() {
             await startClient(httpBackend, client);
 
             const room = client.getRoom(roomId);
-            const timelineSet = room.getTimelineSets()[0];
+            const timelineSet = room!.getTimelineSets()[0];
             await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
         });
 
@@ -897,7 +897,7 @@ describe("MatrixClient event timelines", function() {
 
         it("should successfully create a new timeline even when the latest event is a threaded reply", function() {
             const room = client.getRoom(roomId);
-            const timelineSet = room.getTimelineSets()[0];
+            const timelineSet = room!.getTimelineSets()[0];
             expect(timelineSet.thread).toBeUndefined();
 
             const latestMessageId = 'threadedEvent1:bar';
@@ -937,16 +937,16 @@ describe("MatrixClient event timelines", function() {
             };
             return Promise.all([
                 client.getLatestTimeline(timelineSet).then(function(tl) {
-                    const events = tl.getEvents();
+                    const events = tl!.getEvents();
                     const expectedEvents = [EVENTS[0], THREAD_ROOT];
                     expect(events.map(event => eventPropertiesToCompare(event)))
                         .toEqual(expectedEvents.map(event => eventPropertiesToCompare(event)));
                     // Sanity check: The threaded reply should not be in the timeline
                     expect(events.find(e => e.getId() === THREAD_REPLY.event_id)).toBeFalsy();
 
-                    expect(tl.getPaginationToken(EventTimeline.BACKWARDS))
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                         .toEqual("start_token");
-                    expect(tl.getPaginationToken(EventTimeline.FORWARDS))
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS))
                         .toEqual("end_token");
                 }),
                 httpBackend.flushAllExpected(),

@@ -250,8 +250,8 @@ describe('EventTimelineSet', () => {
             });
 
             it('should not return the related events', () => {
-                eventTimelineSet.relations.aggregateChildEvent(messageEvent);
-                const relations = eventTimelineSet.relations.getChildEventsForEvent(
+                eventTimelineSet!.relations.aggregateChildEvent(messageEvent);
+                const relations = eventTimelineSet!.relations.getChildEventsForEvent(
                     messageEvent.getId(),
                     "m.in_reply_to",
                     EventType.RoomMessage,
