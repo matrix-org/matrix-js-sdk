@@ -201,7 +201,7 @@ describe("MatrixClient events", function() {
             });
             client!.on(RoomEvent.Timeline, function(event, room) {
                 timelineFireCount++;
-                expect(room.roomId).toEqual("!erufh:bar");
+                expect(room?.roomId).toEqual("!erufh:bar");
             });
             client!.on(RoomEvent.Name, function(room) {
                 roomNameInvokeCount++;

@@ -38,7 +38,7 @@ export type UserEventHandlerMap = {
 };
 
 export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
-    private modified?: number;
+    private modified = -1;
 
     // XXX these should be read-only
     public displayName?: string;
@@ -146,11 +146,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      */
     public setDisplayName(name: string): void {
         const oldName = this.displayName;
-        if (typeof name === "string") {
-            this.displayName = name;
-        } else {
-            this.displayName = undefined;
-        }
+        this.displayName = name;
         if (name !== oldName) {
             this.updateModifiedTime();
         }
@@ -161,7 +157,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * in response to this as there is no underlying MatrixEvent to emit with.
      * @param {string} name The new display name.
      */
-    public setRawDisplayName(name: string): void {
+    public setRawDisplayName(name?: string): void {
         this.rawDisplayName = name;
     }
 
@@ -170,7 +166,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * as there is no underlying MatrixEvent to emit with.
      * @param {string} url The new avatar URL.
      */
-    public setAvatarUrl(url: string): void {
+    public setAvatarUrl(url?: string): void {
         const oldUrl = this.avatarUrl;
         this.avatarUrl = url;
         if (url !== oldUrl) {
@@ -191,7 +187,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * property on this object. It is updated <i>before</i> firing events.
      * @return {number} The timestamp
      */
-    public getLastModifiedTime(): number | undefined {
+    public getLastModifiedTime(): number {
         return this.modified;
     }
 

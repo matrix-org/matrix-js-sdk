@@ -92,7 +92,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     // same for invited member count
     private invitedMemberCount: number | null = null;
     private summaryInvitedMemberCount: number | null = null;
-    private modified?: number;
+    private modified = -1;
 
     // XXX: Should be read-only
     public members: Record<string, RoomMember> = {}; // userId: RoomMember
@@ -684,7 +684,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * updated when this object has received new state events.
      * @return {number} The timestamp
      */
-    public getLastModifiedTime(): number | undefined {
+    public getLastModifiedTime(): number {
         return this.modified;
     }
 

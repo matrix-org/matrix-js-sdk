@@ -43,7 +43,7 @@ export type RoomMemberEventHandlerMap = {
 
 export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEventHandlerMap> {
     private _isOutOfBand = false;
-    private modified?: number;
+    private modified = -1;
     public requestedProfileInfo = false; // used by sync.ts
 
     // XXX these should be read-only
@@ -242,7 +242,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * It is updated <i>before</i> firing events.
      * @return {number} The timestamp
      */
-    public getLastModifiedTime(): number | undefined {
+    public getLastModifiedTime(): number {
         return this.modified;
     }
 
