@@ -345,7 +345,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                         await event.attemptDecryption(this.client.crypto!);
                     }
                     event.setStatus(EventStatus.NOT_SENT);
-                    this.addPendingEvent(event, event.getTxnId());
+                    this.addPendingEvent(event, event.getTxnId()!);
                 });
             });
         }

@@ -292,7 +292,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream: boolean;
     private successor: MatrixCall;
-    private opponentMember: RoomMember | null;
+    private opponentMember: RoomMember;
     private opponentVersion: number | string;
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
@@ -372,7 +372,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return dataChannel;
     }
 
-    public getOpponentMember(): RoomMember | null {
+    public getOpponentMember(): RoomMember {
         return this.opponentMember;
     }
 
@@ -2210,7 +2210,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = ev.sender;
+        this.opponentMember = ev.sender!; // XXX: we should use ev.getSender() and just store the userId
     }
 
     private async addBufferedIceCandidates(): Promise<void> {

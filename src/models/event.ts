@@ -253,7 +253,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     /* The txnId with which this event was sent if it was during this session,
      * allows for a unique ID which does not change when the event comes back down sync.
      */
-    private txnId: string | null = null;
+    private txnId?: string;
 
     /**
      * @experimental
@@ -332,7 +332,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
             event.content["m.relates_to"][prop] = internaliseString(event.content["m.relates_to"][prop]);
         });
 
-        this.txnId = event.txn_id || null;
+        this.txnId = event.txn_id;
         this.localTimestamp = Date.now() - (this.getAge() ?? 0);
         this.reEmitter = new TypedReEmitter(this);
     }
@@ -853,7 +853,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
             // highlighting when the user's name is mentioned rely on this happening. We also want
             // to set the push actions before emitting so that any notification listeners don't
             // pick up the wrong contents.
-            this.setPushActions(undefined);
+            this.setPushActions(null);
 
             if (options.emit !== false) {
                 this.emit(MatrixEventEvent.Decrypted, this, err);
@@ -1534,7 +1534,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         this.txnId = txnId;
     }
 
-    public getTxnId(): string | null {
+    public getTxnId(): string | undefined {
         return this.txnId;
     }
 
