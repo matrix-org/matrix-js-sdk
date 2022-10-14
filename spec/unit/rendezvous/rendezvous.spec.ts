@@ -17,7 +17,24 @@ limitations under the License.
 import MockHttpBackend from "matrix-mock-request";
 
 import '../../olm-loader';
-import { buildChannelFromCode } from "../../../src/rendezvous";
+import { buildChannelFromCode, MSC3906Rendezvous, RendezvousFailureReason } from "../../../src/rendezvous";
+import { DummyTransport } from "./DummyTransport";
+import { MSC3903ECDHv1RendezvousChannel } from "../../../src/rendezvous/channels";
+import { MatrixClient } from "../../../src";
+
+function makeMockClient(opts: { userId: string, deviceId: string, msc3882Enabled: boolean}): MatrixClient {
+    return {
+        doesServerSupportUnstableFeature(feature: string) {
+            return Promise.resolve(opts.msc3882Enabled && feature === "org.matrix.msc3882");
+        },
+        getUserId() { return opts.userId; },
+        getDeviceId() { return opts.deviceId; },
+        requestLoginToken() {
+            return Promise.resolve({ login_token: "token" });
+        },
+        baseUrl: "https://example.com",
+    } as unknown as MatrixClient;
+}
 
 describe("Rendezvous", function() {
     beforeAll(async function() {
@@ -26,10 +43,16 @@ describe("Rendezvous", function() {
 
     let httpBackend: MockHttpBackend;
     let fetchFn: typeof global.fetchFn;
+    let transports: DummyTransport<any>[];
 
     beforeEach(function() {
         httpBackend = new MockHttpBackend();
         fetchFn = httpBackend.fetchFn as typeof global.fetch;
+        transports = [];
+    });
+
+    afterEach(function() {
+        transports.forEach(x => x.cleanup());
     });
 
     describe("buildChannelFromCode", function() {
@@ -124,6 +147,131 @@ describe("Rendezvous", function() {
             };
             await httpBackend.flush('');
             expect(await prom).toStrictEqual({});
+        });
+    });
+
+    describe("end-to-end", function() {
+        it("generate on new device and scan on existing - decline", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
+            const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+            transports.push(aliceTransport, bobTransport);
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
+            try {
+                // alice is signing in initiates and generates a code
+                const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+                const aliceRz = new MSC3906Rendezvous(aliceEcdh);
+                const aliceOnFailure = jest.fn();
+                aliceTransport.onCancelled = aliceOnFailure;
+                await aliceRz.generateCode();
+                const aliceStartProm = aliceRz.startAfterShowingCode();
+
+                // bob is already signed in and scans the code
+                const bob = makeMockClient({ userId: "bob", deviceId: "BOB", msc3882Enabled: true });
+                const {
+                    channel: bobEcdh,
+                    intent: aliceIntentAsSeenByBob,
+                } = await buildChannelFromCode(aliceRz.code!, () => {}, fetchFn);
+                // we override the channel to set to dummy transport:
+                (bobEcdh as unknown as MSC3903ECDHv1RendezvousChannel).transport = bobTransport;
+                const bobRz = new MSC3906Rendezvous(bobEcdh, bob);
+                const bobStartProm = bobRz.startAfterScanningCode(aliceIntentAsSeenByBob);
+
+                // check that the two sides are talking to each other with same checksum
+                const aliceChecksum = await aliceStartProm;
+                const bobChecksum = await bobStartProm;
+                expect(aliceChecksum).toEqual(bobChecksum);
+
+                const aliceCompleteProm = aliceRz.completeLoginOnNewDevice();
+                await bobRz.declineLoginOnExistingDevice();
+
+                await aliceCompleteProm;
+                expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UserDeclined);
+            } finally {
+                aliceTransport.cleanup();
+                bobTransport.cleanup();
+            }
+        });
+
+        it("generate on existing device and scan on new device - decline", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
+            const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+            transports.push(aliceTransport, bobTransport);
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
+            try {
+                // bob is already signed initiates and generates a code
+                const bob = makeMockClient({ userId: "bob", deviceId: "BOB", msc3882Enabled: true });
+                const bobEcdh = new MSC3903ECDHv1RendezvousChannel(bobTransport);
+                const bobRz = new MSC3906Rendezvous(bobEcdh, bob);
+                await bobRz.generateCode();
+                const bobStartProm = bobRz.startAfterShowingCode();
+
+                // alice wants to sign in and scans the code
+                const aliceOnFailure = jest.fn();
+                const {
+                    channel: aliceEcdh,
+                    intent: bobsIntentAsSeenByAlice,
+                } = await buildChannelFromCode(bobRz.code!, aliceOnFailure, fetchFn);
+                // we override the channel to set to dummy transport:
+                (aliceEcdh as unknown as MSC3903ECDHv1RendezvousChannel).transport = aliceTransport;
+                const aliceRz = new MSC3906Rendezvous(aliceEcdh, undefined, aliceOnFailure);
+                const aliceStartProm = aliceRz.startAfterScanningCode(bobsIntentAsSeenByAlice);
+
+                // check that the two sides are talking to each other with same checksum
+                const bobChecksum = await bobStartProm;
+                const aliceChecksum = await aliceStartProm;
+                expect(aliceChecksum).toEqual(bobChecksum);
+
+                const aliceCompleteProm = aliceRz.completeLoginOnNewDevice();
+                await bobRz.declineLoginOnExistingDevice();
+
+                await aliceCompleteProm;
+                expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UserDeclined);
+            } finally {
+                aliceTransport.cleanup();
+                bobTransport.cleanup();
+            }
+        });
+
+        it("no protocol available", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
+            const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+            transports.push(aliceTransport, bobTransport);
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
+            try {
+                // alice is signing in initiates and generates a code
+                const aliceOnFailure = jest.fn();
+                const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+                const aliceRz = new MSC3906Rendezvous(aliceEcdh, undefined, aliceOnFailure);
+                aliceTransport.onCancelled = aliceOnFailure;
+                await aliceRz.generateCode();
+                const aliceStartProm = aliceRz.startAfterShowingCode();
+
+                // bob is already signed in and scans the code
+                const bob = makeMockClient({ userId: "bob", deviceId: "BOB", msc3882Enabled: false });
+                const {
+                    channel: bobEcdh,
+                    intent: aliceIntentAsSeenByBob,
+                } = await buildChannelFromCode(aliceRz.code!, () => {}, fetchFn);
+                // we override the channel to set to dummy transport:
+                (bobEcdh as unknown as MSC3903ECDHv1RendezvousChannel).transport = bobTransport;
+                const bobRz = new MSC3906Rendezvous(bobEcdh, bob);
+                const bobStartProm = bobRz.startAfterScanningCode(aliceIntentAsSeenByBob);
+
+                // check that the two sides are talking to each other with same checksum
+                const aliceChecksum = await aliceStartProm;
+                const bobChecksum = await bobStartProm;
+                expect(bobChecksum).toBeUndefined();
+                expect(aliceChecksum).toBeUndefined();
+
+                expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UnsupportedAlgorithm);
+                // await aliceRz.completeLoginOnNewDevice();
+            } finally {
+                aliceTransport.cleanup();
+                bobTransport.cleanup();
+            }
         });
     });
 });

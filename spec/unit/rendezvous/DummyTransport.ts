@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { logger } from "../../../src/logger";
 import {
     RendezvousFailureListener,
     RendezvousFailureReason,
@@ -22,14 +23,16 @@ import {
 } from "../../../src/rendezvous";
 import { sleep } from '../../../src/utils';
 
-export class DummyTransport implements RendezvousTransport {
-    otherParty?: DummyTransport;
+export class DummyTransport<T extends RendezvousTransportDetails> implements RendezvousTransport {
+    otherParty?: DummyTransport<T>;
     etag?: string;
+    lastEtagReceived?: string;
     data = null;
 
     ready = false;
+    cancelled = false;
 
-    constructor(private mockDetails: RendezvousTransportDetails) {}
+    constructor(private name: string, private mockDetails: T) {}
     onCancelled?: RendezvousFailureListener;
 
     details(): Promise<RendezvousTransportDetails> {
@@ -37,29 +40,54 @@ export class DummyTransport implements RendezvousTransport {
     }
 
     async send(contentType: string, data: any): Promise<void> {
+        logger.info(
+            `[${this.name}] => [${this.otherParty?.name}] Attempting to send data: ${
+                data} of type ${contentType} where etag matches ${this.etag}`,
+        );
         // eslint-disable-next-line no-constant-condition
-        while (true) {
-            if (!this.etag || this.otherParty?.etag === this.etag) {
+        while (!this.cancelled) {
+            if (!this.etag || (this.otherParty?.etag && this.otherParty?.etag === this.etag)) {
                 this.data = data;
                 this.etag = Math.random().toString();
+                this.lastEtagReceived = this.etag;
+                this.otherParty!.etag = this.etag;
+                this.otherParty!.data = data;
+                logger.info(`[${this.name}] => [${this.otherParty?.name}] Sent with etag ${this.etag}`);
                 return;
             }
-            await sleep(100);
+            logger.info(`[${this.name}] Sleeping to retry send after etag ${this.etag}`);
+            await sleep(250);
         }
     }
 
     async receive(): Promise<any> {
+        logger.info(`[${this.name}] Attempting to receive where etag is after ${this.lastEtagReceived}`);
         // eslint-disable-next-line no-constant-condition
-        while (true) {
-            if (!this.etag || this.otherParty?.etag !== this.etag) {
-                this.etag = this.otherParty?.etag;
-                return this.otherParty?.data ? JSON.parse(this.otherParty.data) : undefined;
+        while (!this.cancelled) {
+            if (!this.lastEtagReceived || this.lastEtagReceived !== this.etag) {
+                this.lastEtagReceived = this.etag;
+                const data = this.data ? JSON.parse(this.data) : undefined;
+                logger.info(
+                    `[${this.otherParty?.name}] => [${this.name}] Received data: ` +
+                    `${JSON.stringify(data)} with etag ${this.etag}`,
+                );
+                return data;
             }
-            await sleep(100);
+            logger.info(`[${this.name}] Sleeping to retry receive after etag ${
+                this.lastEtagReceived} as remote is ${this.etag}`);
+            await sleep(250);
         }
+
+        return undefined;
     }
 
     cancel(reason: RendezvousFailureReason): Promise<void> {
-        throw new Error("Method not implemented.");
+        this.cancelled = true;
+        this.onCancelled?.(reason);
+        return Promise.resolve();
+    }
+
+    cleanup() {
+        this.cancelled = true;
     }
 }

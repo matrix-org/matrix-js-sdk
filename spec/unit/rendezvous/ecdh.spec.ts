@@ -30,8 +30,8 @@ describe("ECDHv1", function() {
     });
 
     it("initiator wants to sign in", async function() {
-        const aliceTransport = new DummyTransport({ type: 'dummy' });
-        const bobTransport = new DummyTransport({ type: 'dummy' });
+        const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+        const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
@@ -52,8 +52,8 @@ describe("ECDHv1", function() {
     });
 
     it("initiator wants to reciprocate", async function() {
-        const aliceTransport = new DummyTransport({ type: 'dummy' });
-        const bobTransport = new DummyTransport({ type: 'dummy' });
+        const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+        const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
