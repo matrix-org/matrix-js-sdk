@@ -38,13 +38,13 @@ export type UserEventHandlerMap = {
 };
 
 export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
-    private modified: number;
+    private modified?: number;
 
     // XXX these should be read-only
-    public displayName: string;
-    public rawDisplayName: string;
-    public avatarUrl: string;
-    public presenceStatusMsg: string = null;
+    public displayName?: string;
+    public rawDisplayName?: string;
+    public avatarUrl?: string;
+    public presenceStatusMsg?: string;
     public presence = "offline";
     public lastActiveAgo = 0;
     public lastPresenceTs = 0;
@@ -52,10 +52,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     public events: {
         presence?: MatrixEvent;
         profile?: MatrixEvent;
-    } = {
-            presence: null,
-            profile: null,
-        };
+    } = {};
 
     /**
      * Construct a new User. A User must have an ID and can optionally have extra
@@ -83,7 +80,6 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
         super();
         this.displayName = userId;
         this.rawDisplayName = userId;
-        this.avatarUrl = null;
         this.updateModifiedTime();
     }
 
@@ -166,11 +162,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * @param {string} name The new display name.
      */
     public setRawDisplayName(name: string): void {
-        if (typeof name === "string") {
-            this.rawDisplayName = name;
-        } else {
-            this.rawDisplayName = undefined;
-        }
+        this.rawDisplayName = name;
     }
 
     /**
@@ -199,7 +191,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * property on this object. It is updated <i>before</i> firing events.
      * @return {number} The timestamp
      */
-    public getLastModifiedTime(): number {
+    public getLastModifiedTime(): number | undefined {
         return this.modified;
     }
 
