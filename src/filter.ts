@@ -212,7 +212,13 @@ export class Filter {
      * @return {MatrixEvent[]} the list of events which match the filter
      */
     public filterRoomTimeline(events: MatrixEvent[]): MatrixEvent[] {
-        return this.roomTimelineFilter?.filter(this.roomFilter?.filter(events) ?? events) ?? events;
+        if (this.roomFilter) {
+            events = this.roomFilter.filter(events);
+        }
+        if (this.roomTimelineFilter) {
+            events = this.roomTimelineFilter.filter(events);
+        }
+        return events;
     }
 
     /**

@@ -483,7 +483,6 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     private setStateEvent(event: MatrixEvent): void {
-        if (!event.isState()) return;
         if (!this.events.has(event.getType())) {
             this.events.set(event.getType(), new Map());
         }
@@ -629,8 +628,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @param {MatrixEvent} stateEvent membership state event
      */
     private setOutOfBandMember(stateEvent: MatrixEvent): void {
-        if (stateEvent.getType() !== EventType.RoomMember || !stateEvent.isState()) return;
-
+        if (stateEvent.getType() !== EventType.RoomMember) {
+            return;
+        }
         const userId = stateEvent.getStateKey()!;
         const existingMember = this.getMember(userId);
         // never replace members received as part of the sync
