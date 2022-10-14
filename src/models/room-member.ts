@@ -248,7 +248,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
     public isKicked(): boolean {
         return this.membership === "leave"
-            && this.events.member
+            && this.events.member !== undefined
             && this.events.member.getSender() !== this.events.member.getStateKey();
     }
 
