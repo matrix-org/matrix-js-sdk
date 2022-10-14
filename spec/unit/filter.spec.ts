@@ -1,5 +1,7 @@
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import { Filter, IFilterDefinition } from "../../src/filter";
+import { mkEvent } from "../test-utils/test-utils";
+import { EventType } from "../../src";
 
 describe("Filter", function() {
     const filterId = "f1lt3ring15g00d4ursoul";
@@ -55,6 +57,29 @@ describe("Filter", function() {
                     },
                 },
             });
+        });
+    });
+
+    describe("filterRoomTimeline", () => {
+        it("should return input if no roomTimelineFilter and roomFilter", () => {
+            const events = [mkEvent({ type: EventType.Sticker, content: {}, event: true })];
+            expect(new Filter(undefined).filterRoomTimeline(events)).toStrictEqual(events);
+        });
+
+        it("should filter using components when present", () => {
+            const definition: IFilterDefinition = {
+                room: {
+                    timeline: {
+                        types: [EventType.Sticker],
+                    },
+                },
+            };
+            const filter = Filter.fromJson(userId, filterId, definition);
+            const events = [
+                mkEvent({ type: EventType.Sticker, content: {}, event: true }),
+                mkEvent({ type: EventType.RoomMessage, content: {}, event: true }),
+            ];
+            expect(filter.filterRoomTimeline(events)).toStrictEqual([events[0]]);
         });
     });
 });

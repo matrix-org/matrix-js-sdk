@@ -3572,7 +3572,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws Error if the event is not in QUEUED, NOT_SENT or ENCRYPTING state
      */
     public cancelPendingEvent(event: MatrixEvent) {
-        if (![EventStatus.QUEUED, EventStatus.NOT_SENT, EventStatus.ENCRYPTING].includes(event.status)) {
+        if (![EventStatus.QUEUED, EventStatus.NOT_SENT, EventStatus.ENCRYPTING].includes(event.status!)) {
             throw new Error("cannot cancel an event with status " + event.status);
         }
 
@@ -6800,12 +6800,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {boolean} options.emit Emits "event.decrypted" if set to true
      */
     public decryptEventIfNeeded(event: MatrixEvent, options?: IDecryptOptions): Promise<void> {
-        if (event.shouldAttemptDecryption()) {
-            event.attemptDecryption(this.crypto, options);
+        if (event.shouldAttemptDecryption() && this.isCryptoEnabled()) {
+            event.attemptDecryption(this.crypto!, options);
         }
 
         if (event.isBeingDecrypted()) {
-            return event.getDecryptionPromise();
+            return event.getDecryptionPromise()!;
         } else {
             return Promise.resolve();
         }
@@ -9036,8 +9036,8 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
         const hasReadEvent = isThreadEvent
-            ? room.getThread(event.threadRootId).hasUserReadEvent(cli.getUserId(), event.getId())
-            : room.hasUserReadEvent(cli.getUserId(), event.getId());
+            ? room.getThread(event.threadRootId)?.hasUserReadEvent(cli.getUserId()!, event.getId())
+            : room.hasUserReadEvent(cli.getUserId()!, event.getId());
 
         if (!hasReadEvent) {
             let newCount = currentCount;

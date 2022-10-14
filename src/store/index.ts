@@ -195,7 +195,7 @@ export interface IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync(): Promise<ISavedSync>;
+    getSavedSync(): Promise<ISavedSync | null>;
 
     /**
      * @return {Promise} If there is a saved sync, the nextBatch token
