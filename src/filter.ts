@@ -18,10 +18,7 @@ limitations under the License.
  * @module filter
  */
 
-import {
-    EventType,
-    RelationType,
-} from "./@types/event";
+import { EventType, RelationType } from "./@types/event";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
@@ -34,7 +31,7 @@ import { MatrixEvent } from "./models/event";
 function setProp(obj: object, keyNesting: string, val: any) {
     const nestedKeys = keyNesting.split(".");
     let currentObj = obj;
-    for (let i = 0; i < (nestedKeys.length - 1); i++) {
+    for (let i = 0; i < nestedKeys.length - 1; i++) {
         if (!currentObj[nestedKeys[i]]) {
             currentObj[nestedKeys[i]] = {};
         }

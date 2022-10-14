@@ -26,8 +26,7 @@ export class RelationsContainer {
     // this.relations.get(parentEventId).get(relationType).get(relationEventType)
     private relations = new Map<string, Map<RelationType | string, Map<EventType | string, Relations>>>();
 
-    constructor(private readonly client: MatrixClient, private readonly room?: Room) {
-    }
+    constructor(private readonly client: MatrixClient, private readonly room?: Room) {}
 
     /**
      * Get a collection of child events to a given event in this timeline set.
@@ -55,8 +54,8 @@ export class RelationsContainer {
     }
 
     public getAllChildEventsForEvent(parentEventId: string): MatrixEvent[] {
-        const relationsForEvent = this.relations.get(parentEventId)
-            ?? new Map<RelationType | string, Map<EventType | string, Relations>>();
+        const relationsForEvent =
+            this.relations.get(parentEventId) ?? new Map<RelationType | string, Map<EventType | string, Relations>>();
         const events: MatrixEvent[] = [];
         for (const relationsRecord of relationsForEvent.values()) {
             for (const relations of relationsRecord.values()) {
@@ -132,17 +131,14 @@ export class RelationsContainer {
 
         let relationsWithEventType = relationsWithRelType.get(eventType);
         if (!relationsWithEventType) {
-            relationsWithEventType = new Relations(
-                relationType,
-                eventType,
-                this.client,
-            );
+            relationsWithEventType = new Relations(relationType, eventType, this.client);
             relationsWithRelType.set(eventType, relationsWithEventType);
 
             const room = this.room ?? timelineSet?.room;
-            const relatesToEvent = timelineSet?.findEventById(relatesToEventId)
-                ?? room?.findEventById(relatesToEventId)
-                ?? room?.getPendingEvent(relatesToEventId);
+            const relatesToEvent =
+                timelineSet?.findEventById(relatesToEventId) ??
+                room?.findEventById(relatesToEventId) ??
+                room?.getPendingEvent(relatesToEventId);
             if (relatesToEvent) {
                 relationsWithEventType.setTargetEvent(relatesToEvent);
             }

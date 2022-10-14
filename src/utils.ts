@@ -64,7 +64,7 @@ export function encodeParams(params: QueryDict, urlSearchParams?: URLSearchParam
     for (const [key, val] of Object.entries(params)) {
         if (val !== undefined && val !== null) {
             if (Array.isArray(val)) {
-                val.forEach(v => {
+                val.forEach((v) => {
                     searchParams.append(key, String(v));
                 });
             } else {
@@ -109,9 +109,7 @@ export function encodeUri(pathTemplate: string, variables: Record<string, string
         if (!variables.hasOwnProperty(key)) {
             continue;
         }
-        pathTemplate = pathTemplate.replace(
-            key, encodeURIComponent(variables[key]),
-        );
+        pathTemplate = pathTemplate.replace(key, encodeURIComponent(variables[key]));
     }
     return pathTemplate;
 }
@@ -126,11 +124,7 @@ export function encodeUri(pathTemplate: string, variables: Record<string, string
  * @param {boolean} reverse True to search in reverse order.
  * @return {boolean} True if an element was removed.
  */
-export function removeElement<T>(
-    array: T[],
-    fn: (t: T, i?: number, a?: T[]) => boolean,
-    reverse?: boolean,
-): boolean {
+export function removeElement<T>(array: T[], fn: (t: T, i?: number, a?: T[]) => boolean, reverse?: boolean): boolean {
     let i: number;
     if (reverse) {
         for (i = array.length - 1; i >= 0; i--) {
@@ -207,7 +201,7 @@ export function deepCompare(x: any, y: any): boolean {
     }
 
     // special-case NaN (since NaN !== NaN)
-    if (typeof x === 'number' && isNaN(x) && isNaN(y)) {
+    if (typeof x === "number" && isNaN(x) && isNaN(y)) {
         return true;
     }
 
@@ -271,7 +265,7 @@ export function deepCompare(x: any, y: any): boolean {
  * @returns {Array} The entries, sorted by key.
  */
 export function deepSortedObjectEntries(obj: any): [string, any][] {
-    if (typeof(obj) !== "object") return obj;
+    if (typeof obj !== "object") return obj;
 
     // Apparently these are object types...
     if (obj === null || obj === undefined || Array.isArray(obj)) return obj;
@@ -294,7 +288,7 @@ export function deepSortedObjectEntries(obj: any): [string, any][] {
  * @return {boolean} whether or not value is a finite number without type-coercion
  */
 export function isNumber(value: any): boolean {
-    return typeof value === 'number' && isFinite(value);
+    return typeof value === "number" && isFinite(value);
 }
 
 /**
@@ -305,7 +299,7 @@ export function isNumber(value: any): boolean {
  */
 export function removeHiddenChars(str: string): string {
     if (typeof str === "string") {
-        return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
+        return unhomoglyph(str.normalize("NFD").replace(removeHiddenCharsRegex, ""));
     }
     return "";
 }
@@ -317,7 +311,7 @@ export function removeHiddenChars(str: string): string {
  */
 export function removeDirectionOverrideChars(str: string): string {
     if (typeof str === "string") {
-        return str.replace(/[\u202d-\u202e]/g, '');
+        return str.replace(/[\u202d-\u202e]/g, "");
     }
     return "";
 }
@@ -325,11 +319,13 @@ export function removeDirectionOverrideChars(str: string): string {
 export function normalize(str: string): string {
     // Note: we have to match the filter with the removeHiddenChars() because the
     // function strips spaces and other characters (M becomes RN for example, in lowercase).
-    return removeHiddenChars(str.toLowerCase())
-        // Strip all punctuation
-        .replace(/[\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~\u2000-\u206f\u2e00-\u2e7f]/g, "")
-        // We also doubly convert to lowercase to work around oddities of the library.
-        .toLowerCase();
+    return (
+        removeHiddenChars(str.toLowerCase())
+            // Strip all punctuation
+            .replace(/[\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~\u2000-\u206f\u2e00-\u2e7f]/g, "")
+            // We also doubly convert to lowercase to work around oddities of the library.
+            .toLowerCase()
+    );
 }
 
 // Regex matching bunch of unicode control characters and otherwise misleading/invisible characters.
@@ -353,22 +349,17 @@ export function globToRegexp(glob: string, extended = false): string {
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
     // Because micromatch is about 130KB with dependencies,
     // and minimatch is not much better.
-    const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
-        [/\\\*/g, '.*'],
-        [/\?/g, '.'],
+    const replacements: [RegExp, string | ((substring: string, ...args: any[]) => string)][] = [
+        [/\\\*/g, ".*"],
+        [/\?/g, "."],
         !extended && [
             /\\\[(!|)(.*)\\]/g,
-            (_match: string, neg: string, pat: string) => [
-                '[',
-                neg ? '^' : '',
-                pat.replace(/\\-/, '-'),
-                ']',
-            ].join(''),
+            (_match: string, neg: string, pat: string) => ["[", neg ? "^" : "", pat.replace(/\\-/, "-"), "]"].join(""),
         ],
     ];
     return replacements.reduce(
         // https://github.com/microsoft/TypeScript/issues/30134
-        (pat, args) => args ? pat.replace(args[0], args[1] as any) : pat,
+        (pat, args) => (args ? pat.replace(args[0], args[1] as any) : pat),
         escapeRegExp(glob),
     );
 }
@@ -383,9 +374,9 @@ export function ensureNoTrailingSlash(url: string): string {
 
 // Returns a promise which resolves with a given value after the given number of ms
 export function sleep<T>(ms: number, value?: T): Promise<T> {
-    return new Promise((resolve => {
+    return new Promise((resolve) => {
         setTimeout(resolve, ms, value);
-    }));
+    });
 }
 
 export function isNullOrUndefined(val: any): boolean {
@@ -428,7 +419,7 @@ export function promiseTry<T>(fn: () => T | Promise<T>): Promise<T> {
 export async function chunkPromises<T>(fns: (() => Promise<T>)[], chunkSize: number): Promise<T[]> {
     const results: T[] = [];
     for (let i = 0; i < fns.length; i += chunkSize) {
-        results.push(...(await Promise.all(fns.slice(i, i + chunkSize).map(fn => fn()))));
+        results.push(...(await Promise.all(fns.slice(i, i + chunkSize).map((fn) => fn()))));
     }
     return results;
 }
@@ -443,14 +434,17 @@ export async function chunkPromises<T>(fns: (() => Promise<T>)[], chunkSize: num
  * @returns {Promise<T>} The promise for the retried operation.
  */
 export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<T>): Promise<T> {
-    return promiseRetry((attempt: number) => {
-        return promiseFn(attempt);
-    }, {
-        forever: true,
-        factor: 2,
-        minTimeout: 3000, // ms
-        maxTimeout: 15000, // ms
-    });
+    return promiseRetry(
+        (attempt: number) => {
+            return promiseFn(attempt);
+        },
+        {
+            forever: true,
+            factor: 2,
+            minTimeout: 3000, // ms
+            maxTimeout: 15000, // ms
+        },
+    );
 }
 
 // We need to be able to access the Node.js crypto library from within the
@@ -478,7 +472,7 @@ export function getCrypto(): typeof NodeCrypto {
  */
 export const DEFAULT_ALPHABET = (() => {
     let str = "";
-    for (let c = 0x20; c <= 0x7E; c++) {
+    for (let c = 0x20; c <= 0x7e; c++) {
         str += String.fromCharCode(c);
     }
     return str;
@@ -561,7 +555,7 @@ export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): bigint {
 
         // We add 1 to the char index to offset the whole numbering scheme. We unpack this in
         // the baseToString() function.
-        result += BigInt(1 + charIndex) * (len ** j);
+        result += BigInt(1 + charIndex) * len ** j;
     }
     return result;
 }

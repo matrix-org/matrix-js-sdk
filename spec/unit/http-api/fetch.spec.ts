@@ -65,8 +65,9 @@ describe("FetchHttpApi", () => {
     describe("idServerRequest", () => {
         it("should throw if no idBaseUrl", () => {
             const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
-            expect(() => api.idServerRequest(Method.Get, "/test", {}, IdentityPrefix.V2))
-                .toThrow("No identity server base URL set");
+            expect(() => api.idServerRequest(Method.Get, "/test", {}, IdentityPrefix.V2)).toThrow(
+                "No identity server base URL set",
+            );
         });
 
         it("should send params as query string for GET requests", () => {
@@ -105,9 +106,11 @@ describe("FetchHttpApi", () => {
         const text = "418 I'm a teapot";
         const fetchFn = jest.fn().mockResolvedValue({ ok: true, text: jest.fn().mockResolvedValue(text) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
-        await expect(api.requestOtherUrl(Method.Get, "http://url", undefined, {
-            json: false,
-        })).resolves.toBe(text);
+        await expect(
+            api.requestOtherUrl(Method.Get, "http://url", undefined, {
+                json: false,
+            }),
+        ).resolves.toBe(text);
     });
 
     it("should send token via query params if useAuthorizationHeader=false", () => {
@@ -207,10 +210,12 @@ describe("FetchHttpApi", () => {
                     return name === "Content-Type" ? "application/json" : null;
                 },
             },
-            text: jest.fn().mockResolvedValue(JSON.stringify({
-                errcode: "M_CONSENT_NOT_GIVEN",
-                error: "Ye shall ask for consent",
-            })),
+            text: jest.fn().mockResolvedValue(
+                JSON.stringify({
+                    errcode: "M_CONSENT_NOT_GIVEN",
+                    error: "Ye shall ask for consent",
+                }),
+            ),
         });
         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
         const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn });

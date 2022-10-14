@@ -19,22 +19,22 @@ import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import { Relations } from "../../src/models/relations";
 
-describe("Relations", function() {
-    it("should deduplicate annotations", function() {
+describe("Relations", function () {
+    it("should deduplicate annotations", function () {
         const room = new Room("room123", null, null);
         const relations = new Relations("m.annotation", "m.reaction", room);
 
         // Create an instance of an annotation
         const eventData = {
-            "sender": "@bob:example.com",
-            "type": "m.reaction",
-            "event_id": "$cZ1biX33ENJqIm00ks0W_hgiO_6CHrsAc3ZQrnLeNTw",
-            "room_id": "!pzVjCQSoQPpXQeHpmK:example.com",
-            "content": {
+            sender: "@bob:example.com",
+            type: "m.reaction",
+            event_id: "$cZ1biX33ENJqIm00ks0W_hgiO_6CHrsAc3ZQrnLeNTw",
+            room_id: "!pzVjCQSoQPpXQeHpmK:example.com",
+            content: {
                 "m.relates_to": {
-                    "event_id": "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
-                    "key": "👍️",
-                    "rel_type": "m.annotation",
+                    event_id: "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
+                    key: "👍️",
+                    rel_type: "m.annotation",
                 },
             },
         };
@@ -74,24 +74,24 @@ describe("Relations", function() {
         }
     });
 
-    it("should emit created regardless of ordering", async function() {
+    it("should emit created regardless of ordering", async function () {
         const targetEvent = new MatrixEvent({
-            "sender": "@bob:example.com",
-            "type": "m.room.message",
-            "event_id": "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
-            "room_id": "!pzVjCQSoQPpXQeHpmK:example.com",
-            "content": {},
+            sender: "@bob:example.com",
+            type: "m.room.message",
+            event_id: "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
+            room_id: "!pzVjCQSoQPpXQeHpmK:example.com",
+            content: {},
         });
         const relationEvent = new MatrixEvent({
-            "sender": "@bob:example.com",
-            "type": "m.reaction",
-            "event_id": "$cZ1biX33ENJqIm00ks0W_hgiO_6CHrsAc3ZQrnLeNTw",
-            "room_id": "!pzVjCQSoQPpXQeHpmK:example.com",
-            "content": {
+            sender: "@bob:example.com",
+            type: "m.reaction",
+            event_id: "$cZ1biX33ENJqIm00ks0W_hgiO_6CHrsAc3ZQrnLeNTw",
+            room_id: "!pzVjCQSoQPpXQeHpmK:example.com",
+            content: {
                 "m.relates_to": {
-                    "event_id": "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
-                    "key": "👍️",
-                    "rel_type": "m.annotation",
+                    event_id: "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
+                    key: "👍️",
+                    rel_type: "m.annotation",
                 },
             },
         });
@@ -99,7 +99,7 @@ describe("Relations", function() {
         // Add the target event first, then the relation event
         {
             const room = new Room("room123", null, null);
-            const relationsCreated = new Promise(resolve => {
+            const relationsCreated = new Promise((resolve) => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
@@ -113,7 +113,7 @@ describe("Relations", function() {
         // Add the relation event first, then the target event
         {
             const room = new Room("room123", null, null);
-            const relationsCreated = new Promise(resolve => {
+            const relationsCreated = new Promise((resolve) => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
 
@@ -140,31 +140,31 @@ describe("Relations", function() {
 
         // Create an instance of a state event with rel_type m.replace
         const originalTopic = new MatrixEvent({
-            "sender": userId,
-            "type": "m.room.topic",
-            "event_id": "$orig",
-            "room_id": room.roomId,
-            "content": {
-                "topic": "orig",
+            sender: userId,
+            type: "m.room.topic",
+            event_id: "$orig",
+            room_id: room.roomId,
+            content: {
+                topic: "orig",
             },
-            "state_key": "",
+            state_key: "",
         });
         const badlyEditedTopic = new MatrixEvent({
-            "sender": userId,
-            "type": "m.room.topic",
-            "event_id": "$orig",
-            "room_id": room.roomId,
-            "content": {
-                "topic": "topic",
+            sender: userId,
+            type: "m.room.topic",
+            event_id: "$orig",
+            room_id: room.roomId,
+            content: {
+                topic: "topic",
                 "m.new_content": {
-                    "topic": "edit",
+                    topic: "edit",
                 },
                 "m.relates_to": {
-                    "event_id": "$orig",
-                    "rel_type": "m.replace",
+                    event_id: "$orig",
+                    rel_type: "m.replace",
                 },
             },
-            "state_key": "",
+            state_key: "",
         });
 
         await relations.setTargetEvent(originalTopic);

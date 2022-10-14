@@ -17,42 +17,42 @@ limitations under the License.
 
 import nodeCrypto from "crypto";
 
-import { TestClient } from '../../../TestClient';
+import { TestClient } from "../../../TestClient";
 import { MatrixEvent } from "../../../../src/models/event";
 import { IRoomTimelineData } from "../../../../src/models/event-timeline-set";
 import { Room, RoomEvent } from "../../../../src/models/room";
-import { logger } from '../../../../src/logger';
-import { MatrixClient, ClientEvent } from '../../../../src/client';
+import { logger } from "../../../../src/logger";
+import { MatrixClient, ClientEvent } from "../../../../src/client";
 
 export async function makeTestClients(userInfos, options): Promise<[TestClient[], () => void]> {
     const clients: TestClient[] = [];
     const timeouts: ReturnType<typeof setTimeout>[] = [];
     const clientMap: Record<string, Record<string, MatrixClient>> = {};
-    const makeSendToDevice = (matrixClient: MatrixClient): MatrixClient['sendToDevice'] => async (type, map) => {
-        // logger.log(this.getUserId(), "sends", type, map);
-        for (const [userId, devMap] of Object.entries(map)) {
-            if (userId in clientMap) {
-                for (const [deviceId, msg] of Object.entries(devMap)) {
-                    if (deviceId in clientMap[userId]) {
-                        const event = new MatrixEvent({
-                            sender: matrixClient.getUserId()!,
-                            type: type,
-                            content: msg,
-                        });
-                        const client = clientMap[userId][deviceId];
-                        const decryptionPromise = event.isEncrypted() ?
-                            event.attemptDecryption(client.crypto) :
-                            Promise.resolve();
+    const makeSendToDevice =
+        (matrixClient: MatrixClient): MatrixClient["sendToDevice"] =>
+        async (type, map) => {
+            // logger.log(this.getUserId(), "sends", type, map);
+            for (const [userId, devMap] of Object.entries(map)) {
+                if (userId in clientMap) {
+                    for (const [deviceId, msg] of Object.entries(devMap)) {
+                        if (deviceId in clientMap[userId]) {
+                            const event = new MatrixEvent({
+                                sender: matrixClient.getUserId()!,
+                                type: type,
+                                content: msg,
+                            });
+                            const client = clientMap[userId][deviceId];
+                            const decryptionPromise = event.isEncrypted()
+                                ? event.attemptDecryption(client.crypto)
+                                : Promise.resolve();
 
-                        decryptionPromise.then(
-                            () => client.emit(ClientEvent.ToDeviceEvent, event),
-                        );
+                            decryptionPromise.then(() => client.emit(ClientEvent.ToDeviceEvent, event));
+                        }
                     }
                 }
             }
-        }
-        return {};
-    };
+            return {};
+        };
     const makeSendEvent = (matrixClient: MatrixClient) => (room, type, content) => {
         // make up a unique ID as the event ID
         const eventId = "$" + matrixClient.makeTxnId();
@@ -65,15 +65,17 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
             origin_server_ts: Date.now(),
         };
         const event = new MatrixEvent(rawEvent);
-        const remoteEcho = new MatrixEvent(Object.assign({}, rawEvent, {
-            unsigned: {
-                transaction_id: matrixClient.makeTxnId(),
-            },
-        }));
+        const remoteEcho = new MatrixEvent(
+            Object.assign({}, rawEvent, {
+                unsigned: {
+                    transaction_id: matrixClient.makeTxnId(),
+                },
+            }),
+        );
 
         const timeout = setTimeout(() => {
             for (const tc of clients) {
-                const room = new Room('test', tc.client, tc.client.getUserId()!);
+                const room = new Room("test", tc.client, tc.client.getUserId()!);
                 const roomTimelineData = {} as unknown as IRoomTimelineData;
                 if (tc.client === matrixClient) {
                     logger.log("sending remote echo!!");
@@ -94,13 +96,12 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
         if (!options) options = {};
         if (!options.cryptoCallbacks) options.cryptoCallbacks = {};
         if (!options.cryptoCallbacks.saveCrossSigningKeys) {
-            options.cryptoCallbacks.saveCrossSigningKeys = k => { keys = k; };
-            options.cryptoCallbacks.getCrossSigningKey = typ => keys[typ];
+            options.cryptoCallbacks.saveCrossSigningKeys = (k) => {
+                keys = k;
+            };
+            options.cryptoCallbacks.getCrossSigningKey = (typ) => keys[typ];
         }
-        const testClient = new TestClient(
-            userInfo.userId, userInfo.deviceId, undefined, undefined,
-            options,
-        );
+        const testClient = new TestClient(userInfo.userId, userInfo.deviceId, undefined, undefined, options);
         if (!(userInfo.userId in clientMap)) {
             clientMap[userInfo.userId] = {};
         }

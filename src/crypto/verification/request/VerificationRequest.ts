@@ -14,13 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../../../logger';
-import {
-    errorFactory,
-    errorFromEvent,
-    newUnexpectedMessageError,
-    newUnknownMethodError,
-} from "../Error";
+import { logger } from "../../../logger";
+import { errorFactory, errorFromEvent, newUnexpectedMessageError, newUnknownMethodError } from "../Error";
 import { QRCodeData, SCAN_QR_CODE_METHOD } from "../QRCode";
 import { IVerificationChannel } from "./Channel";
 import { MatrixClient } from "../../../client";
@@ -89,9 +84,10 @@ type EventHandlerMap = {
  * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
  * @event "change" whenever the state of the request object has changed.
  */
-export class VerificationRequest<
-    C extends IVerificationChannel = IVerificationChannel,
-> extends TypedEventEmitter<VerificationRequestEvent, EventHandlerMap> {
+export class VerificationRequest<C extends IVerificationChannel = IVerificationChannel> extends TypedEventEmitter<
+    VerificationRequestEvent,
+    EventHandlerMap
+> {
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
@@ -149,18 +145,14 @@ export class VerificationRequest<
 
         if (type === REQUEST_TYPE || type === READY_TYPE) {
             if (!Array.isArray(content.methods)) {
-                logger.log("VerificationRequest: validateEvent: " +
-                    "fail because methods");
+                logger.log("VerificationRequest: validateEvent: " + "fail because methods");
                 return false;
             }
         }
 
         if (type === REQUEST_TYPE || type === READY_TYPE || type === START_TYPE) {
-            if (typeof content.from_device !== "string" ||
-                content.from_device.length === 0
-            ) {
-                logger.log("VerificationRequest: validateEvent: "+
-                    "fail because from_device");
+            if (typeof content.from_device !== "string" || content.from_device.length === 0) {
+                logger.log("VerificationRequest: validateEvent: " + "fail because from_device");
                 return false;
             }
         }
@@ -208,14 +200,10 @@ export class VerificationRequest<
     }
 
     public calculateEventTimeout(event: MatrixEvent): number {
-        let effectiveExpiresAt = this.channel.getTimestamp(event)
-            + TIMEOUT_FROM_EVENT_TS;
+        let effectiveExpiresAt = this.channel.getTimestamp(event) + TIMEOUT_FROM_EVENT_TS;
 
-        if (this.requestReceivedAt && !this.initiatedByMe &&
-            this.phase <= PHASE_REQUESTED
-        ) {
-            const expiresAtByReceipt = this.requestReceivedAt
-                + TIMEOUT_FROM_EVENT_RECEIPT;
+        if (this.requestReceivedAt && !this.initiatedByMe && this.phase <= PHASE_REQUESTED) {
+            const expiresAtByReceipt = this.requestReceivedAt + TIMEOUT_FROM_EVENT_RECEIPT;
             effectiveExpiresAt = Math.min(effectiveExpiresAt, expiresAtByReceipt);
         }
 
@@ -263,9 +251,7 @@ export class VerificationRequest<
 
     /** whether this request has sent it's initial event and needs more events to complete */
     public get pending(): boolean {
-        return !this.observeOnly &&
-            this._phase !== PHASE_DONE &&
-            this._phase !== PHASE_CANCELLED;
+        return !this.observeOnly && this._phase !== PHASE_DONE && this._phase !== PHASE_CANCELLED;
     }
 
     /** Only set after a .ready if the other party can scan a QR code */
@@ -284,8 +270,7 @@ export class VerificationRequest<
         if (!force && !this.ready && !this.started) {
             return false;
         }
-        const theirMethodEvent = this.eventsByThem.get(REQUEST_TYPE) ||
-            this.eventsByThem.get(READY_TYPE);
+        const theirMethodEvent = this.eventsByThem.get(REQUEST_TYPE) || this.eventsByThem.get(READY_TYPE);
         if (!theirMethodEvent) {
             // if we started straight away with .start event,
             // we are assuming that the other side will support the
@@ -316,7 +301,7 @@ export class VerificationRequest<
      */
     public get initiatedByMe(): boolean {
         // event created by us but no remote echo has been received yet
-        const noEventsYet = (this.eventsByUs.size + this.eventsByThem.size) === 0;
+        const noEventsYet = this.eventsByUs.size + this.eventsByThem.size === 0;
         if (this._phase === PHASE_UNSENT && noEventsYet) {
             return true;
         }
@@ -547,8 +532,7 @@ export class VerificationRequest<
             transitions.push({ phase: PHASE_REQUESTED, event: requestEvent });
         }
 
-        const readyEvent =
-            requestEvent && this.getEventBy(READY_TYPE, !hasRequestByThem);
+        const readyEvent = requestEvent && this.getEventBy(READY_TYPE, !hasRequestByThem);
         if (readyEvent && phase() === PHASE_REQUESTED) {
             transitions.push({ phase: PHASE_READY, event: readyEvent });
         }
@@ -559,8 +543,7 @@ export class VerificationRequest<
             const ourStartEvent = this.eventsByUs.get(START_TYPE);
             // any party can send .start after a .ready or unsent
             if (theirStartEvent && ourStartEvent) {
-                startEvent = theirStartEvent.getSender() < ourStartEvent.getSender() ?
-                    theirStartEvent : ourStartEvent;
+                startEvent = theirStartEvent.getSender() < ourStartEvent.getSender() ? theirStartEvent : ourStartEvent;
             } else {
                 startEvent = theirStartEvent ? theirStartEvent : ourStartEvent;
             }
@@ -597,17 +580,13 @@ export class VerificationRequest<
                 const content = event.getContent<{
                     methods: string[];
                 }>();
-                this.commonMethods =
-                    content.methods.filter(m => this.verificationMethods.has(m));
+                this.commonMethods = content.methods.filter((m) => this.verificationMethods.has(m));
             }
         }
         // detect if we're not a party in the request, and we should just observe
         if (!this.observeOnly) {
             // if requested or accepted by one of my other devices
-            if (phase === PHASE_REQUESTED ||
-                phase === PHASE_STARTED ||
-                phase === PHASE_READY
-            ) {
+            if (phase === PHASE_REQUESTED || phase === PHASE_STARTED || phase === PHASE_READY) {
                 if (
                     this.channel.receiveStartFromOtherDevices &&
                     this.wasSentByOwnUser(event) &&
@@ -636,7 +615,7 @@ export class VerificationRequest<
 
     private applyPhaseTransitions(): ITransition[] {
         const transitions = this.calculatePhaseTransitions();
-        const existingIdx = transitions.findIndex(t => t.phase === this.phase);
+        const existingIdx = transitions.findIndex((t) => t.phase === this.phase);
         // trim off phases we already went through, if any
         const newTransitions = transitions.slice(existingIdx + 1);
         // transition to all new phases
@@ -732,9 +711,7 @@ export class VerificationRequest<
         // This is true for QR and SAS verification, and was
         // added here to prevent verification getting cancelled
         // when the server duplicates an event (https://github.com/matrix-org/synapse/issues/3365)
-        const isDuplicateEvent = isSentByUs ?
-            this.eventsByUs.has(type) :
-            this.eventsByThem.has(type);
+        const isDuplicateEvent = isSentByUs ? this.eventsByUs.has(type) : this.eventsByThem.has(type);
         if (isDuplicateEvent) {
             return;
         }
@@ -765,9 +742,8 @@ export class VerificationRequest<
                 // We only do this for live events because it is important that
                 // we sign the keys that were in the QR code, and not the keys
                 // we happen to have at some later point in time.
-                if (isLiveEvent && newTransitions.some(t => t.phase === PHASE_READY)) {
-                    const shouldGenerateQrCode =
-                        this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD, true);
+                if (isLiveEvent && newTransitions.some((t) => t.phase === PHASE_READY)) {
+                    const shouldGenerateQrCode = this.otherPartySupportsMethod(SCAN_QR_CODE_METHOD, true);
                     if (shouldGenerateQrCode) {
                         this._qrCodeData = await QRCodeData.create(this, this.client);
                     }
@@ -784,14 +760,16 @@ export class VerificationRequest<
             }
         } finally {
             // log events we processed so we can see from rageshakes what events were added to a request
-            logger.log(`Verification request ${this.channel.transactionId}: ` +
-                `${type} event with id:${event.getId()}, ` +
-                `content:${JSON.stringify(event.getContent())} ` +
-                `deviceId:${this.channel.deviceId}, ` +
-                `sender:${event.getSender()}, isSentByUs:${isSentByUs}, ` +
-                `isLiveEvent:${isLiveEvent}, isRemoteEcho:${isRemoteEcho}, ` +
-                `phase:${oldPhase}=>${this.phase}, ` +
-                `observeOnly:${wasObserveOnly}=>${this._observeOnly}`);
+            logger.log(
+                `Verification request ${this.channel.transactionId}: ` +
+                    `${type} event with id:${event.getId()}, ` +
+                    `content:${JSON.stringify(event.getContent())} ` +
+                    `deviceId:${this.channel.deviceId}, ` +
+                    `sender:${event.getSender()}, isSentByUs:${isSentByUs}, ` +
+                    `isLiveEvent:${isLiveEvent}, isRemoteEcho:${isRemoteEcho}, ` +
+                    `phase:${oldPhase}=>${this.phase}, ` +
+                    `observeOnly:${wasObserveOnly}=>${this._observeOnly}`,
+            );
         }
     }
 
@@ -802,10 +780,8 @@ export class VerificationRequest<
             this.timeoutTimer = setTimeout(this.cancelOnTimeout, this.timeout);
         }
         if (this.timeoutTimer) {
-            const shouldClear = phase === PHASE_STARTED ||
-                phase === PHASE_READY ||
-                phase === PHASE_DONE ||
-                phase === PHASE_CANCELLED;
+            const shouldClear =
+                phase === PHASE_STARTED || phase === PHASE_READY || phase === PHASE_DONE || phase === PHASE_CANCELLED;
             if (shouldClear) {
                 clearTimeout(this.timeoutTimer);
                 this.timeoutTimer = null;
@@ -848,8 +824,7 @@ export class VerificationRequest<
         // Before that, we could be looking at somebody else's verification request and we just
         // happen to be in the room
         if (this.phase !== PHASE_UNSENT && (isUnexpectedRequest || isUnexpectedReady)) {
-            logger.warn(`Cancelling, unexpected ${type} verification ` +
-                `event from ${event.getSender()}`);
+            logger.warn(`Cancelling, unexpected ${type} verification ` + `event from ${event.getSender()}`);
             const reason = `Unexpected ${type} event in phase ${this.phase}`;
             await this.cancel(errorFromEvent(newUnexpectedMessageError({ reason })));
             return true;

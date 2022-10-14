@@ -18,19 +18,19 @@ import "../../../olm-loader";
 import { CryptoEvent, verificationMethods } from "../../../../src/crypto";
 import { logger } from "../../../../src/logger";
 import { SAS } from "../../../../src/crypto/verification/SAS";
-import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
+import { makeTestClients, setupWebcrypto, teardownWebcrypto } from "./util";
 
 const Olm = global.Olm;
 
 jest.useFakeTimers();
 
-describe("verification request integration tests with crypto layer", function() {
+describe("verification request integration tests with crypto layer", function () {
     if (!global.Olm) {
-        logger.warn('Not running device verification unit tests: libolm not present');
+        logger.warn("Not running device verification unit tests: libolm not present");
         return;
     }
 
-    beforeAll(function() {
+    beforeAll(function () {
         setupWebcrypto();
         return Olm.init();
     });
@@ -39,7 +39,7 @@ describe("verification request integration tests with crypto layer", function() 
         teardownWebcrypto();
     });
 
-    it("should request and accept a verification", async function() {
+    it("should request and accept a verification", async function () {
         const [[alice, bob], clearTestClientTimeouts] = await makeTestClients(
             [
                 { userId: "@alice:example.com", deviceId: "Osborne2" },
@@ -49,7 +49,7 @@ describe("verification request integration tests with crypto layer", function() 
                 verificationMethods: [verificationMethods.SAS],
             },
         );
-        alice.client.crypto.deviceList.getRawStoredDevicesForUser = function() {
+        alice.client.crypto.deviceList.getRawStoredDevicesForUser = function () {
             return {
                 Dynabook: {
                     algorithms: [],
@@ -71,7 +71,7 @@ describe("verification request integration tests with crypto layer", function() 
             bobVerifier.endTimer();
         });
         const aliceRequest = await alice.client.requestVerification("@bob:example.com");
-        await aliceRequest.waitFor(r => r.started);
+        await aliceRequest.waitFor((r) => r.started);
         const aliceVerifier = aliceRequest.verifier;
         expect(aliceVerifier).toBeInstanceOf(SAS);
 

@@ -19,13 +19,13 @@ limitations under the License.
  * @module sync-accumulator
  */
 
-import { logger } from './logger';
+import { logger } from "./logger";
 import { deepCopy, isSupportedReceiptType } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
 import { ReceiptType } from "./@types/read_receipts";
-import { UNREAD_THREAD_NOTIFICATIONS } from './@types/sync';
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 
 interface IOpts {
     maxTimelineEntries?: number;
@@ -269,7 +269,8 @@ export class SyncAccumulator {
                 break;
 
             case Category.Join:
-                if (this.inviteRooms[roomId]) { // (1)
+                if (this.inviteRooms[roomId]) {
+                    // (1)
                     // was previously invite, now join. We expect /sync to give
                     // the entire state and timeline on 'join', so delete previous
                     // invite state
@@ -280,9 +281,11 @@ export class SyncAccumulator {
                 break;
 
             case Category.Leave:
-                if (this.inviteRooms[roomId]) { // (4)
+                if (this.inviteRooms[roomId]) {
+                    // (4)
                     delete this.inviteRooms[roomId];
-                } else { // (2)
+                } else {
+                    // (2)
                     delete this.joinRooms[roomId];
                 }
                 break;
@@ -293,7 +296,8 @@ export class SyncAccumulator {
     }
 
     private accumulateInviteState(roomId: string, data: IInvitedRoom): void {
-        if (!data.invite_state || !data.invite_state.events) { // no new data
+        if (!data.invite_state || !data.invite_state.events) {
+            // no new data
             return;
         }
         if (!this.inviteRooms[roomId]) {
@@ -384,9 +388,8 @@ export class SyncAccumulator {
         if (data.unread_notifications) {
             currentData._unreadNotifications = data.unread_notifications;
         }
-        currentData._unreadThreadNotifications = data[UNREAD_THREAD_NOTIFICATIONS.stable]
-            ?? data[UNREAD_THREAD_NOTIFICATIONS.unstable]
-            ?? undefined;
+        currentData._unreadThreadNotifications =
+            data[UNREAD_THREAD_NOTIFICATIONS.stable] ?? data[UNREAD_THREAD_NOTIFICATIONS.unstable] ?? undefined;
 
         if (data.summary) {
             const HEROES_KEY = "m.heroes";
@@ -485,15 +488,11 @@ export class SyncAccumulator {
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.
         if (currentData._timeline.length > this.opts.maxTimelineEntries) {
-            const startIndex = (
-                currentData._timeline.length - this.opts.maxTimelineEntries
-            );
+            const startIndex = currentData._timeline.length - this.opts.maxTimelineEntries;
             for (let i = startIndex; i < currentData._timeline.length; i++) {
                 if (currentData._timeline[i].token) {
                     // keep all events after this, including this one
-                    currentData._timeline = currentData._timeline.slice(
-                        i, currentData._timeline.length,
-                    );
+                    currentData._timeline = currentData._timeline.slice(i, currentData._timeline.length);
                     break;
                 }
             }
@@ -570,9 +569,7 @@ export class SyncAccumulator {
                 if (!receiptEvent.content[receiptData.eventId][receiptData.type]) {
                     receiptEvent.content[receiptData.eventId][receiptData.type] = {};
                 }
-                receiptEvent.content[receiptData.eventId][receiptData.type][userId] = (
-                    receiptData.data
-                );
+                receiptEvent.content[receiptData.eventId][receiptData.type][userId] = receiptData.data;
             });
             // add only if we have some receipt data
             if (Object.keys(receiptEvent.content).length > 0) {
@@ -617,10 +614,12 @@ export class SyncAccumulator {
             // by "reverse clobbering" from the end of the timeline to the start.
             // Convert maps back into arrays.
             const rollBackState = Object.create(null);
-            for (let i = roomJson.timeline.events.length - 1; i >=0; i--) {
+            for (let i = roomJson.timeline.events.length - 1; i >= 0; i--) {
                 const timelineEvent = roomJson.timeline.events[i];
-                if ((timelineEvent as IStateEvent).state_key === null ||
-                    (timelineEvent as IStateEvent).state_key === undefined) {
+                if (
+                    (timelineEvent as IStateEvent).state_key === null ||
+                    (timelineEvent as IStateEvent).state_key === undefined
+                ) {
                     continue; // not a state event
                 }
                 // since we're going back in time, we need to use the previous

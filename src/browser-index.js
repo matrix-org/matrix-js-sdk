@@ -30,13 +30,9 @@ try {
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {
-    matrixcs.setCryptoStoreFactory(
-        function() {
-            return new matrixcs.IndexedDBCryptoStore(
-                indexedDB, "matrix-js-sdk:crypto",
-            );
-        },
-    );
+    matrixcs.setCryptoStoreFactory(function () {
+        return new matrixcs.IndexedDBCryptoStore(indexedDB, "matrix-js-sdk:crypto");
+    });
 }
 
 // We export 3 things to make browserify happy as well as downstream projects.

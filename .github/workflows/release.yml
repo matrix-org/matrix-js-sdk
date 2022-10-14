@@ -1,7 +1,7 @@
 name: Release Process
 on:
   release:
-    types: [ published ]
+    types: [published]
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   jsdoc:

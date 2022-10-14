@@ -18,21 +18,21 @@ import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
 import { RoomState } from "../../src";
 
-describe("RoomMember", function() {
+describe("RoomMember", function () {
     const roomId = "!foo:bar";
     const userA = "@alice:bar";
     const userB = "@bertha:bar";
     const userC = "@clarissa:bar";
     let member = new RoomMember(roomId, userA);
 
-    beforeEach(function() {
+    beforeEach(function () {
         member = new RoomMember(roomId, userA);
     });
 
-    describe("getAvatarUrl", function() {
+    describe("getAvatarUrl", function () {
         const hsUrl = "https://my.home.server";
 
-        it("should return the URL from m.room.member preferentially", function() {
+        it("should return the URL from m.room.member preferentially", function () {
             member.events.member = utils.mkEvent({
                 event: true,
                 type: "m.room.member",
@@ -44,21 +44,20 @@ describe("RoomMember", function() {
                     avatar_url: "mxc://flibble/wibble",
                 },
             });
-            const url = member.getAvatarUrl(hsUrl, 1, 1, '', false, false);
+            const url = member.getAvatarUrl(hsUrl, 1, 1, "", false, false);
             // we don't care about how the mxc->http conversion is done, other
             // than it contains the mxc body.
             expect(url?.indexOf("flibble/wibble")).not.toEqual(-1);
         });
 
-        it("should return nothing if there is no m.room.member and allowDefault=false",
-            function() {
-                const url = member.getAvatarUrl(hsUrl, 64, 64, "crop", false, false);
-                expect(url).toEqual(null);
-            });
+        it("should return nothing if there is no m.room.member and allowDefault=false", function () {
+            const url = member.getAvatarUrl(hsUrl, 64, 64, "crop", false, false);
+            expect(url).toEqual(null);
+        });
     });
 
-    describe("setPowerLevelEvent", function() {
-        it("should set 'powerLevel' and 'powerLevelNorm'.", function() {
+    describe("setPowerLevelEvent", function () {
+        it("should set 'powerLevel' and 'powerLevelNorm'.", function () {
             const event = utils.mkEvent({
                 type: "m.room.power_levels",
                 room: roomId,
@@ -67,7 +66,7 @@ describe("RoomMember", function() {
                     users_default: 20,
                     users: {
                         "@bertha:bar": 200,
-                        "@invalid:user": 10,  // shouldn't barf on this.
+                        "@invalid:user": 10, // shouldn't barf on this.
                     },
                 },
                 event: true,
@@ -82,97 +81,94 @@ describe("RoomMember", function() {
             expect(memberB.powerLevelNorm).toEqual(100);
         });
 
-        it("should emit 'RoomMember.powerLevel' if the power level changes.",
-            function() {
-                const event = utils.mkEvent({
-                    type: "m.room.power_levels",
-                    room: roomId,
-                    user: userA,
-                    content: {
-                        users_default: 20,
-                        users: {
-                            "@bertha:bar": 200,
-                            "@invalid:user": 10,  // shouldn't barf on this.
-                        },
+        it("should emit 'RoomMember.powerLevel' if the power level changes.", function () {
+            const event = utils.mkEvent({
+                type: "m.room.power_levels",
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@bertha:bar": 200,
+                        "@invalid:user": 10, // shouldn't barf on this.
                     },
-                    event: true,
-                });
-                let emitCount = 0;
+                },
+                event: true,
+            });
+            let emitCount = 0;
 
-                member.on(RoomMemberEvent.PowerLevel, function(emitEvent, emitMember) {
-                    emitCount += 1;
-                    expect(emitMember).toEqual(member);
-                    expect(emitEvent).toEqual(event);
-                });
-
-                member.setPowerLevelEvent(event);
-                expect(emitCount).toEqual(1);
-                member.setPowerLevelEvent(event); // no-op
-                expect(emitCount).toEqual(1);
+            member.on(RoomMemberEvent.PowerLevel, function (emitEvent, emitMember) {
+                emitCount += 1;
+                expect(emitMember).toEqual(member);
+                expect(emitEvent).toEqual(event);
             });
 
-        it("should honour power levels of zero.",
-            function() {
-                const event = utils.mkEvent({
-                    type: "m.room.power_levels",
-                    room: roomId,
-                    user: userA,
-                    content: {
-                        users_default: 20,
-                        users: {
-                            "@alice:bar": 0,
-                        },
+            member.setPowerLevelEvent(event);
+            expect(emitCount).toEqual(1);
+            member.setPowerLevelEvent(event); // no-op
+            expect(emitCount).toEqual(1);
+        });
+
+        it("should honour power levels of zero.", function () {
+            const event = utils.mkEvent({
+                type: "m.room.power_levels",
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@alice:bar": 0,
                     },
-                    event: true,
-                });
-                let emitCount = 0;
+                },
+                event: true,
+            });
+            let emitCount = 0;
 
-                // set the power level to something other than zero or we
-                // won't get an event
-                member.powerLevel = 1;
-                member.on(RoomMemberEvent.PowerLevel, function(emitEvent, emitMember) {
-                    emitCount += 1;
-                    expect(emitMember.userId).toEqual('@alice:bar');
-                    expect(emitMember.powerLevel).toEqual(0);
-                    expect(emitEvent).toEqual(event);
-                });
-
-                member.setPowerLevelEvent(event);
-                expect(member.powerLevel).toEqual(0);
-                expect(emitCount).toEqual(1);
+            // set the power level to something other than zero or we
+            // won't get an event
+            member.powerLevel = 1;
+            member.on(RoomMemberEvent.PowerLevel, function (emitEvent, emitMember) {
+                emitCount += 1;
+                expect(emitMember.userId).toEqual("@alice:bar");
+                expect(emitMember.powerLevel).toEqual(0);
+                expect(emitEvent).toEqual(event);
             });
 
-        it("should not honor string power levels.",
-            function() {
-                const event = utils.mkEvent({
-                    type: "m.room.power_levels",
-                    room: roomId,
-                    user: userA,
-                    content: {
-                        users_default: 20,
-                        users: {
-                            "@alice:bar": "5",
-                        },
+            member.setPowerLevelEvent(event);
+            expect(member.powerLevel).toEqual(0);
+            expect(emitCount).toEqual(1);
+        });
+
+        it("should not honor string power levels.", function () {
+            const event = utils.mkEvent({
+                type: "m.room.power_levels",
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@alice:bar": "5",
                     },
-                    event: true,
-                });
-                let emitCount = 0;
-
-                member.on(RoomMemberEvent.PowerLevel, function(emitEvent, emitMember) {
-                    emitCount += 1;
-                    expect(emitMember.userId).toEqual('@alice:bar');
-                    expect(emitMember.powerLevel).toEqual(20);
-                    expect(emitEvent).toEqual(event);
-                });
-
-                member.setPowerLevelEvent(event);
-                expect(member.powerLevel).toEqual(20);
-                expect(emitCount).toEqual(1);
+                },
+                event: true,
             });
+            let emitCount = 0;
+
+            member.on(RoomMemberEvent.PowerLevel, function (emitEvent, emitMember) {
+                emitCount += 1;
+                expect(emitMember.userId).toEqual("@alice:bar");
+                expect(emitMember.powerLevel).toEqual(20);
+                expect(emitEvent).toEqual(event);
+            });
+
+            member.setPowerLevelEvent(event);
+            expect(member.powerLevel).toEqual(20);
+            expect(emitCount).toEqual(1);
+        });
     });
 
-    describe("setTypingEvent", function() {
-        it("should set 'typing'", function() {
+    describe("setTypingEvent", function () {
+        it("should set 'typing'", function () {
             member.typing = false;
             const memberB = new RoomMember(roomId, userB);
             memberB.typing = true;
@@ -184,9 +180,7 @@ describe("RoomMember", function() {
                 user: userA,
                 room: roomId,
                 content: {
-                    user_ids: [
-                        userA, userC,
-                    ],
+                    user_ids: [userA, userC],
                 },
                 event: true,
             });
@@ -199,34 +193,31 @@ describe("RoomMember", function() {
             expect(memberC.typing).toEqual(true);
         });
 
-        it("should emit 'RoomMember.typing' if the typing state changes",
-            function() {
-                const event = utils.mkEvent({
-                    type: "m.typing",
-                    room: roomId,
-                    content: {
-                        user_ids: [
-                            userA, userC,
-                        ],
-                    },
-                    event: true,
-                });
-                let emitCount = 0;
-                member.on(RoomMemberEvent.Typing, function(ev, mem) {
-                    expect(mem).toEqual(member);
-                    expect(ev).toEqual(event);
-                    emitCount += 1;
-                });
-                member.typing = false;
-                member.setTypingEvent(event);
-                expect(emitCount).toEqual(1);
-                member.setTypingEvent(event); // no-op
-                expect(emitCount).toEqual(1);
+        it("should emit 'RoomMember.typing' if the typing state changes", function () {
+            const event = utils.mkEvent({
+                type: "m.typing",
+                room: roomId,
+                content: {
+                    user_ids: [userA, userC],
+                },
+                event: true,
             });
+            let emitCount = 0;
+            member.on(RoomMemberEvent.Typing, function (ev, mem) {
+                expect(mem).toEqual(member);
+                expect(ev).toEqual(event);
+                emitCount += 1;
+            });
+            member.typing = false;
+            member.setTypingEvent(event);
+            expect(emitCount).toEqual(1);
+            member.setTypingEvent(event); // no-op
+            expect(emitCount).toEqual(1);
+        });
     });
 
-    describe("isOutOfBand", function() {
-        it("should be set by markOutOfBand", function() {
+    describe("isOutOfBand", function () {
+        it("should be set by markOutOfBand", function () {
             const member = new RoomMember(roomId, userA);
             expect(member.isOutOfBand()).toEqual(false);
             member.markOutOfBand();
@@ -234,7 +225,7 @@ describe("RoomMember", function() {
         });
     });
 
-    describe("setMembershipEvent", function() {
+    describe("setMembershipEvent", function () {
         const joinEvent = utils.mkMembership({
             event: true,
             mship: "join",
@@ -251,51 +242,54 @@ describe("RoomMember", function() {
             room: roomId,
         });
 
-        it("should set 'membership' and assign the event to 'events.member'.",
-            function() {
-                member.setMembershipEvent(inviteEvent);
-                expect(member.membership).toEqual("invite");
-                expect(member.events.member).toEqual(inviteEvent);
-                member.setMembershipEvent(joinEvent);
-                expect(member.membership).toEqual("join");
-                expect(member.events.member).toEqual(joinEvent);
-            });
+        it("should set 'membership' and assign the event to 'events.member'.", function () {
+            member.setMembershipEvent(inviteEvent);
+            expect(member.membership).toEqual("invite");
+            expect(member.events.member).toEqual(inviteEvent);
+            member.setMembershipEvent(joinEvent);
+            expect(member.membership).toEqual("join");
+            expect(member.events.member).toEqual(joinEvent);
+        });
 
-        it("should set 'name' based on user_id, displayname and room state",
-            function() {
-                const roomState = {
-                    getStateEvents: function(type) {
-                        if (type !== "m.room.member") {
-                            return [];
-                        }
-                        return [
-                            utils.mkMembership({
-                                event: true, mship: "join", room: roomId,
-                                user: userB,
-                            }),
-                            utils.mkMembership({
-                                event: true, mship: "join", room: roomId,
-                                user: userC, name: "Alice",
-                            }),
-                            joinEvent,
-                        ];
-                    },
-                    getUserIdsWithDisplayName: function(displayName) {
-                        return [userA, userC];
-                    },
-                } as unknown as RoomState;
-                expect(member.name).toEqual(userA); // default = user_id
-                member.setMembershipEvent(joinEvent);
-                expect(member.name).toEqual("Alice"); // prefer displayname
-                member.setMembershipEvent(joinEvent, roomState);
-                expect(member.name).not.toEqual("Alice"); // it should disambig.
-                // user_id should be there somewhere
-                expect(member.name.indexOf(userA)).not.toEqual(-1);
-            });
+        it("should set 'name' based on user_id, displayname and room state", function () {
+            const roomState = {
+                getStateEvents: function (type) {
+                    if (type !== "m.room.member") {
+                        return [];
+                    }
+                    return [
+                        utils.mkMembership({
+                            event: true,
+                            mship: "join",
+                            room: roomId,
+                            user: userB,
+                        }),
+                        utils.mkMembership({
+                            event: true,
+                            mship: "join",
+                            room: roomId,
+                            user: userC,
+                            name: "Alice",
+                        }),
+                        joinEvent,
+                    ];
+                },
+                getUserIdsWithDisplayName: function (displayName) {
+                    return [userA, userC];
+                },
+            } as unknown as RoomState;
+            expect(member.name).toEqual(userA); // default = user_id
+            member.setMembershipEvent(joinEvent);
+            expect(member.name).toEqual("Alice"); // prefer displayname
+            member.setMembershipEvent(joinEvent, roomState);
+            expect(member.name).not.toEqual("Alice"); // it should disambig.
+            // user_id should be there somewhere
+            expect(member.name.indexOf(userA)).not.toEqual(-1);
+        });
 
-        it("should emit 'RoomMember.membership' if the membership changes", function() {
+        it("should emit 'RoomMember.membership' if the membership changes", function () {
             let emitCount = 0;
-            member.on(RoomMemberEvent.Membership, function(ev, mem) {
+            member.on(RoomMemberEvent.Membership, function (ev, mem) {
                 emitCount += 1;
                 expect(mem).toEqual(member);
                 expect(ev).toEqual(inviteEvent);
@@ -306,9 +300,9 @@ describe("RoomMember", function() {
             expect(emitCount).toEqual(1);
         });
 
-        it("should emit 'RoomMember.name' if the name changes", function() {
+        it("should emit 'RoomMember.name' if the name changes", function () {
             let emitCount = 0;
-            member.on(RoomMemberEvent.Name, function(ev, mem) {
+            member.on(RoomMemberEvent.Name, function (ev, mem) {
                 emitCount += 1;
                 expect(mem).toEqual(member);
                 expect(ev).toEqual(joinEvent);
@@ -319,7 +313,7 @@ describe("RoomMember", function() {
             expect(emitCount).toEqual(1);
         });
 
-        it("should set 'name' to user_id if it is just whitespace", function() {
+        it("should set 'name' to user_id if it is just whitespace", function () {
             const joinEvent = utils.mkMembership({
                 event: true,
                 mship: "join",
@@ -333,7 +327,7 @@ describe("RoomMember", function() {
             expect(member.name).toEqual(userA); // it should fallback because all whitespace
         });
 
-        it("should disambiguate users on a fuzzy displayname match", function() {
+        it("should disambiguate users on a fuzzy displayname match", function () {
             const joinEvent = utils.mkMembership({
                 event: true,
                 mship: "join",
@@ -343,19 +337,22 @@ describe("RoomMember", function() {
             });
 
             const roomState = {
-                getStateEvents: function(type) {
+                getStateEvents: function (type) {
                     if (type !== "m.room.member") {
                         return [];
                     }
                     return [
                         utils.mkMembership({
-                            event: true, mship: "join", room: roomId,
-                            user: userC, name: "Alice",
+                            event: true,
+                            mship: "join",
+                            room: roomId,
+                            user: userC,
+                            name: "Alice",
                         }),
                         joinEvent,
                     ];
                 },
-                getUserIdsWithDisplayName: function(displayName) {
+                getUserIdsWithDisplayName: function (displayName) {
                     return [userA, userC];
                 },
             } as unknown as RoomState;

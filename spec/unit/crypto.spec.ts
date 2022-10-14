@@ -1,4 +1,4 @@
-import '../olm-loader';
+import "../olm-loader";
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
@@ -13,11 +13,11 @@ import * as olmlib from "../../src/crypto/olmlib";
 import { sleep } from "../../src/utils";
 import { CRYPTO_ENABLED } from "../../src/client";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
-import { logger } from '../../src/logger';
+import { logger } from "../../src/logger";
 import { MemoryStore } from "../../src";
-import { RoomKeyRequestState } from '../../src/crypto/OutgoingRoomKeyRequestManager';
-import { RoomMember } from '../../src/models/room-member';
-import { IStore } from '../../src/store';
+import { RoomKeyRequestState } from "../../src/crypto/OutgoingRoomKeyRequestManager";
+import { RoomMember } from "../../src/models/room-member";
+import { IStore } from "../../src/store";
 
 const Olm = global.Olm;
 
@@ -42,14 +42,14 @@ async function keyshareEventForEvent(client, event, index): Promise<MatrixEvent>
         type: "m.forwarded_room_key",
         sender: client.getUserId(),
         content: {
-            "algorithm": olmlib.MEGOLM_ALGORITHM,
-            "room_id": roomId,
-            "sender_key": eventContent.sender_key,
-            "sender_claimed_ed25519_key": key.sender_claimed_ed25519_key,
-            "session_id": eventContent.session_id,
-            "session_key": key.key,
-            "chain_index": key.chain_index,
-            "forwarding_curve25519_key_chain": key.forwarding_curve_key_chain,
+            algorithm: olmlib.MEGOLM_ALGORITHM,
+            room_id: roomId,
+            sender_key: eventContent.sender_key,
+            sender_claimed_ed25519_key: key.sender_claimed_ed25519_key,
+            session_id: eventContent.session_id,
+            session_key: key.key,
+            chain_index: key.chain_index,
+            forwarding_curve25519_key_chain: key.forwarding_curve_key_chain,
             "org.matrix.msc3061.shared_history": true,
         },
     });
@@ -73,10 +73,10 @@ function roomKeyEventForEvent(client: MatrixClient, event: MatrixEvent): MatrixE
         type: "m.room_key",
         sender: client.getUserId(),
         content: {
-            "algorithm": olmlib.MEGOLM_ALGORITHM,
-            "room_id": roomId,
-            "session_id": eventContent.session_id,
-            "session_key": key.key,
+            algorithm: olmlib.MEGOLM_ALGORITHM,
+            room_id: roomId,
+            session_id: eventContent.session_id,
+            session_key: key.key,
         },
     });
     // make onRoomKeyEvent think this was an encrypted event
@@ -91,12 +91,12 @@ function roomKeyEventForEvent(client: MatrixClient, event: MatrixEvent): MatrixE
     return ksEvent;
 }
 
-describe("Crypto", function() {
+describe("Crypto", function () {
     if (!CRYPTO_ENABLED) {
         return;
     }
 
-    beforeAll(function() {
+    beforeAll(function () {
         return Olm.init();
     });
 
@@ -104,34 +104,35 @@ describe("Crypto", function() {
         jest.useRealTimers();
     });
 
-    it("Crypto exposes the correct olm library version", function() {
+    it("Crypto exposes the correct olm library version", function () {
         expect(Crypto.getOlmVersion()[0]).toEqual(3);
     });
 
-    describe("encrypted events", function() {
-        it("provides encryption information", async function() {
-            const client = (new TestClient(
-                "@alice:example.com", "deviceid",
-            )).client;
+    describe("encrypted events", function () {
+        it("provides encryption information", async function () {
+            const client = new TestClient("@alice:example.com", "deviceid").client;
             await client.initCrypto();
 
             // unencrypted event
             const event = {
                 getId: () => "$event_id",
                 getSenderKey: () => null,
-                getWireContent: () => {return {};},
+                getWireContent: () => {
+                    return {};
+                },
             } as unknown as MatrixEvent;
 
             let encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeFalsy();
 
             // unknown sender (e.g. deleted device), forwarded megolm key (untrusted)
-            event.getSenderKey = () => 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
-            event.getWireContent = () => {return { algorithm: olmlib.MEGOLM_ALGORITHM };};
+            event.getSenderKey = () => "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI";
+            event.getWireContent = () => {
+                return { algorithm: olmlib.MEGOLM_ALGORITHM };
+            };
             event.getForwardingCurve25519KeyChain = () => ["not empty"];
             event.isKeySourceUntrusted = () => true;
-            event.getClaimedEd25519Key =
-                () => 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+            event.getClaimedEd25519Key = () => "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
             encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeTruthy();
@@ -142,10 +143,8 @@ describe("Crypto", function() {
             event.getForwardingCurve25519KeyChain = () => [];
             event.isKeySourceUntrusted = () => true;
             const device = new DeviceInfo("FLIBBLE");
-            device.keys["curve25519:FLIBBLE"] =
-                'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI';
-            device.keys["ed25519:FLIBBLE"] =
-                'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA';
+            device.keys["curve25519:FLIBBLE"] = "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI";
+            device.keys["ed25519:FLIBBLE"] = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
             client.crypto.deviceList.getDeviceByIdentityKey = () => device;
 
             encryptionInfo = client.getEventEncryptionInfo(event);
@@ -156,8 +155,7 @@ describe("Crypto", function() {
 
             // known sender, trusted megolm key, but bad ed25519key
             event.isKeySourceUntrusted = () => false;
-            device.keys["ed25519:FLIBBLE"] =
-                'BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB';
+            device.keys["ed25519:FLIBBLE"] = "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB";
 
             encryptionInfo = client.getEventEncryptionInfo(event);
             expect(encryptionInfo.encrypted).toBeTruthy();
@@ -169,16 +167,16 @@ describe("Crypto", function() {
         });
     });
 
-    describe('Session management', function() {
+    describe("Session management", function () {
         const otkResponse = {
             one_time_keys: {
-                '@alice:home.server': {
+                "@alice:home.server": {
                     aliceDevice: {
-                        'signed_curve25519:FLIBBLE': {
-                            key: 'YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI',
+                        "signed_curve25519:FLIBBLE": {
+                            key: "YmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmJiYmI",
                             signatures: {
-                                '@alice:home.server': {
-                                    'ed25519:aliceDevice': 'totally a valid signature',
+                                "@alice:home.server": {
+                                    "ed25519:aliceDevice": "totally a valid signature",
                                 },
                             },
                         },
@@ -192,26 +190,29 @@ describe("Crypto", function() {
 
         let fakeEmitter;
 
-        beforeEach(async function() {
+        beforeEach(async function () {
             const mockStorage = new MockStorageApi() as unknown as Storage;
             const clientStore = new MemoryStore({ localStorage: mockStorage }) as unknown as IStore;
             const cryptoStore = new MemoryCryptoStore();
 
-            cryptoStore.storeEndToEndDeviceData({
-                devices: {
-                    '@bob:home.server': {
-                        'BOBDEVICE': {
-                            algorithms: [],
-                            verified: 1,
-                            known: false,
-                            keys: {
-                                'curve25519:BOBDEVICE': 'this is a key',
+            cryptoStore.storeEndToEndDeviceData(
+                {
+                    devices: {
+                        "@bob:home.server": {
+                            BOBDEVICE: {
+                                algorithms: [],
+                                verified: 1,
+                                known: false,
+                                keys: {
+                                    "curve25519:BOBDEVICE": "this is a key",
+                                },
                             },
                         },
                     },
+                    trackingStatus: {},
                 },
-                trackingStatus: {},
-            }, {});
+                {},
+            );
 
             mockBaseApis = {
                 sendToDevice: jest.fn(),
@@ -235,76 +236,72 @@ describe("Crypto", function() {
             await crypto.init();
         });
 
-        afterEach(async function() {
+        afterEach(async function () {
             await crypto.stop();
         });
 
-        it("restarts wedged Olm sessions", async function() {
+        it("restarts wedged Olm sessions", async function () {
             const prom = new Promise<void>((resolve) => {
-                mockBaseApis.claimOneTimeKeys = function() {
+                mockBaseApis.claimOneTimeKeys = function () {
                     resolve();
                     return otkResponse;
                 };
             });
 
-            fakeEmitter.emit('toDeviceEvent', {
+            fakeEmitter.emit("toDeviceEvent", {
                 getId: jest.fn().mockReturnValue("$wedged"),
-                getType: jest.fn().mockReturnValue('m.room.message'),
+                getType: jest.fn().mockReturnValue("m.room.message"),
                 getContent: jest.fn().mockReturnValue({
-                    msgtype: 'm.bad.encrypted',
+                    msgtype: "m.bad.encrypted",
                 }),
                 getWireContent: jest.fn().mockReturnValue({
-                    algorithm: 'm.olm.v1.curve25519-aes-sha2',
-                    sender_key: 'this is a key',
+                    algorithm: "m.olm.v1.curve25519-aes-sha2",
+                    sender_key: "this is a key",
                 }),
-                getSender: jest.fn().mockReturnValue('@bob:home.server'),
+                getSender: jest.fn().mockReturnValue("@bob:home.server"),
             });
 
             await prom;
         });
     });
 
-    describe('Key requests', function() {
+    describe("Key requests", function () {
         let aliceClient: MatrixClient;
         let bobClient: MatrixClient;
         let claraClient: MatrixClient;
 
-        beforeEach(async function() {
-            aliceClient = (new TestClient(
-                "@alice:example.com", "alicedevice",
-            )).client;
-            bobClient = (new TestClient(
-                "@bob:example.com", "bobdevice",
-            )).client;
-            claraClient = (new TestClient(
-                "@clara:example.com", "claradevice",
-            )).client;
+        beforeEach(async function () {
+            aliceClient = new TestClient("@alice:example.com", "alicedevice").client;
+            bobClient = new TestClient("@bob:example.com", "bobdevice").client;
+            claraClient = new TestClient("@clara:example.com", "claradevice").client;
             await aliceClient.initCrypto();
             await bobClient.initCrypto();
             await claraClient.initCrypto();
         });
 
-        afterEach(async function() {
+        afterEach(async function () {
             aliceClient.stopClient();
             bobClient.stopClient();
             claraClient.stopClient();
         });
 
-        it("does not cancel keyshare requests until all messages are decrypted with trusted keys", async function() {
+        it("does not cancel keyshare requests until all messages are decrypted with trusted keys", async function () {
             const encryptionCfg = {
-                "algorithm": "m.megolm.v1.aes-sha2",
+                algorithm: "m.megolm.v1.aes-sha2",
             };
             const roomId = "!someroom";
             const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
             const bobRoom = new Room(roomId, bobClient, "@bob:example.com", {});
             // Make Bob invited by Alice so Bob will accept Alice's forwarded keys
-            bobRoom.currentState.setStateEvents([new MatrixEvent({
-                type: "m.room.member",
-                sender: "@alice:example.com",
-                room_id: roomId,
-                content: { membership: "invite" },
-                state_key: "@bob:example.com",
-            })]);
+            bobRoom.currentState.setStateEvents([
+                new MatrixEvent({
+                    type: "m.room.member",
+                    sender: "@alice:example.com",
+                    room_id: roomId,
+                    content: { membership: "invite" },
+                    state_key: "@bob:example.com",
+                }),
+            ]);
             aliceClient.store.storeRoom(aliceRoom);
             bobClient.store.storeRoom(bobRoom);
             await aliceClient.setRoomEncryption(roomId, encryptionCfg);
@@ -331,35 +328,37 @@ describe("Crypto", function() {
                     },
                 }),
             ];
-            await Promise.all(events.map(async (event) => {
-                // alice encrypts each event, and then bob tries to decrypt
-                // them without any keys, so that they'll be in pending
-                await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                // remove keys from the event
-                // @ts-ignore private properties
-                event.clearEvent = undefined;
-                // @ts-ignore private properties
-                event.senderCurve25519Key = null;
-                // @ts-ignore private properties
-                event.claimedEd25519Key = null;
-                try {
-                    await bobClient.crypto.decryptEvent(event);
-                } catch (e) {
-                    // we expect this to fail because we don't have the
-                    // decryption keys yet
-                }
-            }));
+            await Promise.all(
+                events.map(async (event) => {
+                    // alice encrypts each event, and then bob tries to decrypt
+                    // them without any keys, so that they'll be in pending
+                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                    // remove keys from the event
+                    // @ts-ignore private properties
+                    event.clearEvent = undefined;
+                    // @ts-ignore private properties
+                    event.senderCurve25519Key = null;
+                    // @ts-ignore private properties
+                    event.claimedEd25519Key = null;
+                    try {
+                        await bobClient.crypto.decryptEvent(event);
+                    } catch (e) {
+                        // we expect this to fail because we don't have the
+                        // decryption keys yet
+                    }
+                }),
+            );
 
             const device = new DeviceInfo(aliceClient.deviceId);
             bobClient.crypto.deviceList.getDeviceByIdentityKey = () => device;
 
-            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
-                roomId, olmlib.MEGOLM_ALGORITHM,
-            );
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(roomId, olmlib.MEGOLM_ALGORITHM);
 
-            const decryptEventsPromise = Promise.all(events.map((ev) => {
-                return awaitEvent(ev, "Event.decrypted");
-            }));
+            const decryptEventsPromise = Promise.all(
+                events.map((ev) => {
+                    return awaitEvent(ev, "Event.decrypted");
+                }),
+            );
 
             // keyshare the session key starting at the second message, so
             // the first message can't be decrypted yet, but the second one
@@ -414,9 +413,9 @@ describe("Crypto", function() {
             expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody)).toBeFalsy();
         });
 
-        it("should error if a forwarded room key lacks a content.sender_key", async function() {
+        it("should error if a forwarded room key lacks a content.sender_key", async function () {
             const encryptionCfg = {
-                "algorithm": "m.megolm.v1.aes-sha2",
+                algorithm: "m.megolm.v1.aes-sha2",
             };
             const roomId = "!someroom";
             const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
@@ -455,9 +454,7 @@ describe("Crypto", function() {
             const device = new DeviceInfo(aliceClient.deviceId);
             bobClient.crypto.deviceList.getDeviceByIdentityKey = () => device;
 
-            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
-                roomId, olmlib.MEGOLM_ALGORITHM,
-            );
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(roomId, olmlib.MEGOLM_ALGORITHM);
 
             const ksEvent = await keyshareEventForEvent(aliceClient, event, 1);
             ksEvent.getContent().sender_key = undefined; // test
@@ -466,7 +463,7 @@ describe("Crypto", function() {
             expect(bobClient.crypto.olmDevice.addInboundGroupSession).not.toHaveBeenCalled();
         });
 
-        it("creates a new keyshare request if we request a keyshare", async function() {
+        it("creates a new keyshare request if we request a keyshare", async function () {
             // make sure that cancelAndResend... creates a new keyshare request
             // if there wasn't an already-existing one
             const event = new MatrixEvent({
@@ -486,11 +483,10 @@ describe("Crypto", function() {
                 session_id: "sessionid",
                 sender_key: "senderkey",
             };
-            expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody))
-                .toBeDefined();
+            expect(await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody)).toBeDefined();
         });
 
-        it("uses a new txnid for re-requesting keys", async function() {
+        it("uses a new txnid for re-requesting keys", async function () {
             jest.useFakeTimers();
 
             const event = new MatrixEvent({
@@ -535,9 +531,9 @@ describe("Crypto", function() {
             expect(aliceSendToDevice.mock.calls[2][2]).not.toBe(txnId);
         });
 
-        it("should accept forwarded keys which it requested", async function() {
+        it("should accept forwarded keys which it requested", async function () {
             const encryptionCfg = {
-                "algorithm": "m.megolm.v1.aes-sha2",
+                algorithm: "m.megolm.v1.aes-sha2",
             };
             const roomId = "!someroom";
             const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
@@ -568,24 +564,26 @@ describe("Crypto", function() {
                     },
                 }),
             ];
-            await Promise.all(events.map(async (event) => {
-                // alice encrypts each event, and then bob tries to decrypt
-                // them without any keys, so that they'll be in pending
-                await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                // remove keys from the event
-                // @ts-ignore private properties
-                event.clearEvent = undefined;
-                // @ts-ignore private properties
-                event.senderCurve25519Key = null;
-                // @ts-ignore private properties
-                event.claimedEd25519Key = null;
-                try {
-                    await bobClient.crypto.decryptEvent(event);
-                } catch (e) {
-                    // we expect this to fail because we don't have the
-                    // decryption keys yet
-                }
-            }));
+            await Promise.all(
+                events.map(async (event) => {
+                    // alice encrypts each event, and then bob tries to decrypt
+                    // them without any keys, so that they'll be in pending
+                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                    // remove keys from the event
+                    // @ts-ignore private properties
+                    event.clearEvent = undefined;
+                    // @ts-ignore private properties
+                    event.senderCurve25519Key = null;
+                    // @ts-ignore private properties
+                    event.claimedEd25519Key = null;
+                    try {
+                        await bobClient.crypto.decryptEvent(event);
+                    } catch (e) {
+                        // we expect this to fail because we don't have the
+                        // decryption keys yet
+                    }
+                }),
+            );
 
             const device = new DeviceInfo(aliceClient.deviceId);
             bobClient.crypto.deviceList.getDeviceByIdentityKey = () => device;
@@ -603,18 +601,17 @@ describe("Crypto", function() {
             };
             const outgoingReq = await cryptoStore.getOutgoingRoomKeyRequest(roomKeyRequestBody);
             expect(outgoingReq).toBeDefined();
-            await cryptoStore.updateOutgoingRoomKeyRequest(
-                outgoingReq.requestId, RoomKeyRequestState.Unsent,
-                { state: RoomKeyRequestState.Sent },
-            );
+            await cryptoStore.updateOutgoingRoomKeyRequest(outgoingReq.requestId, RoomKeyRequestState.Unsent, {
+                state: RoomKeyRequestState.Sent,
+            });
 
-            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
-                roomId, olmlib.MEGOLM_ALGORITHM,
-            );
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(roomId, olmlib.MEGOLM_ALGORITHM);
 
-            const decryptEventsPromise = Promise.all(events.map((ev) => {
-                return awaitEvent(ev, "Event.decrypted");
-            }));
+            const decryptEventsPromise = Promise.all(
+                events.map((ev) => {
+                    return awaitEvent(ev, "Event.decrypted");
+                }),
+            );
             const ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             const key = await bobClient.crypto.olmDevice.getInboundGroupSessionKey(
@@ -628,22 +625,24 @@ describe("Crypto", function() {
             expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
         });
 
-        it("should accept forwarded keys from the user who invited it to the room", async function() {
+        it("should accept forwarded keys from the user who invited it to the room", async function () {
             const encryptionCfg = {
-                "algorithm": "m.megolm.v1.aes-sha2",
+                algorithm: "m.megolm.v1.aes-sha2",
             };
             const roomId = "!someroom";
             const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
             const bobRoom = new Room(roomId, bobClient, "@bob:example.com", {});
             const claraRoom = new Room(roomId, claraClient, "@clara:example.com", {});
             // Make Bob invited by Clara
-            bobRoom.currentState.setStateEvents([new MatrixEvent({
-                type: "m.room.member",
-                sender: "@clara:example.com",
-                room_id: roomId,
-                content: { membership: "invite" },
-                state_key: "@bob:example.com",
-            })]);
+            bobRoom.currentState.setStateEvents([
+                new MatrixEvent({
+                    type: "m.room.member",
+                    sender: "@clara:example.com",
+                    room_id: roomId,
+                    content: { membership: "invite" },
+                    state_key: "@bob:example.com",
+                }),
+            ]);
             aliceClient.store.storeRoom(aliceRoom);
             bobClient.store.storeRoom(bobRoom);
             claraClient.store.storeRoom(claraRoom);
@@ -672,39 +671,41 @@ describe("Crypto", function() {
                     },
                 }),
             ];
-            await Promise.all(events.map(async (event) => {
-                // alice encrypts each event, and then bob tries to decrypt
-                // them without any keys, so that they'll be in pending
-                await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                // remove keys from the event
-                // @ts-ignore private properties
-                event.clearEvent = undefined;
-                // @ts-ignore private properties
-                event.senderCurve25519Key = null;
-                // @ts-ignore private properties
-                event.claimedEd25519Key = null;
-                try {
-                    await bobClient.crypto.decryptEvent(event);
-                } catch (e) {
-                    // we expect this to fail because we don't have the
-                    // decryption keys yet
-                }
-            }));
+            await Promise.all(
+                events.map(async (event) => {
+                    // alice encrypts each event, and then bob tries to decrypt
+                    // them without any keys, so that they'll be in pending
+                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                    // remove keys from the event
+                    // @ts-ignore private properties
+                    event.clearEvent = undefined;
+                    // @ts-ignore private properties
+                    event.senderCurve25519Key = null;
+                    // @ts-ignore private properties
+                    event.claimedEd25519Key = null;
+                    try {
+                        await bobClient.crypto.decryptEvent(event);
+                    } catch (e) {
+                        // we expect this to fail because we don't have the
+                        // decryption keys yet
+                    }
+                }),
+            );
 
             const device = new DeviceInfo(claraClient.deviceId);
             bobClient.crypto.deviceList.getDeviceByIdentityKey = () => device;
             bobClient.crypto.deviceList.getUserByIdentityKey = () => "@clara:example.com";
 
-            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
-                roomId, olmlib.MEGOLM_ALGORITHM,
-            );
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(roomId, olmlib.MEGOLM_ALGORITHM);
 
-            const decryptEventsPromise = Promise.all(events.map((ev) => {
-                return awaitEvent(ev, "Event.decrypted");
-            }));
+            const decryptEventsPromise = Promise.all(
+                events.map((ev) => {
+                    return awaitEvent(ev, "Event.decrypted");
+                }),
+            );
             const ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
-            ksEvent.event.sender = claraClient.getUserId(),
-            ksEvent.sender = new RoomMember(roomId, claraClient.getUserId());
+            (ksEvent.event.sender = claraClient.getUserId()),
+                (ksEvent.sender = new RoomMember(roomId, claraClient.getUserId()));
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             const key = await bobClient.crypto.olmDevice.getInboundGroupSessionKey(
                 roomId,
@@ -717,9 +718,9 @@ describe("Crypto", function() {
             expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
         });
 
-        it("should accept forwarded keys from one of its own user's other devices", async function() {
+        it("should accept forwarded keys from one of its own user's other devices", async function () {
             const encryptionCfg = {
-                "algorithm": "m.megolm.v1.aes-sha2",
+                algorithm: "m.megolm.v1.aes-sha2",
             };
             const roomId = "!someroom";
             const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
@@ -750,40 +751,42 @@ describe("Crypto", function() {
                     },
                 }),
             ];
-            await Promise.all(events.map(async (event) => {
-                // alice encrypts each event, and then bob tries to decrypt
-                // them without any keys, so that they'll be in pending
-                await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                // remove keys from the event
-                // @ts-ignore private properties
-                event.clearEvent = undefined;
-                // @ts-ignore private properties
-                event.senderCurve25519Key = null;
-                // @ts-ignore private properties
-                event.claimedEd25519Key = null;
-                try {
-                    await bobClient.crypto.decryptEvent(event);
-                } catch (e) {
-                    // we expect this to fail because we don't have the
-                    // decryption keys yet
-                }
-            }));
+            await Promise.all(
+                events.map(async (event) => {
+                    // alice encrypts each event, and then bob tries to decrypt
+                    // them without any keys, so that they'll be in pending
+                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                    // remove keys from the event
+                    // @ts-ignore private properties
+                    event.clearEvent = undefined;
+                    // @ts-ignore private properties
+                    event.senderCurve25519Key = null;
+                    // @ts-ignore private properties
+                    event.claimedEd25519Key = null;
+                    try {
+                        await bobClient.crypto.decryptEvent(event);
+                    } catch (e) {
+                        // we expect this to fail because we don't have the
+                        // decryption keys yet
+                    }
+                }),
+            );
 
             const device = new DeviceInfo(claraClient.deviceId);
             device.verified = DeviceInfo.DeviceVerification.VERIFIED;
             bobClient.crypto.deviceList.getDeviceByIdentityKey = () => device;
             bobClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:example.com";
 
-            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
-                roomId, olmlib.MEGOLM_ALGORITHM,
-            );
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(roomId, olmlib.MEGOLM_ALGORITHM);
 
-            const decryptEventsPromise = Promise.all(events.map((ev) => {
-                return awaitEvent(ev, "Event.decrypted");
-            }));
+            const decryptEventsPromise = Promise.all(
+                events.map((ev) => {
+                    return awaitEvent(ev, "Event.decrypted");
+                }),
+            );
             const ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
-            ksEvent.event.sender = bobClient.getUserId(),
-            ksEvent.sender = new RoomMember(roomId, bobClient.getUserId());
+            (ksEvent.event.sender = bobClient.getUserId()),
+                (ksEvent.sender = new RoomMember(roomId, bobClient.getUserId()));
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             const key = await bobClient.crypto.olmDevice.getInboundGroupSessionKey(
                 roomId,
@@ -796,9 +799,9 @@ describe("Crypto", function() {
             expect(events[1].getContent().msgtype).not.toBe("m.bad.encrypted");
         });
 
-        it("should not accept unexpected forwarded keys for a room it's in", async function() {
+        it("should not accept unexpected forwarded keys for a room it's in", async function () {
             const encryptionCfg = {
-                "algorithm": "m.megolm.v1.aes-sha2",
+                algorithm: "m.megolm.v1.aes-sha2",
             };
             const roomId = "!someroom";
             const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
@@ -832,36 +835,36 @@ describe("Crypto", function() {
                     },
                 }),
             ];
-            await Promise.all(events.map(async (event) => {
-                // alice encrypts each event, and then bob tries to decrypt
-                // them without any keys, so that they'll be in pending
-                await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                // remove keys from the event
-                // @ts-ignore private properties
-                event.clearEvent = undefined;
-                // @ts-ignore private properties
-                event.senderCurve25519Key = null;
-                // @ts-ignore private properties
-                event.claimedEd25519Key = null;
-                try {
-                    await bobClient.crypto.decryptEvent(event);
-                } catch (e) {
-                    // we expect this to fail because we don't have the
-                    // decryption keys yet
-                }
-            }));
+            await Promise.all(
+                events.map(async (event) => {
+                    // alice encrypts each event, and then bob tries to decrypt
+                    // them without any keys, so that they'll be in pending
+                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                    // remove keys from the event
+                    // @ts-ignore private properties
+                    event.clearEvent = undefined;
+                    // @ts-ignore private properties
+                    event.senderCurve25519Key = null;
+                    // @ts-ignore private properties
+                    event.claimedEd25519Key = null;
+                    try {
+                        await bobClient.crypto.decryptEvent(event);
+                    } catch (e) {
+                        // we expect this to fail because we don't have the
+                        // decryption keys yet
+                    }
+                }),
+            );
 
             const device = new DeviceInfo(claraClient.deviceId);
             bobClient.crypto.deviceList.getDeviceByIdentityKey = () => device;
             bobClient.crypto.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
-            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
-                roomId, olmlib.MEGOLM_ALGORITHM,
-            );
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(roomId, olmlib.MEGOLM_ALGORITHM);
 
             const ksEvent = await keyshareEventForEvent(aliceClient, events[0], 0);
-            ksEvent.event.sender = claraClient.getUserId(),
-            ksEvent.sender = new RoomMember(roomId, claraClient.getUserId());
+            (ksEvent.event.sender = claraClient.getUserId()),
+                (ksEvent.sender = new RoomMember(roomId, claraClient.getUserId()));
             await bobDecryptor.onRoomKeyEvent(ksEvent);
             const key = await bobClient.crypto.olmDevice.getInboundGroupSessionKey(
                 roomId,
@@ -871,9 +874,9 @@ describe("Crypto", function() {
             expect(key).toBeNull();
         });
 
-        it("should park forwarded keys for a room it's not in", async function() {
+        it("should park forwarded keys for a room it's not in", async function () {
             const encryptionCfg = {
-                "algorithm": "m.megolm.v1.aes-sha2",
+                algorithm: "m.megolm.v1.aes-sha2",
             };
             const roomId = "!someroom";
             const aliceRoom = new Room(roomId, aliceClient, "@alice:example.com", {});
@@ -901,26 +904,26 @@ describe("Crypto", function() {
                     },
                 }),
             ];
-            await Promise.all(events.map(async (event) => {
-                // alice encrypts each event, and then bob tries to decrypt
-                // them without any keys, so that they'll be in pending
-                await aliceClient.crypto.encryptEvent(event, aliceRoom);
-                // remove keys from the event
-                // @ts-ignore private properties
-                event.clearEvent = undefined;
-                // @ts-ignore private properties
-                event.senderCurve25519Key = null;
-                // @ts-ignore private properties
-                event.claimedEd25519Key = null;
-            }));
+            await Promise.all(
+                events.map(async (event) => {
+                    // alice encrypts each event, and then bob tries to decrypt
+                    // them without any keys, so that they'll be in pending
+                    await aliceClient.crypto.encryptEvent(event, aliceRoom);
+                    // remove keys from the event
+                    // @ts-ignore private properties
+                    event.clearEvent = undefined;
+                    // @ts-ignore private properties
+                    event.senderCurve25519Key = null;
+                    // @ts-ignore private properties
+                    event.claimedEd25519Key = null;
+                }),
+            );
 
             const device = new DeviceInfo(aliceClient.deviceId);
             bobClient.crypto.deviceList.getDeviceByIdentityKey = () => device;
             bobClient.crypto.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
-            const bobDecryptor = bobClient.crypto.getRoomDecryptor(
-                roomId, olmlib.MEGOLM_ALGORITHM,
-            );
+            const bobDecryptor = bobClient.crypto.getRoomDecryptor(roomId, olmlib.MEGOLM_ALGORITHM);
 
             const content = events[0].getWireContent();
 
@@ -939,22 +942,24 @@ describe("Crypto", function() {
                 content.session_id,
             );
             const parked = await bobClient.crypto.cryptoStore.takeParkedSharedHistory(roomId);
-            expect(parked).toEqual([{
-                senderId: aliceClient.getUserId(),
-                senderKey: content.sender_key,
-                sessionId: content.session_id,
-                sessionKey: aliceKey.key,
-                keysClaimed: { ed25519: aliceKey.sender_claimed_ed25519_key },
-                forwardingCurve25519KeyChain: ["akey"],
-            }]);
+            expect(parked).toEqual([
+                {
+                    senderId: aliceClient.getUserId(),
+                    senderKey: content.sender_key,
+                    sessionId: content.session_id,
+                    sessionKey: aliceKey.key,
+                    keysClaimed: { ed25519: aliceKey.sender_claimed_ed25519_key },
+                    forwardingCurve25519KeyChain: ["akey"],
+                },
+            ]);
         });
     });
 
-    describe('Secret storage', function() {
-        it("creates secret storage even if there is no keyInfo", async function() {
-            jest.spyOn(logger, 'log').mockImplementation(() => {});
+    describe("Secret storage", function () {
+        it("creates secret storage even if there is no keyInfo", async function () {
+            jest.spyOn(logger, "log").mockImplementation(() => {});
             jest.setTimeout(10000);
-            const client = (new TestClient("@a:example.com", "dev")).client;
+            const client = new TestClient("@a:example.com", "dev").client;
             await client.initCrypto();
             client.crypto.getSecretStorageKey = jest.fn().mockResolvedValue(null);
             client.crypto.isCrossSigningReady = async () => false;
@@ -986,7 +991,7 @@ describe("Crypto", function() {
             ensureOlmSessionsForDevices = jest.spyOn(olmlib, "ensureOlmSessionsForDevices");
             ensureOlmSessionsForDevices.mockResolvedValue({});
             encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
-            encryptMessageForDevice.mockImplementation(async (...[result,,,,,, payload]) => {
+            encryptMessageForDevice.mockImplementation(async (...[result, , , , , , payload]) => {
                 result.plaintext = JSON.stringify(payload);
             });
 
@@ -1035,7 +1040,7 @@ describe("Crypto", function() {
         });
 
         it("sends nothing to devices that couldn't be encrypted to", async () => {
-            encryptMessageForDevice.mockImplementation(async (...[result,,,, userId, device, payload]) => {
+            encryptMessageForDevice.mockImplementation(async (...[result, , , , userId, device, payload]) => {
                 // Refuse to encrypt to Carol's desktop device
                 if (userId === "@carol:example.org" && device.deviceId === "caroldesktop") return;
                 result.plaintext = JSON.stringify(payload);

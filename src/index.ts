@@ -16,7 +16,7 @@ limitations under the License.
 
 import * as matrixcs from "./matrix";
 import * as utils from "./utils";
-import { logger } from './logger';
+import { logger } from "./logger";
 
 if (global.__js_sdk_entrypoint) {
     throw new Error("Multiple matrix-js-sdk entrypoints detected!");
@@ -25,12 +25,11 @@ global.__js_sdk_entrypoint = true;
 
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
+    const crypto = require("crypto");
     utils.setCrypto(crypto);
 } catch (err) {
-    logger.log('nodejs was compiled without crypto support');
+    logger.log("nodejs was compiled without crypto support");
 }
 
 export * from "./matrix";
 export default matrixcs;
-

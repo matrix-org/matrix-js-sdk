@@ -1,8 +1,8 @@
 name: Static Analysis
 on:
-  pull_request: { }
+  pull_request: {}
   push:
-    branches: [ develop, master ]
+    branches: [develop, master]
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -15,7 +15,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          cache: 'yarn'
+          cache: "yarn"
 
       - name: Install Deps
         run: "yarn install"
@@ -41,7 +41,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          cache: 'yarn'
+          cache: "yarn"
 
       - name: Install Deps
         run: "yarn install"
@@ -57,7 +57,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          cache: 'yarn'
+          cache: "yarn"
 
       - name: Install Deps
         run: "yarn install"
@@ -94,7 +94,7 @@ jobs:
           use-check: false
           check-fail-mode: added
           output-behaviour: annotate
-          ts-extra-args: '--strict'
+          ts-extra-args: "--strict"
           files-changed: ${{ steps.files.outputs.files_updated }}
           files-added: ${{ steps.files.outputs.files_created }}
           files-deleted: ${{ steps.files.outputs.files_deleted }}

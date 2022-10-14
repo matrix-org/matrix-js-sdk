@@ -67,12 +67,7 @@ export interface CryptoStore {
 
     // Olm Sessions
     countEndToEndSessions(txn: unknown, func: (count: number) => void): void;
-    getEndToEndSession(
-        deviceKey: string,
-        sessionId: string,
-        txn: unknown,
-        func: (session: ISessionInfo) => void,
-    ): void;
+    getEndToEndSession(deviceKey: string, sessionId: string, txn: unknown, func: (session: ISessionInfo) => void): void;
     getEndToEndSessions(
         deviceKey: string,
         txn: unknown,
@@ -91,10 +86,7 @@ export interface CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void;
-    getAllEndToEndInboundGroupSessions(
-        txn: unknown,
-        func: (session: ISession | null) => void,
-    ): void;
+    getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void;
     addEndToEndInboundGroupSession(
         senderCurve25519Key: string,
         sessionId: string,
@@ -152,12 +144,12 @@ export interface ISessionInfo {
 
 export interface IDeviceData {
     devices: {
-        [ userId: string ]: {
-            [ deviceId: string ]: IDevice;
+        [userId: string]: {
+            [deviceId: string]: IDevice;
         };
     };
     trackingStatus: {
-        [ userId: string ]: TrackingStatus;
+        [userId: string]: TrackingStatus;
     };
     crossSigningInfo?: Record<string, ICrossSigningInfo>;
     syncToken?: string;

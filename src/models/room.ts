@@ -27,10 +27,13 @@ import { IEvent, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent, Matr
 import { EventStatus } from "./event-status";
 import { RoomMember } from "./room-member";
 import { IRoomSummary, RoomSummary } from "./room-summary";
-import { logger } from '../logger';
-import { TypedReEmitter } from '../ReEmitter';
+import { logger } from "../logger";
+import { TypedReEmitter } from "../ReEmitter";
 import {
-    EventType, RoomCreateTypeField, RoomType, UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
+    EventType,
+    RoomCreateTypeField,
+    RoomType,
+    UNSTABLE_ELEMENT_FUNCTIONAL_USERS,
     EVENT_VISIBILITY_CHANGE_TYPE,
     RelationType,
 } from "../@types/event";
@@ -43,20 +46,15 @@ import {
     Thread,
     ThreadEvent,
     EventHandlerMap as ThreadHandlerMap,
-    FILTER_RELATED_BY_REL_TYPES, THREAD_RELATION_TYPE,
+    FILTER_RELATED_BY_REL_TYPES,
+    THREAD_RELATION_TYPE,
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
 import { ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
-import {
-    MAIN_ROOM_TIMELINE,
-    ReadReceipt,
-    Receipt,
-    ReceiptContent,
-    synthesizeReceipt,
-} from "./read-receipt";
+import { MAIN_ROOM_TIMELINE, ReadReceipt, Receipt, ReceiptContent, synthesizeReceipt } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
 
 // These constants are used as sane defaults when the homeserver doesn't support
@@ -65,8 +63,8 @@ import { Feature, ServerSupport } from "../feature";
 // room versions which are considered okay for people to run without being asked
 // to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
 // return an m.room_versions capability.
-export const KNOWN_SAFE_ROOM_VERSION = '9';
-const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+export const KNOWN_SAFE_ROOM_VERSION = "9";
+const SAFE_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
 
 interface IOpts {
     storageToken?: string;
@@ -131,7 +129,8 @@ export enum RoomEvent {
     UnreadNotifications = "Room.UnreadNotifications",
 }
 
-type EmittedEvents = RoomEvent
+type EmittedEvents =
+    | RoomEvent
     | RoomStateEvent.Events
     | RoomStateEvent.Members
     | RoomStateEvent.NewMember
@@ -162,31 +161,22 @@ export type RoomEventHandlerMap = {
     ) => void;
     [RoomEvent.OldStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
     [RoomEvent.CurrentStateUpdated]: (room: Room, previousRoomState: RoomState, roomState: RoomState) => void;
-    [RoomEvent.HistoryImportedWithinTimeline]: (
-        markerEvent: MatrixEvent,
-        room: Room,
-    ) => void;
-    [RoomEvent.UnreadNotifications]: (
-        unreadNotifications: NotificationCount,
-        threadId?: string,
-    ) => void;
+    [RoomEvent.HistoryImportedWithinTimeline]: (markerEvent: MatrixEvent, room: Room) => void;
+    [RoomEvent.UnreadNotifications]: (unreadNotifications: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
-} & ThreadHandlerMap
-    & MatrixEventHandlerMap
-    & Pick<
+} & ThreadHandlerMap &
+    MatrixEventHandlerMap &
+    Pick<
         RoomStateEventHandlerMap,
-        RoomStateEvent.Events
-            | RoomStateEvent.Members
-            | RoomStateEvent.NewMember
-            | RoomStateEvent.Update
-            | RoomStateEvent.Marker
-            | BeaconEvent.New
-    >
-    & Pick<
-        BeaconEventHandlerMap,
-        BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange
-    >;
+        | RoomStateEvent.Events
+        | RoomStateEvent.Members
+        | RoomStateEvent.NewMember
+        | RoomStateEvent.Update
+        | RoomStateEvent.Marker
+        | BeaconEvent.New
+    > &
+    Pick<BeaconEventHandlerMap, BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange>;
 
 export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<EmittedEvents, RoomEventHandlerMap>;
@@ -336,16 +326,13 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         // all our per-room timeline sets. the first one is the unfiltered ones;
         // the subsequent ones are the filtered ones in no particular order.
         this.timelineSets = [new EventTimelineSet(this, opts)];
-        this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), [
-            RoomEvent.Timeline,
-            RoomEvent.TimelineReset,
-        ]);
+        this.reEmitter.reEmit(this.getUnfilteredTimelineSet(), [RoomEvent.Timeline, RoomEvent.TimelineReset]);
 
         this.fixUpLegacyTimelineFields();
 
         if (this.opts.pendingEventOrdering === PendingEventOrdering.Detached) {
             this.pendingEventList = [];
-            this.client.store.getPendingEvents(this.roomId).then(events => {
+            this.client.store.getPendingEvents(this.roomId).then((events) => {
                 events.forEach(async (serializedEvent: Partial<IEvent>) => {
                     const event = new MatrixEvent(serializedEvent);
                     if (event.getType() === EventType.RoomMessageEncrypted) {
@@ -402,15 +389,15 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public decryptCriticalEvents(): Promise<void> {
         const readReceiptEventId = this.getEventReadUpTo(this.client.getUserId(), true);
         const events = this.getLiveTimeline().getEvents();
-        const readReceiptTimelineIndex = events.findIndex(matrixEvent => {
+        const readReceiptTimelineIndex = events.findIndex((matrixEvent) => {
             return matrixEvent.event.event_id === readReceiptEventId;
         });
 
         const decryptionPromises = events
             .slice(readReceiptTimelineIndex)
-            .filter(event => event.shouldAttemptDecryption())
+            .filter((event) => event.shouldAttemptDecryption())
             .reverse()
-            .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
+            .map((event) => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
         return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
     }
@@ -421,13 +408,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @returns {Promise} Signals when all events have been decrypted
      */
     public decryptAllEvents(): Promise<void> {
-        const decryptionPromises = this
-            .getUnfilteredTimelineSet()
+        const decryptionPromises = this.getUnfilteredTimelineSet()
             .getLiveTimeline()
             .getEvents()
-            .filter(event => event.shouldAttemptDecryption())
+            .filter((event) => event.shouldAttemptDecryption())
             .reverse()
-            .map(event => event.attemptDecryption(this.client.crypto, { isRetry: true }));
+            .map((event) => event.attemptDecryption(this.client.crypto, { isRetry: true }));
 
         return Promise.allSettled(decryptionPromises) as unknown as Promise<void>;
     }
@@ -438,7 +424,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public getCreator(): string | null {
         const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
-        return createEvent?.getContent()['creator'] ?? null;
+        return createEvent?.getContent()["creator"] ?? null;
     }
 
     /**
@@ -452,10 +438,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 logger.warn("[getVersion] Room " + this.roomId + " does not have an m.room.create event");
                 this.getVersionWarning = true;
             }
-            return '1';
+            return "1";
         }
-        const ver = createEvent.getContent()['room_version'];
-        if (ver === undefined) return '1';
+        const ver = createEvent.getContent()["room_version"];
+        if (ver === undefined) return "1";
         return ver;
     }
 
@@ -514,7 +500,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             // the capability we're using to determine this.
             logger.warn(
                 "Refreshing room version capability because the server looks " +
-                "to be supporting a newer room version we don't know about.",
+                    "to be supporting a newer room version we don't know about.",
             );
 
             const caps = await this.client.getCapabilities(true);
@@ -544,8 +530,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         // If the room is on the default version then nothing needs to change
         if (currentVersion === versionCap.default) return result;
 
-        const stableVersions = Object.keys(versionCap.available)
-            .filter((v) => versionCap.available[v] === 'stable');
+        const stableVersions = Object.keys(versionCap.available).filter((v) => versionCap.available[v] === "stable");
 
         // Check if the room is on an unstable version. We determine urgency based
         // off the version being in the Matrix spec namespace or not (if the version
@@ -587,8 +572,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public getPendingEvents(): MatrixEvent[] {
         if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
-                "Cannot call getPendingEvents with pendingEventOrdering == " +
-                this.opts.pendingEventOrdering);
+                "Cannot call getPendingEvents with pendingEventOrdering == " + this.opts.pendingEventOrdering,
+            );
         }
 
         return this.pendingEventList;
@@ -603,15 +588,16 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public removePendingEvent(eventId: string): boolean {
         if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
             throw new Error(
-                "Cannot call removePendingEvent with pendingEventOrdering == " +
-                this.opts.pendingEventOrdering);
+                "Cannot call removePendingEvent with pendingEventOrdering == " + this.opts.pendingEventOrdering,
+            );
         }
 
         const removed = utils.removeElement(
             this.pendingEventList,
-            function(ev) {
+            function (ev) {
                 return ev.getId() == eventId;
-            }, false,
+            },
+            false,
         );
 
         this.savePendingEvents();
@@ -631,7 +617,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             return false;
         }
 
-        return this.pendingEventList.some(event => event.getId() === eventId);
+        return this.pendingEventList.some((event) => event.getId() === eventId);
     }
 
     /**
@@ -645,7 +631,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             return null;
         }
 
-        return this.pendingEventList.find(event => event.getId() === eventId);
+        return this.pendingEventList.find((event) => event.getId() === eventId);
     }
 
     /**
@@ -715,8 +701,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         }
         // remember, we're assuming this room is a DM,
         // so returning the first member we find should be fine
-        const hasHeroes = Array.isArray(this.summaryHeroes) &&
-            this.summaryHeroes.length;
+        const hasHeroes = Array.isArray(this.summaryHeroes) && this.summaryHeroes.length;
         if (hasHeroes) {
             return this.summaryHeroes[0];
         }
@@ -736,12 +721,13 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         if (memberCount > 2) {
             return;
         }
-        const hasHeroes = Array.isArray(this.summaryHeroes) &&
-            this.summaryHeroes.length;
+        const hasHeroes = Array.isArray(this.summaryHeroes) && this.summaryHeroes.length;
         if (hasHeroes) {
-            const availableMember = this.summaryHeroes.map((userId) => {
-                return this.getMember(userId);
-            }).find((member) => !!member);
+            const availableMember = this.summaryHeroes
+                .map((userId) => {
+                    return this.getMember(userId);
+                })
+                .find((member) => !!member);
             if (availableMember) {
                 return availableMember;
             }
@@ -760,12 +746,13 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         // if all else fails, try falling back to a user,
         // and create a one-off member for it
         if (hasHeroes) {
-            const availableUser = this.summaryHeroes.map((userId) => {
-                return this.client.getUser(userId);
-            }).find((user) => !!user);
+            const availableUser = this.summaryHeroes
+                .map((userId) => {
+                    return this.client.getUser(userId);
+                })
+                .find((user) => !!user);
             if (availableUser) {
-                const member = new RoomMember(
-                    this.roomId, availableUser.userId);
+                const member = new RoomMember(this.roomId, availableUser.userId);
                 member.user = availableUser;
                 return member;
             }
@@ -793,7 +780,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         return response.chunk;
     }
 
-    private async loadMembers(): Promise<{ memberEvents: MatrixEvent[], fromServer: boolean }> {
+    private async loadMembers(): Promise<{ memberEvents: MatrixEvent[]; fromServer: boolean }> {
         // were the members loaded from the server?
         let fromServer = false;
         let rawMembersEvents = await this.client.store.getOutOfBandMembers(this.roomId);
@@ -802,13 +789,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         // that this function is only called once (unless loading the members
         // fails), since loadMembersIfNeeded always returns this.membersPromise
         // if set, which will be the result of the first (successful) call.
-        if (rawMembersEvents === null ||
-            (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId))
-        ) {
+        if (rawMembersEvents === null || (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId))) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();
-            logger.log(`LL: got ${rawMembersEvents.length} ` +
-                `members from server for room ${this.roomId}`);
+            logger.log(`LL: got ${rawMembersEvents.length} ` + `members from server for room ${this.roomId}`);
         }
         const memberEvents = rawMembersEvents.map(this.client.getEventMapper());
         return { memberEvents, fromServer };
@@ -832,41 +816,47 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         // the OOB members
         this.currentState.markOutOfBandMembersStarted();
 
-        const inMemoryUpdate = this.loadMembers().then((result) => {
-            this.currentState.setOutOfBandMembers(result.memberEvents);
-            // now the members are loaded, start to track the e2e devices if needed
-            if (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId)) {
-                this.client.crypto.trackRoomDevices(this.roomId);
-            }
-            return result.fromServer;
-        }).catch((err) => {
-            // allow retries on fail
-            this.membersPromise = null;
-            this.currentState.markOutOfBandMembersFailed();
-            throw err;
-        });
+        const inMemoryUpdate = this.loadMembers()
+            .then((result) => {
+                this.currentState.setOutOfBandMembers(result.memberEvents);
+                // now the members are loaded, start to track the e2e devices if needed
+                if (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId)) {
+                    this.client.crypto.trackRoomDevices(this.roomId);
+                }
+                return result.fromServer;
+            })
+            .catch((err) => {
+                // allow retries on fail
+                this.membersPromise = null;
+                this.currentState.markOutOfBandMembersFailed();
+                throw err;
+            });
         // update members in storage, but don't wait for it
-        inMemoryUpdate.then((fromServer) => {
-            if (fromServer) {
-                const oobMembers = this.currentState.getMembers()
-                    .filter((m) => m.isOutOfBand())
-                    .map((m) => m.events.member.event as IStateEventWithRoomId);
-                logger.log(`LL: telling store to write ${oobMembers.length}`
-                    + ` members for room ${this.roomId}`);
-                const store = this.client.store;
-                return store.setOutOfBandMembers(this.roomId, oobMembers)
-                    // swallow any IDB error as we don't want to fail
-                    // because of this
-                    .catch((err) => {
-                        logger.log("LL: storing OOB room members failed, oh well",
-                            err);
-                    });
-            }
-        }).catch((err) => {
-            // as this is not awaited anywhere,
-            // at least show the error in the console
-            logger.error(err);
-        });
+        inMemoryUpdate
+            .then((fromServer) => {
+                if (fromServer) {
+                    const oobMembers = this.currentState
+                        .getMembers()
+                        .filter((m) => m.isOutOfBand())
+                        .map((m) => m.events.member.event as IStateEventWithRoomId);
+                    logger.log(`LL: telling store to write ${oobMembers.length}` + ` members for room ${this.roomId}`);
+                    const store = this.client.store;
+                    return (
+                        store
+                            .setOutOfBandMembers(this.roomId, oobMembers)
+                            // swallow any IDB error as we don't want to fail
+                            // because of this
+                            .catch((err) => {
+                                logger.log("LL: storing OOB room members failed, oh well", err);
+                            })
+                    );
+                }
+            })
+            .catch((err) => {
+                // as this is not awaited anywhere,
+                // at least show the error in the console
+                logger.error(err);
+            });
 
         this.membersPromise = inMemoryUpdate;
 
@@ -891,8 +881,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     private cleanupAfterLeaving(): void {
         this.clearLoadedMembersIfNeeded().catch((err) => {
-            logger.error(`error after clearing loaded members from ` +
-                `room ${this.roomId} after leaving`);
+            logger.error(`error after clearing loaded members from ` + `room ${this.roomId} after leaving`);
             logger.log(err);
         });
     }
@@ -918,10 +907,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
         logger.log(
             `[refreshLiveTimeline for ${this.roomId}] at ` +
-            `mostRecentEventInTimeline=${mostRecentEventInTimeline && mostRecentEventInTimeline.getId()} ` +
-            `liveTimelineBefore=${liveTimelineBefore.toString()} ` +
-            `forwardPaginationToken=${forwardPaginationToken} ` +
-            `backwardPaginationToken=${backwardPaginationToken}`,
+                `mostRecentEventInTimeline=${mostRecentEventInTimeline && mostRecentEventInTimeline.getId()} ` +
+                `liveTimelineBefore=${liveTimelineBefore.toString()} ` +
+                `forwardPaginationToken=${forwardPaginationToken} ` +
+                `backwardPaginationToken=${backwardPaginationToken}`,
         );
 
         // Get the main TimelineSet
@@ -965,11 +954,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         // instead because it's the latest in the room and any new messages in
         // the scrollback will include the history.
         const liveTimeline = timelineSet.getLiveTimeline();
-        if (!liveTimeline || (
-            liveTimeline.getPaginationToken(Direction.Forward) === null &&
-            liveTimeline.getPaginationToken(Direction.Backward) === null &&
-            liveTimeline.getEvents().length === 0
-        )) {
+        if (
+            !liveTimeline ||
+            (liveTimeline.getPaginationToken(Direction.Forward) === null &&
+                liveTimeline.getPaginationToken(Direction.Backward) === null &&
+                liveTimeline.getEvents().length === 0)
+        ) {
             logger.log(`[refreshLiveTimeline for ${this.roomId}] using our new live timeline`);
             // Set the pagination token back to the live sync token (`null`) instead
             // of using the `/context` historical token (ex. `t12-13_0_0_0_0_0_0_0_0`)
@@ -986,8 +976,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         } else {
             logger.log(
                 `[refreshLiveTimeline for ${this.roomId}] \`/sync\` or some other request beat us to creating a new ` +
-                `live timeline after we reset it. We'll use that instead since any events in the scrollback from ` +
-                `this timeline will include the history.`,
+                    `live timeline after we reset it. We'll use that instead since any events in the scrollback from ` +
+                    `this timeline will include the history.`,
             );
         }
 
@@ -1012,9 +1002,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public resetLiveTimeline(backPaginationToken: string | null, forwardPaginationToken: string | null): void {
         for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].resetLiveTimeline(
-                backPaginationToken, forwardPaginationToken,
-            );
+            this.timelineSets[i].resetLiveTimeline(backPaginationToken, forwardPaginationToken);
         }
 
         this.fixUpLegacyTimelineFields();
@@ -1034,10 +1022,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         // state at the start and end of that timeline. These are more
         // for backwards-compatibility than anything else.
         this.timeline = this.getLiveTimeline().getEvents();
-        this.oldState = this.getLiveTimeline()
-            .getState(EventTimeline.BACKWARDS);
-        this.currentState = this.getLiveTimeline()
-            .getState(EventTimeline.FORWARDS);
+        this.oldState = this.getLiveTimeline().getState(EventTimeline.BACKWARDS);
+        this.currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
 
         // Let people know to register new listeners for the new state
         // references. The reference won't necessarily change every time so only
@@ -1259,11 +1245,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             }
         }
 
-        this.emit(
-            RoomEvent.UnreadNotifications,
-            notification,
-            threadId,
-        );
+        this.emit(RoomEvent.UnreadNotifications, notification, threadId);
     }
 
     /**
@@ -1385,9 +1367,9 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         if (aliasEvents) {
             for (const aliasEvent of aliasEvents) {
                 if (Array.isArray(aliasEvent.getContent().aliases)) {
-                    const filteredAliases = aliasEvent.getContent<{ aliases: string[] }>().aliases.filter(a => {
-                        if (typeof(a) !== "string") return false;
-                        if (a[0] !== '#') return false;
+                    const filteredAliases = aliasEvent.getContent<{ aliases: string[] }>().aliases.filter((a) => {
+                        if (typeof a !== "string") return false;
+                        if (a[0] !== "#") return false;
                         if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
 
                         // It's probably valid by here.
@@ -1527,7 +1509,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @return {RoomMember[]} A list of members with the given membership state.
      */
     public getMembersWithMembership(membership: string): RoomMember[] {
-        return this.currentState.getMembers().filter(function(m) {
+        return this.currentState.getMembers().filter(function (m) {
             return m.membership === membership;
         });
     }
@@ -1589,21 +1571,14 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public getOrCreateFilteredTimelineSet(
         filter: Filter,
-        {
-            prepopulateTimeline = true,
-            useSyncEvents = true,
-            pendingEvents = true,
-        }: ICreateFilterOpts = {},
+        { prepopulateTimeline = true, useSyncEvents = true, pendingEvents = true }: ICreateFilterOpts = {},
     ): EventTimelineSet {
         if (this.filteredTimelineSets[filter.filterId]) {
             return this.filteredTimelineSets[filter.filterId];
         }
         const opts = Object.assign({ filter, pendingEvents }, this.opts);
         const timelineSet = new EventTimelineSet(this, opts);
-        this.reEmitter.reEmit(timelineSet, [
-            RoomEvent.Timeline,
-            RoomEvent.TimelineReset,
-        ]);
+        this.reEmitter.reEmit(timelineSet, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
         if (useSyncEvents) {
             this.filteredTimelineSets[filter.filterId] = timelineSet;
             this.timelineSets.push(timelineSet);
@@ -1621,7 +1596,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             // may have grown huge and so take a long time to filter.
             // see https://github.com/vector-im/vector-web/issues/2109
 
-            unfilteredLiveTimeline.getEvents().forEach(function(event) {
+            unfilteredLiveTimeline.getEvents().forEach(function (event) {
                 timelineSet.addLiveEvent(event);
             });
 
@@ -1631,15 +1606,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 timeline = timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS);
             }
 
-            timelineSet.getLiveTimeline().setPaginationToken(
-                timeline.getPaginationToken(EventTimeline.BACKWARDS),
-                EventTimeline.BACKWARDS,
-            );
-        } else if (useSyncEvents) {
-            const livePaginationToken = unfilteredLiveTimeline.getPaginationToken(Direction.Forward);
             timelineSet
                 .getLiveTimeline()
-                .setPaginationToken(livePaginationToken, Direction.Backward);
+                .setPaginationToken(timeline.getPaginationToken(EventTimeline.BACKWARDS), EventTimeline.BACKWARDS);
+        } else if (useSyncEvents) {
+            const livePaginationToken = unfilteredLiveTimeline.getPaginationToken(Direction.Forward);
+            timelineSet.getLiveTimeline().setPaginationToken(livePaginationToken, Direction.Backward);
         }
 
         // alternatively, we could try to do something like this to try and re-paginate
@@ -1658,8 +1630,8 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         const filter = new Filter(myUserId);
 
         const definition: IFilterDefinition = {
-            "room": {
-                "timeline": {
+            room: {
+                timeline: {
                     [FILTER_RELATED_BY_REL_TYPES.name]: [THREAD_RELATION_TYPE.name],
                 },
             },
@@ -1670,10 +1642,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         }
 
         filter.setDefinition(definition);
-        const filterId = await this.client.getOrCreateFilter(
-            `THREAD_PANEL_${this.roomId}_${filterType}`,
-            filter,
-        );
+        const filterId = await this.client.getOrCreateFilter(`THREAD_PANEL_${this.roomId}_${filterType}`, filter);
 
         filter.filterId = filterId;
 
@@ -1683,40 +1652,38 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     private async createThreadTimelineSet(filterType?: ThreadFilterType): Promise<EventTimelineSet> {
         let timelineSet: EventTimelineSet;
         if (Thread.hasServerSideListSupport) {
-            timelineSet =
-                new EventTimelineSet(this, this.opts, undefined, undefined, Boolean(Thread.hasServerSideListSupport));
-            this.reEmitter.reEmit(timelineSet, [
-                RoomEvent.Timeline,
-                RoomEvent.TimelineReset,
-            ]);
+            timelineSet = new EventTimelineSet(
+                this,
+                this.opts,
+                undefined,
+                undefined,
+                Boolean(Thread.hasServerSideListSupport),
+            );
+            this.reEmitter.reEmit(timelineSet, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
         } else if (Thread.hasServerSideSupport) {
             const filter = await this.getThreadListFilter(filterType);
 
-            timelineSet = this.getOrCreateFilteredTimelineSet(
-                filter,
-                {
-                    prepopulateTimeline: false,
-                    useSyncEvents: false,
-                    pendingEvents: false,
-                },
-            );
+            timelineSet = this.getOrCreateFilteredTimelineSet(filter, {
+                prepopulateTimeline: false,
+                useSyncEvents: false,
+                pendingEvents: false,
+            });
         } else {
             timelineSet = new EventTimelineSet(this, {
                 pendingEvents: false,
             });
 
-            Array.from(this.threads)
-                .forEach(([, thread]) => {
-                    if (thread.length === 0) return;
-                    const currentUserParticipated = thread.events.some(event => {
-                        return event.getSender() === this.client.getUserId();
-                    });
-                    if (filterType !== ThreadFilterType.My || currentUserParticipated) {
-                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
-                            toStartOfTimeline: false,
-                        });
-                    }
+            Array.from(this.threads).forEach(([, thread]) => {
+                if (thread.length === 0) return;
+                const currentUserParticipated = thread.events.some((event) => {
+                    return event.getSender() === this.client.getUserId();
                 });
+                if (filterType !== ThreadFilterType.My || currentUserParticipated) {
+                    timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
+                        toStartOfTimeline: false,
+                    });
+                }
+            });
         }
 
         return timelineSet;
@@ -1731,11 +1698,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public processThreadRoots(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         for (const rootEvent of events) {
-            EventTimeline.setEventMetadata(
-                rootEvent,
-                this.currentState,
-                toStartOfTimeline,
-            );
+            EventTimeline.setEventMetadata(rootEvent, this.currentState, toStartOfTimeline);
             if (!this.getThread(rootEvent.getId())) {
                 this.createThread(rootEvent.getId(), rootEvent, [], toStartOfTimeline);
             }
@@ -1771,22 +1734,21 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             if (!events.length) return;
 
             // Sorted by last_reply origin_server_ts
-            const threadRoots = events
-                .map(this.client.getEventMapper())
-                .sort((eventA, eventB) => {
-                    /**
-                     * `origin_server_ts` in a decentralised world is far from ideal
-                     * but for lack of any better, we will have to use this
-                     * Long term the sorting should be handled by homeservers and this
-                     * is only meant as a short term patch
-                     */
-                    const threadAMetadata = eventA
-                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
-                    const threadBMetadata = eventB
-                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
-                    return threadAMetadata.latest_event.origin_server_ts -
-                        threadBMetadata.latest_event.origin_server_ts;
-                });
+            const threadRoots = events.map(this.client.getEventMapper()).sort((eventA, eventB) => {
+                /**
+                 * `origin_server_ts` in a decentralised world is far from ideal
+                 * but for lack of any better, we will have to use this
+                 * Long term the sorting should be handled by homeservers and this
+                 * is only meant as a short term patch
+                 */
+                const threadAMetadata = eventA.getServerAggregatedRelation<IThreadBundledRelationship>(
+                    THREAD_RELATION_TYPE.name,
+                );
+                const threadBMetadata = eventB.getServerAggregatedRelation<IThreadBundledRelationship>(
+                    THREAD_RELATION_TYPE.name,
+                );
+                return threadAMetadata.latest_event.origin_server_ts - threadBMetadata.latest_event.origin_server_ts;
+            });
 
             let latestMyThreadsRootEvent: MatrixEvent;
             const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
@@ -1797,8 +1759,9 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                     roomState,
                 });
 
-                const threadRelationship = rootEvent
-                    .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                const threadRelationship = rootEvent.getServerAggregatedRelation<IThreadBundledRelationship>(
+                    THREAD_RELATION_TYPE.name,
+                );
                 if (threadRelationship.current_user_participated) {
                     this.threadsTimelineSets[1].addLiveEvent(rootEvent, {
                         duplicateStrategy: DuplicateStrategy.Ignore,
@@ -1811,7 +1774,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
             this.processThreadRoots(threadRoots, true);
 
-            this.client.decryptEventIfNeeded(threadRoots[threadRoots.length -1]);
+            this.client.decryptEventIfNeeded(threadRoots[threadRoots.length - 1]);
             if (latestMyThreadsRootEvent) {
                 this.client.decryptEventIfNeeded(latestMyThreadsRootEvent);
             }
@@ -1827,9 +1790,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      * @private
      */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
-        const timelineSet = filter === ThreadFilterType.My
-            ? this.threadsTimelineSets[1]
-            : this.threadsTimelineSets[0];
+        const timelineSet = filter === ThreadFilterType.My ? this.threadsTimelineSets[1] : this.threadsTimelineSets[0];
 
         const { chunk: events, end } = await this.client.createThreadListMessagesRequest(
             this.roomId,
@@ -1881,7 +1842,11 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    public eventShouldLiveIn(event: MatrixEvent, events?: MatrixEvent[], roots?: Set<string>): {
+    public eventShouldLiveIn(
+        event: MatrixEvent,
+        events?: MatrixEvent[],
+        roots?: Set<string>,
+    ): {
         shouldLiveInRoom: boolean;
         shouldLiveInThread: boolean;
         threadId?: string;
@@ -1912,7 +1877,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         }
 
         const parentEventId = event.getAssociatedId();
-        const parentEvent = this.findEventById(parentEventId) ?? events?.find(e => e.getId() === parentEventId);
+        const parentEvent = this.findEventById(parentEventId) ?? events?.find((e) => e.getId() === parentEventId);
 
         // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
         if (parentEvent && (event.isRelation() || event.isRedaction())) {
@@ -1948,7 +1913,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         if (thread) {
             thread.addEvents(events, toStartOfTimeline);
         } else {
-            const rootEvent = this.findEventById(threadId) ?? events.find(e => e.getId() === threadId);
+            const rootEvent = this.findEventById(threadId) ?? events.find((e) => e.getId() === threadId);
             thread = this.createThread(threadId, rootEvent, events, toStartOfTimeline);
             this.emit(ThreadEvent.Update, thread);
         }
@@ -1970,9 +1935,9 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             eventsByThread[threadId]?.push(event);
         }
 
-        Object.entries(eventsByThread).map(([threadId, threadEvents]) => (
-            this.addThreadedEvents(threadId, threadEvents, toStartOfTimeline)
-        ));
+        Object.entries(eventsByThread).map(([threadId, threadEvents]) =>
+            this.addThreadedEvents(threadId, threadEvents, toStartOfTimeline),
+        );
     }
 
     public createThread(
@@ -1986,7 +1951,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             if (relatedEvents?.length) {
                 // Include all relations of the root event, given it'll be visible in both timelines,
                 // except `m.replace` as that will already be applied atop the event using `MatrixEvent::makeReplaced`
-                events = events.concat(relatedEvents.filter(e => !e.isRelation(RelationType.Replace)));
+                events = events.concat(relatedEvents.filter((e) => !e.isRelation(RelationType.Replace)));
             }
         }
 
@@ -2010,7 +1975,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         }
 
         if (this.threadsReady) {
-            this.threadsTimelineSets.forEach(timelineSet => {
+            this.threadsTimelineSets.forEach((timelineSet) => {
                 if (thread.rootEvent) {
                     if (Thread.hasServerSideSupport) {
                         timelineSet.addLiveEvent(thread.rootEvent);
@@ -2136,9 +2101,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         // pointing to an event that wasn't yet in the timeline
         // Don't synthesize RR for m.room.redaction as this causes the RR to go missing.
         if (event.sender && event.getType() !== EventType.RoomRedaction) {
-            this.addReceipt(synthesizeReceipt(
-                event.sender.userId, event, ReceiptType.Read,
-            ), true);
+            this.addReceipt(synthesizeReceipt(event.sender.userId, event, ReceiptType.Read), true);
 
             // Any live events from a user could be taken as implicit
             // presence information: evidence that they are currently active.
@@ -2168,13 +2131,11 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public addPendingEvent(event: MatrixEvent, txnId: string): void {
         if (event.status !== EventStatus.SENDING && event.status !== EventStatus.NOT_SENT) {
-            throw new Error("addPendingEvent called on an event with status " +
-                event.status);
+            throw new Error("addPendingEvent called on an event with status " + event.status);
         }
 
         if (this.txnToEvent[txnId]) {
-            throw new Error("addPendingEvent called on an event with known txnId " +
-                txnId);
+            throw new Error("addPendingEvent called on an event with known txnId " + txnId);
         }
 
         // call setEventMetadata to set up event.sender etc
@@ -2199,7 +2160,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
             if (event.isRedaction()) {
                 const redactId = event.event.redacts;
-                let redactedEvent = this.pendingEventList?.find(e => e.getId() === redactId);
+                let redactedEvent = this.pendingEventList?.find((e) => e.getId() === redactId);
                 if (!redactedEvent) {
                     redactedEvent = this.findEventById(redactId);
                 }
@@ -2213,16 +2174,14 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 const timelineSet = this.timelineSets[i];
                 if (timelineSet.getFilter()) {
                     if (timelineSet.getFilter().filterRoomTimeline([event]).length) {
-                        timelineSet.addEventToTimeline(event,
-                            timelineSet.getLiveTimeline(), {
-                                toStartOfTimeline: false,
-                            });
-                    }
-                } else {
-                    timelineSet.addEventToTimeline(event,
-                        timelineSet.getLiveTimeline(), {
+                        timelineSet.addEventToTimeline(event, timelineSet.getLiveTimeline(), {
                             toStartOfTimeline: false,
                         });
+                    }
+                } else {
+                    timelineSet.addEventToTimeline(event, timelineSet.getLiveTimeline(), {
+                        toStartOfTimeline: false,
+                    });
                 }
             }
         }
@@ -2245,17 +2204,19 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     private savePendingEvents(): void {
         if (this.pendingEventList) {
-            const pendingEvents = this.pendingEventList.map(event => {
-                return {
-                    ...event.event,
-                    txn_id: event.getTxnId(),
-                };
-            }).filter(event => {
-                // Filter out the unencrypted messages if the room is encrypted
-                const isEventEncrypted = event.type === EventType.RoomMessageEncrypted;
-                const isRoomEncrypted = this.client.isRoomEncrypted(this.roomId);
-                return isEventEncrypted || !isRoomEncrypted;
-            });
+            const pendingEvents = this.pendingEventList
+                .map((event) => {
+                    return {
+                        ...event.event,
+                        txn_id: event.getTxnId(),
+                    };
+                })
+                .filter((event) => {
+                    // Filter out the unencrypted messages if the room is encrypted
+                    const isEventEncrypted = event.type === EventType.RoomMessageEncrypted;
+                    const isRoomEncrypted = this.client.isRoomEncrypted(this.roomId);
+                    return isEventEncrypted || !isRoomEncrypted;
+                });
 
             this.client.store.setPendingEvents(this.roomId, pendingEvents);
         }
@@ -2343,13 +2304,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     public updatePendingEvent(event: MatrixEvent, newStatus: EventStatus, newEventId?: string): void {
         logger.log(
             `setting pendingEvent status to ${newStatus} in ${event.getRoomId()} ` +
-            `event ID ${event.getId()} -> ${newEventId}`,
+                `event ID ${event.getId()} -> ${newEventId}`,
         );
 
         // if the message was sent, we expect an event id
         if (newStatus == EventStatus.SENT && !newEventId) {
-            throw new Error("updatePendingEvent called with status=SENT, " +
-                "but no new event id");
+            throw new Error("updatePendingEvent called with status=SENT, " + "but no new event id");
         }
 
         // SENT races against /sync, so we have to special-case it.
@@ -2381,14 +2341,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         const oldEventId = event.getId();
 
         if (!oldStatus) {
-            throw new Error("updatePendingEventStatus called on an event which is " +
-                "not a local echo.");
+            throw new Error("updatePendingEventStatus called on an event which is " + "not a local echo.");
         }
 
         const allowed = ALLOWED_TRANSITIONS[oldStatus];
         if (!allowed || allowed.indexOf(newStatus) < 0) {
-            throw new Error("Invalid EventStatus transition " + oldStatus + "->" +
-                newStatus);
+            throw new Error("Invalid EventStatus transition " + oldStatus + "->" + newStatus);
         }
 
         event.setStatus(newStatus);
@@ -2430,8 +2388,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         if (!redactId) {
             return;
         }
-        const redactedEvent = this.getUnfilteredTimelineSet()
-            .findEventById(redactId);
+        const redactedEvent = this.getUnfilteredTimelineSet().findEventById(redactId);
         if (redactedEvent) {
             redactedEvent.unmarkLocallyRedacted();
             // re-render after undoing redaction
@@ -2464,7 +2421,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy;
         let timelineWasEmpty = false;
-        if (typeof (duplicateStrategyOrOpts) === 'object') {
+        if (typeof duplicateStrategyOrOpts === "object") {
             ({
                 duplicateStrategy,
                 fromCache = false,
@@ -2475,9 +2432,9 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             // Deprecation warning
             // FIXME: Remove after 2023-06-01 (technical debt)
             logger.warn(
-                'Overload deprecated: ' +
-                '`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` ' +
-                'is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`',
+                "Overload deprecated: " +
+                    "`Room.addLiveEvents(events, duplicateStrategy?, fromCache?)` " +
+                    "is deprecated in favor of the overload with `Room.addLiveEvents(events, IAddLiveEventOptions)`",
             );
         }
 
@@ -2490,8 +2447,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             const liveTimeline = this.timelineSets[i].getLiveTimeline();
             if (liveTimeline.getPaginationToken(EventTimeline.FORWARDS)) {
                 throw new Error(
-                    "live timeline " + i + " is no longer live - it has a pagination token " +
-                    "(" + liveTimeline.getPaginationToken(EventTimeline.FORWARDS) + ")",
+                    "live timeline " +
+                        i +
+                        " is no longer live - it has a pagination token " +
+                        "(" +
+                        liveTimeline.getPaginationToken(EventTimeline.FORWARDS) +
+                        ")",
                 );
             }
             if (liveTimeline.getNeighbouringTimeline(EventTimeline.FORWARDS)) {
@@ -2521,11 +2482,11 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                 }
             }
 
-            const {
-                shouldLiveInRoom,
-                shouldLiveInThread,
-                threadId,
-            } = this.eventShouldLiveIn(event, events, threadRoots);
+            const { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
+                event,
+                events,
+                threadRoots,
+            );
 
             if (shouldLiveInThread && !eventsByThread[threadId ?? ""]) {
                 eventsByThread[threadId ?? ""] = [];
@@ -2542,39 +2503,38 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         });
     }
 
-    public partitionThreadedEvents(events: MatrixEvent[]): [
-        timelineEvents: MatrixEvent[],
-        threadedEvents: MatrixEvent[],
-    ] {
+    public partitionThreadedEvents(
+        events: MatrixEvent[],
+    ): [timelineEvents: MatrixEvent[], threadedEvents: MatrixEvent[]] {
         // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
         if (this.client.supportsExperimentalThreads()) {
             const threadRoots = this.findThreadRoots(events);
-            return events.reduce((memo, event: MatrixEvent) => {
-                const {
-                    shouldLiveInRoom,
-                    shouldLiveInThread,
-                    threadId,
-                } = this.eventShouldLiveIn(event, events, threadRoots);
+            return events.reduce(
+                (memo, event: MatrixEvent) => {
+                    const { shouldLiveInRoom, shouldLiveInThread, threadId } = this.eventShouldLiveIn(
+                        event,
+                        events,
+                        threadRoots,
+                    );
 
-                if (shouldLiveInRoom) {
-                    memo[ROOM].push(event);
-                }
+                    if (shouldLiveInRoom) {
+                        memo[ROOM].push(event);
+                    }
 
-                if (shouldLiveInThread) {
-                    event.setThreadId(threadId ?? "");
-                    memo[THREAD].push(event);
-                }
+                    if (shouldLiveInThread) {
+                        event.setThreadId(threadId ?? "");
+                        memo[THREAD].push(event);
+                    }
 
-                return memo;
-            }, [[] as MatrixEvent[], [] as MatrixEvent[]]);
+                    return memo;
+                },
+                [[] as MatrixEvent[], [] as MatrixEvent[]],
+            );
         } else {
             // When `experimentalThreadSupport` is disabled treat all events as timelineEvents
-            return [
-                events as MatrixEvent[],
-                [] as MatrixEvent[],
-            ];
+            return [events as MatrixEvent[], [] as MatrixEvent[]];
         }
     }
 
@@ -2687,14 +2647,16 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
                     const existingEvent = this.currentState.getStateEvents(strippedEvent.type, strippedEvent.state_key);
                     if (!existingEvent) {
                         // set the fake stripped event instead
-                        this.currentState.setStateEvents([new MatrixEvent({
-                            type: strippedEvent.type,
-                            state_key: strippedEvent.state_key,
-                            content: strippedEvent.content,
-                            event_id: "$fake" + Date.now(),
-                            room_id: this.roomId,
-                            user_id: this.myUserId, // technically a lie
-                        })]);
+                        this.currentState.setStateEvents([
+                            new MatrixEvent({
+                                type: strippedEvent.type,
+                                state_key: strippedEvent.state_key,
+                                content: strippedEvent.content,
+                                event_id: "$fake" + Date.now(),
+                                room_id: this.roomId,
+                                user_id: this.myUserId, // technically a lie
+                            }),
+                        ]);
                     }
                 });
             }
@@ -2764,9 +2726,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      *                   message events into the room.
      */
     public maySendMessage(): boolean {
-        return this.getMyMembership() === 'join' && (this.client.isRoomEncrypted(this.roomId)
-            ? this.currentState.maySendEvent(EventType.RoomMessageEncrypted, this.myUserId)
-            : this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId));
+        return (
+            this.getMyMembership() === "join" &&
+            (this.client.isRoomEncrypted(this.roomId)
+                ? this.currentState.maySendEvent(EventType.RoomMessageEncrypted, this.myUserId)
+                : this.currentState.maySendEvent(EventType.RoomMessage, this.myUserId))
+        );
     }
 
     /**
@@ -2963,7 +2928,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         const myMembership = this.getMyMembership();
         // if I have created a room and invited people through
         // 3rd party invites
-        if (myMembership == 'join') {
+        if (myMembership == "join") {
             const thirdPartyInvites = this.currentState.getStateEvents(EventType.RoomThirdPartyInvite);
 
             if (thirdPartyInvites?.length) {
@@ -2984,11 +2949,12 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
         let leftNames = otherNames;
         // if we didn't have heroes, try finding them in the room state
         if (!leftNames.length) {
-            leftNames = this.currentState.getMembers().filter((m) => {
-                return m.userId !== userId &&
-                    m.membership !== "invite" &&
-                    m.membership !== "join";
-            }).map((m) => m.name);
+            leftNames = this.currentState
+                .getMembers()
+                .filter((m) => {
+                    return m.userId !== userId && m.membership !== "invite" && m.membership !== "join";
+                })
+                .map((m) => m.name);
         }
 
         let oldName: string;
@@ -3027,14 +2993,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             return;
         }
         const isPowerSufficient =
-            (
-                EVENT_VISIBILITY_CHANGE_TYPE.name
-                && this.currentState.maySendStateEvent(EVENT_VISIBILITY_CHANGE_TYPE.name, userId)
-            )
-            || (
-                EVENT_VISIBILITY_CHANGE_TYPE.altName
-                && this.currentState.maySendStateEvent(EVENT_VISIBILITY_CHANGE_TYPE.altName, userId)
-            );
+            (EVENT_VISIBILITY_CHANGE_TYPE.name &&
+                this.currentState.maySendStateEvent(EVENT_VISIBILITY_CHANGE_TYPE.name, userId)) ||
+            (EVENT_VISIBILITY_CHANGE_TYPE.altName &&
+                this.currentState.maySendStateEvent(EVENT_VISIBILITY_CHANGE_TYPE.altName, userId));
         if (!isPowerSufficient) {
             // Powerlevel is insufficient.
             return;
@@ -3054,8 +3016,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             // However, to protect against a potential DoS attack, we limit the
             // number of iterations in this loop.
             let index = visibilityEventsOnOriginalEvent.length - 1;
-            const min = Math.max(0,
-                visibilityEventsOnOriginalEvent.length - MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH);
+            const min = Math.max(
+                0,
+                visibilityEventsOnOriginalEvent.length - MAX_NUMBER_OF_VISIBILITY_EVENTS_TO_SCAN_THROUGH,
+            );
             for (; index >= min; --index) {
                 const target = visibilityEventsOnOriginalEvent[index];
                 if (target.getTs() < event.getTs()) {
@@ -3095,7 +3059,7 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
             // most likely because it was ill-formed.
             return;
         }
-        const index = visibilityEventsOnOriginalEvent.findIndex(change => change.getId() === event.getId());
+        const index = visibilityEventsOnOriginalEvent.findIndex((change) => change.getId() === event.getId());
         if (index === -1) {
             // This change event was not recorded, most likely because
             // it was ill-formed.
@@ -3164,27 +3128,11 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
 
 // a map from current event status to a list of allowed next statuses
 const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
-    [EventStatus.ENCRYPTING]: [
-        EventStatus.SENDING,
-        EventStatus.NOT_SENT,
-        EventStatus.CANCELLED,
-    ],
-    [EventStatus.SENDING]: [
-        EventStatus.ENCRYPTING,
-        EventStatus.QUEUED,
-        EventStatus.NOT_SENT,
-        EventStatus.SENT,
-    ],
-    [EventStatus.QUEUED]: [
-        EventStatus.SENDING,
-        EventStatus.CANCELLED,
-    ],
+    [EventStatus.ENCRYPTING]: [EventStatus.SENDING, EventStatus.NOT_SENT, EventStatus.CANCELLED],
+    [EventStatus.SENDING]: [EventStatus.ENCRYPTING, EventStatus.QUEUED, EventStatus.NOT_SENT, EventStatus.SENT],
+    [EventStatus.QUEUED]: [EventStatus.SENDING, EventStatus.CANCELLED],
     [EventStatus.SENT]: [],
-    [EventStatus.NOT_SENT]: [
-        EventStatus.SENDING,
-        EventStatus.QUEUED,
-        EventStatus.CANCELLED,
-    ],
+    [EventStatus.NOT_SENT]: [EventStatus.SENDING, EventStatus.QUEUED, EventStatus.CANCELLED],
     [EventStatus.CANCELLED]: [],
 };
 
@@ -3345,4 +3293,3 @@ function memberNamesToRoomName(names: string[], count: number): string {
  * @param {string} membership The new membership value
  * @param {string} prevMembership The previous membership value
  */
-

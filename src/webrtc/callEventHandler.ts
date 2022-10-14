@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent, MatrixEventEvent } from '../models/event';
-import { logger } from '../logger';
-import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
-import { EventType } from '../@types/event';
-import { ClientEvent, MatrixClient } from '../client';
+import { MatrixEvent, MatrixEventEvent } from "../models/event";
+import { logger } from "../logger";
+import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from "./call";
+import { EventType } from "../@types/event";
+import { ClientEvent, MatrixClient } from "../client";
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
 import { SyncState } from "../sync";
 import { RoomEvent } from "../models/room";
@@ -68,9 +68,11 @@ export class CallEventHandler {
 
     private evaluateEventBuffer = async () => {
         if (this.client.getSyncState() === SyncState.Syncing) {
-            await Promise.all(this.callEventBuffer.map(event => {
-                this.client.decryptEventIfNeeded(event);
-            }));
+            await Promise.all(
+                this.callEventBuffer.map((event) => {
+                    this.client.decryptEventIfNeeded(event);
+                }),
+            );
 
             const ignoreCallIds = new Set<string>();
             // inspect the buffer and mark all calls which have been answered
@@ -152,23 +154,15 @@ export class CallEventHandler {
 
             if (call) {
                 logger.log(
-                    `WARN: Already have a MatrixCall with id ${content.call_id} but got an ` +
-                    `invite. Clobbering.`,
+                    `WARN: Already have a MatrixCall with id ${content.call_id} but got an ` + `invite. Clobbering.`,
                 );
             }
 
             const timeUntilTurnCresExpire = this.client.getTurnServersExpiry() - Date.now();
             logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
-            call = createNewMatrixCall(
-                this.client,
-                event.getRoomId(),
-                { forceTURN: this.client.forceTURN },
-            );
+            call = createNewMatrixCall(this.client, event.getRoomId(), { forceTURN: this.client.forceTURN });
             if (!call) {
-                logger.log(
-                    "Incoming call ID " + content.call_id + " but this client " +
-                    "doesn't support WebRTC",
-                );
+                logger.log("Incoming call ID " + content.call_id + " but this client " + "doesn't support WebRTC");
                 // don't hang up the call: there could be other clients
                 // connected that do support WebRTC and declining the
                 // the call on their behalf would be really annoying.
@@ -193,11 +187,7 @@ export class CallEventHandler {
                     thisCall.state,
                 );
 
-                if (
-                    call.roomId === thisCall.roomId &&
-                    thisCall.direction === CallDirection.Outbound &&
-                    isCalling
-                ) {
+                if (call.roomId === thisCall.roomId && thisCall.direction === CallDirection.Outbound && isCalling) {
                     existingCall = thisCall;
                     break;
                 }
@@ -214,15 +204,19 @@ export class CallEventHandler {
                     existingCall.callId > call.callId
                 ) {
                     logger.log(
-                        "Glare detected: answering incoming call " + call.callId +
-                        " and canceling outgoing call " + existingCall.callId,
+                        "Glare detected: answering incoming call " +
+                            call.callId +
+                            " and canceling outgoing call " +
+                            existingCall.callId,
                     );
                     existingCall.replacedBy(call);
                     call.answer();
                 } else {
                     logger.log(
-                        "Glare detected: rejecting incoming call " + call.callId +
-                        " and keeping outgoing call " + existingCall.callId,
+                        "Glare detected: rejecting incoming call " +
+                            call.callId +
+                            " and keeping outgoing call " +
+                            existingCall.callId,
                     );
                     call.hangup(CallErrorCode.Replaced, true);
                 }

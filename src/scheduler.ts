@@ -20,14 +20,14 @@ limitations under the License.
  * @module scheduler
  */
 import * as utils from "./utils";
-import { logger } from './logger';
+import { logger } from "./logger";
 import { MatrixEvent } from "./models/event";
 import { EventType } from "./@types/event";
 import { IDeferred } from "./utils";
 import { ConnectionError, MatrixError } from "./http-api";
 import { ISendEventResponse } from "./@types/requests";
 
-const DEBUG = false;  // set true to enable console logging.
+const DEBUG = false; // set true to enable console logging.
 
 interface IQueueEntry<T> {
     event: MatrixEvent;
@@ -86,7 +86,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         if (attempts > 4) {
             return -1; // give up
         }
-        return (1000 * Math.pow(2, attempts));
+        return 1000 * Math.pow(2, attempts);
     }
 
     /**
@@ -135,7 +135,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         if (!name || !this.queues[name]) {
             return null;
         }
-        return this.queues[name].map(function(obj) {
+        return this.queues[name].map(function (obj) {
             return obj.event;
         });
     }
@@ -206,8 +206,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         // for each inactive queue with events in them
         Object.keys(this.queues)
             .filter((queueName) => {
-                return this.activeQueues.indexOf(queueName) === -1 &&
-                    this.queues[queueName].length > 0;
+                return this.activeQueues.indexOf(queueName) === -1 && this.queues[queueName].length > 0;
             })
             .forEach((queueName) => {
                 // mark the queue as active
@@ -238,31 +237,43 @@ export class MatrixScheduler<T = ISendEventResponse> {
         // the deferred of the previously sent event can run.
         // This way enqueued relations/redactions to enqueued events can receive
         // the remove id of their target before being sent.
-        Promise.resolve().then(() => {
-            return this.procFn(obj.event);
-        }).then((res) => {
-            // remove this from the queue
-            this.removeNextEvent(queueName);
-            debuglog("Queue '%s' sent event %s", queueName, obj.event.getId());
-            obj.defer.resolve(res);
-            // keep processing
-            this.processQueue(queueName);
-        }, (err) => {
-            obj.attempts += 1;
-            // ask the retry algorithm when/if we should try again
-            const waitTimeMs = this.retryAlgorithm(obj.event, obj.attempts, err);
-            debuglog("retry(%s) err=%s event_id=%s waitTime=%s", obj.attempts, err, obj.event.getId(), waitTimeMs);
-            if (waitTimeMs === -1) {  // give up (you quitter!)
-                debuglog("Queue '%s' giving up on event %s", queueName, obj.event.getId());
-                // remove this from the queue
-                this.removeNextEvent(queueName);
-                obj.defer.reject(err);
-                // process next event
-                this.processQueue(queueName);
-            } else {
-                setTimeout(this.processQueue, waitTimeMs, queueName);
-            }
-        });
+        Promise.resolve()
+            .then(() => {
+                return this.procFn(obj.event);
+            })
+            .then(
+                (res) => {
+                    // remove this from the queue
+                    this.removeNextEvent(queueName);
+                    debuglog("Queue '%s' sent event %s", queueName, obj.event.getId());
+                    obj.defer.resolve(res);
+                    // keep processing
+                    this.processQueue(queueName);
+                },
+                (err) => {
+                    obj.attempts += 1;
+                    // ask the retry algorithm when/if we should try again
+                    const waitTimeMs = this.retryAlgorithm(obj.event, obj.attempts, err);
+                    debuglog(
+                        "retry(%s) err=%s event_id=%s waitTime=%s",
+                        obj.attempts,
+                        err,
+                        obj.event.getId(),
+                        waitTimeMs,
+                    );
+                    if (waitTimeMs === -1) {
+                        // give up (you quitter!)
+                        debuglog("Queue '%s' giving up on event %s", queueName, obj.event.getId());
+                        // remove this from the queue
+                        this.removeNextEvent(queueName);
+                        obj.defer.reject(err);
+                        // process next event
+                        this.processQueue(queueName);
+                    } else {
+                        setTimeout(this.processQueue, waitTimeMs, queueName);
+                    }
+                },
+            );
     };
 
     private peekNextEvent(queueName: string): IQueueEntry<T> {
@@ -324,4 +335,3 @@ function debuglog(...args: any[]) {
  * @param {MatrixEvent} event The event to send.
  * @return {Promise} Resolved/rejected depending on the outcome of the request.
  */
-

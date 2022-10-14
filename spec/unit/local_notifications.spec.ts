@@ -16,15 +16,13 @@ limitations under the License.
 
 import { LocalNotificationSettings } from "../../src/@types/local_notifications";
 import { LOCAL_NOTIFICATION_SETTINGS_PREFIX, MatrixClient } from "../../src/matrix";
-import { TestClient } from '../TestClient';
+import { TestClient } from "../TestClient";
 
 let client: MatrixClient;
 
 describe("Local notification settings", () => {
     beforeEach(() => {
-        client = (new TestClient(
-            "@alice:matrix.org", "123", undefined, undefined, undefined,
-        )).client;
+        client = new TestClient("@alice:matrix.org", "123", undefined, undefined, undefined).client;
         client.setAccountData = jest.fn();
     });
 

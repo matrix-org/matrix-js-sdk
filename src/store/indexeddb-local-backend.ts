@@ -17,7 +17,7 @@ limitations under the License.
 import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { IStartClientOpts, IStateEventWithRoomId } from "../matrix";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
@@ -37,14 +37,17 @@ const DB_MIGRATIONS: DbMigration[] = [
         db.createObjectStore("sync", { keyPath: ["clobber"] });
     },
     (db) => {
-        const oobMembersStore = db.createObjectStore(
-            "oob_membership_events", {
-                keyPath: ["room_id", "state_key"],
-            });
+        const oobMembersStore = db.createObjectStore("oob_membership_events", {
+            keyPath: ["room_id", "state_key"],
+        });
         oobMembersStore.createIndex("room", "room_id");
     },
-    (db) => { db.createObjectStore("client_options", { keyPath: ["clobber"] }); },
-    (db) => { db.createObjectStore("to_device_queue", { autoIncrement: true }); },
+    (db) => {
+        db.createObjectStore("client_options", { keyPath: ["clobber"] });
+    },
+    (db) => {
+        db.createObjectStore("to_device_queue", { autoIncrement: true });
+    },
     // Expand as needed.
 ];
 const VERSION = DB_MIGRATIONS.length;
@@ -85,10 +88,10 @@ function selectQuery<T>(
 
 function txnAsPromise(txn: IDBTransaction): Promise<Event> {
     return new Promise((resolve, reject) => {
-        txn.oncomplete = function(event) {
+        txn.oncomplete = function (event) {
             resolve(event);
         };
-        txn.onerror = function() {
+        txn.onerror = function () {
             reject(txn.error);
         };
     });
@@ -96,10 +99,10 @@ function txnAsPromise(txn: IDBTransaction): Promise<Event> {
 
 function reqAsEventPromise(req: IDBRequest): Promise<Event> {
     return new Promise((resolve, reject) => {
-        req.onsuccess = function(event) {
+        req.onsuccess = function (event) {
             resolve(event);
         };
-        req.onerror = function() {
+        req.onerror = function () {
             reject(req.error);
         };
     });
@@ -164,9 +167,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         req.onupgradeneeded = (ev) => {
             const db = req.result;
             const oldVersion = ev.oldVersion;
-            logger.log(
-                `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
-            );
+            logger.log(`LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`);
             if (oldVersion < 1) {
                 // The database did not previously exist
                 this._isNewlyCreated = true;
@@ -205,18 +206,18 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @return {Promise} Resolves on success
      */
     private init() {
-        return Promise.all([
-            this.loadAccountData(),
-            this.loadSyncData(),
-        ]).then(([accountData, syncData]) => {
+        return Promise.all([this.loadAccountData(), this.loadSyncData()]).then(([accountData, syncData]) => {
             logger.log(`LocalIndexedDBStoreBackend: loaded initial data`);
-            this.syncAccumulator.accumulate({
-                next_batch: syncData.nextBatch,
-                rooms: syncData.roomsData,
-                account_data: {
-                    events: accountData,
+            this.syncAccumulator.accumulate(
+                {
+                    next_batch: syncData.nextBatch,
+                    rooms: syncData.roomsData,
+                    account_data: {
+                        events: accountData,
+                    },
                 },
-            }, true);
+                true,
+            );
         });
     }
 
@@ -277,8 +278,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @param {event[]} membershipEvents the membership events to store
      */
     public async setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
-        logger.log(`LL: backend about to store ${membershipEvents.length}` +
-            ` members for ${roomId}`);
+        logger.log(`LL: backend about to store ${membershipEvents.length}` + ` members for ${roomId}`);
         const tx = this.db.transaction(["oob_membership_events"], "readwrite");
         const store = tx.objectStore("oob_membership_events");
         membershipEvents.forEach((e) => {
@@ -306,33 +306,28 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         // keys in the store.
         // this should be way faster than deleting every member
         // individually for a large room.
-        const readTx = this.db.transaction(
-            ["oob_membership_events"],
-            "readonly");
+        const readTx = this.db.transaction(["oob_membership_events"], "readonly");
         const store = readTx.objectStore("oob_membership_events");
         const roomIndex = store.index("room");
         const roomRange = IDBKeyRange.only(roomId);
 
-        const minStateKeyProm = reqAsCursorPromise(
-            roomIndex.openKeyCursor(roomRange, "next"),
-        ).then((cursor) => cursor && cursor.primaryKey[1]);
-        const maxStateKeyProm = reqAsCursorPromise(
-            roomIndex.openKeyCursor(roomRange, "prev"),
-        ).then((cursor) => cursor && cursor.primaryKey[1]);
-        const [minStateKey, maxStateKey] = await Promise.all(
-            [minStateKeyProm, maxStateKeyProm]);
+        const minStateKeyProm = reqAsCursorPromise(roomIndex.openKeyCursor(roomRange, "next")).then(
+            (cursor) => cursor && cursor.primaryKey[1],
+        );
+        const maxStateKeyProm = reqAsCursorPromise(roomIndex.openKeyCursor(roomRange, "prev")).then(
+            (cursor) => cursor && cursor.primaryKey[1],
+        );
+        const [minStateKey, maxStateKey] = await Promise.all([minStateKeyProm, maxStateKeyProm]);
 
-        const writeTx = this.db.transaction(
-            ["oob_membership_events"],
-            "readwrite");
+        const writeTx = this.db.transaction(["oob_membership_events"], "readwrite");
         const writeStore = writeTx.objectStore("oob_membership_events");
-        const membersKeyRange = IDBKeyRange.bound(
+        const membersKeyRange = IDBKeyRange.bound([roomId, minStateKey], [roomId, maxStateKey]);
+
+        logger.log(
+            `LL: Deleting all users + marker in storage for room ${roomId}, with key range:`,
             [roomId, minStateKey],
             [roomId, maxStateKey],
         );
-
-        logger.log(`LL: Deleting all users + marker in storage for room ${roomId}, with key range:`,
-            [roomId, minStateKey], [roomId, maxStateKey]);
         await reqAsPromise(writeStore.delete(membersKeyRange));
     }
 
@@ -425,10 +420,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @param {Object} roomsData The 'rooms' /sync data from a SyncAccumulator
      * @return {Promise} Resolves if the data was persisted.
      */
-    private persistSyncData(
-        nextBatch: string,
-        roomsData: ISyncResponse["rooms"],
-    ): Promise<void> {
+    private persistSyncData(nextBatch: string, roomsData: ISyncResponse["rooms"]): Promise<void> {
         logger.log("Persisting sync data up to", nextBatch);
         return utils.promiseTry<void>(() => {
             const txn = this.db.transaction(["sync"], "readwrite");
@@ -533,7 +525,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 if (results.length > 1) {
                     logger.warn("loadSyncData: More than 1 sync row found.");
                 }
-                return results.length > 0 ? results[0] : {} as ISyncData;
+                return results.length > 0 ? results[0] : ({} as ISyncData);
             });
         });
     }

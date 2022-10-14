@@ -48,9 +48,9 @@ export enum ConditionOperator {
 
 export type PushRuleAction = Tweaks | PushRuleActionName;
 
-export type MemberCountCondition
-    <N extends number, Op extends ConditionOperator = ConditionOperator.ExactEquals>
-    = `${Op}${N}` | (Op extends ConditionOperator.ExactEquals ? `${N}` : never);
+export type MemberCountCondition<N extends number, Op extends ConditionOperator = ConditionOperator.ExactEquals> =
+    | `${Op}${N}`
+    | (Op extends ConditionOperator.ExactEquals ? `${N}` : never);
 
 export type AnyMemberCountCondition = MemberCountCondition<number, ConditionOperator>;
 
@@ -92,7 +92,8 @@ export interface ISenderNotificationPermissionCondition
 
 // XXX: custom conditions are possible but always fail, and break the typescript discriminated union so ignore them here
 // IPushRuleCondition<Exclude<string, ConditionKind>> unfortunately does not resolve this at the time of writing.
-export type PushRuleCondition = IEventMatchCondition
+export type PushRuleCondition =
+    | IEventMatchCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition;

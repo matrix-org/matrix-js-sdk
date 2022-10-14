@@ -14,21 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../logger';
-import * as olmlib from './olmlib';
-import { encodeBase64 } from './olmlib';
-import { randomString } from '../randomstring';
-import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from './aes';
-import { ClientEvent, ICryptoCallbacks, MatrixEvent } from '../matrix';
+import { logger } from "../logger";
+import * as olmlib from "./olmlib";
+import { encodeBase64 } from "./olmlib";
+import { randomString } from "../randomstring";
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from "./aes";
+import { ClientEvent, ICryptoCallbacks, MatrixEvent } from "../matrix";
 import { ClientEventHandlerMap, MatrixClient } from "../client";
-import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
-import { TypedEventEmitter } from '../models/typed-event-emitter';
+import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from "./api";
+import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
 // Some of the key functions use a tuple and some use an object...
 export type SecretStorageKeyTuple = [keyId: string, keyInfo: ISecretStorageKeyInfo];
-export type SecretStorageKeyObject = {keyId: string, keyInfo: ISecretStorageKeyInfo};
+export type SecretStorageKeyObject = { keyId: string; keyInfo: ISecretStorageKeyInfo };
 
 export interface ISecretRequest {
     requestId: string;
@@ -38,7 +38,7 @@ export interface ISecretRequest {
 
 export interface IAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
     // Subset of MatrixClient (which also uses any for the event content)
-    getAccountDataFromServer: <T extends {[k: string]: any}>(eventType: string) => Promise<T>;
+    getAccountDataFromServer: <T extends { [k: string]: any }>(eventType: string) => Promise<T>;
     getAccountData: (eventType: string) => MatrixEvent;
     setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
@@ -85,7 +85,7 @@ export class SecretStorage {
 
     public async getDefaultKeyId(): Promise<string | null> {
         const defaultKey = await this.accountDataAdapter.getAccountDataFromServer<{ key: string }>(
-            'm.secret_storage.default_key',
+            "m.secret_storage.default_key",
         );
         if (!defaultKey) return null;
         return defaultKey.key;
@@ -94,20 +94,14 @@ export class SecretStorage {
     public setDefaultKeyId(keyId: string): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             const listener = (ev: MatrixEvent): void => {
-                if (
-                    ev.getType() === 'm.secret_storage.default_key' &&
-                    ev.getContent().key === keyId
-                ) {
+                if (ev.getType() === "m.secret_storage.default_key" && ev.getContent().key === keyId) {
                     this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                     resolve();
                 }
             };
             this.accountDataAdapter.on(ClientEvent.AccountData, listener);
 
-            this.accountDataAdapter.setAccountData(
-                'm.secret_storage.default_key',
-                { key: keyId },
-            ).catch(e => {
+            this.accountDataAdapter.setAccountData("m.secret_storage.default_key", { key: keyId }).catch((e) => {
                 this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
                 reject(e);
             });
@@ -163,9 +157,7 @@ export class SecretStorage {
             );
         }
 
-        await this.accountDataAdapter.setAccountData(
-            `m.secret_storage.key.${keyId}`, keyInfo,
-        );
+        await this.accountDataAdapter.setAccountData(`m.secret_storage.key.${keyId}`, keyInfo);
 
         return {
             keyId,
@@ -219,7 +211,7 @@ export class SecretStorage {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             if (info.mac) {
                 const { mac } = await calculateKeyCheck(key, info.iv);
-                return info.mac.replace(/=+$/g, '') === mac.replace(/=+$/g, '');
+                return info.mac.replace(/=+$/g, "") === mac.replace(/=+$/g, "");
             } else {
                 // if we have no information, we have to assume the key is right
                 return true;
@@ -267,8 +259,7 @@ export class SecretStorage {
                 const [, encryption] = await this.getSecretStorageKey(keys, name);
                 encrypted[keyId] = await encryption.encrypt(secret);
             } else {
-                logger.warn("unknown algorithm for secret storage key " + keyId
-                            + ": " + keyInfo.algorithm);
+                logger.warn("unknown algorithm for secret storage key " + keyId + ": " + keyInfo.algorithm);
                 // do nothing if we don't understand the encryption algorithm
             }
         }
@@ -297,10 +288,8 @@ export class SecretStorage {
         const keys: Record<string, ISecretStorageKeyInfo> = {};
         for (const keyId of Object.keys(secretInfo.encrypted)) {
             // get key information from key storage
-            const keyInfo = (
-                await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
-                    "m.secret_storage.key." + keyId,
-                )
+            const keyInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretStorageKeyInfo>(
+                "m.secret_storage.key." + keyId,
             );
             const encInfo = secretInfo.encrypted[keyId];
             // only use keys we understand the encryption algorithm of
@@ -312,8 +301,10 @@ export class SecretStorage {
         }
 
         if (Object.keys(keys).length === 0) {
-            throw new Error(`Could not decrypt ${name} because none of ` +
-                `the keys it is encrypted with are for a supported algorithm`);
+            throw new Error(
+                `Could not decrypt ${name} because none of ` +
+                    `the keys it is encrypted with are for a supported algorithm`,
+            );
         }
 
         let keyId: string;
@@ -438,9 +429,10 @@ export class SecretStorage {
     public async onRequestReceived(event: MatrixEvent): Promise<void> {
         const sender = event.getSender();
         const content = event.getContent();
-        if (sender !== this.baseApis.getUserId()
-            || !(content.name && content.action
-                 && content.requesting_device_id && content.request_id)) {
+        if (
+            sender !== this.baseApis.getUserId() ||
+            !(content.name && content.action && content.requesting_device_id && content.request_id)
+        ) {
             // ignore requests from anyone else, for now
             return;
         }
@@ -473,10 +465,7 @@ export class SecretStorage {
             }
 
             // check if we have the secret
-            logger.info(
-                "received request for secret (" + sender +
-                ", " + deviceId + ", " + content.request_id + ")",
-            );
+            logger.info("received request for secret (" + sender + ", " + deviceId + ", " + content.request_id + ")");
             if (!this.cryptoCallbacks.onSecretRequested) {
                 return;
             }
@@ -501,15 +490,9 @@ export class SecretStorage {
                     sender_key: this.baseApis.crypto.olmDevice.deviceCurve25519Key,
                     ciphertext: {},
                 };
-                await olmlib.ensureOlmSessionsForDevices(
-                    this.baseApis.crypto.olmDevice,
-                    this.baseApis,
-                    {
-                        [sender]: [
-                            this.baseApis.getStoredDevice(sender, deviceId),
-                        ],
-                    },
-                );
+                await olmlib.ensureOlmSessionsForDevices(this.baseApis.crypto.olmDevice, this.baseApis, {
+                    [sender]: [this.baseApis.getStoredDevice(sender, deviceId)],
+                });
                 await olmlib.encryptMessageForDevice(
                     encryptedContent.ciphertext,
                     this.baseApis.getUserId(),
@@ -566,9 +549,7 @@ export class SecretStorage {
                 event.getSenderKey(),
             );
             if (!deviceInfo) {
-                logger.log(
-                    "secret share from unknown device with key", event.getSenderKey(),
-                );
+                logger.log("secret share from unknown device with key", event.getSenderKey());
                 return;
             }
             if (!requestControl.devices.includes(deviceInfo.deviceId)) {
@@ -584,10 +565,7 @@ export class SecretStorage {
                 return;
             }
 
-            logger.log(
-                `Successfully received secret ${requestControl.name} ` +
-                `from ${deviceInfo.deviceId}`,
-            );
+            logger.log(`Successfully received secret ${requestControl.name} ` + `from ${deviceInfo.deviceId}`);
             requestControl.resolve(content.secret);
         }
     }
@@ -616,10 +594,10 @@ export class SecretStorage {
 
         if (keys[keyId].algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
             const decryption = {
-                encrypt: function(secret: string): Promise<IEncryptedPayload> {
+                encrypt: function (secret: string): Promise<IEncryptedPayload> {
                     return encryptAES(secret, privateKey, name);
                 },
-                decrypt: function(encInfo: IEncryptedPayload): Promise<string> {
+                decrypt: function (encInfo: IEncryptedPayload): Promise<string> {
                     return decryptAES(encInfo, privateKey, name);
                 },
             };

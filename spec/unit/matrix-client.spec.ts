@@ -52,7 +52,7 @@ jest.mock("../../src/webrtc/call", () => ({
     supportsMatrixCall: jest.fn(() => false),
 }));
 
-describe("MatrixClient", function() {
+describe("MatrixClient", function () {
     const userId = "@alice:bar";
     const identityServerUrl = "https://identity.server";
     const identityServerDomain = "identity.server";
@@ -113,13 +113,20 @@ describe("MatrixClient", function() {
             });
         }
         const next = httpLookups.shift();
-        const logLine = (
-            "MatrixClient[UT] RECV " + method + " " + path + "  " +
-            "EXPECT " + (next ? next.method : next) + " " + (next ? next.path : next)
-        );
+        const logLine =
+            "MatrixClient[UT] RECV " +
+            method +
+            " " +
+            path +
+            "  " +
+            "EXPECT " +
+            (next ? next.method : next) +
+            " " +
+            (next ? next.path : next);
         logger.log(logLine);
 
-        if (!next) { // no more things to return
+        if (!next) {
+            // no more things to return
             if (pendingLookup) {
                 if (pendingLookup.method === method && pendingLookup.path === path) {
                     return pendingLookup.promise;
@@ -135,15 +142,12 @@ describe("MatrixClient", function() {
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
-            logger.log(
-                "MatrixClient[UT] Matched. Returning " +
-                (next.error ? "BAD" : "GOOD") + " response",
-            );
+            logger.log("MatrixClient[UT] Matched. Returning " + (next.error ? "BAD" : "GOOD") + " response");
             if (next.expectBody) {
                 expect(data).toEqual(next.expectBody);
             }
             if (next.expectQueryParams) {
-                Object.keys(next.expectQueryParams).forEach(function(k) {
+                Object.keys(next.expectQueryParams).forEach(function (k) {
                     expect(qp[k]).toEqual(next.expectQueryParams[k]);
                 });
             }
@@ -177,30 +181,48 @@ describe("MatrixClient", function() {
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
             accessToken: "my.access.token",
-            fetchFn: function() {} as any, // NOP
+            fetchFn: function () {} as any, // NOP
             store: store,
             scheduler: scheduler,
             userId: userId,
         });
         // FIXME: We shouldn't be yanking http like this.
-        client.http = [
-            "authedRequest", "getContentUri", "request", "uploadContent",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
+        client.http = ["authedRequest", "getContentUri", "request", "uploadContent"].reduce((r, k) => {
+            r[k] = jest.fn();
+            return r;
+        }, {});
         client.http.authedRequest.mockImplementation(httpReq);
         client.http.request.mockImplementation(httpReq);
     }
 
-    beforeEach(function() {
-        scheduler = [
-            "getQueueForEvent", "queueEvent", "removeEventFromQueue",
-            "setProcessFunction",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
+    beforeEach(function () {
+        scheduler = ["getQueueForEvent", "queueEvent", "removeEventFromQueue", "setProcessFunction"].reduce((r, k) => {
+            r[k] = jest.fn();
+            return r;
+        }, {});
         store = [
-            "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
-            "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
-            "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
-            "getSyncAccumulator", "startup", "deleteAllData",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
+            "getRoom",
+            "getRooms",
+            "getUser",
+            "getSyncToken",
+            "scrollback",
+            "save",
+            "wantsSave",
+            "setSyncToken",
+            "storeEvents",
+            "storeRoom",
+            "storeUser",
+            "getFilterIdByName",
+            "setFilterIdByName",
+            "getFilter",
+            "storeFilter",
+            "getSyncAccumulator",
+            "startup",
+            "deleteAllData",
+        ].reduce((r, k) => {
+            r[k] = jest.fn();
+            return r;
+        }, {});
         store.getSavedSync = jest.fn().mockReturnValue(Promise.resolve(null));
         store.getSavedSyncToken = jest.fn().mockReturnValue(Promise.resolve(null));
         store.setSyncData = jest.fn().mockReturnValue(Promise.resolve(null));
@@ -218,13 +240,13 @@ describe("MatrixClient", function() {
         httpLookups.push(SYNC_RESPONSE);
     });
 
-    afterEach(function() {
+    afterEach(function () {
         // need to re-stub the requests with NOPs because there are no guarantees
         // clients from previous tests will be GC'd before the next test. This
         // means they may call /events and then fail an expect() which will fail
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
-        client.http.authedRequest.mockImplementation(function() {
+        client.http.authedRequest.mockImplementation(function () {
             return new Promise(() => {});
         });
         client.stopClient();
@@ -410,15 +432,12 @@ describe("MatrixClient", function() {
         expect(tree).toBeFalsy();
     });
 
-    it("should not POST /filter if a matching filter already exists", async function() {
-        httpLookups = [
-            PUSH_RULES_RESPONSE,
-            SYNC_RESPONSE,
-        ];
+    it("should not POST /filter if a matching filter already exists", async function () {
+        httpLookups = [PUSH_RULES_RESPONSE, SYNC_RESPONSE];
         const filterId = "ehfewf";
         store.getFilterIdByName.mockReturnValue(filterId);
         const filter = new Filter("0", filterId);
-        filter.setDefinition({ "room": { "timeline": { "limit": 8 } } });
+        filter.setDefinition({ room: { timeline: { limit: 8 } } });
         store.getFilter.mockReturnValue(filter);
         const syncPromise = new Promise<void>((resolve, reject) => {
             client.on("sync", function syncListener(state) {
@@ -435,12 +454,12 @@ describe("MatrixClient", function() {
         await syncPromise;
     });
 
-    describe("getSyncState", function() {
-        it("should return null if the client isn't started", function() {
+    describe("getSyncState", function () {
+        it("should return null if the client isn't started", function () {
             expect(client.getSyncState()).toBe(null);
         });
 
-        it("should return the same sync state as emitted sync events", async function() {
+        it("should return the same sync state as emitted sync events", async function () {
             const syncingPromise = new Promise<void>((resolve) => {
                 client.on("sync", function syncListener(state) {
                     expect(state).toEqual(client.getSyncState());
@@ -455,22 +474,20 @@ describe("MatrixClient", function() {
         });
     });
 
-    describe("getOrCreateFilter", function() {
-        it("should POST createFilter if no id is present in localStorage", function() {
-        });
-        it("should use an existing filter if id is present in localStorage", function() {
-        });
-        it("should handle localStorage filterId missing from the server", function(done) {
+    describe("getOrCreateFilter", function () {
+        it("should POST createFilter if no id is present in localStorage", function () {});
+        it("should use an existing filter if id is present in localStorage", function () {});
+        it("should handle localStorage filterId missing from the server", function (done) {
             function getFilterName(userId, suffix?: string) {
                 // scope this on the user ID because people may login on many accounts
                 // and they all need to be stored!
                 return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
             }
-            const invalidFilterId = 'invalidF1lt3r';
+            const invalidFilterId = "invalidF1lt3r";
             httpLookups = [];
             httpLookups.push({
                 method: "GET",
-                path: FILTER_PATH + '/' + invalidFilterId,
+                path: FILTER_PATH + "/" + invalidFilterId,
                 error: {
                     errcode: "M_UNKNOWN",
                     name: "M_UNKNOWN",
@@ -486,25 +503,27 @@ describe("MatrixClient", function() {
             client.store.setFilterIdByName(filterName, invalidFilterId);
             const filter = new Filter(client.credentials.userId);
 
-            client.getOrCreateFilter(filterName, filter).then(function(filterId) {
+            client.getOrCreateFilter(filterName, filter).then(function (filterId) {
                 expect(filterId).toEqual(FILTER_RESPONSE.data.filter_id);
                 done();
             });
         });
     });
 
-    describe("retryImmediately", function() {
-        it("should return false if there is no request waiting", async function() {
+    describe("retryImmediately", function () {
+        it("should return false if there is no request waiting", async function () {
             httpLookups = [];
             await client.startClient();
             expect(client.retryImmediately()).toBe(false);
         });
 
-        it("should work on /filter", function(done) {
+        it("should work on /filter", function (done) {
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
-                method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
+                method: "POST",
+                path: FILTER_PATH,
+                error: { errcode: "NOPE_NOPE_NOPE" },
             });
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
@@ -525,20 +544,22 @@ describe("MatrixClient", function() {
             client.startClient();
         });
 
-        it("should work on /sync", function(done) {
+        it("should work on /sync", function (done) {
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
+                method: "GET",
+                path: "/sync",
+                error: { errcode: "NOPE_NOPE_NOPE" },
             });
             httpLookups.push({
-                method: "GET", path: "/sync", data: SYNC_DATA,
+                method: "GET",
+                path: "/sync",
+                data: SYNC_DATA,
             });
 
             client.on("sync", function syncListener(state) {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(1);
-                    expect(client.retryImmediately()).toBe(
-                        true,
-                    );
+                    expect(client.retryImmediately()).toBe(true);
                     jest.advanceTimersByTime(1);
                 } else if (state === "RECONNECTING" && httpLookups.length > 0) {
                     jest.advanceTimersByTime(10000);
@@ -550,10 +571,12 @@ describe("MatrixClient", function() {
             client.startClient();
         });
 
-        it("should work on /pushrules", function(done) {
+        it("should work on /pushrules", function (done) {
             httpLookups = [];
             httpLookups.push({
-                method: "GET", path: "/pushrules/", error: { errcode: "NOPE_NOPE_NOPE" },
+                method: "GET",
+                path: "/pushrules/",
+                error: { errcode: "NOPE_NOPE_NOPE" },
             });
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
@@ -576,13 +599,11 @@ describe("MatrixClient", function() {
         });
     });
 
-    describe("emitted sync events", function() {
+    describe("emitted sync events", function () {
         function syncChecker(expectedStates, done) {
             return function syncListener(state, old) {
                 const expected = expectedStates.shift();
-                logger.log(
-                    "'sync' curr=%s old=%s EXPECT=%s", state, old, expected,
-                );
+                logger.log("'sync' curr=%s old=%s EXPECT=%s", state, old, expected);
                 if (!expected) {
                     done();
                     return;
@@ -598,19 +619,21 @@ describe("MatrixClient", function() {
             };
         }
 
-        it("should transition null -> PREPARED after the first /sync", function(done) {
+        it("should transition null -> PREPARED after the first /sync", function (done) {
             const expectedStates = [];
             expectedStates.push(["PREPARED", null]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
         });
 
-        it("should transition null -> ERROR after a failed /filter", function(done) {
+        it("should transition null -> ERROR after a failed /filter", function (done) {
             const expectedStates = [];
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
-                method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
+                method: "POST",
+                path: FILTER_PATH,
+                error: { errcode: "NOPE_NOPE_NOPE" },
             });
             expectedStates.push(["ERROR", null]);
             client.on("sync", syncChecker(expectedStates, done));
@@ -620,35 +643,41 @@ describe("MatrixClient", function() {
         // Disabled because now `startClient` makes a legit call to `/versions`
         // And those tests are really unhappy about it... Not possible to figure
         // out what a good resolution would look like
-        xit("should transition ERROR -> CATCHUP after /sync if prev failed",
-            function(done) {
-                const expectedStates = [];
-                acceptKeepalives = false;
-                httpLookups = [];
-                httpLookups.push(PUSH_RULES_RESPONSE);
-                httpLookups.push(FILTER_RESPONSE);
-                httpLookups.push({
-                    method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
-                });
-                httpLookups.push({
-                    method: "GET", path: KEEP_ALIVE_PATH,
-                    error: { errcode: "KEEPALIVE_FAIL" },
-                });
-                httpLookups.push({
-                    method: "GET", path: KEEP_ALIVE_PATH, data: {},
-                });
-                httpLookups.push({
-                    method: "GET", path: "/sync", data: SYNC_DATA,
-                });
-
-                expectedStates.push(["RECONNECTING", null]);
-                expectedStates.push(["ERROR", "RECONNECTING"]);
-                expectedStates.push(["CATCHUP", "ERROR"]);
-                client.on("sync", syncChecker(expectedStates, done));
-                client.startClient();
+        xit("should transition ERROR -> CATCHUP after /sync if prev failed", function (done) {
+            const expectedStates = [];
+            acceptKeepalives = false;
+            httpLookups = [];
+            httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push(FILTER_RESPONSE);
+            httpLookups.push({
+                method: "GET",
+                path: "/sync",
+                error: { errcode: "NOPE_NOPE_NOPE" },
+            });
+            httpLookups.push({
+                method: "GET",
+                path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
+            });
+            httpLookups.push({
+                method: "GET",
+                path: KEEP_ALIVE_PATH,
+                data: {},
+            });
+            httpLookups.push({
+                method: "GET",
+                path: "/sync",
+                data: SYNC_DATA,
             });
 
-        it("should transition PREPARED -> SYNCING after /sync", function(done) {
+            expectedStates.push(["RECONNECTING", null]);
+            expectedStates.push(["ERROR", "RECONNECTING"]);
+            expectedStates.push(["CATCHUP", "ERROR"]);
+            client.on("sync", syncChecker(expectedStates, done));
+            client.startClient();
+        });
+
+        it("should transition PREPARED -> SYNCING after /sync", function (done) {
             const expectedStates = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
@@ -656,14 +685,17 @@ describe("MatrixClient", function() {
             client.startClient();
         });
 
-        xit("should transition SYNCING -> ERROR after a failed /sync", function(done) {
+        xit("should transition SYNCING -> ERROR after a failed /sync", function (done) {
             acceptKeepalives = false;
             const expectedStates = [];
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
+                method: "GET",
+                path: "/sync",
+                error: { errcode: "NONONONONO" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH,
+                method: "GET",
+                path: KEEP_ALIVE_PATH,
                 error: { errcode: "KEEPALIVE_FAIL" },
             });
 
@@ -675,46 +707,50 @@ describe("MatrixClient", function() {
             client.startClient();
         });
 
-        xit("should transition ERROR -> SYNCING after /sync if prev failed",
-            function(done) {
-                const expectedStates = [];
-                httpLookups.push({
-                    method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
-                });
-                httpLookups.push(SYNC_RESPONSE);
-
-                expectedStates.push(["PREPARED", null]);
-                expectedStates.push(["SYNCING", "PREPARED"]);
-                expectedStates.push(["ERROR", "SYNCING"]);
-                client.on("sync", syncChecker(expectedStates, done));
-                client.startClient();
+        xit("should transition ERROR -> SYNCING after /sync if prev failed", function (done) {
+            const expectedStates = [];
+            httpLookups.push({
+                method: "GET",
+                path: "/sync",
+                error: { errcode: "NONONONONO" },
             });
+            httpLookups.push(SYNC_RESPONSE);
 
-        it("should transition SYNCING -> SYNCING on subsequent /sync successes",
-            function(done) {
-                const expectedStates = [];
-                httpLookups.push(SYNC_RESPONSE);
-                httpLookups.push(SYNC_RESPONSE);
+            expectedStates.push(["PREPARED", null]);
+            expectedStates.push(["SYNCING", "PREPARED"]);
+            expectedStates.push(["ERROR", "SYNCING"]);
+            client.on("sync", syncChecker(expectedStates, done));
+            client.startClient();
+        });
 
-                expectedStates.push(["PREPARED", null]);
-                expectedStates.push(["SYNCING", "PREPARED"]);
-                expectedStates.push(["SYNCING", "SYNCING"]);
-                client.on("sync", syncChecker(expectedStates, done));
-                client.startClient();
-            });
+        it("should transition SYNCING -> SYNCING on subsequent /sync successes", function (done) {
+            const expectedStates = [];
+            httpLookups.push(SYNC_RESPONSE);
+            httpLookups.push(SYNC_RESPONSE);
 
-        xit("should transition ERROR -> ERROR if keepalive keeps failing", function(done) {
+            expectedStates.push(["PREPARED", null]);
+            expectedStates.push(["SYNCING", "PREPARED"]);
+            expectedStates.push(["SYNCING", "SYNCING"]);
+            client.on("sync", syncChecker(expectedStates, done));
+            client.startClient();
+        });
+
+        xit("should transition ERROR -> ERROR if keepalive keeps failing", function (done) {
             acceptKeepalives = false;
             const expectedStates = [];
             httpLookups.push({
-                method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
+                method: "GET",
+                path: "/sync",
+                error: { errcode: "NONONONONO" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH,
+                method: "GET",
+                path: KEEP_ALIVE_PATH,
                 error: { errcode: "KEEPALIVE_FAIL" },
             });
             httpLookups.push({
-                method: "GET", path: KEEP_ALIVE_PATH,
+                method: "GET",
+                path: KEEP_ALIVE_PATH,
                 error: { errcode: "KEEPALIVE_FAIL" },
             });
 
@@ -728,27 +764,29 @@ describe("MatrixClient", function() {
         });
     });
 
-    describe("inviteByEmail", function() {
+    describe("inviteByEmail", function () {
         const roomId = "!foo:bar";
 
-        it("should send an invite HTTP POST", function() {
-            httpLookups = [{
-                method: "POST",
-                path: "/rooms/!foo%3Abar/invite",
-                data: {},
-                expectBody: {
-                    id_server: identityServerDomain,
-                    medium: "email",
-                    address: "alice@gmail.com",
+        it("should send an invite HTTP POST", function () {
+            httpLookups = [
+                {
+                    method: "POST",
+                    path: "/rooms/!foo%3Abar/invite",
+                    data: {},
+                    expectBody: {
+                        id_server: identityServerDomain,
+                        medium: "email",
+                        address: "alice@gmail.com",
+                    },
                 },
-            }];
+            ];
             client.inviteByEmail(roomId, "alice@gmail.com");
             expect(httpLookups.length).toEqual(0);
         });
     });
 
-    describe("guest rooms", function() {
-        it("should only do /sync calls (without filter/pushrules)", async function() {
+    describe("guest rooms", function () {
+        it("should only do /sync calls (without filter/pushrules)", async function () {
             httpLookups = []; // no /pushrules or /filter
             httpLookups.push({
                 method: "GET",
@@ -760,20 +798,21 @@ describe("MatrixClient", function() {
             expect(httpLookups.length).toBe(0);
         });
 
-        xit("should be able to peek into a room using peekInRoom", function(done) {
-        });
+        xit("should be able to peek into a room using peekInRoom", function (done) {});
     });
 
-    describe("getPresence", function() {
-        it("should send a presence HTTP GET", function() {
-            httpLookups = [{
-                method: "GET",
-                path: `/presence/${encodeURIComponent(userId)}/status`,
-                data: {
-                    "presence": "unavailable",
-                    "last_active_ago": 420845,
+    describe("getPresence", function () {
+        it("should send a presence HTTP GET", function () {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/presence/${encodeURIComponent(userId)}/status`,
+                    data: {
+                        presence: "unavailable",
+                        last_active_ago: 420845,
+                    },
                 },
-            }];
+            ];
             client.getPresence(userId);
             expect(httpLookups.length).toEqual(0);
         });
@@ -787,12 +826,14 @@ describe("MatrixClient", function() {
         it("overload without threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: content,
-            }];
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    data: { event_id: eventId },
+                    expectBody: content,
+                },
+            ];
 
             await client.sendEvent(roomId, EventType.RoomMessage, { ...content }, txnId);
         });
@@ -800,12 +841,14 @@ describe("MatrixClient", function() {
         it("overload with null threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: content,
-            }];
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    data: { event_id: eventId },
+                    expectBody: content,
+                },
+            ];
 
             await client.sendEvent(roomId, null, EventType.RoomMessage, { ...content }, txnId);
         });
@@ -814,19 +857,21 @@ describe("MatrixClient", function() {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
             const threadId = "$threadId:server";
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: {
-                    ...content,
-                    "m.relates_to": {
-                        "event_id": threadId,
-                        "is_falling_back": true,
-                        "rel_type": "m.thread",
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    data: { event_id: eventId },
+                    expectBody: {
+                        ...content,
+                        "m.relates_to": {
+                            event_id: threadId,
+                            is_falling_back: true,
+                            rel_type: "m.thread",
+                        },
                     },
                 },
-            }];
+            ];
 
             await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
@@ -842,22 +887,24 @@ describe("MatrixClient", function() {
             const rootEvent = new MatrixEvent({ event_id: threadId });
             room.createThread(threadId, rootEvent, [rootEvent], false);
 
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: {
-                    ...content,
-                    "m.relates_to": {
-                        "m.in_reply_to": {
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    data: { event_id: eventId },
+                    expectBody: {
+                        ...content,
+                        "m.relates_to": {
+                            "m.in_reply_to": {
+                                event_id: threadId,
+                            },
                             event_id: threadId,
+                            is_falling_back: true,
+                            rel_type: "m.thread",
                         },
-                        "event_id": threadId,
-                        "is_falling_back": true,
-                        "rel_type": "m.thread",
                     },
                 },
-            }];
+            ];
 
             await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
@@ -882,22 +929,24 @@ describe("MatrixClient", function() {
             const rootEvent = new MatrixEvent({ event_id: threadId });
             room.createThread(threadId, rootEvent, [rootEvent], false);
 
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: {
-                    ...content,
-                    "m.relates_to": {
-                        "m.in_reply_to": {
-                            event_id: "$other:event",
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    data: { event_id: eventId },
+                    expectBody: {
+                        ...content,
+                        "m.relates_to": {
+                            "m.in_reply_to": {
+                                event_id: "$other:event",
+                            },
+                            event_id: threadId,
+                            is_falling_back: false,
+                            rel_type: "m.thread",
                         },
-                        "event_id": threadId,
-                        "is_falling_back": false,
-                        "rel_type": "m.thread",
                     },
                 },
-            }];
+            ];
 
             await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
@@ -935,11 +984,13 @@ describe("MatrixClient", function() {
         it("overload without threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
-                data: { event_id: eventId },
-            }];
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                    data: { event_id: eventId },
+                },
+            ];
 
             await client.redactEvent(roomId, eventId, txnId);
         });
@@ -947,11 +998,13 @@ describe("MatrixClient", function() {
         it("overload with null threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
-                data: { event_id: eventId },
-            }];
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                    data: { event_id: eventId },
+                },
+            ];
 
             await client.redactEvent(roomId, null, eventId, txnId);
         });
@@ -959,11 +1012,13 @@ describe("MatrixClient", function() {
         it("overload with threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
-                data: { event_id: eventId },
-            }];
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                    data: { event_id: eventId },
+                },
+            ];
 
             await client.redactEvent(roomId, "$threadId:server", eventId, txnId);
         });
@@ -972,12 +1027,14 @@ describe("MatrixClient", function() {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
             const reason = "This is the redaction reason";
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
-                expectBody: { reason }, // NOT ENCRYPTED
-                data: { event_id: eventId },
-            }];
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}/${txnId}`,
+                    expectBody: { reason }, // NOT ENCRYPTED
+                    data: { event_id: eventId },
+                },
+            ];
 
             await client.redactEvent(roomId, eventId, txnId, { reason });
         });
@@ -1024,7 +1081,8 @@ describe("MatrixClient", function() {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
             };
-            client.crypto = { // mock crypto
+            client.crypto = {
+                // mock crypto
                 encryptEvent: (event, room) => new Promise(() => {}),
                 stop: jest.fn(),
             };
@@ -1033,7 +1091,7 @@ describe("MatrixClient", function() {
         function assertCancelled() {
             expect(event.status).toBe(EventStatus.CANCELLED);
             expect(client.scheduler.removeEventFromQueue(event)).toBeFalsy();
-            expect(httpLookups.filter(h => h.path.includes("/send/")).length).toBe(0);
+            expect(httpLookups.filter((h) => h.path.includes("/send/")).length).toBe(0);
         }
 
         it("should cancel an event which is queued", () => {
@@ -1070,22 +1128,22 @@ describe("MatrixClient", function() {
             const room = new Room("!room1:matrix.org", client, userId);
 
             const rootEvent = new MatrixEvent({
-                "content": {},
-                "origin_server_ts": 1,
-                "room_id": "!room1:matrix.org",
-                "sender": "@alice:matrix.org",
-                "type": "m.room.message",
-                "unsigned": {
+                content: {},
+                origin_server_ts: 1,
+                room_id: "!room1:matrix.org",
+                sender: "@alice:matrix.org",
+                type: "m.room.message",
+                unsigned: {
                     "m.relations": {
                         "m.thread": {
-                            "latest_event": {},
-                            "count": 33,
-                            "current_user_participated": false,
+                            latest_event: {},
+                            count: 33,
+                            current_user_participated: false,
                         },
                     },
                 },
-                "event_id": "$ev1",
-                "user_id": "@alice:matrix.org",
+                event_id: "$ev1",
+                user_id: "@alice:matrix.org",
             });
 
             expect(rootEvent.isThreadRoot).toBe(true);
@@ -1110,12 +1168,7 @@ describe("MatrixClient", function() {
             const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
             client.getRoom = () => room;
 
-            client.setRoomReadMarkers(
-                "room_id",
-                "read_marker_event_id",
-                rrEvent,
-                rpEvent,
-            );
+            client.setRoomReadMarkers("room_id", "read_marker_event_id", rrEvent, rpEvent);
 
             expect(client.setRoomReadMarkersHttpRequest).toHaveBeenCalledWith(
                 "room_id",
@@ -1140,7 +1193,7 @@ describe("MatrixClient", function() {
     });
 
     describe("beacons", () => {
-        const roomId = '!room:server.org';
+        const roomId = "!room:server.org";
         const content = makeBeaconInfoContent(100, true);
 
         beforeEach(() => {
@@ -1153,10 +1206,10 @@ describe("MatrixClient", function() {
             // event type combined
             const expectedEventType = M_BEACON_INFO.name;
             const [method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
-            expect(method).toBe('PUT');
+            expect(method).toBe("PUT");
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
-                `${encodeURIComponent(expectedEventType)}/${encodeURIComponent(userId)}`,
+                    `${encodeURIComponent(expectedEventType)}/${encodeURIComponent(userId)}`,
             );
             expect(queryParams).toBeFalsy();
             expect(requestContent).toEqual(content);
@@ -1169,31 +1222,31 @@ describe("MatrixClient", function() {
             const [, path, , requestContent] = client.http.authedRequest.mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
-                `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
+                    `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
             );
             expect(requestContent).toEqual(content);
         });
 
-        describe('processBeaconEvents()', () => {
-            it('does nothing when events is falsy', () => {
+        describe("processBeaconEvents()", () => {
+            it("does nothing when events is falsy", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
 
                 client.processBeaconEvents(room, undefined);
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
             });
 
-            it('does nothing when events is of length 0', () => {
+            it("does nothing when events is of length 0", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
 
                 client.processBeaconEvents(room, []);
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
             });
 
-            it('calls room states processBeaconEvents with events', () => {
+            it("calls room states processBeaconEvents with events", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, 'processBeaconEvents');
+                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
 
                 const messageEvent = testUtils.mkMessage({ room: roomId, user: userId, event: true });
                 const beaconEvent = makeBeaconEvent(userId);
@@ -1207,14 +1260,13 @@ describe("MatrixClient", function() {
     describe("setRoomTopic", () => {
         const roomId = "!foofoofoofoofoofoo:matrix.org";
         const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
-            return jest.fn()
-                .mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
-                    expect(roomId).toEqual(roomId);
-                    expect(eventType).toEqual(EventType.RoomTopic);
-                    expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
-                    expect(stateKey).toBeUndefined();
-                    return Promise.resolve();
-                });
+            return jest.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+                expect(roomId).toEqual(roomId);
+                expect(eventType).toEqual(EventType.RoomTopic);
+                expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
+                expect(stateKey).toBeUndefined();
+                return Promise.resolve();
+            });
         };
 
         it("is called with plain text topic and sends state event", async () => {
@@ -1240,13 +1292,13 @@ describe("MatrixClient", function() {
     });
 
     describe("setPassword", () => {
-        const auth = { session: 'abcdef', type: 'foo' };
-        const newPassword = 'newpassword';
+        const auth = { session: "abcdef", type: "foo" };
+        const newPassword = "newpassword";
 
         const passwordTest = (expectedRequestContent: any) => {
             const [method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
-            expect(method).toBe('POST');
-            expect(path).toEqual('/account/password');
+            expect(method).toBe("POST");
+            expect(path).toEqual("/account/password");
             expect(queryParams).toBeFalsy();
             expect(requestContent).toEqual(expectedRequestContent);
         };
@@ -1299,7 +1351,7 @@ describe("MatrixClient", function() {
             // Current version of the endpoint we support is v3
             const [method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
             expect(data).toBeFalsy();
-            expect(method).toBe('GET');
+            expect(method).toBe("GET");
             expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
             expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
             expect(queryParams).toBeFalsy();
@@ -1362,11 +1414,17 @@ describe("MatrixClient", function() {
             client.on(ClientEvent.TurnServers, onTurnServers);
             expect(await client.checkTurnServers()).toBe(true);
             client.off(ClientEvent.TurnServers, onTurnServers);
-            expect(events).toEqual([[[{
-                urls: turnServer.uris,
-                username: turnServer.username,
-                credential: turnServer.password,
-            }]]]);
+            expect(events).toEqual([
+                [
+                    [
+                        {
+                            urls: turnServer.uris,
+                            username: turnServer.username,
+                            credential: turnServer.password,
+                        },
+                    ],
+                ],
+            ]);
         });
 
         it("emits an event when an error occurs", async () => {
@@ -1413,11 +1471,11 @@ describe("MatrixClient", function() {
         beforeEach(() => {
             // Mockup `getAccountData`/`setAccountData`.
             const dataStore = new Map();
-            client.setAccountData = function(eventType, content) {
+            client.setAccountData = function (eventType, content) {
                 dataStore.set(eventType, content);
                 return Promise.resolve();
             };
-            client.getAccountData = function(eventType) {
+            client.getAccountData = function (eventType) {
                 const data = dataStore.get(eventType);
                 return new MatrixEvent({
                     content: data,
@@ -1426,23 +1484,23 @@ describe("MatrixClient", function() {
 
             // Mockup `createRoom`/`getRoom`/`joinRoom`, including state.
             const rooms = new Map();
-            client.createRoom = function(options = {}) {
+            client.createRoom = function (options = {}) {
                 const roomId = options["_roomId"] || `!room-${rooms.size}:example.org`;
                 const state = new Map();
                 const room = {
                     roomId,
                     _options: options,
                     _state: state,
-                    getUnfilteredTimelineSet: function() {
+                    getUnfilteredTimelineSet: function () {
                         return {
-                            getLiveTimeline: function() {
+                            getLiveTimeline: function () {
                                 return {
-                                    getState: function(direction) {
+                                    getState: function (direction) {
                                         expect(direction).toBe(EventTimeline.FORWARDS);
                                         return {
-                                            getStateEvents: function(type) {
+                                            getStateEvents: function (type) {
                                                 const store = state.get(type) || {};
-                                                return Object.keys(store).map(key => store[key]);
+                                                return Object.keys(store).map((key) => store[key]);
                                             },
                                         };
                                     },
@@ -1454,15 +1512,15 @@ describe("MatrixClient", function() {
                 rooms.set(roomId, room);
                 return Promise.resolve({ room_id: roomId });
             };
-            client.getRoom = function(roomId) {
+            client.getRoom = function (roomId) {
                 return rooms.get(roomId);
             };
-            client.joinRoom = function(roomId) {
+            client.joinRoom = function (roomId) {
                 return this.getRoom(roomId) || this.createRoom({ _roomId: roomId });
             };
 
             // Mockup state events
-            client.sendStateEvent = function(roomId, type, content) {
+            client.sendStateEvent = function (roomId, type, content) {
                 const room = this.getRoom(roomId);
                 const state: Map<string, any> = room._state;
                 let store = state.get(type);
@@ -1472,19 +1530,19 @@ describe("MatrixClient", function() {
                 }
                 const eventId = `$event-${Math.random()}:example.org`;
                 store[eventId] = {
-                    getId: function() {
+                    getId: function () {
                         return eventId;
                     },
-                    getRoomId: function() {
+                    getRoomId: function () {
                         return roomId;
                     },
-                    getContent: function() {
+                    getContent: function () {
                         return content;
                     },
                 };
                 return { event_id: eventId };
             };
-            client.redactEvent = function(roomId, eventId) {
+            client.redactEvent = function (roomId, eventId) {
                 const room = this.getRoom(roomId);
                 const state: Map<string, any> = room._state;
                 for (const store of state.values()) {

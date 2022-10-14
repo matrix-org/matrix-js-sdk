@@ -48,4 +48,3 @@ interface IInfo {
 export class RoomSummary {
     constructor(public readonly roomId: string, info?: IInfo) {}
 }
-

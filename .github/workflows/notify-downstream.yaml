@@ -1,7 +1,7 @@
 name: Notify Downstream Projects
 on:
   push:
-    branches: [ develop ]
+    branches: [develop]
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 jobs:
   notify-downstream:

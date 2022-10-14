@@ -2,9 +2,9 @@
 import EventEmitter from "events";
 
 // load olm before the sdk if possible
-import '../olm-loader';
+import "../olm-loader";
 
-import { logger } from '../../src/logger';
+import { logger } from "../../src/logger";
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { ClientEvent, EventType, IPusher, MatrixClient, MsgType } from "../../src";
 import { SyncState } from "../../src/sync";
@@ -45,16 +45,17 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
  * @param {string} name The name of the class
  * @return {Object} An instantiated object with spied methods/properties.
  */
-export function mock<T>(constr: { new(...args: any[]): T }, name: string): T {
+export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
     // Based on http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
     const HelperConstr = new Function(); // jshint ignore:line
     HelperConstr.prototype = constr.prototype;
     // @ts-ignore
     const result = new HelperConstr();
-    result.toString = function() {
+    result.toString = function () {
         return "mock" + (name ? " of " + name : "");
     };
-    for (const key of Object.getOwnPropertyNames(constr.prototype)) { // eslint-disable-line guard-for-in
+    for (const key of Object.getOwnPropertyNames(constr.prototype)) {
+        // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = jest.fn();
@@ -112,15 +113,17 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
     };
     if (opts.skey !== undefined) {
         event.state_key = opts.skey;
-    } else if ([
-        EventType.RoomName,
-        EventType.RoomTopic,
-        EventType.RoomCreate,
-        EventType.RoomJoinRules,
-        EventType.RoomPowerLevels,
-        EventType.RoomTopic,
-        "com.example.state",
-    ].includes(opts.type)) {
+    } else if (
+        [
+            EventType.RoomName,
+            EventType.RoomTopic,
+            EventType.RoomCreate,
+            EventType.RoomJoinRules,
+            EventType.RoomPowerLevels,
+            EventType.RoomTopic,
+            "com.example.state",
+        ].includes(opts.type)
+    ) {
         event.state_key = "";
     }
 
@@ -226,8 +229,8 @@ export function mkMembership(opts: IMembershipOpts & { event?: boolean }): Parti
 }
 
 export function mkMembershipCustom<T>(
-    base: T & { membership: string, sender: string, content?: IContent },
-): T & { type: EventType, sender: string, state_key: string, content: IContent } & GeneratedMetadata {
+    base: T & { membership: string; sender: string; content?: IContent },
+): T & { type: EventType; sender: string; state_key: string; content: IContent } & GeneratedMetadata {
     const content = base.content || {};
     return mkEventCustom({
         ...base,
@@ -301,13 +304,13 @@ export function mkReplyMessage(
         ...opts,
         type: EventType.RoomMessage,
         content: {
-            "msgtype": MsgType.Text,
-            "body": opts.msg,
+            msgtype: MsgType.Text,
+            body: opts.msg,
             "m.relates_to": {
-                "rel_type": "m.in_reply_to",
-                "event_id": opts.replyToMessage.getId(),
+                rel_type: "m.in_reply_to",
+                event_id: opts.replyToMessage.getId(),
                 "m.in_reply_to": {
-                    "event_id": opts.replyToMessage.getId(),
+                    event_id: opts.replyToMessage.getId(),
                 },
             },
         },
@@ -372,7 +375,7 @@ export async function awaitDecryption(event: MatrixEvent): Promise<MatrixEvent> 
     }
 }
 
-export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise(r => e.once(k, r));
+export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise((r) => e.once(k, r));
 
 export const mkPusher = (extra: Partial<IPusher> = {}): IPusher => ({
     app_display_name: "app",

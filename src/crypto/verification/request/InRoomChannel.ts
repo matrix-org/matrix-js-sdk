@@ -15,13 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    VerificationRequest,
-    REQUEST_TYPE,
-    READY_TYPE,
-    START_TYPE,
-} from "./VerificationRequest";
-import { logger } from '../../../logger';
+import { VerificationRequest, REQUEST_TYPE, READY_TYPE, START_TYPE } from "./VerificationRequest";
+import { logger } from "../../../logger";
 import { IVerificationChannel } from "./Channel";
 import { EventType } from "../../../@types/event";
 import { MatrixClient } from "../../../client";
@@ -44,12 +39,7 @@ export class InRoomChannel implements IVerificationChannel {
      * @param {string} roomId id of the room where verification events should be posted in, should be a DM with the given user.
      * @param {string} userId id of user that the verification request is directed at, should be present in the room.
      */
-    constructor(
-        private readonly client: MatrixClient,
-        public readonly roomId: string,
-        public userId: string = null,
-    ) {
-    }
+    constructor(private readonly client: MatrixClient, public readonly roomId: string, public userId: string = null) {}
 
     public get receiveStartFromOtherDevices(): boolean {
         return true;
@@ -135,16 +125,17 @@ export class InRoomChannel implements IVerificationChannel {
         // part of a verification request, so be noisy when rejecting something
         if (type === REQUEST_TYPE) {
             if (!content || typeof content.to !== "string" || !content.to.length) {
-                logger.log("InRoomChannel: validateEvent: " +
-                    "no valid to " + (content && content.to));
+                logger.log("InRoomChannel: validateEvent: " + "no valid to " + (content && content.to));
                 return false;
             }
 
             // ignore requests that are not direct to or sent by the syncing user
             if (!InRoomChannel.getOtherPartyUserId(event, client)) {
-                logger.log("InRoomChannel: validateEvent: " +
-                    `not directed to or sent by me: ${event.getSender()}` +
-                    `, ${content && content.to}`);
+                logger.log(
+                    "InRoomChannel: validateEvent: " +
+                        `not directed to or sent by me: ${event.getSender()}` +
+                        `, ${content && content.to}`,
+                );
                 return false;
             }
         }
@@ -209,8 +200,7 @@ export class InRoomChannel implements IVerificationChannel {
         const sender = event.getSender();
         if (this.userId !== null) {
             if (sender !== ownUserId && sender !== this.userId) {
-                logger.log(`InRoomChannel: ignoring verification event from ` +
-                    `non-participating sender ${sender}`);
+                logger.log(`InRoomChannel: ignoring verification event from ` + `non-participating sender ${sender}`);
                 return;
             }
         }
@@ -257,7 +247,9 @@ export class InRoomChannel implements IVerificationChannel {
         if (type === REQUEST_TYPE) {
             // type is mapped to m.room.message in the send method
             content = {
-                body: this.client.getUserId() + " is requesting to verify " +
+                body:
+                    this.client.getUserId() +
+                    " is requesting to verify " +
                     "your key, but your client does not support in-chat key " +
                     "verification.  You will need to use legacy key " +
                     "verification to verify keys.",

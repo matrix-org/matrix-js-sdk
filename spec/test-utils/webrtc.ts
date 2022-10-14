@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export const DUMMY_SDP = (
+export const DUMMY_SDP =
     "v=0\r\n" +
     "o=- 5022425983810148698 2 IN IP4 127.0.0.1\r\n" +
     "s=-\r\nt=0 0\r\na=group:BUNDLE 0\r\n" +
@@ -51,8 +51,7 @@ export const DUMMY_SDP = (
     "a=rtpmap:112 telephone-event/32000\r\n" +
     "a=rtpmap:113 telephone-event/16000\r\n" +
     "a=rtpmap:126 telephone-event/8000\r\n" +
-    "a=ssrc:3619738545 cname:2RWtmqhXLdoF4sOi\r\n"
-);
+    "a=ssrc:3619738545 cname:2RWtmqhXLdoF4sOi\r\n";
 
 export class MockRTCPeerConnection {
     localDescription: RTCSessionDescription;
@@ -60,13 +59,15 @@ export class MockRTCPeerConnection {
     constructor() {
         this.localDescription = {
             sdp: DUMMY_SDP,
-            type: 'offer',
-            toJSON: function() { },
+            type: "offer",
+            toJSON: function () {},
         };
     }
 
-    addEventListener() { }
-    createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
+    addEventListener() {}
+    createDataChannel(label: string, opts: RTCDataChannelInit) {
+        return { label, ...opts };
+    }
     createOffer() {
         return Promise.resolve({});
     }
@@ -76,30 +77,33 @@ export class MockRTCPeerConnection {
     setLocalDescription() {
         return Promise.resolve();
     }
-    close() { }
-    getStats() { return []; }
-    addTrack(track: MockMediaStreamTrack) { return new MockRTCRtpSender(track); }
+    close() {}
+    getStats() {
+        return [];
+    }
+    addTrack(track: MockMediaStreamTrack) {
+        return new MockRTCRtpSender(track);
+    }
 }
 
 export class MockRTCRtpSender {
-    constructor(public track: MockMediaStreamTrack) { }
+    constructor(public track: MockMediaStreamTrack) {}
 
-    replaceTrack(track: MockMediaStreamTrack) { this.track = track; }
+    replaceTrack(track: MockMediaStreamTrack) {
+        this.track = track;
+    }
 }
 
 export class MockMediaStreamTrack {
-    constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) { }
+    constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) {}
 
-    stop() { }
+    stop() {}
 }
 
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
 // implementation
 export class MockMediaStream {
-    constructor(
-        public id: string,
-        private tracks: MockMediaStreamTrack[] = [],
-    ) {}
+    constructor(public id: string, private tracks: MockMediaStreamTrack[] = []) {}
 
     listeners: [string, (...args: any[]) => any][] = [];
 
@@ -109,9 +113,15 @@ export class MockMediaStream {
             c();
         });
     }
-    getTracks() { return this.tracks; }
-    getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
-    getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
+    getTracks() {
+        return this.tracks;
+    }
+    getAudioTracks() {
+        return this.tracks.filter((track) => track.kind === "audio");
+    }
+    getVideoTracks() {
+        return this.tracks.filter((track) => track.kind === "video");
+    }
     addEventListener(eventType: string, callback: (...args: any[]) => any) {
         this.listeners.push([eventType, callback]);
     }
@@ -124,13 +134,13 @@ export class MockMediaStream {
         this.tracks.push(track);
         this.dispatchEvent("addtrack");
     }
-    removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
+    removeTrack(track: MockMediaStreamTrack) {
+        this.tracks.splice(this.tracks.indexOf(track), 1);
+    }
 }
 
 export class MockMediaDeviceInfo {
-    constructor(
-        public kind: "audio" | "video",
-    ) { }
+    constructor(public kind: "audio" | "video") {}
 }
 
 export class MockMediaHandler {
@@ -141,6 +151,8 @@ export class MockMediaHandler {
 
         return new MockMediaStream("mock_stream_from_media_handler", tracks);
     }
-    stopUserMediaStream() { }
-    hasAudioDevice() { return true; }
+    stopUserMediaStream() {}
+    hasAudioDevice() {
+        return true;
+    }
 }

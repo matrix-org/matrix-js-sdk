@@ -32,7 +32,7 @@ export class SearchResult {
      */
 
     public static fromJson(jsonObj: ISearchResult, eventMapper: EventMapper): SearchResult {
-        const jsonContext = jsonObj.context || {} as IResultContext;
+        const jsonContext = jsonObj.context || ({} as IResultContext);
         let eventsBefore = (jsonContext.events_before || []).map(eventMapper);
         let eventsAfter = (jsonContext.events_after || []).map(eventMapper);
 
@@ -40,8 +40,8 @@ export class SearchResult {
 
         // Filter out any contextual events which do not correspond to the same timeline (thread or room)
         const threadRootId = context.ourEvent.threadRootId;
-        eventsBefore = eventsBefore.filter(e => e.threadRootId === threadRootId);
-        eventsAfter = eventsAfter.filter(e => e.threadRootId === threadRootId);
+        eventsBefore = eventsBefore.filter((e) => e.threadRootId === threadRootId);
+        eventsAfter = eventsAfter.filter((e) => e.threadRootId === threadRootId);
 
         context.setPaginateToken(jsonContext.start, true);
         context.addEvents(eventsBefore, true);

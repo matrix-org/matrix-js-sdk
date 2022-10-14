@@ -31,8 +31,7 @@ export class ToDeviceMessageQueue {
     private retryTimeout: ReturnType<typeof setTimeout> | null = null;
     private retryAttempts = 0;
 
-    constructor(private client: MatrixClient) {
-    }
+    constructor(private client: MatrixClient) {}
 
     public start(): void {
         this.running = true;

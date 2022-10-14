@@ -14,19 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import MockHttpBackend from 'matrix-mock-request';
-import { indexedDB as fakeIndexedDB } from 'fake-indexeddb';
+import MockHttpBackend from "matrix-mock-request";
+import { indexedDB as fakeIndexedDB } from "fake-indexeddb";
 
 import { IndexedDBStore, MatrixEvent, MemoryStore, Room } from "../../src";
 import { MatrixClient } from "../../src/client";
-import { ToDeviceBatch } from '../../src/models/ToDeviceMessage';
-import { logger } from '../../src/logger';
-import { IStore } from '../../src/store';
+import { ToDeviceBatch } from "../../src/models/ToDeviceMessage";
+import { logger } from "../../src/logger";
+import { IStore } from "../../src/store";
 
 const FAKE_USER = "@alice:example.org";
 const FAKE_DEVICE_ID = "AAAAAAAA";
 const FAKE_PAYLOAD = {
-    "foo": 42,
+    foo: 42,
 };
 const EXPECTED_BODY = {
     messages: {
@@ -43,8 +43,8 @@ const FAKE_MSG = {
 };
 
 enum StoreType {
-    Memory = 'Memory',
-    IndexedDB = 'IndexedDB',
+    Memory = "Memory",
+    IndexedDB = "IndexedDB",
 }
 
 // Jest now uses @sinonjs/fake-timers which exposes tickAsync() and a number of
@@ -55,7 +55,7 @@ enum StoreType {
 // and avoids assuming anything about the app's behaviour.
 const realSetTimeout = setTimeout;
 function flushPromises() {
-    return new Promise(r => {
+    return new Promise((r) => {
         realSetTimeout(r, 1);
     });
 }
@@ -68,13 +68,11 @@ async function flushAndRunTimersUntil(cond: () => boolean) {
     }
 }
 
-describe.each([
-    [StoreType.Memory], [StoreType.IndexedDB],
-])("queueToDevice (%s store)", function(storeType) {
+describe.each([[StoreType.Memory], [StoreType.IndexedDB]])("queueToDevice (%s store)", function (storeType) {
     let httpBackend: MockHttpBackend;
     let client: MatrixClient;
 
-    beforeEach(async function() {
+    beforeEach(async function () {
         httpBackend = new MockHttpBackend();
 
         let store: IStore;
@@ -94,23 +92,22 @@ describe.each([
         });
     });
 
-    afterEach(function() {
+    afterEach(function () {
         jest.useRealTimers();
         client.stopClient();
     });
 
-    it("sends a to-device message", async function() {
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).check((request) => {
-            expect(request.data).toEqual(EXPECTED_BODY);
-        }).respond(200, {});
+    it("sends a to-device message", async function () {
+        httpBackend
+            .when("PUT", "/sendToDevice/org.example.foo/")
+            .check((request) => {
+                expect(request.data).toEqual(EXPECTED_BODY);
+            })
+            .respond(200, {});
 
         await client.queueToDevice({
             eventType: "org.example.foo",
-            batch: [
-                FAKE_MSG,
-            ],
+            batch: [FAKE_MSG],
         });
 
         await httpBackend.flushAllExpected();
@@ -120,24 +117,21 @@ describe.each([
         await flushPromises();
     });
 
-    it("retries on error", async function() {
+    it("retries on error", async function () {
         jest.useFakeTimers();
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(500);
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(500);
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).check((request) => {
-            expect(request.data).toEqual(EXPECTED_BODY);
-        }).respond(200, {});
+        httpBackend
+            .when("PUT", "/sendToDevice/org.example.foo/")
+            .check((request) => {
+                expect(request.data).toEqual(EXPECTED_BODY);
+            })
+            .respond(200, {});
 
         await client.queueToDevice({
             eventType: "org.example.foo",
-            batch: [
-                FAKE_MSG,
-            ],
+            batch: [FAKE_MSG],
         });
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
@@ -150,18 +144,14 @@ describe.each([
         await flushPromises();
     });
 
-    it("stops retrying on 4xx errors", async function() {
+    it("stops retrying on 4xx errors", async function () {
         jest.useFakeTimers();
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(400);
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(400);
 
         await client.queueToDevice({
             eventType: "org.example.foo",
-            batch: [
-                FAKE_MSG,
-            ],
+            batch: [FAKE_MSG],
         });
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
@@ -175,29 +165,23 @@ describe.each([
         expect(httpBackend.requests.length).toEqual(0);
     });
 
-    it("honours ratelimiting", async function() {
+    it("honours ratelimiting", async function () {
         jest.useFakeTimers();
 
         // pick something obscure enough it's unlikley to clash with a
         // retry delay the algorithm uses anyway
         const retryDelay = 279 * 1000;
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(429, {
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(429, {
             errcode: "M_LIMIT_EXCEEDED",
             retry_after_ms: retryDelay,
         });
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(200, {});
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(200, {});
 
         await client.queueToDevice({
             eventType: "org.example.foo",
-            batch: [
-                FAKE_MSG,
-            ],
+            batch: [FAKE_MSG],
         });
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
@@ -218,26 +202,20 @@ describe.each([
         expect(httpBackend.flushSync(null, 1)).toEqual(1);
     });
 
-    it("retries on retryImmediately()", async function() {
+    it("retries on retryImmediately()", async function () {
         httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
             versions: ["r0.0.1"],
         });
 
         await Promise.all([client.startClient(), httpBackend.flush(null, 1, 20)]);
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(500);
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(500);
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(200, {});
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(200, {});
 
         await client.queueToDevice({
             eventType: "org.example.foo",
-            batch: [
-                FAKE_MSG,
-            ],
+            batch: [FAKE_MSG],
         });
         expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
         await flushPromises();
@@ -248,26 +226,20 @@ describe.each([
         expect(await httpBackend.flush(null, 1, 3000)).toEqual(1);
     });
 
-    it("retries on when client is started", async function() {
+    it("retries on when client is started", async function () {
         httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
             versions: ["r0.0.1"],
         });
 
         await Promise.all([client.startClient(), httpBackend.flush("/_matrix/client/versions", 1, 20)]);
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(500);
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(500);
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(200, {});
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(200, {});
 
         await client.queueToDevice({
             eventType: "org.example.foo",
-            batch: [
-                FAKE_MSG,
-            ],
+            batch: [FAKE_MSG],
         });
         expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
         await flushPromises();
@@ -278,26 +250,20 @@ describe.each([
         expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
     });
 
-    it("retries when a message is retried", async function() {
+    it("retries when a message is retried", async function () {
         httpBackend.when("GET", "/_matrix/client/versions").respond(200, {
             versions: ["r0.0.1"],
         });
 
         await Promise.all([client.startClient(), httpBackend.flush(null, 1, 20)]);
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(500);
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(500);
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).respond(200, {});
+        httpBackend.when("PUT", "/sendToDevice/org.example.foo/").respond(200, {});
 
         await client.queueToDevice({
             eventType: "org.example.foo",
-            batch: [
-                FAKE_MSG,
-            ],
+            batch: [FAKE_MSG],
         });
 
         expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
@@ -314,7 +280,7 @@ describe.each([
         expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
     });
 
-    it("splits many messages into multiple HTTP requests", async function() {
+    it("splits many messages into multiple HTTP requests", async function () {
         const batch: ToDeviceBatch = {
             eventType: "org.example.foo",
             batch: [],
@@ -328,17 +294,19 @@ describe.each([
             });
         }
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).check((request) => {
-            expect(Object.keys(request.data.messages).length).toEqual(20);
-        }).respond(200, {});
+        httpBackend
+            .when("PUT", "/sendToDevice/org.example.foo/")
+            .check((request) => {
+                expect(Object.keys(request.data.messages).length).toEqual(20);
+            })
+            .respond(200, {});
 
-        httpBackend.when(
-            "PUT", "/sendToDevice/org.example.foo/",
-        ).check((request) => {
-            expect(Object.keys(request.data.messages).length).toEqual(1);
-        }).respond(200, {});
+        httpBackend
+            .when("PUT", "/sendToDevice/org.example.foo/")
+            .check((request) => {
+                expect(Object.keys(request.data.messages).length).toEqual(1);
+            })
+            .respond(200, {});
 
         await client.queueToDevice(batch);
         await httpBackend.flushAllExpected();

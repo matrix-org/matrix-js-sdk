@@ -44,18 +44,16 @@ export * from "./store/indexeddb";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
-export * from './@types/event';
-export * from './@types/PushRules';
-export * from './@types/partials';
-export * from './@types/requests';
-export * from './@types/search';
-export * from './models/room-summary';
+export * from "./@types/event";
+export * from "./@types/PushRules";
+export * from "./@types/partials";
+export * from "./@types/requests";
+export * from "./@types/search";
+export * from "./models/room-summary";
 export * as ContentHelpers from "./content-helpers";
-export {
-    createNewMatrixCall,
-} from "./webrtc/call";
+export { createNewMatrixCall } from "./webrtc/call";
 
-let cryptoStoreFactory = () => new MemoryCryptoStore;
+let cryptoStoreFactory = () => new MemoryCryptoStore();
 
 /**
  * Configure a different factory to be used for creating crypto stores
@@ -70,23 +68,20 @@ export function setCryptoStoreFactory(fac) {
 export interface ICryptoCallbacks {
     getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array>;
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
-    shouldUpgradeDeviceVerifications?: (
-        users: Record<string, any>
-    ) => Promise<string[]>;
+    shouldUpgradeDeviceVerifications?: (users: Record<string, any>) => Promise<string[]>;
     getSecretStorageKey?: (
-        keys: {keys: Record<string, ISecretStorageKeyInfo>}, name: string
+        keys: { keys: Record<string, ISecretStorageKeyInfo> },
+        name: string,
     ) => Promise<[string, Uint8Array] | null>;
-    cacheSecretStorageKey?: (
-        keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array
-    ) => void;
+    cacheSecretStorageKey?: (keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array) => void;
     onSecretRequested?: (
-        userId: string, deviceId: string,
-        requestId: string, secretName: string, deviceTrust: DeviceTrustLevel
+        userId: string,
+        deviceId: string,
+        requestId: string,
+        secretName: string,
+        deviceTrust: DeviceTrustLevel,
     ) => Promise<string>;
-    getDehydrationKey?: (
-        keyInfo: ISecretStorageKeyInfo,
-        checkFunc: (key: Uint8Array) => void,
-    ) => Promise<Uint8Array>;
+    getDehydrationKey?: (keyInfo: ISecretStorageKeyInfo, checkFunc: (key: Uint8Array) => void) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
 }
 
@@ -112,9 +107,11 @@ export interface ICryptoCallbacks {
  * <code>opts</code>.
  */
 export function createClient(opts: ICreateClientOpts) {
-    opts.store = opts.store || new MemoryStore({
-        localStorage: global.localStorage,
-    });
+    opts.store =
+        opts.store ||
+        new MemoryStore({
+            localStorage: global.localStorage,
+        });
     opts.scheduler = opts.scheduler || new MatrixScheduler();
     opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
     return new MatrixClient(opts);
@@ -131,13 +128,13 @@ export function createClient(opts: ICreateClientOpts) {
  */
 
 /**
-  * The request callback interface for performing HTTP requests. This matches the
-  * API for the {@link https://github.com/request/request#requestoptions-callback|
-  * request NPM module}. The SDK will implement a callback which meets this
-  * interface in order to handle the HTTP response.
-  * @callback requestCallback
-  * @param {Error} err The error if one occurred, else falsey.
-  * @param {Object} response The HTTP response which consists of
-  * <code>{statusCode: {Number}, headers: {Object}}</code>
-  * @param {Object} body The parsed HTTP response body.
-  */
+ * The request callback interface for performing HTTP requests. This matches the
+ * API for the {@link https://github.com/request/request#requestoptions-callback|
+ * request NPM module}. The SDK will implement a callback which meets this
+ * interface in order to handle the HTTP response.
+ * @callback requestCallback
+ * @param {Error} err The error if one occurred, else falsey.
+ * @param {Object} response The HTTP response which consists of
+ * <code>{statusCode: {Number}, headers: {Object}}</code>
+ * @param {Object} body The parsed HTTP response body.
+ */

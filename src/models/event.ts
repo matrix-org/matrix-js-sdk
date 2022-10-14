@@ -22,15 +22,15 @@ limitations under the License.
 
 import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
 
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { VerificationRequest } from "../crypto/verification/request/VerificationRequest";
 import { EVENT_VISIBILITY_CHANGE_TYPE, EventType, MsgType, RelationType } from "../@types/event";
 import { Crypto, IEventDecryptionResult } from "../crypto";
 import { deepSortedObjectEntries, internaliseString } from "../utils";
 import { RoomMember } from "./room-member";
 import { Thread, ThreadEvent, EventHandlerMap as ThreadEventHandlerMap, THREAD_RELATION_TYPE } from "./thread";
-import { IActionsObject } from '../pushprocessor';
-import { TypedReEmitter } from '../ReEmitter';
+import { IActionsObject } from "../pushprocessor";
+import { TypedReEmitter } from "../ReEmitter";
 import { MatrixError } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
@@ -511,13 +511,12 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      * @experimental
      */
     public get isThreadRoot(): boolean {
-        const threadDetails = this
-            .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+        const threadDetails = this.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
 
         // Bundled relationships only returned when the sync response is limited
         // hence us having to check both bundled relation and inspect the thread
         // model
-        return !!threadDetails || (this.getThread()?.id === this.getId());
+        return !!threadDetails || this.getThread()?.id === this.getId();
     }
 
     public get replyEventId(): string {
@@ -526,14 +525,12 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         // can't just rely on ev.getContent() by itself because historically we
         // still show the reply from the original message even though the edit
         // event does not include the relation reply.
-        const mRelatesTo = this.getContent()['m.relates_to'] || this.getWireContent()['m.relates_to'];
-        return mRelatesTo?.['m.in_reply_to']?.event_id;
+        const mRelatesTo = this.getContent()["m.relates_to"] || this.getWireContent()["m.relates_to"];
+        return mRelatesTo?.["m.in_reply_to"]?.event_id;
     }
 
     public get relationEventId(): string | undefined {
-        return this.getWireContent()
-            ?.["m.relates_to"]
-            ?.event_id;
+        return this.getWireContent()?.["m.relates_to"]?.event_id;
     }
 
     /**
@@ -702,9 +699,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         const forceRedecrypt = options.forceRedecryptIfUntrusted && this.isKeySourceUntrusted();
         if (alreadyDecrypted && !forceRedecrypt) {
             // we may want to just ignore this? let's start with rejecting it.
-            throw new Error(
-                "Attempt to decrypt event which has already been decrypted",
-            );
+            throw new Error("Attempt to decrypt event which has already been decrypted");
         }
 
         // if we already have a decryption attempt in progress, then it may
@@ -714,9 +709,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         // new info.
         //
         if (this._decryptionPromise) {
-            logger.log(
-                `Event ${this.getId()} already being decrypted; queueing a retry`,
-            );
+            logger.log(`Event ${this.getId()} already being decrypted; queueing a retry`);
             this.retryDecryption = true;
             return this._decryptionPromise;
         }
@@ -735,12 +728,16 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      */
     public cancelAndResendKeyRequest(crypto: Crypto, userId: string): Promise<void> {
         const wireContent = this.getWireContent();
-        return crypto.requestRoomKey({
-            algorithm: wireContent.algorithm,
-            room_id: this.getRoomId(),
-            session_id: wireContent.session_id,
-            sender_key: wireContent.sender_key,
-        }, this.getKeyRequestRecipients(userId), true);
+        return crypto.requestRoomKey(
+            {
+                algorithm: wireContent.algorithm,
+                room_id: this.getRoomId(),
+                session_id: wireContent.session_id,
+                sender_key: wireContent.sender_key,
+            },
+            this.getKeyRequestRecipients(userId),
+            true,
+        );
     }
 
     /**
@@ -754,13 +751,17 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         // send the request to all of our own devices, and the
         // original sending device if it wasn't us.
         const wireContent = this.getWireContent();
-        const recipients = [{
-            userId, deviceId: '*',
-        }];
+        const recipients = [
+            {
+                userId,
+                deviceId: "*",
+            },
+        ];
         const sender = this.getSender();
         if (sender !== userId) {
             recipients.push({
-                userId: sender, deviceId: wireContent.device_id,
+                userId: sender,
+                deviceId: wireContent.device_id,
             });
         }
         return recipients;
@@ -792,13 +793,10 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
                 if (e.name !== "DecryptionError") {
                     // not a decryption error: log the whole exception as an error
                     // (and don't bother with a retry)
-                    const re = options.isRetry ? 're' : '';
+                    const re = options.isRetry ? "re" : "";
                     // For find results: this can produce "Error decrypting event (id=$ev)" and
                     // "Error redecrypting event (id=$ev)".
-                    logger.error(
-                        `Error ${re}decrypting event ` +
-                        `(id=${this.getId()}): ${e.stack || e}`,
-                    );
+                    logger.error(`Error ${re}decrypting event ` + `(id=${this.getId()}): ${e.stack || e}`);
                     this._decryptionPromise = null;
                     this.retryDecryption = false;
                     return;
@@ -889,12 +887,9 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      */
     private setClearData(decryptionResult: IEventDecryptionResult): void {
         this.clearEvent = decryptionResult.clearEvent;
-        this.senderCurve25519Key =
-            decryptionResult.senderCurve25519Key || null;
-        this.claimedEd25519Key =
-            decryptionResult.claimedEd25519Key || null;
-        this.forwardingCurve25519KeyChain =
-            decryptionResult.forwardingCurve25519KeyChain || [];
+        this.senderCurve25519Key = decryptionResult.senderCurve25519Key || null;
+        this.claimedEd25519Key = decryptionResult.claimedEd25519Key || null;
+        this.forwardingCurve25519KeyChain = decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
         this.invalidateExtensibleEvent();
     }
@@ -1480,7 +1475,8 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
     toSnapshot(): MatrixEvent {
         const ev = new MatrixEvent(JSON.parse(JSON.stringify(this.event)));
         for (const [p, v] of Object.entries(this)) {
-            if (p !== "event") { // exclude the thing we just cloned
+            if (p !== "event") {
+                // exclude the thing we just cloned
                 ev[p] = v;
             }
         }
@@ -1571,21 +1567,34 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
  *  - We keep user_id for backwards-compat with v1
  */
 const REDACT_KEEP_KEYS = new Set([
-    'event_id', 'type', 'room_id', 'user_id', 'sender', 'state_key', 'prev_state',
-    'content', 'unsigned', 'origin_server_ts',
+    "event_id",
+    "type",
+    "room_id",
+    "user_id",
+    "sender",
+    "state_key",
+    "prev_state",
+    "content",
+    "unsigned",
+    "origin_server_ts",
 ]);
 
 // a map from state event type to the .content keys we keep when an event is redacted
 const REDACT_KEEP_CONTENT_MAP = {
-    [EventType.RoomMember]: { 'membership': 1 },
-    [EventType.RoomCreate]: { 'creator': 1 },
-    [EventType.RoomJoinRules]: { 'join_rule': 1 },
+    [EventType.RoomMember]: { membership: 1 },
+    [EventType.RoomCreate]: { creator: 1 },
+    [EventType.RoomJoinRules]: { join_rule: 1 },
     [EventType.RoomPowerLevels]: {
-        'ban': 1, 'events': 1, 'events_default': 1,
-        'kick': 1, 'redact': 1, 'state_default': 1,
-        'users': 1, 'users_default': 1,
+        ban: 1,
+        events: 1,
+        events_default: 1,
+        kick: 1,
+        redact: 1,
+        state_default: 1,
+        users: 1,
+        users_default: 1,
     },
-    [EventType.RoomAliases]: { 'aliases': 1 },
+    [EventType.RoomAliases]: { aliases: 1 },
 };
 
 /**

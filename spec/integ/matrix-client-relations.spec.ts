@@ -29,13 +29,7 @@ describe("MatrixClient relations", () => {
 
     const setupTests = (): [MatrixClient, HttpBackend] => {
         const scheduler = new MatrixScheduler();
-        const testClient = new TestClient(
-            userId,
-            "DEVICE",
-            accessToken,
-            undefined,
-            { scheduler },
-        );
+        const testClient = new TestClient(userId, "DEVICE", accessToken, undefined, { scheduler });
         const httpBackend = testClient.httpBackend;
         const client = testClient.client;
 
@@ -52,76 +46,67 @@ describe("MatrixClient relations", () => {
     });
 
     it("should read related events with the default options", async () => {
-        const response = client!.relations(roomId, '$event-0', null, null);
+        const response = client!.relations(roomId, "$event-0", null, null);
 
         httpBackend!
             .when("GET", "/rooms/!room%3Ahere/relations/%24event-0?dir=b")
-            .respond(200, { chunk: [], next_batch: 'NEXT' });
+            .respond(200, { chunk: [], next_batch: "NEXT" });
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
+        expect(await response).toEqual({ events: [], nextBatch: "NEXT" });
     });
 
     it("should read related events with relation type", async () => {
-        const response = client!.relations(roomId, '$event-0', 'm.reference', null);
+        const response = client!.relations(roomId, "$event-0", "m.reference", null);
 
         httpBackend!
             .when("GET", "/rooms/!room%3Ahere/relations/%24event-0/m.reference?dir=b")
-            .respond(200, { chunk: [], next_batch: 'NEXT' });
+            .respond(200, { chunk: [], next_batch: "NEXT" });
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
+        expect(await response).toEqual({ events: [], nextBatch: "NEXT" });
     });
 
     it("should read related events with relation type and event type", async () => {
-        const response = client!.relations(roomId, '$event-0', 'm.reference', 'm.room.message');
+        const response = client!.relations(roomId, "$event-0", "m.reference", "m.room.message");
 
         httpBackend!
-            .when(
-                "GET",
-                "/rooms/!room%3Ahere/relations/%24event-0/m.reference/m.room.message?dir=b",
-            )
-            .respond(200, { chunk: [], next_batch: 'NEXT' });
+            .when("GET", "/rooms/!room%3Ahere/relations/%24event-0/m.reference/m.room.message?dir=b")
+            .respond(200, { chunk: [], next_batch: "NEXT" });
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
+        expect(await response).toEqual({ events: [], nextBatch: "NEXT" });
     });
 
     it("should read related events with custom options", async () => {
-        const response = client!.relations(roomId, '$event-0', null, null, {
+        const response = client!.relations(roomId, "$event-0", null, null, {
             dir: Direction.Forward,
-            from: 'FROM',
+            from: "FROM",
             limit: 10,
-            to: 'TO',
+            to: "TO",
         });
 
         httpBackend!
-            .when(
-                "GET",
-                "/rooms/!room%3Ahere/relations/%24event-0?dir=f&from=FROM&limit=10&to=TO",
-            )
-            .respond(200, { chunk: [], next_batch: 'NEXT' });
+            .when("GET", "/rooms/!room%3Ahere/relations/%24event-0?dir=f&from=FROM&limit=10&to=TO")
+            .respond(200, { chunk: [], next_batch: "NEXT" });
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
+        expect(await response).toEqual({ events: [], nextBatch: "NEXT" });
     });
 
-    it('should use default direction in the fetchRelations endpoint', async () => {
-        const response = client!.fetchRelations(roomId, '$event-0', null, null);
+    it("should use default direction in the fetchRelations endpoint", async () => {
+        const response = client!.fetchRelations(roomId, "$event-0", null, null);
 
         httpBackend!
-            .when(
-                "GET",
-                "/rooms/!room%3Ahere/relations/%24event-0?dir=b",
-            )
-            .respond(200, { chunk: [], next_batch: 'NEXT' });
+            .when("GET", "/rooms/!room%3Ahere/relations/%24event-0?dir=b")
+            .respond(200, { chunk: [], next_batch: "NEXT" });
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "chunk": [], "next_batch": "NEXT" });
+        expect(await response).toEqual({ chunk: [], next_batch: "NEXT" });
     });
 });

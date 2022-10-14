@@ -58,8 +58,8 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     public events: {
         member?: MatrixEvent;
     } = {
-            member: null,
-        };
+        member: null,
+    };
 
     /**
      * Construct a new room member.
@@ -137,23 +137,15 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             logger.trace(
                 `membership event with membership undefined (forwardLooking: ${event.forwardLooking})!`,
                 event.getContent(),
-                `prevcontent is `, event.getPrevContent(),
+                `prevcontent is `,
+                event.getPrevContent(),
             );
         }
 
-        this.disambiguate = shouldDisambiguate(
-            this.userId,
-            displayName,
-            roomState,
-        );
+        this.disambiguate = shouldDisambiguate(this.userId, displayName, roomState);
 
         const oldName = this.name;
-        this.name = calculateDisplayName(
-            this.userId,
-            displayName,
-            roomState,
-            this.disambiguate,
-        );
+        this.name = calculateDisplayName(this.userId, displayName, roomState, this.disambiguate);
 
         // not quite raw: we strip direction override chars so it can safely be inserted into
         // blocks of text without breaking the text direction
@@ -188,7 +180,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
         let maxLevel = evContent.users_default || 0;
         const users = evContent.users || {};
-        Object.values(users).forEach(function(lvl: number) {
+        Object.values(users).forEach(function (lvl: number) {
             maxLevel = Math.max(maxLevel, lvl);
         });
         const oldPowerLevel = this.powerLevel;
@@ -258,8 +250,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 
     public isKicked(): boolean {
-        return this.membership === "leave" &&
-            this.events.member.getSender() !== this.events.member.getStateKey();
+        return this.membership === "leave" && this.events.member.getSender() !== this.events.member.getStateKey();
     }
 
     /**

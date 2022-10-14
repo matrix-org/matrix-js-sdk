@@ -48,10 +48,7 @@ describe("anySignal", () => {
     jest.useFakeTimers();
 
     it("should fire when any signal fires", () => {
-        const { signal } = anySignal([
-            timeoutSignal(3000),
-            timeoutSignal(2000),
-        ]);
+        const { signal } = anySignal([timeoutSignal(3000), timeoutSignal(2000)]);
 
         const onabort = jest.fn();
         signal.onabort = onabort;
@@ -64,10 +61,7 @@ describe("anySignal", () => {
     });
 
     it("should cleanup when instructed", () => {
-        const { signal, cleanup } = anySignal([
-            timeoutSignal(3000),
-            timeoutSignal(2000),
-        ]);
+        const { signal, cleanup } = anySignal([timeoutSignal(3000), timeoutSignal(2000)]);
 
         const onabort = jest.fn();
         signal.onabort = onabort;
@@ -90,61 +84,95 @@ describe("anySignal", () => {
 
 describe("parseErrorResponse", () => {
     it("should resolve Matrix Errors from XHR", () => {
-        expect(parseErrorResponse({
-            getResponseHeader(name: string): string | null {
-                return name === "Content-Type" ? "application/json" : null;
-            },
-            status: 500,
-        } as XMLHttpRequest, '{"errcode": "TEST"}')).toStrictEqual(new MatrixError({
-            errcode: "TEST",
-        }, 500));
+        expect(
+            parseErrorResponse(
+                {
+                    getResponseHeader(name: string): string | null {
+                        return name === "Content-Type" ? "application/json" : null;
+                    },
+                    status: 500,
+                } as XMLHttpRequest,
+                '{"errcode": "TEST"}',
+            ),
+        ).toStrictEqual(
+            new MatrixError(
+                {
+                    errcode: "TEST",
+                },
+                500,
+            ),
+        );
     });
 
     it("should resolve Matrix Errors from fetch", () => {
-        expect(parseErrorResponse({
-            headers: {
-                get(name: string): string | null {
-                    return name === "Content-Type" ? "application/json" : null;
+        expect(
+            parseErrorResponse(
+                {
+                    headers: {
+                        get(name: string): string | null {
+                            return name === "Content-Type" ? "application/json" : null;
+                        },
+                    },
+                    status: 500,
+                } as Response,
+                '{"errcode": "TEST"}',
+            ),
+        ).toStrictEqual(
+            new MatrixError(
+                {
+                    errcode: "TEST",
                 },
-            },
-            status: 500,
-        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new MatrixError({
-            errcode: "TEST",
-        }, 500));
+                500,
+            ),
+        );
     });
 
     it("should handle no type gracefully", () => {
-        expect(parseErrorResponse({
-            headers: {
-                get(name: string): string | null {
-                    return null;
-                },
-            },
-            status: 500,
-        } as Response, '{"errcode": "TEST"}')).toStrictEqual(new Error("Server returned 500 error"));
+        expect(
+            parseErrorResponse(
+                {
+                    headers: {
+                        get(name: string): string | null {
+                            return null;
+                        },
+                    },
+                    status: 500,
+                } as Response,
+                '{"errcode": "TEST"}',
+            ),
+        ).toStrictEqual(new Error("Server returned 500 error"));
     });
 
     it("should handle invalid type gracefully", () => {
-        expect(parseErrorResponse({
-            headers: {
-                get(name: string): string | null {
-                    return name === "Content-Type" ? " " : null;
-                },
-            },
-            status: 500,
-        } as Response, '{"errcode": "TEST"}'))
-            .toStrictEqual(new Error("Error parsing Content-Type ' ': TypeError: invalid media type"));
+        expect(
+            parseErrorResponse(
+                {
+                    headers: {
+                        get(name: string): string | null {
+                            return name === "Content-Type" ? " " : null;
+                        },
+                    },
+                    status: 500,
+                } as Response,
+                '{"errcode": "TEST"}',
+            ),
+        ).toStrictEqual(new Error("Error parsing Content-Type ' ': TypeError: invalid media type"));
     });
 
     it("should handle plaintext errors", () => {
-        expect(parseErrorResponse({
-            headers: {
-                get(name: string): string | null {
-                    return name === "Content-Type" ? "text/plain" : null;
-                },
-            },
-            status: 418,
-        } as Response, "I'm a teapot")).toStrictEqual(new Error("Server returned 418 error: I'm a teapot"));
+        expect(
+            parseErrorResponse(
+                {
+                    headers: {
+                        get(name: string): string | null {
+                            return name === "Content-Type" ? "text/plain" : null;
+                        },
+                    },
+                    status: 418,
+                } as Response,
+                "I'm a teapot",
+            ),
+        ).toStrictEqual(new Error("Server returned 418 error: I'm a teapot"));
     });
 });
 

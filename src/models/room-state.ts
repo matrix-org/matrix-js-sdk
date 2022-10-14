@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { RoomMember } from "./room-member";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import * as utils from "../utils";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
 import { MatrixEvent, MatrixEventEvent } from "./event";
@@ -152,7 +152,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.joinedMemberCount === null) {
             this.joinedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === 'join' ? count + 1 : count;
+                return m.membership === "join" ? count + 1 : count;
             }, 0);
         }
         return this.joinedMemberCount;
@@ -176,7 +176,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.invitedMemberCount === null) {
             this.invitedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === 'invite' ? count + 1 : count;
+                return m.membership === "invite" ? count + 1 : count;
             }, 0);
         }
         return this.invitedMemberCount;
@@ -256,7 +256,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // no match
             return stateKey === undefined ? [] : null;
         }
-        if (stateKey === undefined) { // return all values
+        if (stateKey === undefined) {
+            // return all values
             return Array.from(this.events.get(eventType).values());
         }
         const event = this.events.get(eventType).get(stateKey);
@@ -324,8 +325,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public setUnknownStateEvents(events: MatrixEvent[]): void {
         const unknownStateEvents = events.filter((event) => {
-            return !this.events.has(event.getType()) ||
-                !this.events.get(event.getType()).has(event.getStateKey());
+            return !this.events.has(event.getType()) || !this.events.get(event.getType()).has(event.getStateKey());
         });
 
         this.setStateEvents(unknownStateEvents);
@@ -388,14 +388,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 // leave events apparently elide the displayname or avatar_url,
                 // so let's fake one up so that we don't leak user ids
                 // into the timeline
-                if (event.getContent().membership === "leave" ||
-                    event.getContent().membership === "ban") {
-                    event.getContent().avatar_url =
-                        event.getContent().avatar_url ||
-                        event.getPrevContent().avatar_url;
+                if (event.getContent().membership === "leave" || event.getContent().membership === "ban") {
+                    event.getContent().avatar_url = event.getContent().avatar_url || event.getPrevContent().avatar_url;
                     event.getContent().displayname =
-                        event.getContent().displayname ||
-                        event.getPrevContent().displayname;
+                        event.getContent().displayname || event.getPrevContent().displayname;
                 }
 
                 const member = this.getOrCreateMember(userId, event);
@@ -439,8 +435,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return;
         }
 
-        const beaconByEventIdDict: Record<string, Beacon> =
-            [...this.beacons.values()].reduce((dict, beacon) => ({ ...dict, [beacon.beaconInfoId]: beacon }), {});
+        const beaconByEventIdDict: Record<string, Beacon> = [...this.beacons.values()].reduce(
+            (dict, beacon) => ({ ...dict, [beacon.beaconInfoId]: beacon }),
+            {},
+        );
 
         const processBeaconRelation = (beaconInfoEventId: string, event: MatrixEvent): void => {
             if (!M_BEACON.matches(event.getType())) {
@@ -514,7 +512,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const beacon = this.beacons.get(beaconIdentifier);
 
             if (event.isRedacted()) {
-                if (beacon.beaconInfoId === event.getRedactionEvent()?.['redacts']) {
+                if (beacon.beaconInfoId === event.getRedactionEvent()?.["redacts"]) {
                     beacon.destroy();
                     this.beacons.delete(beaconIdentifier);
                 }
@@ -551,8 +549,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     private onBeaconLivenessChange(): void {
         this._liveBeaconIds = Array.from(this.beacons.values())
-            .filter(beacon => beacon.isLive)
-            .map(beacon => beacon.identifier);
+            .filter((beacon) => beacon.isLive)
+            .map((beacon) => beacon.identifier);
 
         this.emit(RoomStateEvent.BeaconLiveness, this, this.hasLiveBeacons);
     }
@@ -672,7 +670,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @param {MatrixEvent} event The typing event
      */
     public setTypingEvent(event: MatrixEvent): void {
-        Object.values(this.members).forEach(function(member) {
+        Object.values(this.members).forEach(function (member) {
             member.setTypingEvent(event);
         });
     }
@@ -721,7 +719,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public maySendRedactionForEvent(mxEvent: MatrixEvent, userId: string): boolean {
         const member = this.getMember(userId);
-        if (!member || member.membership === 'leave') return false;
+        if (!member || member.membership === "leave") return false;
 
         if (mxEvent.status || mxEvent.isRedacted()) return false;
 
@@ -730,7 +728,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const canRedact = this.maySendEvent(EventType.RoomRedaction, userId);
         if (mxEvent.getSender() === userId) return canRedact;
 
-        return this.hasSufficientPowerLevelFor('redact', member.powerLevel);
+        return this.hasSufficientPowerLevelFor("redact", member.powerLevel);
     }
 
     /**
@@ -779,14 +777,14 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-      * Returns true if the given MatrixClient has permission to send a state
-      * event of type `stateEventType` into this room.
-      * @param {string} stateEventType The type of state events to test
-      * @param {MatrixClient} cli The client to test permission for
-      * @return {boolean} true if the given client should be permitted to send
-      *                        the given type of state event into this room,
-      *                        according to the room's state.
-      */
+     * Returns true if the given MatrixClient has permission to send a state
+     * event of type `stateEventType` into this room.
+     * @param {string} stateEventType The type of state events to test
+     * @param {MatrixClient} cli The client to test permission for
+     * @return {boolean} true if the given client should be permitted to send
+     *                        the given type of state event into this room,
+     *                        according to the room's state.
+     */
     public mayClientSendStateEvent(stateEventType: EventType | string, cli: MatrixClient): boolean {
         if (cli.isGuest()) {
             return false;
@@ -820,7 +818,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      *                        according to the room's state.
      */
     private maySendEventOfType(eventType: EventType | string, userId: string, state: boolean): boolean {
-        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
+        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
         let powerLevels;
         let eventsLevels = {};
@@ -871,7 +869,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return false;
         }
 
-        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
+        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
         let notifLevel = 50;
         if (

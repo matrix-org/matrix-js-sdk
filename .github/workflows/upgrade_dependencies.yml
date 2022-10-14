@@ -1,6 +1,6 @@
 name: Upgrade Dependencies
 on:
-  workflow_dispatch: { }
+  workflow_dispatch: {}
   workflow_call:
     secrets:
       ELEMENT_BOT_TOKEN:
@@ -13,7 +13,7 @@ jobs:
 
       - uses: actions/setup-node@v3
         with:
-          cache: 'yarn'
+          cache: "yarn"
 
       - name: Upgrade
         run: yarn upgrade && yarn install
@@ -29,7 +29,7 @@ jobs:
           labels: |
             Dependencies
             T-Task
-          
+
       - name: Enable automerge
         uses: peter-evans/enable-pull-request-automerge@v2
         if: steps.cpr.outputs.pull-request-operation == 'created'

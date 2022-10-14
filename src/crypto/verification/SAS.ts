@@ -19,7 +19,7 @@ limitations under the License.
  * @module crypto/verification/SAS
  */
 
-import anotherjson from 'another-json';
+import anotherjson from "another-json";
 import { Utility, SAS as OlmSAS } from "@matrix-org/olm";
 
 import { VerificationBase as Base, SwitchStartEventError, VerificationEventHandlerMap } from "./Base";
@@ -29,27 +29,19 @@ import {
     newKeyMismatchError,
     newUnknownMethodError,
     newUserCancelledError,
-} from './Error';
-import { logger } from '../../logger';
+} from "./Error";
+import { logger } from "../../logger";
 import { IContent, MatrixEvent } from "../../models/event";
 
 const START_TYPE = "m.key.verification.start";
 
-const EVENTS = [
-    "m.key.verification.accept",
-    "m.key.verification.key",
-    "m.key.verification.mac",
-];
+const EVENTS = ["m.key.verification.accept", "m.key.verification.key", "m.key.verification.mac"];
 
 let olmutil: Utility;
 
-const newMismatchedSASError = errorFactory(
-    "m.mismatched_sas", "Mismatched short authentication string",
-);
+const newMismatchedSASError = errorFactory("m.mismatched_sas", "Mismatched short authentication string");
 
-const newMismatchedCommitmentError = errorFactory(
-    "m.mismatched_commitment", "Mismatched commitment",
-);
+const newMismatchedCommitmentError = errorFactory("m.mismatched_commitment", "Mismatched commitment");
 
 function generateDecimalSas(sasBytes: number[]): [number, number, number] {
     /**
@@ -61,91 +53,91 @@ function generateDecimalSas(sasBytes: number[]): [number, number, number] {
      *         1st number    2nd number     3rd number
      */
     return [
-        (sasBytes[0] << 5 | sasBytes[1] >> 3) + 1000,
-        ((sasBytes[1] & 0x7) << 10 | sasBytes[2] << 2 | sasBytes[3] >> 6) + 1000,
-        ((sasBytes[3] & 0x3f) << 7 | sasBytes[4] >> 1) + 1000,
+        ((sasBytes[0] << 5) | (sasBytes[1] >> 3)) + 1000,
+        (((sasBytes[1] & 0x7) << 10) | (sasBytes[2] << 2) | (sasBytes[3] >> 6)) + 1000,
+        (((sasBytes[3] & 0x3f) << 7) | (sasBytes[4] >> 1)) + 1000,
     ];
 }
 
 type EmojiMapping = [emoji: string, name: string];
 
 const emojiMapping: EmojiMapping[] = [
-    ["🐶", "dog"],        //  0
-    ["🐱", "cat"],        //  1
-    ["🦁", "lion"],       //  2
-    ["🐎", "horse"],      //  3
-    ["🦄", "unicorn"],    //  4
-    ["🐷", "pig"],        //  5
-    ["🐘", "elephant"],   //  6
-    ["🐰", "rabbit"],     //  7
-    ["🐼", "panda"],      //  8
-    ["🐓", "rooster"],    //  9
-    ["🐧", "penguin"],    // 10
-    ["🐢", "turtle"],     // 11
-    ["🐟", "fish"],       // 12
-    ["🐙", "octopus"],    // 13
-    ["🦋", "butterfly"],  // 14
-    ["🌷", "flower"],     // 15
-    ["🌳", "tree"],       // 16
-    ["🌵", "cactus"],     // 17
-    ["🍄", "mushroom"],   // 18
-    ["🌏", "globe"],      // 19
-    ["🌙", "moon"],       // 20
-    ["☁️", "cloud"],       // 21
-    ["🔥", "fire"],       // 22
-    ["🍌", "banana"],     // 23
-    ["🍎", "apple"],      // 24
+    ["🐶", "dog"], //  0
+    ["🐱", "cat"], //  1
+    ["🦁", "lion"], //  2
+    ["🐎", "horse"], //  3
+    ["🦄", "unicorn"], //  4
+    ["🐷", "pig"], //  5
+    ["🐘", "elephant"], //  6
+    ["🐰", "rabbit"], //  7
+    ["🐼", "panda"], //  8
+    ["🐓", "rooster"], //  9
+    ["🐧", "penguin"], // 10
+    ["🐢", "turtle"], // 11
+    ["🐟", "fish"], // 12
+    ["🐙", "octopus"], // 13
+    ["🦋", "butterfly"], // 14
+    ["🌷", "flower"], // 15
+    ["🌳", "tree"], // 16
+    ["🌵", "cactus"], // 17
+    ["🍄", "mushroom"], // 18
+    ["🌏", "globe"], // 19
+    ["🌙", "moon"], // 20
+    ["☁️", "cloud"], // 21
+    ["🔥", "fire"], // 22
+    ["🍌", "banana"], // 23
+    ["🍎", "apple"], // 24
     ["🍓", "strawberry"], // 25
-    ["🌽", "corn"],       // 26
-    ["🍕", "pizza"],      // 27
-    ["🎂", "cake"],       // 28
-    ["❤️", "heart"],      // 29
-    ["🙂", "smiley"],      // 30
-    ["🤖", "robot"],      // 31
-    ["🎩", "hat"],        // 32
-    ["👓", "glasses"],    // 33
-    ["🔧", "spanner"],     // 34
-    ["🎅", "santa"],      // 35
-    ["👍", "thumbs up"],  // 36
-    ["☂️", "umbrella"],    // 37
-    ["⌛", "hourglass"],   // 38
-    ["⏰", "clock"],      // 39
-    ["🎁", "gift"],       // 40
+    ["🌽", "corn"], // 26
+    ["🍕", "pizza"], // 27
+    ["🎂", "cake"], // 28
+    ["❤️", "heart"], // 29
+    ["🙂", "smiley"], // 30
+    ["🤖", "robot"], // 31
+    ["🎩", "hat"], // 32
+    ["👓", "glasses"], // 33
+    ["🔧", "spanner"], // 34
+    ["🎅", "santa"], // 35
+    ["👍", "thumbs up"], // 36
+    ["☂️", "umbrella"], // 37
+    ["⌛", "hourglass"], // 38
+    ["⏰", "clock"], // 39
+    ["🎁", "gift"], // 40
     ["💡", "light bulb"], // 41
-    ["📕", "book"],       // 42
-    ["✏️", "pencil"],     // 43
-    ["📎", "paperclip"],  // 44
-    ["✂️", "scissors"],    // 45
-    ["🔒", "lock"],       // 46
-    ["🔑", "key"],        // 47
-    ["🔨", "hammer"],     // 48
-    ["☎️", "telephone"],  // 49
-    ["🏁", "flag"],       // 50
-    ["🚂", "train"],      // 51
-    ["🚲", "bicycle"],    // 52
-    ["✈️", "aeroplane"],   // 53
-    ["🚀", "rocket"],     // 54
-    ["🏆", "trophy"],     // 55
-    ["⚽", "ball"],       // 56
-    ["🎸", "guitar"],     // 57
-    ["🎺", "trumpet"],    // 58
-    ["🔔", "bell"],       // 59
-    ["⚓️", "anchor"],     // 60
+    ["📕", "book"], // 42
+    ["✏️", "pencil"], // 43
+    ["📎", "paperclip"], // 44
+    ["✂️", "scissors"], // 45
+    ["🔒", "lock"], // 46
+    ["🔑", "key"], // 47
+    ["🔨", "hammer"], // 48
+    ["☎️", "telephone"], // 49
+    ["🏁", "flag"], // 50
+    ["🚂", "train"], // 51
+    ["🚲", "bicycle"], // 52
+    ["✈️", "aeroplane"], // 53
+    ["🚀", "rocket"], // 54
+    ["🏆", "trophy"], // 55
+    ["⚽", "ball"], // 56
+    ["🎸", "guitar"], // 57
+    ["🎺", "trumpet"], // 58
+    ["🔔", "bell"], // 59
+    ["⚓️", "anchor"], // 60
     ["🎧", "headphones"], // 61
-    ["📁", "folder"],     // 62
-    ["📌", "pin"],        // 63
+    ["📁", "folder"], // 62
+    ["📌", "pin"], // 63
 ];
 
 function generateEmojiSas(sasBytes: number[]): EmojiMapping[] {
     const emojis = [
         // just like base64 encoding
         sasBytes[0] >> 2,
-        (sasBytes[0] & 0x3) << 4 | sasBytes[1] >> 4,
-        (sasBytes[1] & 0xf) << 2 | sasBytes[2] >> 6,
+        ((sasBytes[0] & 0x3) << 4) | (sasBytes[1] >> 4),
+        ((sasBytes[1] & 0xf) << 2) | (sasBytes[2] >> 6),
         sasBytes[2] & 0x3f,
         sasBytes[3] >> 2,
-        (sasBytes[3] & 0x3) << 4 | sasBytes[4] >> 4,
-        (sasBytes[4] & 0xf) << 2 | sasBytes[5] >> 6,
+        ((sasBytes[3] & 0x3) << 4) | (sasBytes[4] >> 4),
+        ((sasBytes[4] & 0xf) << 2) | (sasBytes[5] >> 6),
     ];
 
     return emojis.map((num) => emojiMapping[num]);
@@ -185,7 +177,7 @@ const macMethods = {
 };
 
 function calculateMAC(olmSAS: OlmSAS, method: string) {
-    return function(...args) {
+    return function (...args) {
         const macFunction = olmSAS[macMethods[method]];
         const mac = macFunction.apply(olmSAS, args);
         logger.log("SAS calculateMAC:", method, args, mac);
@@ -195,23 +187,22 @@ function calculateMAC(olmSAS: OlmSAS, method: string) {
 
 const calculateKeyAgreement = {
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    "curve25519-hkdf-sha256": function(sas: SAS, olmSAS: OlmSAS, bytes: number): Uint8Array {
-        const ourInfo = `${sas.baseApis.getUserId()}|${sas.baseApis.deviceId}|`
-              + `${sas.ourSASPubKey}|`;
+    "curve25519-hkdf-sha256": function (sas: SAS, olmSAS: OlmSAS, bytes: number): Uint8Array {
+        const ourInfo = `${sas.baseApis.getUserId()}|${sas.baseApis.deviceId}|` + `${sas.ourSASPubKey}|`;
         const theirInfo = `${sas.userId}|${sas.deviceId}|${sas.theirSASPubKey}|`;
         const sasInfo =
-            "MATRIX_KEY_VERIFICATION_SAS|"
-              + (sas.initiatedByMe ? ourInfo + theirInfo : theirInfo + ourInfo)
-              + sas.channel.transactionId;
+            "MATRIX_KEY_VERIFICATION_SAS|" +
+            (sas.initiatedByMe ? ourInfo + theirInfo : theirInfo + ourInfo) +
+            sas.channel.transactionId;
         return olmSAS.generate_bytes(sasInfo, bytes);
     },
-    "curve25519": function(sas: SAS, olmSAS: OlmSAS, bytes: number): Uint8Array {
+    curve25519: function (sas: SAS, olmSAS: OlmSAS, bytes: number): Uint8Array {
         const ourInfo = `${sas.baseApis.getUserId()}${sas.baseApis.deviceId}`;
         const theirInfo = `${sas.userId}${sas.deviceId}`;
         const sasInfo =
-            "MATRIX_KEY_VERIFICATION_SAS"
-              + (sas.initiatedByMe ? ourInfo + theirInfo : theirInfo + ourInfo)
-              + sas.channel.transactionId;
+            "MATRIX_KEY_VERIFICATION_SAS" +
+            (sas.initiatedByMe ? ourInfo + theirInfo : theirInfo + ourInfo) +
+            sas.channel.transactionId;
         return olmSAS.generate_bytes(sasInfo, bytes);
     },
 };
@@ -231,7 +222,7 @@ const MAC_SET = new Set(MAC_LIST);
 const SAS_SET = new Set(SAS_LIST);
 
 function intersection<T>(anArray: T[], aSet: Set<T>): T[] {
-    return anArray instanceof Array ? anArray.filter(x => aSet.has(x)) : [];
+    return anArray instanceof Array ? anArray.filter((x) => aSet.has(x)) : [];
 }
 
 export enum SasEvent {
@@ -334,12 +325,15 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             this.waitingForAccept = false;
         }
         let content = e.getContent();
-        const sasMethods
-              = intersection(content.short_authentication_string, SAS_SET);
-        if (!(KEY_AGREEMENT_SET.has(content.key_agreement_protocol)
-              && HASHES_SET.has(content.hash)
-              && MAC_SET.has(content.message_authentication_code)
-              && sasMethods.length)) {
+        const sasMethods = intersection(content.short_authentication_string, SAS_SET);
+        if (
+            !(
+                KEY_AGREEMENT_SET.has(content.key_agreement_protocol) &&
+                HASHES_SET.has(content.hash) &&
+                MAC_SET.has(content.message_authentication_code) &&
+                sasMethods.length
+            )
+        ) {
             throw newUnknownMethodError();
         }
         if (typeof content.commitment !== "string") {
@@ -385,14 +379,13 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             });
 
             [e] = await Promise.all([
-                this.waitForEvent("m.key.verification.mac")
-                    .then((e) => {
-                        // we don't expect any more messages from the other
-                        // party, and they may send a m.key.verification.done
-                        // when they're done on their end
-                        this.expectedEvent = "m.key.verification.done";
-                        return e;
-                    }),
+                this.waitForEvent("m.key.verification.mac").then((e) => {
+                    // we don't expect any more messages from the other
+                    // party, and they may send a m.key.verification.done
+                    // when they're done on their end
+                    this.expectedEvent = "m.key.verification.done";
+                    return e;
+                }),
                 verifySAS,
             ]);
             content = e.getContent();
@@ -461,14 +454,13 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             });
 
             [e] = await Promise.all([
-                this.waitForEvent("m.key.verification.mac")
-                    .then((e) => {
-                        // we don't expect any more messages from the other
-                        // party, and they may send a m.key.verification.done
-                        // when they're done on their end
-                        this.expectedEvent = "m.key.verification.done";
-                        return e;
-                    }),
+                this.waitForEvent("m.key.verification.mac").then((e) => {
+                    // we don't expect any more messages from the other
+                    // party, and they may send a m.key.verification.done
+                    // when they're done on their end
+                    this.expectedEvent = "m.key.verification.done";
+                    return e;
+                }),
                 verifySAS,
             ]);
             content = e.getContent();
@@ -481,53 +473,47 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
     private sendMAC(olmSAS: OlmSAS, method: string): Promise<void> {
         const mac = {};
         const keyList = [];
-        const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
-              + this.baseApis.getUserId() + this.baseApis.deviceId
-              + this.userId + this.deviceId
-              + this.channel.transactionId;
+        const baseInfo =
+            "MATRIX_KEY_VERIFICATION_MAC" +
+            this.baseApis.getUserId() +
+            this.baseApis.deviceId +
+            this.userId +
+            this.deviceId +
+            this.channel.transactionId;
 
         const deviceKeyId = `ed25519:${this.baseApis.deviceId}`;
-        mac[deviceKeyId] = calculateMAC(olmSAS, method)(
-            this.baseApis.getDeviceEd25519Key(),
-            baseInfo + deviceKeyId,
-        );
+        mac[deviceKeyId] = calculateMAC(olmSAS, method)(this.baseApis.getDeviceEd25519Key(), baseInfo + deviceKeyId);
         keyList.push(deviceKeyId);
 
         const crossSigningId = this.baseApis.getCrossSigningId();
         if (crossSigningId) {
             const crossSigningKeyId = `ed25519:${crossSigningId}`;
-            mac[crossSigningKeyId] = calculateMAC(olmSAS, method)(
-                crossSigningId,
-                baseInfo + crossSigningKeyId,
-            );
+            mac[crossSigningKeyId] = calculateMAC(olmSAS, method)(crossSigningId, baseInfo + crossSigningKeyId);
             keyList.push(crossSigningKeyId);
         }
 
-        const keys = calculateMAC(olmSAS, method)(
-            keyList.sort().join(","),
-            baseInfo + "KEY_IDS",
-        );
+        const keys = calculateMAC(olmSAS, method)(keyList.sort().join(","), baseInfo + "KEY_IDS");
         return this.send("m.key.verification.mac", { mac, keys });
     }
 
     private async checkMAC(olmSAS: OlmSAS, content: IContent, method: string): Promise<void> {
-        const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
-              + this.userId + this.deviceId
-              + this.baseApis.getUserId() + this.baseApis.deviceId
-              + this.channel.transactionId;
+        const baseInfo =
+            "MATRIX_KEY_VERIFICATION_MAC" +
+            this.userId +
+            this.deviceId +
+            this.baseApis.getUserId() +
+            this.baseApis.deviceId +
+            this.channel.transactionId;
 
-        if (content.keys !== calculateMAC(olmSAS, method)(
-            Object.keys(content.mac).sort().join(","),
-            baseInfo + "KEY_IDS",
-        )) {
+        if (
+            content.keys !==
+            calculateMAC(olmSAS, method)(Object.keys(content.mac).sort().join(","), baseInfo + "KEY_IDS")
+        ) {
             throw newKeyMismatchError();
         }
 
         await this.verifyKeys(this.userId, content.mac, (keyId, device, keyInfo) => {
-            if (keyInfo !== calculateMAC(olmSAS, method)(
-                device.keys[keyId],
-                baseInfo + keyId,
-            )) {
+            if (keyInfo !== calculateMAC(olmSAS, method)(device.keys[keyId], baseInfo + keyId)) {
                 throw newKeyMismatchError();
             }
         });

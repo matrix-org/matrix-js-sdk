@@ -1,7 +1,7 @@
 name: SonarQube
 on:
   workflow_run:
-    workflows: [ "Tests" ]
+    workflows: ["Tests"]
     types:
       - completed
 concurrency:

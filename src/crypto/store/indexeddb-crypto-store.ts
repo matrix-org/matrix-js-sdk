@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, PrefixedLogger } from '../../logger';
-import { LocalStorageCryptoStore } from './localStorage-crypto-store';
-import { MemoryCryptoStore } from './memory-crypto-store';
-import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
-import { InvalidCryptoStoreError } from '../../errors';
+import { logger, PrefixedLogger } from "../../logger";
+import { LocalStorageCryptoStore } from "./localStorage-crypto-store";
+import { MemoryCryptoStore } from "./memory-crypto-store";
+import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend";
+import { InvalidCryptoStoreError } from "../../errors";
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
 import {
     CryptoStore,
@@ -51,15 +51,15 @@ import { IEncryptedPayload } from "../aes";
  * @implements {module:crypto/store/base~CryptoStore}
  */
 export class IndexedDBCryptoStore implements CryptoStore {
-    public static STORE_ACCOUNT = 'account';
-    public static STORE_SESSIONS = 'sessions';
-    public static STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
-    public static STORE_INBOUND_GROUP_SESSIONS_WITHHELD = 'inbound_group_sessions_withheld';
-    public static STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS = 'shared_history_inbound_group_sessions';
-    public static STORE_PARKED_SHARED_HISTORY = 'parked_shared_history';
-    public static STORE_DEVICE_DATA = 'device_data';
-    public static STORE_ROOMS = 'rooms';
-    public static STORE_BACKUP = 'sessions_needing_backup';
+    public static STORE_ACCOUNT = "account";
+    public static STORE_SESSIONS = "sessions";
+    public static STORE_INBOUND_GROUP_SESSIONS = "inbound_group_sessions";
+    public static STORE_INBOUND_GROUP_SESSIONS_WITHHELD = "inbound_group_sessions_withheld";
+    public static STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS = "shared_history_inbound_group_sessions";
+    public static STORE_PARKED_SHARED_HISTORY = "parked_shared_history";
+    public static STORE_DEVICE_DATA = "device_data";
+    public static STORE_ROOMS = "rooms";
+    public static STORE_BACKUP = "sessions_needing_backup";
 
     public static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         return IndexedDBHelpers.exists(indexedDB, dbName);
@@ -92,7 +92,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
         this.backendPromise = new Promise<CryptoStore>((resolve, reject) => {
             if (!this.indexedDB) {
-                reject(new Error('no indexeddb support available'));
+                reject(new Error("no indexeddb support available"));
                 return;
             }
 
@@ -107,9 +107,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
             };
 
             req.onblocked = () => {
-                logger.log(
-                    `can't yet open IndexedDBCryptoStore because it is open elsewhere`,
-                );
+                logger.log(`can't yet open IndexedDBCryptoStore because it is open elsewhere`);
             };
 
             req.onerror = (ev) => {
@@ -123,44 +121,46 @@ export class IndexedDBCryptoStore implements CryptoStore {
                 logger.log(`connected to indexeddb ${this.dbName}`);
                 resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
-        }).then((backend) => {
-            // Edge has IndexedDB but doesn't support compund keys which we use fairly extensively.
-            // Try a dummy query which will fail if the browser doesn't support compund keys, so
-            // we can fall back to a different backend.
-            return backend.doTxn(
-                'readonly',
-                [
-                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
-                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
-                ],
-                (txn) => {
-                    backend.getEndToEndInboundGroupSession('', '', txn, () => {});
-                }).then(() => backend,
-            );
-        }).catch((e) => {
-            if (e.name === 'VersionError') {
-                logger.warn("Crypto DB is too new for us to use!", e);
-                // don't fall back to a different store: the user has crypto data
-                // in this db so we should use it or nothing at all.
-                throw new InvalidCryptoStoreError(InvalidCryptoStoreError.TOO_NEW);
-            }
-            logger.warn(
-                `unable to connect to indexeddb ${this.dbName}` +
-                    `: falling back to localStorage store: ${e}`,
-            );
-
-            try {
-                return new LocalStorageCryptoStore(global.localStorage);
-            } catch (e) {
+        })
+            .then((backend) => {
+                // Edge has IndexedDB but doesn't support compund keys which we use fairly extensively.
+                // Try a dummy query which will fail if the browser doesn't support compund keys, so
+                // we can fall back to a different backend.
+                return backend
+                    .doTxn(
+                        "readonly",
+                        [
+                            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+                            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+                        ],
+                        (txn) => {
+                            backend.getEndToEndInboundGroupSession("", "", txn, () => {});
+                        },
+                    )
+                    .then(() => backend);
+            })
+            .catch((e) => {
+                if (e.name === "VersionError") {
+                    logger.warn("Crypto DB is too new for us to use!", e);
+                    // don't fall back to a different store: the user has crypto data
+                    // in this db so we should use it or nothing at all.
+                    throw new InvalidCryptoStoreError(InvalidCryptoStoreError.TOO_NEW);
+                }
                 logger.warn(
-                    `unable to open localStorage: falling back to in-memory store: ${e}`,
+                    `unable to connect to indexeddb ${this.dbName}` + `: falling back to localStorage store: ${e}`,
                 );
-                return new MemoryCryptoStore();
-            }
-        }).then(backend => {
-            this.backend = backend;
-            return backend;
-        });
+
+                try {
+                    return new LocalStorageCryptoStore(global.localStorage);
+                } catch (e) {
+                    logger.warn(`unable to open localStorage: falling back to in-memory store: ${e}`);
+                    return new MemoryCryptoStore();
+                }
+            })
+            .then((backend) => {
+                this.backend = backend;
+                return backend;
+            });
 
         return this.backendPromise;
     }
@@ -173,7 +173,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
     public deleteAllData(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             if (!this.indexedDB) {
-                reject(new Error('no indexeddb support available'));
+                reject(new Error("no indexeddb support available"));
                 return;
             }
 
@@ -181,9 +181,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
             const req = this.indexedDB.deleteDatabase(this.dbName);
 
             req.onblocked = () => {
-                logger.log(
-                    `can't yet delete IndexedDBCryptoStore because it is open elsewhere`,
-                );
+                logger.log(`can't yet delete IndexedDBCryptoStore because it is open elsewhere`);
             };
 
             req.onerror = (ev) => {
@@ -271,9 +269,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         deviceId: string,
         wantedStates: number[],
     ): Promise<OutgoingRoomKeyRequest[]> {
-        return this.backend.getOutgoingRoomKeyRequestsByTarget(
-            userId, deviceId, wantedStates,
-        );
+        return this.backend.getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates);
     }
 
     /**
@@ -293,9 +289,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         expectedState: number,
         updates: Partial<OutgoingRoomKeyRequest>,
     ): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend.updateOutgoingRoomKeyRequest(
-            requestId, expectedState, updates,
-        );
+        return this.backend.updateOutgoingRoomKeyRequest(requestId, expectedState, updates);
     }
 
     /**
@@ -411,7 +405,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         deviceKey: string,
         sessionId: string,
         txn: IDBTransaction,
-        func: (sessions: { [ sessionId: string ]: ISessionInfo }) => void,
+        func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void {
         this.backend.getEndToEndSession(deviceKey, sessionId, txn, func);
     }
@@ -501,10 +495,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *     in the store with an object having keys {senderKey, sessionId,
      *     sessionData}, then once with null to indicate the end of the list.
      */
-    public getAllEndToEndInboundGroupSessions(
-        txn: IDBTransaction,
-        func: (session: ISession | null) => void,
-    ): void {
+    public getAllEndToEndInboundGroupSessions(txn: IDBTransaction, func: (session: ISession | null) => void): void {
         this.backend.getAllEndToEndInboundGroupSessions(txn, func);
     }
 
@@ -674,21 +665,14 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Park a shared-history group session for a room we may be invited to later.
      */
-    public addParkedSharedHistory(
-        roomId: string,
-        parkedData: ParkedSharedHistory,
-        txn?: IDBTransaction,
-    ): void {
+    public addParkedSharedHistory(roomId: string, parkedData: ParkedSharedHistory, txn?: IDBTransaction): void {
         this.backend.addParkedSharedHistory(roomId, parkedData, txn);
     }
 
     /**
      * Pop out all shared-history group sessions for a room.
      */
-    public takeParkedSharedHistory(
-        roomId: string,
-        txn?: IDBTransaction,
-    ): Promise<ParkedSharedHistory[]> {
+    public takeParkedSharedHistory(roomId: string, txn?: IDBTransaction): Promise<ParkedSharedHistory[]> {
         return this.backend.takeParkedSharedHistory(roomId, txn);
     }
 

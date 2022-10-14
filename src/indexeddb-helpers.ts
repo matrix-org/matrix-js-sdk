@@ -45,6 +45,6 @@ export function exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> 
             }
             resolve(exists);
         };
-        req.onerror = ev => reject(req.error);
+        req.onerror = (ev) => reject(req.error);
     });
 }

@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import MockHttpBackend from 'matrix-mock-request';
+import MockHttpBackend from "matrix-mock-request";
 
 import { MatrixClient, PUSHER_ENABLED } from "../../src/matrix";
-import { mkPusher } from '../test-utils/test-utils';
+import { mkPusher } from "../test-utils/test-utils";
 
 const realSetTimeout = setTimeout;
 function flushPromises() {
-    return new Promise(r => {
+    return new Promise((r) => {
         realSetTimeout(r, 1);
     });
 }

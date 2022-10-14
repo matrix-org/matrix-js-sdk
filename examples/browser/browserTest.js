@@ -3,8 +3,8 @@ console.log("Loading browser sdk");
 var client = matrixcs.createClient("https://matrix.org");
 client.publicRooms(function (err, data) {
     if (err) {
-	   console.error("err %s", JSON.stringify(err));
-       return;
+        console.error("err %s", JSON.stringify(err));
+        return;
     }
     console.log("data %s [...]", JSON.stringify(data).substring(0, 100));
     console.log("Congratulations! The SDK is working on the browser!");

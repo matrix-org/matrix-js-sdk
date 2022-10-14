@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 import type { BinaryLike } from "crypto";
-import { getCrypto } from '../utils';
-import { decodeBase64, encodeBase64 } from './olmlib';
+import { getCrypto } from "../utils";
+import { decodeBase64, encodeBase64 } from "./olmlib";
 
-const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
-    (window.crypto.subtle || window.crypto.webkitSubtle) : null;
+const subtleCrypto =
+    typeof window !== "undefined" && window.crypto ? window.crypto.subtle || window.crypto.webkitSubtle : null;
 
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);
@@ -60,13 +60,9 @@ async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: 
     const [aesKey, hmacKey] = deriveKeysNode(key, name);
 
     const cipher = crypto.createCipheriv("aes-256-ctr", aesKey, iv);
-    const ciphertext = Buffer.concat([
-        cipher.update(data, "utf8"),
-        cipher.final(),
-    ]);
+    const ciphertext = Buffer.concat([cipher.update(data, "utf8"), cipher.final()]);
 
-    const hmac = crypto.createHmac("sha256", hmacKey)
-        .update(ciphertext).digest("base64");
+    const hmac = crypto.createHmac("sha256", hmacKey).update(ciphertext).digest("base64");
 
     return {
         iv: encodeBase64(iv),
@@ -93,19 +89,18 @@ async function decryptNode(data: IEncryptedPayload, key: Uint8Array, name: strin
 
     const [aesKey, hmacKey] = deriveKeysNode(key, name);
 
-    const hmac = crypto.createHmac("sha256", hmacKey)
+    const hmac = crypto
+        .createHmac("sha256", hmacKey)
         .update(Buffer.from(data.ciphertext, "base64"))
-        .digest("base64").replace(/=+$/g, '');
+        .digest("base64")
+        .replace(/=+$/g, "");
 
-    if (hmac !== data.mac.replace(/=+$/g, '')) {
+    if (hmac !== data.mac.replace(/=+$/g, "")) {
         throw new Error(`Error decrypting secret ${name}: bad MAC`);
     }
 
-    const decipher = crypto.createDecipheriv(
-        "aes-256-ctr", aesKey, decodeBase64(data.iv),
-    );
-    return decipher.update(data.ciphertext, "base64", "utf8")
-          + decipher.final("utf8");
+    const decipher = crypto.createDecipheriv("aes-256-ctr", aesKey, decodeBase64(data.iv));
+    return decipher.update(data.ciphertext, "base64", "utf8") + decipher.final("utf8");
 }
 
 function deriveKeysNode(key: BinaryLike, name: string): [Buffer, Buffer] {
@@ -113,11 +108,9 @@ function deriveKeysNode(key: BinaryLike, name: string): [Buffer, Buffer] {
     const prk = crypto.createHmac("sha256", zeroSalt).update(key).digest();
 
     const b = Buffer.alloc(1, 1);
-    const aesKey = crypto.createHmac("sha256", prk)
-        .update(name, "utf8").update(b).digest();
+    const aesKey = crypto.createHmac("sha256", prk).update(name, "utf8").update(b).digest();
     b[0] = 2;
-    const hmacKey = crypto.createHmac("sha256", prk)
-        .update(aesKey).update(name, "utf8").update(b).digest();
+    const hmacKey = crypto.createHmac("sha256", prk).update(aesKey).update(name, "utf8").update(b).digest();
 
     return [aesKey, hmacKey];
 }
@@ -157,11 +150,7 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
         encodedData,
     );
 
-    const hmac = await subtleCrypto.sign(
-        { name: 'HMAC' },
-        hmacKey,
-        ciphertext,
-    );
+    const hmac = await subtleCrypto.sign({ name: "HMAC" }, hmacKey, ciphertext);
 
     return {
         iv: encodeBase64(iv),
@@ -185,12 +174,7 @@ async function decryptBrowser(data: IEncryptedPayload, key: Uint8Array, name: st
 
     const ciphertext = decodeBase64(data.ciphertext);
 
-    if (!await subtleCrypto.verify(
-        { name: "HMAC" },
-        hmacKey,
-        decodeBase64(data.mac),
-        ciphertext,
-    )) {
+    if (!(await subtleCrypto.verify({ name: "HMAC" }, hmacKey, decodeBase64(data.mac), ciphertext))) {
         throw new Error(`Error decrypting secret ${name}: bad MAC`);
     }
 
@@ -208,20 +192,14 @@ async function decryptBrowser(data: IEncryptedPayload, key: Uint8Array, name: st
 }
 
 async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[CryptoKey, CryptoKey]> {
-    const hkdfkey = await subtleCrypto.importKey(
-        'raw',
-        key,
-        { name: "HKDF" },
-        false,
-        ["deriveBits"],
-    );
+    const hkdfkey = await subtleCrypto.importKey("raw", key, { name: "HKDF" }, false, ["deriveBits"]);
     const keybits = await subtleCrypto.deriveBits(
         {
             name: "HKDF",
             salt: zeroSalt,
             // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore: https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/879
-            info: (new TextEncoder().encode(name)),
+            info: new TextEncoder().encode(name),
             hash: "SHA-256",
         },
         hkdfkey,
@@ -231,23 +209,17 @@ async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[Crypto
     const aesKey = keybits.slice(0, 32);
     const hmacKey = keybits.slice(32);
 
-    const aesProm = subtleCrypto.importKey(
-        'raw',
-        aesKey,
-        { name: 'AES-CTR' },
-        false,
-        ['encrypt', 'decrypt'],
-    );
+    const aesProm = subtleCrypto.importKey("raw", aesKey, { name: "AES-CTR" }, false, ["encrypt", "decrypt"]);
 
     const hmacProm = subtleCrypto.importKey(
-        'raw',
+        "raw",
         hmacKey,
         {
-            name: 'HMAC',
-            hash: { name: 'SHA-256' },
+            name: "HMAC",
+            hash: { name: "SHA-256" },
         },
         false,
-        ['sign', 'verify'],
+        ["sign", "verify"],
     );
 
     return Promise.all([aesProm, hmacProm]);

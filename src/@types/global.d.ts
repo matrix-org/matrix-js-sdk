@@ -51,18 +51,22 @@ declare global {
     }
 
     interface DesktopCapturerConstraints {
-        audio: boolean | {
-            mandatory: {
-                chromeMediaSource: string;
-                chromeMediaSourceId: string;
-            };
-        };
-        video: boolean | {
-            mandatory: {
-                chromeMediaSource: string;
-                chromeMediaSourceId: string;
-            };
-        };
+        audio:
+            | boolean
+            | {
+                  mandatory: {
+                      chromeMediaSource: string;
+                      chromeMediaSourceId: string;
+                  };
+              };
+        video:
+            | boolean
+            | {
+                  mandatory: {
+                      chromeMediaSource: string;
+                      chromeMediaSourceId: string;
+                  };
+              };
     }
 
     interface DummyInterfaceWeShouldntBeUsingThis {}

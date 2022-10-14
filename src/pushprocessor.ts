@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { deepCompare, escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
-import { logger } from './logger';
+import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { MatrixEvent } from "./models/event";
 import {
@@ -68,9 +68,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 pattern: "m.reaction",
             },
         ],
-        actions: [
-            PushRuleActionName.DontNotify,
-        ],
+        actions: [PushRuleActionName.DontNotify],
     },
     {
         // For homeservers which don't support MSC3786 yet
@@ -134,7 +132,7 @@ export class PushProcessor {
             const action = actionList[i];
             if (action === PushRuleActionName.Notify) {
                 actionObj.notify = true;
-            } else if (typeof action === 'object') {
+            } else if (typeof action === "object") {
                 if (action.value === undefined) {
                     action.value = true;
                 }
@@ -163,8 +161,7 @@ export class PushProcessor {
         // Merge the client-level defaults with the ones from the server
         const globalOverrides = newRules.global.override;
         for (const override of DEFAULT_OVERRIDE_RULES) {
-            const existingRule = globalOverrides
-                .find((r) => r.rule_id === override.rule_id);
+            const existingRule = globalOverrides.find((r) => r.rule_id === override.rule_id);
 
             if (existingRule) {
                 // Copy over the actions, default, and conditions. Don't touch the user's preference.
@@ -216,9 +213,9 @@ export class PushProcessor {
 
     private templateRuleToRaw(kind: PushRuleKind, tprule: any): any {
         const rawrule = {
-            'rule_id': tprule.rule_id,
-            'actions': tprule.actions,
-            'conditions': [],
+            rule_id: tprule.rule_id,
+            actions: tprule.actions,
+            conditions: [],
         };
         switch (kind) {
             case PushRuleKind.Underride:
@@ -230,9 +227,9 @@ export class PushProcessor {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': ConditionKind.EventMatch,
-                    'key': 'room_id',
-                    'value': tprule.rule_id,
+                    kind: ConditionKind.EventMatch,
+                    key: "room_id",
+                    value: tprule.rule_id,
                 });
                 break;
             case PushRuleKind.SenderSpecific:
@@ -240,9 +237,9 @@ export class PushProcessor {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': ConditionKind.EventMatch,
-                    'key': 'user_id',
-                    'value': tprule.rule_id,
+                    kind: ConditionKind.EventMatch,
+                    key: "user_id",
+                    value: tprule.rule_id,
                 });
                 break;
             case PushRuleKind.ContentSpecific:
@@ -250,9 +247,9 @@ export class PushProcessor {
                     return null;
                 }
                 rawrule.conditions.push({
-                    'kind': ConditionKind.EventMatch,
-                    'key': 'content.body',
-                    'pattern': tprule.pattern,
+                    kind: ConditionKind.EventMatch,
+                    key: "content.body",
+                    pattern: tprule.pattern,
                 });
                 break;
         }
@@ -281,7 +278,7 @@ export class PushProcessor {
         cond: ISenderNotificationPermissionCondition,
         ev: MatrixEvent,
     ): boolean {
-        const notifLevelKey = cond['key'];
+        const notifLevelKey = cond["key"];
         if (!notifLevelKey) {
             return false;
         }
@@ -319,16 +316,16 @@ export class PushProcessor {
             return false;
         }
         switch (ineq) {
-            case '':
-            case '==':
+            case "":
+            case "==":
                 return memberCount == rhs;
-            case '<':
+            case "<":
                 return memberCount < rhs;
-            case '>':
+            case ">":
                 return memberCount > rhs;
-            case '<=':
+            case "<=":
                 return memberCount <= rhs;
-            case '>=':
+            case ">=":
                 return memberCount >= rhs;
             default:
                 return false;
@@ -340,13 +337,17 @@ export class PushProcessor {
         if (ev.isEncrypted() && ev.getClearContent()) {
             content = ev.getClearContent();
         }
-        if (!content || !content.body || typeof content.body != 'string') {
+        if (!content || !content.body || typeof content.body != "string") {
             return false;
         }
 
         const room = this.client.getRoom(ev.getRoomId());
-        if (!room || !room.currentState || !room.currentState.members ||
-            !room.currentState.getMember(this.client.credentials.userId)) {
+        if (
+            !room ||
+            !room.currentState ||
+            !room.currentState.members ||
+            !room.currentState.getMember(this.client.credentials.userId)
+        ) {
             return false;
         }
 
@@ -354,7 +355,7 @@ export class PushProcessor {
 
         // N.B. we can't use \b as it chokes on unicode. however \W seems to be okay
         // as shorthand for [^0-9A-Za-z_].
-        const pat = new RegExp("(^|\\W)" + escapeRegExp(displayName) + "(\\W|$)", 'i');
+        const pat = new RegExp("(^|\\W)" + escapeRegExp(displayName) + "(\\W|$)", "i");
         return content.body.search(pat) > -1;
     }
 
@@ -364,7 +365,7 @@ export class PushProcessor {
         }
 
         const val = this.valueForDottedKey(cond.key, ev);
-        if (typeof val !== 'string') {
+        if (typeof val !== "string") {
             return false;
         }
 
@@ -372,13 +373,14 @@ export class PushProcessor {
             return cond.value === val;
         }
 
-        if (typeof cond.pattern !== 'string') {
+        if (typeof cond.pattern !== "string") {
             return false;
         }
 
-        const regex = cond.key === 'content.body'
-            ? this.createCachedRegex('(^|\\W)', cond.pattern, '(\\W|$)')
-            : this.createCachedRegex('^', cond.pattern, '$');
+        const regex =
+            cond.key === "content.body"
+                ? this.createCachedRegex("(^|\\W)", cond.pattern, "(\\W|$)")
+                : this.createCachedRegex("^", cond.pattern, "$");
 
         return !!val.match(regex);
     }
@@ -389,21 +391,21 @@ export class PushProcessor {
         }
         PushProcessor.cachedGlobToRegex[glob] = new RegExp(
             prefix + globToRegexp(glob) + suffix,
-            'i', // Case insensitive
+            "i", // Case insensitive
         );
         return PushProcessor.cachedGlobToRegex[glob];
     }
 
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
-        const parts = key.split('.');
+        const parts = key.split(".");
         let val;
 
         // special-case the first component to deal with encrypted messages
         const firstPart = parts[0];
-        if (firstPart === 'content') {
+        if (firstPart === "content") {
             val = ev.getContent();
             parts.shift();
-        } else if (firstPart === 'type') {
+        } else if (firstPart === "type") {
             val = ev.getType();
             parts.shift();
         } else {
@@ -444,7 +446,7 @@ export class PushProcessor {
         if (actionObj.tweaks.highlight === undefined) {
             // if it isn't specified, highlight if it's a content
             // rule but otherwise not
-            actionObj.tweaks.highlight = (rule.kind == PushRuleKind.ContentSpecific);
+            actionObj.tweaks.highlight = rule.kind == PushRuleKind.ContentSpecific;
         }
 
         actionObj = this.performCustomEventHandling(ev, actionObj);
@@ -462,9 +464,9 @@ export class PushProcessor {
                 // Since servers don't support properly sending push notification
                 // about MSC3401 call events, we do the handling ourselves
                 if (
-                    ev.getContent()["m.intent"] === "m.room"
-                    || ("m.terminated" in ev.getContent())
-                    || !("m.terminated" in ev.getPrevContent()) && !deepCompare(ev.getPrevContent(), {})
+                    ev.getContent()["m.intent"] === "m.room" ||
+                    "m.terminated" in ev.getContent() ||
+                    (!("m.terminated" in ev.getPrevContent()) && !deepCompare(ev.getPrevContent(), {}))
                 ) {
                     actionObj.notify = false;
                     actionObj.tweaks = {};
@@ -505,7 +507,7 @@ export class PushProcessor {
      * @return {object} The push rule, or null if no such rule was found
      */
     public getPushRuleById(ruleId: string): IPushRule {
-        for (const scope of ['global']) {
+        for (const scope of ["global"]) {
             if (this.client.pushRules[scope] === undefined) continue;
 
             for (const kind of RULEKINDS_IN_ORDER) {
@@ -530,4 +532,3 @@ export class PushProcessor {
  * @property {boolean} tweaks.sound Whether this notification should produce a
  * noise.
  */
-

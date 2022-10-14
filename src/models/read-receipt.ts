@@ -51,7 +51,7 @@ interface CachedReceipt {
     data: Receipt;
 }
 
-type ReceiptCache = {[eventId: string]: CachedReceipt[]};
+type ReceiptCache = { [eventId: string]: CachedReceipt[] };
 
 export interface ReceiptContent {
     [eventId: string]: {
@@ -93,7 +93,9 @@ export abstract class ReadReceipt<
      * @returns the latest receipts of the chosen type for the chosen user
      */
     public getReadReceiptForUserId(
-        userId: string, ignoreSynthesized = false, receiptType = ReceiptType.Read,
+        userId: string,
+        ignoreSynthesized = false,
+        receiptType = ReceiptType.Read,
     ): WrappedReceipt | null {
         const [realReceipt, syntheticReceipt] = this.receipts[receiptType]?.[userId] ?? [];
         if (ignoreSynthesized) {
@@ -137,7 +139,7 @@ export abstract class ReadReceipt<
         if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
 
         // If public read receipt is older, return the private one
-        return ((comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId) ?? null;
+        return (comparison < 0 ? privateReadReceipt?.eventId : publicReadReceipt?.eventId) ?? null;
     }
 
     public addReceiptToStructure(
@@ -164,10 +166,7 @@ export abstract class ReadReceipt<
         if (existingReceipt) {
             // we only want to add this receipt if we think it is later than the one we already have.
             // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
-            const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                existingReceipt.eventId,
-                eventId,
-            );
+            const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(existingReceipt.eventId, eventId);
             if (ordering !== null && ordering >= 0) {
                 return;
             }
@@ -212,11 +211,9 @@ export abstract class ReadReceipt<
         if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
             const previousEventId = cachedReceipt.eventId;
             // Remove the receipt we're about to clobber out of existence from the cache
-            this.receiptCacheByEventId[previousEventId] = (
-                this.receiptCacheByEventId[previousEventId].filter(r => {
-                    return r.type !== receiptType || r.userId !== userId;
-                })
-            );
+            this.receiptCacheByEventId[previousEventId] = this.receiptCacheByEventId[previousEventId].filter((r) => {
+                return r.type !== receiptType || r.userId !== userId;
+            });
 
             if (this.receiptCacheByEventId[previousEventId].length < 1) {
                 delete this.receiptCacheByEventId[previousEventId]; // clean up the cache keys
@@ -263,11 +260,13 @@ export abstract class ReadReceipt<
      * @return {String[]} A list of user IDs.
      */
     public getUsersReadUpTo(event: MatrixEvent): string[] {
-        return this.getReceiptsForEvent(event).filter(function(receipt) {
-            return utils.isSupportedReceiptType(receipt.type);
-        }).map(function(receipt) {
-            return receipt.userId;
-        });
+        return this.getReceiptsForEvent(event)
+            .filter(function (receipt) {
+                return utils.isSupportedReceiptType(receipt.type);
+            })
+            .map(function (receipt) {
+                return receipt.userId;
+            });
     }
 
     /**
@@ -282,9 +281,11 @@ export abstract class ReadReceipt<
         const readUpToId = this.getEventReadUpTo(userId, false);
         if (readUpToId === eventId) return true;
 
-        if (this.timeline?.length
-            && this.timeline[this.timeline.length - 1].getSender()
-            && this.timeline[this.timeline.length - 1].getSender() === userId) {
+        if (
+            this.timeline?.length &&
+            this.timeline[this.timeline.length - 1].getSender() &&
+            this.timeline[this.timeline.length - 1].getSender() === userId
+        ) {
             // It doesn't matter where the event is in the timeline, the user has read
             // it because they've sent the latest event.
             return true;

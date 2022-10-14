@@ -16,8 +16,8 @@ limitations under the License.
 
 /** @module timeline-window */
 
-import { Direction, EventTimeline } from './models/event-timeline';
-import { logger } from './logger';
+import { Direction, EventTimeline } from "./models/event-timeline";
+import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { EventTimelineSet } from "./models/event-timeline-set";
 import { MatrixEvent } from "./models/event";
@@ -30,7 +30,7 @@ const DEBUG = false;
 /**
  * @private
  */
-const debuglog = DEBUG ? logger.log.bind(logger) : function() {};
+const debuglog = DEBUG ? logger.log.bind(logger) : function () {};
 
 /**
  * the number of times we ask the server for more events before giving up
@@ -57,17 +57,17 @@ export class TimelineWindow {
      * Construct a TimelineWindow.
      *
      * <p>This abstracts the separate timelines in a Matrix {@link
-        * module:models/room|Room} into a single iterable thing. It keeps track of
+     * module:models/room|Room} into a single iterable thing. It keeps track of
      * the start and endpoints of the window, which can be advanced with the help
      * of pagination requests.
      *
      * <p>Before the window is useful, it must be initialised by calling {@link
-        * module:timeline-window~TimelineWindow#load|load}.
+     * module:timeline-window~TimelineWindow#load|load}.
      *
      * <p>Note that the window will not automatically extend itself when new events
      * are received from /sync; you should arrange to call {@link
-        * module:timeline-window~TimelineWindow#paginate|paginate} on {@link
-        * module:client~MatrixClient.event:"Room.timeline"|Room.timeline} events.
+     * module:timeline-window~TimelineWindow#paginate|paginate} on {@link
+     * module:client~MatrixClient.event:"Room.timeline"|Room.timeline} events.
      *
      * @param {MatrixClient} client   MatrixClient to be used for context/pagination
      *   requests.
@@ -111,7 +111,7 @@ export class TimelineWindow {
                 // we were looking for the live timeline: initialise to the end
                 eventIndex = events.length;
             } else {
-                eventIndex = events.findIndex(e => e.getId() === initialEventId);
+                eventIndex = events.findIndex((e) => e.getId() === initialEventId);
 
                 if (eventIndex < 0) {
                     throw new Error("getEventTimeline result didn't include requested event");
@@ -181,13 +181,11 @@ export class TimelineWindow {
             return false;
         }
 
-        const count = (direction == EventTimeline.BACKWARDS) ?
-            tl.retreat(size) : tl.advance(size);
+        const count = direction == EventTimeline.BACKWARDS ? tl.retreat(size) : tl.advance(size);
 
         if (count) {
             this.eventCount += count;
-            debuglog("TimelineWindow: increased cap by " + count +
-                " (now " + this.eventCount + ")");
+            debuglog("TimelineWindow: increased cap by " + count + " (now " + this.eventCount + ")");
             // remove some events from the other end, if necessary
             const excess = this.eventCount - this.windowLimit;
             if (excess > 0) {
@@ -230,8 +228,9 @@ export class TimelineWindow {
             }
         }
 
-        return Boolean(tl.timeline.getNeighbouringTimeline(direction) ||
-            tl.timeline.getPaginationToken(direction) !== null);
+        return Boolean(
+            tl.timeline.getNeighbouringTimeline(direction) || tl.timeline.getPaginationToken(direction) !== null,
+        );
     }
 
     /**
@@ -295,32 +294,35 @@ export class TimelineWindow {
 
         debuglog("TimelineWindow: starting request");
 
-        const prom = this.client.paginateEventTimeline(tl.timeline, {
-            backwards: direction == EventTimeline.BACKWARDS,
-            limit: size,
-        }).finally(function() {
-            tl.pendingPaginate = null;
-        }).then((r) => {
-            debuglog("TimelineWindow: request completed with result " + r);
-            if (!r) {
-                // end of timeline
-                return false;
-            }
+        const prom = this.client
+            .paginateEventTimeline(tl.timeline, {
+                backwards: direction == EventTimeline.BACKWARDS,
+                limit: size,
+            })
+            .finally(function () {
+                tl.pendingPaginate = null;
+            })
+            .then((r) => {
+                debuglog("TimelineWindow: request completed with result " + r);
+                if (!r) {
+                    // end of timeline
+                    return false;
+                }
 
-            // recurse to advance the index into the results.
-            //
-            // If we don't get any new events, we want to make sure we keep asking
-            // the server for events for as long as we have a valid pagination
-            // token. In particular, we want to know if we've actually hit the
-            // start of the timeline, or if we just happened to know about all of
-            // the events thanks to https://matrix.org/jira/browse/SYN-645.
-            //
-            // On the other hand, we necessarily want to wait forever for the
-            // server to make its mind up about whether there are other events,
-            // because it gives a bad user experience
-            // (https://github.com/vector-im/vector-web/issues/1204).
-            return this.paginate(direction, size, true, requestLimit - 1);
-        });
+                // recurse to advance the index into the results.
+                //
+                // If we don't get any new events, we want to make sure we keep asking
+                // the server for events for as long as we have a valid pagination
+                // token. In particular, we want to know if we've actually hit the
+                // start of the timeline, or if we just happened to know about all of
+                // the events thanks to https://matrix.org/jira/browse/SYN-645.
+                //
+                // On the other hand, we necessarily want to wait forever for the
+                // server to make its mind up about whether there are other events,
+                // because it gives a bad user experience
+                // (https://github.com/vector-im/vector-web/issues/1204).
+                return this.paginate(direction, size, true, requestLimit - 1);
+            });
         tl.pendingPaginate = prom;
         return prom;
     }
@@ -337,23 +339,26 @@ export class TimelineWindow {
 
         // sanity-check the delta
         if (delta > this.eventCount || delta < 0) {
-            throw new Error("Attemting to unpaginate " + delta + " events, but " +
-                "only have " + this.eventCount + " in the timeline");
+            throw new Error(
+                "Attemting to unpaginate " +
+                    delta +
+                    " events, but " +
+                    "only have " +
+                    this.eventCount +
+                    " in the timeline",
+            );
         }
 
         while (delta > 0) {
             const count = startOfTimeline ? tl.advance(delta) : tl.retreat(delta);
             if (count <= 0) {
                 // sadness. This shouldn't be possible.
-                throw new Error(
-                    "Unable to unpaginate any further, but still have " +
-                    this.eventCount + " events");
+                throw new Error("Unable to unpaginate any further, but still have " + this.eventCount + " events");
             }
 
             delta -= count;
             this.eventCount -= count;
-            debuglog("TimelineWindow.unpaginate: dropped " + count +
-                " (now " + this.eventCount + ")");
+            debuglog("TimelineWindow.unpaginate: dropped " + count + " (now " + this.eventCount + ")");
         }
     }
 
@@ -483,7 +488,8 @@ export class TimelineIndex {
         //
         // next see if there is a neighbouring timeline to switch to.
         const neighbour = this.timeline.getNeighbouringTimeline(
-            delta < 0 ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS);
+            delta < 0 ? EventTimeline.BACKWARDS : EventTimeline.FORWARDS,
+        );
         if (neighbour) {
             this.timeline = neighbour;
             if (delta < 0) {

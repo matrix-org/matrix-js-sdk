@@ -82,7 +82,7 @@ export class MSC3089Branch {
      * @returns {string} The name, or "Unnamed File" if unknown.
      */
     public getName(): string {
-        return this.indexEvent.getContent()['name'] || "Unnamed File";
+        return this.indexEvent.getContent()["name"] || "Unnamed File";
     }
 
     /**
@@ -91,10 +91,15 @@ export class MSC3089Branch {
      * @returns {Promise<void>} Resolves when complete.
      */
     public async setName(name: string): Promise<void> {
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            ...this.indexEvent.getContent(),
-            name: name,
-        }, this.id);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                ...this.indexEvent.getContent(),
+                name: name,
+            },
+            this.id,
+        );
     }
 
     /**
@@ -102,7 +107,7 @@ export class MSC3089Branch {
      * @returns {boolean} True if locked, false otherwise.
      */
     public isLocked(): boolean {
-        return this.indexEvent.getContent()['locked'] || false;
+        return this.indexEvent.getContent()["locked"] || false;
     }
 
     /**
@@ -111,24 +116,29 @@ export class MSC3089Branch {
      * @returns {Promise<void>} Resolves when complete.
      */
     public async setLocked(locked: boolean): Promise<void> {
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            ...this.indexEvent.getContent(),
-            locked: locked,
-        }, this.id);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                ...this.indexEvent.getContent(),
+                locked: locked,
+            },
+            this.id,
+        );
     }
 
     /**
      * Gets information about the file needed to download it.
      * @returns {Promise<{info: IEncryptedFile, httpUrl: string}>} Information about the file.
      */
-    public async getFileInfo(): Promise<{ info: IEncryptedFile, httpUrl: string }> {
+    public async getFileInfo(): Promise<{ info: IEncryptedFile; httpUrl: string }> {
         const event = await this.getFileEvent();
 
-        const file = event.getOriginalContent()['file'];
-        const httpUrl = this.client.mxcUrlToHttp(file['url']);
+        const file = event.getOriginalContent()["file"];
+        const httpUrl = this.client.mxcUrlToHttp(file["url"]);
 
         if (!httpUrl) {
-            throw new Error(`No HTTP URL available for ${file['url']}`);
+            throw new Error(`No HTTP URL available for ${file["url"]}`);
         }
 
         return { info: file, httpUrl: httpUrl };
@@ -177,23 +187,33 @@ export class MSC3089Branch {
             ...(additionalContent ?? {}),
             "m.new_content": true,
             "m.relates_to": {
-                "rel_type": RelationType.Replace,
-                "event_id": this.id,
+                rel_type: RelationType.Replace,
+                event_id: this.id,
             },
         });
 
         // Update the version of the new event
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            active: true,
-            name: name,
-            version: this.version + 1,
-        }, fileEventResponse['event_id']);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                active: true,
+                name: name,
+                version: this.version + 1,
+            },
+            fileEventResponse["event_id"],
+        );
 
         // Deprecate ourselves
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            ...(this.indexEvent.getContent()),
-            active: false,
-        }, this.id);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                ...this.indexEvent.getContent(),
+                active: false,
+            },
+            this.id,
+        );
 
         return fileEventResponse;
     }
@@ -221,7 +241,7 @@ export class MSC3089Branch {
         let childEvent: MatrixEvent | undefined;
         let parentEvent = await this.getFileEvent();
         do {
-            childEvent = timelineEvents.find(e => e.replacingEventId() === parentEvent.getId());
+            childEvent = timelineEvents.find((e) => e.replacingEventId() === parentEvent.getId());
             if (childEvent) {
                 const branch = this.directory.getFile(childEvent.getId());
                 if (branch) {

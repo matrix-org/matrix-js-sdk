@@ -33,7 +33,8 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 function isValidFilterId(filterId: string): boolean {
-    const isValidStr = typeof filterId === "string" &&
+    const isValidStr =
+        typeof filterId === "string" &&
         !!filterId &&
         filterId !== "undefined" && // exclude these as we've serialized undefined in localStorage before
         filterId !== "null";
@@ -126,9 +127,7 @@ export class MemoryStore implements IStore {
         if (member.name) {
             user.setDisplayName(member.name);
             if (member.events.member) {
-                user.setRawDisplayName(
-                    member.events.member.getDirectionalContent().displayname,
-                );
+                user.setRawDisplayName(member.events.member.getDirectionalContent().displayname);
             }
         }
         if (member.events.member && member.events.member.getContent().avatar_url) {
@@ -170,7 +169,7 @@ export class MemoryStore implements IStore {
      * @return {RoomSummary[]} A summary of each room.
      */
     public getRoomSummaries(): RoomSummary[] {
-        return Object.values(this.rooms).map(function(room) {
+        return Object.values(this.rooms).map(function (room) {
             return room.summary;
         });
     }
@@ -451,7 +450,7 @@ export class MemoryStore implements IStore {
     }
 
     public removeToDeviceBatch(id: number): Promise<void> {
-        this.pendingToDeviceBatches = this.pendingToDeviceBatches.filter(batch => batch.id !== id);
+        this.pendingToDeviceBatches = this.pendingToDeviceBatches.filter((batch) => batch.id !== id);
         return Promise.resolve();
     }
 }

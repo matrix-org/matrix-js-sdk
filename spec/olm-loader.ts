@@ -15,14 +15,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../src/logger';
+import { logger } from "../src/logger";
 import * as utils from "../src/utils";
 
 // try to load the olm library.
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    global.Olm = require('@matrix-org/olm');
-    logger.log('loaded libolm');
+    global.Olm = require("@matrix-org/olm");
+    logger.log("loaded libolm");
 } catch (e) {
     logger.warn("unable to run crypto tests: libolm not available");
 }
@@ -30,8 +30,8 @@ try {
 // also try to set node crypto
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
+    const crypto = require("crypto");
     utils.setCrypto(crypto);
 } catch (err) {
-    logger.log('nodejs was compiled without crypto support: some tests will fail');
+    logger.log("nodejs was compiled without crypto support: some tests will fail");
 }

@@ -31,8 +31,10 @@ export const POLICIES_ACCOUNT_EVENT_TYPE = new UnstableValue("m.policies", "org.
 /// The key within the user's individual policies storing the user's ignored invites.
 ///
 /// Exported for testing purposes.
-export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue("m.ignore.invites",
-    "org.matrix.msc3847.ignore.invites");
+export const IGNORE_INVITES_ACCOUNT_EVENT_KEY = new UnstableValue(
+    "m.ignore.invites",
+    "org.matrix.msc3847.ignore.invites",
+);
 
 /// The types of recommendations understood.
 enum PolicyRecommendation {
@@ -73,10 +75,7 @@ export enum PolicyScope {
  * our data structures.
  */
 export class IgnoredInvites {
-    constructor(
-        private readonly client: MatrixClient,
-    ) {
-    }
+    constructor(private readonly client: MatrixClient) {}
 
     /**
      * Add a new rule.
@@ -125,13 +124,12 @@ export class IgnoredInvites {
         // of the racy section.
         await this.client.joinRoom(roomId);
         // Race starts.
-        const sources = (await this.getOrCreateSourceRooms())
-            .map(room => room.roomId);
+        const sources = (await this.getOrCreateSourceRooms()).map((room) => room.roomId);
         if (sources.includes(roomId)) {
             return false;
         }
         sources.push(roomId);
-        await this.withIgnoreInvitesPolicies(ignoreInvitesPolicies => {
+        await this.withIgnoreInvitesPolicies((ignoreInvitesPolicies) => {
             ignoreInvitesPolicies.sources = sources;
         });
 
@@ -146,7 +144,10 @@ export class IgnoredInvites {
      * @param roomId The room to which the user is invited.
      * @returns A rule matching the entity, if any was found, `null` otherwise.
      */
-    public async getRuleForInvite({ sender, roomId }: {
+    public async getRuleForInvite({
+        sender,
+        roomId,
+    }: {
         sender: string;
         roomId: string;
     }): Promise<Readonly<MatrixEvent | null>> {
@@ -234,11 +235,13 @@ export class IgnoredInvites {
             }
         }
         // We need to create our own policy room for ignoring invites.
-        target = (await this.client.createRoom({
-            name: "Individual Policy Room",
-            preset: Preset.PrivateChat,
-        })).room_id;
-        await this.withIgnoreInvitesPolicies(ignoreInvitesPolicies => {
+        target = (
+            await this.client.createRoom({
+                name: "Individual Policy Room",
+                preset: Preset.PrivateChat,
+            })
+        ).room_id;
+        await this.withIgnoreInvitesPolicies((ignoreInvitesPolicies) => {
             ignoreInvitesPolicies.target = target;
         });
 
@@ -274,9 +277,9 @@ export class IgnoredInvites {
         }
         let sourceRooms: Room[] = sources
             // `sources` could contain non-string / invalid room ids
-            .filter(roomId => typeof roomId === "string")
-            .map(roomId => this.client.getRoom(roomId))
-            .filter(room => !!room);
+            .filter((roomId) => typeof roomId === "string")
+            .map((roomId) => this.client.getRoom(roomId))
+            .filter((room) => !!room);
         if (sourceRooms.length != sources.length) {
             hasChanges = true;
         }
@@ -290,7 +293,7 @@ export class IgnoredInvites {
         if (hasChanges) {
             // Reload `policies`/`ignoreInvitesPolicies` in case it has been changed
             // during or by our call to `this.getTargetRoom()`.
-            await this.withIgnoreInvitesPolicies(ignoreInvitesPolicies => {
+            await this.withIgnoreInvitesPolicies((ignoreInvitesPolicies) => {
                 ignoreInvitesPolicies.sources = sources;
             });
         }
@@ -307,14 +310,14 @@ export class IgnoredInvites {
      *
      * @returns A non-null object.
      */
-    private getIgnoreInvitesPolicies(): {[key: string]: any} {
+    private getIgnoreInvitesPolicies(): { [key: string]: any } {
         return this.getPoliciesAndIgnoreInvitesPolicies().ignoreInvitesPolicies;
     }
 
     /**
      * Modify in place the `IGNORE_INVITES_POLICIES` object from account data.
      */
-    private async withIgnoreInvitesPolicies(cb: (ignoreInvitesPolicies: {[key: string]: any}) => void) {
+    private async withIgnoreInvitesPolicies(cb: (ignoreInvitesPolicies: { [key: string]: any }) => void) {
         const { policies, ignoreInvitesPolicies } = this.getPoliciesAndIgnoreInvitesPolicies();
         cb(ignoreInvitesPolicies);
         policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name] = ignoreInvitesPolicies;
@@ -325,8 +328,10 @@ export class IgnoredInvites {
      * As `getIgnoreInvitesPolicies` but also return the `POLICIES_ACCOUNT_EVENT_TYPE`
      * object.
      */
-    private getPoliciesAndIgnoreInvitesPolicies():
-        {policies: {[key: string]: any}, ignoreInvitesPolicies: {[key: string]: any}} {
+    private getPoliciesAndIgnoreInvitesPolicies(): {
+        policies: { [key: string]: any };
+        ignoreInvitesPolicies: { [key: string]: any };
+    } {
         let policies = {};
         for (const key of [POLICIES_ACCOUNT_EVENT_TYPE.name, POLICIES_ACCOUNT_EVENT_TYPE.altName]) {
             if (!key) {

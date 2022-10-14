@@ -28,7 +28,7 @@ export class MediaHandler {
     public userMediaStreams: MediaStream[] = [];
     public screensharingStreams: MediaStream[] = [];
 
-    constructor(private client: MatrixClient) { }
+    constructor(private client: MatrixClient) {}
 
     /**
      * Set an audio input device to use for MatrixCalls
@@ -64,7 +64,7 @@ export class MediaHandler {
     public async updateLocalUsermediaStreams(): Promise<void> {
         if (this.userMediaStreams.length === 0) return;
 
-        const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
+        const callMediaStreamParams: Map<string, { audio: boolean; video: boolean }> = new Map();
         for (const call of this.client.callEventHandler.calls.values()) {
             callMediaStreamParams.set(call.callId, {
                 audio: call.hasLocalUserMediaAudioTrack,
@@ -86,12 +86,12 @@ export class MediaHandler {
 
     public async hasAudioDevice(): Promise<boolean> {
         const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter(device => device.kind === "audioinput").length > 0;
+        return devices.filter((device) => device.kind === "audioinput").length > 0;
     }
 
     public async hasVideoDevice(): Promise<boolean> {
         const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter(device => device.kind === "videoinput").length > 0;
+        return devices.filter((device) => device.kind === "videoinput").length > 0;
     }
 
     /**
@@ -101,8 +101,8 @@ export class MediaHandler {
      * @returns {MediaStream} based on passed parameters
      */
     public async getUserMediaStream(audio: boolean, video: boolean, reusable = true): Promise<MediaStream> {
-        const shouldRequestAudio = audio && await this.hasAudioDevice();
-        const shouldRequestVideo = video && await this.hasVideoDevice();
+        const shouldRequestAudio = audio && (await this.hasAudioDevice());
+        const shouldRequestVideo = video && (await this.hasVideoDevice());
 
         let stream: MediaStream;
 
@@ -110,8 +110,8 @@ export class MediaHandler {
             !this.localUserMediaStream ||
             (this.localUserMediaStream.getAudioTracks().length === 0 && shouldRequestAudio) ||
             (this.localUserMediaStream.getVideoTracks().length === 0 && shouldRequestVideo) ||
-            (this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput) ||
-            (this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput)
+            this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput ||
+            this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput
         ) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             logger.log("Getting user media with constraints", constraints);
@@ -252,20 +252,20 @@ export class MediaHandler {
         return {
             audio: audio
                 ? {
-                    deviceId: this.audioInput ? { ideal: this.audioInput } : undefined,
-                }
+                      deviceId: this.audioInput ? { ideal: this.audioInput } : undefined,
+                  }
                 : false,
             video: video
                 ? {
-                    deviceId: this.videoInput ? { ideal: this.videoInput } : undefined,
-                    /* We want 640x360.  Chrome will give it only if we ask exactly,
+                      deviceId: this.videoInput ? { ideal: this.videoInput } : undefined,
+                      /* We want 640x360.  Chrome will give it only if we ask exactly,
                    FF refuses entirely if we ask exactly, so have to ask for ideal
                    instead
                    XXX: Is this still true?
                  */
-                    width: isWebkit ? { exact: 640 } : { ideal: 640 },
-                    height: isWebkit ? { exact: 360 } : { ideal: 360 },
-                }
+                      width: isWebkit ? { exact: 640 } : { ideal: 640 },
+                      height: isWebkit ? { exact: 360 } : { ideal: 360 },
+                  }
                 : false,
         };
     }

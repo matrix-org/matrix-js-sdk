@@ -16,11 +16,7 @@ limitations under the License.
 
 import { RelationType } from "./@types/event";
 import { MatrixEvent } from "./models/event";
-import {
-    FILTER_RELATED_BY_REL_TYPES,
-    FILTER_RELATED_BY_SENDERS,
-    THREAD_RELATION_TYPE,
-} from "./models/thread";
+import { FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS, THREAD_RELATION_TYPE } from "./models/thread";
 
 /**
  * @module filter-component
@@ -108,13 +104,13 @@ export class FilterComponent {
      */
     public toJSON(): object {
         return {
-            "types": this.filterJson.types || null,
-            "not_types": this.filterJson.not_types || [],
-            "rooms": this.filterJson.rooms || null,
-            "not_rooms": this.filterJson.not_rooms || [],
-            "senders": this.filterJson.senders || null,
-            "not_senders": this.filterJson.not_senders || [],
-            "contains_url": this.filterJson.contains_url || null,
+            types: this.filterJson.types || null,
+            not_types: this.filterJson.not_types || [],
+            rooms: this.filterJson.rooms || null,
+            not_rooms: this.filterJson.not_rooms || [],
+            senders: this.filterJson.senders || null,
+            not_senders: this.filterJson.not_senders || [],
+            contains_url: this.filterJson.contains_url || null,
             [FILTER_RELATED_BY_SENDERS.name]: this.filterJson[FILTER_RELATED_BY_SENDERS.name] || [],
             [FILTER_RELATED_BY_REL_TYPES.name]: this.filterJson[FILTER_RELATED_BY_REL_TYPES.name] || [],
         };
@@ -139,13 +135,13 @@ export class FilterComponent {
         relationSenders: string[],
     ): boolean {
         const literalKeys = {
-            "rooms": function(v: string): boolean {
+            rooms: function (v: string): boolean {
                 return roomId === v;
             },
-            "senders": function(v: string): boolean {
+            senders: function (v: string): boolean {
                 return sender === v;
             },
-            "types": function(v: string): boolean {
+            types: function (v: string): boolean {
                 return matchesWildcard(eventType, v);
             },
         };
@@ -188,9 +184,12 @@ export class FilterComponent {
     }
 
     private arrayMatchesFilter(filter: any[], values: any[]): boolean {
-        return values.length > 0 && filter.every(value => {
-            return values.includes(value);
-        });
+        return (
+            values.length > 0 &&
+            filter.every((value) => {
+                return values.includes(value);
+            })
+        );
     }
 
     /**

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../../logger';
+import { logger } from "../../logger";
 import * as utils from "../../utils";
 import {
     CryptoStore,
@@ -103,18 +103,15 @@ export class MemoryCryptoStore implements CryptoStore {
                 // this entry matches the request - return it.
                 logger.log(
                     `already have key request outstanding for ` +
-                    `${requestBody.room_id} / ${requestBody.session_id}: ` +
-                    `not sending another`,
+                        `${requestBody.room_id} / ${requestBody.session_id}: ` +
+                        `not sending another`,
                 );
                 return existing;
             }
 
             // we got to the end of the list without finding a match
             // - add the new request.
-            logger.log(
-                `enqueueing key request for ${requestBody.room_id} / ` +
-                requestBody.session_id,
-            );
+            logger.log(`enqueueing key request for ${requestBody.room_id} / ` + requestBody.session_id);
             this.outgoingRoomKeyRequests.push(request);
             return request;
         });
@@ -181,11 +178,7 @@ export class MemoryCryptoStore implements CryptoStore {
      * @return {Promise<Array<*>>} All OutgoingRoomKeyRequests in state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
-        return Promise.resolve(
-            this.outgoingRoomKeyRequests.filter(
-                (r) => r.state == wantedState,
-            ),
-        );
+        return Promise.resolve(this.outgoingRoomKeyRequests.filter((r) => r.state == wantedState));
     }
 
     public getOutgoingRoomKeyRequestsByTarget(
@@ -197,9 +190,10 @@ export class MemoryCryptoStore implements CryptoStore {
 
         for (const req of this.outgoingRoomKeyRequests) {
             for (const state of wantedStates) {
-                if (req.state === state && req.recipients.some(
-                    (recipient) => recipient.userId === userId && recipient.deviceId === deviceId,
-                )) {
+                if (
+                    req.state === state &&
+                    req.recipients.some((recipient) => recipient.userId === userId && recipient.deviceId === deviceId)
+                ) {
                     results.push(req);
                 }
             }
@@ -232,7 +226,7 @@ export class MemoryCryptoStore implements CryptoStore {
             if (req.state !== expectedState) {
                 logger.warn(
                     `Cannot update room key request from ${expectedState} ` +
-                    `as it was already updated to ${req.state}`,
+                        `as it was already updated to ${req.state}`,
                 );
                 return Promise.resolve(null);
             }
@@ -264,10 +258,7 @@ export class MemoryCryptoStore implements CryptoStore {
             }
 
             if (req.state != expectedState) {
-                logger.warn(
-                    `Cannot delete room key request in state ${req.state} `
-                    + `(expected ${expectedState})`,
-                );
+                logger.warn(`Cannot delete room key request in state ${req.state} ` + `(expected ${expectedState})`);
                 return Promise.resolve(null);
             }
 
@@ -351,7 +342,7 @@ export class MemoryCryptoStore implements CryptoStore {
     }
 
     public async storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
-        const problems = this.sessionProblems[deviceKey] = this.sessionProblems[deviceKey] || [];
+        const problems = (this.sessionProblems[deviceKey] = this.sessionProblems[deviceKey] || []);
         problems.push({ type, fixed, time: Date.now() });
         problems.sort((a, b) => {
             return a.time - b.time;
@@ -404,17 +395,11 @@ export class MemoryCryptoStore implements CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
-        func(
-            this.inboundGroupSessions[k] || null,
-            this.inboundGroupSessionsWithheld[k] || null,
-        );
+        const k = senderCurve25519Key + "/" + sessionId;
+        func(this.inboundGroupSessions[k] || null, this.inboundGroupSessionsWithheld[k] || null);
     }
 
-    public getAllEndToEndInboundGroupSessions(
-        txn: unknown,
-        func: (session: ISession | null) => void,
-    ): void {
+    public getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void {
         for (const key of Object.keys(this.inboundGroupSessions)) {
             // we can't use split, as the components we are trying to split out
             // might themselves contain '/' characters. We rely on the
@@ -436,7 +421,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
+        const k = senderCurve25519Key + "/" + sessionId;
         if (this.inboundGroupSessions[k] === undefined) {
             this.inboundGroupSessions[k] = sessionData;
         }
@@ -448,7 +433,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        this.inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+        this.inboundGroupSessions[senderCurve25519Key + "/" + sessionId] = sessionData;
     }
 
     public storeEndToEndInboundGroupSessionWithheld(
@@ -457,7 +442,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: IWithheld,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
+        const k = senderCurve25519Key + "/" + sessionId;
         this.inboundGroupSessionsWithheld[k] = sessionData;
     }
 
@@ -504,7 +489,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + '/' + session.sessionId;
+            const sessionKey = session.senderKey + "/" + session.sessionId;
             delete this.sessionsNeedingBackup[sessionKey];
         }
         return Promise.resolve();
@@ -512,7 +497,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + '/' + session.sessionId;
+            const sessionKey = session.senderKey + "/" + session.sessionId;
             this.sessionsNeedingBackup[sessionKey] = true;
         }
         return Promise.resolve();

@@ -20,9 +20,9 @@ limitations under the License.
  */
 
 import { VerificationBase as Base, VerificationEventHandlerMap } from "./Base";
-import { newKeyMismatchError, newUserCancelledError } from './Error';
+import { newKeyMismatchError, newUserCancelledError } from "./Error";
 import { decodeBase64, encodeUnpaddedBase64 } from "../olmlib";
-import { logger } from '../../logger';
+import { logger } from "../../logger";
 import { VerificationRequest } from "./request/VerificationRequest";
 import { MatrixClient } from "../../client";
 import { IVerificationChannel } from "./request/Channel";
@@ -70,13 +70,12 @@ export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
     protected doVerification = async (): Promise<void> => {
         if (!this.startEvent) {
             // TODO: Support scanning QR codes
-            throw new Error("It is not currently possible to start verification" +
-                "with this method yet.");
+            throw new Error("It is not currently possible to start verification" + "with this method yet.");
         }
 
         const { qrCodeData } = this.request;
         // 1. check the secret
-        if (this.startEvent.getContent()['secret'] !== qrCodeData.encodedSharedSecret) {
+        if (this.startEvent.getContent()["secret"] !== qrCodeData.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
 
@@ -173,8 +172,7 @@ export class QRCodeData {
         let otherDeviceKey = null;
         let myMasterKey = null;
         if (mode === Mode.VerifyOtherUser) {
-            const otherUserCrossSigningInfo =
-                client.getStoredCrossSigningForUser(request.otherUserId);
+            const otherUserCrossSigningInfo = client.getStoredCrossSigningForUser(request.otherUserId);
             otherUserMasterKey = otherUserCrossSigningInfo.getId("master");
         } else if (mode === Mode.VerifySelfTrusted) {
             otherDeviceKey = await QRCodeData.getOtherDeviceKey(request, client);
@@ -184,15 +182,16 @@ export class QRCodeData {
             myMasterKey = myCrossSigningInfo.getId("master");
         }
         const qrData = QRCodeData.generateQrData(
-            request, client, mode,
+            request,
+            client,
+            mode,
             sharedSecret,
             otherUserMasterKey,
             otherDeviceKey,
             myMasterKey,
         );
         const buffer = QRCodeData.generateBuffer(qrData);
-        return new QRCodeData(mode, sharedSecret,
-            otherUserMasterKey, otherDeviceKey, myMasterKey, buffer);
+        return new QRCodeData(mode, sharedSecret, otherUserMasterKey, otherDeviceKey, myMasterKey, buffer);
     }
 
     /**
@@ -256,8 +255,8 @@ export class QRCodeData {
             version: CODE_VERSION,
             mode,
             transactionId,
-            firstKeyB64: '', // worked out shortly
-            secondKeyB64: '', // worked out shortly
+            firstKeyB64: "", // worked out shortly
+            secondKeyB64: "", // worked out shortly
             secretB64: encodedSharedSecret,
         };
 

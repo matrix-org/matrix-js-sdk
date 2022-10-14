@@ -24,7 +24,7 @@ limitations under the License.
  * it will instead fire as soon as possible after resume.
  */
 
-import { logger } from './logger';
+import { logger } from "./logger";
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.
@@ -46,7 +46,7 @@ const callbackList: {
 }[] = [];
 
 // var debuglog = logger.log.bind(logger);
-const debuglog = function(...params: any[]) {};
+const debuglog = function (...params: any[]) {};
 
 /**
  * reimplementation of window.setTimeout, which will call the callback if
@@ -66,8 +66,7 @@ export function setTimeout(func: (...params: any[]) => void, delayMs: number, ..
 
     const runAt = Date.now() + delayMs;
     const key = count++;
-    debuglog("setTimeout: scheduling cb", key, "at", runAt,
-        "(delay", delayMs, ")");
+    debuglog("setTimeout: scheduling cb", key, "at", runAt, "(delay", delayMs, ")");
     const data = {
         runAt: runAt,
         func: func,
@@ -76,11 +75,9 @@ export function setTimeout(func: (...params: any[]) => void, delayMs: number, ..
     };
 
     // figure out where it goes in the list
-    const idx = binarySearch(
-        callbackList, function(el) {
-            return el.runAt - runAt;
-        },
-    );
+    const idx = binarySearch(callbackList, function (el) {
+        return el.runAt - runAt;
+    });
 
     callbackList.splice(idx, 0, data);
     scheduleRealCallback();
@@ -162,8 +159,7 @@ function runCallbacks(): void {
         try {
             cb.func.apply(global, cb.params);
         } catch (e) {
-            logger.error("Uncaught exception in callback function",
-                e.stack || e);
+            logger.error("Uncaught exception in callback function", e.stack || e);
         }
     }
 }

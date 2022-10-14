@@ -85,8 +85,10 @@ describe("MatrixHttpApi", () => {
             useAuthorizationHeader: false,
         });
         upload = api.uploadContent({} as File);
-        expect(xhr.open)
-            .toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/r0/upload?access_token=token");
+        expect(xhr.open).toHaveBeenCalledWith(
+            Method.Post,
+            baseUrl.toLowerCase() + "/_matrix/media/r0/upload?access_token=token",
+        );
         expect(xhr.setRequestHeader).not.toHaveBeenCalledWith("Authorization");
     });
 
@@ -104,8 +106,10 @@ describe("MatrixHttpApi", () => {
     it("should include filename by default", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
         upload = api.uploadContent({} as File, { name: "name" });
-        expect(xhr.open)
-            .toHaveBeenCalledWith(Method.Post, baseUrl.toLowerCase() + "/_matrix/media/r0/upload?filename=name");
+        expect(xhr.open).toHaveBeenCalledWith(
+            Method.Post,
+            baseUrl.toLowerCase() + "/_matrix/media/r0/upload?filename=name",
+        );
     });
 
     it("should allow not sending the filename", () => {
@@ -216,9 +220,9 @@ describe("MatrixHttpApi", () => {
     it("should return active uploads in `getCurrentUploads`", () => {
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix });
         upload = api.uploadContent({} as File);
-        expect(api.getCurrentUploads().find(u => u.promise === upload)).toBeTruthy();
+        expect(api.getCurrentUploads().find((u) => u.promise === upload)).toBeTruthy();
         api.cancelUpload(upload);
-        expect(api.getCurrentUploads().find(u => u.promise === upload)).toBeFalsy();
+        expect(api.getCurrentUploads().find((u) => u.promise === upload)).toBeFalsy();
     });
 
     it("should return expected object from `getContentUri`", () => {

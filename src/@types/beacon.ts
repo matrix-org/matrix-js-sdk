@@ -97,8 +97,7 @@ export type MBeaconInfoContent = {
 /**
  * m.beacon_info.* event content
  */
-export type MBeaconInfoEventContent = &
-    MBeaconInfoContent &
+export type MBeaconInfoEventContent = MBeaconInfoContent &
     // creation timestamp of the beacon on the client
     MTimestampEvent &
     // the type of asset being tracked as per MSC3488
@@ -128,10 +127,8 @@ export type MBeaconInfoEventContent = &
 /**
  * Content of an m.beacon event
  */
-export type MBeaconEventContent = &
-    MLocationEvent &
+export type MBeaconEventContent = MLocationEvent &
     // timestamp when location was taken
     MTimestampEvent &
     // relates to a beacon_info event
     RELATES_TO_RELATIONSHIP<typeof REFERENCE_RELATION>;
-
