@@ -19,10 +19,14 @@ import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
 import { MatrixEvent } from "../../../../src/models/event";
 import { SAS } from "../../../../src/crypto/verification/SAS";
 import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
-import { verificationMethods } from "../../../../src/crypto";
+import { CryptoEvent, verificationMethods } from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { logger } from "../../../../src/logger";
 import { resetCrossSigningKeys } from "../crypto-utils";
+import { VerificationBase } from "../../../../src/crypto/verification/Base";
+import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
+import { MatrixClient } from "../../../../src";
+import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
 
 const Olm = global.Olm;
 
@@ -48,13 +52,15 @@ describe("SAS verification", function() {
         //channel, baseApis, userId, deviceId, startEvent, request
         const request = {
             onVerifierCancelled: function() {},
-        };
+        } as VerificationRequest;
         const channel = {
             send: function() {
                 return Promise.resolve();
             },
-        };
-        const sas = new SAS(channel, {}, "@alice:example.com", "ABCDEFG", null, request);
+        } as unknown as IVerificationChannel;
+        const mockClient = {} as unknown as MatrixClient;
+        const event = new MatrixEvent({ type: 'test' });
+        const sas = new SAS(channel, mockClient, "@alice:example.com", "ABCDEFG", event, request);
         sas.handleEvent(new MatrixEvent({
             sender: "@alice:example.com",
             type: "es.inquisition",
@@ -65,7 +71,7 @@ describe("SAS verification", function() {
         expect(spy).toHaveBeenCalled();
 
         // Cancel the SAS for cleanup (we started a verification, so abort)
-        sas.cancel();
+        sas.cancel(new Error('error'));
     });
 
     describe("verification", () => {
@@ -403,16 +409,12 @@ describe("SAS verification", function() {
             },
         );
         alice.client.setDeviceVerified = jest.fn();
-        alice.client.downloadKeys = () => {
-            return Promise.resolve();
-        };
+        alice.client.downloadKeys = jest.fn().mockResolvedValue({});
         bob.client.setDeviceVerified = jest.fn();
-        bob.client.downloadKeys = () => {
-            return Promise.resolve();
-        };
+        bob.client.downloadKeys = jest.fn().mockResolvedValue({});
 
-        const bobPromise = new Promise((resolve, reject) => {
-            bob.client.on("crypto.verification.request", request => {
+        const bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
+            bob.client.on(CryptoEvent.VerificationRequest, request => {
                 request.verifier.on("show_sas", (e) => {
                     e.mismatch();
                 });
@@ -421,7 +423,7 @@ describe("SAS verification", function() {
         });
 
         const aliceVerifier = alice.client.beginKeyVerification(
-            verificationMethods.SAS, bob.client.getUserId(), bob.client.deviceId,
+            verificationMethods.SAS, bob.client.getUserId()!, bob.client.deviceId!,
         );
 
         const aliceSpy = jest.fn();
@@ -462,7 +464,7 @@ describe("SAS verification", function() {
                 },
             );
 
-            alice.client.setDeviceVerified = jest.fn();
+            alice.client.crypto.setDeviceVerification = jest.fn();
             alice.client.getDeviceEd25519Key = () => {
                 return "alice+base64+ed25519+key";
             };
@@ -480,7 +482,7 @@ describe("SAS verification", function() {
                 return Promise.resolve();
             };
 
-            bob.client.setDeviceVerified = jest.fn();
+            bob.client.crypto.setDeviceVerification = jest.fn();
             bob.client.getStoredDevice = () => {
                 return DeviceInfo.fromStorage(
                     {
@@ -501,7 +503,7 @@ describe("SAS verification", function() {
             aliceSasEvent = null;
             bobSasEvent = null;
 
-            bobPromise = new Promise((resolve, reject) => {
+            bobPromise = new Promise<void>((resolve, reject) => {
                 bob.client.on("crypto.verification.request", async (request) => {
                     const verifier = request.beginKeyVerification(SAS.NAME);
                     verifier.on("show_sas", (e) => {
@@ -563,10 +565,24 @@ describe("SAS verification", function() {
             ]);
 
             // make sure Alice and Bob verified each other
-            expect(alice.client.setDeviceVerified)
-                .toHaveBeenCalledWith(bob.client.getUserId(), bob.client.deviceId);
-            expect(bob.client.setDeviceVerified)
-                .toHaveBeenCalledWith(alice.client.getUserId(), alice.client.deviceId);
+            expect(alice.client.crypto.setDeviceVerification)
+                .toHaveBeenCalledWith(
+                    bob.client.getUserId(),
+                    bob.client.deviceId,
+                    true,
+                    null,
+                    null,
+                    { "ed25519:Dynabook": "bob+base64+ed25519+key" },
+                );
+            expect(bob.client.crypto.setDeviceVerification)
+                .toHaveBeenCalledWith(
+                    alice.client.getUserId(),
+                    alice.client.deviceId,
+                    true,
+                    null,
+                    null,
+                    { "ed25519:Osborne2": "alice+base64+ed25519+key" },
+                );
         });
     });
 });

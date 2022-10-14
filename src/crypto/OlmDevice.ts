@@ -23,6 +23,7 @@ import * as algorithms from './algorithms';
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
 import { IMegolmSessionData } from "./index";
+import { OlmGroupSessionExtraData } from "../@types/crypto";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
@@ -122,6 +123,7 @@ interface IInboundGroupSessionKey {
     forwarding_curve25519_key_chain: string[];
     sender_claimed_ed25519_key: string;
     shared_history: boolean;
+    untrusted: boolean;
 }
 /* eslint-enable camelcase */
 
@@ -1101,7 +1103,7 @@ export class OlmDevice {
         sessionKey: string,
         keysClaimed: Record<string, string>,
         exportFormat: boolean,
-        extraSessionData: Record<string, any> = {},
+        extraSessionData: OlmGroupSessionExtraData = {},
     ): Promise<void> {
         await this.cryptoStore.doTxn(
             'readwrite', [
@@ -1133,17 +1135,42 @@ export class OlmDevice {
                                     "Update for megolm session "
                                     + senderKey + "/" + sessionId,
                                 );
-                                if (existingSession.first_known_index()
-                                    <= session.first_known_index()
-                                    && !(existingSession.first_known_index() == session.first_known_index()
-                                        && !extraSessionData.untrusted
-                                        && existingSessionData.untrusted)) {
-                                    // existing session has lower index (i.e. can
-                                    // decrypt more), or they have the same index and
-                                    // the new sessions trust does not win over the old
-                                    // sessions trust, so keep it
-                                    logger.log(`Keeping existing megolm session ${sessionId}`);
-                                    return;
+                                if (existingSession.first_known_index() <= session.first_known_index()) {
+                                    if (!existingSessionData.untrusted || extraSessionData.untrusted) {
+                                        // existing session has less-than-or-equal index
+                                        // (i.e. can decrypt at least as much), and the
+                                        // new session's trust does not win over the old
+                                        // session's trust, so keep it
+                                        logger.log(`Keeping existing megolm session ${sessionId}`);
+                                        return;
+                                    }
+                                    if (existingSession.first_known_index() < session.first_known_index()) {
+                                        // We want to upgrade the existing session's trust,
+                                        // but we can't just use the new session because we'll
+                                        // lose the lower index. Check that the sessions connect
+                                        // properly, and then manually set the existing session
+                                        // as trusted.
+                                        if (
+                                            existingSession.export_session(session.first_known_index())
+                                            === session.export_session(session.first_known_index())
+                                        ) {
+                                            logger.info(
+                                                "Upgrading trust of existing megolm session " +
+                                                sessionId + " based on newly-received trusted session",
+                                            );
+                                            existingSessionData.untrusted = false;
+                                            this.cryptoStore.storeEndToEndInboundGroupSession(
+                                                senderKey, sessionId, existingSessionData, txn,
+                                            );
+                                        } else {
+                                            logger.warn(
+                                                "Newly-received megolm session " + sessionId +
+                                                " does not match existing session! Keeping existing session",
+                                            );
+                                        }
+                                        return;
+                                    }
+                                    // If the sessions have the same index, go ahead and store the new trusted one.
                                 }
                             }
 
@@ -1427,13 +1454,23 @@ export class OlmDevice {
                         const claimedKeys = sessionData.keysClaimed || {};
                         const senderEd25519Key = claimedKeys.ed25519 || null;
 
+                        const forwardingKeyChain = sessionData.forwardingCurve25519KeyChain || [];
+                        // older forwarded keys didn't set the "untrusted"
+                        // property, but can be identified by having a
+                        // non-empty forwarding key chain.  These keys should
+                        // be marked as untrusted since we don't know that they
+                        // can be trusted
+                        const untrusted = "untrusted" in sessionData
+                            ? sessionData.untrusted
+                            : forwardingKeyChain.length > 0;
+
                         result = {
                             "chain_index": chainIndex,
                             "key": exportedSession,
-                            "forwarding_curve25519_key_chain":
-                                sessionData.forwardingCurve25519KeyChain || [],
+                            "forwarding_curve25519_key_chain": forwardingKeyChain,
                             "sender_claimed_ed25519_key": senderEd25519Key,
                             "shared_history": sessionData.sharedHistory || false,
+                            "untrusted": untrusted,
                         };
                     },
                 );

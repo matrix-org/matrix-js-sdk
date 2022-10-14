@@ -25,6 +25,7 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
+    ParkedSharedHistory,
 } from "./base";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -33,7 +34,6 @@ import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
 import { IEncryptedPayload } from "../aes";
 
-export const VERSION = 10;
 const PROFILE_TRANSACTIONS = false;
 
 /**
@@ -873,6 +873,50 @@ export class Backend implements CryptoStore {
         });
     }
 
+    public addParkedSharedHistory(
+        roomId: string,
+        parkedData: ParkedSharedHistory,
+        txn?: IDBTransaction,
+    ): void {
+        if (!txn) {
+            txn = this.db.transaction(
+                "parked_shared_history", "readwrite",
+            );
+        }
+        const objectStore = txn.objectStore("parked_shared_history");
+        const req = objectStore.get([roomId]);
+        req.onsuccess = () => {
+            const { parked } = req.result || { parked: [] };
+            parked.push(parkedData);
+            objectStore.put({ roomId, parked });
+        };
+    }
+
+    public takeParkedSharedHistory(
+        roomId: string,
+        txn?: IDBTransaction,
+    ): Promise<ParkedSharedHistory[]> {
+        if (!txn) {
+            txn = this.db.transaction(
+                "parked_shared_history", "readwrite",
+            );
+        }
+        const cursorReq = txn.objectStore("parked_shared_history").openCursor(roomId);
+        return new Promise((resolve, reject) => {
+            cursorReq.onsuccess = () => {
+                const cursor = cursorReq.result;
+                if (!cursor) {
+                    resolve([]);
+                    return;
+                }
+                const data = cursor.value;
+                cursor.delete();
+                resolve(data);
+            };
+            cursorReq.onerror = reject;
+        });
+    }
+
     public doTxn<T>(
         mode: Mode,
         stores: string | string[],
@@ -905,45 +949,34 @@ export class Backend implements CryptoStore {
     }
 }
 
-export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
-    logger.log(
-        `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
-            + ` to ${VERSION}`,
-    );
-    if (oldVersion < 1) { // The database did not previously exist.
-        createDatabase(db);
-    }
-    if (oldVersion < 2) {
-        db.createObjectStore("account");
-    }
-    if (oldVersion < 3) {
+type DbMigration = (db: IDBDatabase) => void;
+const DB_MIGRATIONS: DbMigration[] = [
+    (db) => { createDatabase(db); },
+    (db) => { db.createObjectStore("account"); },
+    (db) => {
         const sessionsStore = db.createObjectStore("sessions", {
             keyPath: ["deviceKey", "sessionId"],
         });
         sessionsStore.createIndex("deviceKey", "deviceKey");
-    }
-    if (oldVersion < 4) {
+    },
+    (db) => {
         db.createObjectStore("inbound_group_sessions", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
-    }
-    if (oldVersion < 5) {
-        db.createObjectStore("device_data");
-    }
-    if (oldVersion < 6) {
-        db.createObjectStore("rooms");
-    }
-    if (oldVersion < 7) {
+    },
+    (db) => { db.createObjectStore("device_data"); },
+    (db) => { db.createObjectStore("rooms"); },
+    (db) => {
         db.createObjectStore("sessions_needing_backup", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
-    }
-    if (oldVersion < 8) {
+    },
+    (db) => {
         db.createObjectStore("inbound_group_sessions_withheld", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
-    }
-    if (oldVersion < 9) {
+    },
+    (db) => {
         const problemsStore = db.createObjectStore("session_problems", {
             keyPath: ["deviceKey", "time"],
         });
@@ -952,13 +985,29 @@ export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
         db.createObjectStore("notified_error_devices", {
             keyPath: ["userId", "deviceId"],
         });
-    }
-    if (oldVersion < 10) {
+    },
+    (db) => {
         db.createObjectStore("shared_history_inbound_group_sessions", {
             keyPath: ["roomId"],
         });
-    }
+    },
+    (db) => {
+        db.createObjectStore("parked_shared_history", {
+            keyPath: ["roomId"],
+        });
+    },
     // Expand as needed.
+];
+export const VERSION = DB_MIGRATIONS.length;
+
+export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
+    logger.log(
+        `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
+            + ` to ${VERSION}`,
+    );
+    DB_MIGRATIONS.forEach((migration, index) => {
+        if (oldVersion <= index) migration(db);
+    });
 }
 
 function createDatabase(db: IDBDatabase): void {

@@ -36,9 +36,14 @@ import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
-import { ContentHelpers, Room } from "../../src";
+import { ContentHelpers, EventTimeline, Room } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
+import {
+    IGNORE_INVITES_ACCOUNT_EVENT_KEY,
+    POLICIES_ACCOUNT_EVENT_TYPE,
+    PolicyScope,
+} from "../../src/models/invites-ignorer";
 
 jest.useFakeTimers();
 
@@ -98,7 +103,7 @@ describe("MatrixClient", function() {
     ];
     let acceptKeepalives: boolean;
     let pendingLookup = null;
-    function httpReq(cb, method, path, qp, data, prefix) {
+    function httpReq(method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
                 unstable_features: {
@@ -127,7 +132,6 @@ describe("MatrixClient", function() {
                 method: method,
                 path: path,
             };
-            pendingLookup.promise.abort = () => {}; // to make it a valid IAbortablePromise
             return pendingLookup.promise;
         }
         if (next.path === path && next.method === method) {
@@ -173,7 +177,7 @@ describe("MatrixClient", function() {
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
             accessToken: "my.access.token",
-            request: function() {} as any, // NOP
+            fetchFn: function() {} as any, // NOP
             store: store,
             scheduler: scheduler,
             userId: userId,
@@ -427,7 +431,7 @@ describe("MatrixClient", function() {
                 }
             });
         });
-        await client.startClient();
+        await client.startClient({ filter });
         await syncPromise;
     });
 
@@ -1148,8 +1152,7 @@ describe("MatrixClient", function() {
 
             // event type combined
             const expectedEventType = M_BEACON_INFO.name;
-            const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
-            expect(callback).toBeFalsy();
+            const [method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(method).toBe('PUT');
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
@@ -1163,7 +1166,7 @@ describe("MatrixClient", function() {
             await client.unstable_setLiveBeacon(roomId, content);
 
             // event type combined
-            const [, , path, , requestContent] = client.http.authedRequest.mock.calls[0];
+            const [, path, , requestContent] = client.http.authedRequest.mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
                 `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
@@ -1224,7 +1227,7 @@ describe("MatrixClient", function() {
         it("is called with plain text topic and callback and sends state event", async () => {
             const sendStateEvent = createSendStateEventMock("pizza");
             client.sendStateEvent = sendStateEvent;
-            await client.setRoomTopic(roomId, "pizza", () => {});
+            await client.setRoomTopic(roomId, "pizza");
             expect(sendStateEvent).toHaveBeenCalledTimes(1);
         });
 
@@ -1239,15 +1242,9 @@ describe("MatrixClient", function() {
     describe("setPassword", () => {
         const auth = { session: 'abcdef', type: 'foo' };
         const newPassword = 'newpassword';
-        const callback = () => {};
 
-        const passwordTest = (expectedRequestContent: any, expectedCallback?: Function) => {
-            const [callback, method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
-            if (expectedCallback) {
-                expect(callback).toBe(expectedCallback);
-            } else {
-                expect(callback).toBeFalsy();
-            }
+        const passwordTest = (expectedRequestContent: any) => {
+            const [method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
             expect(method).toBe('POST');
             expect(path).toEqual('/account/password');
             expect(queryParams).toBeFalsy();
@@ -1264,8 +1261,8 @@ describe("MatrixClient", function() {
         });
 
         it("no logout_devices specified + callback", async () => {
-            await client.setPassword(auth, newPassword, callback);
-            passwordTest({ auth, new_password: newPassword }, callback);
+            await client.setPassword(auth, newPassword);
+            passwordTest({ auth, new_password: newPassword });
         });
 
         it("overload logoutDevices=true", async () => {
@@ -1274,8 +1271,8 @@ describe("MatrixClient", function() {
         });
 
         it("overload logoutDevices=true + callback", async () => {
-            await client.setPassword(auth, newPassword, true, callback);
-            passwordTest({ auth, new_password: newPassword, logout_devices: true }, callback);
+            await client.setPassword(auth, newPassword, true);
+            passwordTest({ auth, new_password: newPassword, logout_devices: true });
         });
 
         it("overload logoutDevices=false", async () => {
@@ -1284,8 +1281,8 @@ describe("MatrixClient", function() {
         });
 
         it("overload logoutDevices=false + callback", async () => {
-            await client.setPassword(auth, newPassword, false, callback);
-            passwordTest({ auth, new_password: newPassword, logout_devices: false }, callback);
+            await client.setPassword(auth, newPassword, false);
+            passwordTest({ auth, new_password: newPassword, logout_devices: false });
         });
     });
 
@@ -1300,8 +1297,7 @@ describe("MatrixClient", function() {
             const result = await client.getLocalAliases(roomId);
 
             // Current version of the endpoint we support is v3
-            const [callback, method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
-            expect(callback).toBeFalsy();
+            const [method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
             expect(data).toBeFalsy();
             expect(method).toBe('GET');
             expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
@@ -1410,6 +1406,303 @@ describe("MatrixClient", function() {
             const payload = {};
             await client.encryptAndSendToDevices(deviceInfos, payload);
             expect(client.crypto.encryptAndSendToDevices).toHaveBeenLastCalledWith(deviceInfos, payload);
+        });
+    });
+
+    describe("support for ignoring invites", () => {
+        beforeEach(() => {
+            // Mockup `getAccountData`/`setAccountData`.
+            const dataStore = new Map();
+            client.setAccountData = function(eventType, content) {
+                dataStore.set(eventType, content);
+                return Promise.resolve();
+            };
+            client.getAccountData = function(eventType) {
+                const data = dataStore.get(eventType);
+                return new MatrixEvent({
+                    content: data,
+                });
+            };
+
+            // Mockup `createRoom`/`getRoom`/`joinRoom`, including state.
+            const rooms = new Map();
+            client.createRoom = function(options = {}) {
+                const roomId = options["_roomId"] || `!room-${rooms.size}:example.org`;
+                const state = new Map();
+                const room = {
+                    roomId,
+                    _options: options,
+                    _state: state,
+                    getUnfilteredTimelineSet: function() {
+                        return {
+                            getLiveTimeline: function() {
+                                return {
+                                    getState: function(direction) {
+                                        expect(direction).toBe(EventTimeline.FORWARDS);
+                                        return {
+                                            getStateEvents: function(type) {
+                                                const store = state.get(type) || {};
+                                                return Object.keys(store).map(key => store[key]);
+                                            },
+                                        };
+                                    },
+                                };
+                            },
+                        };
+                    },
+                };
+                rooms.set(roomId, room);
+                return Promise.resolve({ room_id: roomId });
+            };
+            client.getRoom = function(roomId) {
+                return rooms.get(roomId);
+            };
+            client.joinRoom = function(roomId) {
+                return this.getRoom(roomId) || this.createRoom({ _roomId: roomId });
+            };
+
+            // Mockup state events
+            client.sendStateEvent = function(roomId, type, content) {
+                const room = this.getRoom(roomId);
+                const state: Map<string, any> = room._state;
+                let store = state.get(type);
+                if (!store) {
+                    store = {};
+                    state.set(type, store);
+                }
+                const eventId = `$event-${Math.random()}:example.org`;
+                store[eventId] = {
+                    getId: function() {
+                        return eventId;
+                    },
+                    getRoomId: function() {
+                        return roomId;
+                    },
+                    getContent: function() {
+                        return content;
+                    },
+                };
+                return { event_id: eventId };
+            };
+            client.redactEvent = function(roomId, eventId) {
+                const room = this.getRoom(roomId);
+                const state: Map<string, any> = room._state;
+                for (const store of state.values()) {
+                    delete store[eventId];
+                }
+            };
+        });
+
+        it("should initialize and return the same `target` consistently", async () => {
+            const target1 = await client.ignoredInvites.getOrCreateTargetRoom();
+            const target2 = await client.ignoredInvites.getOrCreateTargetRoom();
+            expect(target1).toBeTruthy();
+            expect(target1).toBe(target2);
+        });
+
+        it("should initialize and return the same `sources` consistently", async () => {
+            const sources1 = await client.ignoredInvites.getOrCreateSourceRooms();
+            const sources2 = await client.ignoredInvites.getOrCreateSourceRooms();
+            expect(sources1).toBeTruthy();
+            expect(sources1).toHaveLength(1);
+            expect(sources1).toEqual(sources2);
+        });
+
+        it("should initially not reject any invite", async () => {
+            const rule = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:example.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(rule).toBeFalsy();
+        });
+
+        it("should reject invites once we have added a matching rule in the target room (scope: user)", async () => {
+            await client.ignoredInvites.addRule(PolicyScope.User, "*:example.org", "just a test");
+
+            // We should reject this invite.
+            const ruleMatch = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:example.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(ruleMatch).toBeTruthy();
+            expect(ruleMatch.getContent()).toMatchObject({
+                recommendation: "m.ban",
+                reason: "just a test",
+            });
+
+            // We should let these invites go through.
+            const ruleWrongServer = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:somewhere.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(ruleWrongServer).toBeFalsy();
+
+            const ruleWrongServerRoom = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:somewhere.org",
+                roomId: "!snafu:example.org",
+            });
+            expect(ruleWrongServerRoom).toBeFalsy();
+        });
+
+        it("should reject invites once we have added a matching rule in the target room (scope: server)", async () => {
+            const REASON = `Just a test ${Math.random()}`;
+            await client.ignoredInvites.addRule(PolicyScope.Server, "example.org", REASON);
+
+            // We should reject these invites.
+            const ruleSenderMatch = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:example.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(ruleSenderMatch).toBeTruthy();
+            expect(ruleSenderMatch.getContent()).toMatchObject({
+                recommendation: "m.ban",
+                reason: REASON,
+            });
+
+            const ruleRoomMatch = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:somewhere.org",
+                roomId: "!snafu:example.org",
+            });
+            expect(ruleRoomMatch).toBeTruthy();
+            expect(ruleRoomMatch.getContent()).toMatchObject({
+                recommendation: "m.ban",
+                reason: REASON,
+            });
+
+            // We should let these invites go through.
+            const ruleWrongServer = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:somewhere.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(ruleWrongServer).toBeFalsy();
+        });
+
+        it("should reject invites once we have added a matching rule in the target room (scope: room)", async () => {
+            const REASON = `Just a test ${Math.random()}`;
+            const BAD_ROOM_ID = "!bad:example.org";
+            const GOOD_ROOM_ID = "!good:example.org";
+            await client.ignoredInvites.addRule(PolicyScope.Room, BAD_ROOM_ID, REASON);
+
+            // We should reject this invite.
+            const ruleSenderMatch = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:example.org",
+                roomId: BAD_ROOM_ID,
+            });
+            expect(ruleSenderMatch).toBeTruthy();
+            expect(ruleSenderMatch.getContent()).toMatchObject({
+                recommendation: "m.ban",
+                reason: REASON,
+            });
+
+            // We should let these invites go through.
+            const ruleWrongRoom = await client.ignoredInvites.getRuleForInvite({
+                sender: BAD_ROOM_ID,
+                roomId: GOOD_ROOM_ID,
+            });
+            expect(ruleWrongRoom).toBeFalsy();
+        });
+
+        it("should reject invites once we have added a matching rule in a non-target source room", async () => {
+            const NEW_SOURCE_ROOM_ID = "!another-source:example.org";
+
+            // Make sure that everything is initialized.
+            await client.ignoredInvites.getOrCreateSourceRooms();
+            await client.joinRoom(NEW_SOURCE_ROOM_ID);
+            await client.ignoredInvites.addSource(NEW_SOURCE_ROOM_ID);
+
+            // Add a rule in the new source room.
+            await client.sendStateEvent(NEW_SOURCE_ROOM_ID, PolicyScope.User, {
+                entity: "*:example.org",
+                reason: "just a test",
+                recommendation: "m.ban",
+            });
+
+            // We should reject this invite.
+            const ruleMatch = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:example.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(ruleMatch).toBeTruthy();
+            expect(ruleMatch.getContent()).toMatchObject({
+                recommendation: "m.ban",
+                reason: "just a test",
+            });
+
+            // We should let these invites go through.
+            const ruleWrongServer = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:somewhere.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(ruleWrongServer).toBeFalsy();
+
+            const ruleWrongServerRoom = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:somewhere.org",
+                roomId: "!snafu:example.org",
+            });
+            expect(ruleWrongServerRoom).toBeFalsy();
+        });
+
+        it("should not reject invites anymore once we have removed a rule", async () => {
+            await client.ignoredInvites.addRule(PolicyScope.User, "*:example.org", "just a test");
+
+            // We should reject this invite.
+            const ruleMatch = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:example.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(ruleMatch).toBeTruthy();
+            expect(ruleMatch.getContent()).toMatchObject({
+                recommendation: "m.ban",
+                reason: "just a test",
+            });
+
+            // After removing the invite, we shouldn't reject it anymore.
+            await client.ignoredInvites.removeRule(ruleMatch);
+            const ruleMatch2 = await client.ignoredInvites.getRuleForInvite({
+                sender: "@foobar:example.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(ruleMatch2).toBeFalsy();
+        });
+
+        it("should add new rules in the target room, rather than any other source room", async () => {
+            const NEW_SOURCE_ROOM_ID = "!another-source:example.org";
+
+            // Make sure that everything is initialized.
+            await client.ignoredInvites.getOrCreateSourceRooms();
+            await client.joinRoom(NEW_SOURCE_ROOM_ID);
+            const newSourceRoom = client.getRoom(NEW_SOURCE_ROOM_ID);
+
+            // Fetch the list of sources and check that we do not have the new room yet.
+            const policies = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name).getContent();
+            expect(policies).toBeTruthy();
+            const ignoreInvites = policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
+            expect(ignoreInvites).toBeTruthy();
+            expect(ignoreInvites.sources).toBeTruthy();
+            expect(ignoreInvites.sources).not.toContain(NEW_SOURCE_ROOM_ID);
+
+            // Add a source.
+            const added = await client.ignoredInvites.addSource(NEW_SOURCE_ROOM_ID);
+            expect(added).toBe(true);
+            const added2 = await client.ignoredInvites.addSource(NEW_SOURCE_ROOM_ID);
+            expect(added2).toBe(false);
+
+            // Fetch the list of sources and check that we have added the new room.
+            const policies2 = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name).getContent();
+            expect(policies2).toBeTruthy();
+            const ignoreInvites2 = policies2[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
+            expect(ignoreInvites2).toBeTruthy();
+            expect(ignoreInvites2.sources).toBeTruthy();
+            expect(ignoreInvites2.sources).toContain(NEW_SOURCE_ROOM_ID);
+
+            // Add a rule.
+            const eventId = await client.ignoredInvites.addRule(PolicyScope.User, "*:example.org", "just a test");
+
+            // Check where it shows up.
+            const targetRoomId = ignoreInvites2.target;
+            const targetRoom = client.getRoom(targetRoomId);
+            expect(targetRoom._state.get(PolicyScope.User)[eventId]).toBeTruthy();
+            expect(newSourceRoom._state.get(PolicyScope.User)?.[eventId]).toBeFalsy();
         });
     });
 });

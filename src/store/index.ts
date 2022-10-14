@@ -162,7 +162,7 @@ export interface IStore {
      * Get account data event by event type
      * @param {string} eventType The event type being queried
      */
-    getAccountData(eventType: EventType | string): MatrixEvent;
+    getAccountData(eventType: EventType | string): MatrixEvent | undefined;
 
     /**
      * setSyncData does nothing as there is no backing data store.
@@ -247,7 +247,7 @@ export interface IStore {
      /**
       * Fetches the oldest batch of to-device messages in the queue
       */
-     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch>;
+     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
 
      /**
       * Removes a specific batch of to-device messages from the queue

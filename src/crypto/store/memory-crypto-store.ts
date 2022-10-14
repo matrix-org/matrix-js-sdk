@@ -25,6 +25,7 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
+    ParkedSharedHistory,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -58,6 +59,7 @@ export class MemoryCryptoStore implements CryptoStore {
     private rooms: { [roomId: string]: IRoomEncryption } = {};
     private sessionsNeedingBackup: { [sessionKey: string]: boolean } = {};
     private sharedHistoryInboundGroupSessions: { [roomId: string]: [senderKey: string, sessionId: string][] } = {};
+    private parkedSharedHistory = new Map<string, ParkedSharedHistory[]>(); // keyed by room ID
 
     /**
      * Ensure the database exists and is up-to-date.
@@ -524,6 +526,18 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public getSharedHistoryInboundGroupSessions(roomId: string): Promise<[senderKey: string, sessionId: string][]> {
         return Promise.resolve(this.sharedHistoryInboundGroupSessions[roomId] || []);
+    }
+
+    public addParkedSharedHistory(roomId: string, parkedData: ParkedSharedHistory): void {
+        const parked = this.parkedSharedHistory.get(roomId) ?? [];
+        parked.push(parkedData);
+        this.parkedSharedHistory.set(roomId, parked);
+    }
+
+    public takeParkedSharedHistory(roomId: string): Promise<ParkedSharedHistory[]> {
+        const parked = this.parkedSharedHistory.get(roomId) ?? [];
+        this.parkedSharedHistory.delete(roomId);
+        return Promise.resolve(parked);
     }
 
     // Session key backups

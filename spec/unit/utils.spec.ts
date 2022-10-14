@@ -26,9 +26,7 @@ describe("utils", function() {
                 foo: "bar",
                 baz: "beer@",
             };
-            expect(utils.encodeParams(params)).toEqual(
-                "foo=bar&baz=beer%40",
-            );
+            expect(utils.encodeParams(params).toString()).toEqual("foo=bar&baz=beer%40");
         });
 
         it("should handle boolean and numeric values", function() {
@@ -37,7 +35,24 @@ describe("utils", function() {
                 number: 12345,
                 boolean: false,
             };
-            expect(utils.encodeParams(params)).toEqual("string=foobar&number=12345&boolean=false");
+            expect(utils.encodeParams(params).toString()).toEqual("string=foobar&number=12345&boolean=false");
+        });
+
+        it("should handle string arrays", () => {
+            const params = {
+                via: ["one", "two", "three"],
+            };
+            expect(utils.encodeParams(params).toString()).toEqual("via=one&via=two&via=three");
+        });
+    });
+
+    describe("decodeParams", () => {
+        it("should be able to decode multiple values into an array", () => {
+            const params = "foo=bar&via=a&via=b&via=c";
+            expect(utils.decodeParams(params)).toEqual({
+                foo: "bar",
+                via: ["a", "b", "c"],
+            });
         });
     });
 
@@ -152,6 +167,9 @@ describe("utils", function() {
             assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 2 }));
             assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { b: 2, a: 1 }));
             assert.isFalse(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 3 }));
+            assert.isFalse(utils.deepCompare({ a: 1, b: 2 }, { a: 1 }));
+            assert.isFalse(utils.deepCompare({ a: 1 }, { a: 1, b: 2 }));
+            assert.isFalse(utils.deepCompare({ a: 1 }, { b: 1 }));
 
             assert.isTrue(utils.deepCompare({
                 1: { name: "mhc", age: 28 },
@@ -525,38 +543,6 @@ describe("utils", function() {
         });
     });
 
-    describe('getPrivateReadReceiptField', () => {
-        it('should return m.read.private if server supports stable', async () => {
-            expect(await utils.getPrivateReadReceiptField({
-                doesServerSupportUnstableFeature: jest.fn().mockImplementation((feature) => {
-                    return feature === "org.matrix.msc2285.stable";
-                }),
-            } as any)).toBe(ReceiptType.ReadPrivate);
-        });
-
-        it('should return m.read.private if server supports stable and unstable', async () => {
-            expect(await utils.getPrivateReadReceiptField({
-                doesServerSupportUnstableFeature: jest.fn().mockImplementation((feature) => {
-                    return ["org.matrix.msc2285.stable", "org.matrix.msc2285"].includes(feature);
-                }),
-            } as any)).toBe(ReceiptType.ReadPrivate);
-        });
-
-        it('should return org.matrix.msc2285.read.private if server supports  unstable', async () => {
-            expect(await utils.getPrivateReadReceiptField({
-                doesServerSupportUnstableFeature: jest.fn().mockImplementation((feature) => {
-                    return feature === "org.matrix.msc2285";
-                }),
-            } as any)).toBe(ReceiptType.UnstableReadPrivate);
-        });
-
-        it('should return none if server does not support either', async () => {
-            expect(await utils.getPrivateReadReceiptField({
-                doesServerSupportUnstableFeature: jest.fn().mockResolvedValue(false),
-            } as any)).toBeFalsy();
-        });
-    });
-
     describe('isSupportedReceiptType', () => {
         it('should support m.read', () => {
             expect(utils.isSupportedReceiptType(ReceiptType.Read)).toBeTruthy();
@@ -564,10 +550,6 @@ describe("utils", function() {
 
         it('should support m.read.private', () => {
             expect(utils.isSupportedReceiptType(ReceiptType.ReadPrivate)).toBeTruthy();
-        });
-
-        it('should support org.matrix.msc2285.read.private', () => {
-            expect(utils.isSupportedReceiptType(ReceiptType.UnstableReadPrivate)).toBeTruthy();
         });
 
         it('should not support other receipt types', () => {

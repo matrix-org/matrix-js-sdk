@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { REFERENCE_RELATION } from "matrix-events-sdk";
+
 import { MatrixEvent } from "../../../src";
 import { M_BEACON_INFO } from "../../../src/@types/beacon";
 import {
@@ -428,6 +430,27 @@ describe('Beacon', () => {
                 ]);
 
                 expect(beacon.latestLocationState).toBeFalsy();
+                expect(emitSpy).not.toHaveBeenCalled();
+            });
+
+            it("should ignore invalid beacon events", () => {
+                const beacon = new Beacon(makeBeaconInfoEvent(userId, roomId, { isLive: true, timeout: 60000 }));
+                const emitSpy = jest.spyOn(beacon, 'emit');
+
+                const ev = new MatrixEvent({
+                    type: M_BEACON_INFO.name,
+                    sender: userId,
+                    room_id: roomId,
+                    content: {
+                        "m.relates_to": {
+                            rel_type: REFERENCE_RELATION.name,
+                            event_id: beacon.beaconInfoId,
+                        },
+                    },
+                });
+                beacon.addLocations([ev]);
+
+                expect(beacon.latestLocationEvent).toBeFalsy();
                 expect(emitSpy).not.toHaveBeenCalled();
             });
 

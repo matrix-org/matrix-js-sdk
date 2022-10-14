@@ -292,16 +292,17 @@ export const makeBeaconContent: MakeBeaconContent = (
 });
 
 export type BeaconLocationState = MLocationContent & {
-    timestamp: number;
+    uri?: string; // override from MLocationContent to allow optionals
+    timestamp?: number;
 };
 
 export const parseBeaconContent = (content: MBeaconEventContent): BeaconLocationState => {
-    const { description, uri } = M_LOCATION.findIn<MLocationContent>(content);
+    const location = M_LOCATION.findIn<MLocationContent>(content);
     const timestamp = M_TIMESTAMP.findIn<number>(content);
 
     return {
-        description,
-        uri,
+        description: location?.description,
+        uri: location?.uri,
         timestamp,
     };
 };

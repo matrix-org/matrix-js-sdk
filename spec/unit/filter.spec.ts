@@ -1,3 +1,4 @@
+import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import { Filter, IFilterDefinition } from "../../src/filter";
 
 describe("Filter", function() {
@@ -41,6 +42,19 @@ describe("Filter", function() {
             };
             filter.setDefinition(definition);
             expect(filter.getDefinition()).toEqual(definition);
+        });
+    });
+
+    describe("setUnreadThreadNotifications", function() {
+        it("setUnreadThreadNotifications", function() {
+            filter.setUnreadThreadNotifications(true);
+            expect(filter.getDefinition()).toEqual({
+                room: {
+                    timeline: {
+                        [UNREAD_THREAD_NOTIFICATIONS.name]: true,
+                    },
+                },
+            });
         });
     });
 });

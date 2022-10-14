@@ -57,7 +57,8 @@ import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
-import { IAbortablePromise } from "./@types/partials";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
+import { Feature, ServerSupport } from "./feature";
 
 const DEBUG = true;
 
@@ -102,7 +103,7 @@ const MSC2716_ROOM_VERSIONS = [
 function getFilterName(userId: string, suffix?: string): string {
     // scope this on the user ID because people may login on many accounts
     // and they all need to be stored!
-    return `FILTER_SYNC_${userId}` + suffix ? "_" + suffix : "";
+    return `FILTER_SYNC_${userId}` + (suffix ? "_" + suffix : "");
 }
 
 function debuglog(...params) {
@@ -162,7 +163,8 @@ type WrappedRoom<T> = T & {
  */
 export class SyncApi {
     private _peekRoom: Optional<Room> = null;
-    private currentSyncRequest: Optional<IAbortablePromise<ISyncResponse>> = null;
+    private currentSyncRequest: Optional<Promise<ISyncResponse>> = null;
+    private abortController?: AbortController;
     private syncState: Optional<SyncState> = null;
     private syncStateData: Optional<ISyncStateData> = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
@@ -296,9 +298,9 @@ export class SyncApi {
             getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
         ).then(function(filterId) {
             qps.filter = filterId;
-            return client.http.authedRequest<ISyncResponse>(
-                undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
-            );
+            return client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
+                localTimeoutMs,
+            });
         }).then(async (data) => {
             let leaveRooms = [];
             if (data.rooms?.leave) {
@@ -431,11 +433,11 @@ export class SyncApi {
         }
 
         // FIXME: gut wrenching; hard-coded timeout values
-        this.client.http.authedRequest<IEventsResponse>(undefined, Method.Get, "/events", {
+        this.client.http.authedRequest<IEventsResponse>(Method.Get, "/events", {
             room_id: peekRoom.roomId,
             timeout: String(30 * 1000),
             from: token,
-        }, undefined, 50 * 1000).then((res) => {
+        }, undefined, { localTimeoutMs: 50 * 1000 }).then((res) => {
             if (this._peekRoom !== peekRoom) {
                 debuglog("Stopped peeking in room %s", peekRoom.roomId);
                 return;
@@ -561,7 +563,11 @@ export class SyncApi {
     };
 
     private buildDefaultFilter = () => {
-        return new Filter(this.client.credentials.userId);
+        const filter = new Filter(this.client.credentials.userId);
+        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
+            filter.setUnreadThreadNotifications(true);
+        }
+        return filter;
     };
 
     private checkLazyLoadStatus = async () => {
@@ -646,6 +652,7 @@ export class SyncApi {
      */
     public async sync(): Promise<void> {
         this.running = true;
+        this.abortController = new AbortController();
 
         global.window?.addEventListener?.("online", this.onOnline, false);
 
@@ -732,7 +739,7 @@ export class SyncApi {
         // but do not have global.window.removeEventListener.
         global.window?.removeEventListener?.("online", this.onOnline, false);
         this.running = false;
-        this.currentSyncRequest?.abort();
+        this.abortController?.abort();
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
             this.keepAliveTimer = null;
@@ -896,12 +903,12 @@ export class SyncApi {
         }
     }
 
-    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IAbortablePromise<ISyncResponse> {
+    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): Promise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
-        return this.client.http.authedRequest<ISyncResponse>(
-            undefined, Method.Get, "/sync", qps as any, undefined,
-            qps.timeout + BUFFER_PERIOD_MS,
-        );
+        return this.client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
+            localTimeoutMs: qps.timeout + BUFFER_PERIOD_MS,
+            abortSignal: this.abortController?.signal,
+        });
     }
 
     private getSyncParams(syncOptions: ISyncOptions, syncToken: string): ISyncParams {
@@ -1109,7 +1116,20 @@ export class SyncApi {
         if (Array.isArray(data.to_device?.events) && data.to_device.events.length > 0) {
             const cancelledKeyVerificationTxns = [];
             data.to_device.events
-                .map(client.getEventMapper())
+                .filter((eventJSON) => {
+                    if (
+                        eventJSON.type === EventType.RoomMessageEncrypted &&
+                        !(["m.olm.v1.curve25519-aes-sha2"].includes(eventJSON.content?.algorithm))
+                    ) {
+                        logger.log(
+                            'Ignoring invalid encrypted to-device event from ' + eventJSON.sender,
+                        );
+                        return false;
+                    }
+
+                    return true;
+                })
+                .map(client.getEventMapper({ toDevice: true }))
                 .map((toDeviceEvent) => { // map is a cheap inline forEach
                     // We want to flag m.key.verification.start events as cancelled
                     // if there's an accompanying m.key.verification.cancel event, so
@@ -1185,6 +1205,27 @@ export class SyncApi {
             const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
             await this.processRoomEvents(room, stateEvents);
+
+            const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId())?.getSender();
+
+            if (client.isCryptoEnabled()) {
+                const parkedHistory = await client.crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
+                for (const parked of parkedHistory) {
+                    if (parked.senderId === inviter) {
+                        await client.crypto.olmDevice.addInboundGroupSession(
+                            room.roomId,
+                            parked.senderKey,
+                            parked.forwardingCurve25519KeyChain,
+                            parked.sessionId,
+                            parked.sessionKey,
+                            parked.keysClaimed,
+                            true,
+                            { sharedHistory: true, untrusted: true },
+                        );
+                    }
+                }
+            }
+
             if (inviteObj.isBrandNewRoom) {
                 room.recalculate();
                 client.store.storeRoom(room);
@@ -1230,12 +1271,37 @@ export class SyncApi {
                 }
             }
 
+            room.resetThreadUnreadNotificationCount();
+            const unreadThreadNotifications = joinObj[UNREAD_THREAD_NOTIFICATIONS.name]
+                ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName];
+            if (unreadThreadNotifications) {
+                Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
+                    room.setThreadUnreadNotificationCount(
+                        threadId,
+                        NotificationCountType.Total,
+                        unreadNotification.notification_count,
+                    );
+
+                    const hasNoNotifications =
+                        room.getThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight) <= 0;
+                    if (!encrypted || (encrypted && hasNoNotifications)) {
+                        room.setThreadUnreadNotificationCount(
+                            threadId,
+                            NotificationCountType.Highlight,
+                            unreadNotification.highlight_count,
+                        );
+                    }
+                });
+            }
+
             joinObj.timeline = joinObj.timeline || {} as ITimeline;
 
             if (joinObj.isBrandNewRoom) {
                 // set the back-pagination token. Do this *before* adding any
                 // events so that clients can start back-paginating.
-                room.getLiveTimeline().setPaginationToken(joinObj.timeline.prev_batch, EventTimeline.BACKWARDS);
+                if (joinObj.timeline.prev_batch !== null) {
+                    room.getLiveTimeline().setPaginationToken(joinObj.timeline.prev_batch, EventTimeline.BACKWARDS);
+                }
             } else if (joinObj.timeline.limited) {
                 let limited = true;
 
@@ -1288,7 +1354,11 @@ export class SyncApi {
                 }
             }
 
-            await this.processRoomEvents(room, stateEvents, events, syncEventData.fromCache);
+            try {
+                await this.processRoomEvents(room, stateEvents, events, syncEventData.fromCache);
+            } catch (e) {
+                logger.error(`Failed to process events on room ${room.roomId}:`, e);
+            }
 
             // set summary after processing events,
             // because it will trigger a name calculation
@@ -1452,7 +1522,6 @@ export class SyncApi {
         };
 
         this.client.http.request(
-            undefined, // callback
             Method.Get, "/_matrix/client/versions",
             undefined, // queryParams
             undefined, // data

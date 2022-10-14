@@ -30,6 +30,8 @@ declare global {
     namespace NodeJS {
         interface Global {
             localStorage: Storage;
+            // marker variable used to detect both the browser & node entrypoints being used at once
+            __js_sdk_entrypoint: unknown;
         }
     }
 

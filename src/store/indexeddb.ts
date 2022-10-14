@@ -357,7 +357,7 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.saveToDeviceBatches(batches);
     }
 
-    public getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+    public getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
         return this.backend.getOldestToDeviceBatch();
     }
 

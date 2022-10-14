@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Matrix.org Foundation C.I.C.
+Copyright 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// stub for browser-matrix browserify tests
-global.XMLHttpRequest = jest.fn();
+import { ServerControlledNamespacedValue } from "../NamespacedValue";
 
-afterAll(() => {
-    // clean up XMLHttpRequest mock
-    global.XMLHttpRequest = undefined;
-});
+/**
+ * https://github.com/matrix-org/matrix-doc/pull/3773
+ *
+ * @experimental
+ */
+export const UNREAD_THREAD_NOTIFICATIONS = new ServerControlledNamespacedValue(
+    "unread_thread_notifications",
+    "org.matrix.msc3773.unread_thread_notifications");

@@ -26,6 +26,7 @@ import { logger } from '../../../src/logger';
 import * as utils from "../../../src/utils";
 import { ICreateClientOpts } from '../../../src/client';
 import { ISecretStorageKeyInfo } from '../../../src/crypto/api';
+import { DeviceInfo } from '../../../src/crypto/deviceinfo';
 
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -108,16 +109,13 @@ describe("Secrets", function() {
         const secretStorage = alice.crypto.secretStorage;
 
         jest.spyOn(alice, 'setAccountData').mockImplementation(
-            async function(eventType, contents, callback) {
+            async function(eventType, contents) {
                 alice.store.storeAccountDataEvents([
                     new MatrixEvent({
                         type: eventType,
                         content: contents,
                     }),
                 ]);
-                if (callback) {
-                    callback(undefined, undefined);
-                }
                 return {};
             });
 
@@ -191,7 +189,7 @@ describe("Secrets", function() {
                 },
             },
         );
-        alice.setAccountData = async function(eventType, contents, callback) {
+        alice.setAccountData = async function(eventType, contents) {
             alice.store.storeAccountDataEvents([
                 new MatrixEvent({
                     type: eventType,
@@ -250,20 +248,20 @@ describe("Secrets", function() {
 
         osborne2.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
             "VAX": {
-                user_id: "@alice:example.com",
-                device_id: "VAX",
+                known: false,
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
                     "ed25519:VAX": vaxDevice.deviceEd25519Key,
                     "curve25519:VAX": vaxDevice.deviceCurve25519Key,
                 },
+                verified: DeviceInfo.DeviceVerification.VERIFIED,
             },
         });
         vax.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
             "Osborne2": {
-                user_id: "@alice:example.com",
-                device_id: "Osborne2",
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                verified: 0,
+                known: false,
                 keys: {
                     "ed25519:Osborne2": osborne2Device.deviceEd25519Key,
                     "curve25519:Osborne2": osborne2Device.deviceCurve25519Key,
@@ -280,10 +278,12 @@ describe("Secrets", function() {
             Object.values(otks)[0],
         );
 
-        const request = await secretStorage.request("foo", ["VAX"]);
-        const secret = await request.promise;
+        osborne2.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+        osborne2.client.crypto.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
-        expect(secret).toBe("bar");
+        const request = await secretStorage.request("foo", ["VAX"]);
+        await request.promise; // return value not used
+
         osborne2.stop();
         vax.stop();
         clearTestClientTimeouts();
@@ -329,7 +329,7 @@ describe("Secrets", function() {
             );
             bob.uploadDeviceSigningKeys = async () => ({});
             bob.uploadKeySignatures = jest.fn().mockResolvedValue(undefined);
-            bob.setAccountData = async function(eventType, contents, callback) {
+            bob.setAccountData = async function(eventType, contents) {
                 const event = new MatrixEvent({
                     type: eventType,
                     content: contents,
