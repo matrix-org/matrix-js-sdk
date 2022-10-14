@@ -939,7 +939,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *
      * @return {Object<string, string>}
      */
-    public getKeysClaimed(): Record<"ed25519", string> {
+    public getKeysClaimed(): Record<"ed25519", string | null> {
         return {
             ed25519: this.claimedEd25519Key,
         };
@@ -991,7 +991,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      * @return {boolean}
      */
     public isKeySourceUntrusted(): boolean | undefined {
-        return this.untrusted;
+        return !!this.untrusted;
     }
 
     public getUnsigned(): IUnsigned {
@@ -1079,11 +1079,11 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
             throw new Error("invalid redactionEvent in makeRedacted");
         }
 
-        this._localRedactionEvent = undefined;
+        this._localRedactionEvent = null;
 
         this.emit(MatrixEventEvent.BeforeRedaction, this, redactionEvent);
 
-        this._replacingEvent = undefined;
+        this._replacingEvent = null;
         // we attempt to replicate what we would see from the server if
         // the event had been redacted before we saw it.
         //
@@ -1215,7 +1215,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *
      * @param {Object} pushActions push actions
      */
-    public setPushActions(pushActions: IActionsObject | undefined): void {
+    public setPushActions(pushActions: IActionsObject | null): void {
         this.pushActions = pushActions;
     }
 
@@ -1239,7 +1239,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
             this.event.unsigned.redacted_because = oldUnsigned.redacted_because;
         }
         // successfully sent.
-        this.setStatus(undefined);
+        this.setStatus(null);
         if (this.getId() !== oldId) {
             // emit the event if it changed
             this.emit(MatrixEventEvent.LocalEventIdReplaced, this);
@@ -1324,7 +1324,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
             return;
         }
         if (this._replacingEvent !== newEvent) {
-            this._replacingEvent = newEvent;
+            this._replacingEvent = newEvent ?? null;
             this.emit(MatrixEventEvent.Replaced, this);
             this.invalidateExtensibleEvent();
         }
@@ -1337,7 +1337,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *
      * @return {EventStatus}
      */
-    public getAssociatedStatus(): EventStatus | undefined {
+    public getAssociatedStatus(): EventStatus | null {
         if (this._replacingEvent) {
             return this._replacingEvent.status;
         } else if (this._localRedactionEvent) {
@@ -1371,7 +1371,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      *
      * @return {MatrixEvent?}
      */
-    public replacingEvent(): MatrixEvent | undefined {
+    public replacingEvent(): MatrixEvent | null {
         return this._replacingEvent;
     }
 
@@ -1534,7 +1534,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
         this.txnId = txnId;
     }
 
-    public getTxnId(): string | undefined {
+    public getTxnId(): string | null {
         return this.txnId;
     }
 
