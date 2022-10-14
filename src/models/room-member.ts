@@ -169,7 +169,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @fires module:client~MatrixClient#event:"RoomMember.powerLevel"
      */
     public setPowerLevelEvent(powerLevelEvent: MatrixEvent): void {
-        if (powerLevelEvent.getType() !== EventType.RoomPowerLevels) {
+        if (powerLevelEvent.getType() !== EventType.RoomPowerLevels || powerLevelEvent.getStateKey() !== "") {
             return;
         }
 

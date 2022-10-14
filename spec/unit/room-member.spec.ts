@@ -16,7 +16,7 @@ limitations under the License.
 
 import * as utils from "../test-utils/test-utils";
 import { RoomMember, RoomMemberEvent } from "../../src/models/room-member";
-import { RoomState } from "../../src";
+import { EventType, RoomState } from "../../src";
 
 describe("RoomMember", function() {
     const roomId = "!foo:bar";
@@ -142,33 +142,71 @@ describe("RoomMember", function() {
                 expect(emitCount).toEqual(1);
             });
 
-        it("should not honor string power levels.",
-            function() {
-                const event = utils.mkEvent({
-                    type: "m.room.power_levels",
-                    room: roomId,
-                    user: userA,
-                    content: {
-                        users_default: 20,
-                        users: {
-                            "@alice:bar": "5",
-                        },
+        it("should not honor string power levels.", function() {
+            const event = utils.mkEvent({
+                type: "m.room.power_levels",
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@alice:bar": "5",
                     },
-                    event: true,
-                });
-                let emitCount = 0;
-
-                member.on(RoomMemberEvent.PowerLevel, function(emitEvent, emitMember) {
-                    emitCount += 1;
-                    expect(emitMember.userId).toEqual('@alice:bar');
-                    expect(emitMember.powerLevel).toEqual(20);
-                    expect(emitEvent).toEqual(event);
-                });
-
-                member.setPowerLevelEvent(event);
-                expect(member.powerLevel).toEqual(20);
-                expect(emitCount).toEqual(1);
+                },
+                event: true,
             });
+            let emitCount = 0;
+
+            member.on(RoomMemberEvent.PowerLevel, function(emitEvent, emitMember) {
+                emitCount += 1;
+                expect(emitMember.userId).toEqual('@alice:bar');
+                expect(emitMember.powerLevel).toEqual(20);
+                expect(emitEvent).toEqual(event);
+            });
+
+            member.setPowerLevelEvent(event);
+            expect(member.powerLevel).toEqual(20);
+            expect(emitCount).toEqual(1);
+        });
+
+        it("should no-op if given a non-state or unrelated event", () => {
+            const fn = jest.spyOn(member, "emit");
+            expect(fn).not.toHaveBeenCalledWith(RoomMemberEvent.PowerLevel);
+            member.setPowerLevelEvent(utils.mkEvent({
+                type: EventType.RoomPowerLevels,
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@alice:bar": "5",
+                    },
+                },
+                skey: "invalid",
+                event: true,
+            }));
+            member.setPowerLevelEvent(utils.mkEvent({
+                type: EventType.RoomPowerLevels,
+                room: roomId,
+                user: userA,
+                content: {
+                    users_default: 20,
+                    users: {
+                        "@alice:bar": "5",
+                    },
+                },
+                skey: null,
+                event: true,
+            }));
+            member.setPowerLevelEvent(utils.mkEvent({
+                type: EventType.Sticker,
+                room: roomId,
+                user: userA,
+                content: {},
+                event: true,
+            }));
+            expect(fn).not.toHaveBeenCalledWith(RoomMemberEvent.PowerLevel);
+        });
     });
 
     describe("setTypingEvent", function() {
