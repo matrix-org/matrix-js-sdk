@@ -38,9 +38,12 @@ export class MSC3906Rendezvous {
     private newDeviceKey?: string;
     private ourIntent: RendezvousIntent;
     public code?: string;
-    public onFailure?: (reason: RendezvousFailureReason) => void;
 
-    constructor(public channel: RendezvousChannel, cli?: MatrixClient) {
+    constructor(
+        public channel: RendezvousChannel,
+        cli?: MatrixClient,
+        public onFailure?: (reason: RendezvousFailureReason) => void,
+    ) {
         this.cli = cli;
         this.ourIntent = this.isNewDevice ?
             RendezvousIntent.LOGIN_ON_NEW_DEVICE :
@@ -175,6 +178,9 @@ export class MSC3906Rendezvous {
             switch (outcome ?? '') {
                 case 'unsupported':
                     await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);
+                    break;
+                case 'declined':
+                    await this.cancel(RendezvousFailureReason.UserDeclined);
                     break;
                 default:
                     await this.cancel(RendezvousFailureReason.Unknown);
@@ -388,6 +394,7 @@ export class MSC3906Rendezvous {
     }
 
     async cancel(reason: RendezvousFailureReason) {
+        this.onFailure?.(reason);
         await this.channel.cancel(reason);
     }
 

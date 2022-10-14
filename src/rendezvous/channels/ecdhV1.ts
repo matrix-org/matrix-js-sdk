@@ -88,11 +88,11 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     private olmSAS?: SAS;
     private ourPublicKey: Uint8Array;
     private aesKey?: CryptoKey | Uint8Array;
-    public onFailure?: (reason: RendezvousFailureReason) => void;
 
     constructor(
         public transport: RendezvousTransport,
         private theirPublicKey?: Uint8Array,
+        public onFailure?: (reason: RendezvousFailureReason) => void,
     ) {
         this.olmSAS = new global.Olm.SAS();
         this.ourPublicKey = decodeBase64(this.olmSAS.get_pubkey());

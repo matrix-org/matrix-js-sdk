@@ -79,7 +79,7 @@ export async function buildChannelFromCode(
 
     logger.info(`Building ECDHv1 rendezvous via HTTP from: ${code}`);
     return {
-        channel: new MSC3903ECDHv1RendezvousChannel(transport, theirPublicKey),
+        channel: new MSC3903ECDHv1RendezvousChannel(transport, theirPublicKey, onFailure),
         intent,
     };
 }
