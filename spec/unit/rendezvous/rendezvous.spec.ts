@@ -475,7 +475,7 @@ describe("Rendezvous", function() {
             verificationFunction: aliceVerification,
             crossSigningIds: {
                 master: 'mmmmm',
-            }
+            },
         });
         const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
