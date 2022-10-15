@@ -16,8 +16,23 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
+import type { MatrixClient } from "../../../src";
 import { RendezvousFailureReason } from "../../../src/rendezvous";
 import { MSC3886SimpleHttpRendezvousTransport } from "../../../src/rendezvous/transports/simpleHttpTransport";
+
+function makeMockClient(opts: { userId: string, deviceId: string, msc3886Enabled: boolean}): MatrixClient {
+    return {
+        doesServerSupportUnstableFeature(feature: string) {
+            return Promise.resolve(opts.msc3886Enabled && feature === "org.matrix.msc3886");
+        },
+        getUserId() { return opts.userId; },
+        getDeviceId() { return opts.deviceId; },
+        requestLoginToken() {
+            return Promise.resolve({ login_token: "token" });
+        },
+        baseUrl: "https://example.com",
+    } as unknown as MatrixClient;
+}
 
 describe("SimpleHttpRendezvousTransport", function() {
     let httpBackend: MockHttpBackend;
@@ -29,14 +44,20 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     async function postAndCheckLocation(
+        msc3886Enabled: boolean,
         fallbackRzServer: string,
         locationResponse: string,
         expectedFinalLocation: string,
     ) {
-        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ fallbackRzServer, fetchFn });
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled });
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ client, fallbackRzServer, fetchFn });
         { // initial POST
+            const expectedPostLocation = msc3886Enabled ?
+                `${client.baseUrl}/_matrix/client/unstable/org.matrix.msc3886/rendezvous` :
+                fallbackRzServer;
+
             const prom = simpleHttpTransport.send("application/json", {});
-            httpBackend.when("POST", fallbackRzServer).response = {
+            httpBackend.when("POST", expectedPostLocation).response = {
                 body: null,
                 response: {
                     statusCode: 201,
@@ -66,12 +87,15 @@ describe("SimpleHttpRendezvousTransport", function() {
         }
     }
     it("should throw an error when no server available", function() {
-        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ fetchFn });
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ client, fetchFn });
         expect(simpleHttpTransport.send("application/json", {})).rejects.toThrow("Invalid rendezvous URI");
     });
 
     it("POST to fallback server", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
@@ -90,19 +114,45 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST with absolute path response", async function() {
-        await postAndCheckLocation("https://fallbackserver/rz", "/123", "https://fallbackserver/123");
+        await postAndCheckLocation(
+            false,
+            "https://fallbackserver/rz",
+            "/123",
+            "https://fallbackserver/123",
+        );
     });
 
-    it("POST with relative path response", async function() {
-        await postAndCheckLocation("https://fallbackserver/rz", "123", "https://fallbackserver/rz/123");
+    it("POST to built-in MSC3886 implementation", async function() {
+        await postAndCheckLocation(
+            true,
+            "https://fallbackserver/rz",
+            "123",
+            "https://example.com/_matrix/client/unstable/org.matrix.msc3886/rendezvous/123",
+        );
     });
 
     it("POST with relative path response including parent", async function() {
-        await postAndCheckLocation("https://fallbackserver/rz/abc", "../xyz/123", "https://fallbackserver/rz/xyz/123");
+        await postAndCheckLocation(
+            false,
+            "https://fallbackserver/rz/abc",
+            "../xyz/123",
+            "https://fallbackserver/rz/xyz/123",
+        );
+    });
+
+    it("POST with relative path response including parent", async function() {
+        await postAndCheckLocation(
+            false,
+            "https://fallbackserver/rz/abc",
+            "../xyz/123",
+            "https://fallbackserver/rz/xyz/123",
+        );
     });
 
     it("POST to follow 307 to other server", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
@@ -131,7 +181,9 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST and GET", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
@@ -187,7 +239,9 @@ describe("SimpleHttpRendezvousTransport", function() {
     });
 
     it("POST and PUTs", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
@@ -243,52 +297,10 @@ describe("SimpleHttpRendezvousTransport", function() {
         }
     });
 
-    it("init with URI", async function() {
-        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
-            rendezvousUri: "https://server/rz/123",
-            fetchFn,
-        });
-        {
-            const prom = simpleHttpTransport.receive();
-            httpBackend.when("GET", "https://server/rz/123").response = {
-                body: { foo: "baa" },
-                response: {
-                    statusCode: 200,
-                    headers: {
-                        "content-type": "application/json",
-                        "etag": "aaa",
-                    },
-                },
-            };
-            await httpBackend.flush('');
-            expect(await prom).toEqual({ foo: "baa" });
-        }
-    });
-
-    it("init from HS", async function() {
-        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
-            rendezvousUri: "https://server/rz/123",
-            fetchFn,
-        });
-        {
-            const prom = simpleHttpTransport.receive();
-            httpBackend.when("GET", "https://server/rz/123").response = {
-                body: { foo: "baa" },
-                response: {
-                    statusCode: 200,
-                    headers: {
-                        "content-type": "application/json",
-                        "etag": "aaa",
-                    },
-                },
-            };
-            await httpBackend.flush('');
-            expect(await prom).toEqual({ foo: "baa" });
-        }
-    });
-
     it("POST and DELETE", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });

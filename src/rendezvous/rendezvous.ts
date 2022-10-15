@@ -17,13 +17,12 @@ limitations under the License.
 import { RendezvousChannel } from ".";
 import { LoginTokenPostResponse } from "../@types/auth";
 import { MatrixClient } from "../client";
-import { CrossSigningInfo, requestKeysDuringVerification } from "../crypto/CrossSigning";
+import { CrossSigningInfo } from "../crypto/CrossSigning";
 import { DeviceInfo } from "../crypto/deviceinfo";
 import { IAuthData } from "../interactive-auth";
 import { logger } from "../logger";
-import { createClient } from "../matrix";
 import { sleep } from "../utils";
-import { RendezvousFailureReason } from "./cancellationReason";
+import { RendezvousFailureListener, RendezvousFailureReason } from "./cancellationReason";
 import { RendezvousIntent } from "./code";
 
 enum PayloadType {
@@ -32,23 +31,22 @@ enum PayloadType {
     Progress = 'm.login.progress',
 }
 
+/**
+ * Implements MSC3906 to allow a user to sign in on a new device using QR code.
+ * This implementation only supports generating a QR code on a device that is already signed in.
+ * Note that this is UNSTABLE and may have breaking changes without notice.
+ */
 export class MSC3906Rendezvous {
-    private cli?: MatrixClient;
     private newDeviceId?: string;
     private newDeviceKey?: string;
-    private ourIntent: RendezvousIntent;
+    private ourIntent: RendezvousIntent = RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
     public code?: string;
 
     constructor(
         public channel: RendezvousChannel,
-        cli?: MatrixClient,
-        public onFailure?: (reason: RendezvousFailureReason) => void,
-    ) {
-        this.cli = cli;
-        this.ourIntent = this.isNewDevice ?
-            RendezvousIntent.LOGIN_ON_NEW_DEVICE :
-            RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
-    }
+        public client: MatrixClient,
+        public onFailure?: RendezvousFailureListener,
+    ) {}
 
     async generateCode(): Promise<void> {
         if (this.code) {
@@ -58,102 +56,53 @@ export class MSC3906Rendezvous {
         this.code = JSON.stringify(await this.channel.generateCode(this.ourIntent));
     }
 
-    private get isNewDevice(): boolean {
-        return !this.cli;
-    }
-
-    private async areIntentsIncompatible(theirIntent: RendezvousIntent): Promise<boolean> {
-        const incompatible = theirIntent === this.ourIntent;
-
-        if (incompatible) {
-            await this.send({ type: PayloadType.Finish, intent: this.ourIntent });
-            await this.channel.cancel(
-                this.isNewDevice ?
-                    RendezvousFailureReason.OtherDeviceNotSignedIn :
-                    RendezvousFailureReason.OtherDeviceAlreadySignedIn,
-            );
-        }
-
-        return incompatible;
-    }
-
     async startAfterShowingCode(): Promise<string | undefined> {
-        return this.start();
-    }
-
-    async startAfterScanningCode(theirIntent: RendezvousIntent): Promise<string | undefined> {
-        return this.start(theirIntent);
-    }
-
-    private async start(theirIntent?: RendezvousIntent): Promise<string | undefined> {
-        const didScan = !!theirIntent;
-
         const checksum = await this.channel.connect();
 
         logger.info(`Connected to secure channel with checksum: ${checksum} our intent is ${this.ourIntent}`);
 
-        if (didScan) {
-            if (await this.areIntentsIncompatible(theirIntent)) {
-                // a m.login.finish event is sent as part of areIntentsIncompatible
+        {
+            const res = await this.channel.receive();
+            if (res?.intent !== RendezvousIntent.LOGIN_ON_NEW_DEVICE) {
+                await this.send({ type: PayloadType.Finish, intent: this.ourIntent });
+                await this.cancel(RendezvousFailureReason.OtherDeviceAlreadySignedIn);
                 return undefined;
             }
         }
 
-        if (this.cli) {
-            if (didScan) {
-                await this.channel.receive(); // wait for ack
+        // determine available protocols
+        if (!(await this.client.doesServerSupportUnstableFeature('org.matrix.msc3882'))) {
+            logger.info("Server doesn't support MSC3882");
+            await this.send({ type: PayloadType.Finish, outcome: 'unsupported' });
+            await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);
+            return undefined;
+        }
+
+        await this.send({ type: PayloadType.Progress, protocols: ['login_token'] });
+
+        logger.info('Waiting for other device to chose protocol');
+        const { type, protocol, outcome } = await this.channel.receive();
+
+        if (type === PayloadType.Finish) {
+            // new device decided not to complete
+            switch (outcome ?? '') {
+                case 'unsupported':
+                    await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
+                    break;
+                default:
+                    await this.cancel(RendezvousFailureReason.Unknown);
             }
+            return undefined;
+        }
 
-            // determine available protocols
-            if (!(await this.cli.doesServerSupportUnstableFeature('org.matrix.msc3882'))) {
-                logger.info("Server doesn't support MSC3882");
-                await this.send({ type: PayloadType.Finish, outcome: 'unsupported' });
-                await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);
-                return undefined;
-            }
+        if (type !== PayloadType.Progress) {
+            await this.cancel(RendezvousFailureReason.Unknown);
+            return undefined;
+        }
 
-            await this.send({ type: PayloadType.Progress, protocols: ['login_token'] });
-
-            logger.info('Waiting for other device to chose protocol');
-            const { type, protocol, outcome } = await this.channel.receive();
-
-            if (type === PayloadType.Finish) {
-                // new device decided not to complete
-                switch (outcome ?? '') {
-                    case 'unsupported':
-                        await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
-                        break;
-                    default:
-                        await this.cancel(RendezvousFailureReason.Unknown);
-                }
-                return undefined;
-            }
-
-            if (type !== PayloadType.Progress) {
-                await this.cancel(RendezvousFailureReason.Unknown);
-                return undefined;
-            }
-
-            if (protocol !== 'login_token') {
-                await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
-                return undefined;
-            }
-        } else {
-            if (!didScan) {
-                logger.info("Sending ack");
-                await this.send({ type: PayloadType.Progress });
-            }
-
-            logger.info("Waiting for protocols");
-            const { protocols } = await this.channel.receive();
-
-            if (!Array.isArray(protocols) || !protocols.includes('login_token')) {
-                await this.send({ type: PayloadType.Finish, outcome: 'unsupported' });
-                await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
-                return undefined;
-            }
-
-            await this.send({ type: PayloadType.Progress, protocol: "login_token" });
+        if (protocol !== 'login_token') {
+            await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
+            return undefined;
         }
 
         return checksum;
@@ -163,111 +112,15 @@ export class MSC3906Rendezvous {
         await this.channel.send({ type, ...payload });
     }
 
-    async completeLoginOnNewDevice(): Promise<{
-        userId: string;
-        deviceId: string;
-        accessToken: string;
-        homeserverUrl: string;
-    } | undefined> {
-        logger.info('Waiting for login_token');
-
-        // eslint-disable-next-line camelcase
-        const { type, login_token: token, outcome, homeserver } = await this.channel.receive();
-
-        if (type === PayloadType.Finish) {
-            switch (outcome ?? '') {
-                case 'unsupported':
-                    await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);
-                    break;
-                case 'declined':
-                    await this.cancel(RendezvousFailureReason.UserDeclined);
-                    break;
-                default:
-                    await this.cancel(RendezvousFailureReason.Unknown);
-            }
-            return undefined;
-        }
-
-        if (!homeserver) {
-            throw new Error("No homeserver returned");
-        }
-        // eslint-disable-next-line camelcase
-        if (!token) {
-            throw new Error("No login token returned");
-        }
-
-        const client = createClient({
-            baseUrl: homeserver,
-        });
-
-        const { device_id: deviceId, user_id: userId, access_token: accessToken } =
-            await client.login("m.login.token", { token });
-
-        return {
-            userId,
-            deviceId,
-            accessToken,
-            homeserverUrl: homeserver,
-        };
-    }
-
-    async completeVerificationOnNewDevice(client: MatrixClient): Promise<void> {
-        await this.send({
-            type: PayloadType.Progress,
-            outcome: 'success',
-            device_id: client.getDeviceId(),
-            device_key: client.getDeviceEd25519Key(),
-        });
-
-        // await confirmation of verification
-        const {
-            verifying_device_id: verifyingDeviceId,
-            master_key: masterKey,
-            verifying_device_key: verifyingDeviceKey,
-        } = await this.channel.receive();
-
-        if (!verifyingDeviceId || !verifyingDeviceKey) {
-            logger.warn("No verifying_device_id or verifying_device_key received");
-            return;
-        }
-
-        const userId = client.getUserId()!;
-        const verifyingDeviceFromServer =
-            client.crypto?.deviceList.getStoredDevice(userId, verifyingDeviceId);
-
-        if (verifyingDeviceFromServer?.getFingerprint() !== verifyingDeviceKey) {
-            logger.warn(`Verifying device ${verifyingDeviceId} doesn't match: ${verifyingDeviceFromServer}`);
-            return;
-        }
-        // set other device as verified
-        logger.info(`Setting device ${verifyingDeviceId} as verified`);
-        await client.setDeviceVerified(userId, verifyingDeviceId, true);
-
-        if (masterKey) {
-            // set master key as trusted
-            await client.setDeviceVerified(userId, masterKey, true);
-        }
-
-        // request secrets from the verifying device
-        logger.info(`Requesting secrets from ${verifyingDeviceId}`);
-        await requestKeysDuringVerification(client, userId, verifyingDeviceId);
-    }
-
     async declineLoginOnExistingDevice() {
         logger.info('User declined sign in');
         await this.send({ type: PayloadType.Finish, outcome: 'declined' });
     }
 
     async confirmLoginOnExistingDevice(): Promise<string | undefined> {
-        if (!this.cli) {
-            throw new Error('No client set');
-        }
-
-        const client = this.cli;
-
         logger.info("Requesting login token");
 
-        const loginTokenResponse = await client.requestLoginToken();
+        const loginTokenResponse = await this.client.requestLoginToken();
 
         if (typeof (loginTokenResponse as IAuthData).session === 'string') {
             // TODO: handle UIA response
@@ -277,7 +130,7 @@ export class MSC3906Rendezvous {
         const { login_token } = loginTokenResponse as LoginTokenPostResponse;
 
         // eslint-disable-next-line camelcase
-        await this.send({ type: PayloadType.Progress, login_token, homeserver: client.baseUrl });
+        await this.send({ type: PayloadType.Progress, login_token, homeserver: this.client.baseUrl });
 
         logger.info('Waiting for outcome');
         const res = await this.channel.receive();
@@ -297,11 +150,7 @@ export class MSC3906Rendezvous {
     }
 
     private async verifyAndCrossSignDevice(deviceInfo: DeviceInfo) {
-        if (!this.cli) {
-            throw new Error('No client set');
-        }
-
-        if (!this.cli.crypto) {
+        if (!this.client.crypto) {
             throw new Error('Crypto not available on client');
         }
 
@@ -316,26 +165,26 @@ export class MSC3906Rendezvous {
             );
         }
 
-        const userId = this.cli.getUserId();
+        const userId = this.client.getUserId();
 
         if (!userId) {
             throw new Error('No user ID set');
         }
         // mark the device as verified locally + cross sign
         logger.info(`Marking device ${this.newDeviceId} as verified`);
-        const info = await this.cli.crypto.setDeviceVerification(
+        const info = await this.client.crypto.setDeviceVerification(
             userId,
             this.newDeviceId,
             true, false, true,
         );
 
-        const masterPublicKey = this.cli.crypto.crossSigningInfo.getId('master');
+        const masterPublicKey = this.client.crypto.crossSigningInfo.getId('master');
 
         await this.send({
             type: PayloadType.Finish,
             outcome: 'verified',
-            verifying_device_id: this.cli.getDeviceId(),
-            verifying_device_key: this.cli.getDeviceEd25519Key(),
+            verifying_device_id: this.client.getDeviceId(),
+            verifying_device_key: this.client.getDeviceEd25519Key(),
             master_key: masterPublicKey,
         });
 
@@ -351,24 +200,19 @@ export class MSC3906Rendezvous {
             logger.info("No new device key to sign");
             return undefined;
         }
-        const client = this.cli;
 
-        if (!client) {
-            throw new Error('No client set');
-        }
-
-        if (!client.crypto) {
+        if (!this.client.crypto) {
             throw new Error('Crypto not available on client');
         }
 
-        const userId = client.getUserId();
+        const userId = this.client.getUserId();
 
         if (!userId) {
             throw new Error('No user ID set');
         }
 
         {
-            const deviceInfo = client.crypto.getStoredDevice(userId, this.newDeviceId);
+            const deviceInfo = this.client.crypto.getStoredDevice(userId, this.newDeviceId);
 
             if (deviceInfo) {
                 return await this.verifyAndCrossSignDevice(deviceInfo);
@@ -379,7 +223,7 @@ export class MSC3906Rendezvous {
         await sleep(timeout);
 
         {
-            const deviceInfo = client.crypto.getStoredDevice(userId, this.newDeviceId);
+            const deviceInfo = this.client.crypto.getStoredDevice(userId, this.newDeviceId);
 
             if (deviceInfo) {
                 return await this.verifyAndCrossSignDevice(deviceInfo);
@@ -387,10 +231,6 @@ export class MSC3906Rendezvous {
         }
 
         throw new Error('Device not online within timeout');
-    }
-
-    async userCancelled(): Promise<void> {
-        this.cancel(RendezvousFailureReason.UserCancelled);
     }
 
     async cancel(reason: RendezvousFailureReason) {

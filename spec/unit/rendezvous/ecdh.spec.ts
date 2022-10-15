@@ -17,13 +17,13 @@ limitations under the License.
 import crypto from 'crypto';
 
 import '../../olm-loader';
-import { RendezvousIntent } from "../../../src/rendezvous";
+import { RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
 import { MSC3903ECDHv1RendezvousChannel } from '../../../src/rendezvous/channels';
 import { decodeBase64 } from '../../../src/crypto/olmlib';
-import { setCrypto } from '../../../src/utils';
 import { DummyTransport } from './DummyTransport';
+import { setCrypto } from '../../../src/utils';
 
-describe("ECDHv1", function() {
+describe('ECDHv1', function() {
     beforeAll(async function() {
         setCrypto(crypto);
         await global.Olm.init();
@@ -49,6 +49,9 @@ describe("ECDHv1", function() {
         await alice.send(message);
         const bobReceive = await bob.receive();
         expect(bobReceive).toEqual(message);
+
+        await alice.cancel(RendezvousFailureReason.Unknown);
+        await bob.cancel(RendezvousFailureReason.Unknown);
     });
 
     it("initiator wants to reciprocate", async function() {
@@ -71,5 +74,30 @@ describe("ECDHv1", function() {
         await bob.send(message);
         const aliceReceive = await alice.receive();
         expect(aliceReceive).toEqual(message);
+
+        await alice.cancel(RendezvousFailureReason.Unknown);
+        await bob.cancel(RendezvousFailureReason.Unknown);
+    });
+
+    it("double connect", async function() {
+        const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+        const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+        aliceTransport.otherParty = bobTransport;
+        bobTransport.otherParty = aliceTransport;
+
+        // alice is signing in initiates and generates a code
+        const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+        const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
+        const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+
+        const bobChecksum = await bob.connect();
+        const aliceChecksum = await alice.connect();
+
+        expect(aliceChecksum).toEqual(bobChecksum);
+
+        expect(alice.connect()).rejects.toThrow();
+
+        await alice.cancel(RendezvousFailureReason.Unknown);
+        await bob.cancel(RendezvousFailureReason.Unknown);
     });
 });
