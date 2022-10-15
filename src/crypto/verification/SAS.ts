@@ -460,7 +460,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
 
     private sendMAC(olmSAS: OlmSAS, method: string): Promise<void> {
         const mac = {};
-        const keyList = [];
+        const keyList: string[] = [];
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this.baseApis.getUserId() + this.baseApis.deviceId
               + this.userId + this.deviceId
