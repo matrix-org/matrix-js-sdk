@@ -594,7 +594,7 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        const bobDevice = bobClient.crypto.olmDevice;
+        const bobDevice = bobClient.crypto!.olmDevice;
 
         const encryptionCfg = {
             "algorithm": "m.megolm.v1.aes-sha2",
@@ -622,10 +622,11 @@ describe("MegolmDecryption", function() {
             },
         };
 
-        aliceClient.crypto.deviceList.storeDevicesForUser(
+        aliceClient.crypto!.deviceList.storeDevicesForUser(
             "@bob:example.com", BOB_DEVICES,
         );
-        aliceClient.crypto.deviceList.downloadKeys = async function(userIds) {
+        aliceClient.crypto!.deviceList.downloadKeys = async function(userIds) {
+            // @ts-ignore private
             return this.getDevicesFromStore(userIds);
         };
 
@@ -639,7 +640,7 @@ describe("MegolmDecryption", function() {
                     signatures: {},
                 };
                 signedOneTimeKeys["signed_curve25519:" + keyId] = k;
-                await bobClient.crypto.signObject(k);
+                await bobClient.crypto!.signObject(k);
                 break;
             }
         }
@@ -666,7 +667,7 @@ describe("MegolmDecryption", function() {
                 transaction_id: "transactionid",
             },
         });
-        await aliceClient.crypto.encryptEvent(event, room);
+        await aliceClient.crypto!.encryptEvent(event, room);
 
         expect(aliceClient.sendToDevice).toHaveBeenCalled();
         const [msgtype] = mocked(aliceClient.sendToDevice).mock.calls[0];
@@ -687,8 +688,8 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        const aliceDevice = aliceClient.crypto.olmDevice;
-        const bobDevice = bobClient.crypto.olmDevice;
+        const aliceDevice = aliceClient.crypto!.olmDevice;
+        const bobDevice = bobClient.crypto!.olmDevice;
 
         const encryptionCfg = {
             "algorithm": "m.megolm.v1.aes-sha2",
@@ -725,10 +726,11 @@ describe("MegolmDecryption", function() {
             },
         };
 
-        aliceClient.crypto.deviceList.storeDevicesForUser(
+        aliceClient.crypto!.deviceList.storeDevicesForUser(
             "@bob:example.com", BOB_DEVICES,
         );
-        aliceClient.crypto.deviceList.downloadKeys = async function(userIds) {
+        aliceClient.crypto!.deviceList.downloadKeys = async function(userIds) {
+            // @ts-ignore private
             return this.getDevicesFromStore(userIds);
         };
 
@@ -747,7 +749,7 @@ describe("MegolmDecryption", function() {
             event_id: "$event",
             content: {},
         });
-        await aliceClient.crypto.encryptEvent(event, aliceRoom);
+        await aliceClient.crypto!.encryptEvent(event, aliceRoom);
 
         expect(aliceClient.sendToDevice).toHaveBeenCalled();
         const [msgtype, contentMap] = mocked(aliceClient.sendToDevice).mock.calls[0];
