@@ -69,6 +69,9 @@ describe("SimpleHttpRendezvousTransport", function() {
             await httpBackend.flush('');
             await prom;
         }
+        const details = await simpleHttpTransport.details();
+        expect(details.uri).toBe(expectedFinalLocation);
+
         { // first GET without etag
             const prom = simpleHttpTransport.receive();
             httpBackend.when("GET", expectedFinalLocation).response = {
@@ -89,7 +92,7 @@ describe("SimpleHttpRendezvousTransport", function() {
     it("should throw an error when no server available", function() {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ client, fetchFn });
-        expect(simpleHttpTransport.send("application/json", {})).rejects.toThrow("Invalid rendezvous URI");
+        expect(simpleHttpTransport.send("application/json", {})).rejects.toThrowError("Invalid rendezvous URI");
     });
 
     it("POST to fallback server", async function() {
@@ -111,6 +114,25 @@ describe("SimpleHttpRendezvousTransport", function() {
         };
         await httpBackend.flush('');
         expect(await prom).toStrictEqual(undefined);
+    });
+
+    it("POST with no location", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
+            fallbackRzServer: "https://fallbackserver/rz",
+            fetchFn,
+        });
+        const prom = simpleHttpTransport.send("application/json", {});
+        expect(prom).rejects.toThrowError();
+        httpBackend.when("POST", "https://fallbackserver/rz").response = {
+            body: null,
+            response: {
+                statusCode: 201,
+                headers: {},
+            },
+        };
+        await httpBackend.flush('');
     });
 
     it("POST with absolute path response", async function() {
@@ -332,6 +354,98 @@ describe("SimpleHttpRendezvousTransport", function() {
             };
             await httpBackend.flush('');
             await prom;
+        }
+    });
+
+    it("details before ready", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
+            fallbackRzServer: "https://fallbackserver/rz",
+            fetchFn,
+        });
+        expect(simpleHttpTransport.details()).rejects.toThrowError();
+    });
+
+    it("send after cancelled", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
+            fallbackRzServer: "https://fallbackserver/rz",
+            fetchFn,
+        });
+        await simpleHttpTransport.cancel(RendezvousFailureReason.UserDeclined);
+        expect(simpleHttpTransport.send("application/json", 'asd')).resolves.toBeUndefined();
+    });
+
+    it("receive before ready", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
+            fallbackRzServer: "https://fallbackserver/rz",
+            fetchFn,
+        });
+        expect(simpleHttpTransport.receive()).rejects.toThrowError();
+    });
+
+    it("404 failure callback", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
+        const onFailure = jest.fn();
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
+            fallbackRzServer: "https://fallbackserver/rz",
+            fetchFn,
+            onFailure,
+        });
+
+        expect(simpleHttpTransport.send("application/json", JSON.stringify({ foo: "baa" }))).resolves.toBeUndefined();
+        httpBackend.when("POST", "https://fallbackserver/rz").response = {
+            body: null,
+            response: {
+                statusCode: 404,
+                headers: {},
+            },
+        };
+        await httpBackend.flush('', 1);
+        expect(onFailure).toBeCalledWith(RendezvousFailureReason.Unknown);
+    });
+
+    it("404 failure callback mapped to expired", async function() {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
+        const onFailure = jest.fn();
+        const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
+            client,
+            fallbackRzServer: "https://fallbackserver/rz",
+            fetchFn,
+            onFailure,
+        });
+
+        { // initial POST
+            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ foo: "baa" }));
+            httpBackend.when("POST", "https://fallbackserver/rz").response = {
+                body: null,
+                response: {
+                    statusCode: 201,
+                    headers: {
+                        location: "https://fallbackserver/rz/123",
+                        expires: "Thu, 01 Jan 1970 00:00:00 GMT",
+                    },
+                },
+            };
+            await httpBackend.flush('');
+            await prom;
+        }
+        { // GET with 404 to simulate expiry
+            expect(simpleHttpTransport.receive()).resolves.toBeUndefined();
+            httpBackend.when("GET", "https://fallbackserver/rz/123").response = {
+                body: { foo: "baa" },
+                response: {
+                    statusCode: 404,
+                    headers: {},
+                },
+            };
+            await httpBackend.flush('');
+            expect(onFailure).toBeCalledWith(RendezvousFailureReason.Expired);
         }
     });
 });

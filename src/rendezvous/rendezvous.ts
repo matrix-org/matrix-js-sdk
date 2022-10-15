@@ -61,15 +61,6 @@ export class MSC3906Rendezvous {
 
         logger.info(`Connected to secure channel with checksum: ${checksum} our intent is ${this.ourIntent}`);
 
-        {
-            const res = await this.channel.receive();
-            if (res?.intent !== RendezvousIntent.LOGIN_ON_NEW_DEVICE) {
-                await this.send({ type: PayloadType.Finish, intent: this.ourIntent });
-                await this.cancel(RendezvousFailureReason.OtherDeviceAlreadySignedIn);
-                return undefined;
-            }
-        }
-
         // determine available protocols
         if (!(await this.client.doesServerSupportUnstableFeature('org.matrix.msc3882'))) {
             logger.info("Server doesn't support MSC3882");
