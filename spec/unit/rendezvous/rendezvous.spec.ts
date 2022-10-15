@@ -95,12 +95,12 @@ describe("Rendezvous", function() {
 
             expect(typeof aliceRz.code).toBe('string');
 
-            const code = JSON.parse(aliceRz.code) as RendezvousCode;
+            const code = JSON.parse(aliceRz.code!) as RendezvousCode;
 
             expect(code.intent).toEqual(RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE);
-            expect(code.rendezvous.algorithm).toEqual("m.rendezvous.v1.curve25519-aes-sha256");
-            expect(code.rendezvous.transport.type).toEqual("http.v1");
-            expect((code.rendezvous.transport as MSC3886SimpleHttpRendezvousTransportDetails).uri)
+            expect(code.rendezvous?.algorithm).toEqual("m.rendezvous.v1.curve25519-aes-sha256");
+            expect(code.rendezvous?.transport.type).toEqual("http.v1");
+            expect((code.rendezvous?.transport as MSC3886SimpleHttpRendezvousTransportDetails).uri)
                 .toEqual("https://fallbackserver/rz/123");
         });
     });
