@@ -298,7 +298,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
     private opponentCaps: CallCapabilities;
-    private inviteTimeout: ReturnType<typeof setTimeout>;
+    private inviteTimeout?: ReturnType<typeof setTimeout>;
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold
     // This flag represents whether we want the other party to be on hold
@@ -322,7 +322,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private remoteSDPStreamMetadata: SDPStreamMetadata;
 
-    private callLengthInterval: ReturnType<typeof setInterval>;
+    private callLengthInterval?: ReturnType<typeof setInterval>;
     private callLength = 0;
 
     constructor(opts: CallOpts) {
@@ -1689,7 +1689,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.inviteOrAnswerSent = true;
             this.setState(CallState.InviteSent);
             this.inviteTimeout = setTimeout(() => {
-                this.inviteTimeout = null;
+                this.inviteTimeout = undefined;
                 if (this.state === CallState.InviteSent) {
                     this.hangup(CallErrorCode.InviteTimeout, false);
                 }
@@ -2004,11 +2004,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
-            this.inviteTimeout = null;
+            this.inviteTimeout = undefined;
         }
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
-            this.callLengthInterval = null;
+            this.callLengthInterval = undefined;
         }
 
         // Order is important here: first we stopAllMedia() and only then we can deleteAllFeeds()
@@ -2210,7 +2210,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = ev.sender;
+        this.opponentMember = ev.sender!; // XXX: we should use ev.getSender() and just store the userId
     }
 
     private async addBufferedIceCandidates(): Promise<void> {

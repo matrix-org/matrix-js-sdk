@@ -155,7 +155,7 @@ export class IndexedDBStore extends MemoryStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync = this.degradable((): Promise<ISavedSync> => {
+    public getSavedSync = this.degradable((): Promise<ISavedSync | null> => {
         return this.backend.getSavedSync();
     }, "getSavedSync");
 
@@ -292,16 +292,16 @@ export class IndexedDBStore extends MemoryStore {
      */
     private degradable<A extends Array<any>, R = void>(
         func: DegradableFn<A, R>,
-        fallback?: string,
+        fallback?: keyof MemoryStore,
     ): DegradableFn<A, R> {
-        const fallbackFn = super[fallback];
+        const fallbackFn = fallback ? super[fallback] as Function : null;
 
         return async (...args) => {
             try {
                 return await func.call(this, ...args);
             } catch (e) {
                 logger.error("IndexedDBStore failure, degrading to MemoryStore", e);
-                this.emitter.emit("degraded", e);
+                this.emitter.emit("degraded", e as Error);
                 try {
                     // We try to delete IndexedDB after degrading since this store is only a
                     // cache (the app will still function correctly without the data).
@@ -357,7 +357,7 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.saveToDeviceBatches(batches);
     }
 
-    public getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+    public getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
         return this.backend.getOldestToDeviceBatch();
     }
 

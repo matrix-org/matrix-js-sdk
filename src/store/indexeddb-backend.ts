@@ -23,7 +23,7 @@ export interface IIndexedDBBackend {
     syncToDatabase(userTuples: UserTuple[]): Promise<void>;
     isNewlyCreated(): Promise<boolean>;
     setSyncData(syncData: ISyncResponse): Promise<void>;
-    getSavedSync(): Promise<ISavedSync>;
+    getSavedSync(): Promise<ISavedSync | null>;
     getNextBatchToken(): Promise<string>;
     clearDatabase(): Promise<void>;
     getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null>;
@@ -33,7 +33,7 @@ export interface IIndexedDBBackend {
     getClientOptions(): Promise<IStartClientOpts>;
     storeClientOptions(options: IStartClientOpts): Promise<void>;
     saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void>;
-    getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch>;
+    getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
     removeToDeviceBatch(id: number): Promise<void>;
 }
 

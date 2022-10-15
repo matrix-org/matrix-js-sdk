@@ -1,6 +1,6 @@
 import * as utils from "../test-utils/test-utils";
-import { PushProcessor } from "../../src/pushprocessor";
-import { EventType, MatrixClient, MatrixEvent } from "../../src";
+import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
+import { EventType, IContent, MatrixClient, MatrixEvent } from "../../src";
 
 describe('NotificationService', function() {
     const testUserId = "@ali:matrix.org";
@@ -335,5 +335,103 @@ describe('NotificationService', function() {
             default: false,
             enabled: true,
         }, testEvent)).toBe(true);
+    });
+
+    describe("performCustomEventHandling()", () => {
+        const getActionsForEvent = (prevContent: IContent, content: IContent): IActionsObject => {
+            testEvent = utils.mkEvent({
+                type: "org.matrix.msc3401.call",
+                room: testRoomId,
+                user: "@alice:foo",
+                skey: "state_key",
+                event: true,
+                content: content,
+                prev_content: prevContent,
+            });
+
+            return pushProcessor.actionsForEvent(testEvent);
+        };
+
+        const assertDoesNotify = (actions: IActionsObject): void => {
+            expect(actions.notify).toBeTruthy();
+            expect(actions.tweaks.sound).toBeTruthy();
+            expect(actions.tweaks.highlight).toBeFalsy();
+        };
+
+        const assertDoesNotNotify = (actions: IActionsObject): void => {
+            expect(actions.notify).toBeFalsy();
+            expect(actions.tweaks.sound).toBeFalsy();
+            expect(actions.tweaks.highlight).toBeFalsy();
+        };
+
+        it.each(
+            ["m.ring", "m.prompt"],
+        )("should notify when new group call event appears with %s intent", (intent: string) => {
+            assertDoesNotify(getActionsForEvent({}, {
+                "m.intent": intent,
+                "m.type": "m.voice",
+                "m.name": "Call",
+            }));
+        });
+
+        it("should notify when a call is un-terminated", () => {
+            assertDoesNotify(getActionsForEvent({
+                "m.intent": "m.ring",
+                "m.type": "m.voice",
+                "m.name": "Call",
+                "m.terminated": "All users left",
+            }, {
+                "m.intent": "m.ring",
+                "m.type": "m.voice",
+                "m.name": "Call",
+            }));
+        });
+
+        it("should not notify when call is terminated", () => {
+            assertDoesNotNotify(getActionsForEvent({
+                "m.intent": "m.ring",
+                "m.type": "m.voice",
+                "m.name": "Call",
+            }, {
+                "m.intent": "m.ring",
+                "m.type": "m.voice",
+                "m.name": "Call",
+                "m.terminated": "All users left",
+            }));
+        });
+
+        it("should ignore with m.room intent", () => {
+            assertDoesNotNotify(getActionsForEvent({}, {
+                "m.intent": "m.room",
+                "m.type": "m.voice",
+                "m.name": "Call",
+            }));
+        });
+
+        describe("ignoring non-relevant state changes", () => {
+            it("should ignore intent changes", () => {
+                assertDoesNotNotify(getActionsForEvent({
+                    "m.intent": "m.ring",
+                    "m.type": "m.voice",
+                    "m.name": "Call",
+                }, {
+                    "m.intent": "m.ring",
+                    "m.type": "m.video",
+                    "m.name": "Call",
+                }));
+            });
+
+            it("should ignore name changes", () => {
+                assertDoesNotNotify(getActionsForEvent({
+                    "m.intent": "m.ring",
+                    "m.type": "m.voice",
+                    "m.name": "Call",
+                }, {
+                    "m.intent": "m.ring",
+                    "m.type": "m.voice",
+                    "m.name": "New call",
+                }));
+            });
+        });
     });
 });

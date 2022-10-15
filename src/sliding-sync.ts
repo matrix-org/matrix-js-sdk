@@ -15,10 +15,9 @@ limitations under the License.
 */
 
 import { logger } from './logger';
-import { IAbortablePromise } from "./@types/partials";
 import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
-import { TypedEventEmitter } from "./models//typed-event-emitter";
+import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { sleep, IDeferred, defer } from "./utils";
 
 // /sync requests allow you to set a timeout= but the request may continue
@@ -353,7 +352,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private desiredRoomSubscriptions = new Set<string>(); // the *desired* room subscriptions
     private confirmedRoomSubscriptions = new Set<string>();
 
-    private pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
+    private pendingReq?: Promise<MSC3575SlidingSyncResponse>;
+    private abortController?: AbortController;
 
     /**
      * Create a new sliding sync instance
@@ -700,7 +700,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             ...d,
             txnId: this.txnId,
         });
-        this.pendingReq?.abort();
+        this.abortController?.abort();
+        this.abortController = new AbortController();
         return d.promise;
     }
 
@@ -728,7 +729,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             this.txnIdDefers[i].reject(this.txnIdDefers[i].txnId);
         }
         this.txnIdDefers[txnIndex].resolve(txnId);
-        // clear out settled promises, incuding the one we resolved.
+        // clear out settled promises, including the one we resolved.
         this.txnIdDefers = this.txnIdDefers.slice(txnIndex+1);
     }
 
@@ -737,7 +738,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      */
     public stop(): void {
         this.terminated = true;
-        this.pendingReq?.abort();
+        this.abortController?.abort();
         // remove all listeners so things can be GC'd
         this.removeAllListeners(SlidingSyncEvent.Lifecycle);
         this.removeAllListeners(SlidingSyncEvent.List);
@@ -745,9 +746,32 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
+     * Re-setup this connection e.g in the event of an expired session.
+     */
+    private resetup(): void {
+        logger.warn("SlidingSync: resetting connection info");
+        // any pending txn ID defers will be forgotten already by the server, so clear them out
+        this.txnIdDefers.forEach((d) => {
+            d.reject(d.txnId);
+        });
+        this.txnIdDefers = [];
+        // resend sticky params and de-confirm all subscriptions
+        this.lists.forEach((l) => {
+            l.setModified(true);
+        });
+        this.confirmedRoomSubscriptions = new Set<string>(); // leave desired ones alone though!
+        // reset the connection as we might be wedged
+        this.needsResend = true;
+        this.abortController?.abort();
+        this.abortController = new AbortController();
+    }
+
+    /**
      * Start syncing with the server. Blocks until stopped.
      */
     public async start() {
+        this.abortController = new AbortController();
+
         let currentPos: string;
         while (!this.terminated) {
             this.needsResend = false;
@@ -780,9 +804,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     reqBody.txn_id = this.txnId;
                     this.txnId = null;
                 }
-                this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl);
+                this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl, this.abortController.signal);
                 resp = await this.pendingReq;
-                logger.debug(resp);
                 currentPos = resp.pos;
                 // update what we think we're subscribed to.
                 for (const roomId of newSubscriptions) {
@@ -820,16 +843,19 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         null,
                         err,
                     );
-                    await sleep(3000);
-                } else if (this.needsResend || err === "aborted") {
-                    // don't sleep as we caused this error by abort()ing the request.
-                    // we check for 'aborted' because that's the error Jest returns and without it
-                    // we get warnings about not exiting fast enough.
-                    continue;
-                } else {
-                    logger.error(err);
-                    await sleep(3000);
+                    if (err.httpStatus === 400) {
+                        // session probably expired TODO: assign an errcode
+                        // so drop state and re-request
+                        this.resetup();
+                        currentPos = undefined;
+                        await sleep(50); // in case the 400 was for something else; don't tightloop
+                        continue;
+                    } // else fallthrough to generic error handling
+                } else if (this.needsResend || err.name === "AbortError") {
+                    continue; // don't sleep as we caused this error by abort()ing the request.
                 }
+                logger.error(err);
+                await sleep(5000);
             }
             if (!resp) {
                 continue;

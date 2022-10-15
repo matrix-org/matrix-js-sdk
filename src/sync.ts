@@ -57,7 +57,8 @@ import { RoomStateEvent, IMarkerFoundOptions } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
-import { IAbortablePromise } from "./@types/partials";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
+import { Feature, ServerSupport } from "./feature";
 
 const DEBUG = true;
 
@@ -162,7 +163,8 @@ type WrappedRoom<T> = T & {
  */
 export class SyncApi {
     private _peekRoom: Optional<Room> = null;
-    private currentSyncRequest: Optional<IAbortablePromise<ISyncResponse>> = null;
+    private currentSyncRequest: Optional<Promise<ISyncResponse>> = null;
+    private abortController?: AbortController;
     private syncState: Optional<SyncState> = null;
     private syncStateData: Optional<ISyncStateData> = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
@@ -296,9 +298,9 @@ export class SyncApi {
             getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
         ).then(function(filterId) {
             qps.filter = filterId;
-            return client.http.authedRequest<ISyncResponse>(
-                undefined, Method.Get, "/sync", qps as any, undefined, localTimeoutMs,
-            );
+            return client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
+                localTimeoutMs,
+            });
         }).then(async (data) => {
             let leaveRooms = [];
             if (data.rooms?.leave) {
@@ -431,11 +433,11 @@ export class SyncApi {
         }
 
         // FIXME: gut wrenching; hard-coded timeout values
-        this.client.http.authedRequest<IEventsResponse>(undefined, Method.Get, "/events", {
+        this.client.http.authedRequest<IEventsResponse>(Method.Get, "/events", {
             room_id: peekRoom.roomId,
             timeout: String(30 * 1000),
             from: token,
-        }, undefined, 50 * 1000).then((res) => {
+        }, undefined, { localTimeoutMs: 50 * 1000 }).then((res) => {
             if (this._peekRoom !== peekRoom) {
                 debuglog("Stopped peeking in room %s", peekRoom.roomId);
                 return;
@@ -561,7 +563,11 @@ export class SyncApi {
     };
 
     private buildDefaultFilter = () => {
-        return new Filter(this.client.credentials.userId);
+        const filter = new Filter(this.client.credentials.userId);
+        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
+            filter.setUnreadThreadNotifications(true);
+        }
+        return filter;
     };
 
     private checkLazyLoadStatus = async () => {
@@ -646,6 +652,7 @@ export class SyncApi {
      */
     public async sync(): Promise<void> {
         this.running = true;
+        this.abortController = new AbortController();
 
         global.window?.addEventListener?.("online", this.onOnline, false);
 
@@ -732,7 +739,7 @@ export class SyncApi {
         // but do not have global.window.removeEventListener.
         global.window?.removeEventListener?.("online", this.onOnline, false);
         this.running = false;
-        this.currentSyncRequest?.abort();
+        this.abortController?.abort();
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
             this.keepAliveTimer = null;
@@ -896,12 +903,12 @@ export class SyncApi {
         }
     }
 
-    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): IAbortablePromise<ISyncResponse> {
+    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): Promise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
-        return this.client.http.authedRequest<ISyncResponse>(
-            undefined, Method.Get, "/sync", qps as any, undefined,
-            qps.timeout + BUFFER_PERIOD_MS,
-        );
+        return this.client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
+            localTimeoutMs: qps.timeout + BUFFER_PERIOD_MS,
+            abortSignal: this.abortController?.signal,
+        });
     }
 
     private getSyncParams(syncOptions: ISyncOptions, syncToken: string): ISyncParams {
@@ -1264,6 +1271,29 @@ export class SyncApi {
                 }
             }
 
+            room.resetThreadUnreadNotificationCount();
+            const unreadThreadNotifications = joinObj[UNREAD_THREAD_NOTIFICATIONS.name]
+                ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName];
+            if (unreadThreadNotifications) {
+                Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
+                    room.setThreadUnreadNotificationCount(
+                        threadId,
+                        NotificationCountType.Total,
+                        unreadNotification.notification_count,
+                    );
+
+                    const hasNoNotifications =
+                        room.getThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight) <= 0;
+                    if (!encrypted || (encrypted && hasNoNotifications)) {
+                        room.setThreadUnreadNotificationCount(
+                            threadId,
+                            NotificationCountType.Highlight,
+                            unreadNotification.highlight_count,
+                        );
+                    }
+                });
+            }
+
             joinObj.timeline = joinObj.timeline || {} as ITimeline;
 
             if (joinObj.isBrandNewRoom) {
@@ -1492,7 +1522,6 @@ export class SyncApi {
         };
 
         this.client.http.request(
-            undefined, // callback
             Method.Get, "/_matrix/client/versions",
             undefined, // queryParams
             undefined, // data
@@ -1586,8 +1615,8 @@ export class SyncApi {
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
         room.getMembersWithMembership("invite").forEach(function(member) {
-            if (member._requestedProfileInfo) return;
-            member._requestedProfileInfo = true;
+            if (member.requestedProfileInfo) return;
+            member.requestedProfileInfo = true;
             // try to get a cached copy first.
             const user = client.getUser(member.userId);
             let promise;

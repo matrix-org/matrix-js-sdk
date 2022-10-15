@@ -282,7 +282,7 @@ export abstract class ReadReceipt<
         const readUpToId = this.getEventReadUpTo(userId, false);
         if (readUpToId === eventId) return true;
 
-        if (this.timeline.length
+        if (this.timeline?.length
             && this.timeline[this.timeline.length - 1].getSender()
             && this.timeline[this.timeline.length - 1].getSender() === userId) {
             // It doesn't matter where the event is in the timeline, the user has read
@@ -290,7 +290,7 @@ export abstract class ReadReceipt<
             return true;
         }
 
-        for (let i = this.timeline.length - 1; i >= 0; --i) {
+        for (let i = this.timeline?.length - 1; i >= 0; --i) {
             const ev = this.timeline[i];
 
             // If we encounter the target event first, the user hasn't read it

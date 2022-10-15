@@ -303,92 +303,92 @@ describe("RoomState", function() {
             state.setStateEvents(events, { timelineWasEmpty: true });
             expect(emitCount).toEqual(1);
         });
+    });
 
-        describe('beacon events', () => {
-            it('adds new beacon info events to state and emits', () => {
-                const beaconEvent = makeBeaconInfoEvent(userA, roomId);
-                const emitSpy = jest.spyOn(state, 'emit');
+    describe('beacon events', () => {
+        it('adds new beacon info events to state and emits', () => {
+            const beaconEvent = makeBeaconInfoEvent(userA, roomId);
+            const emitSpy = jest.spyOn(state, 'emit');
 
-                state.setStateEvents([beaconEvent]);
+            state.setStateEvents([beaconEvent]);
 
-                expect(state.beacons.size).toEqual(1);
-                const beaconInstance = state.beacons.get(`${roomId}_${userA}`);
-                expect(beaconInstance).toBeTruthy();
-                expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.New, beaconEvent, beaconInstance);
-            });
+            expect(state.beacons.size).toEqual(1);
+            const beaconInstance = state.beacons.get(`${roomId}_${userA}`);
+            expect(beaconInstance).toBeTruthy();
+            expect(emitSpy).toHaveBeenCalledWith(BeaconEvent.New, beaconEvent, beaconInstance);
+        });
 
-            it('does not add redacted beacon info events to state', () => {
-                const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId);
-                const redactionEvent = new MatrixEvent({ type: 'm.room.redaction' });
-                redactedBeaconEvent.makeRedacted(redactionEvent);
-                const emitSpy = jest.spyOn(state, 'emit');
+        it('does not add redacted beacon info events to state', () => {
+            const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId);
+            const redactionEvent = new MatrixEvent({ type: 'm.room.redaction' });
+            redactedBeaconEvent.makeRedacted(redactionEvent);
+            const emitSpy = jest.spyOn(state, 'emit');
 
-                state.setStateEvents([redactedBeaconEvent]);
+            state.setStateEvents([redactedBeaconEvent]);
 
-                // no beacon added
-                expect(state.beacons.size).toEqual(0);
-                expect(state.beacons.get(getBeaconInfoIdentifier(redactedBeaconEvent))).toBeFalsy();
-                // no new beacon emit
-                expect(filterEmitCallsByEventType(BeaconEvent.New, emitSpy).length).toBeFalsy();
-            });
+            // no beacon added
+            expect(state.beacons.size).toEqual(0);
+            expect(state.beacons.get(getBeaconInfoIdentifier(redactedBeaconEvent))).toBeFalsy();
+            // no new beacon emit
+            expect(filterEmitCallsByEventType(BeaconEvent.New, emitSpy).length).toBeFalsy();
+        });
 
-            it('updates existing beacon info events in state', () => {
-                const beaconId = '$beacon1';
-                const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
-                const updatedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, beaconId);
+        it('updates existing beacon info events in state', () => {
+            const beaconId = '$beacon1';
+            const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+            const updatedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: false }, beaconId);
 
-                state.setStateEvents([beaconEvent]);
-                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
-                expect(beaconInstance?.isLive).toEqual(true);
+            state.setStateEvents([beaconEvent]);
+            const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
+            expect(beaconInstance?.isLive).toEqual(true);
 
-                state.setStateEvents([updatedBeaconEvent]);
+            state.setStateEvents([updatedBeaconEvent]);
 
-                // same Beacon
-                expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent))).toBe(beaconInstance);
-                // updated liveness
-                expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent))?.isLive).toEqual(false);
-            });
+            // same Beacon
+            expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent))).toBe(beaconInstance);
+            // updated liveness
+            expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent))?.isLive).toEqual(false);
+        });
 
-            it('destroys and removes redacted beacon events', () => {
-                const beaconId = '$beacon1';
-                const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
-                const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
-                const redactionEvent = new MatrixEvent({ type: 'm.room.redaction', redacts: beaconEvent.getId() });
-                redactedBeaconEvent.makeRedacted(redactionEvent);
+        it('destroys and removes redacted beacon events', () => {
+            const beaconId = '$beacon1';
+            const beaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+            const redactedBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, beaconId);
+            const redactionEvent = new MatrixEvent({ type: 'm.room.redaction', redacts: beaconEvent.getId() });
+            redactedBeaconEvent.makeRedacted(redactionEvent);
 
-                state.setStateEvents([beaconEvent]);
-                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
-                const destroySpy = jest.spyOn(beaconInstance as Beacon, 'destroy');
-                expect(beaconInstance?.isLive).toEqual(true);
+            state.setStateEvents([beaconEvent]);
+            const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
+            const destroySpy = jest.spyOn(beaconInstance as Beacon, 'destroy');
+            expect(beaconInstance?.isLive).toEqual(true);
 
-                state.setStateEvents([redactedBeaconEvent]);
+            state.setStateEvents([redactedBeaconEvent]);
 
-                expect(destroySpy).toHaveBeenCalled();
-                expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent))).toBe(undefined);
-            });
+            expect(destroySpy).toHaveBeenCalled();
+            expect(state.beacons.get(getBeaconInfoIdentifier(beaconEvent))).toBe(undefined);
+        });
 
-            it('updates live beacon ids once after setting state events', () => {
-                const liveBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, '$beacon1');
-                const deadBeaconEvent = makeBeaconInfoEvent(userB, roomId, { isLive: false }, '$beacon2');
+        it('updates live beacon ids once after setting state events', () => {
+            const liveBeaconEvent = makeBeaconInfoEvent(userA, roomId, { isLive: true }, '$beacon1');
+            const deadBeaconEvent = makeBeaconInfoEvent(userB, roomId, { isLive: false }, '$beacon2');
 
-                const emitSpy = jest.spyOn(state, 'emit');
+            const emitSpy = jest.spyOn(state, 'emit');
 
-                state.setStateEvents([liveBeaconEvent, deadBeaconEvent]);
+            state.setStateEvents([liveBeaconEvent, deadBeaconEvent]);
 
-                // called once
-                expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(1);
+            // called once
+            expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(1);
 
-                // live beacon is now not live
-                const updatedLiveBeaconEvent = makeBeaconInfoEvent(
-                    userA, roomId, { isLive: false }, liveBeaconEvent.getId(),
-                );
+            // live beacon is now not live
+            const updatedLiveBeaconEvent = makeBeaconInfoEvent(
+                userA, roomId, { isLive: false }, liveBeaconEvent.getId(),
+            );
 
-                state.setStateEvents([updatedLiveBeaconEvent]);
+            state.setStateEvents([updatedLiveBeaconEvent]);
 
-                expect(state.hasLiveBeacons).toBe(false);
-                expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(3);
-                expect(emitSpy).toHaveBeenCalledWith(RoomStateEvent.BeaconLiveness, state, false);
-            });
+            expect(state.hasLiveBeacons).toBe(false);
+            expect(filterEmitCallsByEventType(RoomStateEvent.BeaconLiveness, emitSpy).length).toBe(3);
+            expect(emitSpy).toHaveBeenCalledWith(RoomStateEvent.BeaconLiveness, state, false);
         });
     });
 
@@ -1005,6 +1005,22 @@ describe("RoomState", function() {
 
                 expect(addLocationsSpy).toHaveBeenCalledWith([decryptingRelatedEvent]);
             });
+        });
+    });
+
+    describe("mayClientSendStateEvent", () => {
+        it("should return false if the user isn't authenticated", () => {
+            expect(state.mayClientSendStateEvent("m.room.message", {
+                isGuest: jest.fn().mockReturnValue(false),
+                credentials: {},
+            } as unknown as MatrixClient)).toBeFalsy();
+        });
+
+        it("should return false if the user is a guest", () => {
+            expect(state.mayClientSendStateEvent("m.room.message", {
+                isGuest: jest.fn().mockReturnValue(true),
+                credentials: { userId: userA },
+            } as unknown as MatrixClient)).toBeFalsy();
         });
     });
 });
