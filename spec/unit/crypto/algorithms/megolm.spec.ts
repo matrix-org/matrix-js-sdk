@@ -780,10 +780,10 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        const bobDevice = bobClient.crypto.olmDevice;
+        const bobDevice = bobClient.crypto!.olmDevice;
 
         const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
-        aliceClient.crypto.registerEventHandlers(aliceEventEmitter);
+        aliceClient.crypto!.registerEventHandlers(aliceEventEmitter);
 
         const roomId = "!someroom";
 
@@ -800,7 +800,7 @@ describe("MegolmDecryption", function() {
             },
         }));
 
-        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto!.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
@@ -827,7 +827,7 @@ describe("MegolmDecryption", function() {
             },
         }));
 
-        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto!.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
