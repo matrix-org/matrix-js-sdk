@@ -311,6 +311,45 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         return startContent;
     }
 
+    private async verifyAndCheckMAC(
+        keyAgreement: string,
+        sasMethods: string[],
+        olmSAS: OlmSAS,
+        macMethod: string,
+    ): Promise<void> {
+        const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
+        const verifySAS = new Promise<void>((resolve, reject) => {
+            this.sasEvent = {
+                sas: generateSas(sasBytes, sasMethods),
+                confirm: async () => {
+                    try {
+                        await this.sendMAC(olmSAS, macMethod);
+                        resolve();
+                    } catch (err) {
+                        reject(err);
+                    }
+                },
+                cancel: () => reject(newUserCancelledError()),
+                mismatch: () => reject(newMismatchedSASError()),
+            };
+            this.emit(SasEvent.ShowSas, this.sasEvent);
+        });
+
+        const [e] = await Promise.all([
+            this.waitForEvent(EventType.KeyVerificationMac)
+                .then((e) => {
+                    // we don't expect any more messages from the other
+                    // party, and they may send a m.key.verification.done
+                    // when they're done on their end
+                    this.expectedEvent = EventType.KeyVerificationDone;
+                    return e;
+                }),
+            verifySAS,
+        ]);
+        const content = e.getContent();
+        await this.checkMAC(olmSAS, content, macMethod);
+    }
+
     private async doSendVerification(): Promise<void> {
         this.waitingForAccept = true;
         let startContent;
@@ -367,37 +406,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             this.theirSASPubKey = content.key;
             olmSAS.set_their_key(content.key);
 
-            const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
-            const verifySAS = new Promise<void>((resolve, reject) => {
-                this.sasEvent = {
-                    sas: generateSas(sasBytes, sasMethods),
-                    confirm: async () => {
-                        try {
-                            await this.sendMAC(olmSAS, macMethod);
-                            resolve();
-                        } catch (err) {
-                            reject(err);
-                        }
-                    },
-                    cancel: () => reject(newUserCancelledError()),
-                    mismatch: () => reject(newMismatchedSASError()),
-                };
-                this.emit(SasEvent.ShowSas, this.sasEvent);
-            });
-
-            [e] = await Promise.all([
-                this.waitForEvent(EventType.KeyVerificationMac)
-                    .then((e) => {
-                        // we don't expect any more messages from the other
-                        // party, and they may send a m.key.verification.done
-                        // when they're done on their end
-                        this.expectedEvent = EventType.KeyVerificationDone;
-                        return e;
-                    }),
-                verifySAS,
-            ]);
-            content = e.getContent();
-            await this.checkMAC(olmSAS, content, macMethod);
+            await this.verifyAndCheckMAC(keyAgreement, sasMethods, olmSAS, macMethod);
         } finally {
             olmSAS.free();
         }
@@ -433,7 +442,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
                 commitment: olmutil.sha256(commitmentStr),
             });
 
-            let e = await this.waitForEvent(EventType.KeyVerificationKey);
+            const e = await this.waitForEvent(EventType.KeyVerificationKey);
             // FIXME: make sure event is properly formed
             content = e.getContent();
             this.theirSASPubKey = content.key;
@@ -443,37 +452,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
                 key: this.ourSASPubKey,
             });
 
-            const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
-            const verifySAS = new Promise<void>((resolve, reject) => {
-                this.sasEvent = {
-                    sas: generateSas(sasBytes, sasMethods),
-                    confirm: async () => {
-                        try {
-                            await this.sendMAC(olmSAS, macMethod);
-                            resolve();
-                        } catch (err) {
-                            reject(err);
-                        }
-                    },
-                    cancel: () => reject(newUserCancelledError()),
-                    mismatch: () => reject(newMismatchedSASError()),
-                };
-                this.emit(SasEvent.ShowSas, this.sasEvent);
-            });
-
-            [e] = await Promise.all([
-                this.waitForEvent(EventType.KeyVerificationMac)
-                    .then((e) => {
-                        // we don't expect any more messages from the other
-                        // party, and they may send a m.key.verification.done
-                        // when they're done on their end
-                        this.expectedEvent = EventType.KeyVerificationDone;
-                        return e;
-                    }),
-                verifySAS,
-            ]);
-            content = e.getContent();
-            await this.checkMAC(olmSAS, content, macMethod);
+            await this.verifyAndCheckMAC(keyAgreement, sasMethods, olmSAS, macMethod);
         } finally {
             olmSAS.free();
         }
