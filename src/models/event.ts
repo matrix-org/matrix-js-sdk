@@ -188,7 +188,7 @@ export enum MatrixEventEvent {
     RelationsCreated = "Event.relationsCreated",
 }
 
-type EmittedEvents = MatrixEventEvent | ThreadEvent.Update;
+export type MatrixEventEmittedEvents = MatrixEventEvent | ThreadEvent.Update;
 
 export type MatrixEventHandlerMap = {
     [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err?: Error) => void;
@@ -198,9 +198,9 @@ export type MatrixEventHandlerMap = {
     [MatrixEventEvent.Status]: (event: MatrixEvent, status: EventStatus | null) => void;
     [MatrixEventEvent.Replaced]: (event: MatrixEvent) => void;
     [MatrixEventEvent.RelationsCreated]: (relationType: string, eventType: string) => void;
-} & ThreadEventHandlerMap;
+} & Pick<ThreadEventHandlerMap, ThreadEvent.Update>;
 
-export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHandlerMap> {
+export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap> {
     private pushActions: IActionsObject | null = null;
     private _replacingEvent: MatrixEvent | null = null;
     private _localRedactionEvent: MatrixEvent | null = null;
@@ -283,7 +283,7 @@ export class MatrixEvent extends TypedEventEmitter<EmittedEvents, MatrixEventHan
      */
     public verificationRequest?: VerificationRequest;
 
-    private readonly reEmitter: TypedReEmitter<EmittedEvents, MatrixEventHandlerMap>;
+    private readonly reEmitter: TypedReEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap>;
 
     /**
      * Construct a Matrix Event object
