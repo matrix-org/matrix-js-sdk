@@ -1276,9 +1276,9 @@ describe("MatrixClient syncing", () => {
             client!.on(RoomEvent.TimelineReset, (room) => {
                 resetCallCount++;
 
-                const tl = room.getLiveTimeline();
-                expect(tl.getEvents().length).toEqual(0);
-                const tok = tl.getPaginationToken(EventTimeline.BACKWARDS);
+                const tl = room?.getLiveTimeline();
+                expect(tl?.getEvents().length).toEqual(0);
+                const tok = tl?.getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("newerTok");
             });
 

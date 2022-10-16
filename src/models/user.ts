@@ -38,13 +38,13 @@ export type UserEventHandlerMap = {
 };
 
 export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
-    private modified: number;
+    private modified = -1;
 
     // XXX these should be read-only
-    public displayName: string;
-    public rawDisplayName: string;
-    public avatarUrl: string;
-    public presenceStatusMsg: string = null;
+    public displayName?: string;
+    public rawDisplayName?: string;
+    public avatarUrl?: string;
+    public presenceStatusMsg?: string;
     public presence = "offline";
     public lastActiveAgo = 0;
     public lastPresenceTs = 0;
@@ -52,10 +52,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     public events: {
         presence?: MatrixEvent;
         profile?: MatrixEvent;
-    } = {
-            presence: null,
-            profile: null,
-        };
+    } = {};
 
     /**
      * Construct a new User. A User must have an ID and can optionally have extra
@@ -83,7 +80,6 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
         super();
         this.displayName = userId;
         this.rawDisplayName = userId;
-        this.avatarUrl = null;
         this.updateModifiedTime();
     }
 
@@ -150,11 +146,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      */
     public setDisplayName(name: string): void {
         const oldName = this.displayName;
-        if (typeof name === "string") {
-            this.displayName = name;
-        } else {
-            this.displayName = undefined;
-        }
+        this.displayName = name;
         if (name !== oldName) {
             this.updateModifiedTime();
         }
@@ -165,12 +157,8 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * in response to this as there is no underlying MatrixEvent to emit with.
      * @param {string} name The new display name.
      */
-    public setRawDisplayName(name: string): void {
-        if (typeof name === "string") {
-            this.rawDisplayName = name;
-        } else {
-            this.rawDisplayName = undefined;
-        }
+    public setRawDisplayName(name?: string): void {
+        this.rawDisplayName = name;
     }
 
     /**
@@ -178,7 +166,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * as there is no underlying MatrixEvent to emit with.
      * @param {string} url The new avatar URL.
      */
-    public setAvatarUrl(url: string): void {
+    public setAvatarUrl(url?: string): void {
         const oldUrl = this.avatarUrl;
         this.avatarUrl = url;
         if (url !== oldUrl) {

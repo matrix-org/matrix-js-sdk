@@ -160,7 +160,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param {MatrixEvent} event The event whose status has changed
      * @param {EventStatus} status The new status
      */
-    private onEventStatus = (event: MatrixEvent, status: EventStatus) => {
+    private onEventStatus = (event: MatrixEvent, status: EventStatus | null) => {
         if (!event.isSending()) {
             // Sending is done, so we don't need to listen anymore
             event.removeListener(MatrixEventEvent.Status, this.onEventStatus);

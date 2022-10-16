@@ -107,8 +107,8 @@ export class Filter {
     }
 
     private definition: IFilterDefinition = {};
-    private roomFilter: FilterComponent;
-    private roomTimelineFilter: FilterComponent;
+    private roomFilter?: FilterComponent;
+    private roomTimelineFilter?: FilterComponent;
 
     constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
 
@@ -116,7 +116,7 @@ export class Filter {
      * Get the ID of this filter on your homeserver (if known)
      * @return {?string} The filter ID
      */
-    getFilterId(): string | null {
+    public getFilterId(): string | undefined {
         return this.filterId;
     }
 
@@ -124,7 +124,7 @@ export class Filter {
      * Get the JSON body of the filter.
      * @return {Object} The filter definition
      */
-    getDefinition(): IFilterDefinition {
+    public getDefinition(): IFilterDefinition {
         return this.definition;
     }
 
@@ -132,7 +132,7 @@ export class Filter {
      * Set the JSON body of the filter
      * @param {Object} definition The filter definition
      */
-    setDefinition(definition: IFilterDefinition) {
+    public setDefinition(definition: IFilterDefinition) {
         this.definition = definition;
 
         // This is all ported from synapse's FilterCollection()
@@ -201,7 +201,7 @@ export class Filter {
      * Get the room.timeline filter component of the filter
      * @return {FilterComponent} room timeline filter component
      */
-    getRoomTimelineFilterComponent(): FilterComponent {
+    public getRoomTimelineFilterComponent(): FilterComponent | undefined {
         return this.roomTimelineFilter;
     }
 
@@ -211,15 +211,21 @@ export class Filter {
      * @param {MatrixEvent[]} events  the list of events being filtered
      * @return {MatrixEvent[]} the list of events which match the filter
      */
-    filterRoomTimeline(events: MatrixEvent[]): MatrixEvent[] {
-        return this.roomTimelineFilter.filter(this.roomFilter.filter(events));
+    public filterRoomTimeline(events: MatrixEvent[]): MatrixEvent[] {
+        if (this.roomFilter) {
+            events = this.roomFilter.filter(events);
+        }
+        if (this.roomTimelineFilter) {
+            events = this.roomTimelineFilter.filter(events);
+        }
+        return events;
     }
 
     /**
      * Set the max number of events to return for each room's timeline.
      * @param {Number} limit The max number of events to return for each room.
      */
-    setTimelineLimit(limit: number) {
+    public setTimelineLimit(limit: number) {
         setProp(this.definition, "room.timeline.limit", limit);
     }
 
@@ -234,14 +240,14 @@ export class Filter {
                 ...this.definition?.room,
                 timeline: {
                     ...this.definition?.room?.timeline,
-                    [UNREAD_THREAD_NOTIFICATIONS.name]: !!enabled,
+                    [UNREAD_THREAD_NOTIFICATIONS.name]: enabled,
                 },
             },
         };
     }
 
-    setLazyLoadMembers(enabled: boolean): void {
-        setProp(this.definition, "room.state.lazy_load_members", !!enabled);
+    public setLazyLoadMembers(enabled: boolean): void {
+        setProp(this.definition, "room.state.lazy_load_members", enabled);
     }
 
     /**
@@ -249,7 +255,7 @@ export class Filter {
      * @param {boolean} includeLeave True to make rooms the user has left appear
      * in responses.
      */
-    setIncludeLeaveRooms(includeLeave: boolean) {
+    public setIncludeLeaveRooms(includeLeave: boolean) {
         setProp(this.definition, "room.include_leave", includeLeave);
     }
 }
