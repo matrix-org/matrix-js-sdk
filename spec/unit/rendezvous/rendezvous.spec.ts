@@ -579,4 +579,13 @@ describe("Rendezvous", function() {
         }, 1500);
         expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError();
     });
+
+    it("mismatched device key", async function() {
+        const { aliceRz } = await completeLogin({
+            BOB: {
+                getFingerprint: () => "XXXX",
+            },
+        });
+        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError(/different key/);
+    });
 });
