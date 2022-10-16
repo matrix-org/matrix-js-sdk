@@ -15,11 +15,9 @@ limitations under the License.
 */
 
 import { RendezvousChannel } from ".";
-import { LoginTokenPostResponse } from "../@types/auth";
 import { MatrixClient } from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
 import { DeviceInfo } from "../crypto/deviceinfo";
-import { IAuthData } from "../interactive-auth";
 import { logger } from "../logger";
 import { sleep } from "../utils";
 import { RendezvousFailureListener, RendezvousFailureReason } from "./cancellationReason";
@@ -108,20 +106,9 @@ export class MSC3906Rendezvous {
         await this.send({ type: PayloadType.Finish, outcome: 'declined' });
     }
 
-    async confirmLoginOnExistingDevice(): Promise<string | undefined> {
-        logger.info("Requesting login token");
-
-        const loginTokenResponse = await this.client.requestLoginToken();
-
-        if (typeof (loginTokenResponse as IAuthData).session === 'string') {
-            // TODO: handle UIA response
-            throw new Error("UIA isn't supported yet");
-        }
+    async approveLoginOnExistingDevice(loginToken: string): Promise<string | undefined> {
         // eslint-disable-next-line camelcase
-        const { login_token } = loginTokenResponse as LoginTokenPostResponse;
-
-        // eslint-disable-next-line camelcase
-        await this.send({ type: PayloadType.Progress, login_token, homeserver: this.client.baseUrl });
+        await this.send({ type: PayloadType.Progress, login_token: loginToken, homeserver: this.client.baseUrl });
 
         logger.info('Waiting for outcome');
         const res = await this.channel.receive();

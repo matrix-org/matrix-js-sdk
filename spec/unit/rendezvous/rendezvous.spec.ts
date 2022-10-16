@@ -52,9 +52,6 @@ function makeMockClient(opts: {
         getUserId() { return opts.userId; },
         getDeviceId() { return opts.deviceId; },
         getDeviceEd25519Key() { return opts.deviceKey; },
-        requestLoginToken() {
-            return Promise.resolve({ login_token: "token" });
-        },
         baseUrl: "https://example.com",
         crypto: {
             getStoredDevice(userId: string, deviceId: string) {
@@ -434,7 +431,7 @@ describe("Rendezvous", function() {
         await aliceStartProm;
         await bobStartPromise;
 
-        const confirmProm = aliceRz.confirmLoginOnExistingDevice();
+        const confirmProm = aliceRz.approveLoginOnExistingDevice("token");
 
         const bobCompleteProm = (async () => {
             const loginToken = await bobEcdh.receive();
@@ -508,7 +505,7 @@ describe("Rendezvous", function() {
         await aliceStartProm;
         await bobStartPromise;
 
-        const confirmProm = aliceRz.confirmLoginOnExistingDevice();
+        const confirmProm = aliceRz.approveLoginOnExistingDevice("token");
 
         const bobLoginProm = (async () => {
             const loginToken = await bobEcdh.receive();
