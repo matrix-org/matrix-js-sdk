@@ -25,36 +25,158 @@ import { setCrypto } from '../../../src/utils';
 
 describe('ECDHv1', function() {
     beforeAll(async function() {
-        setCrypto(crypto);
         await global.Olm.init();
     });
 
-    it("initiator wants to sign in", async function() {
-        const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-        const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
+    describe('with crypto', () => {
+        beforeEach(async function() {
+            setCrypto(crypto);
+        });
+        it("initiator wants to sign in", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
 
-        // alice is signing in initiates and generates a code
-        const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
-        const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-        const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+            // alice is signing in initiates and generates a code
+            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
+            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
-        const bobChecksum = await bob.connect();
-        const aliceChecksum = await alice.connect();
+            const bobChecksum = await bob.connect();
+            const aliceChecksum = await alice.connect();
 
-        expect(aliceChecksum).toEqual(bobChecksum);
+            expect(aliceChecksum).toEqual(bobChecksum);
 
-        const message = "hello world";
-        await alice.send(message);
-        const bobReceive = await bob.receive();
-        expect(bobReceive).toEqual(message);
+            const message = "hello world";
+            await alice.send(message);
+            const bobReceive = await bob.receive();
+            expect(bobReceive).toEqual(message);
 
-        await alice.cancel(RendezvousFailureReason.Unknown);
-        await bob.cancel(RendezvousFailureReason.Unknown);
+            await alice.cancel(RendezvousFailureReason.Unknown);
+            await bob.cancel(RendezvousFailureReason.Unknown);
+        });
+
+        it("initiator wants to reciprocate", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
+
+            // alice is signing in initiates and generates a code
+            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
+            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+
+            const bobChecksum = await bob.connect();
+            const aliceChecksum = await alice.connect();
+
+            expect(aliceChecksum).toEqual(bobChecksum);
+
+            const message = "hello world";
+            await bob.send(message);
+            const aliceReceive = await alice.receive();
+            expect(aliceReceive).toEqual(message);
+
+            await alice.cancel(RendezvousFailureReason.Unknown);
+            await bob.cancel(RendezvousFailureReason.Unknown);
+        });
+
+        it("double connect", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
+
+            // alice is signing in initiates and generates a code
+            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
+            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+
+            const bobChecksum = await bob.connect();
+            const aliceChecksum = await alice.connect();
+
+            expect(aliceChecksum).toEqual(bobChecksum);
+
+            expect(alice.connect()).rejects.toThrow();
+
+            await alice.cancel(RendezvousFailureReason.Unknown);
+            await bob.cancel(RendezvousFailureReason.Unknown);
+        });
+
+        it("closed", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
+
+            // alice is signing in initiates and generates a code
+            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
+            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+
+            const bobChecksum = await bob.connect();
+            const aliceChecksum = await alice.connect();
+
+            expect(aliceChecksum).toEqual(bobChecksum);
+
+            alice.close();
+
+            expect(alice.connect()).rejects.toThrow();
+            expect(alice.send('')).rejects.toThrow();
+            expect(alice.receive()).rejects.toThrow();
+
+            await alice.cancel(RendezvousFailureReason.Unknown);
+            await bob.cancel(RendezvousFailureReason.Unknown);
+        });
+
+        it("require ciphertext", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
+
+            // alice is signing in initiates and generates a code
+            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
+            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+
+            const bobChecksum = await bob.connect();
+            const aliceChecksum = await alice.connect();
+
+            expect(aliceChecksum).toEqual(bobChecksum);
+
+            // send a message without encryption
+            await aliceTransport.send('application/json', '{}');
+            expect(bob.receive()).rejects.toThrowError();
+
+            await alice.cancel(RendezvousFailureReason.Unknown);
+            await bob.cancel(RendezvousFailureReason.Unknown);
+        });
+
+        it("ciphertext before set up", async function() {
+            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
+            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            aliceTransport.otherParty = bobTransport;
+            bobTransport.otherParty = aliceTransport;
+
+            // alice is signing in initiates and generates a code
+            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
+
+            await bobTransport.send('application/json', '{ ciphertext: "foo" }');
+
+            expect(alice.receive()).rejects.toThrowError();
+
+            await alice.cancel(RendezvousFailureReason.Unknown);
+        });
     });
 
-    it("initiator wants to reciprocate", async function() {
+    it("no crypto", async function() {
+        // simulates running in a browser without crypto support
+        // n.b. we can't test subtle crypto because it's not available in jsdom jest environment
+        setCrypto(undefined);
+
         const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
         const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
         aliceTransport.otherParty = bobTransport;
@@ -65,37 +187,8 @@ describe('ECDHv1', function() {
         const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
         const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
-        const bobChecksum = await bob.connect();
-        const aliceChecksum = await alice.connect();
-
-        expect(aliceChecksum).toEqual(bobChecksum);
-
-        const message = "hello world";
-        await bob.send(message);
-        const aliceReceive = await alice.receive();
-        expect(aliceReceive).toEqual(message);
-
-        await alice.cancel(RendezvousFailureReason.Unknown);
-        await bob.cancel(RendezvousFailureReason.Unknown);
-    });
-
-    it("double connect", async function() {
-        const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-        const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
-
-        // alice is signing in initiates and generates a code
-        const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
-        const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-        const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
-
-        const bobChecksum = await bob.connect();
-        const aliceChecksum = await alice.connect();
-
-        expect(aliceChecksum).toEqual(bobChecksum);
-
-        expect(alice.connect()).rejects.toThrow();
+        expect(bob.connect()).rejects.toThrowError();
+        expect(alice.connect()).rejects.toThrowError();
 
         await alice.cancel(RendezvousFailureReason.Unknown);
         await bob.cancel(RendezvousFailureReason.Unknown);

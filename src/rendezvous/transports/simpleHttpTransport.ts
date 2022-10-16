@@ -101,8 +101,6 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
             throw new Error('Invalid rendezvous URI');
         }
 
-        // logger.debug(`Sending data: ${data} to ${uri}`);
-
         const headers: Record<string, string> = { 'content-type': contentType };
         if (this.etag) {
             headers['if-match'] = this.etag;
@@ -116,8 +114,6 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
             return this.cancel(RendezvousFailureReason.Unknown);
         }
         this.etag = res.headers.get("etag") ?? undefined;
-
-        // logger.debug(`Posted data to ${uri} new etag ${this.etag}`);
 
         if (method === 'POST') {
             const location = res.headers.get('location');
@@ -146,14 +142,13 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
             if (this.cancelled) {
                 return;
             }
-            // logger.debug(`Polling: ${this.uri} after etag ${this.etag}`);
+
             const headers: Record<string, string> = {};
             if (this.etag) {
                 headers['if-none-match'] = this.etag;
             }
             const poll = await this.fetch(this.uri, { method: "GET", headers });
 
-            // logger.debug(`Received polling response: ${poll.status} from ${this.uri}`);
             if (poll.status === 404) {
                 return this.cancel(RendezvousFailureReason.Unknown);
             }
@@ -165,7 +160,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
             } else if (poll.status === 200) {
                 this.etag = poll.headers.get("etag") ?? undefined;
                 const data = await poll.json();
-                // logger.debug(`Received data: ${JSON.stringify(data)} from ${this.uri} with etag ${this.etag}`);
+
                 return data;
             }
             await sleep(1000);
@@ -184,7 +179,6 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
 
         if (this.uri && reason === RendezvousFailureReason.UserDeclined) {
             try {
-                // logger.debug(`Deleting channel: ${this.uri}`);
                 await this.fetch(this.uri, { method: "DELETE" });
             } catch (e) {
                 logger.warn(e);
