@@ -175,7 +175,7 @@ describe('ECDHv1', function() {
     it("no crypto", async function() {
         // simulates running in a browser without crypto support
         // n.b. we can't test subtle crypto because it's not available in jsdom jest environment
-        setCrypto(undefined);
+        setCrypto(undefined as typeof crypto);
 
         const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
         const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
