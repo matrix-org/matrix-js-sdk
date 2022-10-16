@@ -156,7 +156,7 @@ describe("Rendezvous", function() {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is aleady signs in and generates a code
+        // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -210,7 +210,7 @@ describe("Rendezvous", function() {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is aleady signs in and generates a code
+        // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -268,7 +268,7 @@ describe("Rendezvous", function() {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is aleady signs in and generates a code
+        // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -326,7 +326,7 @@ describe("Rendezvous", function() {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is aleady signs in and generates a code
+        // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -386,7 +386,7 @@ describe("Rendezvous", function() {
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // alice is aleady signs in and generates a code
+        // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
         const alice = makeMockClient({
             userId: "alice",
@@ -446,19 +446,14 @@ describe("Rendezvous", function() {
         await bobCompleteProm;
     });
 
-    it("approve on existing device + verification", async function() {
+    async function completeLogin(devices: Record<string, Partial<DeviceInfo>>) {
         const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
         const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
         transports.push(aliceTransport, bobTransport);
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
 
-        // const info = await this.client.crypto.setDeviceVerification(
-        //     userId,
-        //     this.newDeviceId,
-        //     true, false, true,
-        // );
-        // alice is aleady signs in and generates a code
+        // alice is already signs in and generates a code
         const aliceOnFailure = jest.fn();
         const aliceVerification = jest.fn();
         const alice = makeMockClient({
@@ -466,11 +461,7 @@ describe("Rendezvous", function() {
             deviceId: "ALICE",
             msc3882Enabled: true,
             msc3886Enabled: false,
-            devices: {
-                BOB: {
-                    getFingerprint: () => "bbbb",
-                },
-            },
+            devices,
             deviceKey: 'aaaa',
             verificationFunction: aliceVerification,
             crossSigningIds: {
@@ -528,6 +519,21 @@ describe("Rendezvous", function() {
         expect(await confirmProm).toEqual('BOB');
         await bobLoginProm;
 
+        return {
+            aliceTransport,
+            aliceEcdh,
+            aliceRz,
+            bobTransport,
+            bobEcdh,
+        };
+    }
+
+    it("approve on existing device + verification", async function() {
+        const { bobEcdh, aliceRz } = await completeLogin({
+            BOB: {
+                getFingerprint: () => "bbbb",
+            },
+        });
         const verifyProm = aliceRz.verifyNewDeviceOnExistingDevice();
 
         const bobVerifyProm = (async () => {
@@ -543,5 +549,34 @@ describe("Rendezvous", function() {
 
         await verifyProm;
         await bobVerifyProm;
+    });
+
+    it("device not online within timeout", async function() {
+        const { aliceRz } = await completeLogin({});
+        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError();
+    });
+
+    it("device appears online within timeout", async function() {
+        const devices: Record<string, Partial<DeviceInfo>> = {};
+        const { aliceRz } = await completeLogin(devices);
+        // device appears after 1 second
+        setTimeout(() => {
+            devices.BOB = {
+                getFingerprint: () => "bbbb",
+            };
+        }, 1000);
+        await aliceRz.verifyNewDeviceOnExistingDevice(2000);
+    });
+
+    it("device appears online after timeout", async function() {
+        const devices: Record<string, Partial<DeviceInfo>> = {};
+        const { aliceRz } = await completeLogin(devices);
+        // device appears after 1 second
+        setTimeout(() => {
+            devices.BOB = {
+                getFingerprint: () => "bbbb",
+            };
+        }, 1500);
+        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError();
     });
 });
