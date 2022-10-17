@@ -322,7 +322,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      * @param {function(string)} func Called with the account pickle
      */
-    public getAccount(txn: IDBTransaction, func: (accountPickle: string) => void) {
+    public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void) {
         this.backend.getAccount(txn, func);
     }
 
@@ -345,7 +345,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(string)} func Called with the account keys object:
      *        { key_type: base64 encoded seed } where key type = user_signing_key_seed or self_signing_key_seed
      */
-    public getCrossSigningKeys(txn: IDBTransaction, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(
+        txn: IDBTransaction,
+        func: (keys: Record<string, ICrossSigningKey> | null) => void,
+    ): void {
         this.backend.getCrossSigningKeys(txn, func);
     }
 

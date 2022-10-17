@@ -69,9 +69,9 @@ export interface CryptoStore {
     deleteOutgoingRoomKeyRequest(requestId: string, expectedState: number): Promise<OutgoingRoomKeyRequest | null>;
 
     // Olm Account
-    getAccount(txn: unknown, func: (accountPickle: string) => void);
+    getAccount(txn: unknown, func: (accountPickle: string | null) => void);
     storeAccount(txn: unknown, accountPickle: string): void;
-    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void;
+    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void;
     getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
         func: (key: SecretStorePrivateKeys[K] | null) => void,

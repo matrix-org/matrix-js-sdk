@@ -44,7 +44,7 @@ import { InboundGroupSessionData } from "../OlmDevice";
  */
 export class MemoryCryptoStore implements CryptoStore {
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
-    private account: string = null;
+    private account: string | null = null;
     private crossSigningKeys: Record<string, ICrossSigningKey> | null = null;
     private privateKeys: Partial<SecretStorePrivateKeys> = {};
 
@@ -279,7 +279,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     // Olm Account
 
-    public getAccount(txn: unknown, func: (accountPickle: string) => void) {
+    public getAccount(txn: unknown, func: (accountPickle: string | null) => void) {
         func(this.account);
     }
 
@@ -287,7 +287,7 @@ export class MemoryCryptoStore implements CryptoStore {
         this.account = accountPickle;
     }
 
-    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
         func(this.crossSigningKeys);
     }
 

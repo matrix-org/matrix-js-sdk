@@ -368,7 +368,7 @@ export class Backend implements CryptoStore {
 
     // Olm Account
 
-    public getAccount(txn: IDBTransaction, func: (accountPickle: string) => void): void {
+    public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("-");
         getReq.onsuccess = function() {
@@ -385,7 +385,7 @@ export class Backend implements CryptoStore {
         objectStore.put(accountPickle, "-");
     }
 
-    public getCrossSigningKeys(txn: IDBTransaction, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(txn: IDBTransaction, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("crossSigningKeys");
         getReq.onsuccess = function() {

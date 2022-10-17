@@ -373,7 +373,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
 
     // Olm account
 
-    public getAccount(txn: unknown, func: (accountPickle: string) => void): void {
+    public getAccount(txn: unknown, func: (accountPickle: string | null) => void): void {
         const accountPickle = getJsonItem<string>(this.store, KEY_END_TO_END_ACCOUNT);
         func(accountPickle);
     }
@@ -382,7 +382,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         setJsonItem(this.store, KEY_END_TO_END_ACCOUNT, accountPickle);
     }
 
-    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
         const keys = getJsonItem<Record<string, ICrossSigningKey>>(this.store, KEY_CROSS_SIGNING_KEYS);
         func(keys);
     }
