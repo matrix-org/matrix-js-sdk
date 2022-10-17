@@ -44,13 +44,13 @@ export class MSC3906Rendezvous {
     private ourIntent: RendezvousIntent = RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
     public code?: string;
 
-    constructor(
+    public constructor(
         public channel: RendezvousChannel,
         public client: MatrixClient,
         public onFailure?: RendezvousFailureListener,
     ) {}
 
-    async generateCode(): Promise<void> {
+    public async generateCode(): Promise<void> {
         if (this.code) {
             return;
         }
@@ -58,7 +58,7 @@ export class MSC3906Rendezvous {
         this.code = JSON.stringify(await this.channel.generateCode(this.ourIntent));
     }
 
-    async startAfterShowingCode(): Promise<string | undefined> {
+    public async startAfterShowingCode(): Promise<string | undefined> {
         const checksum = await this.channel.connect();
 
         logger.info(`Connected to secure channel with checksum: ${checksum} our intent is ${this.ourIntent}`);
@@ -106,12 +106,12 @@ export class MSC3906Rendezvous {
         await this.channel.send({ type, ...payload });
     }
 
-    async declineLoginOnExistingDevice() {
+    public async declineLoginOnExistingDevice() {
         logger.info('User declined sign in');
         await this.send({ type: PayloadType.Finish, outcome: 'declined' });
     }
 
-    async approveLoginOnExistingDevice(loginToken: string): Promise<string | undefined> {
+    public async approveLoginOnExistingDevice(loginToken: string): Promise<string | undefined> {
         // eslint-disable-next-line camelcase
         await this.send({ type: PayloadType.Progress, login_token: loginToken, homeserver: this.client.baseUrl });
 
@@ -174,7 +174,14 @@ export class MSC3906Rendezvous {
         return info;
     }
 
-    async verifyNewDeviceOnExistingDevice(timeout = 10 * 1000): Promise<DeviceInfo | CrossSigningInfo | undefined> {
+    /**
+     * Verify the device and cross-sign it.
+     * @param timeout time in milliseconds to wait for device to come online
+     * @returns the new device info if the device was verified
+     */
+    public async verifyNewDeviceOnExistingDevice(
+        timeout = 10 * 1000,
+    ): Promise<DeviceInfo | CrossSigningInfo | undefined> {
         if (!this.newDeviceId) {
             throw new Error('No new device to sign');
         }
@@ -216,12 +223,12 @@ export class MSC3906Rendezvous {
         throw new Error('Device not online within timeout');
     }
 
-    async cancel(reason: RendezvousFailureReason) {
+    public async cancel(reason: RendezvousFailureReason) {
         this.onFailure?.(reason);
         await this.channel.cancel(reason);
     }
 
-    async close() {
+    public async close() {
         await this.channel.close();
     }
 }

@@ -49,7 +49,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
     private fallbackRzServer?: string;
     private fetchFn?: typeof global.fetch;
 
-    constructor({
+    public constructor({
         onFailure,
         client,
         fallbackRzServer,
@@ -66,7 +66,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         this.fallbackRzServer = fallbackRzServer;
     }
 
-    async details(): Promise<MSC3886SimpleHttpRendezvousTransportDetails> {
+    public async details(): Promise<MSC3886SimpleHttpRendezvousTransportDetails> {
         if (!this.uri) {
             throw new Error('Rendezvous not set up');
         }

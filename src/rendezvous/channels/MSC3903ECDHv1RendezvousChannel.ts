@@ -71,7 +71,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     private ourPublicKey: Uint8Array;
     private aesKey?: CryptoKey | Uint8Array;
 
-    constructor(
+    public constructor(
         public transport: RendezvousTransport,
         private theirPublicKey?: Uint8Array,
         public onFailure?: (reason: RendezvousFailureReason) => void,
