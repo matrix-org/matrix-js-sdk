@@ -1370,35 +1370,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Get the aliases this room has according to the room's state
-     * The aliases returned by this function may not necessarily
-     * still point to this room.
-     * @return {array} The room's alias as an array of strings
-     * @deprecated this uses m.room.aliases events, replaced by Room::getAltAliases()
-     */
-    public getAliases(): string[] {
-        const aliasStrings: string[] = [];
-
-        const aliasEvents = this.currentState.getStateEvents(EventType.RoomAliases);
-        if (aliasEvents) {
-            for (const aliasEvent of aliasEvents) {
-                if (Array.isArray(aliasEvent.getContent().aliases)) {
-                    const filteredAliases = aliasEvent.getContent<{ aliases: string[] }>().aliases.filter(a => {
-                        if (typeof(a) !== "string") return false;
-                        if (a[0] !== '#') return false;
-                        if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
-
-                        // It's probably valid by here.
-                        return true;
-                    });
-                    aliasStrings.push(...filteredAliases);
-                }
-            }
-        }
-        return aliasStrings;
-    }
-
-    /**
      * Get this room's canonical alias
      * The alias returned by this function may not necessarily
      * still point to this room.
