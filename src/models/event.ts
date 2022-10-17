@@ -1585,7 +1585,6 @@ const REDACT_KEEP_CONTENT_MAP = {
         'kick': 1, 'redact': 1, 'state_default': 1,
         'users': 1, 'users_default': 1,
     },
-    [EventType.RoomAliases]: { 'aliases': 1 },
 };
 
 /**
