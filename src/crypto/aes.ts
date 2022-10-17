@@ -81,7 +81,7 @@ export async function encryptAES(
 }
 
 /**
- * decrypt a string in the browser
+ * decrypt a string
  *
  * @param {object} data the encrypted data
  * @param {string} data.ciphertext the ciphertext in base64
