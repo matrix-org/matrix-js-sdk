@@ -23,7 +23,7 @@ import { RendezvousTransport, RendezvousTransportDetails } from '../transport';
 import { MatrixClient } from '../../matrix';
 import { ClientPrefix } from '../../http-api';
 
-const TYPE = new UnstableValue(undefined, "org.matrix.msc3886.http.v1");
+const TYPE = new UnstableValue("http.v1", "org.matrix.msc3886.http.v1");
 
 export interface MSC3886SimpleHttpRendezvousTransportDetails extends RendezvousTransportDetails {
     uri: string;

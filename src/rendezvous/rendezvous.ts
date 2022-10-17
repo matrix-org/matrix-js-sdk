@@ -31,7 +31,7 @@ enum PayloadType {
     Progress = 'm.login.progress',
 }
 
-const LOGIN_TOKEN_PROTOCOL = new UnstableValue(undefined, "org.matrix.msc3906.login_token");
+const LOGIN_TOKEN_PROTOCOL = new UnstableValue("login_token", "org.matrix.msc3906.login_token");
 
 /**
  * Implements MSC3906 to allow a user to sign in on a new device using QR code.
