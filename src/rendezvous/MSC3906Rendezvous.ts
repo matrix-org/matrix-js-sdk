@@ -31,6 +31,29 @@ enum PayloadType {
     Progress = 'm.login.progress',
 }
 
+enum Outcome {
+    Success = 'success',
+    Failure = 'failure',
+    Verified = 'verified',
+    Declined = 'declined',
+    Unsupported = 'unsupported',
+}
+
+interface RendezvousPayload {
+    type: PayloadType;
+    intent?: RendezvousIntent;
+    outcome?: Outcome;
+    device_id?: string;
+    device_key?: string;
+    verifying_device_id?: string;
+    verifying_device_key?: string;
+    master_key?: string;
+    protocols?: string[];
+    protocol?: string;
+    login_token?: string;
+    homeserver?: string;
+}
+
 const LOGIN_TOKEN_PROTOCOL = new UnstableValue("login_token", "org.matrix.msc3906.login_token");
 
 /**
@@ -44,16 +67,27 @@ export class MSC3906Rendezvous {
     private ourIntent: RendezvousIntent = RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
     private _code?: string;
 
+    /**
+     * @param channel The secure channel used for communication
+     * @param client The Matrix client in used on the device already logged in
+     * @param onFailure Callback for when the rendezvous fails
+     */
     public constructor(
         private channel: RendezvousChannel,
         private client: MatrixClient,
         public onFailure?: RendezvousFailureListener,
     ) {}
 
-    public get code() {
+    /**
+     * Returns the code representing the rendezvous suitable for rendering in a QR code.
+     */
+    public get code(): string {
         return this._code;
     }
 
+    /**
+     * Generate the code including doing partial set up of the channel where required.
+     */
     public async generateCode(): Promise<void> {
         if (this._code) {
             return;
@@ -71,7 +105,7 @@ export class MSC3906Rendezvous {
         // determine available protocols
         if (features.get(Feature.LoginTokenRequest) === ServerSupport.Unsupported) {
             logger.info("Server doesn't support MSC3882");
-            await this.send({ type: PayloadType.Finish, outcome: 'unsupported' });
+            await this.send({ type: PayloadType.Finish, outcome: Outcome.Unsupported });
             await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);
             return undefined;
         }
@@ -79,7 +113,7 @@ export class MSC3906Rendezvous {
         await this.send({ type: PayloadType.Progress, protocols: [LOGIN_TOKEN_PROTOCOL.name] });
 
         logger.info('Waiting for other device to chose protocol');
-        const { type, protocol, outcome } = await this.channel.receive();
+        const { type, protocol, outcome } = await this.receive();
 
         if (type === PayloadType.Finish) {
             // new device decided not to complete
@@ -106,13 +140,17 @@ export class MSC3906Rendezvous {
         return checksum;
     }
 
-    private async send({ type, ...payload }: { type: PayloadType, [key: string]: any }) {
-        await this.channel.send({ type, ...payload });
+    private async receive(): Promise<RendezvousPayload> {
+        return await this.channel.receive() as RendezvousPayload;
+    }
+
+    private async send(payload: RendezvousPayload) {
+        await this.channel.send(payload);
     }
 
     public async declineLoginOnExistingDevice() {
         logger.info('User declined sign in');
-        await this.send({ type: PayloadType.Finish, outcome: 'declined' });
+        await this.send({ type: PayloadType.Finish, outcome: Outcome.Declined });
     }
 
     public async approveLoginOnExistingDevice(loginToken: string): Promise<string | undefined> {
@@ -120,7 +158,7 @@ export class MSC3906Rendezvous {
         await this.send({ type: PayloadType.Progress, login_token: loginToken, homeserver: this.client.baseUrl });
 
         logger.info('Waiting for outcome');
-        const res = await this.channel.receive();
+        const res = await this.receive();
         if (!res) {
             return undefined;
         }
@@ -169,7 +207,7 @@ export class MSC3906Rendezvous {
 
         await this.send({
             type: PayloadType.Finish,
-            outcome: 'verified',
+            outcome: Outcome.Verified,
             verifying_device_id: this.client.getDeviceId(),
             verifying_device_key: this.client.getDeviceEd25519Key(),
             master_key: masterPublicKey,
