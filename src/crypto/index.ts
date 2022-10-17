@@ -20,6 +20,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
+import type { IEventDecryptionResult } from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -67,7 +68,7 @@ import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
-import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
+import { EventStatus, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { ToDeviceBatch } from "../models/ToDeviceMessage";
 import {
     ClientEvent,
@@ -216,30 +217,6 @@ export interface IRoomKeyRequestRecipient {
 interface ISignableObject {
     signatures?: ISignatures;
     unsigned?: object;
-}
-
-/**
- * The result of a (successful) call to decryptEvent.
- */
-export interface IEventDecryptionResult {
-    /**
-     * The plaintext payload for the event (typically containing <tt>type</tt> and <tt>content</tt> fields).
-     */
-    clearEvent: IClearEvent;
-    /**
-     * List of curve25519 keys involved in telling us about the senderCurve25519Key and claimedEd25519Key.
-     * See {@link MatrixEvent#getForwardingCurve25519KeyChain}.
-     */
-    forwardingCurve25519KeyChain?: string[];
-    /**
-     * Key owned by the sender of this event.  See {@link MatrixEvent#getSenderKey}.
-     */
-    senderCurve25519Key?: string;
-    /**
-     * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
-     */
-    claimedEd25519Key?: string;
-    untrusted?: boolean;
 }
 
 export interface IRequestsMap {
@@ -3915,3 +3892,6 @@ class IncomingRoomKeyRequestCancellation {
         this.requestId = content.request_id;
     }
 }
+
+// IEventDecryptionResult is re-exported for backwards compatibility, in case any applications are referencing it.
+export { IEventDecryptionResult } from "../@types/crypto";
