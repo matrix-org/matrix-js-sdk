@@ -205,23 +205,16 @@ export class MSC3906Rendezvous {
             throw new Error('No user ID set');
         }
 
-        {
-            const deviceInfo = this.client.crypto.getStoredDevice(userId, this.newDeviceId);
+        let deviceInfo = this.client.crypto.getStoredDevice(userId, this.newDeviceId);
 
-            if (deviceInfo) {
-                return await this.verifyAndCrossSignDevice(deviceInfo);
-            }
+        if (!deviceInfo) {
+            logger.info("Going to wait for new device to be online");
+            await sleep(timeout);
+            deviceInfo = this.client.crypto.getStoredDevice(userId, this.newDeviceId);
         }
 
-        logger.info("Going to wait for new device to be online");
-        await sleep(timeout);
-
-        {
-            const deviceInfo = this.client.crypto.getStoredDevice(userId, this.newDeviceId);
-
-            if (deviceInfo) {
-                return await this.verifyAndCrossSignDevice(deviceInfo);
-            }
+        if (deviceInfo) {
+            return await this.verifyAndCrossSignDevice(deviceInfo);
         }
 
         throw new Error('Device not online within timeout');
