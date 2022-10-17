@@ -1,5 +1,5 @@
 /*
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,13 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from "./matrix";
+export let crypto = global.window?.crypto;
+export let subtleCrypto = global.window?.crypto?.subtle ?? global.window?.crypto?.webkitSubtle;
+export let TextEncoder = global.window?.TextEncoder;
 
-if (global.__js_sdk_entrypoint) {
-    throw new Error("Multiple matrix-js-sdk entrypoints detected!");
+/* eslint-disable @typescript-eslint/no-var-requires */
+if (!crypto) {
+    crypto = require("crypto").webcrypto;
 }
-global.__js_sdk_entrypoint = true;
-
-export * from "./matrix";
-export default matrixcs;
-
+if (!subtleCrypto) {
+    subtleCrypto = crypto?.subtle;
+}
+if (!TextEncoder) {
+    TextEncoder = require("util").TextEncoder;
+}
+/* eslint-enable @typescript-eslint/no-var-requires */

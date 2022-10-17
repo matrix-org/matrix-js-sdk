@@ -26,13 +26,20 @@ import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
 import { DeviceInfo } from "./deviceinfo";
 import { DeviceTrustLevel } from './CrossSigning';
 import { keyFromPassphrase } from './key_passphrase';
-import { getCrypto, sleep } from "../utils";
+import { sleep } from "../utils";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
-import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
-import { IAes256AuthData, ICurve25519AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from './aes';
+import {
+    Curve25519SessionData,
+    IAes256AuthData,
+    ICurve25519AuthData,
+    IKeyBackupInfo,
+    IKeyBackupSession,
+} from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent, IMegolmSessionData } from "./index";
+import { crypto } from "./crypto";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -677,7 +684,9 @@ export class Curve25519 implements BackupAlgorithm {
         return this.publicKey.encrypt(JSON.stringify(plainText));
     }
 
-    public async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession<Curve25519SessionData>>,
+    ): Promise<IMegolmSessionData[]> {
         const privKey = await this.getKey();
         const decryption = new global.Olm.PkDecryption();
         try {
@@ -711,7 +720,7 @@ export class Curve25519 implements BackupAlgorithm {
 
     public async keyMatches(key: Uint8Array): Promise<boolean> {
         const decryption = new global.Olm.PkDecryption();
-        let pubKey;
+        let pubKey: string;
         try {
             pubKey = decryption.init_with_private_key(key);
         } finally {
@@ -727,18 +736,9 @@ export class Curve25519 implements BackupAlgorithm {
 }
 
 function randomBytes(size: number): Uint8Array {
-    const crypto: {randomBytes: (n: number) => Uint8Array} | undefined = getCrypto() as any;
-    if (crypto) {
-        // nodejs version
-        return crypto.randomBytes(size);
-    }
-    if (window?.crypto) {
-        // browser version
-        const buf = new Uint8Array(size);
-        window.crypto.getRandomValues(buf);
-        return buf;
-    }
-    throw new Error("No usable crypto implementation");
+    const buf = new Uint8Array(size);
+    crypto.getRandomValues(buf);
+    return buf;
 }
 
 const UNSTABLE_MSC3270_NAME = new UnstableValue(null, "org.matrix.msc3270.v1.aes-hmac-sha2");
@@ -807,7 +807,9 @@ export class Aes256 implements BackupAlgorithm {
         return encryptAES(JSON.stringify(plainText), this.key, data.session_id);
     }
 
-    public async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession<IEncryptedPayload>>,
+    ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {

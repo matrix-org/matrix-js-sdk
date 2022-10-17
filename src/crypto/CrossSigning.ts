@@ -31,7 +31,7 @@ import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from "../matrix";
 import { ISignatures } from "../@types/signed";
-import { CryptoStore } from "./store/base";
+import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ISecretStorageKeyInfo } from "./api";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
@@ -699,7 +699,10 @@ export class DeviceTrustLevel {
 
 export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: OlmDevice): ICacheCallbacks {
     return {
-        getCrossSigningKeyCache: async function(type: string, _expectedPublicKey: string): Promise<Uint8Array> {
+        getCrossSigningKeyCache: async function(
+            type: keyof SecretStorePrivateKeys,
+            _expectedPublicKey: string,
+        ): Promise<Uint8Array> {
             const key = await new Promise<any>((resolve) => {
                 return store.doTxn(
                     'readonly',
@@ -718,7 +721,10 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
                 return key;
             }
         },
-        storeCrossSigningKeyCache: async function(type: string, key: Uint8Array): Promise<void> {
+        storeCrossSigningKeyCache: async function(
+            type: keyof SecretStorePrivateKeys,
+            key: Uint8Array,
+        ): Promise<void> {
             if (!(key instanceof Uint8Array)) {
                 throw new Error(
                     `storeCrossSigningKeyCache expects Uint8Array, got ${key}`,

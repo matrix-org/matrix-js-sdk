@@ -29,14 +29,13 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
+    ParkedSharedHistory, SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. indexeddb storage for e2e.
@@ -323,7 +322,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      * @param {function(string)} func Called with the account pickle
      */
-    public getAccount(txn: IDBTransaction, func: (accountPickle: string) => void) {
+    public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void) {
         this.backend.getAccount(txn, func);
     }
 
@@ -346,7 +345,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(string)} func Called with the account keys object:
      *        { key_type: base64 encoded seed } where key type = user_signing_key_seed or self_signing_key_seed
      */
-    public getCrossSigningKeys(txn: IDBTransaction, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(
+        txn: IDBTransaction,
+        func: (keys: Record<string, ICrossSigningKey> | null) => void,
+    ): void {
         this.backend.getCrossSigningKeys(txn, func);
     }
 
@@ -355,10 +357,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(string)} func Called with the private key
      * @param {string} type A key type
      */
-    public getSecretStorePrivateKey(
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: IDBTransaction,
-        func: (key: IEncryptedPayload | null) => void,
-        type: string,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
     ): void {
         this.backend.getSecretStorePrivateKey(txn, func, type);
     }
@@ -380,7 +382,11 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {string} type The type of cross-signing private key to store
      * @param {string} key keys object as getCrossSigningKeys()
      */
-    public storeSecretStorePrivateKey(txn: IDBTransaction, type: string, key: IEncryptedPayload): void {
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: IDBTransaction,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
         this.backend.storeSecretStorePrivateKey(txn, type, key);
     }
 

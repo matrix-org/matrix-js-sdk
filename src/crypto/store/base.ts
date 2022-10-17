@@ -24,14 +24,25 @@ import { IDevice } from "../deviceinfo";
 import { ICrossSigningInfo } from "../CrossSigning";
 import { PrefixedLogger } from "../../logger";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 import { MatrixEvent } from "../../models/event";
+import { DehydrationManager } from "../dehydration";
+import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. Definitions for storage for the crypto module
  *
  * @module
  */
+
+export interface SecretStorePrivateKeys {
+    dehydration: {
+        keyInfo: DehydrationManager["keyInfo"];
+        key: IEncryptedPayload;
+        deviceDisplayName: string;
+        time: number;
+    } | null;
+    "m.megolm_backup.v1": IEncryptedPayload;
+}
 
 /**
  * Abstraction of things that can store data required for end-to-end encryption
@@ -58,12 +69,20 @@ export interface CryptoStore {
     deleteOutgoingRoomKeyRequest(requestId: string, expectedState: number): Promise<OutgoingRoomKeyRequest | null>;
 
     // Olm Account
-    getAccount(txn: unknown, func: (accountPickle: string) => void);
+    getAccount(txn: unknown, func: (accountPickle: string | null) => void);
     storeAccount(txn: unknown, accountPickle: string): void;
-    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void;
-    getSecretStorePrivateKey(txn: unknown, func: (key: IEncryptedPayload | null) => void, type: string): void;
+    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void;
+    getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
+    ): void;
     storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void;
-    storeSecretStorePrivateKey(txn: unknown, type: string, key: IEncryptedPayload): void;
+    storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void;
 
     // Olm Sessions
     countEndToEndSessions(txn: unknown, func: (count: number) => void): void;
