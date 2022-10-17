@@ -35,7 +35,7 @@ import {
     IAes256AuthData,
     ICurve25519AuthData,
     IKeyBackupInfo,
-    IKeyBackupSession
+    IKeyBackupSession,
 } from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent, IMegolmSessionData } from "./index";
