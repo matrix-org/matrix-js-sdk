@@ -34,7 +34,7 @@ import { IEncryptedPayload } from "../aes";
  * @module
  */
 
-export type SecretStorePrivateKeys = {
+export interface SecretStorePrivateKeys {
     dehydration: {
         keyInfo: DehydrationManager["keyInfo"];
         key: IEncryptedPayload;
@@ -42,7 +42,7 @@ export type SecretStorePrivateKeys = {
         time: number;
     } | null;
     "m.megolm_backup.v1": IEncryptedPayload;
-};
+}
 
 /**
  * Abstraction of things that can store data required for end-to-end encryption
