@@ -18,8 +18,12 @@ import { UnstableValue } from 'matrix-events-sdk';
 
 import { logger } from '../../logger';
 import { sleep } from '../../utils';
-import { RendezvousFailureListener, RendezvousFailureReason } from '../cancellationReason';
-import { RendezvousTransport, RendezvousTransportDetails } from '../transport';
+import {
+    RendezvousFailureListener,
+    RendezvousFailureReason,
+    RendezvousTransport,
+    RendezvousTransportDetails,
+} from '..';
 import { MatrixClient } from '../../matrix';
 import { ClientPrefix } from '../../http-api';
 

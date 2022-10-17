@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export * from './code';
-export * from './cancellationReason';
-export * from './transport';
-export * from './channel';
-export * from './rendezvous';
-export * from './error';
+export * from './MSC3906Rendezvous';
+export * from './RendezvousChannel';
+export * from './RendezvousChannelAlgorithm';
+export * from './RendezvousCode';
+export * from './RendezvousError';
+export * from './RendezvousFailureReason';
+export * from './RendezvousIntent';
+export * from './RendezvousTransport';

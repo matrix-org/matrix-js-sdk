@@ -23,8 +23,7 @@ import { DeviceInfo } from "../crypto/deviceinfo";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
 import { logger } from "../logger";
 import { sleep } from "../utils";
-import { RendezvousFailureListener, RendezvousFailureReason } from "./cancellationReason";
-import { RendezvousIntent } from "./code";
+import { RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
 
 enum PayloadType {
     Start = 'm.login.start',

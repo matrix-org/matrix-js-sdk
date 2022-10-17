@@ -14,18 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SecureRendezvousChannelAlgorithm } from "./channels";
-import { RendezvousTransportDetails } from "./transport";
-
-export enum RendezvousIntent {
-    LOGIN_ON_NEW_DEVICE = "login.start",
-    RECIPROCATE_LOGIN_ON_EXISTING_DEVICE = "login.reciprocate",
-}
+import { RendezvousChannelAlgorithm, RendezvousTransportDetails, RendezvousIntent } from ".";
 
 export interface RendezvousCode {
     intent: RendezvousIntent;
     rendezvous?: {
         transport: RendezvousTransportDetails;
-        algorithm: SecureRendezvousChannelAlgorithm;
+        algorithm: RendezvousChannelAlgorithm;
     };
 }

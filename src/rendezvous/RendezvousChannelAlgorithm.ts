@@ -14,4 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export * from './MSC3886SimpleHttpRendezvousTransport';
+export enum RendezvousChannelAlgorithm {
+  ECDH_V1 = "org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256"
+}

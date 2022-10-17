@@ -14,8 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export * from './ecdhV1';
+export * from './MSC3903ECDHv1RendezvousChannel';
 
-export enum SecureRendezvousChannelAlgorithm {
-    ECDH_V1 = "org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256"
-}
