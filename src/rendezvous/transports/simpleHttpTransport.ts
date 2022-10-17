@@ -92,7 +92,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         return this.fallbackRzServer;
     }
 
-    async send(contentType: string, data: any) {
+    public async send(contentType: string, data: any) {
         if (this.cancelled) {
             return;
         }
