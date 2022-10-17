@@ -398,9 +398,9 @@ export class Backend implements CryptoStore {
         };
     }
 
-    public getSecretStorePrivateKey(
+    public getSecretStorePrivateKey<T = IEncryptedPayload>(
         txn: IDBTransaction,
-        func: (key: IEncryptedPayload | null) => void,
+        func: (key: T | null) => void,
         type: string,
     ): void {
         const objectStore = txn.objectStore("account");
@@ -419,7 +419,7 @@ export class Backend implements CryptoStore {
         objectStore.put(keys, "crossSigningKeys");
     }
 
-    public storeSecretStorePrivateKey(txn: IDBTransaction, type: string, key: IEncryptedPayload): void {
+    public storeSecretStorePrivateKey<T = IEncryptedPayload>(txn: IDBTransaction, type: string, key: T): void {
         const objectStore = txn.objectStore("account");
         objectStore.put(key, `ssss_cache:${type}`);
     }

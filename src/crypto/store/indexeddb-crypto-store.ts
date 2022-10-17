@@ -355,9 +355,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(string)} func Called with the private key
      * @param {string} type A key type
      */
-    public getSecretStorePrivateKey(
+    public getSecretStorePrivateKey<T = IEncryptedPayload>(
         txn: IDBTransaction,
-        func: (key: IEncryptedPayload | null) => void,
+        func: (key: T | null) => void,
         type: string,
     ): void {
         this.backend.getSecretStorePrivateKey(txn, func, type);
@@ -380,7 +380,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {string} type The type of cross-signing private key to store
      * @param {string} key keys object as getCrossSigningKeys()
      */
-    public storeSecretStorePrivateKey(txn: IDBTransaction, type: string, key: IEncryptedPayload): void {
+    public storeSecretStorePrivateKey<T = IEncryptedPayload>(txn: IDBTransaction, type: string, key: T): void {
         this.backend.storeSecretStorePrivateKey(txn, type, key);
     }
 

@@ -29,8 +29,14 @@ import { keyFromPassphrase } from './key_passphrase';
 import { sleep } from "../utils";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { encodeRecoveryKey } from './recoverykey';
-import { calculateKeyCheck, decryptAES, encryptAES } from './aes';
-import { IAes256AuthData, ICurve25519AuthData, IKeyBackupInfo, IKeyBackupSession } from "./keybackup";
+import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from './aes';
+import {
+    Curve25519SessionData,
+    IAes256AuthData,
+    ICurve25519AuthData,
+    IKeyBackupInfo,
+    IKeyBackupSession
+} from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent, IMegolmSessionData } from "./index";
 import { crypto } from "./crypto";
@@ -678,7 +684,9 @@ export class Curve25519 implements BackupAlgorithm {
         return this.publicKey.encrypt(JSON.stringify(plainText));
     }
 
-    public async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession<Curve25519SessionData>>,
+    ): Promise<IMegolmSessionData[]> {
         const privKey = await this.getKey();
         const decryption = new global.Olm.PkDecryption();
         try {
@@ -799,7 +807,9 @@ export class Aes256 implements BackupAlgorithm {
         return encryptAES(JSON.stringify(plainText), this.key, data.session_id);
     }
 
-    public async decryptSessions(sessions: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]> {
+    public async decryptSessions(
+        sessions: Record<string, IKeyBackupSession<IEncryptedPayload>>,
+    ): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
 
         for (const [sessionId, sessionData] of Object.entries(sessions)) {

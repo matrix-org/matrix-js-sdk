@@ -18,10 +18,14 @@ export let crypto = global.window?.crypto;
 export let subtleCrypto = global.window?.crypto?.subtle ?? global.window?.crypto?.webkitSubtle;
 export let TextEncoder = global.window?.TextEncoder;
 
-if (typeof process !== 'undefined') {
-    /* eslint-disable @typescript-eslint/no-var-requires */
-    crypto = require("node:crypto").webcrypto;
-    TextEncoder = require("util").TextEncoder;
-    /* eslint-enable @typescript-eslint/no-var-requires */
-    subtleCrypto = crypto.subtle;
+/* eslint-disable @typescript-eslint/no-var-requires */
+if (!crypto) {
+    crypto = require("crypto").webcrypto;
 }
+if (!subtleCrypto) {
+    subtleCrypto = crypto?.subtle;
+}
+if (!TextEncoder) {
+    TextEncoder = require("util").TextEncoder;
+}
+/* eslint-enable @typescript-eslint/no-var-requires */

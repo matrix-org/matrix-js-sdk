@@ -292,8 +292,12 @@ export class MemoryCryptoStore implements CryptoStore {
         func(this.crossSigningKeys);
     }
 
-    public getSecretStorePrivateKey(txn: unknown, func: (key: IEncryptedPayload | null) => void, type: string): void {
-        const result = this.privateKeys[type];
+    public getSecretStorePrivateKey<T = IEncryptedPayload>(
+        txn: unknown,
+        func: (key: T | null) => void,
+        type: string,
+    ): void {
+        const result = this.privateKeys[type] as T;
         func(result || null);
     }
 
@@ -301,8 +305,8 @@ export class MemoryCryptoStore implements CryptoStore {
         this.crossSigningKeys = keys;
     }
 
-    public storeSecretStorePrivateKey(txn: unknown, type: string, key: IEncryptedPayload): void {
-        this.privateKeys[type] = key;
+    public storeSecretStorePrivateKey<T = IEncryptedPayload>(txn: unknown, type: string, key: T): void {
+        this.privateKeys[type] = key as IEncryptedPayload;
     }
 
     // Olm Sessions
