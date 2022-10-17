@@ -201,7 +201,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
-    private roomThreadsNotificationType: NotificationCountType | null = null;
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -1251,22 +1250,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.threadNotifications.set(threadId, notification);
 
-        // Remember what the global threads notification count type is
-        // for all the threads in the room
-        if (count > 0) {
-            switch (this.roomThreadsNotificationType) {
-                case NotificationCountType.Highlight:
-                    break;
-                case NotificationCountType.Total:
-                    if (type === NotificationCountType.Highlight) {
-                        this.roomThreadsNotificationType = type;
-                    }
-                    break;
-                default:
-                    this.roomThreadsNotificationType = type;
-            }
-        }
-
         this.emit(
             RoomEvent.UnreadNotifications,
             notification,
@@ -1278,8 +1261,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @experimental
      * @returns the notification count type for all the threads in the room
      */
-    public getThreadsAggregateNotificationType(): NotificationCountType | null {
-        return this.roomThreadsNotificationType;
+    public get threadsAggregateNotificationType(): NotificationCountType | null {
+        let type: NotificationCountType | null = null;
+        for (const threadNotification of this.threadNotifications.values()) {
+            if ((threadNotification.highlight ?? 0) > 0) {
+                return NotificationCountType.Highlight;
+            } else if ((threadNotification.total ?? 0) > 0 && !type) {
+                type = NotificationCountType.Total;
+            }
+        }
+        return type;
     }
 
     /**
@@ -1287,7 +1278,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Resets the thread notifications for this room
      */
     public resetThreadUnreadNotificationCount(): void {
-        this.roomThreadsNotificationType = null;
         this.threadNotifications.clear();
     }
 
