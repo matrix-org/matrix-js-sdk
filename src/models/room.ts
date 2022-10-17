@@ -201,7 +201,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
-    private roomThreadsNotificationType: NotificationCountType | null = null;
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -1251,22 +1250,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.threadNotifications.set(threadId, notification);
 
-        // Remember what the global threads notification count type is
-        // for all the threads in the room
-        if (count > 0) {
-            switch (this.roomThreadsNotificationType) {
-                case NotificationCountType.Highlight:
-                    break;
-                case NotificationCountType.Total:
-                    if (type === NotificationCountType.Highlight) {
-                        this.roomThreadsNotificationType = type;
-                    }
-                    break;
-                default:
-                    this.roomThreadsNotificationType = type;
-            }
-        }
-
         this.emit(
             RoomEvent.UnreadNotifications,
             notification,
@@ -1278,8 +1261,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @experimental
      * @returns the notification count type for all the threads in the room
      */
-    public getThreadsAggregateNotificationType(): NotificationCountType | null {
-        return this.roomThreadsNotificationType;
+    public get threadsAggregateNotificationType(): NotificationCountType | null {
+        let type: NotificationCountType | null = null;
+        for (const threadNotification of this.threadNotifications.values()) {
+            if ((threadNotification.highlight ?? 0) > 0) {
+                return NotificationCountType.Highlight;
+            } else if ((threadNotification.total ?? 0) > 0 && !type) {
+                type = NotificationCountType.Total;
+            }
+        }
+        return type;
     }
 
     /**
@@ -1287,7 +1278,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Resets the thread notifications for this room
      */
     public resetThreadUnreadNotificationCount(): void {
-        this.roomThreadsNotificationType = null;
         this.threadNotifications.clear();
     }
 
@@ -1377,35 +1367,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getMxcAvatarUrl(): string | null {
         return this.currentState.getStateEvents(EventType.RoomAvatar, "")?.getContent()?.url || null;
-    }
-
-    /**
-     * Get the aliases this room has according to the room's state
-     * The aliases returned by this function may not necessarily
-     * still point to this room.
-     * @return {array} The room's alias as an array of strings
-     * @deprecated this uses m.room.aliases events, replaced by Room::getAltAliases()
-     */
-    public getAliases(): string[] {
-        const aliasStrings: string[] = [];
-
-        const aliasEvents = this.currentState.getStateEvents(EventType.RoomAliases);
-        if (aliasEvents) {
-            for (const aliasEvent of aliasEvents) {
-                if (Array.isArray(aliasEvent.getContent().aliases)) {
-                    const filteredAliases = aliasEvent.getContent<{ aliases: string[] }>().aliases.filter(a => {
-                        if (typeof(a) !== "string") return false;
-                        if (a[0] !== '#') return false;
-                        if (!a.endsWith(`:${aliasEvent.getStateKey()}`)) return false;
-
-                        // It's probably valid by here.
-                        return true;
-                    });
-                    aliasStrings.push(...filteredAliases);
-                }
-            }
-        }
-        return aliasStrings;
     }
 
     /**

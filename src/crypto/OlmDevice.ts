@@ -308,10 +308,10 @@ export class OlmDevice {
      * @private
      */
     private getAccount(txn: unknown, func: (account: Account) => void): void {
-        this.cryptoStore.getAccount(txn, (pickledAccount: string) => {
+        this.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
             const account = new global.Olm.Account();
             try {
-                account.unpickle(this.pickleKey, pickledAccount);
+                account.unpickle(this.pickleKey, pickledAccount!);
                 func(account);
             } finally {
                 account.free();
@@ -350,8 +350,8 @@ export class OlmDevice {
                 IndexedDBCryptoStore.STORE_SESSIONS,
             ],
             (txn) => {
-                this.cryptoStore.getAccount(txn, (pickledAccount: string) => {
-                    result.pickledAccount = pickledAccount;
+                this.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
+                    result.pickledAccount = pickledAccount!;
                 });
                 result.sessions = [];
                 // Note that the pickledSession object we get in the callback

@@ -25,14 +25,13 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
+    ParkedSharedHistory, SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. in-memory storage for e2e.
@@ -45,9 +44,9 @@ import { IEncryptedPayload } from "../aes";
  */
 export class MemoryCryptoStore implements CryptoStore {
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
-    private account: string = null;
-    private crossSigningKeys: Record<string, ICrossSigningKey> = null;
-    private privateKeys: Record<string, IEncryptedPayload> = {};
+    private account: string | null = null;
+    private crossSigningKeys: Record<string, ICrossSigningKey> | null = null;
+    private privateKeys: Partial<SecretStorePrivateKeys> = {};
 
     private sessions: { [deviceKey: string]: { [sessionId: string]: ISessionInfo } } = {};
     private sessionProblems: { [deviceKey: string]: IProblem[] } = {};
@@ -280,7 +279,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     // Olm Account
 
-    public getAccount(txn: unknown, func: (accountPickle: string) => void) {
+    public getAccount(txn: unknown, func: (accountPickle: string | null) => void) {
         func(this.account);
     }
 
@@ -288,12 +287,16 @@ export class MemoryCryptoStore implements CryptoStore {
         this.account = accountPickle;
     }
 
-    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
         func(this.crossSigningKeys);
     }
 
-    public getSecretStorePrivateKey(txn: unknown, func: (key: IEncryptedPayload | null) => void, type: string): void {
-        const result = this.privateKeys[type];
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
+    ): void {
+        const result = this.privateKeys[type] as SecretStorePrivateKeys[K] | undefined;
         func(result || null);
     }
 
@@ -301,7 +304,11 @@ export class MemoryCryptoStore implements CryptoStore {
         this.crossSigningKeys = keys;
     }
 
-    public storeSecretStorePrivateKey(txn: unknown, type: string, key: IEncryptedPayload): void {
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
         this.privateKeys[type] = key;
     }
 

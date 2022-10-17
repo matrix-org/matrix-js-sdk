@@ -23,7 +23,6 @@ limitations under the License.
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
-import type * as NodeCrypto from "crypto";
 import { MatrixEvent } from "./models/event";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
@@ -451,20 +450,6 @@ export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<
         minTimeout: 3000, // ms
         maxTimeout: 15000, // ms
     });
-}
-
-// We need to be able to access the Node.js crypto library from within the
-// Matrix SDK without needing to `require("crypto")`, which will fail in
-// browsers.  So `index.ts` will call `setCrypto` to store it, and when we need
-// it, we can call `getCrypto`.
-let crypto: typeof NodeCrypto;
-
-export function setCrypto(c: typeof NodeCrypto) {
-    crypto = c;
-}
-
-export function getCrypto(): typeof NodeCrypto {
-    return crypto;
 }
 
 // String averaging inspired by https://stackoverflow.com/a/2510816
