@@ -90,6 +90,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public readonly room: Room;
     public readonly client: MatrixClient;
 
+    public initialEventsFetched = !Thread.hasServerSideSupport;
+
     constructor(
         public readonly id: string,
         public rootEvent: MatrixEvent | undefined,
@@ -242,6 +244,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
             this.client.decryptEventIfNeeded(event, {});
         } else if (!toStartOfTimeline &&
+            this.initialEventsFetched &&
             event.localTimestamp > this.lastReply()?.localTimestamp
         ) {
             await this.fetchEditsWhereNeeded(event);
@@ -288,6 +291,22 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             const mapper = this.client.getEventMapper();
             this.lastEvent = mapper(bundledRelationship.latest_event);
             await this.processEvent(this.lastEvent);
+        }
+
+        if (!this.initialEventsFetched) {
+            this.initialEventsFetched = true;
+            // fetch initial event to allow proper pagination
+            try {
+                // if the thread has regular events, this will just load the last reply.
+                // if the thread is newly created, this will load the root event.
+                await this.client.paginateEventTimeline(this.liveTimeline, { backwards: true, limit: 1 });
+                // just to make sure that, if we've created a timeline window for this thread before the thread itself
+                // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
+                this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
+            } catch (e) {
+                logger.error("Failed to load start of newly created thread: ", e);
+                this.initialEventsFetched = false;
+            }
         }
 
         this.emit(ThreadEvent.Update, this);
