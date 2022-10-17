@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { UnstableValue } from "matrix-events-sdk";
+
 import { RendezvousChannel } from ".";
 import { MatrixClient } from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
