@@ -142,6 +142,9 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
 
         this.aesKey = await importKey(aesKeyBytes);
 
+        // blank the bytes out to make sure not kept in memory
+        aesKeyBytes.fill(0);
+
         const rawChecksum = this.olmSAS.generate_bytes(aesInfo, 5);
         return generateDecimalSas(Array.from(rawChecksum)).join('-');
     }
