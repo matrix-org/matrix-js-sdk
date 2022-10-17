@@ -14,14 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import crypto from 'crypto';
-
 import '../../olm-loader';
 import { RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
 import { MSC3903ECDHv1RendezvousChannel } from '../../../src/rendezvous/channels';
 import { decodeBase64 } from '../../../src/crypto/olmlib';
 import { DummyTransport } from './DummyTransport';
-import { setCrypto } from '../../../src/utils';
 
 describe('ECDHv1', function() {
     beforeAll(async function() {
@@ -29,9 +26,6 @@ describe('ECDHv1', function() {
     });
 
     describe('with crypto', () => {
-        beforeEach(async function() {
-            setCrypto(crypto);
-        });
         it("initiator wants to sign in", async function() {
             const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
             const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
@@ -170,27 +164,5 @@ describe('ECDHv1', function() {
 
             await alice.cancel(RendezvousFailureReason.Unknown);
         });
-    });
-
-    it("no crypto", async function() {
-        // simulates running in a browser without crypto support
-        // n.b. we can't test subtle crypto because it's not available in jsdom jest environment
-        setCrypto(undefined as unknown as typeof crypto);
-
-        const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-        const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
-        aliceTransport.otherParty = bobTransport;
-        bobTransport.otherParty = aliceTransport;
-
-        // alice is signing in initiates and generates a code
-        const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
-        const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-        const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
-
-        expect(bob.connect()).rejects.toThrowError();
-        expect(alice.connect()).rejects.toThrowError();
-
-        await alice.cancel(RendezvousFailureReason.Unknown);
-        await bob.cancel(RendezvousFailureReason.Unknown);
     });
 });

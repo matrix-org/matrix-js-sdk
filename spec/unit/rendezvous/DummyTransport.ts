@@ -42,7 +42,7 @@ export class DummyTransport<T extends RendezvousTransportDetails> implements Ren
     async send(data: object): Promise<void> {
         logger.info(
             `[${this.name}] => [${this.otherParty?.name}] Attempting to send data: ${
-                data} where etag matches ${this.etag}`,
+                JSON.stringify(data)} where etag matches ${this.etag}`,
         );
         // eslint-disable-next-line no-constant-condition
         while (!this.cancelled) {

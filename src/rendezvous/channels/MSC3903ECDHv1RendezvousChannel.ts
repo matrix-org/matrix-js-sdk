@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { SAS } from '@matrix-org/olm';
-import { TextEncoder } from 'util';
 
 import {
     RendezvousError,
@@ -28,11 +27,8 @@ import {
     RendezvousChannelAlgorithm,
 } from '..';
 import { encodeBase64, decodeBase64 } from '../../crypto/olmlib';
-import { getCrypto } from '../../utils';
+import { crypto, subtleCrypto, TextEncoder } from '../../crypto/crypto';
 import { generateDecimalSas } from '../../crypto/verification/SASDecimal';
-
-const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
-    (window.crypto.subtle || window.crypto.webkitSubtle) : null;
 
 export interface ECDHv1RendezvousCode extends RendezvousCode {
     rendezvous: {
@@ -49,13 +45,9 @@ interface ECDHPayload {
     ciphertext?: string;
 }
 
-async function importKey(key: Uint8Array): Promise<CryptoKey | Uint8Array> {
-    if (getCrypto()) {
-        return key;
-    }
-
+async function importKey(key: Uint8Array): Promise<CryptoKey> {
     if (!subtleCrypto) {
-        throw new Error('Neither Web Crypto nor Node.js crypto are available');
+        throw new Error('Web Crypto is not available');
     }
 
     const imported = subtleCrypto.importKey(
@@ -77,7 +69,7 @@ async function importKey(key: Uint8Array): Promise<CryptoKey | Uint8Array> {
 export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     private olmSAS?: SAS;
     private ourPublicKey: Uint8Array;
-    private aesKey?: CryptoKey | Uint8Array;
+    private aesKey?: CryptoKey;
 
     public constructor(
         public transport: RendezvousTransport,
@@ -155,29 +147,12 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     }
 
     private async encrypt(data: string): Promise<ECDHPayload> {
-        if (this.aesKey instanceof Uint8Array) {
-            const crypto = getCrypto();
-
-            const iv = crypto.randomBytes(32);
-            const cipher = crypto.createCipheriv("aes-256-gcm", this.aesKey as Uint8Array, iv, { authTagLength: 16 });
-            const ciphertext = Buffer.concat([
-                cipher.update(data, "utf8"),
-                cipher.final(),
-                cipher.getAuthTag(),
-            ]);
-
-            return {
-                iv: encodeBase64(iv),
-                ciphertext: encodeBase64(ciphertext),
-            };
-        }
-
         if (!subtleCrypto) {
-            throw new Error('Neither Web Crypto nor Node.js crypto are available');
+            throw new Error('Web Crypto is not available');
         }
 
         const iv = new Uint8Array(32);
-        window.crypto.getRandomValues(iv);
+        crypto.getRandomValues(iv);
 
         const encodedData = new TextEncoder().encode(data);
 
@@ -214,22 +189,8 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
 
         const ciphertextBytes = decodeBase64(ciphertext);
 
-        if (this.aesKey instanceof Uint8Array) {
-            const crypto = getCrypto();
-            // in contrast to Web Crypto API, Node's crypto needs the auth tag split off the cipher text
-            const ciphertextOnly = ciphertextBytes.slice(0, ciphertextBytes.length - 16);
-            const authTag = ciphertextBytes.slice(ciphertextBytes.length - 16);
-            const decipher = crypto.createDecipheriv(
-                "aes-256-gcm", this.aesKey as Uint8Array, decodeBase64(iv), { authTagLength: 16 },
-            );
-            decipher.setAuthTag(authTag);
-            return JSON.parse(
-                decipher.update(encodeBase64(ciphertextOnly), "base64", "utf-8") + decipher.final("utf-8"),
-            );
-        }
-
         if (!subtleCrypto) {
-            throw new Error('Neither Web Crypto nor Node.js crypto are available');
+            throw new Error('Web Crypto is not available');
         }
 
         const plaintext = await subtleCrypto.decrypt(
