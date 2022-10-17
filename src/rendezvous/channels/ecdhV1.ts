@@ -99,7 +99,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         return rendezvous;
     }
 
-    async connect(): Promise<string> {
+    public async connect(): Promise<string> {
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
