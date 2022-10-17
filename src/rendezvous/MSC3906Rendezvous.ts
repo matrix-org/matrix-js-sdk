@@ -50,7 +50,7 @@ export class MSC3906Rendezvous {
         public onFailure?: RendezvousFailureListener,
     ) {}
 
-    public get() {
+    public get code() {
         return this._code;
     }
 

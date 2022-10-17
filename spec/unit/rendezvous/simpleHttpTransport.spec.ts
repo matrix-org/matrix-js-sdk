@@ -56,7 +56,7 @@ describe("SimpleHttpRendezvousTransport", function() {
                 `${client.baseUrl}/_matrix/client/unstable/org.matrix.msc3886/rendezvous` :
                 fallbackRzServer;
 
-            const prom = simpleHttpTransport.send("application/json", {});
+            const prom = simpleHttpTransport.send({});
             httpBackend.when("POST", expectedPostLocation).response = {
                 body: null,
                 response: {
@@ -92,7 +92,7 @@ describe("SimpleHttpRendezvousTransport", function() {
     it("should throw an error when no server available", function() {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ client, fetchFn });
-        expect(simpleHttpTransport.send("application/json", {})).rejects.toThrowError("Invalid rendezvous URI");
+        expect(simpleHttpTransport.send({})).rejects.toThrowError("Invalid rendezvous URI");
     });
 
     it("POST to fallback server", async function() {
@@ -102,7 +102,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        const prom = simpleHttpTransport.send("application/json", {});
+        const prom = simpleHttpTransport.send({});
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
             response: {
@@ -123,7 +123,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        const prom = simpleHttpTransport.send("application/json", {});
+        const prom = simpleHttpTransport.send({});
         expect(prom).rejects.toThrowError();
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
@@ -178,7 +178,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        const prom = simpleHttpTransport.send("application/json", {});
+        const prom = simpleHttpTransport.send({});
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
             response: {
@@ -210,7 +210,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             fetchFn,
         });
         { // initial POST
-            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ foo: "baa" }));
+            const prom = simpleHttpTransport.send({ foo: "baa" });
             httpBackend.when("POST", "https://fallbackserver/rz").check(({ headers, data }) => {
                 expect(headers["content-type"]).toEqual("application/json");
                 expect(data).toEqual({ foo: "baa" });
@@ -268,7 +268,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             fetchFn,
         });
         { // initial POST
-            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ foo: "baa" }));
+            const prom = simpleHttpTransport.send({ foo: "baa" });
             httpBackend.when("POST", "https://fallbackserver/rz").check(({ headers, data }) => {
                 expect(headers["content-type"]).toEqual("application/json");
                 expect(data).toEqual({ foo: "baa" });
@@ -285,7 +285,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             await prom;
         }
         { // first PUT without etag
-            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ a: "b" }));
+            const prom = simpleHttpTransport.send({ a: "b" });
             httpBackend.when("PUT", "https://fallbackserver/rz/123").check(({ headers, data }) => {
                 expect(headers["if-match"]).toBeUndefined();
                 expect(data).toEqual({ a: "b" });
@@ -302,7 +302,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             await prom;
         }
         { // subsequent PUT which should have etag from previous request
-            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ c: "d" }));
+            const prom = simpleHttpTransport.send({ c: "d" });
             httpBackend.when("PUT", "https://fallbackserver/rz/123").check(({ headers }) => {
                 expect(headers["if-match"]).toEqual("aaa");
             }).response = {
@@ -327,7 +327,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             fetchFn,
         });
         { // Create
-            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ foo: "baa" }));
+            const prom = simpleHttpTransport.send({ foo: "baa" });
             httpBackend.when("POST", "https://fallbackserver/rz").check(({ headers, data }) => {
                 expect(headers["content-type"]).toEqual("application/json");
                 expect(data).toEqual({ foo: "baa" });
@@ -375,7 +375,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             fetchFn,
         });
         await simpleHttpTransport.cancel(RendezvousFailureReason.UserDeclined);
-        expect(simpleHttpTransport.send("application/json", 'asd')).resolves.toBeUndefined();
+        expect(simpleHttpTransport.send({})).resolves.toBeUndefined();
     });
 
     it("receive before ready", async function() {
@@ -398,7 +398,7 @@ describe("SimpleHttpRendezvousTransport", function() {
             onFailure,
         });
 
-        expect(simpleHttpTransport.send("application/json", JSON.stringify({ foo: "baa" }))).resolves.toBeUndefined();
+        expect(simpleHttpTransport.send({ foo: "baa" })).resolves.toBeUndefined();
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
             response: {
@@ -421,7 +421,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         });
 
         { // initial POST
-            const prom = simpleHttpTransport.send("application/json", JSON.stringify({ foo: "baa" }));
+            const prom = simpleHttpTransport.send({ foo: "baa" });
             httpBackend.when("POST", "https://fallbackserver/rz").response = {
                 body: null,
                 response: {

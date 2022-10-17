@@ -32,13 +32,13 @@ export interface RendezvousChannel {
      * Send a payload via the channel.
      * @param data payload to send
      */
-    send(data: any): Promise<void>;
+    send(data: object): Promise<void>;
 
     /**
      * Receive a payload from the channel.
      * @returns the received payload
      */
-    receive(): Promise<any>;
+    receive(): Promise<object>;
 
     /**
      * Close the channel and clear up any resources.

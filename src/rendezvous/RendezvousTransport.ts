@@ -41,15 +41,14 @@ export interface RendezvousTransport {
 
   /**
    * Send data via the transport.
-   * @param contentType the content type of the data being sent
    * @param data the data itself
    */
-  send(contentType: string, data: any): Promise<void>;
+  send(data: object): Promise<void>;
 
   /**
    * Receive data from the transport.
    */
-  receive(): Promise<any>;
+  receive(): Promise<object>;
 
   /**
    * Cancel the rendezvous. This will call `onCancelled()` if it is set.

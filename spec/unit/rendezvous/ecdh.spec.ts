@@ -48,7 +48,7 @@ describe('ECDHv1', function() {
 
             expect(aliceChecksum).toEqual(bobChecksum);
 
-            const message = "hello world";
+            const message = { key: "xxx" };
             await alice.send(message);
             const bobReceive = await bob.receive();
             expect(bobReceive).toEqual(message);
@@ -73,7 +73,7 @@ describe('ECDHv1', function() {
 
             expect(aliceChecksum).toEqual(bobChecksum);
 
-            const message = "hello world";
+            const message = { key: "xxx" };
             await bob.send(message);
             const aliceReceive = await alice.receive();
             expect(aliceReceive).toEqual(message);
@@ -123,7 +123,7 @@ describe('ECDHv1', function() {
             alice.close();
 
             expect(alice.connect()).rejects.toThrow();
-            expect(alice.send('')).rejects.toThrow();
+            expect(alice.send({})).rejects.toThrow();
             expect(alice.receive()).rejects.toThrow();
 
             await alice.cancel(RendezvousFailureReason.Unknown);
@@ -147,7 +147,7 @@ describe('ECDHv1', function() {
             expect(aliceChecksum).toEqual(bobChecksum);
 
             // send a message without encryption
-            await aliceTransport.send('application/json', '{}');
+            await aliceTransport.send({});
             expect(bob.receive()).rejects.toThrowError();
 
             await alice.cancel(RendezvousFailureReason.Unknown);
@@ -164,7 +164,7 @@ describe('ECDHv1', function() {
             const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
             await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
 
-            await bobTransport.send('application/json', '{ ciphertext: "foo" }');
+            await bobTransport.send({ ciphertext: "foo" });
 
             expect(alice.receive()).rejects.toThrowError();
 

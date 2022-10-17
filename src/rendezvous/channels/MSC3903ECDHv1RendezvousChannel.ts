@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { SAS } from '@matrix-org/olm';
+import { TextEncoder } from 'util';
 
 import {
     RendezvousError,
@@ -28,7 +29,7 @@ import {
 } from '..';
 import { encodeBase64, decodeBase64 } from '../../crypto/olmlib';
 import { getCrypto } from '../../utils';
-import { generateDecimalSas } from '../../crypto/verification/SAS';
+import { generateDecimalSas } from '../../crypto/verification/SASDecimal';
 
 const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
     (window.crypto.subtle || window.crypto.webkitSubtle) : null;
@@ -39,6 +40,13 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
         algorithm: RendezvousChannelAlgorithm.ECDH_V1;
         key: string;
     };
+}
+
+interface ECDHPayload {
+    algorithm?: RendezvousChannelAlgorithm.ECDH_V1;
+    key?: string;
+    iv?: string;
+    ciphertext?: string;
 }
 
 async function importKey(key: Uint8Array): Promise<CryptoKey | Uint8Array> {
@@ -108,7 +116,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
 
         if (isInitiator) {
             // wait for the other side to send us their public key
-            const res = await this.receive();
+            const res = await this.receive() as ECDHPayload | undefined;
             if (!res) {
                 throw new Error('No response from other device');
             }
@@ -146,7 +154,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         return generateDecimalSas(Array.from(rawChecksum)).join('-');
     }
 
-    private async encrypt(data: any): Promise<string> {
+    private async encrypt(data: string): Promise<ECDHPayload> {
         if (this.aesKey instanceof Uint8Array) {
             const crypto = getCrypto();
 
@@ -158,10 +166,10 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
                 cipher.getAuthTag(),
             ]);
 
-            return JSON.stringify({
+            return {
                 iv: encodeBase64(iv),
                 ciphertext: encodeBase64(ciphertext),
-            });
+            };
         }
 
         if (!subtleCrypto) {
@@ -183,27 +191,23 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
             encodedData,
         );
 
-        return JSON.stringify({
+        return {
             iv: encodeBase64(iv),
             ciphertext: encodeBase64(ciphertext),
-        });
+        };
     }
 
-    public async send(data: any) {
+    public async send(payload: object) {
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
 
-        const stringifiedData = JSON.stringify(data);
+        const data = this.aesKey ? await this.encrypt(JSON.stringify(payload)) : payload;
 
-        if (this.aesKey) {
-            await this.transport.send('application/json', await this.encrypt(stringifiedData));
-        } else {
-            await this.transport.send('application/json', stringifiedData);
-        }
+        await this.transport.send(data);
     }
 
-    private async decrypt({ iv, ciphertext }: { iv: string, ciphertext: string }): Promise<any> {
+    private async decrypt({ iv, ciphertext }: ECDHPayload): Promise<ECDHPayload> {
         if (!ciphertext || !iv) {
             throw new Error('Missing ciphertext and/or iv');
         }
@@ -219,7 +223,9 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
                 "aes-256-gcm", this.aesKey as Uint8Array, decodeBase64(iv), { authTagLength: 16 },
             );
             decipher.setAuthTag(authTag);
-            return decipher.update(encodeBase64(ciphertextOnly), "base64", "utf-8") + decipher.final("utf-8");
+            return JSON.parse(
+                decipher.update(encodeBase64(ciphertextOnly), "base64", "utf-8") + decipher.final("utf-8"),
+            );
         }
 
         if (!subtleCrypto) {
@@ -236,25 +242,24 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
             ciphertextBytes,
         );
 
-        return new TextDecoder().decode(new Uint8Array(plaintext));
+        return JSON.parse(new TextDecoder().decode(new Uint8Array(plaintext)));
     }
 
-    public async receive(): Promise<any> {
+    public async receive(): Promise<object> {
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
 
-        const data = await this.transport.receive();
+        const data = await this.transport.receive() as ECDHPayload | undefined;
         if (!data) {
-            return data;
+            return undefined;
         }
 
         if (data.ciphertext) {
             if (!this.aesKey) {
                 throw new Error('Shared secret not set up');
             }
-            const decrypted = await this.decrypt(data);
-            return JSON.parse(decrypted);
+            return this.decrypt(data);
         } else if (this.aesKey) {
             throw new Error('Data received but no ciphertext');
         }

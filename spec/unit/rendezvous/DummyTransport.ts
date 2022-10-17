@@ -27,7 +27,7 @@ export class DummyTransport<T extends RendezvousTransportDetails> implements Ren
     otherParty?: DummyTransport<T>;
     etag?: string;
     lastEtagReceived?: string;
-    data = null;
+    data: object | null = null;
 
     ready = false;
     cancelled = false;
@@ -39,10 +39,10 @@ export class DummyTransport<T extends RendezvousTransportDetails> implements Ren
         return Promise.resolve(this.mockDetails);
     }
 
-    async send(contentType: string, data: any): Promise<void> {
+    async send(data: object): Promise<void> {
         logger.info(
             `[${this.name}] => [${this.otherParty?.name}] Attempting to send data: ${
-                data} of type ${contentType} where etag matches ${this.etag}`,
+                data} where etag matches ${this.etag}`,
         );
         // eslint-disable-next-line no-constant-condition
         while (!this.cancelled) {
@@ -60,18 +60,17 @@ export class DummyTransport<T extends RendezvousTransportDetails> implements Ren
         }
     }
 
-    async receive(): Promise<any> {
+    async receive(): Promise<object> {
         logger.info(`[${this.name}] Attempting to receive where etag is after ${this.lastEtagReceived}`);
         // eslint-disable-next-line no-constant-condition
         while (!this.cancelled) {
             if (!this.lastEtagReceived || this.lastEtagReceived !== this.etag) {
                 this.lastEtagReceived = this.etag;
-                const data = this.data ? JSON.parse(this.data) : undefined;
                 logger.info(
                     `[${this.otherParty?.name}] => [${this.name}] Received data: ` +
-                    `${JSON.stringify(data)} with etag ${this.etag}`,
+                    `${JSON.stringify(this.data)} with etag ${this.etag}`,
                 );
-                return data;
+                return this.data;
             }
             logger.info(`[${this.name}] Sleeping to retry receive after etag ${
                 this.lastEtagReceived} as remote is ${this.etag}`);

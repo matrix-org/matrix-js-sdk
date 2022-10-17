@@ -32,6 +32,7 @@ import {
 } from './Error';
 import { logger } from '../../logger';
 import { IContent, MatrixEvent } from "../../models/event";
+import { generateDecimalSas } from './SASDecimal';
 
 const START_TYPE = "m.key.verification.start";
 
@@ -50,22 +51,6 @@ const newMismatchedSASError = errorFactory(
 const newMismatchedCommitmentError = errorFactory(
     "m.mismatched_commitment", "Mismatched commitment",
 );
-
-export function generateDecimalSas(sasBytes: number[]): [number, number, number] {
-    /**
-     *      +--------+--------+--------+--------+--------+
-     *      | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 |
-     *      +--------+--------+--------+--------+--------+
-     * bits: 87654321 87654321 87654321 87654321 87654321
-     *       \____________/\_____________/\____________/
-     *         1st number    2nd number     3rd number
-     */
-    return [
-        (sasBytes[0] << 5 | sasBytes[1] >> 3) + 1000,
-        ((sasBytes[1] & 0x7) << 10 | sasBytes[2] << 2 | sasBytes[3] >> 6) + 1000,
-        ((sasBytes[3] & 0x3f) << 7 | sasBytes[4] >> 1) + 1000,
-    ];
-}
 
 type EmojiMapping = [emoji: string, name: string];
 

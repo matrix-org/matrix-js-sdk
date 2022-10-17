@@ -100,7 +100,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         return this.fallbackRzServer;
     }
 
-    public async send(contentType: string, data: any) {
+    public async send(data: object) {
         if (this.cancelled) {
             return;
         }
@@ -111,14 +111,14 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
             throw new Error('Invalid rendezvous URI');
         }
 
-        const headers: Record<string, string> = { 'content-type': contentType };
+        const headers: Record<string, string> = { 'content-type': 'application/json' };
         if (this.etag) {
             headers['if-match'] = this.etag;
         }
 
         const res = await this.fetch(uri, { method,
             headers,
-            body: data,
+            body: JSON.stringify(data),
         });
         if (res.status === 404) {
             return this.cancel(RendezvousFailureReason.Unknown);
@@ -143,7 +143,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         }
     }
 
-    public async receive(): Promise<any> {
+    public async receive(): Promise<object> {
         if (!this.uri) {
             throw new Error('Rendezvous not set up');
         }
@@ -160,7 +160,8 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
             const poll = await this.fetch(this.uri, { method: "GET", headers });
 
             if (poll.status === 404) {
-                return this.cancel(RendezvousFailureReason.Unknown);
+                this.cancel(RendezvousFailureReason.Unknown);
+                return undefined;
             }
 
             // rely on server expiring the channel rather than checking ourselves
@@ -169,9 +170,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
                 this.etag = poll.headers.get("etag") ?? undefined;
             } else if (poll.status === 200) {
                 this.etag = poll.headers.get("etag") ?? undefined;
-                const data = await poll.json();
-
-                return data;
+                return poll.json();
             }
             await sleep(1000);
         }
