@@ -42,20 +42,24 @@ export class MSC3906Rendezvous {
     private newDeviceId?: string;
     private newDeviceKey?: string;
     private ourIntent: RendezvousIntent = RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
-    public code?: string;
+    private _code?: string;
 
     public constructor(
-        public channel: RendezvousChannel,
-        public client: MatrixClient,
+        private channel: RendezvousChannel,
+        private client: MatrixClient,
         public onFailure?: RendezvousFailureListener,
     ) {}
 
+    public get() {
+        return this._code;
+    }
+
     public async generateCode(): Promise<void> {
-        if (this.code) {
+        if (this._code) {
             return;
         }
 
-        this.code = JSON.stringify(await this.channel.generateCode(this.ourIntent));
+        this._code = JSON.stringify(await this.channel.generateCode(this.ourIntent));
     }
 
     public async startAfterShowingCode(): Promise<string | undefined> {

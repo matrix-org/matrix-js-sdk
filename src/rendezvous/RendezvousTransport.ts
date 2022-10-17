@@ -27,7 +27,7 @@ export interface RendezvousTransport {
   /**
    * Ready state of the transport. This is set to true when the transport is ready to be used.
    */
-  ready: boolean;
+  readonly ready: boolean;
 
   /**
    * Listener for cancellation events. This is called when the rendezvous is cancelled or fails.

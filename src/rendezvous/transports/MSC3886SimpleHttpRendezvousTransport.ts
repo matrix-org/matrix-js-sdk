@@ -39,15 +39,15 @@ export interface MSC3886SimpleHttpRendezvousTransportDetails extends RendezvousT
  * Note that this is UNSTABLE and may have breaking changes without notice.
  */
 export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport {
-    ready = false;
-    cancelled = false;
     private uri?: string;
     private etag?: string;
     private expiresAt?: Date;
-    public onFailure?: RendezvousFailureListener;
     private client: MatrixClient;
     private fallbackRzServer?: string;
     private fetchFn?: typeof global.fetch;
+    private cancelled = false;
+    private _ready = false;
+    public onFailure?: RendezvousFailureListener;
 
     public constructor({
         onFailure,
@@ -64,6 +64,10 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         this.onFailure = onFailure;
         this.client = client;
         this.fallbackRzServer = fallbackRzServer;
+    }
+
+    get ready() {
+        return this._ready;
     }
 
     public async details(): Promise<MSC3886SimpleHttpRendezvousTransportDetails> {
@@ -135,7 +139,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
             const baseUrl = res.url ?? uri;
             // resolve location header which could be relative or absolute
             this.uri = new URL(location, `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}`).href;
-            this.ready = true;
+            this._ready = true;
         }
     }
 
@@ -180,7 +184,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         }
 
         this.cancelled = true;
-        this.ready = false;
+        this._ready = false;
         this.onFailure?.(reason);
 
         if (this.uri && reason === RendezvousFailureReason.UserDeclined) {
