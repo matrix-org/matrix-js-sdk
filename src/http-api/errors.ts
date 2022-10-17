@@ -23,6 +23,19 @@ interface IErrorJson extends Partial<IUsageLimit> {
 }
 
 /**
+ * Construct a generic HTTP error. This is a JavaScript Error with additional information
+ * specific to HTTP responses.
+ * @constructor
+ * @param {string} msg The error message to include.
+ * @param {number} httpStatus The HTTP response status code.
+ */
+export class HTTPError extends Error {
+    constructor(msg: string, public readonly httpStatus?: number) {
+        super(msg);
+    }
+}
+
+/**
  * Construct a Matrix error. This is a JavaScript Error with additional
  * information specific to the standard Matrix error response.
  * @constructor
@@ -33,11 +46,11 @@ interface IErrorJson extends Partial<IUsageLimit> {
  * @prop {Object} data The raw Matrix error JSON used to construct this object.
  * @prop {number} httpStatus The numeric HTTP status code given
  */
-export class MatrixError extends Error {
+export class MatrixError extends HTTPError {
     public readonly errcode?: string;
     public readonly data: IErrorJson;
 
-    constructor(errorJson: IErrorJson = {}, public httpStatus?: number, public url?: string) {
+    constructor(errorJson: IErrorJson = {}, public readonly httpStatus?: number, public url?: string) {
         let message = errorJson.error || "Unknown message";
         if (httpStatus) {
             message = `[${httpStatus}] ${message}`;
@@ -45,7 +58,7 @@ export class MatrixError extends Error {
         if (url) {
             message = `${message} (${url})`;
         }
-        super(`MatrixError: ${message}`);
+        super(`MatrixError: ${message}`, httpStatus);
         this.errcode = errorJson.errcode;
         this.name = errorJson.errcode || "Unknown error code";
         this.data = errorJson;

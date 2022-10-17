@@ -2210,7 +2210,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = ev.sender;
+        this.opponentMember = ev.sender!; // XXX: we should use ev.getSender() and just store the userId
     }
 
     private async addBufferedIceCandidates(): Promise<void> {

@@ -60,7 +60,7 @@ describe("IndexedDBStore", () => {
         expect(await store.getOutOfBandMembers(roomId)).toHaveLength(1);
 
         // Simulate a broken IDB
-        (store.backend as LocalIndexedDBStoreBackend)["db"].transaction = (): IDBTransaction => {
+        (store.backend as LocalIndexedDBStoreBackend)["db"]!.transaction = (): IDBTransaction => {
             const err = new Error("Failed to execute 'transaction' on 'IDBDatabase': " +
                 "The database connection is closing.");
             err.name = "InvalidStateError";
