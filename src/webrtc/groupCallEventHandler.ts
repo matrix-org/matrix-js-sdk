@@ -125,6 +125,11 @@ export class GroupCallEventHandler {
                 continue;
             }
 
+            logger.debug(
+                `Choosing group call ${callEvent.getStateKey()} with TS ` +
+                `${callEvent.getTs()} for room ${room.roomId} from ${callEvents.length} possible calls.`,
+            );
+
             this.createGroupCallFromRoomStateEvent(callEvent);
             break;
         }
