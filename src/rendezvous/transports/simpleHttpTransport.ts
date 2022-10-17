@@ -60,7 +60,6 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         this.onFailure = onFailure;
         this.client = client;
         this.fallbackRzServer = fallbackRzServer;
-        this.ready = !!this.uri;
     }
 
     async details(): Promise<MSC3886SimpleHttpRendezvousTransportDetails> {
@@ -132,7 +131,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
             const baseUrl = res.url ?? uri;
             // resolve location header which could be relative or absolute
             this.uri = new URL(location, `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}`).href;
-            this.ready =true;
+            this.ready = true;
         }
     }
 
