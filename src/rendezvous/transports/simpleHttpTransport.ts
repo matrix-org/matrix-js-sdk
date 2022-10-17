@@ -135,7 +135,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         }
     }
 
-    async receive(): Promise<any> {
+    public async receive(): Promise<any> {
         if (!this.uri) {
             throw new Error('Rendezvous not set up');
         }
