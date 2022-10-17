@@ -1255,10 +1255,10 @@ export class Room extends ReadReceipt<EmittedEvents, RoomEventHandlerMap> {
      */
     public get threadsAggregateNotificationType(): NotificationCountType | null {
         let type: NotificationCountType | null = null;
-        for (const [, threadNotification] of this.threadNotifications) {
-            if (threadNotification.highlight > 0) {
+        for (const threadNotification of this.threadNotifications.values()) {
+            if (threadNotification!.highlight > 0) {
                 return NotificationCountType.Highlight;
-            } else if (threadNotification.total > 0 && !type) {
+            } else if (threadNotification!.total > 0 && !type) {
                 type = NotificationCountType.Total;
             }
         }
