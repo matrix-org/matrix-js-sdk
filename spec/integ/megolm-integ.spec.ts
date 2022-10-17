@@ -1133,10 +1133,10 @@ describe("megolm", () => {
             'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string) => {
+                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
                     const account = new global.Olm.Account();
                     try {
-                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount);
+                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, aliceTestClient.getDeviceKey(), aliceOtk.key);
                     } finally {
                         account.free();
@@ -1271,10 +1271,10 @@ describe("megolm", () => {
             'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string) => {
+                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
                     const account = new global.Olm.Account();
                     try {
-                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount);
+                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, aliceTestClient.getDeviceKey(), aliceOtk.key);
                     } finally {
                         account.free();

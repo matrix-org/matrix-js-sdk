@@ -385,7 +385,10 @@ export class Backend implements CryptoStore {
         objectStore.put(accountPickle, "-");
     }
 
-    public getCrossSigningKeys(txn: IDBTransaction, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
+    public getCrossSigningKeys(
+        txn: IDBTransaction,
+        func: (keys: Record<string, ICrossSigningKey> | null) => void,
+    ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("crossSigningKeys");
         getReq.onsuccess = function() {
