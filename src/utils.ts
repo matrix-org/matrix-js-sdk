@@ -22,6 +22,7 @@ limitations under the License.
 
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
+import { Optional } from "matrix-events-sdk";
 
 import type * as NodeCrypto from "crypto";
 import { MatrixEvent } from "./models/event";
@@ -123,13 +124,17 @@ export function decodeParams(query: string): Record<string, string | string[]> {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate: string, variables: Record<string, string>): string {
+export function encodeUri(pathTemplate: string, variables: Record<string, Optional<string>>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
         }
+        const value = variables[key];
+        if (value === undefined || value === null) {
+            continue;
+        }
         pathTemplate = pathTemplate.replace(
-            key, encodeURIComponent(variables[key]),
+            key, encodeURIComponent(value),
         );
     }
     return pathTemplate;

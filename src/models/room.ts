@@ -1828,9 +1828,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private onThreadNewReply(thread: Thread): void {
-        if (thread.length && thread.rootEvent) {
-            this.updateThreadRootEvents(thread, false);
-        }
+        this.updateThreadRootEvents(thread, false);
     }
 
     private onThreadDelete(thread: Thread): void {
@@ -1957,9 +1955,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean) => {
-        this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline);
-        if (thread.hasCurrentUserParticipated) {
-            this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline);
+        if (thread.length) {
+            this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline);
+            if (thread.hasCurrentUserParticipated) {
+                this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline);
+            }
         }
     };
 
@@ -1968,18 +1968,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         thread: Thread,
         toStartOfTimeline: boolean,
     ) => {
-        if (Thread.hasServerSideSupport) {
-            timelineSet.addLiveEvent(thread.rootEvent, {
-                duplicateStrategy: DuplicateStrategy.Replace,
-                fromCache: false,
-                roomState: this.currentState,
-            });
-        } else {
-            timelineSet.addEventToTimeline(
-                thread.rootEvent,
-                timelineSet.getLiveTimeline(),
-                { toStartOfTimeline },
-            );
+        if (timelineSet && thread.rootEvent) {
+            if (Thread.hasServerSideSupport) {
+                timelineSet.addLiveEvent(thread.rootEvent, {
+                    duplicateStrategy: DuplicateStrategy.Replace,
+                    fromCache: false,
+                    roomState: this.currentState,
+                });
+            } else {
+                timelineSet.addEventToTimeline(
+                    thread.rootEvent,
+                    timelineSet.getLiveTimeline(),
+                    { toStartOfTimeline },
+                );
+            }
         }
     };
 
@@ -2020,15 +2022,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
         ]);
+        const isNewer = this.lastThread?.rootEvent
+            && rootEvent?.localTimestamp
+            && this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp;
 
-        if (!this.lastThread || this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp) {
+        if (!this.lastThread || isNewer) {
             this.lastThread = thread;
         }
 
         if (this.threadsReady) {
-            if (thread.length && thread.rootEvent) {
-                this.updateThreadRootEvents(thread, toStartOfTimeline);
-            }
+            this.updateThreadRootEvents(thread, toStartOfTimeline);
         }
 
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);

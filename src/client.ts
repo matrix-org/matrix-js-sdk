@@ -5243,6 +5243,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("could not get thread timeline: no client support");
         }
 
+        if (!timelineSet.room) {
+            throw new Error("could not get thread timeline: not a room timeline");
+        }
+
         if (!timelineSet.thread) {
             throw new Error("could not get thread timeline: not a thread timeline");
         }
@@ -5277,14 +5281,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
 
                 const thread = timelineSet.thread;
-                const resOlder = await this.fetchRelations(
+                const resOlder: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
                     { dir: Direction.Backward, from: res.start },
                 );
-                const resNewer = await this.fetchRelations(
+                const resNewer: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
                     THREAD_RELATION_TYPE.name,
@@ -5339,10 +5343,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     null,
                     { dir: Direction.Backward, from: res.start },
                 );
-                const eventsNewer = [];
+                const eventsNewer: IEvent[] = [];
                 let nextBatch: Optional<string> = res.end;
                 while (nextBatch) {
-                    const resNewer = await this.fetchRelations(
+                    const resNewer: IRelationsResponse = await this.fetchRelations(
                         timelineSet.room.roomId,
                         thread.id,
                         THREAD_RELATION_TYPE.name,
@@ -5532,7 +5536,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
             // so the timelineFilter doesn't get written into it below
             filter = {
-                ...filter,
                 ...Filter.LAZY_LOADING_MESSAGES_FILTER,
             };
         }
@@ -5579,7 +5582,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const isNotifTimeline = (eventTimeline.getTimelineSet() === this.notifTimelineSet);
         const room = this.getRoom(eventTimeline.getRoomId());
         const isThreadListTimeline = eventTimeline.getTimelineSet().isThreadTimeline;
-        const isThreadTimeline = (eventTimeline.getTimelineSet().thread);
+        const thread = eventTimeline.getTimelineSet().thread;
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more
         // nicely with HTTP errors.
@@ -5690,7 +5693,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.paginationRequests[dir] = null;
             });
             eventTimeline.paginationRequests[dir] = promise;
-        } else if (isThreadTimeline) {
+        } else if (thread) {
             const room = this.getRoom(eventTimeline.getRoomId());
             if (!room) {
                 throw new Error("Unknown room " + eventTimeline.getRoomId());
@@ -5698,10 +5701,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
             promise = this.fetchRelations(
                 eventTimeline.getRoomId(),
-                eventTimeline.getTimelineSet().thread?.id,
+                thread.id,
                 THREAD_RELATION_TYPE.name,
                 null,
-                { dir, limit: opts.limit, from: token },
+                { dir, limit: opts.limit, from: token ?? undefined },
             ).then(async (res) => {
                 const mapper = this.getEventMapper();
                 const matrixEvents = res.chunk.map(mapper);
@@ -6933,12 +6936,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<{
-        originalEvent: MatrixEvent;
+        originalEvent: MatrixEvent | null;
         events: MatrixEvent[];
         nextBatch?: string;
         prevBatch?: string;
     }> {
-        const fetchedEventType = this.getEncryptedIfNeededEventType(roomId, eventType);
+        const fetchedEventType = eventType ? this.getEncryptedIfNeededEventType(roomId, eventType) : null;
         const result = await this.fetchRelations(
             roomId,
             eventId,
@@ -6962,7 +6965,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             events = events.filter(e => e.getSender() === originalEvent.getSender());
         }
         return {
-            originalEvent,
+            originalEvent: originalEvent ?? null,
             events,
             nextBatch: result.next_batch,
             prevBatch: result.prev_batch,

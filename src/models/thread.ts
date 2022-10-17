@@ -234,6 +234,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): Promise<void> {
         this.setEventMetadata(event);
 
+        const lastReply = this.lastReply();
+        const isNewestReply = !lastReply || event.localTimestamp > lastReply?.localTimestamp;
+
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
             // all the relevant membership info to hydrate events with a sender
@@ -243,16 +246,13 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.addEventToTimeline(event, toStartOfTimeline);
 
             this.client.decryptEventIfNeeded(event, {});
-        } else if (!toStartOfTimeline &&
-            this.initialEventsFetched &&
-            event.localTimestamp > this.lastReply()?.localTimestamp
-        ) {
+        } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
             await this.fetchEditsWhereNeeded(event);
             this.addEventToTimeline(event, false);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
             // Apply annotations and replace relations to the relations of the timeline only
-            this.timelineSet.relations.aggregateParentEvent(event);
-            this.timelineSet.relations.aggregateChildEvent(event, this.timelineSet);
+            this.timelineSet.relations?.aggregateParentEvent(event);
+            this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
             return;
         }
 
@@ -268,12 +268,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
     }
 
-    public async processEvent(event: MatrixEvent): Promise<void> {
-        this.setEventMetadata(event);
-        await this.fetchEditsWhereNeeded(event);
+    public async processEvent(event: Optional<MatrixEvent>): Promise<void> {
+        if (event) {
+            this.setEventMetadata(event);
+            await this.fetchEditsWhereNeeded(event);
+        }
     }
 
-    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship {
+    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
@@ -286,7 +288,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
-            this._currentUserParticipated = bundledRelationship.current_user_participated;
+            this._currentUserParticipated = bundledRelationship.current_user_participated ?? false;
 
             const mapper = this.client.getEventMapper();
             this.lastEvent = mapper(bundledRelationship.latest_event);
