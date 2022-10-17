@@ -22,9 +22,9 @@ const zeroSalt = new Uint8Array(8);
 
 export interface IEncryptedPayload {
     [key: string]: any; // extensible
-    iv?: string;
-    ciphertext?: string;
-    mac?: string;
+    iv: string;
+    ciphertext: string;
+    mac: string;
 }
 
 /**
@@ -41,7 +41,7 @@ export async function encryptAES(
     name: string,
     ivStr?: string,
 ): Promise<IEncryptedPayload> {
-    let iv;
+    let iv: Uint8Array;
     if (ivStr) {
         iv = decodeBase64(ivStr);
     } else {
