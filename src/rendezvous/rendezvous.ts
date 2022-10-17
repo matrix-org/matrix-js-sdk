@@ -20,6 +20,7 @@ import { RendezvousChannel } from ".";
 import { MatrixClient } from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
 import { DeviceInfo } from "../crypto/deviceinfo";
+import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
 import { logger } from "../logger";
 import { sleep } from "../utils";
 import { RendezvousFailureListener, RendezvousFailureReason } from "./cancellationReason";
@@ -63,8 +64,9 @@ export class MSC3906Rendezvous {
 
         logger.info(`Connected to secure channel with checksum: ${checksum} our intent is ${this.ourIntent}`);
 
+        const features = await buildFeatureSupportMap(await this.client.getVersions());
         // determine available protocols
-        if (!(await this.client.doesServerSupportUnstableFeature('org.matrix.msc3882'))) {
+        if (features.get(Feature.LoginTokenRequest) === ServerSupport.Unsupported) {
             logger.info("Server doesn't support MSC3882");
             await this.send({ type: PayloadType.Finish, outcome: 'unsupported' });
             await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);

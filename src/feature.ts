@@ -25,6 +25,7 @@ export enum ServerSupport {
 export enum Feature {
     Thread = "Thread",
     ThreadUnreadNotifications = "ThreadUnreadNotifications",
+    LoginTokenRequest = "LoginTokenRequest",
 }
 
 type FeatureSupportCondition = {
@@ -40,6 +41,9 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     [Feature.ThreadUnreadNotifications]: {
         unstablePrefixes: ["org.matrix.msc3771", "org.matrix.msc3773"],
         matrixVersion: "v1.4",
+    },
+    [Feature.LoginTokenRequest]: {
+        unstablePrefixes: ["org.matrix.msc3882"],
     },
 };
 

@@ -42,12 +42,13 @@ function makeMockClient(opts: {
     crossSigningIds?: Record<string, string>;
 }): MatrixClient {
     return {
-        doesServerSupportUnstableFeature(feature: string) {
-            switch (feature) {
-                case "org.matrix.msc3882": return opts.msc3882Enabled;
-                case "org.matrix.msc3886": return opts.msc3886Enabled;
-                default: return false;
-            }
+        getVersions() {
+            return {
+                unstable_features: {
+                    "org.matrix.msc3882": opts.msc3882Enabled,
+                    "org.matrix.msc3886": opts.msc3886Enabled,
+                },
+            };
         },
         getUserId() { return opts.userId; },
         getDeviceId() { return opts.deviceId; },
