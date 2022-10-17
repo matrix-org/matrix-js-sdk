@@ -38,7 +38,7 @@ export interface RendezvousChannel {
      * Receive a payload from the channel.
      * @returns the received payload
      */
-    receive(): Promise<object>;
+    receive(): Promise<object | undefined>;
 
     /**
      * Close the channel and clear up any resources.

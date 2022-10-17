@@ -209,7 +209,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         return JSON.parse(new TextDecoder().decode(new Uint8Array(plaintext)));
     }
 
-    public async receive(): Promise<object> {
+    public async receive(): Promise<object | undefined> {
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }

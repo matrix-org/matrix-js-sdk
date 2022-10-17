@@ -143,14 +143,14 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         }
     }
 
-    public async receive(): Promise<object> {
+    public async receive(): Promise<object | undefined> {
         if (!this.uri) {
             throw new Error('Rendezvous not set up');
         }
         // eslint-disable-next-line no-constant-condition
         while (true) {
             if (this.cancelled) {
-                return;
+                return undefined;
             }
 
             const headers: Record<string, string> = {};

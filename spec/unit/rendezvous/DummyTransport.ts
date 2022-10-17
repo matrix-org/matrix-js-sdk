@@ -27,7 +27,7 @@ export class DummyTransport<T extends RendezvousTransportDetails> implements Ren
     otherParty?: DummyTransport<T>;
     etag?: string;
     lastEtagReceived?: string;
-    data: object | null = null;
+    data: object = {};
 
     ready = false;
     cancelled = false;
@@ -77,7 +77,7 @@ export class DummyTransport<T extends RendezvousTransportDetails> implements Ren
             await sleep(250);
         }
 
-        return undefined;
+        return {};
     }
 
     cancel(reason: RendezvousFailureReason): Promise<void> {

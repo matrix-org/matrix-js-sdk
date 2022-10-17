@@ -48,7 +48,7 @@ export interface RendezvousTransport {
   /**
    * Receive data from the transport.
    */
-  receive(): Promise<object>;
+  receive(): Promise<object | undefined>;
 
   /**
    * Cancel the rendezvous. This will call `onCancelled()` if it is set.

@@ -79,9 +79,9 @@ export class MSC3906Rendezvous {
     ) {}
 
     /**
-     * Returns the code representing the rendezvous suitable for rendering in a QR code.
+     * Returns the code representing the rendezvous suitable for rendering in a QR code or undefined if not generated yet.
      */
-    public get code(): string {
+    public get code(): string | undefined {
         return this._code;
     }
 
@@ -132,7 +132,7 @@ export class MSC3906Rendezvous {
             return undefined;
         }
 
-        if (!LOGIN_TOKEN_PROTOCOL.matches(protocol)) {
+        if (!protocol || !LOGIN_TOKEN_PROTOCOL.matches(protocol)) {
             await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
             return undefined;
         }
