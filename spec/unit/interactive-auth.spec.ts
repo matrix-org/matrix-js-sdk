@@ -259,7 +259,6 @@ describe("InteractiveAuth", () => {
         const requestEmailToken = jest.fn();
 
         const ia = new InteractiveAuth({
-            authData: null,
             matrixClient: getFakeClient(),
             stateUpdated,
             doRequest,

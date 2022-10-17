@@ -368,7 +368,7 @@ describe("MatrixClient event timelines", function() {
                     expect(tl!.getEvents().length).toEqual(4);
                     for (let i = 0; i < 4; i++) {
                         expect(tl!.getEvents()[i].event).toEqual(EVENTS[i]);
-                        expect(tl!.getEvents()[i]?.sender.name).toEqual(userName);
+                        expect(tl!.getEvents()[i]?.sender?.name).toEqual(userName);
                     }
                     expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                         .toEqual("start_token");
@@ -406,7 +406,7 @@ describe("MatrixClient event timelines", function() {
             }).then(function(tl) {
                 expect(tl!.getEvents().length).toEqual(2);
                 expect(tl!.getEvents()[1].event).toEqual(EVENTS[0]);
-                expect(tl!.getEvents()[1]?.sender.name).toEqual(userName);
+                expect(tl!.getEvents()[1]?.sender?.name).toEqual(userName);
                 expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                     .toEqual("f_1_1");
                 // expect(tl.getPaginationToken(EventTimeline.FORWARDS))
@@ -767,8 +767,8 @@ describe("MatrixClient event timelines", function() {
             httpBackend = testClient.httpBackend;
             await startClient(httpBackend, client);
 
-            const room = client.getRoom(roomId);
-            const timelineSet = room.getTimelineSets()[0];
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0]!;
             await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
         });
 
@@ -786,7 +786,7 @@ describe("MatrixClient event timelines", function() {
             httpBackend = testClient.httpBackend;
 
             return startClient(httpBackend, client).then(() => {
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
                 const timelineSet = room.getTimelineSets()[0];
                 expect(client.getLatestTimeline(timelineSet)).rejects.toBeFalsy();
             });
@@ -849,7 +849,7 @@ describe("MatrixClient event timelines", function() {
                     expect(tl!.getEvents().length).toEqual(4);
                     for (let i = 0; i < 4; i++) {
                         expect(tl!.getEvents()[i].event).toEqual(EVENTS[i]);
-                        expect(tl!.getEvents()[i]?.sender.name).toEqual(userName);
+                        expect(tl!.getEvents()[i]?.sender?.name).toEqual(userName);
                     }
                     expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
                         .toEqual("start_token");
@@ -1129,8 +1129,8 @@ describe("MatrixClient event timelines", function() {
             });
 
             it("should allow fetching all threads", async function() {
-                const room = client.getRoom(roomId);
-                const timelineSets = await room?.createThreadsTimelineSets();
+                const room = client.getRoom(roomId)!;
+                const timelineSets = await room.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
                 respondToThreads();
                 respondToThreads();
@@ -1185,14 +1185,14 @@ describe("MatrixClient event timelines", function() {
             });
 
             it("should allow fetching all threads", async function() {
-                const room = client.getRoom(roomId);
+                const room = client.getRoom(roomId)!;
 
                 respondToFilter();
                 respondToSync();
                 respondToFilter();
                 respondToSync();
 
-                const timelineSetsPromise = room?.createThreadsTimelineSets();
+                const timelineSetsPromise = room.createThreadsTimelineSets();
                 expect(timelineSetsPromise).not.toBeNull();
                 await flushHttp(timelineSetsPromise!);
                 respondToFilter();
@@ -1218,7 +1218,7 @@ describe("MatrixClient event timelines", function() {
             const [allThreads] = timelineSets!;
 
             respondToThreads().check((request) => {
-                expect(request.queryParams.filter).toEqual(JSON.stringify({
+                expect(request.queryParams?.filter).toEqual(JSON.stringify({
                     "lazy_load_members": true,
                 }));
             });
@@ -1244,7 +1244,7 @@ describe("MatrixClient event timelines", function() {
                 state: [],
                 next_batch: null,
             }).check((request) => {
-                expect(request.queryParams.from).toEqual(RANDOM_TOKEN);
+                expect(request.queryParams?.from).toEqual(RANDOM_TOKEN);
             });
 
             allThreads.getLiveTimeline().setPaginationToken(RANDOM_TOKEN, Direction.Backward);

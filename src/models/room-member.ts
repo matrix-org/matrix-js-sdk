@@ -35,7 +35,7 @@ export enum RoomMemberEvent {
 }
 
 export type RoomMemberEventHandlerMap = {
-    [RoomMemberEvent.Membership]: (event: MatrixEvent, member: RoomMember, oldMembership: string | null) => void;
+    [RoomMemberEvent.Membership]: (event: MatrixEvent, member: RoomMember, oldMembership?: string) => void;
     [RoomMemberEvent.Name]: (event: MatrixEvent, member: RoomMember, oldName: string | null) => void;
     [RoomMemberEvent.PowerLevel]: (event: MatrixEvent, member: RoomMember) => void;
     [RoomMemberEvent.Typing]: (event: MatrixEvent, member: RoomMember) => void;
@@ -43,8 +43,8 @@ export type RoomMemberEventHandlerMap = {
 
 export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEventHandlerMap> {
     private _isOutOfBand = false;
-    private _modified: number;
-    public _requestedProfileInfo: boolean; // used by sync.ts
+    private modified = -1;
+    public requestedProfileInfo = false; // used by sync.ts
 
     // XXX these should be read-only
     public typing = false;
@@ -52,14 +52,12 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     public rawDisplayName: string;
     public powerLevel = 0;
     public powerLevelNorm = 0;
-    public user?: User = null;
-    public membership: string = null;
+    public user?: User;
+    public membership?: string;
     public disambiguate = false;
     public events: {
         member?: MatrixEvent;
-    } = {
-            member: null,
-        };
+    } = {};
 
     /**
      * Construct a new room member.
@@ -119,7 +117,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @fires module:client~MatrixClient#event:"RoomMember.membership"
      */
     public setMembershipEvent(event: MatrixEvent, roomState?: RoomState): void {
-        const displayName = event.getDirectionalContent().displayname;
+        const displayName = event.getDirectionalContent().displayname ?? "";
 
         if (event.getType() !== EventType.RoomMember) {
             return;
@@ -141,23 +139,14 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             );
         }
 
-        this.disambiguate = shouldDisambiguate(
-            this.userId,
-            displayName,
-            roomState,
-        );
+        this.disambiguate = shouldDisambiguate(this.userId, displayName, roomState);
 
         const oldName = this.name;
-        this.name = calculateDisplayName(
-            this.userId,
-            displayName,
-            roomState,
-            this.disambiguate,
-        );
+        this.name = calculateDisplayName(this.userId, displayName, this.disambiguate);
 
         // not quite raw: we strip direction override chars so it can safely be inserted into
         // blocks of text without breaking the text direction
-        this.rawDisplayName = utils.removeDirectionOverrideChars(event.getDirectionalContent().displayname);
+        this.rawDisplayName = utils.removeDirectionOverrideChars(event.getDirectionalContent().displayname ?? "");
         if (!this.rawDisplayName || !utils.removeHiddenChars(this.rawDisplayName)) {
             this.rawDisplayName = this.userId;
         }
@@ -180,15 +169,15 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @fires module:client~MatrixClient#event:"RoomMember.powerLevel"
      */
     public setPowerLevelEvent(powerLevelEvent: MatrixEvent): void {
-        if (powerLevelEvent.getType() !== "m.room.power_levels") {
+        if (powerLevelEvent.getType() !== EventType.RoomPowerLevels || powerLevelEvent.getStateKey() !== "") {
             return;
         }
 
         const evContent = powerLevelEvent.getDirectionalContent();
 
         let maxLevel = evContent.users_default || 0;
-        const users = evContent.users || {};
-        Object.values(users).forEach(function(lvl: number) {
+        const users: { [userId: string]: number } = evContent.users || {};
+        Object.values(users).forEach((lvl: number) => {
             maxLevel = Math.max(maxLevel, lvl);
         });
         const oldPowerLevel = this.powerLevel;
@@ -244,7 +233,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * Update the last modified time to the current time.
      */
     private updateModifiedTime() {
-        this._modified = Date.now();
+        this.modified = Date.now();
     }
 
     /**
@@ -254,12 +243,13 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @return {number} The timestamp
      */
     public getLastModifiedTime(): number {
-        return this._modified;
+        return this.modified;
     }
 
     public isKicked(): boolean {
-        return this.membership === "leave" &&
-            this.events.member.getSender() !== this.events.member.getStateKey();
+        return this.membership === "leave"
+            && this.events.member !== undefined
+            && this.events.member.getSender() !== this.events.member.getStateKey();
     }
 
     /**
@@ -267,7 +257,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * the user that invited this member
      * @return {string} user id of the inviter
      */
-    public getDMInviter(): string {
+    public getDMInviter(): string | undefined {
         // when not available because that room state hasn't been loaded in,
         // we don't really know, but more likely to not be a direct chat
         if (this.events.member) {
@@ -280,7 +270,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
             const memberEvent = this.events.member;
             let memberContent = memberEvent.getContent();
-            let inviteSender = memberEvent.getSender();
+            let inviteSender: string | undefined = memberEvent.getSender();
 
             if (memberContent.membership === "join") {
                 memberContent = memberEvent.getPrevContent();
@@ -335,20 +325,19 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * get the mxc avatar url, either from a state event, or from a lazily loaded member
      * @return {string} the mxc avatar url
      */
-    public getMxcAvatarUrl(): string | null {
+    public getMxcAvatarUrl(): string | undefined {
         if (this.events.member) {
             return this.events.member.getDirectionalContent().avatar_url;
         } else if (this.user) {
             return this.user.avatarUrl;
         }
-        return null;
     }
 }
 
 const MXID_PATTERN = /@.+:.+/;
 const LTR_RTL_PATTERN = /[\u200E\u200F\u202A-\u202F]/;
 
-function shouldDisambiguate(selfUserId: string, displayName: string, roomState?: RoomState): boolean {
+function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?: RoomState): boolean {
     if (!displayName || displayName === selfUserId) return false;
 
     // First check if the displayname is something we consider truthy
@@ -377,13 +366,12 @@ function shouldDisambiguate(selfUserId: string, displayName: string, roomState?:
 
 function calculateDisplayName(
     selfUserId: string,
-    displayName: string,
-    roomState: RoomState,
+    displayName: string | undefined,
     disambiguate: boolean,
 ): string {
-    if (disambiguate) return utils.removeDirectionOverrideChars(displayName) + " (" + selfUserId + ")";
-
     if (!displayName || displayName === selfUserId) return selfUserId;
+
+    if (disambiguate) return utils.removeDirectionOverrideChars(displayName) + " (" + selfUserId + ")";
 
     // First check if the displayname is something we consider truthy
     // after stripping it of zero width characters and padding spaces

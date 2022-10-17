@@ -82,7 +82,7 @@ export class EventContext {
      *                                  backwards in time
      * @return {string}
      */
-    public getPaginateToken(backwards = false): string {
+    public getPaginateToken(backwards = false): string | null {
         return this.paginateTokens[backwards ? Direction.Backward : Direction.Forward];
     }
 
