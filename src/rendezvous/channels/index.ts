@@ -17,5 +17,5 @@ limitations under the License.
 export * from './ecdhV1';
 
 export enum SecureRendezvousChannelAlgorithm {
-    ECDH_V1 = "m.rendezvous.v1.curve25519-aes-sha256"
+    ECDH_V1 = "org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256"
 }

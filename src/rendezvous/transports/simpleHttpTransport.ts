@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { UnstableValue } from 'matrix-events-sdk';
+
 import { logger } from '../../logger';
 import { sleep } from '../../utils';
 import { RendezvousFailureListener, RendezvousFailureReason } from '../cancellationReason';
@@ -21,8 +23,9 @@ import { RendezvousTransport, RendezvousTransportDetails } from '../transport';
 import { MatrixClient } from '../../matrix';
 import { ClientPrefix } from '../../http-api';
 
+const TYPE = new UnstableValue(undefined, "org.matrix.msc3886.http.v1");
+
 export interface MSC3886SimpleHttpRendezvousTransportDetails extends RendezvousTransportDetails {
-    type: 'http.v1';
     uri: string;
 }
 
@@ -66,7 +69,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         }
 
         return {
-            type: 'http.v1',
+            type: TYPE.name,
             uri: this.uri,
         };
     }

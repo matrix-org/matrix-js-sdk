@@ -124,8 +124,8 @@ describe("Rendezvous", function() {
         const code = JSON.parse(aliceRz.code!) as RendezvousCode;
 
         expect(code.intent).toEqual(RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE);
-        expect(code.rendezvous?.algorithm).toEqual("m.rendezvous.v1.curve25519-aes-sha256");
-        expect(code.rendezvous?.transport.type).toEqual("http.v1");
+        expect(code.rendezvous?.algorithm).toEqual("org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256");
+        expect(code.rendezvous?.transport.type).toEqual("org.matrix.msc3886.http.v1");
         expect((code.rendezvous?.transport as MSC3886SimpleHttpRendezvousTransportDetails).uri)
             .toEqual("https://fallbackserver/rz/123");
 
@@ -246,7 +246,7 @@ describe("Rendezvous", function() {
 
             expect(protocols).toEqual({
                 type: 'm.login.progress',
-                protocols: ['login_token'],
+                protocols: ['org.matrix.msc3906.login_token'],
             });
 
             await bobEcdh.send({ type: 'm.login.finish', outcome: 'unsupported' });
@@ -304,7 +304,7 @@ describe("Rendezvous", function() {
 
             expect(protocols).toEqual({
                 type: 'm.login.progress',
-                protocols: ['login_token'],
+                protocols: ['org.matrix.msc3906.login_token'],
             });
 
             await bobEcdh.send({ type: 'm.login.progress', protocol: 'bad protocol' });
@@ -362,10 +362,10 @@ describe("Rendezvous", function() {
 
             expect(protocols).toEqual({
                 type: 'm.login.progress',
-                protocols: ['login_token'],
+                protocols: ['org.matrix.msc3906.login_token'],
             });
 
-            await bobEcdh.send({ type: 'm.login.progress', protocol: 'login_token' });
+            await bobEcdh.send({ type: 'm.login.progress', protocol: 'org.matrix.msc3906.login_token' });
         })();
 
         await aliceStartProm;
@@ -422,10 +422,10 @@ describe("Rendezvous", function() {
 
             expect(protocols).toEqual({
                 type: 'm.login.progress',
-                protocols: ['login_token'],
+                protocols: ['org.matrix.msc3906.login_token'],
             });
 
-            await bobEcdh.send({ type: 'm.login.progress', protocol: 'login_token' });
+            await bobEcdh.send({ type: 'm.login.progress', protocol: 'org.matrix.msc3906.login_token' });
         })();
 
         await aliceStartProm;
@@ -496,10 +496,10 @@ describe("Rendezvous", function() {
 
             expect(protocols).toEqual({
                 type: 'm.login.progress',
-                protocols: ['login_token'],
+                protocols: ['org.matrix.msc3906.login_token'],
             });
 
-            await bobEcdh.send({ type: 'm.login.progress', protocol: 'login_token' });
+            await bobEcdh.send({ type: 'm.login.progress', protocol: 'org.matrix.msc3906.login_token' });
         })();
 
         await aliceStartProm;

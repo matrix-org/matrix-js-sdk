@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { UnstableValue } from "matrix-events-sdk";
 import { RendezvousChannel } from ".";
 import { MatrixClient } from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
@@ -28,6 +29,8 @@ enum PayloadType {
     Finish = 'm.login.finish',
     Progress = 'm.login.progress',
 }
+
+const LOGIN_TOKEN_PROTOCOL = new UnstableValue(undefined, "org.matrix.msc3906.login_token");
 
 /**
  * Implements MSC3906 to allow a user to sign in on a new device using QR code.
@@ -67,7 +70,7 @@ export class MSC3906Rendezvous {
             return undefined;
         }
 
-        await this.send({ type: PayloadType.Progress, protocols: ['login_token'] });
+        await this.send({ type: PayloadType.Progress, protocols: [LOGIN_TOKEN_PROTOCOL.name] });
 
         logger.info('Waiting for other device to chose protocol');
         const { type, protocol, outcome } = await this.channel.receive();
@@ -89,7 +92,7 @@ export class MSC3906Rendezvous {
             return undefined;
         }
 
-        if (protocol !== 'login_token') {
+        if (!LOGIN_TOKEN_PROTOCOL.matches(protocol)) {
             await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
             return undefined;
         }
