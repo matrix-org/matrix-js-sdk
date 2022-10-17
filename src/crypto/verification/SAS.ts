@@ -51,7 +51,7 @@ const newMismatchedCommitmentError = errorFactory(
     "m.mismatched_commitment", "Mismatched commitment",
 );
 
-function generateDecimalSas(sasBytes: number[]): [number, number, number] {
+export function generateDecimalSas(sasBytes: number[]): [number, number, number] {
     /**
      *      +--------+--------+--------+--------+--------+
      *      | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 |
