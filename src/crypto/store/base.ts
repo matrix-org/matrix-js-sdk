@@ -40,7 +40,7 @@ export type SecretStorePrivateKeys = {
         key: IEncryptedPayload;
         deviceDisplayName: string;
         time: number;
-    };
+    } | null;
     "m.megolm_backup.v1": IEncryptedPayload;
 };
 

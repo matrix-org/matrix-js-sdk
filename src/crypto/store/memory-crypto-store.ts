@@ -45,7 +45,7 @@ import { InboundGroupSessionData } from "../OlmDevice";
 export class MemoryCryptoStore implements CryptoStore {
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string = null;
-    private crossSigningKeys: Record<string, ICrossSigningKey> = null;
+    private crossSigningKeys: Record<string, ICrossSigningKey> | null = null;
     private privateKeys: Partial<SecretStorePrivateKeys> = {};
 
     private sessions: { [deviceKey: string]: { [sessionId: string]: ISessionInfo } } = {};
