@@ -169,7 +169,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         }
     }
 
-    async cancel(reason: RendezvousFailureReason) {
+    public async cancel(reason: RendezvousFailureReason) {
         if (reason === RendezvousFailureReason.Unknown &&
             this.expiresAt && this.expiresAt.getTime() < Date.now()) {
             reason = RendezvousFailureReason.Expired;
