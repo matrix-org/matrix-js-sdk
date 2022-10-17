@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export let crypto = window?.crypto;
-export let subtleCrypto = window?.crypto?.subtle ?? window?.crypto?.webkitSubtle;
-export let TextEncoder = window?.TextEncoder;
+export let crypto = global.window?.crypto;
+export let subtleCrypto = global.window?.crypto?.subtle ?? global.window?.crypto?.webkitSubtle;
+export let TextEncoder = global.window?.TextEncoder;
 
 if (typeof process !== 'undefined') {
     /* eslint-disable @typescript-eslint/no-var-requires */

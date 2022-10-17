@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { decodeBase64, encodeBase64 } from './olmlib';
-import { subtleCrypto } from "./crypto";
+import { subtleCrypto, crypto, TextEncoder } from "./crypto";
 
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);
@@ -46,7 +46,7 @@ export async function encryptAES(
         iv = decodeBase64(ivStr);
     } else {
         iv = new Uint8Array(16);
-        window.crypto.getRandomValues(iv);
+        crypto.getRandomValues(iv);
 
         // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
         // (which would mean we wouldn't be able to decrypt on Android). The loss

@@ -23,18 +23,9 @@ import { makeTestClients } from './verification/util';
 import { encryptAES } from "../../../src/crypto/aes";
 import { resetCrossSigningKeys, createSecretStorageKey } from "./crypto-utils";
 import { logger } from '../../../src/logger';
-import * as utils from "../../../src/utils";
 import { ICreateClientOpts } from '../../../src/client';
 import { ISecretStorageKeyInfo } from '../../../src/crypto/api';
 import { DeviceInfo } from '../../../src/crypto/deviceinfo';
-
-try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
-    utils.setCrypto(crypto);
-} catch (err) {
-    logger.log('nodejs was compiled without crypto support');
-}
 
 async function makeTestClient(userInfo: { userId: string, deviceId: string}, options: Partial<ICreateClientOpts> = {}) {
     const client = (new TestClient(
