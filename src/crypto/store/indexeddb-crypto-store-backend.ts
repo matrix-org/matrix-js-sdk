@@ -25,14 +25,13 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
+    ParkedSharedHistory, SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
 const PROFILE_TRANSACTIONS = false;
 
@@ -398,10 +397,10 @@ export class Backend implements CryptoStore {
         };
     }
 
-    public getSecretStorePrivateKey<T = IEncryptedPayload>(
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: IDBTransaction,
-        func: (key: T | null) => void,
-        type: string,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
     ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get(`ssss_cache:${type}`);
@@ -419,7 +418,11 @@ export class Backend implements CryptoStore {
         objectStore.put(keys, "crossSigningKeys");
     }
 
-    public storeSecretStorePrivateKey<T = IEncryptedPayload>(txn: IDBTransaction, type: string, key: T): void {
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: IDBTransaction,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
         const objectStore = txn.objectStore("account");
         objectStore.put(key, `ssss_cache:${type}`);
     }

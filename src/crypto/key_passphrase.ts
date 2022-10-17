@@ -70,7 +70,7 @@ export async function deriveKey(
     password: string,
     salt: string,
     iterations: number,
-    numBits: number,
+    numBits = DEFAULT_BITSIZE,
 ): Promise<Uint8Array> {
     if (!subtleCrypto || !TextEncoder) {
         throw new Error("Password-based backup is not available on this platform");

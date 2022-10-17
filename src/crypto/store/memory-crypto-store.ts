@@ -25,14 +25,13 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
+    ParkedSharedHistory, SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. in-memory storage for e2e.
@@ -47,7 +46,7 @@ export class MemoryCryptoStore implements CryptoStore {
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string = null;
     private crossSigningKeys: Record<string, ICrossSigningKey> = null;
-    private privateKeys: Record<string, IEncryptedPayload> = {};
+    private privateKeys: Partial<SecretStorePrivateKeys> = {};
 
     private sessions: { [deviceKey: string]: { [sessionId: string]: ISessionInfo } } = {};
     private sessionProblems: { [deviceKey: string]: IProblem[] } = {};
@@ -292,12 +291,12 @@ export class MemoryCryptoStore implements CryptoStore {
         func(this.crossSigningKeys);
     }
 
-    public getSecretStorePrivateKey<T = IEncryptedPayload>(
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
-        func: (key: T | null) => void,
-        type: string,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
     ): void {
-        const result = this.privateKeys[type] as T;
+        const result = this.privateKeys[type] as SecretStorePrivateKeys[K] | undefined;
         func(result || null);
     }
 
@@ -305,8 +304,12 @@ export class MemoryCryptoStore implements CryptoStore {
         this.crossSigningKeys = keys;
     }
 
-    public storeSecretStorePrivateKey<T = IEncryptedPayload>(txn: unknown, type: string, key: T): void {
-        this.privateKeys[type] = key as IEncryptedPayload;
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
+        this.privateKeys[type] = key;
     }
 
     // Olm Sessions

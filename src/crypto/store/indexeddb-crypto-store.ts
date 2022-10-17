@@ -29,14 +29,13 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
+    ParkedSharedHistory, SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. indexeddb storage for e2e.
@@ -355,10 +354,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(string)} func Called with the private key
      * @param {string} type A key type
      */
-    public getSecretStorePrivateKey<T = IEncryptedPayload>(
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: IDBTransaction,
-        func: (key: T | null) => void,
-        type: string,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
     ): void {
         this.backend.getSecretStorePrivateKey(txn, func, type);
     }
@@ -380,7 +379,11 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {string} type The type of cross-signing private key to store
      * @param {string} key keys object as getCrossSigningKeys()
      */
-    public storeSecretStorePrivateKey<T = IEncryptedPayload>(txn: IDBTransaction, type: string, key: T): void {
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: IDBTransaction,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
         this.backend.storeSecretStorePrivateKey(txn, type, key);
     }
 

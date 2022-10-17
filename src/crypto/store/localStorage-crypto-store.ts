@@ -16,12 +16,11 @@ limitations under the License.
 
 import { logger } from '../../logger';
 import { MemoryCryptoStore } from './memory-crypto-store';
-import { IDeviceData, IProblem, ISession, ISessionInfo, IWithheld, Mode } from "./base";
+import { IDeviceData, IProblem, ISession, ISessionInfo, IWithheld, Mode, SecretStorePrivateKeys } from "./base";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { ICrossSigningKey } from "../../client";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. Partial localStorage backed storage for e2e.
@@ -388,12 +387,12 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         func(keys);
     }
 
-    public getSecretStorePrivateKey<T = IEncryptedPayload>(
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: unknown,
-        func: (key: T | null) => void,
-        type: string,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
     ): void {
-        const key = getJsonItem<T>(this.store, E2E_PREFIX + `ssss_cache.${type}`);
+        const key = getJsonItem<SecretStorePrivateKeys[K]>(this.store, E2E_PREFIX + `ssss_cache.${type}`);
         func(key);
     }
 
@@ -401,7 +400,11 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         setJsonItem(this.store, KEY_CROSS_SIGNING_KEYS, keys);
     }
 
-    public storeSecretStorePrivateKey<T = IEncryptedPayload>(txn: unknown, type: string, key: T): void {
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
         setJsonItem(this.store, E2E_PREFIX + `ssss_cache.${type}`, key);
     }
 
