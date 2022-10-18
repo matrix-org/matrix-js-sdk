@@ -1291,20 +1291,27 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         for (const track of stream.getTracks()) {
             const tIdx = getTransceiverIndex(SDPStreamMetadataPurpose.Usermedia, track.kind);
 
-            const oldSender = this.transceivers[tIdx].sender;
+            const oldSender = this.transceivers[tIdx]?.sender;
+            let added = false;
+            if (oldSender) {
+                try {
+                    logger.info(
+                        `Call ${this.callId} `+
+                        `Replacing track (` +
+                        `id="${track.id}", ` +
+                        `kind="${track.kind}", ` +
+                        `streamId="${stream.id}", ` +
+                        `streamPurpose="${callFeed.purpose}"` +
+                        `) to peer connection`,
+                    );
+                    await oldSender.replaceTrack(track);
+                    added = true;
+                } catch (error) {
+                    logger.warn(`replaceTrack failed: adding new transceiver instead`, error);
+                }
+            }
 
-            try {
-                logger.info(
-                    `Call ${this.callId} `+
-                    `Replacing track (` +
-                    `id="${track.id}", ` +
-                    `kind="${track.kind}", ` +
-                    `streamId="${stream.id}", ` +
-                    `streamPurpose="${callFeed.purpose}"` +
-                    `) to peer connection`,
-                );
-                await oldSender.replaceTrack(track);
-            } catch (error) {
+            if (!added) {
                 logger.info(
                     `Call ${this.callId} `+
                     `Adding track (` +

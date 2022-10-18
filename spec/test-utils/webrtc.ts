@@ -109,7 +109,7 @@ export class MockRTCPeerConnection {
     private onReadyToNegotiate: () => void;
     localDescription: RTCSessionDescription;
     signalingState: RTCSignalingState = "stable";
-    public senders: MockRTCRtpSender[] = [];
+    public transceivers: MockRTCRtpTransceiver[] = [];
 
     public static triggerAllNegotiations(): void {
         for (const inst of this.instances) {
@@ -169,12 +169,23 @@ export class MockRTCPeerConnection {
     }
     close() { }
     getStats() { return []; }
-    addTrack(track: MockMediaStreamTrack): MockRTCRtpSender {
+    addTransceiver(track: MockMediaStreamTrack): MockRTCRtpTransceiver {
         this.needsNegotiation = true;
         this.onReadyToNegotiate();
+
         const newSender = new MockRTCRtpSender(track);
-        this.senders.push(newSender);
-        return newSender;
+        const newReceiver = new MockRTCRtpReceiver(track);
+
+        const newTransceiver = new MockRTCRtpTransceiver();
+        newTransceiver.sender = newSender as unknown as RTCRtpSender;
+        newTransceiver.receiver = newReceiver as unknown as RTCRtpReceiver;
+
+        this.transceivers.push(newTransceiver);
+
+        return newTransceiver;
+    }
+    addTrack(track: MockMediaStreamTrack): MockRTCRtpSender {
+        return this.addTransceiver(track).sender as unknown as MockRTCRtpSender;
     }
 
     removeTrack() {
@@ -182,9 +193,8 @@ export class MockRTCPeerConnection {
         this.onReadyToNegotiate();
     }
 
-    getSenders(): MockRTCRtpSender[] { return this.senders; }
-
-    getTransceivers = jest.fn().mockReturnValue([]);
+    getTransceivers(): MockRTCRtpTransceiver[] { return this.transceivers; }
+    getSenders(): MockRTCRtpSender[] { return this.transceivers.map(t => t.sender as unknown as MockRTCRtpSender); }
 
     doNegotiation() {
         if (this.needsNegotiation && this.negotiationNeededListener) {
@@ -198,7 +208,17 @@ export class MockRTCRtpSender {
     constructor(public track: MockMediaStreamTrack) { }
 
     replaceTrack(track: MockMediaStreamTrack) { this.track = track; }
-    setCodecPreferences(prefs: RTCRtpCodecCapability[]): void {}
+}
+
+export class MockRTCRtpReceiver {
+    constructor(public track: MockMediaStreamTrack) { }
+}
+
+export class MockRTCRtpTransceiver {
+    public sender: RTCRtpSender;
+    public receiver: RTCRtpReceiver;
+
+    setCodecPreferences = jest.fn<void, RTCRtpCodecCapability[]>();
 }
 
 export class MockMediaStreamTrack {

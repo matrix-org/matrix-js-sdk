@@ -110,6 +110,10 @@ describe('Call', function() {
 
     const errorListener = () => {};
 
+    // XXX redefining private enum values from call
+    const userMediaAudioTcvrIdx = 0;
+    const userMediaVideoTcvrIdx = 1;
+
     beforeEach(function() {
         prevNavigator = global.navigator;
         prevDocument = global.document;
@@ -370,17 +374,14 @@ describe('Call', function() {
             ).typed(),
         );
 
-        const usermediaSenders: Array<RTCRtpSender> = (call as any).usermediaSenders;
+        // XXX: Lots of inspecting the prvate state of the call object here
+        const transceivers: Array<RTCRtpTransceiver> = (call as any).transceivers;
 
         expect(call.localUsermediaStream.id).toBe("stream");
         expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("new_audio_track");
         expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
-        expect(usermediaSenders.find((sender) => {
-            return sender?.track?.kind === "audio";
-        }).track.id).toBe("new_audio_track");
-        expect(usermediaSenders.find((sender) => {
-            return sender?.track?.kind === "video";
-        }).track.id).toBe("video_track");
+        expect(transceivers[userMediaAudioTcvrIdx].sender.track.id).toBe("new_audio_track");
+        expect(transceivers[userMediaVideoTcvrIdx].sender.track.id).toBe("video_track");
     });
 
     it("should handle upgrade to video call", async () => {
@@ -400,16 +401,13 @@ describe('Call', function() {
         // setLocalVideoMuted probably?
         await (call as any).upgradeCall(false, true);
 
-        const usermediaSenders: Array<RTCRtpSender> = (call as any).usermediaSenders;
+        // XXX: More inspecting private state of the call object
+        const transceivers: Array<RTCRtpTransceiver> = (call as any).transceivers;
 
         expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("usermedia_audio_track");
         expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("usermedia_video_track");
-        expect(usermediaSenders.find((sender) => {
-            return sender?.track?.kind === "audio";
-        }).track.id).toBe("usermedia_audio_track");
-        expect(usermediaSenders.find((sender) => {
-            return sender?.track?.kind === "video";
-        }).track.id).toBe("usermedia_video_track");
+        expect(transceivers[userMediaAudioTcvrIdx].sender.track.id).toBe("usermedia_audio_track");
+        expect(transceivers[userMediaVideoTcvrIdx].sender.track.id).toBe("usermedia_video_track");
     });
 
     it("should handle SDPStreamMetadata changes", async () => {
@@ -479,6 +477,23 @@ describe('Call', function() {
     });
 
     describe("should deduce the call type correctly", () => {
+        beforeEach(async () => {
+            // start an incoming  call, but add no feeds
+            await call.initWithInvite({
+                getContent: jest.fn().mockReturnValue({
+                    version: "1",
+                    call_id: "call_id",
+                    party_id: "remote_party_id",
+                    lifetime: CALL_LIFETIME,
+                    offer: {
+                        sdp: DUMMY_SDP,
+                    },
+                }),
+                getSender: () => "@test:foo",
+                getLocalAge: () => 1,
+            } as unknown as MatrixEvent);
+        });
+
         it("if no video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
@@ -1130,9 +1145,17 @@ describe('Call', function() {
                 headerExtensions: [],
             });
 
-            const prom = new Promise<void>(resolve => {
+            mockSendEvent.mockReset();
+            const sendNegotiatePromise = new Promise<void>(resolve => {
+                mockSendEvent.mockImplementationOnce(() => {
+                    resolve();
+                    return Promise.resolve({ event_id: "foo" });
+                });
+            });
+
+            /*const prom = new Promise<void>(resolve => {
                 const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
-                mockPeerConn.addTrack = jest.fn().mockImplementation((track: MockMediaStreamTrack) => {
+                mockPeerConn.addTransceiver = jest.fn().mockImplementation((track: MockMediaStreamTrack) => {
                     const mockSender = new MockRTCRtpSender(track);
                     mockPeerConn.getTransceivers.mockReturnValue([{
                         sender: mockSender,
@@ -1147,12 +1170,17 @@ describe('Call', function() {
 
                     return mockSender;
                 });
-            });
+            });*/
 
             await call.setScreensharingEnabled(true);
             MockRTCPeerConnection.triggerAllNegotiations();
 
-            await prom;
+            await sendNegotiatePromise;
+
+            const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+            expect(
+                mockPeerConn.transceivers[mockPeerConn.transceivers.length - 1].setCodecPreferences,
+            ).toHaveBeenCalledWith([expect.objectContaining({ mimeType: "video/somethingelse" })]);
         });
     });
 
