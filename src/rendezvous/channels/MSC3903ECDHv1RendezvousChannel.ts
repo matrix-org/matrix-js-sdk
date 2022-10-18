@@ -24,16 +24,21 @@ import {
     RendezvousTransportDetails,
     RendezvousTransport,
     RendezvousFailureReason,
-    RendezvousChannelAlgorithm,
 } from '..';
 import { encodeBase64, decodeBase64 } from '../../crypto/olmlib';
 import { crypto, subtleCrypto, TextEncoder } from '../../crypto/crypto';
 import { generateDecimalSas } from '../../crypto/verification/SASDecimal';
+import { UnstableValue } from '../../NamespacedValue';
+
+const ECDH_V1 = new UnstableValue(
+    "m.rendezvous.v1.curve25519-aes-sha256",
+    "org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256",
+);
 
 export interface ECDHv1RendezvousCode extends RendezvousCode {
     rendezvous: {
         transport: RendezvousTransportDetails;
-        algorithm: RendezvousChannelAlgorithm.ECDH_V1;
+        algorithm: typeof ECDH_V1.name;
         key: string;
     };
 }
@@ -41,7 +46,7 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
 export type MSC3903ECDHPayload = PlainTextPayload | EncryptedPayload;
 
 export interface PlainTextPayload {
-    algorithm: RendezvousChannelAlgorithm.ECDH_V1;
+    algorithm: typeof ECDH_V1.name;
     key?: string;
 }
 
@@ -91,11 +96,11 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
             throw new Error('Code already generated');
         }
 
-        await this.transport.send({ algorithm: RendezvousChannelAlgorithm.ECDH_V1 });
+        await this.transport.send({ algorithm: ECDH_V1.name });
 
         const rendezvous: ECDHv1RendezvousCode = {
             "rendezvous": {
-                algorithm: RendezvousChannelAlgorithm.ECDH_V1,
+                algorithm: ECDH_V1.name,
                 key: encodeBase64(this.ourPublicKey),
                 transport: await this.transport.details(),
             },
@@ -124,7 +129,7 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
             }
             const res = rawRes as Partial<PlainTextPayload>;
             const { key, algorithm } = res;
-            if (algorithm !== RendezvousChannelAlgorithm.ECDH_V1 || !key) {
+            if (!algorithm || !ECDH_V1.matches(algorithm) || !key) {
                 throw new RendezvousError(
                     'Unsupported algorithm: ' + algorithm,
                     RendezvousFailureReason.UnsupportedAlgorithm,
@@ -135,7 +140,7 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
         } else {
             // send our public key unencrypted
             await this.transport.send({
-                algorithm: RendezvousChannelAlgorithm.ECDH_V1,
+                algorithm: ECDH_V1.name,
                 key: encodeBase64(this.ourPublicKey),
             });
         }
@@ -146,7 +151,7 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
 
         const initiatorKey = isInitiator ? this.ourPublicKey : this.theirPublicKey!;
         const recipientKey = isInitiator ? this.theirPublicKey! : this.ourPublicKey;
-        let aesInfo = RendezvousChannelAlgorithm.ECDH_V1.toString();
+        let aesInfo = ECDH_V1.name;
         aesInfo += `|${encodeBase64(initiatorKey)}`;
         aesInfo += `|${encodeBase64(recipientKey)}`;
 
