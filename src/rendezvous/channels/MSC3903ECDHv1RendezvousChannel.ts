@@ -183,7 +183,6 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     }
 
     public async send(payload: object) {
-        console.log(JSON.stringify(payload));
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
