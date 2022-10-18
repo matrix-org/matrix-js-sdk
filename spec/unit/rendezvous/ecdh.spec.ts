@@ -145,7 +145,7 @@ describe('ECDHv1', function() {
             expect(aliceChecksum).toEqual(bobChecksum);
 
             // send a message without encryption
-            await aliceTransport.send({});
+            await aliceTransport.send({ iv: "dummy", ciphertext: "dummy" });
             expect(bob.receive()).rejects.toThrowError();
 
             await alice.cancel(RendezvousFailureReason.Unknown);
@@ -162,7 +162,7 @@ describe('ECDHv1', function() {
             const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
             await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
 
-            await bobTransport.send({ ciphertext: "foo" });
+            await bobTransport.send({ iv: "dummy", ciphertext: "dummy" });
 
             expect(alice.receive()).rejects.toThrowError();
 
