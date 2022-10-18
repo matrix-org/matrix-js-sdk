@@ -8754,15 +8754,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         baseUrl: string,
         accessToken: string,
         termsUrls: string[],
-    ): Promise<any> { // TODO: Types
+    ): Promise<{}> {
         const url = this.termsUrlForService(serviceType, baseUrl);
-        utils.encodeParams({
-            user_accepts: termsUrls,
-        }, url.searchParams);
         const headers = {
             Authorization: "Bearer " + accessToken,
         };
-        return this.http.requestOtherUrl(Method.Post, url, null, { headers });
+        return this.http.requestOtherUrl(Method.Post, url, {
+            user_accepts: termsUrls,
+        }, { headers });
     }
 
     /**

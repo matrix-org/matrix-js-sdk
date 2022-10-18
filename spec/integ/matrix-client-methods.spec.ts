@@ -1254,6 +1254,20 @@ describe("MatrixClient", function() {
         });
     });
 
+    describe("agreeToTerms", () => {
+        it("should send `user_accepts` via body of POST request", async () => {
+            const terms = ["https://vector.im/notice-1"];
+
+            httpBackend!.when("POST", "/terms").check(req => {
+                expect(req.data.user_accepts).toStrictEqual(terms);
+            }).respond(200, {});
+
+            const prom = client!.agreeToTerms(SERVICE_TYPES.IS, "https://vector.im", "at", terms);
+            await httpBackend!.flushAllExpected();
+            await prom;
+        });
+    });
+
     describe("publicRooms", () => {
         it("should use GET request if no server or filter is specified", () => {
             httpBackend!.when("GET", "/publicRooms").respond(200, {});
