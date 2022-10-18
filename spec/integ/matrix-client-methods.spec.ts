@@ -1277,7 +1277,7 @@ describe("MatrixClient", function() {
 
         it("should use GET request if only server is specified", () => {
             httpBackend!.when("GET", "/publicRooms").check(request => {
-                expect(request.queryParams.server).toBe("server1");
+                expect(request.queryParams?.server).toBe("server1");
             }).respond(200, {});
             client!.publicRooms({ server: "server1" });
             return httpBackend!.flushAllExpected();
