@@ -182,7 +182,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         };
     }
 
-    public async send(payload: object) {
+    public async send(payload: object): Promise<void> {
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
@@ -238,14 +238,14 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         return data;
     }
 
-    public async close() {
+    public async close(): Promise<void> {
         if (this.olmSAS) {
             this.olmSAS.free();
             this.olmSAS = undefined;
         }
     }
 
-    public async cancel(reason: RendezvousFailureReason) {
+    public async cancel(reason: RendezvousFailureReason): Promise<void> {
         try {
             await this.transport.cancel(reason);
         } finally {

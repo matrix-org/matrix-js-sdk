@@ -66,7 +66,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         this.fallbackRzServer = fallbackRzServer;
     }
 
-    get ready() {
+    public get ready(): boolean {
         return this._ready;
     }
 
@@ -100,7 +100,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         return this.fallbackRzServer;
     }
 
-    public async send(data: object) {
+    public async send(data: object): Promise<void> {
         if (this.cancelled) {
             return;
         }
@@ -176,7 +176,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         }
     }
 
-    public async cancel(reason: RendezvousFailureReason) {
+    public async cancel(reason: RendezvousFailureReason): Promise<void> {
         if (reason === RendezvousFailureReason.Unknown &&
             this.expiresAt && this.expiresAt.getTime() < Date.now()) {
             reason = RendezvousFailureReason.Expired;

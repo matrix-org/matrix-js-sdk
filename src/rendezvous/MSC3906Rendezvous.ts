@@ -174,7 +174,7 @@ export class MSC3906Rendezvous {
         return deviceId;
     }
 
-    private async verifyAndCrossSignDevice(deviceInfo: DeviceInfo) {
+    private async verifyAndCrossSignDevice(deviceInfo: DeviceInfo): Promise<CrossSigningInfo | DeviceInfo> {
         if (!this.client.crypto) {
             throw new Error('Crypto not available on client');
         }
@@ -258,12 +258,12 @@ export class MSC3906Rendezvous {
         throw new Error('Device not online within timeout');
     }
 
-    public async cancel(reason: RendezvousFailureReason) {
+    public async cancel(reason: RendezvousFailureReason): Promise<void> {
         this.onFailure?.(reason);
         await this.channel.cancel(reason);
     }
 
-    public async close() {
+    public async close(): Promise<void> {
         await this.channel.close();
     }
 }
