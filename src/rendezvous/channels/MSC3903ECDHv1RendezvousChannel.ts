@@ -38,11 +38,16 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
     };
 }
 
-export interface MSC3903ECDHPayload {
-    algorithm?: RendezvousChannelAlgorithm.ECDH_V1;
+export type MSC3903ECDHPayload = PlainTextPayload | EncryptedPayload;
+
+export interface PlainTextPayload {
+    algorithm: RendezvousChannelAlgorithm.ECDH_V1;
     key?: string;
-    iv?: string;
-    ciphertext?: string;
+}
+
+export interface EncryptedPayload {
+    iv: string;
+    ciphertext: string;
 }
 
 async function importKey(key: Uint8Array): Promise<CryptoKey> {
@@ -113,12 +118,12 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
 
         if (isInitiator) {
             // wait for the other side to send us their public key
-            const res = await this.transport.receive();
-            if (!res) {
+            const rawRes = await this.transport.receive();
+            if (!rawRes) {
                 throw new Error('No response from other device');
             }
+            const res = rawRes as Partial<PlainTextPayload>;
             const { key, algorithm } = res;
-
             if (algorithm !== RendezvousChannelAlgorithm.ECDH_V1 || !key) {
                 throw new RendezvousError(
                     'Unsupported algorithm: ' + algorithm,
@@ -194,7 +199,7 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
         return this.transport.send((await this.encrypt(payload)));
     }
 
-    private async decrypt({ iv, ciphertext }: MSC3903ECDHPayload): Promise<Partial<T>> {
+    private async decrypt({ iv, ciphertext }: EncryptedPayload): Promise<Partial<T>> {
         if (!ciphertext || !iv) {
             throw new Error('Missing ciphertext and/or iv');
         }
@@ -226,13 +231,13 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
             throw new Error('Shared secret not set up');
         }
 
-        const data = await this.transport.receive();
-        if (!data) {
+        const rawData = await this.transport.receive();
+        if (!rawData) {
             return undefined;
         }
-
-        if (data.ciphertext) {
-            return this.decrypt(data);
+        const data = rawData as Partial<EncryptedPayload>;
+        if (data.ciphertext && data.iv) {
+            return this.decrypt(data as EncryptedPayload);
         }
 
         throw new Error('Data received but no ciphertext');
