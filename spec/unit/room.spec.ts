@@ -2649,8 +2649,8 @@ describe("Room", function() {
 
             room.resetThreadUnreadNotificationCount(["123"]);
 
-            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(0);
-            expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(123);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(666);
+            expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(0);
         });
     });
 
