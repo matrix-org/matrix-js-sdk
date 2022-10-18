@@ -36,6 +36,7 @@ import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
 import { MatrixEvent } from "../../models/event";
+import { EventType, MsgType } from '../../@types/event';
 import { IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
 import { RoomKeyRequestState } from '../OutgoingRoomKeyRequestManager';
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
@@ -1019,7 +1020,12 @@ class MegolmEncryption extends EncryptionAlgorithm {
             }
         }
 
-        const [devicesInRoom, blocked] = await this.getDevicesInRoom(room);
+        /**
+         * When using in-room messages and the room has encryption enabled,
+         * clients should ensure that encryption does not hinder the verification.
+         */
+        const forceDistributeToUnverified = this.isVerificationEvent(eventType, content);
+        const [devicesInRoom, blocked] = await this.getDevicesInRoom(room, forceDistributeToUnverified);
 
         // check if any of these devices are not yet known to the user.
         // if so, warn the user so they can verify or ignore.
@@ -1051,6 +1057,26 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         session.useCount++;
         return encryptedContent;
+    }
+
+    private isVerificationEvent(eventType: string, content: object): boolean {
+        switch (eventType) {
+            case EventType.KeyVerificationCancel:
+            case EventType.KeyVerificationDone:
+            case EventType.KeyVerificationMac:
+            case EventType.KeyVerificationStart:
+            case EventType.KeyVerificationKey:
+            case EventType.KeyVerificationReady:
+            case EventType.KeyVerificationAccept: {
+                return true;
+            }
+            case EventType.RoomMessage: {
+                return content['msgtype'] === MsgType.KeyVerificationRequest;
+            }
+            default: {
+                return false;
+            }
+        }
     }
 
     /**
@@ -1119,6 +1145,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * Get the list of unblocked devices for all users in the room
      *
      * @param {module:models/room} room
+     * @param forceDistributeToUnverified if set to true will include the unverified devices
+     * even if setting is set to block them (useful for verification)
      *
      * @return {Promise} Promise which resolves to an array whose
      *     first element is a map from userId to deviceId to deviceInfo indicating
@@ -1126,7 +1154,10 @@ class MegolmEncryption extends EncryptionAlgorithm {
      *     element is a map from userId to deviceId to data indicating the devices
      *     that are in the room but that have been blocked
      */
-    private async getDevicesInRoom(room: Room): Promise<[DeviceInfoMap, IBlockedMap]> {
+    private async getDevicesInRoom(
+        room: Room,
+        forceDistributeToUnverified = false,
+    ): Promise<[DeviceInfoMap, IBlockedMap]> {
         const members = await room.getEncryptionTargetMembers();
         const roomMembers = members.map(function(u) {
             return u.userId;
@@ -1161,7 +1192,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 const deviceTrust = this.crypto.checkDeviceTrust(userId, deviceId);
 
                 if (userDevices[deviceId].isBlocked() ||
-                    (!deviceTrust.isVerified() && isBlacklisting)
+                    (!deviceTrust.isVerified() && isBlacklisting && !forceDistributeToUnverified)
                 ) {
                     if (!blocked[userId]) {
                         blocked[userId] = {};

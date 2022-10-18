@@ -32,13 +32,14 @@ import {
 } from './Error';
 import { logger } from '../../logger';
 import { IContent, MatrixEvent } from "../../models/event";
+import { EventType } from '../../@types/event';
 
-const START_TYPE = "m.key.verification.start";
+const START_TYPE = EventType.KeyVerificationStart;
 
 const EVENTS = [
-    "m.key.verification.accept",
-    "m.key.verification.key",
-    "m.key.verification.mac",
+    EventType.KeyVerificationAccept,
+    EventType.KeyVerificationKey,
+    EventType.KeyVerificationMac,
 ];
 
 let olmutil: Utility;
@@ -310,6 +311,45 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         return startContent;
     }
 
+    private async verifyAndCheckMAC(
+        keyAgreement: string,
+        sasMethods: string[],
+        olmSAS: OlmSAS,
+        macMethod: string,
+    ): Promise<void> {
+        const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
+        const verifySAS = new Promise<void>((resolve, reject) => {
+            this.sasEvent = {
+                sas: generateSas(sasBytes, sasMethods),
+                confirm: async () => {
+                    try {
+                        await this.sendMAC(olmSAS, macMethod);
+                        resolve();
+                    } catch (err) {
+                        reject(err);
+                    }
+                },
+                cancel: () => reject(newUserCancelledError()),
+                mismatch: () => reject(newMismatchedSASError()),
+            };
+            this.emit(SasEvent.ShowSas, this.sasEvent);
+        });
+
+        const [e] = await Promise.all([
+            this.waitForEvent(EventType.KeyVerificationMac)
+                .then((e) => {
+                    // we don't expect any more messages from the other
+                    // party, and they may send a m.key.verification.done
+                    // when they're done on their end
+                    this.expectedEvent = EventType.KeyVerificationDone;
+                    return e;
+                }),
+            verifySAS,
+        ]);
+        const content = e.getContent();
+        await this.checkMAC(olmSAS, content, macMethod);
+    }
+
     private async doSendVerification(): Promise<void> {
         this.waitingForAccept = true;
         let startContent;
@@ -329,7 +369,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
 
         let e;
         try {
-            e = await this.waitForEvent("m.key.verification.accept");
+            e = await this.waitForEvent(EventType.KeyVerificationAccept);
         } finally {
             this.waitingForAccept = false;
         }
@@ -351,11 +391,11 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         const olmSAS = new global.Olm.SAS();
         try {
             this.ourSASPubKey = olmSAS.get_pubkey();
-            await this.send("m.key.verification.key", {
+            await this.send(EventType.KeyVerificationKey, {
                 key: this.ourSASPubKey,
             });
 
-            e = await this.waitForEvent("m.key.verification.key");
+            e = await this.waitForEvent(EventType.KeyVerificationKey);
             // FIXME: make sure event is properly formed
             content = e.getContent();
             const commitmentStr = content.key + anotherjson.stringify(startContent);
@@ -366,37 +406,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             this.theirSASPubKey = content.key;
             olmSAS.set_their_key(content.key);
 
-            const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
-            const verifySAS = new Promise<void>((resolve, reject) => {
-                this.sasEvent = {
-                    sas: generateSas(sasBytes, sasMethods),
-                    confirm: async () => {
-                        try {
-                            await this.sendMAC(olmSAS, macMethod);
-                            resolve();
-                        } catch (err) {
-                            reject(err);
-                        }
-                    },
-                    cancel: () => reject(newUserCancelledError()),
-                    mismatch: () => reject(newMismatchedSASError()),
-                };
-                this.emit(SasEvent.ShowSas, this.sasEvent);
-            });
-
-            [e] = await Promise.all([
-                this.waitForEvent("m.key.verification.mac")
-                    .then((e) => {
-                        // we don't expect any more messages from the other
-                        // party, and they may send a m.key.verification.done
-                        // when they're done on their end
-                        this.expectedEvent = "m.key.verification.done";
-                        return e;
-                    }),
-                verifySAS,
-            ]);
-            content = e.getContent();
-            await this.checkMAC(olmSAS, content, macMethod);
+            await this.verifyAndCheckMAC(keyAgreement, sasMethods, olmSAS, macMethod);
         } finally {
             olmSAS.free();
         }
@@ -423,7 +433,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         const olmSAS = new global.Olm.SAS();
         try {
             const commitmentStr = olmSAS.get_pubkey() + anotherjson.stringify(content);
-            await this.send("m.key.verification.accept", {
+            await this.send(EventType.KeyVerificationAccept, {
                 key_agreement_protocol: keyAgreement,
                 hash: hashMethod,
                 message_authentication_code: macMethod,
@@ -432,47 +442,17 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
                 commitment: olmutil.sha256(commitmentStr),
             });
 
-            let e = await this.waitForEvent("m.key.verification.key");
+            const e = await this.waitForEvent(EventType.KeyVerificationKey);
             // FIXME: make sure event is properly formed
             content = e.getContent();
             this.theirSASPubKey = content.key;
             olmSAS.set_their_key(content.key);
             this.ourSASPubKey = olmSAS.get_pubkey();
-            await this.send("m.key.verification.key", {
+            await this.send(EventType.KeyVerificationKey, {
                 key: this.ourSASPubKey,
             });
 
-            const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
-            const verifySAS = new Promise<void>((resolve, reject) => {
-                this.sasEvent = {
-                    sas: generateSas(sasBytes, sasMethods),
-                    confirm: async () => {
-                        try {
-                            await this.sendMAC(olmSAS, macMethod);
-                            resolve();
-                        } catch (err) {
-                            reject(err);
-                        }
-                    },
-                    cancel: () => reject(newUserCancelledError()),
-                    mismatch: () => reject(newMismatchedSASError()),
-                };
-                this.emit(SasEvent.ShowSas, this.sasEvent);
-            });
-
-            [e] = await Promise.all([
-                this.waitForEvent("m.key.verification.mac")
-                    .then((e) => {
-                        // we don't expect any more messages from the other
-                        // party, and they may send a m.key.verification.done
-                        // when they're done on their end
-                        this.expectedEvent = "m.key.verification.done";
-                        return e;
-                    }),
-                verifySAS,
-            ]);
-            content = e.getContent();
-            await this.checkMAC(olmSAS, content, macMethod);
+            await this.verifyAndCheckMAC(keyAgreement, sasMethods, olmSAS, macMethod);
         } finally {
             olmSAS.free();
         }
@@ -480,7 +460,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
 
     private sendMAC(olmSAS: OlmSAS, method: string): Promise<void> {
         const mac = {};
-        const keyList = [];
+        const keyList: string[] = [];
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this.baseApis.getUserId() + this.baseApis.deviceId
               + this.userId + this.deviceId
@@ -507,7 +487,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             keyList.sort().join(","),
             baseInfo + "KEY_IDS",
         );
-        return this.send("m.key.verification.mac", { mac, keys });
+        return this.send(EventType.KeyVerificationMac, { mac, keys });
     }
 
     private async checkMAC(olmSAS: OlmSAS, content: IContent, method: string): Promise<void> {

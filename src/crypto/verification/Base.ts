@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import { MatrixEvent } from '../../models/event';
+import { EventType } from '../../@types/event';
 import { logger } from '../../logger';
 import { DeviceInfo } from '../deviceinfo';
 import { newTimeoutError } from "./Error";
@@ -182,13 +183,13 @@ export class VerificationBase<
         } else if (e.getType() === this.expectedEvent) {
             // if we receive an expected m.key.verification.done, then just
             // ignore it, since we don't need to do anything about it
-            if (this.expectedEvent !== "m.key.verification.done") {
+            if (this.expectedEvent !== EventType.KeyVerificationDone) {
                 this.expectedEvent = undefined;
                 this.rejectEvent = undefined;
                 this.resetTimer();
                 this.resolveEvent(e);
             }
-        } else if (e.getType() === "m.key.verification.cancel") {
+        } else if (e.getType() === EventType.KeyVerificationCancel) {
             const reject = this.reject;
             this.reject = undefined;
             // there is only promise to reject if verify has been called
@@ -241,20 +242,20 @@ export class VerificationBase<
                     const sender = e.getSender();
                     if (sender !== this.userId) {
                         const content = e.getContent();
-                        if (e.getType() === "m.key.verification.cancel") {
+                        if (e.getType() === EventType.KeyVerificationCancel) {
                             content.code = content.code || "m.unknown";
                             content.reason = content.reason || content.body
                                 || "Unknown reason";
-                            this.send("m.key.verification.cancel", content);
+                            this.send(EventType.KeyVerificationCancel, content);
                         } else {
-                            this.send("m.key.verification.cancel", {
+                            this.send(EventType.KeyVerificationCancel, {
                                 code: "m.unknown",
                                 reason: content.body || "Unknown reason",
                             });
                         }
                     }
                 } else {
-                    this.send("m.key.verification.cancel", {
+                    this.send(EventType.KeyVerificationCancel, {
                         code: "m.unknown",
                         reason: e.toString(),
                     });
