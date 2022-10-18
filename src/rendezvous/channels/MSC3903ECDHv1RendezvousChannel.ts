@@ -70,6 +70,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     private olmSAS?: SAS;
     private ourPublicKey: Uint8Array;
     private aesKey?: CryptoKey;
+    private connected = false;
 
     public constructor(
         public transport: RendezvousTransport,
@@ -100,6 +101,10 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     }
 
     public async connect(): Promise<string> {
+        if (this.connected) {
+            throw new Error('Channel already connected');
+        }
+
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
@@ -129,6 +134,8 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
                 key: encodeBase64(this.ourPublicKey),
             });
         }
+
+        this.connected = true;
 
         this.olmSAS.set_their_key(encodeBase64(this.theirPublicKey!));
 
@@ -176,6 +183,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
     }
 
     public async send(payload: object) {
+        console.log(JSON.stringify(payload));
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
