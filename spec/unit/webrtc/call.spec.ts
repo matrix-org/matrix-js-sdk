@@ -41,7 +41,6 @@ import {
     installWebRTCMocks,
     MockRTCPeerConnection,
     SCREENSHARE_STREAM_ID,
-    MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
