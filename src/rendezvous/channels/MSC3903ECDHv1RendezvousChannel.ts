@@ -38,7 +38,7 @@ const ECDH_V1 = new UnstableValue(
 export interface ECDHv1RendezvousCode extends RendezvousCode {
     rendezvous: {
         transport: RendezvousTransportDetails;
-        algorithm: typeof ECDH_V1.name;
+        algorithm: typeof ECDH_V1.name | typeof ECDH_V1.altName;
         key: string;
     };
 }
@@ -46,7 +46,7 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
 export type MSC3903ECDHPayload = PlainTextPayload | EncryptedPayload;
 
 export interface PlainTextPayload {
-    algorithm: typeof ECDH_V1.name;
+    algorithm: typeof ECDH_V1.name | typeof ECDH_V1.altName;
     key?: string;
 }
 
