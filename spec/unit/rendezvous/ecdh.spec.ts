@@ -16,9 +16,13 @@ limitations under the License.
 
 import '../../olm-loader';
 import { RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
-import { MSC3903ECDHv1RendezvousChannel } from '../../../src/rendezvous/channels';
+import { MSC3903ECDHPayload, MSC3903ECDHv1RendezvousChannel } from '../../../src/rendezvous/channels';
 import { decodeBase64 } from '../../../src/crypto/olmlib';
 import { DummyTransport } from './DummyTransport';
+
+function makeTransport(name: string) {
+    return new DummyTransport<any, MSC3903ECDHPayload>(name, { type: 'dummy' });
+}
 
 describe('ECDHv1', function() {
     beforeAll(async function() {
@@ -27,8 +31,8 @@ describe('ECDHv1', function() {
 
     describe('with crypto', () => {
         it("initiator wants to sign in", async function() {
-            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            const aliceTransport = makeTransport('Alice');
+            const bobTransport = makeTransport('Bob');
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -52,8 +56,8 @@ describe('ECDHv1', function() {
         });
 
         it("initiator wants to reciprocate", async function() {
-            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            const aliceTransport = makeTransport('Alice');
+            const bobTransport = makeTransport('Bob');
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -77,8 +81,8 @@ describe('ECDHv1', function() {
         });
 
         it("double connect", async function() {
-            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            const aliceTransport = makeTransport('Alice');
+            const bobTransport = makeTransport('Bob');
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -99,8 +103,8 @@ describe('ECDHv1', function() {
         });
 
         it("closed", async function() {
-            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            const aliceTransport = makeTransport('Alice');
+            const bobTransport = makeTransport('Bob');
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -125,8 +129,8 @@ describe('ECDHv1', function() {
         });
 
         it("require ciphertext", async function() {
-            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            const aliceTransport = makeTransport('Alice');
+            const bobTransport = makeTransport('Bob');
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -149,8 +153,8 @@ describe('ECDHv1', function() {
         });
 
         it("ciphertext before set up", async function() {
-            const aliceTransport = new DummyTransport('Alice', { type: 'dummy' });
-            const bobTransport = new DummyTransport('Bob', { type: 'dummy' });
+            const aliceTransport = makeTransport('Alice');
+            const bobTransport = makeTransport('Bob');
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 

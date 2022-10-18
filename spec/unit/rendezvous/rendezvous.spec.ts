@@ -17,8 +17,17 @@ limitations under the License.
 import MockHttpBackend from "matrix-mock-request";
 
 import '../../olm-loader';
-import { MSC3906Rendezvous, RendezvousCode, RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
-import { ECDHv1RendezvousCode, MSC3903ECDHv1RendezvousChannel } from "../../../src/rendezvous/channels";
+import {
+    MSC3906Rendezvous,
+    RendezvousCode,
+    RendezvousFailureReason,
+    RendezvousIntent,
+} from "../../../src/rendezvous";
+import {
+    ECDHv1RendezvousCode,
+    MSC3903ECDHPayload,
+    MSC3903ECDHv1RendezvousChannel,
+} from "../../../src/rendezvous/channels";
 import { MatrixClient } from "../../../src";
 import {
     MSC3886SimpleHttpRendezvousTransport,
@@ -68,6 +77,10 @@ function makeMockClient(opts: {
     } as unknown as MatrixClient;
 }
 
+function makeTransport(name: string, uri = 'https://test.rz/123456') {
+    return new DummyTransport<any, MSC3903ECDHPayload>(name, { type: 'http.v1', uri });
+}
+
 describe("Rendezvous", function() {
     beforeAll(async function() {
         await global.Olm.init();
@@ -75,7 +88,7 @@ describe("Rendezvous", function() {
 
     let httpBackend: MockHttpBackend;
     let fetchFn: typeof global.fetchFn;
-    let transports: DummyTransport<any>[];
+    let transports: DummyTransport<any, MSC3903ECDHPayload>[];
 
     beforeEach(function() {
         httpBackend = new MockHttpBackend();
@@ -148,8 +161,8 @@ describe("Rendezvous", function() {
     });
 
     it("no protocols", async function() {
-        const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
-        const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+        const aliceTransport = makeTransport('Alice');
+        const bobTransport = makeTransport('Bob', 'https://test.rz/999999');
         transports.push(aliceTransport, bobTransport);
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
@@ -202,8 +215,8 @@ describe("Rendezvous", function() {
     });
 
     it("new device declines protocol", async function() {
-        const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
-        const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+        const aliceTransport = makeTransport('Alice', 'https://test.rz/123456');
+        const bobTransport = makeTransport('Bob', 'https://test.rz/999999');
         transports.push(aliceTransport, bobTransport);
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
@@ -260,8 +273,8 @@ describe("Rendezvous", function() {
     });
 
     it("new device declines protocol", async function() {
-        const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
-        const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+        const aliceTransport = makeTransport('Alice', 'https://test.rz/123456');
+        const bobTransport = makeTransport('Bob', 'https://test.rz/999999');
         transports.push(aliceTransport, bobTransport);
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
@@ -318,8 +331,8 @@ describe("Rendezvous", function() {
     });
 
     it("decline on existing device", async function() {
-        const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
-        const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+        const aliceTransport = makeTransport('Alice', 'https://test.rz/123456');
+        const bobTransport = makeTransport('Bob', 'https://test.rz/999999');
         transports.push(aliceTransport, bobTransport);
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
@@ -378,8 +391,8 @@ describe("Rendezvous", function() {
     });
 
     it("approve on existing device + no verification", async function() {
-        const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
-        const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+        const aliceTransport = makeTransport('Alice', 'https://test.rz/123456');
+        const bobTransport = makeTransport('Bob', 'https://test.rz/999999');
         transports.push(aliceTransport, bobTransport);
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;
@@ -445,8 +458,8 @@ describe("Rendezvous", function() {
     });
 
     async function completeLogin(devices: Record<string, Partial<DeviceInfo>>) {
-        const aliceTransport = new DummyTransport('Alice', { type: 'http.v1', uri: 'https://test.rz/123456' });
-        const bobTransport = new DummyTransport('Bob', { type: 'http.v1', uri: 'https://test.rz/999999' });
+        const aliceTransport = makeTransport('Alice', 'https://test.rz/123456');
+        const bobTransport = makeTransport('Bob', 'https://test.rz/999999');
         transports.push(aliceTransport, bobTransport);
         aliceTransport.otherParty = bobTransport;
         bobTransport.otherParty = aliceTransport;

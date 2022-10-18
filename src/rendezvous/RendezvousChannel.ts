@@ -16,13 +16,11 @@ limitations under the License.
 
 import {
     RendezvousCode,
-    RendezvousTransport,
     RendezvousIntent,
     RendezvousFailureReason,
 } from ".";
 
-export interface RendezvousChannel {
-    transport: RendezvousTransport;
+export interface RendezvousChannel<T> {
     /**
      * @returns the checksum/confirmation digits to be shown to the user
      */
@@ -32,13 +30,13 @@ export interface RendezvousChannel {
      * Send a payload via the channel.
      * @param data payload to send
      */
-    send(data: object): Promise<void>;
+    send(data: T): Promise<void>;
 
     /**
      * Receive a payload from the channel.
      * @returns the received payload
      */
-    receive(): Promise<object | undefined>;
+    receive(): Promise<Partial<T> | undefined>;
 
     /**
      * Close the channel and clear up any resources.

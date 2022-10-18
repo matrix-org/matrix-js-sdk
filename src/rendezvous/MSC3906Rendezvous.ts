@@ -39,7 +39,7 @@ enum Outcome {
     Unsupported = 'unsupported',
 }
 
-interface RendezvousPayload {
+export interface MSC3906RendezvousPayload {
     type: PayloadType;
     intent?: RendezvousIntent;
     outcome?: Outcome;
@@ -73,7 +73,7 @@ export class MSC3906Rendezvous {
      * @param onFailure Callback for when the rendezvous fails
      */
     public constructor(
-        private channel: RendezvousChannel,
+        private channel: RendezvousChannel<MSC3906RendezvousPayload>,
         private client: MatrixClient,
         public onFailure?: RendezvousFailureListener,
     ) {}
@@ -140,11 +140,11 @@ export class MSC3906Rendezvous {
         return checksum;
     }
 
-    private async receive(): Promise<RendezvousPayload> {
-        return await this.channel.receive() as RendezvousPayload;
+    private async receive(): Promise<MSC3906RendezvousPayload> {
+        return await this.channel.receive() as MSC3906RendezvousPayload;
     }
 
-    private async send(payload: RendezvousPayload) {
+    private async send(payload: MSC3906RendezvousPayload) {
         await this.channel.send(payload);
     }
 

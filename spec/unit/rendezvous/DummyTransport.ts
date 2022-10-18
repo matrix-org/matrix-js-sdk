@@ -23,23 +23,23 @@ import {
 } from "../../../src/rendezvous";
 import { sleep } from '../../../src/utils';
 
-export class DummyTransport<T extends RendezvousTransportDetails> implements RendezvousTransport {
-    otherParty?: DummyTransport<T>;
+export class DummyTransport<D extends RendezvousTransportDetails, T> implements RendezvousTransport<T> {
+    otherParty?: DummyTransport<D, T>;
     etag?: string;
     lastEtagReceived?: string;
-    data: object = {};
+    data: T | undefined;
 
     ready = false;
     cancelled = false;
 
-    constructor(private name: string, private mockDetails: T) {}
+    constructor(private name: string, private mockDetails: D) {}
     onCancelled?: RendezvousFailureListener;
 
     details(): Promise<RendezvousTransportDetails> {
         return Promise.resolve(this.mockDetails);
     }
 
-    async send(data: object): Promise<void> {
+    async send(data: T): Promise<void> {
         logger.info(
             `[${this.name}] => [${this.otherParty?.name}] Attempting to send data: ${
                 JSON.stringify(data)} where etag matches ${this.etag}`,
@@ -60,7 +60,7 @@ export class DummyTransport<T extends RendezvousTransportDetails> implements Ren
         }
     }
 
-    async receive(): Promise<object> {
+    async receive(): Promise<T | undefined> {
         logger.info(`[${this.name}] Attempting to receive where etag is after ${this.lastEtagReceived}`);
         // eslint-disable-next-line no-constant-condition
         while (!this.cancelled) {
@@ -77,7 +77,7 @@ export class DummyTransport<T extends RendezvousTransportDetails> implements Ren
             await sleep(250);
         }
 
-        return {};
+        return undefined;
     }
 
     cancel(reason: RendezvousFailureReason): Promise<void> {

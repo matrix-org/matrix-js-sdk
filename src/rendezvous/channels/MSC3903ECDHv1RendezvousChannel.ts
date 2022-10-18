@@ -38,7 +38,7 @@ export interface ECDHv1RendezvousCode extends RendezvousCode {
     };
 }
 
-interface ECDHPayload {
+export interface MSC3903ECDHPayload {
     algorithm?: RendezvousChannelAlgorithm.ECDH_V1;
     key?: string;
     iv?: string;
@@ -66,14 +66,14 @@ async function importKey(key: Uint8Array): Promise<CryptoKey> {
  * X25519/ECDH key agreement based secure rendezvous channel.
  * Note that this is UNSTABLE and may have breaking changes without notice.
  */
-export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
+export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
     private olmSAS?: SAS;
     private ourPublicKey: Uint8Array;
     private aesKey?: CryptoKey;
     private connected = false;
 
     public constructor(
-        public transport: RendezvousTransport,
+        private transport: RendezvousTransport<MSC3903ECDHPayload>,
         private theirPublicKey?: Uint8Array,
         public onFailure?: (reason: RendezvousFailureReason) => void,
     ) {
@@ -86,7 +86,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
             throw new Error('Code already generated');
         }
 
-        await this.send({ algorithm: RendezvousChannelAlgorithm.ECDH_V1 });
+        await this.transport.send({ algorithm: RendezvousChannelAlgorithm.ECDH_V1 });
 
         const rendezvous: ECDHv1RendezvousCode = {
             "rendezvous": {
@@ -113,7 +113,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
 
         if (isInitiator) {
             // wait for the other side to send us their public key
-            const res = await this.receive() as ECDHPayload | undefined;
+            const res = await this.transport.receive();
             if (!res) {
                 throw new Error('No response from other device');
             }
@@ -129,7 +129,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
             this.theirPublicKey = decodeBase64(key);
         } else {
             // send our public key unencrypted
-            await this.send({
+            await this.transport.send({
                 algorithm: RendezvousChannelAlgorithm.ECDH_V1,
                 key: encodeBase64(this.ourPublicKey),
             });
@@ -156,7 +156,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         return generateDecimalSas(Array.from(rawChecksum)).join('-');
     }
 
-    private async encrypt(data: string): Promise<ECDHPayload> {
+    private async encrypt(data: T): Promise<MSC3903ECDHPayload> {
         if (!subtleCrypto) {
             throw new Error('Web Crypto is not available');
         }
@@ -164,7 +164,7 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         const iv = new Uint8Array(32);
         crypto.getRandomValues(iv);
 
-        const encodedData = new TextEncoder().encode(data);
+        const encodedData = new TextEncoder().encode(JSON.stringify(data));
 
         const ciphertext = await subtleCrypto.encrypt(
             {
@@ -182,17 +182,19 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         };
     }
 
-    public async send(payload: object): Promise<void> {
+    public async send(payload: T): Promise<void> {
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
 
-        const data = this.aesKey ? await this.encrypt(JSON.stringify(payload)) : payload;
+        if (!this.aesKey) {
+            throw new Error('Shared secret not set up');
+        }
 
-        await this.transport.send(data);
+        return this.transport.send((await this.encrypt(payload)));
     }
 
-    private async decrypt({ iv, ciphertext }: ECDHPayload): Promise<ECDHPayload> {
+    private async decrypt({ iv, ciphertext }: MSC3903ECDHPayload): Promise<Partial<T>> {
         if (!ciphertext || !iv) {
             throw new Error('Missing ciphertext and/or iv');
         }
@@ -216,26 +218,24 @@ export class MSC3903ECDHv1RendezvousChannel implements RendezvousChannel {
         return JSON.parse(new TextDecoder().decode(new Uint8Array(plaintext)));
     }
 
-    public async receive(): Promise<object | undefined> {
+    public async receive(): Promise<Partial<T> | undefined> {
         if (!this.olmSAS) {
             throw new Error('Channel closed');
         }
+        if (!this.aesKey) {
+            throw new Error('Shared secret not set up');
+        }
 
-        const data = await this.transport.receive() as ECDHPayload | undefined;
+        const data = await this.transport.receive();
         if (!data) {
             return undefined;
         }
 
         if (data.ciphertext) {
-            if (!this.aesKey) {
-                throw new Error('Shared secret not set up');
-            }
             return this.decrypt(data);
-        } else if (this.aesKey) {
-            throw new Error('Data received but no ciphertext');
         }
 
-        return data;
+        throw new Error('Data received but no ciphertext');
     }
 
     public async close(): Promise<void> {

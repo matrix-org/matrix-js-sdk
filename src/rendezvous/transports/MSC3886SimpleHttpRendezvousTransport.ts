@@ -38,7 +38,7 @@ export interface MSC3886SimpleHttpRendezvousTransportDetails extends RendezvousT
  * simple HTTP rendezvous protocol.
  * Note that this is UNSTABLE and may have breaking changes without notice.
  */
-export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport {
+export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements RendezvousTransport<T> {
     private uri?: string;
     private etag?: string;
     private expiresAt?: Date;
@@ -100,7 +100,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         return this.fallbackRzServer;
     }
 
-    public async send(data: object): Promise<void> {
+    public async send(data: T): Promise<void> {
         if (this.cancelled) {
             return;
         }
@@ -143,7 +143,7 @@ export class MSC3886SimpleHttpRendezvousTransport implements RendezvousTransport
         }
     }
 
-    public async receive(): Promise<object | undefined> {
+    public async receive(): Promise<Partial<T> | undefined> {
         if (!this.uri) {
             throw new Error('Rendezvous not set up');
         }

@@ -23,7 +23,7 @@ export interface RendezvousTransportDetails {
 /**
  * Interface representing a generic rendezvous transport.
  */
-export interface RendezvousTransport {
+export interface RendezvousTransport<T> {
   /**
    * Ready state of the transport. This is set to true when the transport is ready to be used.
    */
@@ -43,12 +43,12 @@ export interface RendezvousTransport {
    * Send data via the transport.
    * @param data the data itself
    */
-  send(data: object): Promise<void>;
+  send(data: T): Promise<void>;
 
   /**
    * Receive data from the transport.
    */
-  receive(): Promise<object | undefined>;
+  receive(): Promise<Partial<T> | undefined>;
 
   /**
    * Cancel the rendezvous. This will call `onCancelled()` if it is set.
