@@ -1296,6 +1296,30 @@ describe("MatrixClient", function() {
             expect(client.http.opts.accessToken).toBe(token);
         });
     });
+
+    describe("registerWithIdentityServer", () => {
+        it("should pass data to POST request", async () => {
+            const token = {
+                access_token: "access_token",
+                token_type: "Bearer",
+                matrix_server_name: "server_name",
+                expires_in: 12345,
+            };
+
+            httpBackend!.when("POST", "/account/register").check(req => {
+                expect(req.data).toStrictEqual(token);
+            }).respond(200, {
+                access_token: "at",
+                token: "tt",
+            });
+
+            const prom = client!.registerWithIdentityServer(token);
+            await httpBackend!.flushAllExpected();
+            const resp = await prom;
+            expect(resp.access_token).toBe("at");
+            expect(resp.token).toBe("tt");
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
