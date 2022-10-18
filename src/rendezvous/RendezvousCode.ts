@@ -14,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RendezvousChannelAlgorithm, RendezvousTransportDetails, RendezvousIntent } from ".";
+import { RendezvousTransportDetails, RendezvousIntent } from ".";
 
 export interface RendezvousCode {
     intent: RendezvousIntent;
     rendezvous?: {
         transport: RendezvousTransportDetails;
-        algorithm: RendezvousChannelAlgorithm;
+        algorithm: string;
     };
 }
