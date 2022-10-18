@@ -1254,6 +1254,20 @@ describe("MatrixClient", function() {
         });
     });
 
+    describe("agreeToTerms", () => {
+        it("should send `user_accepts` via body of POST request", async () => {
+            const terms = ["https://vector.im/notice-1"];
+
+            httpBackend!.when("POST", "/terms").check(req => {
+                expect(req.data.user_accepts).toStrictEqual(terms);
+            }).respond(200, {});
+
+            const prom = client!.agreeToTerms(SERVICE_TYPES.IS, "https://vector.im", "at", terms);
+            await httpBackend!.flushAllExpected();
+            await prom;
+        });
+    });
+
     describe("publicRooms", () => {
         it("should use GET request if no server or filter is specified", () => {
             httpBackend!.when("GET", "/publicRooms").respond(200, {});
@@ -1263,7 +1277,7 @@ describe("MatrixClient", function() {
 
         it("should use GET request if only server is specified", () => {
             httpBackend!.when("GET", "/publicRooms").check(request => {
-                expect(request.queryParams.server).toBe("server1");
+                expect(request.queryParams?.server).toBe("server1");
             }).respond(200, {});
             client!.publicRooms({ server: "server1" });
             return httpBackend!.flushAllExpected();
@@ -1294,6 +1308,30 @@ describe("MatrixClient", function() {
             expect(resp.user_id).toBe(userId);
             expect(client.getUserId()).toBe(userId);
             expect(client.http.opts.accessToken).toBe(token);
+        });
+    });
+
+    describe("registerWithIdentityServer", () => {
+        it("should pass data to POST request", async () => {
+            const token = {
+                access_token: "access_token",
+                token_type: "Bearer",
+                matrix_server_name: "server_name",
+                expires_in: 12345,
+            };
+
+            httpBackend!.when("POST", "/account/register").check(req => {
+                expect(req.data).toStrictEqual(token);
+            }).respond(200, {
+                access_token: "at",
+                token: "tt",
+            });
+
+            const prom = client!.registerWithIdentityServer(token);
+            await httpBackend!.flushAllExpected();
+            const resp = await prom;
+            expect(resp.access_token).toBe("at");
+            expect(resp.token).toBe("tt");
         });
     });
 });

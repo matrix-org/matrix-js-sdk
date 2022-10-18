@@ -8278,13 +8278,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Server access token.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public registerWithIdentityServer(hsOpenIdToken: any): Promise<any> { // TODO: Types
+    public registerWithIdentityServer(hsOpenIdToken: IOpenIDToken): Promise<{
+        access_token: string;
+        token: string;
+    }> {
         if (!this.idBaseUrl) {
             throw new Error("No identity server base URL set");
         }
 
         const uri = this.http.getUrl("/account/register", undefined, IdentityPrefix.V2, this.idBaseUrl);
-        return this.http.requestOtherUrl(Method.Post, uri, null, hsOpenIdToken);
+        return this.http.requestOtherUrl(Method.Post, uri, hsOpenIdToken);
     }
 
     /**
@@ -8751,15 +8754,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         baseUrl: string,
         accessToken: string,
         termsUrls: string[],
-    ): Promise<any> { // TODO: Types
+    ): Promise<{}> {
         const url = this.termsUrlForService(serviceType, baseUrl);
-        utils.encodeParams({
-            user_accepts: termsUrls,
-        }, url.searchParams);
         const headers = {
             Authorization: "Bearer " + accessToken,
         };
-        return this.http.requestOtherUrl(Method.Post, url, null, { headers });
+        return this.http.requestOtherUrl(Method.Post, url, {
+            user_accepts: termsUrls,
+        }, { headers });
     }
 
     /**
