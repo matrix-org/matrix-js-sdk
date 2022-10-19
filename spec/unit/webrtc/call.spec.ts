@@ -109,10 +109,6 @@ describe('Call', function() {
 
     const errorListener = () => {};
 
-    // XXX redefining private enum values from call
-    const userMediaAudioTcvrIdx = 0;
-    const userMediaVideoTcvrIdx = 1;
-
     beforeEach(function() {
         prevNavigator = global.navigator;
         prevDocument = global.document;
@@ -374,13 +370,14 @@ describe('Call', function() {
         );
 
         // XXX: Lots of inspecting the prvate state of the call object here
-        const transceivers: Array<RTCRtpTransceiver> = (call as any).transceivers;
+        const transceivers: Map<string, RTCRtpTransceiver> = (call as any).transceivers;
 
         expect(call.localUsermediaStream.id).toBe("stream");
         expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("new_audio_track");
         expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
-        expect(transceivers[userMediaAudioTcvrIdx].sender.track.id).toBe("new_audio_track");
-        expect(transceivers[userMediaVideoTcvrIdx].sender.track.id).toBe("video_track");
+        // call has a function for generating these but we hardcode here to avoid exporting it
+        expect(transceivers.get("m.usermedia:audio").sender.track.id).toBe("new_audio_track");
+        expect(transceivers.get("m.usermedia:video").sender.track.id).toBe("video_track");
     });
 
     it("should handle upgrade to video call", async () => {
@@ -401,12 +398,12 @@ describe('Call', function() {
         await (call as any).upgradeCall(false, true);
 
         // XXX: More inspecting private state of the call object
-        const transceivers: Array<RTCRtpTransceiver> = (call as any).transceivers;
+        const transceivers: Map<string, RTCRtpTransceiver> = (call as any).transceivers;
 
         expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("usermedia_audio_track");
         expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("usermedia_video_track");
-        expect(transceivers[userMediaAudioTcvrIdx].sender.track.id).toBe("usermedia_audio_track");
-        expect(transceivers[userMediaVideoTcvrIdx].sender.track.id).toBe("usermedia_video_track");
+        expect(transceivers.get("m.usermedia:audio").sender.track.id).toBe("usermedia_audio_track");
+        expect(transceivers.get("m.usermedia:video").sender.track.id).toBe("usermedia_video_track");
     });
 
     it("should handle SDPStreamMetadata changes", async () => {
