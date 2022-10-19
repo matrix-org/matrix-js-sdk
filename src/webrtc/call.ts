@@ -296,7 +296,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentVersion: number | string;
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
-    private opponentPartyId: string | null = null;
+    private opponentPartyId?: string;
     private opponentCaps?: CallCapabilities;
     private inviteTimeout?: ReturnType<typeof setTimeout>;
 

@@ -91,7 +91,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     }
 
     private get hasAudioTrack(): boolean {
-        return !!this.stream?.getAudioTracks().length;
+        return this.stream.getAudioTracks().length > 0;
     }
 
     private updateStream(oldStream: MediaStream | null, newStream: MediaStream): void {
@@ -124,14 +124,14 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.analyser.fftSize = 512;
         this.analyser.smoothingTimeConstant = 0.1;
 
-        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.stream!);
+        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.stream);
         mediaStreamAudioSourceNode.connect(this.analyser);
 
         this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
     }
 
     private onAddTrack = (): void => {
-        this.emit(CallFeedEvent.NewStream, this.stream!);
+        this.emit(CallFeedEvent.NewStream, this.stream);
     };
 
     /**
@@ -157,7 +157,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      * @returns {boolean} is audio muted?
      */
     public isAudioMuted(): boolean {
-        return !this.stream?.getAudioTracks().length || this.audioMuted;
+        return this.stream.getAudioTracks().length === 0 || this.audioMuted;
     }
 
     /**
@@ -167,7 +167,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      */
     public isVideoMuted(): boolean {
         // We assume only one video track
-        return !this.stream?.getVideoTracks().length || this.videoMuted;
+        return this.stream.getVideoTracks().length === 0 || this.videoMuted;
     }
 
     public isSpeaking(): boolean {
