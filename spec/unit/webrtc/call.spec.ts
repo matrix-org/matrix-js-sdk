@@ -237,7 +237,7 @@ describe('Call', function() {
 
         expect(identChangedCallback).toHaveBeenCalled();
 
-        const ident = call.getRemoteAssertedIdentity();
+        const ident = call.getRemoteAssertedIdentity()!;
         expect(ident.id).toEqual("@steve:example.com");
         expect(ident.displayName).toEqual("Steve Gibbons");
 

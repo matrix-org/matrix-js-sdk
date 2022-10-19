@@ -114,10 +114,10 @@ export class CrossSigningInfo {
         }
 
         if (expectedPubkey === undefined) {
-            expectedPubkey = this.getId(type) ?? undefined;
+            expectedPubkey = this.getId(type)!;
         }
 
-        function validateKey(key?: Uint8Array): [string, PkSigning] | undefined {
+        function validateKey(key: Uint8Array | null): [string, PkSigning] | undefined {
             if (!key) return;
             const signing = new global.Olm.PkSigning();
             const gotPubkey = signing.init_with_seed(key);
@@ -127,7 +127,7 @@ export class CrossSigningInfo {
             signing.free();
         }
 
-        let privkey: Uint8Array | undefined;
+        let privkey: Uint8Array | null = null;
         if (this.cacheCallbacks.getCrossSigningKeyCache && shouldCache) {
             privkey = await this.cacheCallbacks.getCrossSigningKeyCache(type, expectedPubkey);
         }
@@ -141,7 +141,7 @@ export class CrossSigningInfo {
         const result = validateKey(privkey);
         if (result) {
             if (this.cacheCallbacks.storeCrossSigningKeyCache && shouldCache) {
-                await this.cacheCallbacks.storeCrossSigningKeyCache(type, privkey);
+                await this.cacheCallbacks.storeCrossSigningKeyCache(type, privkey!);
             }
             return result;
         }

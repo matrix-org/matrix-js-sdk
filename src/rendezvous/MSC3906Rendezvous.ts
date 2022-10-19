@@ -203,7 +203,7 @@ export class MSC3906Rendezvous {
             true, false, true,
         );
 
-        const masterPublicKey = this.client.crypto.crossSigningInfo.getId('master');
+        const masterPublicKey = this.client.crypto.crossSigningInfo.getId('master')!;
 
         await this.send({
             type: PayloadType.Finish,

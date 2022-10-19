@@ -842,7 +842,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         let newKeyId: string | null = null;
 
         // create a new SSSS key and set it as default
-        const createSSSS = async (opts: IAddSecretStorageKeyOpts, privateKey: Uint8Array) => {
+        const createSSSS = async (opts: IAddSecretStorageKeyOpts, privateKey?: Uint8Array) => {
             if (privateKey) {
                 opts.key = privateKey;
             }
@@ -956,7 +956,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             newKeyId = await createSSSS(opts, backupKey);
 
             // store the backup key in secret storage
-            await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(backupKey), [newKeyId]);
+            await secretStorage.store("m.megolm_backup.v1", olmlib.encodeBase64(backupKey!), [newKeyId]);
 
             // The backup is trusted because the user provided the private key.
             // Sign the backup with the cross-signing key so the key backup can
@@ -1268,9 +1268,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     if (usersToUpgrade) {
                         for (const userId of usersToUpgrade) {
                             if (userId in users) {
-                                await this.baseApis.setDeviceVerified(
-                                    userId, users[userId].crossSigningInfo.getId(),
-                                );
+                                await this.baseApis.setDeviceVerified(userId, users[userId].crossSigningInfo.getId()!);
                             }
                         }
                     }
@@ -1360,7 +1358,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns {string} the key ID
      */
-    public getCrossSigningId(type: string): string {
+    public getCrossSigningId(type: string): string | null {
         return this.crossSigningInfo.getId(type);
     }
 
@@ -1522,7 +1520,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return;
         }
 
-        const seenPubkey = newCrossSigning.getId();
+        const seenPubkey = newCrossSigning.getId()!;
         const masterChanged = this.crossSigningInfo.getId() !== seenPubkey;
         const masterExistsNotLocallyCached =
             newCrossSigning.getId() && !crossSigningPrivateKeys.has("master");
@@ -1539,9 +1537,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // higher levels to handle so that e.g. cancelling access properly
             // aborts any larger operation as well.
             try {
-                const ret = await this.crossSigningInfo.getCrossSigningKey(
-                    'master', seenPubkey,
-                );
+                const ret = await this.crossSigningInfo.getCrossSigningKey('master', seenPubkey);
                 signing = ret[1];
                 logger.info("Got cross-signing master private key");
             } finally {
@@ -1580,7 +1576,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             let signing: PkSigning | null = null;
             try {
                 const ret = await this.crossSigningInfo.getCrossSigningKey(
-                    "self_signing", newCrossSigning.getId("self_signing"),
+                    "self_signing", newCrossSigning.getId("self_signing")!,
                 );
                 signing = ret[1];
                 logger.info("Got cross-signing self-signing private key");
@@ -1603,7 +1599,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             let signing: PkSigning | null = null;
             try {
                 const ret = await this.crossSigningInfo.getCrossSigningKey(
-                    "user_signing", newCrossSigning.getId("user_signing"),
+                    "user_signing", newCrossSigning.getId("user_signing")!,
                 );
                 signing = ret[1];
                 logger.info("Got cross-signing user-signing private key");
@@ -1619,7 +1615,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // Include only the _new_ device signature in the upload.
             // We may have existing signatures from deleted devices, which will cause
             // the entire upload to fail.
-            keySignatures[this.crossSigningInfo.getId()] = Object.assign(
+            keySignatures[this.crossSigningInfo.getId()!] = Object.assign(
                 {} as ISignedKey,
                 masterKey,
                 {
@@ -1721,9 +1717,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                         },
                     });
                     if (usersToUpgrade.includes(userId)) {
-                        await this.baseApis.setDeviceVerified(
-                            userId, crossSigningInfo.getId(),
-                        );
+                        await this.baseApis.setDeviceVerified(userId, crossSigningInfo.getId()!);
                     }
                 }
             }

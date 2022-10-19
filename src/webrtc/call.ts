@@ -384,7 +384,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return Boolean(this.opponentCaps && this.opponentCaps["m.call.dtmf"]);
     }
 
-    public getRemoteAssertedIdentity(): AssertedIdentity {
+    public getRemoteAssertedIdentity(): AssertedIdentity | undefined {
         return this.remoteAssertedIdentity;
     }
 

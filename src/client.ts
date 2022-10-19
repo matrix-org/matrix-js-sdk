@@ -876,7 +876,7 @@ export type EmittedEvents = ClientEvent
     | BeaconEvent;
 
 export type ClientEventHandlerMap = {
-    [ClientEvent.Sync]: (state: SyncState, lastState?: SyncState, data?: ISyncStateData) => void;
+    [ClientEvent.Sync]: (state: SyncState, lastState: SyncState | null, data: ISyncStateData | null) => void;
     [ClientEvent.Event]: (event: MatrixEvent) => void;
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
     [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;

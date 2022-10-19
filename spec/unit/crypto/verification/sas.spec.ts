@@ -366,7 +366,7 @@ describe("SAS verification", function() {
                 "@alice:example.com", {
                     keys: alice.client.crypto!.crossSigningInfo.keys,
                     crossSigningVerifiedBefore: false,
-                    firstUse: false,
+                    firstUse: true,
                 },
             );
 
