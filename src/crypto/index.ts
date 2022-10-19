@@ -309,7 +309,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     private deviceKeys: Record<string, string> = {}; // type: key
 
     public globalBlacklistUnverifiedDevices = false;
-    private globalErrorOnUnknownDevices = true;
+    public globalErrorOnUnknownDevices = true;
 
     // list of IncomingRoomKeyRequests/IncomingRoomKeyRequestCancellations
     // we received in the current sync.
@@ -1827,29 +1827,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
         return this.globalBlacklistUnverifiedDevices;
-    }
-
-    /**
-     * Set whether sendMessage in a room with unknown and unverified devices
-     * should throw an error and not send them message. This has 'Global' for
-     * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
-     * no room-level equivalent for this setting.
-     *
-     * This API is currently UNSTABLE and may change or be removed without notice.
-     *
-     * @param {boolean} value whether error on unknown devices
-     */
-    public setGlobalErrorOnUnknownDevices(value: boolean): void {
-        this.globalErrorOnUnknownDevices = value;
-    }
-
-    /**
-     * @return {boolean} whether to error on unknown devices
-     *
-     * This API is currently UNSTABLE and may change or be removed without notice.
-     */
-    public getGlobalErrorOnUnknownDevices(): boolean {
-        return this.globalErrorOnUnknownDevices;
     }
 
     /**

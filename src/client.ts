@@ -2136,11 +2136,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {boolean} value whether error on unknown devices
      */
-    public setGlobalErrorOnUnknownDevices(value: boolean) {
+    public setGlobalErrorOnUnknownDevices(value: boolean): void {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.setGlobalErrorOnUnknownDevices(value);
+        this.crypto.globalErrorOnUnknownDevices = value;
     }
 
     /**
@@ -2152,7 +2152,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getGlobalErrorOnUnknownDevices();
+        return this.crypto.globalErrorOnUnknownDevices;
     }
 
     /**
