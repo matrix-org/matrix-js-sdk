@@ -76,7 +76,7 @@ export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
 
         const { qrCodeData } = this.request;
         // 1. check the secret
-        if (this.startEvent.getContent()['secret'] !== qrCodeData.encodedSharedSecret) {
+        if (this.startEvent.getContent()['secret'] !== qrCodeData?.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
 
@@ -92,7 +92,7 @@ export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
         // 3. determine key to sign / mark as trusted
         const keys: Record<string, string> = {};
 
-        switch (qrCodeData.mode) {
+        switch (qrCodeData?.mode) {
             case Mode.VerifyOtherUser: {
                 // add master key to keys to be signed, only if we're not doing self-verification
                 const masterKey = qrCodeData.otherUserMasterKey;
@@ -187,9 +187,9 @@ export class QRCodeData {
             client,
             mode,
             sharedSecret,
-            otherUserMasterKey,
-            otherDeviceKey,
-            myMasterKey,
+            otherUserMasterKey!,
+            otherDeviceKey!,
+            myMasterKey!,
         );
         const buffer = QRCodeData.generateBuffer(qrData);
         return new QRCodeData(mode, sharedSecret, otherUserMasterKey, otherDeviceKey, myMasterKey, buffer);
@@ -239,33 +239,6 @@ export class QRCodeData {
         return mode;
     }
 
-    private static generateQrData(
-        request: VerificationRequest,
-        client: MatrixClient,
-        mode: Mode.VerifyOtherUser,
-        encodedSharedSecret: string,
-        otherUserMasterKey: string,
-        otherDeviceKey: never,
-        myMasterKey: never,
-    ): IQrData;
-    private static generateQrData(
-        request: VerificationRequest,
-        client: MatrixClient,
-        mode: Mode.VerifySelfTrusted,
-        encodedSharedSecret: string,
-        otherUserMasterKey: never,
-        otherDeviceKey: string,
-        myMasterKey: never,
-    ): IQrData;
-    private static generateQrData(
-        request: VerificationRequest,
-        client: MatrixClient,
-        mode: Mode.VerifySelfUntrusted,
-        encodedSharedSecret: string,
-        otherUserMasterKey: never,
-        otherDeviceKey: never,
-        myMasterKey: string,
-    ): IQrData;
     private static generateQrData(
         request: VerificationRequest,
         client: MatrixClient,

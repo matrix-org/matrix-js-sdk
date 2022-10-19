@@ -114,7 +114,7 @@ export class VerificationRequest<
     private commonMethods: VerificationMethod[] = [];
     private _phase: Phase;
     public _cancellingUserId: string; // Used in tests only
-    private _verifier: VerificationBase<any, any>;
+    private _verifier?: VerificationBase<any, any>;
 
     constructor(
         public readonly channel: C,
@@ -236,7 +236,7 @@ export class VerificationRequest<
      * The key verification request event.
      * @returns {MatrixEvent} The request event, or falsey if not found.
      */
-    public get requestEvent(): MatrixEvent {
+    public get requestEvent(): MatrixEvent | undefined {
         return this.getEventByEither(REQUEST_TYPE);
     }
 
@@ -246,7 +246,7 @@ export class VerificationRequest<
     }
 
     /** The verifier to do the actual verification, once the method has been established. Only defined when the `phase` is PHASE_STARTED. */
-    public get verifier(): VerificationBase<any, any> {
+    public get verifier(): VerificationBase<any, any> | undefined {
         return this._verifier;
     }
 
@@ -443,7 +443,7 @@ export class VerificationRequest<
                 this._chosenMethod = method;
             }
         }
-        return this._verifier;
+        return this._verifier!;
     }
 
     /**
@@ -548,20 +548,18 @@ export class VerificationRequest<
             transitions.push({ phase: PHASE_REQUESTED, event: requestEvent });
         }
 
-        const readyEvent =
-            requestEvent && this.getEventBy(READY_TYPE, !hasRequestByThem);
+        const readyEvent = requestEvent && this.getEventBy(READY_TYPE, !hasRequestByThem);
         if (readyEvent && phase() === PHASE_REQUESTED) {
             transitions.push({ phase: PHASE_READY, event: readyEvent });
         }
 
-        let startEvent;
+        let startEvent: MatrixEvent | undefined;
         if (readyEvent || !requestEvent) {
             const theirStartEvent = this.eventsByThem.get(START_TYPE);
             const ourStartEvent = this.eventsByUs.get(START_TYPE);
             // any party can send .start after a .ready or unsent
             if (theirStartEvent && ourStartEvent) {
-                startEvent = theirStartEvent.getSender() < ourStartEvent.getSender() ?
-                    theirStartEvent : ourStartEvent;
+                startEvent = theirStartEvent.getSender() < ourStartEvent.getSender() ? theirStartEvent : ourStartEvent;
             } else {
                 startEvent = theirStartEvent ? theirStartEvent : ourStartEvent;
             }
@@ -569,7 +567,9 @@ export class VerificationRequest<
             startEvent = this.getEventBy(START_TYPE, !hasRequestByThem);
         }
         if (startEvent) {
-            const fromRequestPhase = phase() === PHASE_REQUESTED && requestEvent.getSender() !== startEvent.getSender();
+            const fromRequestPhase = (
+                phase() === PHASE_REQUESTED && requestEvent?.getSender() !== startEvent.getSender()
+            );
             const fromUnsentPhase = phase() === PHASE_UNSENT && this.channel.canCreateRequest(START_TYPE);
             if (fromRequestPhase || phase() === PHASE_READY || fromUnsentPhase) {
                 transitions.push({ phase: PHASE_STARTED, event: startEvent });
@@ -651,7 +651,7 @@ export class VerificationRequest<
         if (newEvent.getType() !== START_TYPE) {
             return false;
         }
-        const oldEvent = this._verifier.startEvent;
+        const oldEvent = this._verifier!.startEvent;
 
         let oldRaceIdentifier;
         if (this.isSelfVerification) {
