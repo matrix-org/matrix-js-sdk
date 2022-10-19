@@ -41,7 +41,6 @@ import {
     installWebRTCMocks,
     MockRTCPeerConnection,
     SCREENSHARE_STREAM_ID,
-    MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
@@ -370,17 +369,15 @@ describe('Call', function() {
             ).typed(),
         );
 
-        const usermediaSenders: Array<RTCRtpSender> = (call as any).usermediaSenders;
+        // XXX: Lots of inspecting the prvate state of the call object here
+        const transceivers: Map<string, RTCRtpTransceiver> = (call as any).transceivers;
 
         expect(call.localUsermediaStream.id).toBe("stream");
         expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("new_audio_track");
         expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("video_track");
-        expect(usermediaSenders.find((sender) => {
-            return sender?.track?.kind === "audio";
-        }).track.id).toBe("new_audio_track");
-        expect(usermediaSenders.find((sender) => {
-            return sender?.track?.kind === "video";
-        }).track.id).toBe("video_track");
+        // call has a function for generating these but we hardcode here to avoid exporting it
+        expect(transceivers.get("m.usermedia:audio").sender.track.id).toBe("new_audio_track");
+        expect(transceivers.get("m.usermedia:video").sender.track.id).toBe("video_track");
     });
 
     it("should handle upgrade to video call", async () => {
@@ -400,16 +397,13 @@ describe('Call', function() {
         // setLocalVideoMuted probably?
         await (call as any).upgradeCall(false, true);
 
-        const usermediaSenders: Array<RTCRtpSender> = (call as any).usermediaSenders;
+        // XXX: More inspecting private state of the call object
+        const transceivers: Map<string, RTCRtpTransceiver> = (call as any).transceivers;
 
         expect(call.localUsermediaStream.getAudioTracks()[0].id).toBe("usermedia_audio_track");
         expect(call.localUsermediaStream.getVideoTracks()[0].id).toBe("usermedia_video_track");
-        expect(usermediaSenders.find((sender) => {
-            return sender?.track?.kind === "audio";
-        }).track.id).toBe("usermedia_audio_track");
-        expect(usermediaSenders.find((sender) => {
-            return sender?.track?.kind === "video";
-        }).track.id).toBe("usermedia_video_track");
+        expect(transceivers.get("m.usermedia:audio").sender.track.id).toBe("usermedia_audio_track");
+        expect(transceivers.get("m.usermedia:video").sender.track.id).toBe("usermedia_video_track");
     });
 
     it("should handle SDPStreamMetadata changes", async () => {
@@ -479,6 +473,23 @@ describe('Call', function() {
     });
 
     describe("should deduce the call type correctly", () => {
+        beforeEach(async () => {
+            // start an incoming  call, but add no feeds
+            await call.initWithInvite({
+                getContent: jest.fn().mockReturnValue({
+                    version: "1",
+                    call_id: "call_id",
+                    party_id: "remote_party_id",
+                    lifetime: CALL_LIFETIME,
+                    offer: {
+                        sdp: DUMMY_SDP,
+                    },
+                }),
+                getSender: () => "@test:foo",
+                getLocalAge: () => 1,
+            } as unknown as MatrixEvent);
+        });
+
         it("if no video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
@@ -1057,8 +1068,23 @@ describe('Call', function() {
     });
 
     describe("Screen sharing", () => {
+        const waitNegotiateFunc = resolve => {
+            mockSendEvent.mockImplementationOnce(() => {
+                // Note that the peer connection here is a dummy one and always returns
+                // dummy SDP, so there's not much point returning the content: the SDP will
+                // always be the same.
+                resolve();
+                return Promise.resolve({ event_id: "foo" });
+            });
+        };
+
         beforeEach(async () => {
             await startVoiceCall(client, call);
+
+            const sendNegotiatePromise = new Promise<void>(waitNegotiateFunc);
+
+            MockRTCPeerConnection.triggerAllNegotiations();
+            await sendNegotiatePromise;
 
             await call.onAnswerReceived(makeMockEvent("@test:foo", {
                 "version": 1,
@@ -1090,12 +1116,7 @@ describe('Call', function() {
             ).toHaveLength(1);
 
             mockSendEvent.mockReset();
-            const sendNegotiatePromise = new Promise<void>(resolve => {
-                mockSendEvent.mockImplementationOnce(() => {
-                    resolve();
-                    return Promise.resolve({ event_id: "foo" });
-                });
-            });
+            const sendNegotiatePromise = new Promise<void>(waitNegotiateFunc);
 
             MockRTCPeerConnection.triggerAllNegotiations();
             await sendNegotiatePromise;
@@ -1130,29 +1151,52 @@ describe('Call', function() {
                 headerExtensions: [],
             });
 
-            const prom = new Promise<void>(resolve => {
-                const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
-                mockPeerConn.addTrack = jest.fn().mockImplementation((track: MockMediaStreamTrack) => {
-                    const mockSender = new MockRTCRtpSender(track);
-                    mockPeerConn.getTransceivers.mockReturnValue([{
-                        sender: mockSender,
-                        setCodecPreferences: (prefs: RTCRtpCodecCapability[]) => {
-                            expect(prefs).toEqual([
-                                expect.objectContaining({ mimeType: "video/somethingelse" }),
-                            ]);
-
-                            resolve();
-                        },
-                    }]);
-
-                    return mockSender;
-                });
-            });
+            mockSendEvent.mockReset();
+            const sendNegotiatePromise = new Promise<void>(waitNegotiateFunc);
 
             await call.setScreensharingEnabled(true);
             MockRTCPeerConnection.triggerAllNegotiations();
 
-            await prom;
+            await sendNegotiatePromise;
+
+            const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+            expect(
+                mockPeerConn.transceivers[mockPeerConn.transceivers.length - 1].setCodecPreferences,
+            ).toHaveBeenCalledWith([expect.objectContaining({ mimeType: "video/somethingelse" })]);
+        });
+
+        it("re-uses transceiver when screen sharing is re-enabled", async () => {
+            const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+
+            // sanity check: we should start with one transciever (user media audio)
+            expect(mockPeerConn.transceivers.length).toEqual(1);
+
+            const screenshareOnProm1 = new Promise<void>(waitNegotiateFunc);
+
+            await call.setScreensharingEnabled(true);
+            MockRTCPeerConnection.triggerAllNegotiations();
+
+            await screenshareOnProm1;
+
+            // we should now have another transciever for the screenshare
+            expect(mockPeerConn.transceivers.length).toEqual(2);
+
+            const screenshareOffProm = new Promise<void>(waitNegotiateFunc);
+            await call.setScreensharingEnabled(false);
+            MockRTCPeerConnection.triggerAllNegotiations();
+            await screenshareOffProm;
+
+            // both transceivers should still be there
+            expect(mockPeerConn.transceivers.length).toEqual(2);
+
+            const screenshareOnProm2 = new Promise<void>(waitNegotiateFunc);
+            await call.setScreensharingEnabled(true);
+            MockRTCPeerConnection.triggerAllNegotiations();
+            await screenshareOnProm2;
+
+            // should still be two, ie. another one should not have been created
+            // when re-enabling the screen share.
+            expect(mockPeerConn.transceivers.length).toEqual(2);
         });
     });
 

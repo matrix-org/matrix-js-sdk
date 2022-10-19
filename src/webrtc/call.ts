@@ -308,6 +308,16 @@ export type CallEventHandlerMap = {
     [CallEvent.SendVoipEvent]: (event: Record<string, any>) => void;
 };
 
+// The key of the transceiver map (purpose + media type, separated by ':')
+type TransceiverKey = string;
+
+// generates keys for the map of transceivers
+// kind is unfortunately a string rather than MediaType as this is the type of
+// track.kind
+function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: TransceiverKey): string {
+    return purpose + ':' + kind;
+}
+
 /**
  * Construct a new Matrix Call.
  * @constructor
@@ -345,8 +355,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private candidateSendTries = 0;
     private candidatesEnded = false;
     private feeds: Array<CallFeed> = [];
-    private usermediaSenders: Array<RTCRtpSender> = [];
-    private screensharingSenders: Array<RTCRtpSender> = [];
+
+    // our transceivers for each purpose and type of media
+    private transceivers = new Map<TransceiverKey, RTCRtpTransceiver>();
+
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream: boolean;
     private successor: MatrixCall;
@@ -634,6 +646,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             audioMuted,
             videoMuted,
         }));
+
+        // gather transceivers from the new tracks so that we can use the same ones for tracks that
+        // we add later. We only do this for user media streams though: screenshare streams just always
+        // get their own unidirectional transceiver since a bidirectional screen share is pretty rare
+        // (we *could* re-use an existing recvonly transceiver for this, but it's simpler to just not).
+        if (purpose == SDPStreamMetadataPurpose.Usermedia) {
+            for (const track of stream.getTracks()) {
+                const transceiver = this.peerConn.getTransceivers().find(t => t.receiver.track == track);
+                this.transceivers.set(getTransceiverKey(purpose, track.kind), transceiver);
+            }
+        }
+
         this.emit(CallEvent.FeedsChanged, this.feeds);
 
         logger.info(
@@ -675,6 +699,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             stream,
             purpose,
         }));
+
+        for (const track of stream.getTracks()) {
+            const transceiver = this.peerConn.getTransceivers().find(t => t.receiver.track == track);
+            this.transceivers.set(getTransceiverKey(purpose, track.kind), transceiver);
+        }
+
         this.emit(CallEvent.FeedsChanged, this.feeds);
 
         logger.info(`Call ${this.callId} pushed remote stream (id="${stream.id}", active="${stream.active}")`);
@@ -722,11 +752,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.feeds.push(callFeed);
 
         if (addToPeerConnection) {
-            const senderArray = callFeed.purpose === SDPStreamMetadataPurpose.Usermedia ?
-                this.usermediaSenders : this.screensharingSenders;
-            // Empty the array
-            senderArray.splice(0, senderArray.length);
-
             for (const track of callFeed.stream.getTracks()) {
                 logger.info(
                     `Call ${this.callId} ` +
@@ -738,7 +763,27 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     `enabled=${track.enabled}` +
                     `) to peer connection`,
                 );
-                senderArray.push(this.peerConn.addTrack(track, callFeed.stream));
+
+                const tKey = getTransceiverKey(callFeed.purpose, track.kind);
+                if (this.transceivers.has(tKey)) {
+                    // we already have a sender, so we re-use it. We try to re-use transceivers as much
+                    // as possible because they can't be removed once added, so otherwise they just
+                    // accumulate which makes the SDP very large very quickly: in fact it only takes
+                    // about 6 video tracks to exceed the maximum size of an Olm-encrypted
+                    // Matrix event.
+                    const transceiver = this.transceivers.get(tKey);
+
+                    transceiver.sender.replaceTrack(track);
+                    // set the direction to indicate we're going to start sending again
+                    // (this will trigger the re-negotiation)
+                    transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
+                } else {
+                    // create a new one: pass the track in and everything happens automatically
+                    this.transceivers.set(tKey, this.peerConn.addTransceiver(track, {
+                        streams: [callFeed.stream],
+                        direction: callFeed.purpose === SDPStreamMetadataPurpose.Usermedia ? "sendrecv" : "sendonly",
+                    }));
+                }
             }
         }
 
@@ -759,20 +804,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param callFeed to remove
      */
     public removeLocalFeed(callFeed: CallFeed): void {
-        const senderArray = callFeed.purpose === SDPStreamMetadataPurpose.Usermedia
-            ? this.usermediaSenders
-            : this.screensharingSenders;
+        const audioTransceiverKey = getTransceiverKey(callFeed.purpose, "audio");
+        const videoTransceiverKey = getTransceiverKey(callFeed.purpose, "video");
 
-        for (const sender of senderArray) {
-            this.peerConn.removeTrack(sender);
+        for (const transceiverKey of [audioTransceiverKey, videoTransceiverKey]) {
+            // this is slightly mixing the track and transceiver API but is basically just shorthand.
+            // There is no way to actually remove a transceiver, so this just sets it to inactive
+            // (or recvonly) and replaces the source with nothing.
+            if (this.transceivers.has(transceiverKey)) {
+                const transceiver = this.transceivers.get(transceiverKey);
+                if (transceiver.sender) this.peerConn.removeTrack(transceiver.sender);
+            }
         }
 
         if (callFeed.purpose === SDPStreamMetadataPurpose.Screenshare) {
             this.client.getMediaHandler().stopScreensharingStream(callFeed.stream);
         }
 
-        // Empty the array
-        senderArray.splice(0, senderArray.length);
         this.deleteFeed(callFeed);
     }
 
@@ -1139,9 +1187,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 return false;
             }
         } else {
-            for (const sender of this.screensharingSenders) {
-                this.peerConn.removeTrack(sender);
+            const audioTransceiver = this.transceivers.get(getTransceiverKey(
+                SDPStreamMetadataPurpose.Screenshare, "audio",
+            ));
+            const videoTransceiver = this.transceivers.get(getTransceiverKey(
+                SDPStreamMetadataPurpose.Screenshare, "video",
+            ));
+
+            for (const transceiver of [audioTransceiver, videoTransceiver]) {
+                // this is slightly mixing the track and transceiver API but is basically just shorthand
+                // for removing the sender.
+                if (transceiver && transceiver.sender) this.peerConn.removeTrack(transceiver.sender);
             }
+
             this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream);
             this.deleteFeedByStream(this.localScreensharingStream);
             return false;
@@ -1167,9 +1225,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 const track = stream.getTracks().find((track) => {
                     return track.kind === "video";
                 });
-                const sender = this.usermediaSenders.find((sender) => {
-                    return sender.track?.kind === "video";
-                });
+
+                const sender = this.transceivers.get(getTransceiverKey(
+                    SDPStreamMetadataPurpose.Usermedia, "video",
+                )).sender;
+
                 sender.replaceTrack(track);
 
                 this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, false);
@@ -1183,9 +1243,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const track = this.localUsermediaStream.getTracks().find((track) => {
                 return track.kind === "video";
             });
-            const sender = this.usermediaSenders.find((sender) => {
-                return sender.track?.kind === "video";
-            });
+            const sender = this.transceivers.get(getTransceiverKey(
+                SDPStreamMetadataPurpose.Usermedia, "video",
+            )).sender;
             sender.replaceTrack(track);
 
             this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream);
@@ -1219,28 +1279,30 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.localUsermediaStream.addTrack(track);
         }
 
-        const newSenders = [];
-
         for (const track of stream.getTracks()) {
-            const oldSender = this.usermediaSenders.find((sender) => {
-                return sender.track?.kind === track.kind;
-            });
+            const tKey = getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, track.kind);
 
-            let newSender: RTCRtpSender;
+            const oldSender = this.transceivers.get(tKey)?.sender;
+            let added = false;
+            if (oldSender) {
+                try {
+                    logger.info(
+                        `Call ${this.callId} `+
+                        `Replacing track (` +
+                        `id="${track.id}", ` +
+                        `kind="${track.kind}", ` +
+                        `streamId="${stream.id}", ` +
+                        `streamPurpose="${callFeed.purpose}"` +
+                        `) to peer connection`,
+                    );
+                    await oldSender.replaceTrack(track);
+                    added = true;
+                } catch (error) {
+                    logger.warn(`replaceTrack failed: adding new transceiver instead`, error);
+                }
+            }
 
-            try {
-                logger.info(
-                    `Call ${this.callId} `+
-                    `Replacing track (` +
-                    `id="${track.id}", ` +
-                    `kind="${track.kind}", ` +
-                    `streamId="${stream.id}", ` +
-                    `streamPurpose="${callFeed.purpose}"` +
-                    `) to peer connection`,
-                );
-                await oldSender.replaceTrack(track);
-                newSender = oldSender;
-            } catch (error) {
+            if (!added) {
                 logger.info(
                     `Call ${this.callId} `+
                     `Adding track (` +
@@ -1250,13 +1312,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     `streamPurpose="${callFeed.purpose}"` +
                     `) to peer connection`,
                 );
-                newSender = this.peerConn.addTrack(track, this.localUsermediaStream);
+
+                this.transceivers.set(tKey, this.peerConn.addTransceiver(track, {
+                    streams: [this.localUsermediaStream],
+                    direction: "sendrecv",
+                }));
             }
-
-            newSenders.push(newSender);
         }
-
-        this.usermediaSenders = newSenders;
     }
 
     /**
@@ -2109,17 +2171,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
         }
 
-        for (const trans of this.peerConn.getTransceivers()) {
-            if (
-                this.screensharingSenders.includes(trans.sender) &&
-                    (
-                        trans.sender.track?.kind === "video" ||
-                        trans.receiver.track?.kind === "video"
-                    )
-            ) {
-                trans.setCodecPreferences(codecs);
-            }
-        }
+        const screenshareVideoTransceiver = this.transceivers.get(getTransceiverKey(
+            SDPStreamMetadataPurpose.Screenshare, "video",
+        ));
+        if (screenshareVideoTransceiver) screenshareVideoTransceiver.setCodecPreferences(codecs);
     }
 
     private onNegotiationNeeded = async (): Promise<void> => {
