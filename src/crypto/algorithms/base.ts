@@ -242,7 +242,7 @@ export abstract class DecryptionAlgorithm {
 export class DecryptionError extends Error {
     public readonly detailedString: string;
 
-    constructor(public readonly code: string, msg: string, details?: Record<string, string>) {
+    constructor(public readonly code: string, msg: string, details?: Record<string, string | Error>) {
         super(msg);
         this.code = code;
         this.name = 'DecryptionError';
@@ -250,7 +250,7 @@ export class DecryptionError extends Error {
     }
 }
 
-function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string>): string {
+function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string | Error>): string {
     let result = err.name + '[msg: ' + err.message;
 
     if (details) {

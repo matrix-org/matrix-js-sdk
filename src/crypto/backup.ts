@@ -40,7 +40,7 @@ import {
 import { UnstableValue } from "../NamespacedValue";
 import { CryptoEvent, IMegolmSessionData } from "./index";
 import { crypto } from "./crypto";
-import { HTTPError } from "../http-api";
+import { HTTPError, MatrixError } from "../http-api";
 
 const KEY_BACKUP_KEYS_PER_REQUEST = 200;
 const KEY_BACKUP_CHECK_RATE_LIMIT = 5000; // ms
@@ -425,12 +425,7 @@ export class BackupManager {
         }
 
         ret.usable = ret.sigs.some((s) => {
-            return (
-                s.valid && (
-                    (s.device && s.deviceTrust.isVerified()) ||
-                        (s.crossSigningId)
-                )
-            );
+            return s.valid && ((s.device && s.deviceTrust?.isVerified()) || (s.crossSigningId));
         });
         return ret;
     }
@@ -468,17 +463,17 @@ export class BackupManager {
                 } catch (err) {
                     numFailures++;
                     logger.log("Key backup request failed", err);
-                    if (err.data) {
+                    if ((<MatrixError>err).data) {
                         if (
-                            err.data.errcode == 'M_NOT_FOUND' ||
-                                err.data.errcode == 'M_WRONG_ROOM_KEYS_VERSION'
+                            (<MatrixError>err).data.errcode == 'M_NOT_FOUND' ||
+                            (<MatrixError>err).data.errcode == 'M_WRONG_ROOM_KEYS_VERSION'
                         ) {
                             // Re-check key backup status on error, so we can be
                             // sure to present the current situation when asked.
                             await this.checkKeyBackup();
                             // Backup version has changed or this backup version
                             // has been deleted
-                            this.baseApis.crypto!.emit(CryptoEvent.KeyBackupFailed, err.data.errcode);
+                            this.baseApis.crypto!.emit(CryptoEvent.KeyBackupFailed, (<MatrixError>err).data.errcode!);
                             throw err;
                         }
                     }
@@ -511,13 +506,13 @@ export class BackupManager {
 
         const rooms: IKeyBackup["rooms"] = {};
         for (const session of sessions) {
-            const roomId = session.sessionData.room_id;
+            const roomId = session.sessionData!.room_id;
             if (rooms[roomId] === undefined) {
                 rooms[roomId] = { sessions: {} };
             }
 
             const sessionData = this.baseApis.crypto!.olmDevice.exportInboundGroupSession(
-                session.senderKey, session.sessionId, session.sessionData,
+                session.senderKey, session.sessionId, session.sessionData!,
             );
             sessionData.algorithm = MEGOLM_ALGORITHM;
 
@@ -529,18 +524,18 @@ export class BackupManager {
             );
             const device = this.baseApis.crypto!.deviceList.getDeviceByIdentityKey(
                 MEGOLM_ALGORITHM, session.senderKey,
-            );
-            const verified = this.baseApis.crypto!.checkDeviceInfoTrust(userId, device).isVerified();
+            ) ?? undefined;
+            const verified = this.baseApis.crypto!.checkDeviceInfoTrust(userId!, device).isVerified();
 
             rooms[roomId]['sessions'][session.sessionId] = {
                 first_message_index: sessionData.first_known_index,
                 forwarded_count: forwardedCount,
                 is_verified: verified,
-                session_data: await this.algorithm.encryptSession(sessionData),
+                session_data: await this.algorithm!.encryptSession(sessionData),
             };
         }
 
-        await this.baseApis.sendKeyBackup(undefined, undefined, this.backupInfo.version, { rooms });
+        await this.baseApis.sendKeyBackup(undefined, undefined, this.backupInfo!.version, { rooms });
 
         await this.baseApis.crypto!.cryptoStore.unmarkSessionsNeedingBackup(sessions);
         remaining = await this.baseApis.crypto!.cryptoStore.countSessionsNeedingBackup();

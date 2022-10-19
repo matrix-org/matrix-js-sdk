@@ -2646,7 +2646,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
      */
-    public checkKeyBackup(): Promise<IKeyBackupCheck> {
+    public checkKeyBackup(): Promise<IKeyBackupCheck | null> {
+        if (!this.crypto) {
+            throw new Error("End-to-end encryption disabled");
+        }
         return this.crypto.backupManager.checkKeyBackup();
     }
 
@@ -2683,6 +2686,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * }
      */
     public isKeyBackupTrusted(info: IKeyBackupInfo): Promise<TrustInfo> {
+        if (!this.crypto) {
+            throw new Error("End-to-end encryption disabled");
+        }
         return this.crypto.backupManager.isKeyBackupTrusted(info);
     }
 
@@ -2691,7 +2697,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     the server, otherwise false. If we haven't completed a successful check
      *     of key backup status yet, returns null.
      */
-    public getKeyBackupEnabled(): boolean {
+    public getKeyBackupEnabled(): boolean | null {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }

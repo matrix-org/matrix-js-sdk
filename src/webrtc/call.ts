@@ -366,13 +366,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param options An object providing configuration options for the data channel.
      */
     public createDataChannel(label: string, options: RTCDataChannelInit) {
-        const dataChannel = this.peerConn.createDataChannel(label, options);
+        const dataChannel = this.peerConn!.createDataChannel(label, options);
         this.emit(CallEvent.DataChannel, dataChannel);
         logger.debug("created data channel");
         return dataChannel;
     }
 
-    public getOpponentMember(): RoomMember {
+    public getOpponentMember(): RoomMember | undefined {
         return this.opponentMember;
     }
 
@@ -395,64 +395,58 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public get hasLocalUserMediaVideoTrack(): boolean {
-        return this.localUsermediaStream?.getVideoTracks().length > 0;
+        return !!this.localUsermediaStream?.getVideoTracks().length;
     }
 
     public get hasRemoteUserMediaVideoTrack(): boolean {
         return this.getRemoteFeeds().some((feed) => {
-            return (
-                feed.purpose === SDPStreamMetadataPurpose.Usermedia &&
-                feed.stream.getVideoTracks().length > 0
-            );
+            return feed.purpose === SDPStreamMetadataPurpose.Usermedia && feed.stream?.getVideoTracks().length;
         });
     }
 
     public get hasLocalUserMediaAudioTrack(): boolean {
-        return this.localUsermediaStream?.getAudioTracks().length > 0;
+        return !!this.localUsermediaStream?.getAudioTracks().length;
     }
 
     public get hasRemoteUserMediaAudioTrack(): boolean {
         return this.getRemoteFeeds().some((feed) => {
-            return (
-                feed.purpose === SDPStreamMetadataPurpose.Usermedia &&
-                feed.stream.getAudioTracks().length > 0
-            );
+            return feed.purpose === SDPStreamMetadataPurpose.Usermedia && !!feed.stream?.getAudioTracks().length;
         });
     }
 
-    public get localUsermediaFeed(): CallFeed {
+    public get localUsermediaFeed(): CallFeed | undefined {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
     }
 
-    public get localScreensharingFeed(): CallFeed {
+    public get localScreensharingFeed(): CallFeed | undefined {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
     }
 
-    public get localUsermediaStream(): MediaStream {
+    public get localUsermediaStream(): MediaStream | undefined {
         return this.localUsermediaFeed?.stream;
     }
 
-    public get localScreensharingStream(): MediaStream {
+    public get localScreensharingStream(): MediaStream | undefined {
         return this.localScreensharingFeed?.stream;
     }
 
-    public get remoteUsermediaFeed(): CallFeed {
+    public get remoteUsermediaFeed(): CallFeed | undefined {
         return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
     }
 
-    public get remoteScreensharingFeed(): CallFeed {
+    public get remoteScreensharingFeed(): CallFeed | undefined {
         return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
     }
 
-    public get remoteUsermediaStream(): MediaStream {
+    public get remoteUsermediaStream(): MediaStream | undefined {
         return this.remoteUsermediaFeed?.stream;
     }
 
-    public get remoteScreensharingStream(): MediaStream {
+    public get remoteScreensharingStream(): MediaStream | undefined {
         return this.remoteScreensharingFeed?.stream;
     }
 
-    private getFeedByStreamId(streamId: string): CallFeed {
+    private getFeedByStreamId(streamId: string): CallFeed | undefined {
         return this.getFeeds().find((feed) => feed.stream.id === streamId);
     }
 

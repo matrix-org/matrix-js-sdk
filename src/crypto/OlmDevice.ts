@@ -490,7 +490,7 @@ export class OlmDevice {
      * @return {number} number of keys
      */
     public maxNumberOfOneTimeKeys(): number {
-        return this.maxOneTimeKeys;
+        return this.maxOneTimeKeys ?? -1;
     }
 
     /**

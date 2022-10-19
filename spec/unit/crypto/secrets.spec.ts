@@ -41,7 +41,7 @@ async function makeTestClient(userInfo: { userId: string, deviceId: string}, opt
     await client.initCrypto();
 
     // No need to download keys for these tests
-    jest.spyOn(client.crypto, 'downloadKeys').mockResolvedValue({});
+    jest.spyOn(client.crypto!, 'downloadKeys').mockResolvedValue({});
 
     return client;
 }
@@ -93,11 +93,11 @@ describe("Secrets", function() {
                 },
             },
         );
-        alice.crypto.crossSigningInfo.setKeys({
+        alice.crypto!.crossSigningInfo.setKeys({
             master: signingkeyInfo,
         });
 
-        const secretStorage = alice.crypto.secretStorage;
+        const secretStorage = alice.crypto!.secretStorage;
 
         jest.spyOn(alice, 'setAccountData').mockImplementation(
             async function(eventType, contents) {
@@ -113,7 +113,7 @@ describe("Secrets", function() {
         const keyAccountData = {
             algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
         };
-        await alice.crypto.crossSigningInfo.signObject(keyAccountData, 'master');
+        await alice.crypto!.crossSigningInfo.signObject(keyAccountData, 'master');
 
         alice.store.storeAccountDataEvents([
             new MatrixEvent({
@@ -200,7 +200,7 @@ describe("Secrets", function() {
         await alice.storeSecret("foo", "bar");
 
         const accountData = alice.getAccountData('foo');
-        expect(accountData.getContent().encrypted).toBeTruthy();
+        expect(accountData!.getContent().encrypted).toBeTruthy();
         alice.stopClient();
     });
 
@@ -233,29 +233,29 @@ describe("Secrets", function() {
             },
         );
 
-        const vaxDevice = vax.client.crypto.olmDevice;
-        const osborne2Device = osborne2.client.crypto.olmDevice;
-        const secretStorage = osborne2.client.crypto.secretStorage;
+        const vaxDevice = vax.client.crypto!.olmDevice;
+        const osborne2Device = osborne2.client.crypto!.olmDevice;
+        const secretStorage = osborne2.client.crypto!.secretStorage;
 
-        osborne2.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
+        osborne2.client.crypto!.deviceList.storeDevicesForUser("@alice:example.com", {
             "VAX": {
                 known: false,
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
-                    "ed25519:VAX": vaxDevice.deviceEd25519Key,
-                    "curve25519:VAX": vaxDevice.deviceCurve25519Key,
+                    "ed25519:VAX": vaxDevice.deviceEd25519Key!,
+                    "curve25519:VAX": vaxDevice.deviceCurve25519Key!,
                 },
                 verified: DeviceInfo.DeviceVerification.VERIFIED,
             },
         });
-        vax.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
+        vax.client.crypto!.deviceList.storeDevicesForUser("@alice:example.com", {
             "Osborne2": {
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 verified: 0,
                 known: false,
                 keys: {
-                    "ed25519:Osborne2": osborne2Device.deviceEd25519Key,
-                    "curve25519:Osborne2": osborne2Device.deviceCurve25519Key,
+                    "ed25519:Osborne2": osborne2Device.deviceEd25519Key!,
+                    "curve25519:Osborne2": osborne2Device.deviceCurve25519Key!,
                 },
             },
         });
@@ -264,13 +264,13 @@ describe("Secrets", function() {
         const otks = (await osborne2Device.getOneTimeKeys()).curve25519;
         await osborne2Device.markKeysAsPublished();
 
-        await vax.client.crypto.olmDevice.createOutboundSession(
+        await vax.client.crypto!.olmDevice.createOutboundSession(
             osborne2Device.deviceCurve25519Key,
             Object.values(otks)[0],
         );
 
-        osborne2.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
-        osborne2.client.crypto.deviceList.getUserByIdentityKey = () => "@alice:example.com";
+        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        osborne2.client.crypto!.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
         const request = await secretStorage.request("foo", ["VAX"]);
         await request.promise; // return value not used
@@ -486,7 +486,7 @@ describe("Secrets", function() {
                     },
                 }),
             ]);
-            alice.crypto.deviceList.storeCrossSigningForUser("@alice:example.com", {
+            alice.crypto!.deviceList.storeCrossSigningForUser("@alice:example.com", {
                 firstUse: false,
                 crossSigningVerifiedBefore: false,
                 keys: {
@@ -630,7 +630,7 @@ describe("Secrets", function() {
                     },
                 }),
             ]);
-            alice.crypto.deviceList.storeCrossSigningForUser("@alice:example.com", {
+            alice.crypto!.deviceList.storeCrossSigningForUser("@alice:example.com", {
                 firstUse: false,
                 crossSigningVerifiedBefore: false,
                 keys: {

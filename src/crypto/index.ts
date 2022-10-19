@@ -469,8 +469,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         await this.deviceList.load();
 
         // build our device keys: these will later be uploaded
-        this.deviceKeys["ed25519:" + this.deviceId] = this.olmDevice.deviceEd25519Key;
-        this.deviceKeys["curve25519:" + this.deviceId] = this.olmDevice.deviceCurve25519Key;
+        this.deviceKeys["ed25519:" + this.deviceId] = this.olmDevice.deviceEd25519Key!;
+        this.deviceKeys["curve25519:" + this.deviceId] = this.olmDevice.deviceCurve25519Key!;
 
         logger.log("Crypto: fetching own devices...");
         let myDevices = this.deviceList.getRawStoredDevicesForUser(this.userId);
@@ -548,7 +548,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     !deviceTrust.isLocallyVerified() &&
                     deviceTrust.isCrossSigningVerified()
                 ) {
-                    const deviceObj = this.deviceList.getStoredDevice(userId, deviceId);
+                    const deviceObj = this.deviceList.getStoredDevice(userId, deviceId)!;
                     this.emit(CryptoEvent.DeviceVerificationChanged, userId, deviceId, deviceObj);
                 }
             }
@@ -696,7 +696,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             builder.addCrossSigningKeys(authUploadDeviceSigningKeys, crossSigningInfo.keys);
 
             // Cross-sign own device
-            const device = this.deviceList.getStoredDevice(this.userId, this.deviceId);
+            const device = this.deviceList.getStoredDevice(this.userId, this.deviceId)!;
             const deviceSignature = await crossSigningInfo.signDevice(this.userId, device);
             builder.addKeySignature(this.userId, this.deviceId, deviceSignature);
 
@@ -1210,7 +1210,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         logger.info("Starting cross-signing key change post-processing");
 
         // sign the current device with the new key, and upload to the server
-        const device = this.deviceList.getStoredDevice(this.userId, this.deviceId);
+        const device = this.deviceList.getStoredDevice(this.userId, this.deviceId)!;
         const signedDevice = await this.crossSigningInfo.signDevice(this.userId, device);
         logger.info(`Starting background key sig upload for ${this.deviceId}`);
 
@@ -1371,7 +1371,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns {CrossSigningInfo} the cross signing information for the user.
      */
-    public getStoredCrossSigningForUser(userId: string): CrossSigningInfo {
+    public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
         return this.deviceList.getStoredCrossSigningForUser(userId);
     }
 
@@ -1411,8 +1411,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns {DeviceTrustLevel}
      */
-    public checkDeviceInfoTrust(userId: string, device: DeviceInfo): DeviceTrustLevel {
-        const trustedLocally = !!(device && device.isVerified());
+    public checkDeviceInfoTrust(userId: string, device?: DeviceInfo): DeviceTrustLevel {
+        const trustedLocally = !!device?.isVerified();
 
         const userCrossSigning = this.deviceList.getStoredCrossSigningForUser(userId);
         if (device && userCrossSigning) {
@@ -1437,13 +1437,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public checkIfOwnDeviceCrossSigned(deviceId: string): boolean {
         const device = this.deviceList.getStoredDevice(this.userId, deviceId);
+        if (!device) return false;
         const userCrossSigning = this.deviceList.getStoredCrossSigningForUser(this.userId);
-        return userCrossSigning.checkDeviceTrust(
+        return userCrossSigning?.checkDeviceTrust(
             userCrossSigning,
             device,
             false,
             true,
-        ).isCrossSigningVerified();
+        ).isCrossSigningVerified() ?? false;
     }
 
     /*
@@ -1576,7 +1577,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             (selfSigningChanged || selfSigningExistsNotLocallyCached)
         ) {
             logger.info("Attempting to retrieve cross-signing self-signing private key");
-            let signing = null;
+            let signing: PkSigning | null = null;
             try {
                 const ret = await this.crossSigningInfo.getCrossSigningKey(
                     "self_signing", newCrossSigning.getId("self_signing"),
@@ -1584,13 +1585,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 signing = ret[1];
                 logger.info("Got cross-signing self-signing private key");
             } finally {
-                if (signing) signing.free();
+                signing?.free();
             }
 
-            const device = this.deviceList.getStoredDevice(this.userId, this.deviceId);
-            const signedDevice = await this.crossSigningInfo.signDevice(
-                this.userId, device,
-            );
+            const device = this.deviceList.getStoredDevice(this.userId, this.deviceId)!;
+            const signedDevice = await this.crossSigningInfo.signDevice(this.userId, device);
             keySignatures[this.deviceId] = signedDevice;
         }
         if (userSigningChanged) {
@@ -1616,7 +1615,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         if (masterChanged) {
             const masterKey = this.crossSigningInfo.keys.master;
             await this.signObject(masterKey);
-            const deviceSig = masterKey.signatures[this.userId]["ed25519:" + this.deviceId];
+            const deviceSig = masterKey.signatures![this.userId]["ed25519:" + this.deviceId];
             // Include only the _new_ device signature in the upload.
             // We may have existing signatures from deleted devices, which will cause
             // the entire upload to fail.
@@ -1772,7 +1771,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @return {string} base64-encoded ed25519 key.
      */
-    public getDeviceEd25519Key(): string {
+    public getDeviceEd25519Key(): string | null {
         return this.olmDevice.deviceEd25519Key;
     }
 
@@ -1781,7 +1780,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @return {string} base64-encoded curve25519 key.
      */
-    public getDeviceCurve25519Key(): string {
+    public getDeviceCurve25519Key(): string | null {
         return this.olmDevice.deviceCurve25519Key;
     }
 
@@ -2863,7 +2862,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         event.makeEncrypted(
             "m.room.encrypted",
             encryptedContent,
-            this.olmDevice.deviceCurve25519Key,
+            this.olmDevice.deviceCurve25519Key!,
             this.olmDevice.deviceEd25519Key,
         );
     }
@@ -3144,7 +3143,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 const deviceId = deviceInfo.deviceId;
                 const encryptedContent: IEncryptedContent = {
                     algorithm: olmlib.OLM_ALGORITHM,
-                    sender_key: this.olmDevice.deviceCurve25519Key,
+                    sender_key: this.olmDevice.deviceCurve25519Key!,
                     ciphertext: {},
                 };
 

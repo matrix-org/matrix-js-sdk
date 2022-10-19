@@ -54,7 +54,7 @@ type EventHandlerMap = {
 };
 
 export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
-    public stream?: MediaStream;
+    public stream: MediaStream;
     public userId: string;
     public purpose: SDPStreamMetadataPurpose;
     public speakingVolumeSamples: number[];
@@ -83,6 +83,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
 
         this.updateStream(null, opts.stream);
+        this.stream = opts.stream; // updateStream does this, but this makes TS happier
 
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();

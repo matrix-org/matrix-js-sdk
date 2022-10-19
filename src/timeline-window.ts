@@ -105,6 +105,10 @@ export class TimelineWindow {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
         const initFields = (timeline: Optional<EventTimeline>) => {
+            if (!timeline) {
+                throw new Error("No timeline given to initFields");
+            }
+
             let eventIndex: number;
 
             const events = timeline.getEvents();
@@ -336,11 +340,17 @@ export class TimelineWindow {
      */
     public unpaginate(delta: number, startOfTimeline: boolean): void {
         const tl = startOfTimeline ? this.start : this.end;
+        if (!tl) {
+            throw new Error(
+                `Attempting to unpaginate startOfTimeline=${startOfTimeline} but don't have this direction`,
+            );
+        }
 
         // sanity-check the delta
         if (delta > this.eventCount || delta < 0) {
-            throw new Error("Attemting to unpaginate " + delta + " events, but " +
-                "only have " + this.eventCount + " in the timeline");
+            throw new Error(
+                `Attemting to unpaginate ${delta} events, but only have ${this.eventCount} in the timeline`,
+            );
         }
 
         while (delta > 0) {
