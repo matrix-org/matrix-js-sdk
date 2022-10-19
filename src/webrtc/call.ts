@@ -1975,10 +1975,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // clunky because TypeScript can't follow the types through if we use an expression as the key
         if (this.state === CallState.CreateOffer) {
             content.offer = this.peerConn.localDescription?.toJSON();
-            logger.debug(`offer is`, content.offer);
         } else {
             content.description = this.peerConn.localDescription?.toJSON();
-            logger.debug(`description is`, content.description);
         }
 
         content.capabilities = {
