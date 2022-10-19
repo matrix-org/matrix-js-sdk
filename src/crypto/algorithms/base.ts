@@ -299,7 +299,7 @@ export class UnknownDeviceError extends Error {
 export function registerAlgorithm(
     algorithm: string,
     encryptor: new (params: IParams) => EncryptionAlgorithm,
-    decryptor: new (params: Omit<IParams, "deviceId">) => DecryptionAlgorithm,
+    decryptor: new (params: DecryptionClassParams) => DecryptionAlgorithm,
 ): void {
     ENCRYPTION_CLASSES.set(algorithm, encryptor);
     DECRYPTION_CLASSES.set(algorithm, decryptor);

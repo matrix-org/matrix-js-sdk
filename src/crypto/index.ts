@@ -698,7 +698,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // Cross-sign own device
             const device = this.deviceList.getStoredDevice(this.userId, this.deviceId)!;
             const deviceSignature = await crossSigningInfo.signDevice(this.userId, device);
-            builder.addKeySignature(this.userId, this.deviceId, deviceSignature);
+            builder.addKeySignature(this.userId, this.deviceId, deviceSignature!);
 
             // Sign message key backup with cross-signing master key
             if (this.backupManager.backupInfo) {
@@ -1217,7 +1217,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const upload = ({ shouldEmit = false }) => {
             return this.baseApis.uploadKeySignatures({
                 [this.userId]: {
-                    [this.deviceId]: signedDevice,
+                    [this.deviceId]: signedDevice!,
                 },
             }).then((response) => {
                 const { failures } = response || {};
@@ -1590,7 +1590,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             const device = this.deviceList.getStoredDevice(this.userId, this.deviceId)!;
             const signedDevice = await this.crossSigningInfo.signDevice(this.userId, device);
-            keySignatures[this.deviceId] = signedDevice;
+            keySignatures[this.deviceId] = signedDevice!;
         }
         if (userSigningChanged) {
             logger.info("Got new user-signing key", newCrossSigning.getId("user_signing"));
@@ -2234,9 +2234,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             if (deviceTrust.isCrossSigningVerified()) {
                 logger.log(`Own device ${deviceId} already cross-signing verified`);
             } else {
-                device = await this.crossSigningInfo.signDevice(
+                device = (await this.crossSigningInfo.signDevice(
                     userId, DeviceInfo.fromStorage(dev, deviceId),
-                );
+                ))!;
             }
 
             if (device) {

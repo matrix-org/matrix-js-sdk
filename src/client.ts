@@ -200,7 +200,6 @@ import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
-import { UnknownDeviceError } from "./crypto/algorithms";
 
 export type Store = IStore;
 
@@ -3501,7 +3500,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const room = this.getRoom(roomIdOrAlias);
-        if (room?.hasMembershipState(this.credentials.userId, "join")) {
+        if (room?.hasMembershipState(this.credentials.userId!, "join")) {
             return Promise.resolve(room);
         }
 
@@ -5938,7 +5937,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | void {
+    public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | undefined {
         let promise: Promise<unknown>;
         let hasDontNotifyRule = false;
 

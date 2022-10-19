@@ -1411,9 +1411,9 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         pendingEvents.delete(event);
         if (pendingEvents.size === 0) {
-            senderPendingEvents.delete(sessionId);
+            senderPendingEvents!.delete(sessionId);
         }
-        if (senderPendingEvents.size === 0) {
+        if (senderPendingEvents!.size === 0) {
             this.pendingEvents.delete(senderKey);
         }
     }

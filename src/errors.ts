@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IUploadKeySignaturesResponse } from "./client";
-import { MatrixEvent } from "./models/event";
-
 export enum InvalidStoreState {
     ToggledLazyLoading,
 }
