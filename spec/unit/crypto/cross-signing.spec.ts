@@ -1074,4 +1074,58 @@ describe("Cross Signing", function() {
         expect(alice.checkIfOwnDeviceCrossSigned(deviceId)).toBeFalsy();
         alice.stopClient();
     });
+
+    it("checkIfOwnDeviceCrossSigned should sanely handle unknown devices", async () => {
+        const { client: alice } = await makeTestClient(
+            { userId: "@alice:example.com", deviceId: "Osborne2" },
+        );
+        alice.uploadDeviceSigningKeys = async () => ({});
+        alice.uploadKeySignatures = async () => ({ failures: {} });
+
+        // Generate Alice's SSK etc
+        const aliceMasterSigning = new global.Olm.PkSigning();
+        const aliceMasterPrivkey = aliceMasterSigning.generate_seed();
+        const aliceMasterPubkey = aliceMasterSigning.init_with_seed(aliceMasterPrivkey);
+        const aliceSigning = new global.Olm.PkSigning();
+        const alicePrivkey = aliceSigning.generate_seed();
+        const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
+        const aliceSSK: ICrossSigningKey = {
+            user_id: "@alice:example.com",
+            usage: ["self_signing"],
+            keys: {
+                ["ed25519:" + alicePubkey]: alicePubkey,
+            },
+        };
+        const sskSig = aliceMasterSigning.sign(anotherjson.stringify(aliceSSK));
+        aliceSSK.signatures = {
+            "@alice:example.com": {
+                ["ed25519:" + aliceMasterPubkey]: sskSig,
+            },
+        };
+
+        // Alice's device downloads the keys
+        alice.crypto!.deviceList.storeCrossSigningForUser("@alice:example.com", {
+            keys: {
+                master: {
+                    user_id: "@alice:example.com",
+                    usage: ["master"],
+                    keys: {
+                        ["ed25519:" + aliceMasterPubkey]: aliceMasterPubkey,
+                    },
+                },
+                self_signing: aliceSSK,
+            },
+            firstUse: true,
+            crossSigningVerifiedBefore: false,
+        });
+
+        expect(alice.checkIfOwnDeviceCrossSigned("notadevice")).toBeFalsy();
+        alice.stopClient();
+    });
+
+    it("checkIfOwnDeviceCrossSigned should sanely handle unknown users", async () => {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        expect(alice.checkIfOwnDeviceCrossSigned("notadevice")).toBeFalsy();
+        alice.stopClient();
+    });
 });

@@ -2,6 +2,7 @@ import '../olm-loader';
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 
+import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { MatrixClient } from "../../src/client";
 import { Crypto } from "../../src/crypto";
 import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
@@ -1073,6 +1074,52 @@ describe("Crypto", function() {
                 payload,
             );
             client.httpBackend.verifyNoOutstandingRequests();
+        });
+    });
+
+    describe("checkSecretStoragePrivateKey", () => {
+        let client: TestClient;
+
+        beforeEach(async () => {
+            client = new TestClient("@alice:example.org", "aliceweb");
+            await client.client.initCrypto();
+        });
+
+        afterEach(async () => {
+            await client.stop();
+        });
+
+        it("should free PkDecryption", () => {
+            const free = jest.fn();
+            jest.spyOn(Olm, "PkDecryption").mockImplementation(() => ({
+                init_with_private_key: jest.fn(),
+                free,
+            }) as unknown as PkDecryption);
+            client.client.checkSecretStoragePrivateKey(new Uint8Array(), "");
+            expect(free).toHaveBeenCalled();
+        });
+    });
+
+    describe("checkCrossSigningPrivateKey", () => {
+        let client: TestClient;
+
+        beforeEach(async () => {
+            client = new TestClient("@alice:example.org", "aliceweb");
+            await client.client.initCrypto();
+        });
+
+        afterEach(async () => {
+            await client.stop();
+        });
+
+        it("should free PkSigning", () => {
+            const free = jest.fn();
+            jest.spyOn(Olm, "PkSigning").mockImplementation(() => ({
+                init_with_seed: jest.fn(),
+                free,
+            }) as unknown as PkSigning);
+            client.client.checkCrossSigningPrivateKey(new Uint8Array(), "");
+            expect(free).toHaveBeenCalled();
         });
     });
 });

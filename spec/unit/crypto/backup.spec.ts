@@ -699,4 +699,29 @@ describe("MegolmBackup", function() {
             )).rejects.toThrow();
         });
     });
+
+    describe("flagAllGroupSessionsForBackup", () => {
+        it("should return number of sesions needing backup", async () => {
+            const scheduler = [
+                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
+                "setProcessFunction",
+            ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {}) as MockedObject<MatrixScheduler>;
+            const store = new StubStore();
+            const client = new MatrixClient({
+                baseUrl: "https://my.home.server",
+                idBaseUrl: "https://identity.server",
+                accessToken: "my.access.token",
+                fetchFn: jest.fn(), // NOP
+                store,
+                scheduler,
+                userId: "@alice:bar",
+                deviceId: "device",
+                cryptoStore,
+            });
+            await client.initCrypto();
+
+            cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);
+            await expect(client.flagAllGroupSessionsForBackup()).resolves.toBe(6);
+        });
+    });
 });
