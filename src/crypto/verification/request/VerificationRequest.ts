@@ -96,20 +96,20 @@ export class VerificationRequest<
     private eventsByUs = new Map<string, MatrixEvent>();
     private eventsByThem = new Map<string, MatrixEvent>();
     private _observeOnly = false;
-    private timeoutTimer: ReturnType<typeof setTimeout> = null;
+    private timeoutTimer: ReturnType<typeof setTimeout> | null = null;
     private _accepting = false;
     private _declining = false;
     private verifierHasFinished = false;
     private _cancelled = false;
-    private _chosenMethod: VerificationMethod = null;
+    private _chosenMethod: VerificationMethod | null = null;
     // we keep a copy of the QR Code data (including other user master key) around
     // for QR reciprocate verification, to protect against
     // cross-signing identity reset between the .ready and .start event
     // and signing the wrong key after .start
-    private _qrCodeData: QRCodeData = null;
+    private _qrCodeData: QRCodeData | null = null;
 
     // The timestamp when we received the request event from the other side
-    private requestReceivedAt: number = null;
+    private requestReceivedAt: number | null = null;
 
     private commonMethods: VerificationMethod[] = [];
     private _phase: Phase;
@@ -204,7 +204,7 @@ export class VerificationRequest<
     }
 
     /** the method picked in the .start event */
-    public get chosenMethod(): VerificationMethod {
+    public get chosenMethod(): VerificationMethod | null {
         return this._chosenMethod;
     }
 
@@ -270,7 +270,7 @@ export class VerificationRequest<
     }
 
     /** Only set after a .ready if the other party can scan a QR code */
-    public get qrCodeData(): QRCodeData {
+    public get qrCodeData(): QRCodeData | null {
         return this._qrCodeData;
     }
 
@@ -340,7 +340,7 @@ export class VerificationRequest<
     /** The id of the user that initiated the request */
     public get requestingUserId(): string {
         if (this.initiatedByMe) {
-            return this.client.getUserId();
+            return this.client.getUserId()!;
         } else {
             return this.otherUserId;
         }
@@ -351,7 +351,7 @@ export class VerificationRequest<
         if (this.initiatedByMe) {
             return this.otherUserId;
         } else {
-            return this.client.getUserId();
+            return this.client.getUserId()!;
         }
     }
 
@@ -368,7 +368,7 @@ export class VerificationRequest<
      * The id of the user that cancelled the request,
      * only defined when phase is PHASE_CANCELLED
      */
-    public get cancellingUserId(): string {
+    public get cancellingUserId(): string | undefined {
         const myCancel = this.eventsByUs.get(CANCEL_TYPE);
         const theirCancel = this.eventsByThem.get(CANCEL_TYPE);
 
@@ -422,7 +422,7 @@ export class VerificationRequest<
      */
     public beginKeyVerification(
         method: VerificationMethod,
-        targetDevice: ITargetDevice = null,
+        targetDevice: ITargetDevice | null = null,
     ): VerificationBase<any, any> {
         // need to allow also when unsent in case of to_device
         if (!this.observeOnly && !this._verifier) {
@@ -470,7 +470,7 @@ export class VerificationRequest<
             if (this._verifier) {
                 return this._verifier.cancel(errorFactory(code, reason)());
             } else {
-                this._cancellingUserId = this.client.getUserId();
+                this._cancellingUserId = this.client.getUserId()!;
                 await this.channel.send(CANCEL_TYPE, { code, reason });
             }
         }
@@ -525,11 +525,11 @@ export class VerificationRequest<
         }
     }
 
-    private getEventByEither(type: string): MatrixEvent {
+    private getEventByEither(type: string): MatrixEvent | undefined {
         return this.eventsByThem.get(type) || this.eventsByUs.get(type);
     }
 
-    private getEventBy(type: string, byThem = false): MatrixEvent {
+    private getEventBy(type: string, byThem = false): MatrixEvent | undefined {
         if (byThem) {
             return this.eventsByThem.get(type);
         } else {
@@ -890,9 +890,9 @@ export class VerificationRequest<
 
     private createVerifier(
         method: VerificationMethod,
-        startEvent: MatrixEvent = null,
-        targetDevice: ITargetDevice = null,
-    ): VerificationBase<any, any> {
+        startEvent: MatrixEvent | null = null,
+        targetDevice: ITargetDevice | null = null,
+    ): VerificationBase<any, any> | undefined {
         if (!targetDevice) {
             targetDevice = this.targetDevice;
         }
@@ -941,7 +941,7 @@ export class VerificationRequest<
         }
     }
 
-    public getEventFromOtherParty(type: string): MatrixEvent {
+    public getEventFromOtherParty(type: string): MatrixEvent | undefined {
         return this.eventsByThem.get(type);
     }
 }

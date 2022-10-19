@@ -1000,12 +1000,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.error("Failed to get screen-sharing stream:", err);
                 return false;
             }
-        } else if (this.localScreensharingStream) {
+        } else {
             for (const sender of this.screensharingSenders) {
                 this.peerConn?.removeTrack(sender);
             }
-            this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream);
-            this.deleteFeedByStream(this.localScreensharingStream);
+            this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream!);
+            this.deleteFeedByStream(this.localScreensharingStream!);
             return false;
         }
     }
@@ -1037,13 +1037,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.error("Failed to get screen-sharing stream:", err);
                 return false;
             }
-        } else if (this.localScreensharingStream) {
+        } else {
             const track = this.localUsermediaStream?.getTracks().find((track) => track.kind === "video");
             const sender = this.usermediaSenders.find((sender) => sender.track?.kind === "video");
             sender?.replaceTrack(track ?? null);
 
-            this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream);
-            this.deleteFeedByStream(this.localScreensharingStream);
+            this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream!);
+            this.deleteFeedByStream(this.localScreensharingStream!);
 
             return false;
         }
@@ -1319,10 +1319,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.setState(CallState.CreateAnswer);
 
-        let myAnswer;
+        let myAnswer: RTCSessionDescriptionInit;
         try {
             this.getRidOfRTXCodecs();
-            myAnswer = await this.peerConn.createAnswer();
+            myAnswer = await this.peerConn!.createAnswer();
         } catch (err) {
             logger.debug("Failed to create answer: ", err);
             this.terminate(CallParty.Local, CallErrorCode.CreateAnswer, true);
@@ -1330,7 +1330,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         try {
-            await this.peerConn.setLocalDescription(myAnswer);
+            await this.peerConn!.setLocalDescription(myAnswer);
             this.setState(CallState.Connecting);
 
             // Allow a short time for initial candidates to be gathered
@@ -1350,7 +1350,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * Internal
      * @param {Object} event
      */
-    private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent): Promise<void> => {
+    private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent): void => {
         if (event.candidate) {
             logger.debug(
                 "Call " + this.callId + " got local ICE " + event.candidate.sdpMid + " candidate: " +
@@ -1628,9 +1628,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // clunky because TypeScript can't follow the types through if we use an expression as the key
         if (this.state === CallState.CreateOffer) {
-            content.offer = this.peerConn.localDescription;
+            content.offer = this.peerConn!.localDescription!;
         } else {
-            content.description = this.peerConn.localDescription;
+            content.description = this.peerConn!.localDescription!;
         }
 
         content.capabilities = {
@@ -1720,11 +1720,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return; // because ICE can still complete as we're ending the call
         }
         logger.debug(
-            "Call ID " + this.callId + ": ICE connection state changed to: " + this.peerConn.iceConnectionState,
+            "Call ID " + this.callId + ": ICE connection state changed to: " + this.peerConn?.iceConnectionState,
         );
         // ideally we'd consider the call to be connected when we get media but
         // chrome doesn't implement any of the 'onstarted' events yet
-        if (this.peerConn.iceConnectionState == 'connected') {
+        if (this.peerConn?.iceConnectionState == 'connected') {
             this.setState(CallState.Connected);
 
             if (!this.callLengthInterval) {
@@ -1733,16 +1733,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     this.emit(CallEvent.LengthChanged, this.callLength);
                 }, 1000);
             }
-        } else if (this.peerConn.iceConnectionState == 'failed') {
+        } else if (this.peerConn?.iceConnectionState == 'failed') {
             this.hangup(CallErrorCode.IceFailed, false);
         }
     };
 
     private onSignallingStateChanged = (): void => {
-        logger.debug(
-            "call " + this.callId + ": Signalling state changed to: " +
-            this.peerConn.signalingState,
-        );
+        logger.debug(`call ${this.callId}: Signalling state changed to: ${this.peerConn?.signalingState}`);
     };
 
     private onTrack = (ev: RTCTrackEvent): void => {
@@ -1782,8 +1779,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // RTCRtpReceiver.getCapabilities and RTCRtpSender.getCapabilities don't seem to be supported on FF
         if (!RTCRtpReceiver.getCapabilities || !RTCRtpSender.getCapabilities) return;
 
-        const recvCodecs = RTCRtpReceiver.getCapabilities("video").codecs;
-        const sendCodecs = RTCRtpSender.getCapabilities("video").codecs;
+        const recvCodecs = RTCRtpReceiver.getCapabilities("video")!.codecs;
+        const sendCodecs = RTCRtpSender.getCapabilities("video")!.codecs;
         const codecs = [...sendCodecs, ...recvCodecs];
 
         for (const codec of codecs) {
@@ -1793,7 +1790,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
         }
 
-        for (const trans of this.peerConn.getTransceivers()) {
+        for (const trans of this.peerConn!.getTransceivers()) {
             if (
                 this.screensharingSenders.includes(trans.sender) &&
                     (
@@ -1817,7 +1814,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.makingOffer = true;
         try {
             this.getRidOfRTXCodecs();
-            const myOffer = await this.peerConn.createOffer();
+            const myOffer = await this.peerConn!.createOffer();
             await this.gotLocalOffer(myOffer);
         } catch (e) {
             this.getLocalOfferFailed(e);
@@ -1947,9 +1944,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * Transfers this call to the target call, effectively 'joining' the
      * two calls (so the remote parties on each call are connected together).
      */
-    public async transferToCall(transferTargetCall?: MatrixCall): Promise<void> {
-        const targetProfileInfo = await this.client.getProfileInfo(transferTargetCall.getOpponentMember().userId);
-        const transfereeProfileInfo = await this.client.getProfileInfo(this.getOpponentMember().userId);
+    public async transferToCall(transferTargetCall: MatrixCall): Promise<void> {
+        const targetUserId = transferTargetCall.getOpponentMember()?.userId;
+        const targetProfileInfo = targetUserId ? await this.client.getProfileInfo(targetUserId) : undefined;
+        const opponentUserId = this.getOpponentMember()?.userId;
+        const transfereeProfileInfo = opponentUserId ? await this.client.getProfileInfo(opponentUserId) : undefined;
 
         const newCallId = genCallID();
 
@@ -1958,9 +1957,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             // ID of the new call (but we can use the same function to generate it)
             replacement_id: genCallID(),
             target_user: {
-                id: this.getOpponentMember().userId,
-                display_name: transfereeProfileInfo.displayname,
-                avatar_url: transfereeProfileInfo.avatar_url,
+                id: opponentUserId,
+                display_name: transfereeProfileInfo?.displayname,
+                avatar_url: transfereeProfileInfo?.avatar_url,
             },
             await_call: newCallId,
         } as MCallReplacesEvent;
@@ -1970,9 +1969,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const bodyToTransferee = {
             replacement_id: genCallID(),
             target_user: {
-                id: transferTargetCall.getOpponentMember().userId,
-                display_name: targetProfileInfo.displayname,
-                avatar_url: targetProfileInfo.avatar_url,
+                id: targetUserId,
+                display_name: targetProfileInfo?.displayname,
+                avatar_url: targetProfileInfo?.avatar_url,
             },
             create_call: newCallId,
         } as MCallReplacesEvent;
@@ -2109,7 +2108,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const callFeed = new CallFeed({
                 client: this.client,
                 roomId: this.roomId,
-                userId: this.client.getUserId(),
+                userId: this.client.getUserId()!,
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,

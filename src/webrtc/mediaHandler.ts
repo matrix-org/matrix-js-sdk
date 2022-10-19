@@ -179,7 +179,10 @@ export class MediaHandler {
      * @param reusable is allowed to be reused by the MediaHandler
      * @returns {MediaStream} based on passed parameters
      */
-    public async getScreensharingStream(desktopCapturerSourceId: string, reusable = true): Promise<MediaStream | null> {
+    public async getScreensharingStream(
+        desktopCapturerSourceId?: string,
+        reusable = true,
+    ): Promise<MediaStream | null> {
         let stream: MediaStream;
 
         if (this.screensharingStreams.length === 0) {
