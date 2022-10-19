@@ -220,8 +220,8 @@ describe("SAS verification", function() {
             await Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => verifier.verify()),
-                alice.httpBackend.flush(),
-                bob.httpBackend.flush(),
+                alice.httpBackend.flush(undefined),
+                bob.httpBackend.flush(undefined),
             ]);
 
             // make sure that it uses the preferred method
@@ -231,10 +231,10 @@ describe("SAS verification", function() {
             // make sure Alice and Bob verified each other
             const bobDevice
                   = await alice.client.getStoredDevice("@bob:example.com", "Dynabook");
-            expect(bobDevice.isVerified()).toBeTruthy();
+            expect(bobDevice?.isVerified()).toBeTruthy();
             const aliceDevice
                   = await bob.client.getStoredDevice("@alice:example.com", "Osborne2");
-            expect(aliceDevice.isVerified()).toBeTruthy();
+            expect(aliceDevice?.isVerified()).toBeTruthy();
         });
 
         it("should be able to verify using the old base64", async () => {
@@ -279,8 +279,8 @@ describe("SAS verification", function() {
             await Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => verifier.verify()),
-                alice.httpBackend.flush(),
-                bob.httpBackend.flush(),
+                alice.httpBackend.flush(undefined),
+                bob.httpBackend.flush(undefined),
             ]);
 
             expect(macMethod).toBe("hkdf-hmac-sha256");
@@ -335,8 +335,8 @@ describe("SAS verification", function() {
             await Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => verifier.verify()),
-                alice.httpBackend.flush(),
-                bob.httpBackend.flush(),
+                alice.httpBackend.flush(undefined),
+                bob.httpBackend.flush(undefined),
             ]);
 
             expect(macMethod).toBe("hmac-sha256");
@@ -365,6 +365,8 @@ describe("SAS verification", function() {
             bob.client.crypto!.deviceList.storeCrossSigningForUser(
                 "@alice:example.com", {
                     keys: alice.client.crypto!.crossSigningInfo.keys,
+                    crossSigningVerifiedBefore: false,
+                    firstUse: false,
                 },
             );
 

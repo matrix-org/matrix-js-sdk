@@ -521,9 +521,9 @@ export class CrossSigningInfo {
             return new UserTrustLevel(false, false, userCrossSigning.firstUse);
         }
 
-        let userTrusted;
+        let userTrusted: boolean;
         const userMaster = userCrossSigning.keys.master;
-        const uskId = this.getId('user_signing');
+        const uskId = this.getId('user_signing')!;
         try {
             pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
@@ -567,7 +567,7 @@ export class CrossSigningInfo {
         const deviceObj = deviceToObject(device, userCrossSigning.userId);
         try {
             // if we can verify the user's SSK from their master key...
-            pkVerify(userSSK, userCrossSigning.getId(), userCrossSigning.userId);
+            pkVerify(userSSK, userCrossSigning.getId()!, userCrossSigning.userId);
             // ...and this device's key from their SSK...
             pkVerify(deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId);
             // ...then we trust this device as much as far as we trust the user
@@ -817,7 +817,7 @@ export async function requestKeysDuringVerification(
                 logger.info("Backup key stored. Starting backup restore...");
                 const backupInfo = await client.getKeyBackupVersion();
                 // no need to await for this - just let it go in the bg
-                client.restoreKeyBackupWithCache(undefined, undefined, backupInfo).then(() => {
+                client.restoreKeyBackupWithCache(undefined, undefined, backupInfo!).then(() => {
                     logger.info("Backup restored.");
                 });
             }

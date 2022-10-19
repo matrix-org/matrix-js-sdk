@@ -306,7 +306,7 @@ export class VerificationBase<
                     reject(new Error("Device ID is the same as the cross-signing ID"));
                 }
                 resolve();
-            }).then(() => this.doVerification?.()).then(this.done.bind(this), this.cancel.bind(this));
+            }).then(() => this.doVerification!()).then(this.done.bind(this), this.cancel.bind(this));
         }
         return this.promise;
     }
