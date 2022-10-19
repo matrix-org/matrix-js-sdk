@@ -43,7 +43,7 @@ describe("Relations", function() {
         // Add the event once and check results
         {
             relations.addEvent(eventA);
-            const annotationsByKey = relations.getSortedAnnotationsByKey();
+            const annotationsByKey = relations.getSortedAnnotationsByKey()!;
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];
             expect(key).toEqual("👍️");
@@ -53,7 +53,7 @@ describe("Relations", function() {
         // Add the event again and expect the same
         {
             relations.addEvent(eventA);
-            const annotationsByKey = relations.getSortedAnnotationsByKey();
+            const annotationsByKey = relations.getSortedAnnotationsByKey()!;
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];
             expect(key).toEqual("👍️");
@@ -66,7 +66,7 @@ describe("Relations", function() {
         // Add the event again and expect the same
         {
             relations.addEvent(eventB);
-            const annotationsByKey = relations.getSortedAnnotationsByKey();
+            const annotationsByKey = relations.getSortedAnnotationsByKey()!;
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];
             expect(key).toEqual("👍️");

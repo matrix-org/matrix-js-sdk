@@ -37,7 +37,7 @@ const mockClient = {
 function createTimeline(numEvents = 3, baseIndex = 1): EventTimeline {
     const room = new Room(ROOM_ID, mockClient, USER_ID);
     const timelineSet = new EventTimelineSet(room);
-    jest.spyOn(timelineSet.room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
+    jest.spyOn(room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
 
     const timeline = new EventTimeline(timelineSet);
 
@@ -170,7 +170,7 @@ describe("TimelineWindow", function() {
     beforeEach(() => {
         jest.clearAllMocks();
         mockClient.getEventTimeline.mockResolvedValue(undefined);
-        mockClient.paginateEventTimeline.mockReturnValue(undefined);
+        mockClient.paginateEventTimeline.mockResolvedValue(false);
     });
 
     describe("load", function() {

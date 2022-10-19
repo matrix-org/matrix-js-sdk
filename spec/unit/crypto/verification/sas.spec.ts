@@ -415,10 +415,10 @@ describe("SAS verification", function() {
 
         const bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
             bob.client.on(CryptoEvent.VerificationRequest, request => {
-                request.verifier.on("show_sas", (e) => {
+                request.verifier!.on("show_sas", (e) => {
                     e.mismatch();
                 });
-                resolve(request.verifier);
+                resolve(request.verifier!);
             });
         });
 

@@ -21,9 +21,9 @@ import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from '../../TestClient';
 import { makeTestClients } from './verification/util';
 import { encryptAES } from "../../../src/crypto/aes";
-import { resetCrossSigningKeys, createSecretStorageKey } from "./crypto-utils";
+import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from '../../../src/logger';
-import { ICreateClientOpts } from '../../../src/client';
+import { ClientEvent, ICreateClientOpts } from '../../../src/client';
 import { ISecretStorageKeyInfo } from '../../../src/crypto/api';
 import { DeviceInfo } from '../../../src/crypto/deviceinfo';
 
@@ -328,7 +328,7 @@ describe("Secrets", function() {
                 this.store.storeAccountDataEvents([
                     event,
                 ]);
-                this.emit("accountData", event);
+                this.emit(ClientEvent.AccountData, event);
                 return {};
             };
 
@@ -339,8 +339,8 @@ describe("Secrets", function() {
                 createSecretStorageKey,
             });
 
-            const crossSigning = bob.crypto.crossSigningInfo;
-            const secretStorage = bob.crypto.secretStorage;
+            const crossSigning = bob.crypto!.crossSigningInfo;
+            const secretStorage = bob.crypto!.secretStorage;
 
             expect(crossSigning.getId()).toBeTruthy();
             expect(await crossSigning.isStoredInSecretStorage(secretStorage))
@@ -528,16 +528,15 @@ describe("Secrets", function() {
                     content: data,
                 });
                 alice.store.storeAccountDataEvents([event]);
-                this.emit("accountData", event);
+                this.emit(ClientEvent.AccountData, event);
                 return {};
             };
 
             await alice.bootstrapSecretStorage({});
 
-            expect(alice.getAccountData("m.secret_storage.default_key").getContent())
+            expect(alice.getAccountData("m.secret_storage.default_key")!.getContent())
                 .toEqual({ key: "key_id" });
-            const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")
-                .getContent() as ISecretStorageKeyInfo;
+            const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")!.getContent<ISecretStorageKeyInfo>();
             expect(keyInfo.algorithm)
                 .toEqual("m.secret_storage.v1.aes-hmac-sha2");
             expect(keyInfo.passphrase).toEqual({
@@ -672,14 +671,13 @@ describe("Secrets", function() {
                     content: data,
                 });
                 alice.store.storeAccountDataEvents([event]);
-                this.emit("accountData", event);
+                this.emit(ClientEvent.AccountData, event);
                 return {};
             };
 
             await alice.bootstrapSecretStorage({});
 
-            const backupKey = alice.getAccountData("m.megolm_backup.v1")
-                .getContent();
+            const backupKey = alice.getAccountData("m.megolm_backup.v1")!.getContent();
             expect(backupKey.encrypted).toHaveProperty("key_id");
             expect(await alice.getSecret("m.megolm_backup.v1"))
                 .toEqual("ey0GB1kB6jhOWgwiBUMIWg==");

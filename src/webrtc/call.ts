@@ -293,10 +293,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private waitForLocalAVStream: boolean;
     private successor?: MatrixCall;
     private opponentMember?: RoomMember;
-    private opponentVersion: number | string;
+    private opponentVersion?: number | string;
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
-    private opponentPartyId?: string;
+    private opponentPartyId?: string | null;
     private opponentCaps?: CallCapabilities;
     private inviteTimeout?: ReturnType<typeof setTimeout>;
 
@@ -574,7 +574,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private pushNewLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
-        const userId = this.client.getUserId();
+        const userId = this.client.getUserId()!;
 
         // Tracks don't always start off enabled, eg. chrome will give a disabled
         // audio track if you ask for user media audio and already had one that
@@ -780,7 +780,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private shouldAnswerWithMediaType(
-        wantedValue: boolean | undefined, valueOfTheOtherSide: boolean | undefined, type: "audio" | "video",
+        wantedValue: boolean | undefined,
+        valueOfTheOtherSide: boolean | undefined,
+        type: "audio" | "video",
     ): boolean {
         if (wantedValue && !valueOfTheOtherSide) {
             // TODO: Figure out how to do this
@@ -826,7 +828,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 const usermediaFeed = new CallFeed({
                     client: this.client,
                     roomId: this.roomId,
-                    userId: this.client.getUserId(),
+                    userId: this.client.getUserId()!,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
                     audioMuted: false,
@@ -848,7 +850,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     this.waitForLocalAVStream = false;
                     await this.answer(answerWithAudio, false);
                 } else {
-                    this.getUserMediaFailed(e);
+                    this.getUserMediaFailed(<Error>e);
                     return;
                 }
             }
@@ -947,7 +949,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         } catch (error) {
             logger.error("Failed to upgrade the call", error);
             this.emit(CallEvent.Error,
-                new CallError(CallErrorCode.NoUserMedia, "Failed to get camera access: ", error),
+                new CallError(CallErrorCode.NoUserMedia, "Failed to get camera access: ", <Error>error),
             );
         }
     }
@@ -1295,11 +1297,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             let code = CallErrorCode.SendAnswer;
             let message = "Failed to send answer";
-            if (error.name == 'UnknownDeviceError') {
+            if ((<Error>error).name == 'UnknownDeviceError') {
                 code = CallErrorCode.UnknownDevices;
                 message = "Unknown devices present in the room";
             }
-            this.emit(CallEvent.Error, new CallError(code, message, error));
+            this.emit(CallEvent.Error, new CallError(code, message, <Error>error));
             throw error;
         }
 
@@ -1657,12 +1659,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 code = CallErrorCode.SendInvite;
                 message = "Failed to send invite";
             }
-            if (error.name == 'UnknownDeviceError') {
+            if ((<Error>error).name == 'UnknownDeviceError') {
                 code = CallErrorCode.UnknownDevices;
                 message = "Unknown devices present in the room";
             }
 
-            this.emit(CallEvent.Error, new CallError(code, message, error));
+            this.emit(CallEvent.Error, new CallError(code, message, <Error>error));
             this.terminate(CallParty.Local, code, false);
 
             // no need to carry on & send the candidate queue, but we also
@@ -1817,7 +1819,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const myOffer = await this.peerConn!.createOffer();
             await this.gotLocalOffer(myOffer);
         } catch (e) {
-            this.getLocalOfferFailed(e);
+            this.getLocalOfferFailed(<Error>e);
             return;
         } finally {
             this.makingOffer = false;
@@ -2071,7 +2073,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 const code = CallErrorCode.SignallingFailed;
                 const message = "Signalling failed";
 
-                this.emit(CallEvent.Error, new CallError(code, message, error));
+                this.emit(CallEvent.Error, new CallError(code, message, <Error>error));
                 this.hangup(code, false);
 
                 return;
@@ -2116,7 +2118,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             });
             await this.placeCallWithCallFeeds([callFeed]);
         } catch (e) {
-            this.getUserMediaFailed(e);
+            this.getUserMediaFailed(<Error>e);
             return;
         }
     }

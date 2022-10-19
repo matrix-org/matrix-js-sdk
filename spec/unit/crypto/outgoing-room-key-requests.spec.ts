@@ -93,7 +93,7 @@ describe.each([
             await store.getOutgoingRoomKeyRequestByState([RoomKeyRequestState.Sent]);
             expect(r).not.toBeNull();
             expect(r).not.toBeUndefined();
-            expect(r.state).toEqual(RoomKeyRequestState.Sent);
+            expect(r!.state).toEqual(RoomKeyRequestState.Sent);
             expect(requests).toContainEqual(r);
         });
 });

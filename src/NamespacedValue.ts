@@ -33,14 +33,14 @@ export class NamespacedValue<S extends string, U extends string> {
         if (this.stable) {
             return this.stable;
         }
-        return this.unstable;
+        return this.unstable!;
     }
 
     public get altName(): U | S | null {
         if (!this.stable) {
             return null;
         }
-        return this.unstable;
+        return this.unstable!;
     }
 
     public get names(): (U | S)[] {
@@ -57,7 +57,7 @@ export class NamespacedValue<S extends string, U extends string> {
     // this desperately wants https://github.com/microsoft/TypeScript/pull/26349 at the top level of the class
     // so we can instantiate `NamespacedValue<string, _, _>` as a default type for that namespace.
     public findIn<T>(obj: any): Optional<T> {
-        let val: T;
+        let val: T | undefined = undefined;
         if (this.name) {
             val = obj?.[this.name];
         }
@@ -91,7 +91,7 @@ export class ServerControlledNamespacedValue<S extends string, U extends string>
         if (this.stable && !this.preferUnstable) {
             return this.stable;
         }
-        return this.unstable;
+        return this.unstable!;
     }
 }
 
@@ -109,10 +109,10 @@ export class UnstableValue<S extends string, U extends string> extends Namespace
     }
 
     public get name(): U {
-        return this.unstable;
+        return this.unstable!;
     }
 
     public get altName(): S {
-        return this.stable;
+        return this.stable!;
     }
 }
