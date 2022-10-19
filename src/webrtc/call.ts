@@ -647,20 +647,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             videoMuted,
         }));
 
-        // gather transceivers from the new tracks so that we can use the same ones for tracks that
-        // we add later. We only do this for user media streams though: screenshare streams just always
-        // get their own unidirectional transceiver since a bidirectional screen share is pretty rare
-        // (we *could* re-use an existing recvonly transceiver for this, but it's simpler to just not).
-        // Actually, we don't do this since firefox doesn't implement setStreams() yet, so the only way
-        // we can group the tracks into streams is to use addTrack(). It remains here to hopefully be
-        // resurrected once Firefox sort themselves out.
-        /*if (purpose == SDPStreamMetadataPurpose.Usermedia) {
-            for (const track of stream.getTracks()) {
-                const transceiver = this.peerConn.getTransceivers().find(t => t.receiver.track == track);
-                this.transceivers.set(getTransceiverKey(purpose, track.kind), transceiver);
-            }
-        }*/
-
         this.emit(CallEvent.FeedsChanged, this.feeds);
 
         logger.info(
@@ -702,15 +688,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             stream,
             purpose,
         }));
-
-        /*
-        Another commented block for retrieving existing transceivers: re-enable once we can use
-        addTransceiver (see the many other comments).
-        for (const track of stream.getTracks()) {
-            const transceiver = this.peerConn.getTransceivers().find(t => t.receiver.track == track);
-            this.transceivers.set(getTransceiverKey(purpose, track.kind), transceiver);
-        }
-        */
 
         this.emit(CallEvent.FeedsChanged, this.feeds);
 
