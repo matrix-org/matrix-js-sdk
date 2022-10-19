@@ -876,7 +876,7 @@ export type EmittedEvents = ClientEvent
     | BeaconEvent;
 
 export type ClientEventHandlerMap = {
-    [ClientEvent.Sync]: (state: SyncState, lastState: SyncState | null, data: ISyncStateData | null) => void;
+    [ClientEvent.Sync]: (state: SyncState, lastState: SyncState | null, data?: ISyncStateData) => void;
     [ClientEvent.Event]: (event: MatrixEvent) => void;
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
     [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;
@@ -1517,11 +1517,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {?SyncState} the sync state, which may be null.
      * @see module:client~MatrixClient#event:"sync"
      */
-    public getSyncState(): SyncState {
-        if (!this.syncApi) {
-            return null;
-        }
-        return this.syncApi.getSyncState();
+    public getSyncState(): SyncState | null {
+        return this.syncApi?.getSyncState() ?? null;
     }
 
     /**

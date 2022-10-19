@@ -52,7 +52,7 @@ class ExtensionE2EE implements Extension {
         return ExtensionState.PreProcess;
     }
 
-    public onRequest(isInitial: boolean): object {
+    public onRequest(isInitial: boolean): object | undefined {
         if (!isInitial) {
             return undefined;
         }
@@ -90,7 +90,7 @@ class ExtensionE2EE implements Extension {
 }
 
 class ExtensionToDevice implements Extension {
-    private nextBatch?: string = null;
+    private nextBatch: string | null = null;
 
     constructor(private readonly client: MatrixClient) {}
 
@@ -114,7 +114,7 @@ class ExtensionToDevice implements Extension {
     }
 
     public async onResponse(data: object): Promise<void> {
-        const cancelledKeyVerificationTxns = [];
+        const cancelledKeyVerificationTxns: string[] = [];
         data["events"] = data["events"] || [];
         data["events"]
             .map(this.client.getEventMapper())
@@ -125,7 +125,7 @@ class ExtensionToDevice implements Extension {
                 // so we can flag the verification events as cancelled in the loop
                 // below.
                 if (toDeviceEvent.getType() === "m.key.verification.cancel") {
-                    const txnId = toDeviceEvent.getContent()['transaction_id'];
+                    const txnId: string | undefined = toDeviceEvent.getContent()['transaction_id'];
                     if (txnId) {
                         cancelledKeyVerificationTxns.push(txnId);
                     }
@@ -177,7 +177,7 @@ class ExtensionAccountData implements Extension {
         return ExtensionState.PostProcess;
     }
 
-    public onRequest(isInitial: boolean): object {
+    public onRequest(isInitial: boolean): object | undefined {
         if (!isInitial) {
             return undefined;
         }
@@ -235,9 +235,9 @@ class ExtensionAccountData implements Extension {
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
  */
 export class SlidingSyncSdk {
-    private syncState: SyncState = null;
-    private syncStateData: ISyncStateData;
-    private lastPos: string = null;
+    private syncState: SyncState | null = null;
+    private syncStateData?: ISyncStateData;
+    private lastPos: string | null = null;
     private failCount = 0;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
 
@@ -306,7 +306,7 @@ export class SlidingSyncSdk {
                 // Element won't stop showing the initial loading spinner unless we fire SyncState.Prepared
                 if (!this.lastPos) {
                     this.updateSyncState(SyncState.Prepared, {
-                        oldSyncToken: this.lastPos,
+                        oldSyncToken: undefined,
                         nextSyncToken: resp.pos,
                         catchingUp: false,
                         fromCache: false,
@@ -315,7 +315,7 @@ export class SlidingSyncSdk {
                 // Conversely, Element won't show the room list unless there is at least 1x SyncState.Syncing
                 // so hence for the very first sync we will fire prepared then immediately syncing.
                 this.updateSyncState(SyncState.Syncing, {
-                    oldSyncToken: this.lastPos,
+                    oldSyncToken: this.lastPos!,
                     nextSyncToken: resp.pos,
                     catchingUp: false,
                     fromCache: false,
@@ -373,7 +373,7 @@ export class SlidingSyncSdk {
      * @see module:client~MatrixClient#event:"sync"
      * @return {?String}
      */
-    public getSyncState(): SyncState {
+    public getSyncState(): SyncState | null {
         return this.syncState;
     }
 
@@ -385,8 +385,8 @@ export class SlidingSyncSdk {
      * this object.
      * @return {?Object}
      */
-    public getSyncStateData(): ISyncStateData {
-        return this.syncStateData;
+    public getSyncStateData(): ISyncStateData | null {
+        return this.syncStateData ?? null;
     }
 
     private shouldAbortSync(error: MatrixError): boolean {
@@ -500,8 +500,7 @@ export class SlidingSyncSdk {
         if (roomData.initial) {
             // set the back-pagination token. Do this *before* adding any
             // events so that clients can start back-paginating.
-            room.getLiveTimeline().setPaginationToken(
-                roomData.prev_batch, EventTimeline.BACKWARDS);
+            room.getLiveTimeline().setPaginationToken(roomData.prev_batch ?? null, EventTimeline.BACKWARDS);
         }
 
         /* TODO
@@ -815,7 +814,7 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
         content: {
             name: roomData.name,
         },
-        sender: client.getUserId(),
+        sender: client.getUserId()!,
         origin_server_ts: new Date().getTime(),
     });
     return roomData;
@@ -824,7 +823,7 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
 // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
 // just outside the class.
 
-function mapEvents(client: MatrixClient, roomId: string, events: object[], decrypt = true): MatrixEvent[] {
+function mapEvents(client: MatrixClient, roomId: string | undefined, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });
     return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
         e["room_id"] = roomId;

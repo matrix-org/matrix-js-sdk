@@ -166,7 +166,7 @@ export class SyncApi {
     private currentSyncRequest?: Promise<ISyncResponse>;
     private abortController?: AbortController;
     private syncState: SyncState | null = null;
-    private syncStateData: ISyncStateData | null = null; // additional data (eg. error object for failed sync)
+    private syncStateData?: ISyncStateData; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
     private keepAliveTimer?: ReturnType<typeof setTimeout>;
@@ -319,7 +319,10 @@ export class SyncApi {
                     //     complicated...
                     return;
                 }
-                leaveObj.timeline = leaveObj.timeline || {};
+                leaveObj.timeline = leaveObj.timeline || {
+                    prev_batch: null,
+                    events: [],
+                };
                 const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
 
                 const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
@@ -1756,7 +1759,7 @@ export class SyncApi {
      * @param {String} newState The new state string
      * @param {Object} data Object of additional data to emit in the event
      */
-    private updateSyncState(newState: SyncState, data: ISyncStateData | null = null): void {
+    private updateSyncState(newState: SyncState, data?: ISyncStateData): void {
         const old = this.syncState;
         this.syncState = newState;
         this.syncStateData = data;

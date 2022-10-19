@@ -271,7 +271,7 @@ export interface Extension {
      * @param isInitial True when this is part of the initial request (send sticky params)
      * @returns The request JSON to send.
      */
-    onRequest(isInitial: boolean): object;
+    onRequest(isInitial: boolean): object | undefined;
     /**
      * A function which is called when there is response JSON under this extension.
      * @param data The response JSON under the extension name.
