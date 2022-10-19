@@ -81,7 +81,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     // The 'next_batch' sync token at the point the data was written,
     // ie. a token representing the point immediately after the
     // moment represented by the snapshot in the db.
-    private syncToken?: string;
+    private syncToken: string | null = null;
 
     private keyDownloadsInProgressByUser = new Map<string, Promise<void>>;
 
@@ -89,16 +89,16 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     private dirty = false;
 
     // Promise resolved when device data is saved
-    private savePromise?: Promise<boolean>;
+    private savePromise: Promise<boolean> | null = null;
     // Function that resolves the save promise
-    private resolveSavePromise?: (saved: boolean) => void;
+    private resolveSavePromise: ((saved: boolean) => void) | null = null;
     // The time the save is scheduled for
-    private savePromiseTime?: number;
+    private savePromiseTime: number | null = null;
     // The timer used to delay the save
-    private saveTimer?: ReturnType<typeof setTimeout>;
+    private saveTimer: ReturnType<typeof setTimeout> | null = null;
     // True if we have fetched data from the server or loaded a non-empty
     // set of device data from the store
-    private hasFetched?: boolean;
+    private hasFetched: boolean | null = null;
 
     private readonly serialiser: DeviceListUpdateSerialiser;
 
@@ -127,7 +127,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
                         deviceData.crossSigningInfo || {} : {};
                     this.deviceTrackingStatus = deviceData ?
                         deviceData.trackingStatus : {};
-                    this.syncToken = deviceData?.syncToken;
+                    this.syncToken = deviceData?.syncToken ?? null;
                     this.userByIdentityKey = {};
                     for (const user of Object.keys(this.devices)) {
                         const userDevices = this.devices[user];
@@ -181,9 +181,9 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
         if (this.savePromiseTime && targetTime < this.savePromiseTime) {
             // There's a save scheduled but for after we would like: cancel
             // it & schedule one for the time we want
-            clearTimeout(this.saveTimer);
-            this.saveTimer = undefined;
-            this.savePromiseTime = undefined;
+            clearTimeout(this.saveTimer ?? undefined);
+            this.saveTimer = null;
+            this.savePromiseTime = null;
             // (but keep the save promise since whatever called save before
             // will still want to know when the save is done)
         }
@@ -205,10 +205,10 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
                 // null out savePromise now (after the delay but before the write),
                 // otherwise we could return the existing promise when the save has
                 // actually already happened.
-                this.savePromiseTime = undefined;
-                this.saveTimer = undefined;
-                this.savePromise = undefined;
-                this.resolveSavePromise = undefined;
+                this.savePromiseTime = null;
+                this.saveTimer = null;
+                this.savePromise = null;
+                this.resolveSavePromise = null;
 
                 this.cryptoStore.doTxn(
                     'readwrite', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
@@ -216,7 +216,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
                             devices: this.devices,
                             crossSigningInfo: this.crossSigningInfo,
                             trackingStatus: this.deviceTrackingStatus,
-                            syncToken: this.syncToken,
+                            syncToken: this.syncToken ?? undefined,
                         }, txn);
                     },
                 ).then(() => {
@@ -238,7 +238,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      *
      * @return {string} The sync token
      */
-    public getSyncToken(): string | undefined {
+    public getSyncToken(): string | null {
         return this.syncToken;
     }
 

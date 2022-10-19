@@ -15,9 +15,8 @@ limitations under the License.
 */
 
 import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
-import { Logger } from "loglevel";
 
-import { logger } from '../logger';
+import { logger, PrefixedLogger } from '../logger';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import * as algorithms from './algorithms';
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
@@ -714,13 +713,13 @@ export class OlmDevice {
      * @param {boolean} nowait Don't wait for an in-progress session to complete.
      *     This should only be set to true of the calling function is the function
      *     that marked the session as being in-progress.
-     * @param {Logger} [log] A possibly customised log
+     * @param {PrefixedLogger} [log] A possibly customised log
      * @return {Promise<?string>}  session id, or null if no established session
      */
     public async getSessionIdForDevice(
         theirDeviceIdentityKey: string,
         nowait = false,
-        log?: Logger,
+        log?: PrefixedLogger,
     ): Promise<string | null> {
         const sessionInfos = await this.getSessionInfoForDevice(theirDeviceIdentityKey, nowait, log);
 

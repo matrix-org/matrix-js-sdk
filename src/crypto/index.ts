@@ -23,6 +23,7 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
+import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType } from "../@types/event";
 import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
@@ -85,7 +86,6 @@ import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { PkDecryption, PkSigning } from "@matrix-org/olm";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -318,8 +318,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     // processing the response.
     private sendKeyRequestsImmediately = false;
 
-    private oneTimeKeyCount: number;
-    private needsNewFallback: boolean;
+    private oneTimeKeyCount?: number;
+    private needsNewFallback?: boolean;
     private fallbackCleanup?: ReturnType<typeof setTimeout>;
 
     /**
@@ -1601,7 +1601,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             (userSigningChanged || userSigningExistsNotLocallyCached)
         ) {
             logger.info("Attempting to retrieve cross-signing user-signing private key");
-            let signing = null;
+            let signing: PkSigning | null = null;
             try {
                 const ret = await this.crossSigningInfo.getCrossSigningKey(
                     "user_signing", newCrossSigning.getId("user_signing"),
@@ -1609,7 +1609,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 signing = ret[1];
                 logger.info("Got cross-signing user-signing private key");
             } finally {
-                if (signing) signing.free();
+                signing?.free();
             }
         }
 
@@ -2755,7 +2755,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const total = keys.length;
 
         function updateProgress() {
-            opts.progressCallback({
+            opts.progressCallback?.({
                 stage: "load_keys",
                 successes,
                 failures,
@@ -3754,8 +3754,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * unknown
      */
     public getRoomDecryptor(roomId: string, algorithm: string): DecryptionAlgorithm {
-        let decryptors: Map<string, DecryptionAlgorithm>;
-        let alg: DecryptionAlgorithm;
+        let decryptors: Map<string, DecryptionAlgorithm> | undefined;
+        let alg: DecryptionAlgorithm | undefined;
 
         roomId = roomId || null;
         if (roomId) {
@@ -3800,10 +3800,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @return {array} An array of room decryptors
      */
     private getRoomDecryptors(algorithm: string): DecryptionAlgorithm[] {
-        const decryptors = [];
+        const decryptors: DecryptionAlgorithm[] = [];
         for (const d of this.roomDecryptors.values()) {
             if (d.has(algorithm)) {
-                decryptors.push(d.get(algorithm));
+                decryptors.push(d.get(algorithm)!);
             }
         }
         return decryptors;
