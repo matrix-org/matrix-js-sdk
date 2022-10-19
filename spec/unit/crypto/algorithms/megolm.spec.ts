@@ -493,9 +493,9 @@ describe("MegolmDecryption", function() {
             bobClient1.initCrypto(),
             bobClient2.initCrypto(),
         ]);
-        const aliceDevice = aliceClient.crypto.olmDevice;
-        const bobDevice1 = bobClient1.crypto.olmDevice;
-        const bobDevice2 = bobClient2.crypto.olmDevice;
+        const aliceDevice = aliceClient.crypto!.olmDevice;
+        const bobDevice1 = bobClient1.crypto!.olmDevice;
+        const bobDevice2 = bobClient2.crypto!.olmDevice;
 
         const encryptionCfg = {
             "algorithm": "m.megolm.v1.aes-sha2",
@@ -532,10 +532,10 @@ describe("MegolmDecryption", function() {
             },
         };
 
-        aliceClient.crypto.deviceList.storeDevicesForUser(
+        aliceClient.crypto!.deviceList.storeDevicesForUser(
             "@bob:example.com", BOB_DEVICES,
         );
-        aliceClient.crypto.deviceList.downloadKeys = async function(userIds) {
+        aliceClient.crypto!.deviceList.downloadKeys = async function(userIds) {
             return this.getDevicesFromStore(userIds);
         };
 
@@ -551,7 +551,7 @@ describe("MegolmDecryption", function() {
                 body: "secret",
             },
         });
-        await aliceClient.crypto.encryptEvent(event, room);
+        await aliceClient.crypto!.encryptEvent(event, room);
 
         expect(aliceClient.sendToDevice).toHaveBeenCalled();
         const [msgtype, contentMap] = mocked(aliceClient.sendToDevice).mock.calls[0];
@@ -583,6 +583,100 @@ describe("MegolmDecryption", function() {
         bobClient2.stopClient();
     });
 
+    it("does not block unverified devices when sending verification events", async function() {
+        const aliceClient = (new TestClient(
+            "@alice:example.com", "alicedevice",
+        )).client;
+        const bobClient = (new TestClient(
+            "@bob:example.com", "bobdevice",
+        )).client;
+        await Promise.all([
+            aliceClient.initCrypto(),
+            bobClient.initCrypto(),
+        ]);
+        const bobDevice = bobClient.crypto!.olmDevice;
+
+        const encryptionCfg = {
+            "algorithm": "m.megolm.v1.aes-sha2",
+        };
+        const roomId = "!someroom";
+        const room = new Room(roomId, aliceClient, "@alice:example.com", {});
+
+        const bobMember = new RoomMember(roomId, "@bob:example.com");
+        room.getEncryptionTargetMembers = async function() {
+            return [bobMember];
+        };
+        room.setBlacklistUnverifiedDevices(true);
+        aliceClient.store.storeRoom(room);
+        await aliceClient.setRoomEncryption(roomId, encryptionCfg);
+
+        const BOB_DEVICES: Record<string, IDevice> = {
+            bobdevice: {
+                algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                keys: {
+                    "ed25519:bobdevice": bobDevice.deviceEd25519Key,
+                    "curve25519:bobdevice": bobDevice.deviceCurve25519Key,
+                },
+                verified: 0,
+                known: true,
+            },
+        };
+
+        aliceClient.crypto!.deviceList.storeDevicesForUser(
+            "@bob:example.com", BOB_DEVICES,
+        );
+        aliceClient.crypto!.deviceList.downloadKeys = async function(userIds) {
+            // @ts-ignore private
+            return this.getDevicesFromStore(userIds);
+        };
+
+        await bobDevice.generateOneTimeKeys(1);
+        const oneTimeKeys = await bobDevice.getOneTimeKeys();
+        const signedOneTimeKeys: Record<string, { key: string, signatures: object }> = {};
+        for (const keyId in oneTimeKeys.curve25519) {
+            if (oneTimeKeys.curve25519.hasOwnProperty(keyId)) {
+                const k = {
+                    key: oneTimeKeys.curve25519[keyId],
+                    signatures: {},
+                };
+                signedOneTimeKeys["signed_curve25519:" + keyId] = k;
+                await bobClient.crypto!.signObject(k);
+                break;
+            }
+        }
+
+        aliceClient.claimOneTimeKeys = jest.fn().mockResolvedValue({
+            one_time_keys: {
+                '@bob:example.com': {
+                    bobdevice: signedOneTimeKeys,
+                },
+            },
+            failures: {},
+        });
+
+        aliceClient.sendToDevice = jest.fn().mockResolvedValue({});
+
+        const event = new MatrixEvent({
+            type: "m.key.verification.start",
+            sender: "@alice:example.com",
+            room_id: roomId,
+            event_id: "$event",
+            content: {
+                from_device: "alicedevice",
+                method: "m.sas.v1",
+                transaction_id: "transactionid",
+            },
+        });
+        await aliceClient.crypto!.encryptEvent(event, room);
+
+        expect(aliceClient.sendToDevice).toHaveBeenCalled();
+        const [msgtype] = mocked(aliceClient.sendToDevice).mock.calls[0];
+        expect(msgtype).toEqual("m.room.encrypted");
+
+        aliceClient.stopClient();
+        bobClient.stopClient();
+    });
+
     it("notifies devices when unable to create olm session", async function() {
         const aliceClient = (new TestClient(
             "@alice:example.com", "alicedevice",
@@ -594,8 +688,8 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        const aliceDevice = aliceClient.crypto.olmDevice;
-        const bobDevice = bobClient.crypto.olmDevice;
+        const aliceDevice = aliceClient.crypto!.olmDevice;
+        const bobDevice = bobClient.crypto!.olmDevice;
 
         const encryptionCfg = {
             "algorithm": "m.megolm.v1.aes-sha2",
@@ -632,10 +726,11 @@ describe("MegolmDecryption", function() {
             },
         };
 
-        aliceClient.crypto.deviceList.storeDevicesForUser(
+        aliceClient.crypto!.deviceList.storeDevicesForUser(
             "@bob:example.com", BOB_DEVICES,
         );
-        aliceClient.crypto.deviceList.downloadKeys = async function(userIds) {
+        aliceClient.crypto!.deviceList.downloadKeys = async function(userIds) {
+            // @ts-ignore private
             return this.getDevicesFromStore(userIds);
         };
 
@@ -654,7 +749,7 @@ describe("MegolmDecryption", function() {
             event_id: "$event",
             content: {},
         });
-        await aliceClient.crypto.encryptEvent(event, aliceRoom);
+        await aliceClient.crypto!.encryptEvent(event, aliceRoom);
 
         expect(aliceClient.sendToDevice).toHaveBeenCalled();
         const [msgtype, contentMap] = mocked(aliceClient.sendToDevice).mock.calls[0];
@@ -685,10 +780,10 @@ describe("MegolmDecryption", function() {
             aliceClient.initCrypto(),
             bobClient.initCrypto(),
         ]);
-        const bobDevice = bobClient.crypto.olmDevice;
+        const bobDevice = bobClient.crypto!.olmDevice;
 
         const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
-        aliceClient.crypto.registerEventHandlers(aliceEventEmitter);
+        aliceClient.crypto!.registerEventHandlers(aliceEventEmitter);
 
         const roomId = "!someroom";
 
@@ -705,7 +800,7 @@ describe("MegolmDecryption", function() {
             },
         }));
 
-        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto!.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
@@ -732,7 +827,7 @@ describe("MegolmDecryption", function() {
             },
         }));
 
-        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto!.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
@@ -762,10 +857,10 @@ describe("MegolmDecryption", function() {
         ]);
 
         const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
-        aliceClient.crypto.registerEventHandlers(aliceEventEmitter);
+        aliceClient.crypto!.registerEventHandlers(aliceEventEmitter);
 
-        aliceClient.crypto.downloadKeys = jest.fn();
-        const bobDevice = bobClient.crypto.olmDevice;
+        aliceClient.crypto!.downloadKeys = jest.fn();
+        const bobDevice = bobClient.crypto!.olmDevice;
 
         const roomId = "!someroom";
 
@@ -788,7 +883,7 @@ describe("MegolmDecryption", function() {
             setTimeout(resolve, 100);
         });
 
-        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto!.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
@@ -820,7 +915,7 @@ describe("MegolmDecryption", function() {
             setTimeout(resolve, 100);
         });
 
-        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto!.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",
@@ -850,10 +945,10 @@ describe("MegolmDecryption", function() {
             bobClient.initCrypto(),
         ]);
         const aliceEventEmitter = new TypedEventEmitter<ClientEvent.ToDeviceEvent, any>();
-        aliceClient.crypto.registerEventHandlers(aliceEventEmitter);
+        aliceClient.crypto!.registerEventHandlers(aliceEventEmitter);
 
-        const bobDevice = bobClient.crypto.olmDevice;
-        aliceClient.crypto.downloadKeys = jest.fn();
+        const bobDevice = bobClient.crypto!.olmDevice;
+        aliceClient.crypto!.downloadKeys = jest.fn();
 
         const roomId = "!someroom";
 
@@ -875,7 +970,7 @@ describe("MegolmDecryption", function() {
             setTimeout(resolve, 100);
         });
 
-        await expect(aliceClient.crypto.decryptEvent(new MatrixEvent({
+        await expect(aliceClient.crypto!.decryptEvent(new MatrixEvent({
             type: "m.room.encrypted",
             sender: "@bob:example.com",
             event_id: "$event",

@@ -25,6 +25,7 @@ import { QRCodeData, SCAN_QR_CODE_METHOD } from "../QRCode";
 import { IVerificationChannel } from "./Channel";
 import { MatrixClient } from "../../../client";
 import { MatrixEvent } from "../../../models/event";
+import { EventType } from '../../../@types/event';
 import { VerificationBase } from "../Base";
 import { VerificationMethod } from "../../index";
 import { TypedEventEmitter } from "../../../models/typed-event-emitter";
@@ -931,7 +932,7 @@ export class VerificationRequest<
     }
 
     public onVerifierFinished(): void {
-        this.channel.send("m.key.verification.done", {});
+        this.channel.send(EventType.KeyVerificationDone, {});
         this.verifierHasFinished = true;
         // move to .done phase
         const newTransitions = this.applyPhaseTransitions();
