@@ -2108,11 +2108,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {boolean} value whether to blacklist all unverified devices by default
      */
-    public setGlobalBlacklistUnverifiedDevices(value: boolean) {
+    public setGlobalBlacklistUnverifiedDevices(value: boolean): boolean {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.setGlobalBlacklistUnverifiedDevices(value);
+        this.crypto.globalBlacklistUnverifiedDevices = value;
+        return value;
     }
 
     /**
@@ -2122,7 +2123,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getGlobalBlacklistUnverifiedDevices();
+        return this.crypto.globalBlacklistUnverifiedDevices;
     }
 
     /**

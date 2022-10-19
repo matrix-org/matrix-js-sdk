@@ -308,7 +308,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     private deviceKeys: Record<string, string> = {}; // type: key
 
-    private globalBlacklistUnverifiedDevices = false;
+    public globalBlacklistUnverifiedDevices = false;
     private globalErrorOnUnknownDevices = true;
 
     // list of IncomingRoomKeyRequests/IncomingRoomKeyRequestCancellations
@@ -1811,6 +1811,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * do not specify a value.
      *
      * @param {boolean} value whether to blacklist all unverified devices by default
+     *
+     * @deprecated For external code, use {@link MatrixClient#setGlobalBlacklistUnverifiedDevices}. For
+     *   internal code, set {@link #globalBlacklistUnverifiedDevices} directly.
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): void {
         this.globalBlacklistUnverifiedDevices = value;
@@ -1818,6 +1821,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     /**
      * @return {boolean} whether to blacklist all unverified devices by default
+     *
+     * @deprecated For external code, use {@link MatrixClient#getGlobalBlacklistUnverifiedDevices}. For
+     *   internal code, reference {@link #globalBlacklistUnverifiedDevices} directly.
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
         return this.globalBlacklistUnverifiedDevices;
