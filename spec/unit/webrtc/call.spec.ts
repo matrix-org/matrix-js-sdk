@@ -1149,25 +1149,6 @@ describe('Call', function() {
                 });
             });
 
-            /*const prom = new Promise<void>(resolve => {
-                const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
-                mockPeerConn.addTransceiver = jest.fn().mockImplementation((track: MockMediaStreamTrack) => {
-                    const mockSender = new MockRTCRtpSender(track);
-                    mockPeerConn.getTransceivers.mockReturnValue([{
-                        sender: mockSender,
-                        setCodecPreferences: (prefs: RTCRtpCodecCapability[]) => {
-                            expect(prefs).toEqual([
-                                expect.objectContaining({ mimeType: "video/somethingelse" }),
-                            ]);
-
-                            resolve();
-                        },
-                    }]);
-
-                    return mockSender;
-                });
-            });*/
-
             await call.setScreensharingEnabled(true);
             MockRTCPeerConnection.triggerAllNegotiations();
 
