@@ -116,7 +116,7 @@ import {
     IStatusResponse,
     IPushRule,
     PushRuleActionName,
-    IAuthDict,
+    IAuthDict, SendEventError,
 } from "./matrix";
 import {
     CrossSigningKey,
@@ -3821,7 +3821,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }));
 
         const room = this.getRoom(roomId);
-        const thread = room?.getThread(threadId);
+        const thread = threadId ? room?.getThread(threadId) : undefined;
         if (thread) {
             localEvent.setThread(thread);
         }
@@ -3841,8 +3841,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // this event does get sent, we have the correct event_id
         const targetId = localEvent.getAssociatedId();
         if (targetId?.startsWith("~")) {
-            const target = room.getPendingEvents().find(e => e.getId() === targetId);
-            target.once(MatrixEventEvent.LocalEventIdReplaced, () => {
+            const target = room?.getPendingEvents().find(e => e.getId() === targetId);
+            target?.once(MatrixEventEvent.LocalEventIdReplaced, () => {
                 localEvent.updateAssociatedId(target.getId());
             });
         }
@@ -3873,13 +3873,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns {Promise} returns a promise which resolves with the result of the send request
      * @private
      */
-    private encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse> {
+    private encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
         let cancelled = false;
         // Add an extra Promise.resolve() to turn synchronous exceptions into promise rejections,
         // so that we can handle synchronous and asynchronous exceptions with the
         // same code path.
         return Promise.resolve().then(() => {
-            const encryptionPromise = this.encryptEventIfNeeded(event, room);
+            const encryptionPromise = this.encryptEventIfNeeded(event, room ?? undefined);
             if (!encryptionPromise) return null; // doesn't need encryption
 
             this.pendingEventEncryption.set(event.getId(), encryptionPromise);
@@ -3894,7 +3894,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         }).then(() => {
             if (cancelled) return {} as ISendEventResponse;
-            let promise: Promise<ISendEventResponse>;
+            let promise: Promise<ISendEventResponse> | null = null;
             if (this.scheduler) {
                 // if this returns a promise then the scheduler has control now and will
                 // resolve/reject when it is done. Internally, the scheduler will invoke
@@ -3927,13 +3927,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // consistent at that point.
                 event.error = err;
                 this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
-                // also put the event object on the error: the caller will need this
-                // to resend or cancel the event
-                err.event = event;
             } catch (e) {
-                logger.error("Exception in error handler!", e.stack || err);
+                logger.error("Exception in error handler!", (<Error>e).stack || err);
             }
-            throw err;
+            throw new SendEventError(err, event);
         });
     }
 

@@ -18,7 +18,7 @@ import { logger, PrefixedLogger } from '../../logger';
 import { LocalStorageCryptoStore } from './localStorage-crypto-store';
 import { MemoryCryptoStore } from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
-import { InvalidCryptoStoreError } from '../../errors';
+import { InvalidCryptoStoreError, InvalidCryptoStoreState } from '../../errors';
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
 import {
     CryptoStore,
@@ -141,7 +141,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
                 logger.warn("Crypto DB is too new for us to use!", e);
                 // don't fall back to a different store: the user has crypto data
                 // in this db so we should use it or nothing at all.
-                throw new InvalidCryptoStoreError(InvalidCryptoStoreError.TOO_NEW);
+                throw new InvalidCryptoStoreError(InvalidCryptoStoreState.TooNew);
             }
             logger.warn(
                 `unable to connect to indexeddb ${this.dbName}` +

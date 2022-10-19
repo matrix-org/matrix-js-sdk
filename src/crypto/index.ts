@@ -2809,7 +2809,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @return {Promise?} Promise which resolves when the event has been
      *     encrypted, or null if nothing was needed
      */
-    public async encryptEvent(event: MatrixEvent, room: Room): Promise<void> {
+    public async encryptEvent(event: MatrixEvent, room?: Room): Promise<void> {
         if (!room) {
             throw new Error("Cannot send encrypted messages in unknown rooms");
         }

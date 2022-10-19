@@ -33,7 +33,7 @@ import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
 import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
-import { InvalidStoreError } from './errors';
+import { InvalidStoreError, InvalidStoreState } from './errors';
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import {
     IEphemeral,
@@ -595,8 +595,7 @@ export class SyncApi {
         const shouldClear = await this.wasLazyLoadingToggled(this.opts.lazyLoadMembers);
         if (shouldClear) {
             this.storeIsInvalid = true;
-            const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
-            const error = new InvalidStoreError(reason, !!this.opts.lazyLoadMembers);
+            const error = new InvalidStoreError(InvalidStoreState.ToggledLazyLoading, !!this.opts.lazyLoadMembers);
             this.updateSyncState(SyncState.Error, { error });
             // bail out of the sync loop now: the app needs to respond to this error.
             // we leave the state as 'ERROR' which isn't great since this normally means

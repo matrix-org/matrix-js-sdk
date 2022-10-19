@@ -47,6 +47,7 @@ import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
+import { SendEventError } from "../errors";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -227,7 +228,7 @@ const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 const CALL_TIMEOUT_MS = 60000;
 
 export class CallError extends Error {
-    code: string;
+    public readonly code: string;
 
     constructor(code: CallErrorCode, msg: string, err: Error) {
         // Still don't think there's any way to have proper nested errors
@@ -318,9 +319,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // the call) we buffer them up here so we can then add the ones from the party we pick
     private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
 
-    private remoteAssertedIdentity: AssertedIdentity;
-
-    private remoteSDPStreamMetadata: SDPStreamMetadata;
+    private remoteAssertedIdentity?: AssertedIdentity;
+    private remoteSDPStreamMetadata?: SDPStreamMetadata;
 
     private callLengthInterval?: ReturnType<typeof setInterval>;
     private callLength = 0;
@@ -508,9 +508,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         const userId = this.getOpponentMember()!.userId;
-        const purpose = this.remoteSDPStreamMetadata[stream.id].purpose;
-        const audioMuted = this.remoteSDPStreamMetadata[stream.id].audio_muted;
-        const videoMuted = this.remoteSDPStreamMetadata[stream.id].video_muted;
+        const purpose = this.remoteSDPStreamMetadata![stream.id].purpose;
+        const audioMuted = this.remoteSDPStreamMetadata![stream.id].audio_muted;
+        const videoMuted = this.remoteSDPStreamMetadata![stream.id].video_muted;
 
         if (!purpose) {
             logger.warn(`Ignoring stream with id ${stream.id} because we didn't get any metadata about it`);
@@ -1293,7 +1293,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         } catch (error) {
             // We've failed to answer: back to the ringing state
             this.setState(CallState.Ringing);
-            this.client.cancelPendingEvent(error.event);
+            if (SendEventError.check(error)) this.client.cancelPendingEvent(error.event);
 
             let code = CallErrorCode.SendAnswer;
             let message = "Failed to send answer";
@@ -1565,10 +1565,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.remoteSDPStreamMetadata = utils.recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
-            const metadata = this.remoteSDPStreamMetadata[streamId];
+            const metadata = this.remoteSDPStreamMetadata![streamId];
 
             feed.setAudioVideoMuted(metadata?.audio_muted, metadata?.video_muted);
-            feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
+            feed.purpose = this.remoteSDPStreamMetadata![streamId]?.purpose;
         }
     }
 
@@ -1651,7 +1651,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.sendVoipEvent(eventType, content);
         } catch (error) {
             logger.error("Failed to send invite", error);
-            if (error.event) this.client.cancelPendingEvent(error.event);
+            if (SendEventError.check(error)) this.client.cancelPendingEvent(error.event);
 
             let code = CallErrorCode.SignallingFailed;
             let message = "Signalling failed";
@@ -2059,7 +2059,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         } catch (error) {
             // don't retry this event: we'll send another one later as we might
             // have more candidates by then.
-            if (error.event) this.client.cancelPendingEvent(error.event);
+            if (SendEventError.check(error)) this.client.cancelPendingEvent(error.event);
 
             // put all the candidates we failed to send back in the queue
             this.candidateSendQueue.push(...candidates);
