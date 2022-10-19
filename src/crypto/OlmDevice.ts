@@ -121,9 +121,9 @@ interface IInboundGroupSessionKey {
     chain_index: number;
     key: string;
     forwarding_curve25519_key_chain: string[];
-    sender_claimed_ed25519_key: string;
+    sender_claimed_ed25519_key: string | null;
     shared_history: boolean;
-    untrusted: boolean;
+    untrusted?: boolean;
 }
 /* eslint-enable camelcase */
 
@@ -145,9 +145,9 @@ export class OlmDevice {
     public pickleKey = "DEFAULT_KEY"; // set by consumers
 
     // don't know these until we load the account from storage in init()
-    public deviceCurve25519Key: string = null;
-    public deviceEd25519Key: string = null;
-    private maxOneTimeKeys: number = null;
+    public deviceCurve25519Key: string | null = null;
+    public deviceEd25519Key: string | null = null;
+    private maxOneTimeKeys: number | null = null;
 
     // we don't bother stashing outboundgroupsessions in the cryptoStore -
     // instead we keep them here.

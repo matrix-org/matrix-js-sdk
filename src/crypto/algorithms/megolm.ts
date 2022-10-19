@@ -40,6 +40,7 @@ import { EventType, MsgType } from '../../@types/event';
 import { IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
 import { RoomKeyRequestState } from '../OutgoingRoomKeyRequestManager';
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
+import { MatrixError } from "../../http-api";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -1259,21 +1260,21 @@ class MegolmDecryption extends DecryptionAlgorithm {
         // (fixes https://github.com/vector-im/element-web/issues/5001)
         this.addEventToPendingList(event);
 
-        let res: IDecryptedGroupMessage;
+        let res: IDecryptedGroupMessage | null;
         try {
             res = await this.olmDevice.decryptGroupMessage(
                 event.getRoomId(), content.sender_key, content.session_id, content.ciphertext,
                 event.getId(), event.getTs(),
             );
         } catch (e) {
-            if (e.name === "DecryptionError") {
+            if ((<Error>e).name === "DecryptionError") {
                 // re-throw decryption errors as-is
                 throw e;
             }
 
             let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
 
-            if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
+            if ((<MatrixError>e)?.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
                 this.requestKeysForEvent(event);
 
                 errorCode = 'OLM_UNKNOWN_MESSAGE_INDEX';
@@ -1384,7 +1385,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         if (!this.pendingEvents.has(senderKey)) {
             this.pendingEvents.set(senderKey, new Map<string, Set<MatrixEvent>>());
         }
-        const senderPendingEvents = this.pendingEvents.get(senderKey);
+        const senderPendingEvents = this.pendingEvents.get(senderKey)!;
         if (!senderPendingEvents.has(sessionId)) {
             senderPendingEvents.set(sessionId, new Set());
         }

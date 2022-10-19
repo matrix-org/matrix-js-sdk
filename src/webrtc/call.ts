@@ -271,33 +271,33 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public roomId: string;
     public callId: string;
     public state = CallState.Fledgling;
-    public hangupParty: CallParty;
-    public hangupReason: string;
-    public direction: CallDirection;
+    public hangupParty?: CallParty;
+    public hangupReason?: string;
+    public direction?: CallDirection;
     public ourPartyId: string;
 
-    private client: MatrixClient;
-    private forceTURN: boolean;
-    private turnServers: Array<TurnServer>;
+    private readonly client: MatrixClient;
+    private readonly forceTURN: boolean;
+    private readonly turnServers: Array<TurnServer>;
     // A queue for candidates waiting to go out.
     // We try to amalgamate candidates into a single candidate message where
     // possible
     private candidateSendQueue: Array<RTCIceCandidate> = [];
     private candidateSendTries = 0;
     private sentEndOfCandidates = false;
-    private peerConn: RTCPeerConnection;
+    private peerConn?: RTCPeerConnection;
     private feeds: Array<CallFeed> = [];
     private usermediaSenders: Array<RTCRtpSender> = [];
     private screensharingSenders: Array<RTCRtpSender> = [];
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream: boolean;
-    private successor: MatrixCall;
-    private opponentMember: RoomMember;
+    private successor?: MatrixCall;
+    private opponentMember?: RoomMember;
     private opponentVersion: number | string;
     // The party ID of the other side: undefined if we haven't chosen a partner
     // yet, null if we have but they didn't send a party ID.
     private opponentPartyId: string;
-    private opponentCaps: CallCapabilities;
+    private opponentCaps?: CallCapabilities;
     private inviteTimeout?: ReturnType<typeof setTimeout>;
 
     // The logic of when & if a call is on hold is nontrivial and explained in is*OnHold

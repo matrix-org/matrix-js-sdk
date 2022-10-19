@@ -85,6 +85,7 @@ import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { PkDecryption, PkSigning } from "@matrix-org/olm";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -274,7 +275,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     private trustCrossSignedDevices = true;
     // the last time we did a check for the number of one-time-keys on the server.
-    private lastOneTimeKeyCheck: number = null;
+    private lastOneTimeKeyCheck: number | null = null;
     private oneTimeKeyCheckInProgress = false;
 
     // EncryptionAlgorithm instance for each room
@@ -838,7 +839,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         );
 
         // the ID of the new SSSS key, if we create one
-        let newKeyId = null;
+        let newKeyId: string | null = null;
 
         // create a new SSSS key and set it as default
         const createSSSS = async (opts: IAddSecretStorageKeyOpts, privateKey: Uint8Array) => {
@@ -859,7 +860,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
         const ensureCanCheckPassphrase = async (keyId: string, keyInfo: ISecretStorageKeyInfo) => {
             if (!keyInfo.mac) {
-                const key = await this.baseApis.cryptoCallbacks.getSecretStorageKey(
+                const key = await this.baseApis.cryptoCallbacks.getSecretStorageKey?.(
                     { keys: { [keyId]: keyInfo } }, "",
                 );
                 if (key) {
@@ -1036,7 +1037,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         } else if (this.backupManager.getKeyBackupEnabled()) {
             // key backup is enabled but we don't have a session backup key in SSSS: see if we have one in
             // the cache or the user can provide one, and if so, write it to SSSS
-            const backupKey = await this.getSessionBackupPrivateKey() || await getKeyBackupPassphrase();
+            const backupKey = await this.getSessionBackupPrivateKey() || await getKeyBackupPassphrase?.();
             if (!backupKey) {
                 // This will require user intervention to recover from since we don't have the key
                 // backup key anywhere. The user should probably just set up a new key backup and
@@ -1115,14 +1116,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns {boolean} true if the key matches, otherwise false
      */
     public checkSecretStoragePrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
-        let decryption = null;
+        let decryption: PkDecryption | null = null;
         try {
             decryption = new global.Olm.PkDecryption();
             const gotPubkey = decryption.init_with_private_key(privateKey);
             // make sure it agrees with the given pubkey
             return gotPubkey === expectedPublicKey;
         } finally {
-            if (decryption) decryption.free();
+            decryption?.free();
         }
     }
 
@@ -1188,14 +1189,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns {boolean} true if the key matches, otherwise false
      */
     public checkCrossSigningPrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
-        let signing = null;
+        let signing: PkSigning | null = null;
         try {
             signing = new global.Olm.PkSigning();
             const gotPubkey = signing.init_with_seed(privateKey);
             // make sure it agrees with the given pubkey
             return gotPubkey === expectedPublicKey;
         } finally {
-            if (signing) signing.free();
+            signing?.free();
         }
     }
 
@@ -1984,7 +1985,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     // returns a promise which resolves to the response
     private async uploadOneTimeKeys() {
-        const promises = [];
+        const promises: Promise<unknown>[] = [];
 
         let fallbackJson: Record<string, IOneTimeKey>;
         if (this.getNeedsNewFallback()) {
@@ -2045,7 +2046,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         * module:crypto/deviceinfo|DeviceInfo}.
      */
     public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
-        return this.deviceList.downloadKeys(userIds, forceDownload);
+        return this.deviceList.downloadKeys(userIds, !!forceDownload);
     }
 
     /**

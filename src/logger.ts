@@ -59,16 +59,16 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
  * Drop-in replacement for <code>console</code> using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
  */
-export const logger: PrefixedLogger = log.getLogger(DEFAULT_NAMESPACE);
+export const logger = log.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;
 logger.setLevel(log.levels.DEBUG, false);
 
 export interface PrefixedLogger extends Logger {
-    withPrefix?: (prefix: string) => PrefixedLogger;
-    prefix?: string;
+    withPrefix: (prefix: string) => PrefixedLogger;
+    prefix: string;
 }
 
-function extendLogger(logger: PrefixedLogger) {
-    logger.withPrefix = function(prefix: string): PrefixedLogger {
+function extendLogger(logger: Logger) {
+    (<PrefixedLogger>logger).withPrefix = function(prefix: string): PrefixedLogger {
         const existingPrefix = this.prefix || "";
         return getPrefixedLogger(existingPrefix + prefix);
     };
@@ -77,7 +77,7 @@ function extendLogger(logger: PrefixedLogger) {
 extendLogger(logger);
 
 function getPrefixedLogger(prefix: string): PrefixedLogger {
-    const prefixLogger: PrefixedLogger = log.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`);
+    const prefixLogger = log.getLogger(`${DEFAULT_NAMESPACE}-${prefix}`) as PrefixedLogger;
     if (prefixLogger.prefix !== prefix) {
         // Only do this setup work the first time through, as loggers are saved by name.
         extendLogger(prefixLogger);

@@ -697,41 +697,31 @@ export interface IMyDevice {
     [UNSTABLE_MSC3852_LAST_SEEN_UA.unstable]?: string;
 }
 
+export interface Keys {
+    keys: { [keyId: string]: string };
+    usage: string[];
+    user_id: string;
+}
+
+export interface SigningKeys extends Keys {
+    signatures: ISignatures;
+}
+
+export interface DeviceKeys {
+    [deviceId: string]: IDeviceKeys & {
+        unsigned?: {
+            device_display_name: string;
+        };
+    };
+}
+
 export interface IDownloadKeyResult {
     failures: { [serverName: string]: object };
-    device_keys: {
-        [userId: string]: {
-            [deviceId: string]: IDeviceKeys & {
-                unsigned?: {
-                    device_display_name: string;
-                };
-            };
-        };
-    };
+    device_keys: { [userId: string]: DeviceKeys };
     // the following three fields were added in 1.1
-    master_keys?: {
-        [userId: string]: {
-            keys: { [keyId: string]: string };
-            usage: string[];
-            user_id: string;
-        };
-    };
-    self_signing_keys?: {
-        [userId: string]: {
-            keys: { [keyId: string]: string };
-            signatures: ISignatures;
-            usage: string[];
-            user_id: string;
-        };
-    };
-    user_signing_keys?: {
-        [userId: string]: {
-            keys: { [keyId: string]: string };
-            signatures: ISignatures;
-            usage: string[];
-            user_id: string;
-        };
-    };
+    master_keys?: { [userId: string]: Keys };
+    self_signing_keys?: { [userId: string]: SigningKeys };
+    user_signing_keys?: { [userId: string]: SigningKeys };
 }
 
 export interface IClaimOTKsResult {
@@ -2672,7 +2662,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 { prefix: ClientPrefix.V3 },
             );
         } catch (e) {
-            if (e.errcode === 'M_NOT_FOUND') {
+            if ((<MatrixError>e).errcode === 'M_NOT_FOUND') {
                 return null;
             } else {
                 throw e;
@@ -2750,7 +2740,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     // TODO: Verify types
     public async prepareKeyBackupVersion(
-        password?: string,
+        password: string | Uint8Array | null,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
     ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
         if (!this.crypto) {
@@ -6413,7 +6403,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public isSynapseAdministrator(): Promise<boolean> {
         const path = utils.encodeUri(
             "/_synapse/admin/v1/users/$userId/admin",
-            { $userId: this.getUserId() },
+            { $userId: this.getUserId()! },
         );
         return this.http.authedRequest(
             Method.Get, path, undefined, undefined, { prefix: '' },
@@ -8455,8 +8445,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getIdentityHashDetails(identityAccessToken: string): Promise<any> { // TODO: Types
         return this.http.idServerRequest(
-            Method.Get, "/hash_details",
-            null, IdentityPrefix.V2, identityAccessToken,
+            Method.Get,
+            "/hash_details",
+            undefined,
+            IdentityPrefix.V2,
+            identityAccessToken,
         );
     }
 
@@ -8530,7 +8523,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (!response || !response['mappings']) return []; // no results
 
-        const foundAddresses = [/* {address: "plain@example.org", mxid} */];
+        const foundAddresses: { address: string, mxid: string }[] = [];
         for (const hashed of Object.keys(response['mappings'])) {
             const mxid = response['mappings'][hashed];
             const plainAddress = localMapping[hashed];
@@ -8800,7 +8793,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $roomId: roomId,
         });
 
-        const queryParams: Record<string, string | string[]> = {
+        const queryParams: QueryDict = {
             suggested_only: String(suggestedOnly),
             max_depth: maxDepth?.toString(),
             from: fromToken,

@@ -163,7 +163,7 @@ export class CallEventHandler {
                 this.client,
                 event.getRoomId(),
                 { forceTURN: this.client.forceTURN },
-            );
+            ) ?? undefined;
             if (!call) {
                 logger.log(
                     "Incoming call ID " + content.call_id + " but this client " +
@@ -238,7 +238,7 @@ export class CallEventHandler {
                 if (!this.candidateEventsByCall.has(content.call_id)) {
                     this.candidateEventsByCall.set(content.call_id, []);
                 }
-                this.candidateEventsByCall.get(content.call_id).push(event);
+                this.candidateEventsByCall.get(content.call_id)!.push(event);
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
@@ -250,7 +250,7 @@ export class CallEventHandler {
                 // if not live, store the fact that the call has ended because
                 // we're probably getting events backwards so
                 // the hangup will come before the invite
-                call = createNewMatrixCall(this.client, event.getRoomId());
+                call = createNewMatrixCall(this.client, event.getRoomId()) ?? undefined;
                 if (call) {
                     call.callId = content.call_id;
                     call.initWithHangup(event);

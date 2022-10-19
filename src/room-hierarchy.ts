@@ -22,6 +22,7 @@ import { Room } from "./models/room";
 import { IHierarchyRoom, IHierarchyRelation } from "./@types/spaces";
 import { MatrixClient } from "./client";
 import { EventType } from "./@types/event";
+import { MatrixError } from "./http-api";
 
 export class RoomHierarchy {
     // Map from room id to list of servers which are listed as a via somewhere in the loaded hierarchy
@@ -30,7 +31,7 @@ export class RoomHierarchy {
     public readonly backRefs = new Map<string, string[]>();
     // Map from room id to object
     public readonly roomMap = new Map<string, IHierarchyRoom>();
-    private loadRequest: ReturnType<MatrixClient["getRoomHierarchy"]>;
+    private loadRequest?: ReturnType<MatrixClient["getRoomHierarchy"]>;
     private nextBatch?: string;
     private _rooms?: IHierarchyRoom[];
     private serverSupportError?: Error;
@@ -65,7 +66,7 @@ export class RoomHierarchy {
         return !!this.loadRequest;
     }
 
-    public get rooms(): IHierarchyRoom[] {
+    public get rooms(): IHierarchyRoom[] | undefined {
         return this._rooms;
     }
 
@@ -84,15 +85,15 @@ export class RoomHierarchy {
         try {
             ({ rooms, next_batch: this.nextBatch } = await this.loadRequest);
         } catch (e) {
-            if (e.errcode === "M_UNRECOGNIZED") {
-                this.serverSupportError = e;
+            if ((<MatrixError>e).errcode === "M_UNRECOGNIZED") {
+                this.serverSupportError = <MatrixError>e;
             } else {
                 throw e;
             }
 
             return [];
         } finally {
-            this.loadRequest = null;
+            this.loadRequest = undefined;
         }
 
         if (this._rooms) {
@@ -112,14 +113,14 @@ export class RoomHierarchy {
                 if (!this.backRefs.has(childRoomId)) {
                     this.backRefs.set(childRoomId, []);
                 }
-                this.backRefs.get(childRoomId).push(room.room_id);
+                this.backRefs.get(childRoomId)!.push(room.room_id);
 
                 // fill viaMap
                 if (Array.isArray(ev.content.via)) {
                     if (!this.viaMap.has(childRoomId)) {
                         this.viaMap.set(childRoomId, new Set());
                     }
-                    const vias = this.viaMap.get(childRoomId);
+                    const vias = this.viaMap.get(childRoomId)!;
                     ev.content.via.forEach(via => vias.add(via));
                 }
             });
@@ -128,11 +129,11 @@ export class RoomHierarchy {
         return rooms;
     }
 
-    public getRelation(parentId: string, childId: string): IHierarchyRelation {
+    public getRelation(parentId: string, childId: string): IHierarchyRelation | undefined {
         return this.roomMap.get(parentId)?.children_state.find(e => e.state_key === childId);
     }
 
-    public isSuggested(parentId: string, childId: string): boolean {
+    public isSuggested(parentId: string, childId: string): boolean | undefined {
         return this.getRelation(parentId, childId)?.content.suggested;
     }
 

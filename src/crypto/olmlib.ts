@@ -137,7 +137,7 @@ export async function encryptMessageForDevice(
 
 interface IExistingOlmSession {
     device: DeviceInfo;
-    sessionId?: string;
+    sessionId: string | null;
 }
 
 /**
