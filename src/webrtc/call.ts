@@ -771,8 +771,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     const transceiver = this.transceivers.get(tKey);
 
                     transceiver.sender.replaceTrack(track);
-                    transceiver.direction =
-                    transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
+                    // set the direction to indicate we're going to start sending again
+                    // (this will trigger the re-negotiation)
+                    transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
                 } else {
                     // create a new one: pass the track in and everything happens automatically
                     this.transceivers.set(tKey, this.peerConn.addTransceiver(track, {
