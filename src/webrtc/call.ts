@@ -309,6 +309,8 @@ export type CallEventHandlerMap = {
 };
 
 // generates keys for the map of transceivers
+// kind is unfortunately a string rather than MediaType as this is the type of
+// track.kind
 function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: string): string {
     return purpose + ':' + kind;
 }
