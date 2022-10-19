@@ -308,10 +308,13 @@ export type CallEventHandlerMap = {
     [CallEvent.SendVoipEvent]: (event: Record<string, any>) => void;
 };
 
+// The key of the transceiver map (purpose + media type, separated by ':')
+type TransceiverKey = string;
+
 // generates keys for the map of transceivers
 // kind is unfortunately a string rather than MediaType as this is the type of
 // track.kind
-function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: string): string {
+function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: TransceiverKey): string {
     return purpose + ':' + kind;
 }
 
@@ -354,7 +357,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private feeds: Array<CallFeed> = [];
 
     // our transceivers for each purpose and type of media
-    private transceivers = new Map<string, RTCRtpTransceiver>();
+    private transceivers = new Map<TransceiverKey, RTCRtpTransceiver>();
 
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream: boolean;
