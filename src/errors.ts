@@ -48,18 +48,7 @@ export class InvalidCryptoStoreError extends Error {
 }
 
 export class KeySignatureUploadError extends Error {
-    public constructor(message: string, public readonly value: IUploadKeySignaturesResponse[]) {
+    public constructor(message: string, public readonly value: any) {
         super(message);
-    }
-}
-
-export class SendEventError extends Error {
-    public constructor(error: Error, public readonly event: MatrixEvent) {
-        super(error.message);
-        this.name = "SendEventError";
-    }
-
-    public static check(error: any): error is SendEventError {
-        return error?.name === "SendEventError" && !!error.event;
     }
 }

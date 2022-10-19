@@ -116,7 +116,7 @@ import {
     IStatusResponse,
     IPushRule,
     PushRuleActionName,
-    IAuthDict, SendEventError,
+    IAuthDict,
 } from "./matrix";
 import {
     CrossSigningKey,
@@ -200,6 +200,7 @@ import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
+import { UnknownDeviceError } from "./crypto/algorithms";
 
 export type Store = IStore;
 
@@ -3930,7 +3931,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             } catch (e) {
                 logger.error("Exception in error handler!", (<Error>e).stack || err);
             }
-            throw new SendEventError(err, event);
+            if (err instanceof MatrixError) {
+                err.event = event;
+            }
+            throw err;
         });
     }
 

@@ -272,7 +272,11 @@ function detailedStringForDecryptionError(err: DecryptionError, details?: Record
  * @extends Error
  */
 export class UnknownDeviceError extends Error {
-    constructor(msg: string, public readonly devices: Record<string, Record<string, object>>) {
+    constructor(
+        msg: string,
+        public readonly devices: Record<string, Record<string, object>>,
+        public event?: MatrixEvent,
+    ) {
         super(msg);
         this.name = "UnknownDeviceError";
         this.devices = devices;

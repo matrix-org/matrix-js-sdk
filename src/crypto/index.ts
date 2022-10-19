@@ -935,7 +935,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
             // if we have the backup key already cached, use it; otherwise use the
             // callback to prompt for the key
-            const backupKey = await this.getSessionBackupPrivateKey() || await getKeyBackupPassphrase();
+            const backupKey = await this.getSessionBackupPrivateKey() || await getKeyBackupPassphrase?.();
 
             // create a new SSSS key and use the backup key as the new SSSS key
             const opts = {} as IAddSecretStorageKeyOpts;
@@ -1297,7 +1297,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     private async checkForDeviceVerificationUpgrade(
         userId: string,
         crossSigningInfo: CrossSigningInfo,
-    ): Promise<IDeviceVerificationUpgrade> {
+    ): Promise<IDeviceVerificationUpgrade | undefined> {
         // only upgrade if this is the first cross-signing key that we've seen for
         // them, and if their cross-signing key isn't already verified
         const trustLevel = this.crossSigningInfo.checkUserTrust(crossSigningInfo);
@@ -1534,7 +1534,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             (masterChanged || masterExistsNotLocallyCached)
         ) {
             logger.info("Attempting to retrieve cross-signing master private key");
-            let signing = null;
+            let signing: PkSigning | null = null;
             // It's important for control flow that we leave any errors alone for
             // higher levels to handle so that e.g. cancelling access properly
             // aborts any larger operation as well.
@@ -1545,7 +1545,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 signing = ret[1];
                 logger.info("Got cross-signing master private key");
             } finally {
-                if (signing) signing.free();
+                signing?.free();
             }
         }
 
@@ -1679,7 +1679,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param {object} keys The new trusted set of keys
      */
-    private async storeTrustedSelfKeys(keys: Record<string, ICrossSigningKey>): Promise<void> {
+    private async storeTrustedSelfKeys(keys: Record<string, ICrossSigningKey> | null): Promise<void> {
         if (keys) {
             this.crossSigningInfo.setKeys(keys);
         } else {
@@ -2114,17 +2114,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public async setDeviceVerification(
         userId: string,
         deviceId: string,
-        verified?: boolean,
-        blocked?: boolean,
-        known?: boolean,
+        verified: boolean | null = null,
+        blocked: boolean | null = null,
+        known: boolean | null = null,
         keys?: Record<string, string>,
     ): Promise<DeviceInfo | CrossSigningInfo> {
-        // get rid of any `undefined`s here so we can just check
-        // for null rather than null or undefined
-        if (verified === undefined) verified = null;
-        if (blocked === undefined) blocked = null;
-        if (known === undefined) known = null;
-
         // Check if the 'device' is actually a cross signing key
         // The js-sdk's verification treats cross-signing keys as devices
         // and so uses this method to mark them verified.
@@ -2597,7 +2591,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // because it first stores in memory. We should await the promise only
         // after all the in-memory state (roomEncryptors and _roomList) has been updated
         // to avoid races when calling this method multiple times. Hence keep a hold of the promise.
-        let storeConfigPromise: Promise<void> = null;
+        let storeConfigPromise: Promise<void> | null = null;
         if (!existingConfig) {
             storeConfigPromise = this.roomList.setRoomEncryption(roomId, config);
         }

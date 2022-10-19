@@ -117,7 +117,7 @@ interface ISyncOptions {
 }
 
 export interface ISyncStateData {
-    error?: MatrixError;
+    error?: Error;
     oldSyncToken?: string;
     nextSyncToken?: string;
     catchingUp?: boolean;
@@ -166,7 +166,7 @@ export class SyncApi {
     private currentSyncRequest: Optional<Promise<ISyncResponse>> = null;
     private abortController?: AbortController;
     private syncState: Optional<SyncState> = null;
-    private syncStateData: Optional<ISyncStateData> = null; // additional data (eg. error object for failed sync)
+    private syncStateData: ISyncStateData | null = null; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
     private keepAliveTimer: Optional<ReturnType<typeof setTimeout>> = null;
@@ -499,18 +499,18 @@ export class SyncApi {
      * this object.
      * @return {?Object}
      */
-    public getSyncStateData(): ISyncStateData {
+    public getSyncStateData(): ISyncStateData | null {
         return this.syncStateData;
     }
 
-    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: MatrixError): Promise<void> {
+    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, error: Error): Promise<void> {
         // Wait for the saved sync to complete - we send the pushrules and filter requests
         // before the saved sync has finished so they can run in parallel, but only process
         // the results after the saved sync is done. Equivalently, we wait for it to finish
         // before reporting failures from these functions.
         await savedSyncPromise;
         const keepaliveProm = this.startKeepAlives();
-        this.updateSyncState(SyncState.Error, { error: err });
+        this.updateSyncState(SyncState.Error, { error });
         await keepaliveProm;
     }
 
@@ -1825,7 +1825,7 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
     // We need to add a listener for RoomState.members in order to hook them
     // correctly.
     room.on(RoomStateEvent.NewMember, (event, state, member) => {
-        member.user = client.getUser(member.userId);
+        member.user = client.getUser(member.userId) ?? undefined;
         client.reEmitter.reEmit(member, [
             RoomMemberEvent.Name,
             RoomMemberEvent.Typing,

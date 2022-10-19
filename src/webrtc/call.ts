@@ -47,7 +47,7 @@ import { CallFeed } from './callFeed';
 import { MatrixClient } from "../client";
 import { ISendEventResponse } from "../@types/requests";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
-import { SendEventError } from "../errors";
+import { MatrixError } from "../http-api";
 
 // events: hangup, error(err), replaced(call), state(state, oldState)
 
@@ -1293,7 +1293,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         } catch (error) {
             // We've failed to answer: back to the ringing state
             this.setState(CallState.Ringing);
-            if (SendEventError.check(error)) this.client.cancelPendingEvent(error.event);
+            if (error instanceof MatrixError && error.event) this.client.cancelPendingEvent(error.event);
 
             let code = CallErrorCode.SendAnswer;
             let message = "Failed to send answer";
@@ -1651,7 +1651,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.sendVoipEvent(eventType, content);
         } catch (error) {
             logger.error("Failed to send invite", error);
-            if (SendEventError.check(error)) this.client.cancelPendingEvent(error.event);
+            if (error instanceof MatrixError && error.event) this.client.cancelPendingEvent(error.event);
 
             let code = CallErrorCode.SignallingFailed;
             let message = "Signalling failed";
@@ -2059,7 +2059,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         } catch (error) {
             // don't retry this event: we'll send another one later as we might
             // have more candidates by then.
-            if (SendEventError.check(error)) this.client.cancelPendingEvent(error.event);
+            if (error instanceof MatrixError && error.event) this.client.cancelPendingEvent(error.event);
 
             // put all the candidates we failed to send back in the queue
             this.candidateSendQueue.push(...candidates);
