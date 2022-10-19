@@ -647,17 +647,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             videoMuted,
         }));
 
-        // gather transceivers from the new tracks so that we can use the same ones for tracks that
-        // we add later. We only do this for user media streams though: screenshare streams just always
-        // get their own unidirectional transceiver since a bidirectional screen share is pretty rare
-        // (we *could* re-use an existing recvonly transceiver for this, but it's simpler to just not).
-        if (purpose == SDPStreamMetadataPurpose.Usermedia) {
-            for (const track of stream.getTracks()) {
-                const transceiver = this.peerConn.getTransceivers().find(t => t.receiver.track == track);
-                this.transceivers.set(getTransceiverKey(purpose, track.kind), transceiver);
-            }
-        }
-
         this.emit(CallEvent.FeedsChanged, this.feeds);
 
         logger.info(
@@ -699,11 +688,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             stream,
             purpose,
         }));
-
-        for (const track of stream.getTracks()) {
-            const transceiver = this.peerConn.getTransceivers().find(t => t.receiver.track == track);
-            this.transceivers.set(getTransceiverKey(purpose, track.kind), transceiver);
-        }
 
         this.emit(CallEvent.FeedsChanged, this.feeds);
 
@@ -773,16 +757,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     // Matrix event.
                     const transceiver = this.transceivers.get(tKey);
 
+                    // this is what would allow us to use addTransceiver(), but it's not available
+                    // on Firefox yet. We call it anyway if we have it.
+                    if (transceiver.sender.setStreams) transceiver.sender.setStreams(callFeed.stream);
+
                     transceiver.sender.replaceTrack(track);
                     // set the direction to indicate we're going to start sending again
                     // (this will trigger the re-negotiation)
                     transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
                 } else {
-                    // create a new one: pass the track in and everything happens automatically
-                    this.transceivers.set(tKey, this.peerConn.addTransceiver(track, {
-                        streams: [callFeed.stream],
-                        direction: callFeed.purpose === SDPStreamMetadataPurpose.Usermedia ? "sendrecv" : "sendonly",
-                    }));
+                    // create a new one. We need to use addTrack rather addTransceiver for this because firefox
+                    // doesn't yet implement RTCRTPSender.setStreams()
+                    // (https://bugzilla.mozilla.org/show_bug.cgi?id=1510802) so we'd have no way to group the
+                    // two tracks together into a stream.
+                    const newSender = this.peerConn.addTrack(track, callFeed.stream);
+
+                    // now go & fish for the new transceiver
+                    this.transceivers.set(tKey, this.peerConn.getTransceivers().find(t => t.sender === newSender));
                 }
             }
         }
@@ -1313,10 +1304,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     `) to peer connection`,
                 );
 
-                this.transceivers.set(tKey, this.peerConn.addTransceiver(track, {
-                    streams: [this.localUsermediaStream],
-                    direction: "sendrecv",
-                }));
+                const newSender = this.peerConn.addTrack(track, this.localUsermediaStream);
+                this.transceivers.set(tKey, this.peerConn.getTransceivers().find(t => t.sender === newSender));
             }
         }
     }
