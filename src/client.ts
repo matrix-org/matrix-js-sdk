@@ -1749,9 +1749,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {?string} base64-encoded ed25519 key. Null if crypto is
      *    disabled.
      */
-    public getDeviceEd25519Key(): string {
-        if (!this.crypto) return null;
-        return this.crypto.getDeviceEd25519Key();
+    public getDeviceEd25519Key(): string | null {
+        return this.crypto?.getDeviceEd25519Key() ?? null;
     }
 
     /**
@@ -1760,9 +1759,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {?string} base64-encoded curve25519 key. Null if crypto is
      *    disabled.
      */
-    public getDeviceCurve25519Key(): string {
-        if (!this.crypto) return null;
-        return this.crypto.getDeviceCurve25519Key();
+    public getDeviceCurve25519Key(): string | null {
+        return this.crypto?.getDeviceCurve25519Key() ?? null;
     }
 
     /**
@@ -2064,7 +2062,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns {CrossSigningInfo} the cross signing information for the user.
      */
-    public getStoredCrossSigningForUser(userId: string): CrossSigningInfo {
+    public getStoredCrossSigningForUser(userId: string): CrossSigningInfo | null {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }

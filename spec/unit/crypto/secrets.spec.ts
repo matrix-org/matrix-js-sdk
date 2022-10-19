@@ -265,7 +265,7 @@ describe("Secrets", function() {
         await osborne2Device.markKeysAsPublished();
 
         await vax.client.crypto!.olmDevice.createOutboundSession(
-            osborne2Device.deviceCurve25519Key,
+            osborne2Device.deviceCurve25519Key!,
             Object.values(otks)[0],
         );
 

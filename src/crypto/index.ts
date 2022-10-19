@@ -1859,11 +1859,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     public setNeedsNewFallback(needsNewFallback: boolean) {
-        this.needsNewFallback = !!needsNewFallback;
+        this.needsNewFallback = needsNewFallback;
     }
 
     public getNeedsNewFallback(): boolean {
-        return this.needsNewFallback;
+        return !!this.needsNewFallback;
     }
 
     // check if it's time to upload one-time keys, and do so if so.
@@ -2863,7 +2863,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             "m.room.encrypted",
             encryptedContent,
             this.olmDevice.deviceCurve25519Key!,
-            this.olmDevice.deviceEd25519Key,
+            this.olmDevice.deviceEd25519Key!,
         );
     }
 
