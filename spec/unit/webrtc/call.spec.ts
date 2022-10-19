@@ -1068,8 +1068,23 @@ describe('Call', function() {
     });
 
     describe("Screen sharing", () => {
+        const waitNegotiateFunc = resolve => {
+            mockSendEvent.mockImplementationOnce(() => {
+                // Note that the peer connection here is a dummy one and always returns
+                // dummy SDP, so there's not much point returning the content: the SDP will
+                // always be the same.
+                resolve();
+                return Promise.resolve({ event_id: "foo" });
+            });
+        };
+
         beforeEach(async () => {
             await startVoiceCall(client, call);
+
+            const sendNegotiatePromise = new Promise<void>(waitNegotiateFunc);
+
+            MockRTCPeerConnection.triggerAllNegotiations();
+            await sendNegotiatePromise;
 
             await call.onAnswerReceived(makeMockEvent("@test:foo", {
                 "version": 1,
@@ -1101,12 +1116,7 @@ describe('Call', function() {
             ).toHaveLength(1);
 
             mockSendEvent.mockReset();
-            const sendNegotiatePromise = new Promise<void>(resolve => {
-                mockSendEvent.mockImplementationOnce(() => {
-                    resolve();
-                    return Promise.resolve({ event_id: "foo" });
-                });
-            });
+            const sendNegotiatePromise = new Promise<void>(waitNegotiateFunc);
 
             MockRTCPeerConnection.triggerAllNegotiations();
             await sendNegotiatePromise;
@@ -1142,12 +1152,7 @@ describe('Call', function() {
             });
 
             mockSendEvent.mockReset();
-            const sendNegotiatePromise = new Promise<void>(resolve => {
-                mockSendEvent.mockImplementationOnce(() => {
-                    resolve();
-                    return Promise.resolve({ event_id: "foo" });
-                });
-            });
+            const sendNegotiatePromise = new Promise<void>(waitNegotiateFunc);
 
             await call.setScreensharingEnabled(true);
             MockRTCPeerConnection.triggerAllNegotiations();
@@ -1158,6 +1163,40 @@ describe('Call', function() {
             expect(
                 mockPeerConn.transceivers[mockPeerConn.transceivers.length - 1].setCodecPreferences,
             ).toHaveBeenCalledWith([expect.objectContaining({ mimeType: "video/somethingelse" })]);
+        });
+
+        it("re-uses transceiver when screen sharing is re-enabled", async () => {
+            const mockPeerConn = call.peerConn as unknown as MockRTCPeerConnection;
+
+            // sanity check: we should start with one transciever (user media audio)
+            expect(mockPeerConn.transceivers.length).toEqual(1);
+
+            const screenshareOnProm1 = new Promise<void>(waitNegotiateFunc);
+
+            await call.setScreensharingEnabled(true);
+            MockRTCPeerConnection.triggerAllNegotiations();
+
+            await screenshareOnProm1;
+
+            // we should now have another transciever for the screenshare
+            expect(mockPeerConn.transceivers.length).toEqual(2);
+
+            const screenshareOffProm = new Promise<void>(waitNegotiateFunc);
+            await call.setScreensharingEnabled(false);
+            MockRTCPeerConnection.triggerAllNegotiations();
+            await screenshareOffProm;
+
+            // both transceivers should still be there
+            expect(mockPeerConn.transceivers.length).toEqual(2);
+
+            const screenshareOnProm2 = new Promise<void>(waitNegotiateFunc);
+            await call.setScreensharingEnabled(true);
+            MockRTCPeerConnection.triggerAllNegotiations();
+            await screenshareOnProm2;
+
+            // should still be two, ie. another one should not have been created
+            // when re-enabling the screen share.
+            expect(mockPeerConn.transceivers.length).toEqual(2);
         });
     });
 

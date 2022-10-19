@@ -104,7 +104,7 @@ export class MockRTCPeerConnection {
     private negotiationNeededListener: () => void;
     public iceCandidateListener?: (e: RTCPeerConnectionIceEvent) => void;
     public onTrackListener?: (e: RTCTrackEvent) => void;
-    private needsNegotiation = false;
+    public needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
     private onReadyToNegotiate: () => void;
     localDescription: RTCSessionDescription;
@@ -176,7 +176,7 @@ export class MockRTCPeerConnection {
         const newSender = new MockRTCRtpSender(track);
         const newReceiver = new MockRTCRtpReceiver(track);
 
-        const newTransceiver = new MockRTCRtpTransceiver();
+        const newTransceiver = new MockRTCRtpTransceiver(this);
         newTransceiver.sender = newSender as unknown as RTCRtpSender;
         newTransceiver.receiver = newReceiver as unknown as RTCRtpReceiver;
 
@@ -215,8 +215,14 @@ export class MockRTCRtpReceiver {
 }
 
 export class MockRTCRtpTransceiver {
+    constructor(private peerConn: MockRTCPeerConnection) {}
+
     public sender: RTCRtpSender;
     public receiver: RTCRtpReceiver;
+
+    public set direction(_: string) {
+        this.peerConn.needsNegotiation = true;
+    }
 
     setCodecPreferences = jest.fn<void, RTCRtpCodecCapability[]>();
 }
