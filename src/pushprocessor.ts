@@ -353,12 +353,11 @@ export class PushProcessor {
         }
 
         const room = this.client.getRoom(ev.getRoomId());
-        if (!room || !room.currentState || !room.currentState.members ||
-            !room.currentState.getMember(this.client.credentials.userId!)) {
+        if (!room?.currentState?.getMember(this.client.credentials.userId!)) {
             return false;
         }
 
-        const displayName = room.currentState.getMember(this.client.credentials.userId).name;
+        const displayName = room!.currentState.getMember(this.client.credentials.userId!).name;
 
         // N.B. we can't use \b as it chokes on unicode. however \W seems to be okay
         // as shorthand for [^0-9A-Za-z_].
