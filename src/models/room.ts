@@ -1280,8 +1280,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @experimental
      * Resets the thread notifications for this room
      */
-    public resetThreadUnreadNotificationCount(): void {
-        this.threadNotifications.clear();
+    public resetThreadUnreadNotificationCount(notificationsToKeep?: string[]): void {
+        if (notificationsToKeep) {
+            for (const [threadId] of this.threadNotifications) {
+                if (!notificationsToKeep.includes(threadId)) {
+                    this.threadNotifications.delete(threadId);
+                }
+            }
+        } else {
+            this.threadNotifications.clear();
+        }
     }
 
     /**

@@ -1271,11 +1271,15 @@ export class SyncApi {
                 }
             }
 
-            room.resetThreadUnreadNotificationCount();
             const unreadThreadNotifications = joinObj[UNREAD_THREAD_NOTIFICATIONS.name]
-                ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName];
+            ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName];
             if (unreadThreadNotifications) {
-                Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
+                // Only partially reset unread notification
+                // We want to keep the client-generated count. Particularly important
+                // for encrypted room that refresh their notification count on event
+                // decryption
+                room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
+                for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
                     room.setThreadUnreadNotificationCount(
                         threadId,
                         NotificationCountType.Total,
@@ -1291,7 +1295,9 @@ export class SyncApi {
                             unreadNotification.highlight_count,
                         );
                     }
-                });
+                }
+            } else {
+                room.resetThreadUnreadNotificationCount();
             }
 
             joinObj.timeline = joinObj.timeline || {} as ITimeline;

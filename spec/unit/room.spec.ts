@@ -2642,6 +2642,16 @@ describe("Room", function() {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 333);
             expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
         });
+
+        it("partially resets room notifications", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
+            room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
+
+            room.resetThreadUnreadNotificationCount(["123"]);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(666);
+            expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(0);
+        });
     });
 
     describe("hasThreadUnreadNotification", () => {
