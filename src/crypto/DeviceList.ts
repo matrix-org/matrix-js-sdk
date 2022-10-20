@@ -181,7 +181,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
         if (this.savePromiseTime && targetTime < this.savePromiseTime) {
             // There's a save scheduled but for after we would like: cancel
             // it & schedule one for the time we want
-            clearTimeout(this.saveTimer ?? undefined);
+            clearTimeout(this.saveTimer!);
             this.saveTimer = null;
             this.savePromiseTime = null;
             // (but keep the save promise since whatever called save before
