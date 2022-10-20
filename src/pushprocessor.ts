@@ -354,7 +354,7 @@ export class PushProcessor {
 
         const room = this.client.getRoom(ev.getRoomId());
         if (!room || !room.currentState || !room.currentState.members ||
-            !room.currentState.getMember(this.client.credentials.userId)) {
+            !room.currentState.getMember(this.client.credentials.userId!)) {
             return false;
         }
 
