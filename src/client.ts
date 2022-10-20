@@ -6452,9 +6452,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private async fetchClientWellKnown(): Promise<void> {
         // `getRawClientConfig` does not throw or reject on network errors, instead
         // it absorbs errors and returns `{}`.
-        this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(this.getDomain());
-        this.clientWellKnown = await this.clientWellKnownPromise;
-        this.emit(ClientEvent.ClientWellKnown, this.clientWellKnown);
+        // In order to not override the existing well-known we first check to see if there is any data at all
+        this.clientWellKnownPromise =  AutoDiscovery.getRawClientConfig(this.getDomain());
+        const clientWellKnown = await this.clientWellKnownPromise;
+        if( Object.keys(clientWellKnown).length !== 0) {
+            this.clientWellKnown = clientWellKnown;
+            this.emit(ClientEvent.ClientWellKnown, this.clientWellKnown);
+        }
     }
 
     public getClientWellKnown(): IClientWellKnown {
