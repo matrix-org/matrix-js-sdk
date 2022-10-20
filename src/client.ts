@@ -5625,9 +5625,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public peekInRoom(roomId: string): Promise<Room> {
-        if (this.peekSync) {
-            this.peekSync.stopPeeking();
-        }
+        this.peekSync?.stopPeeking();
         this.peekSync = new SyncApi(this, this.clientOpts);
         return this.peekSync.peek(roomId);
     }

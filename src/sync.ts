@@ -355,7 +355,7 @@ export class SyncApi {
      * store.
      */
     public peek(roomId: string): Promise<Room> {
-        if (this._peekRoom && this._peekRoom.roomId === roomId) {
+        if (this._peekRoom?.roomId === roomId) {
             return Promise.resolve(this._peekRoom);
         }
 
