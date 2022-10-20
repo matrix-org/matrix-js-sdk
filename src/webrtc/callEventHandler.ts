@@ -181,13 +181,13 @@ export class CallEventHandler {
 
             // if we stashed candidate events for that call ID, play them back now
             if (this.candidateEventsByCall.get(call.callId)) {
-                for (const ev of this.candidateEventsByCall.get(call.callId)) {
+                for (const ev of this.candidateEventsByCall.get(call.callId)!) {
                     call.onRemoteIceCandidatesReceived(ev);
                 }
             }
 
             // Were we trying to call that user (room)?
-            let existingCall: MatrixCall;
+            let existingCall: MatrixCall | undefined;
             for (const thisCall of this.calls.values()) {
                 const isCalling = [CallState.WaitLocalMedia, CallState.CreateOffer, CallState.InviteSent].includes(
                     thisCall.state,

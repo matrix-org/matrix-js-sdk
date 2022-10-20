@@ -308,7 +308,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // the stats for the call at the point it ended. We can't get these after we
     // tear the call down, so we just grab a snapshot before we stop the call.
     // The typescript definitions have this type as 'any' :(
-    private callStatsAtEnd: any[];
+    private callStatsAtEnd?: any[];
 
     // Perfect negotiation state: https://www.w3.org/TR/webrtc/#perfect-negotiation-example
     private makingOffer = false;
@@ -681,7 +681,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     // The typescript definitions have this type as 'any' :(
-    public async getCurrentCallStats(): Promise<any[]> {
+    public async getCurrentCallStats(): Promise<any[] | undefined> {
         if (this.callHasEnded()) {
             return this.callStatsAtEnd;
         }
@@ -689,7 +689,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.collectCallStats();
     }
 
-    private async collectCallStats(): Promise<any[]> {
+    private async collectCallStats(): Promise<any[] | undefined> {
         // This happens when the call fails before it starts.
         // For example when we fail to get capture sources
         if (!this.peerConn) return;
@@ -2286,7 +2286,11 @@ export function supportsMatrixCall(): boolean {
  * since it's only possible to set this option on outbound calls.
  * @return {MatrixCall} the call or null if the browser doesn't support calling.
  */
-export function createNewMatrixCall(client: any, roomId: string, options?: CallOpts): MatrixCall | null {
+export function createNewMatrixCall(
+    client: MatrixClient,
+    roomId: string,
+    options?: Pick<CallOpts, "forceTURN">,
+): MatrixCall | null {
     if (!supportsMatrixCall()) return null;
 
     const optionsForceTURN = options ? options.forceTURN : false;
