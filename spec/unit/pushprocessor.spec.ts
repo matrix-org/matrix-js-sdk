@@ -355,7 +355,7 @@ describe('NotificationService', function() {
 
     describe("group call started push rule", () => {
         beforeEach(() => {
-            matrixClient.pushRules.global.underride.find(r => r.rule_id === ".m.rule.fallback").enabled = false;
+            matrixClient.pushRules!.global!.underride!.find(r => r.rule_id === ".m.rule.fallback")!.enabled = false;
         });
 
         const getActionsForEvent = (prevContent: IContent, content: IContent): IActionsObject => {
