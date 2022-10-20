@@ -1885,9 +1885,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private async setDeviceVerification(
         userId: string,
         deviceId: string,
-        verified: boolean,
-        blocked: boolean,
-        known: boolean,
+        verified?: boolean | null,
+        blocked?: boolean | null,
+        known?: boolean | null,
     ): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
@@ -2043,7 +2043,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns {string} the key ID
      */
-    public getCrossSigningId(type: CrossSigningKey | string = CrossSigningKey.Master): string {
+    public getCrossSigningId(type: CrossSigningKey | string = CrossSigningKey.Master): string | null {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -4898,7 +4898,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private membershipChange(
         roomId: string,
-        userId: string,
+        userId: string | undefined,
         membership: string,
         reason?: string,
     ): Promise<{}> { // API returns an empty object

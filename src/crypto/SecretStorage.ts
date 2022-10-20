@@ -182,7 +182,7 @@ export class SecretStorage {
      *     the form [keyId, keyInfo].  Otherwise, null is returned.
      *     XXX: why is this an array when addKey returns an object?
      */
-    public async getKey(keyId: string): Promise<SecretStorageKeyTuple | null> {
+    public async getKey(keyId?: string | null): Promise<SecretStorageKeyTuple | null> {
         if (!keyId) {
             keyId = await this.getDefaultKeyId();
         }

@@ -281,7 +281,7 @@ export class SyncApi {
      * Sync rooms the user has left.
      * @return {Promise} Resolved when they've been added to the store.
      */
-    public syncLeftRooms() {
+    public async syncLeftRooms(): Promise<Room[]> {
         const client = this.client;
 
         // grab a filter with limit=1 and include_leave=true
@@ -290,57 +290,61 @@ export class SyncApi {
         filter.setIncludeLeaveRooms(true);
 
         const localTimeoutMs = this.opts.pollTimeout! + BUFFER_PERIOD_MS;
+
+        const filterId = await client.getOrCreateFilter(
+            getFilterName(client.credentials.userId!, "LEFT_ROOMS"), filter,
+        );
+
         const qps: ISyncParams = {
             timeout: 0, // don't want to block since this is a single isolated req
+            filter: filterId,
         };
 
-        return client.getOrCreateFilter(
-            getFilterName(client.credentials.userId!, "LEFT_ROOMS"), filter,
-        ).then(function(filterId) {
-            qps.filter = filterId;
-            return client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
-                localTimeoutMs,
-            });
-        }).then(async (data) => {
-            let leaveRooms: WrappedRoom<ILeftRoom>[] = [];
-            if (data.rooms?.leave) {
-                leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
-            }
-            return Promise.all(leaveRooms.map(async (leaveObj) => {
-                const room = leaveObj.room;
-                if (!leaveObj.isBrandNewRoom) {
-                    // the intention behind syncLeftRooms is to add in rooms which were
-                    // *omitted* from the initial /sync. Rooms the user were joined to
-                    // but then left whilst the app is running will appear in this list
-                    // and we do not want to bother with them since they will have the
-                    // current state already (and may get dupe messages if we add
-                    // yet more timeline events!), so skip them.
-                    // NB: When we persist rooms to localStorage this will be more
-                    //     complicated...
-                    return;
-                }
-                leaveObj.timeline = leaveObj.timeline || {
-                    prev_batch: null,
-                    events: [],
-                };
-                const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
-
-                const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
-
-                // set the back-pagination token. Do this *before* adding any
-                // events so that clients can start back-paginating.
-                room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
-
-                await this.processRoomEvents(room, stateEvents, events);
-
-                room.recalculate();
-                client.store.storeRoom(room);
-                client.emit(ClientEvent.Room, room);
-
-                this.processEventsForNotifs(room, events);
-                return room;
-            }));
+        const data = await client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
+            localTimeoutMs,
         });
+
+        let leaveRooms: WrappedRoom<ILeftRoom>[] = [];
+        if (data.rooms?.leave) {
+            leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
+        }
+
+        const rooms = await Promise.all(leaveRooms.map(async (leaveObj) => {
+            const room = leaveObj.room;
+            if (!leaveObj.isBrandNewRoom) {
+                // the intention behind syncLeftRooms is to add in rooms which were
+                // *omitted* from the initial /sync. Rooms the user were joined to
+                // but then left whilst the app is running will appear in this list
+                // and we do not want to bother with them since they will have the
+                // current state already (and may get dupe messages if we add
+                // yet more timeline events!), so skip them.
+                // NB: When we persist rooms to localStorage this will be more
+                //     complicated...
+                return;
+            }
+            leaveObj.timeline = leaveObj.timeline || {
+                prev_batch: null,
+                events: [],
+            };
+            const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
+
+            const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
+
+            // set the back-pagination token. Do this *before* adding any
+            // events so that clients can start back-paginating.
+            room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
+
+            await this.processRoomEvents(room, stateEvents, events);
+
+            room.recalculate();
+            client.store.storeRoom(room);
+            client.emit(ClientEvent.Room, room);
+
+            this.processEventsForNotifs(room, events);
+            return room;
+        }));
+
+        return rooms.filter(Boolean) as Room[];
     }
 
     /**

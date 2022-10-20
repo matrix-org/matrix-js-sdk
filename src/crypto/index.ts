@@ -1062,12 +1062,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public addSecretStorageKey(
         algorithm: string,
         opts: IAddSecretStorageKeyOpts,
-        keyID: string,
+        keyID?: string,
     ): Promise<SecretStorageKeyObject> {
         return this.secretStorage.addKey(algorithm, opts, keyID);
     }
 
-    public hasSecretStorageKey(keyID: string): Promise<boolean> {
+    public hasSecretStorageKey(keyID?: string): Promise<boolean> {
         return this.secretStorage.hasKey(keyID);
     }
 
