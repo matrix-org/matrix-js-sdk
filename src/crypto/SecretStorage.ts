@@ -237,7 +237,7 @@ export class SecretStorage {
      * @param {Array} keys The IDs of the keys to use to encrypt the secret
      *     or null/undefined to use the default key.
      */
-    public async store(name: string, secret: string, keys?: string[]): Promise<void> {
+    public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
         const encrypted: Record<string, IEncryptedPayload> = {};
 
         if (!keys) {
@@ -284,7 +284,7 @@ export class SecretStorage {
      *
      * @return {string} the contents of the secret
      */
-    public async get(name: string): Promise<string> {
+    public async get(name: string): Promise<string | undefined> {
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) {
             return;

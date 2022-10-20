@@ -274,7 +274,7 @@ export class MemoryStore implements IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    public setFilterIdByName(filterName: string, filterId: string) {
+    public setFilterIdByName(filterName: string, filterId?: string) {
         if (!this.localStorage) {
             return;
         }

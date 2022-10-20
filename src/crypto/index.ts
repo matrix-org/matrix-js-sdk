@@ -1071,7 +1071,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.hasKey(keyID);
     }
 
-    public getSecretStorageKey(keyID?: string): Promise<SecretStorageKeyTuple> {
+    public getSecretStorageKey(keyID?: string): Promise<SecretStorageKeyTuple | null> {
         return this.secretStorage.getKey(keyID);
     }
 
@@ -2281,7 +2281,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.requestVerificationWithChannel(userId, channel, this.inRoomVerificationRequests);
     }
 
-    public requestVerification(userId: string, devices: string[]): Promise<VerificationRequest> {
+    public requestVerification(userId: string, devices?: string[]): Promise<VerificationRequest> {
         if (!devices) {
             devices = Object.keys(this.deviceList.getRawStoredDevicesForUser(userId));
         }
