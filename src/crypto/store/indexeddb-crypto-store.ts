@@ -417,7 +417,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         deviceKey: string,
         sessionId: string,
         txn: IDBTransaction,
-        func: (session: ISessionInfo) => void,
+        func: (session: ISessionInfo | null) => void,
     ): void {
         this.backend!.getEndToEndSession(deviceKey, sessionId, txn, func);
     }
@@ -448,7 +448,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *     an object with, deviceKey, lastReceivedMessageTs, sessionId
      *     and session keys.
      */
-    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo) => void): void {
+    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo | null) => void): void {
         this.backend!.getAllEndToEndSessions(txn, func);
     }
 

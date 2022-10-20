@@ -415,7 +415,7 @@ describe("SlidingSync", () => {
             expect(slidingSync.getList(0)).toBeDefined();
             expect(slidingSync.getList(5)).toBeNull();
             expect(slidingSync.getListData(5)).toBeNull();
-            const syncData = slidingSync.getListData(0);
+            const syncData = slidingSync.getListData(0)!;
             expect(syncData.joinedCount).toEqual(500); // from previous test
             expect(syncData.roomIndexToRoomId).toEqual({
                 0: roomA,
@@ -665,7 +665,7 @@ describe("SlidingSync", () => {
                 0: roomB,
                 1: roomC,
             };
-            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual(indexToRoomId);
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual(indexToRoomId);
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "f",
                 // currently the list is [B,C] so we will insert D then immediately delete it
@@ -703,7 +703,7 @@ describe("SlidingSync", () => {
         });
 
         it("should handle deletions correctly", async () => {
-            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual({
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
                 0: roomB,
                 1: roomC,
             });
@@ -739,7 +739,7 @@ describe("SlidingSync", () => {
         });
 
         it("should handle insertions correctly", async () => {
-            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual({
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
                 0: roomC,
             });
             httpBackend!.when("POST", syncUrl).respond(200, {

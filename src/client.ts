@@ -545,7 +545,6 @@ export interface IWellKnownConfig {
     error?: Error | string;
     // eslint-disable-next-line
     base_url?: string | null;
-    state
 }
 
 export interface IDelegatedAuthConfig { // MSC2965
@@ -1386,7 +1385,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         key: Uint8Array,
         keyInfo: IDehydratedDeviceKeyInfo,
         deviceDisplayName?: string,
-    ): Promise<string> {
+    ): Promise<string | undefined> {
         if (!this.crypto) {
             logger.warn('not dehydrating device if crypto is not enabled');
             return;
@@ -1395,7 +1394,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.crypto.dehydrationManager.dehydrateDevice();
     }
 
-    public async exportDevice(): Promise<IExportedDevice> {
+    public async exportDevice(): Promise<IExportedDevice | undefined> {
         if (!this.crypto) {
             logger.warn('not exporting device if crypto is not enabled');
             return;
@@ -3899,7 +3898,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // processFn which is set to this._sendEventHttpRequest so the same code
                 // path is executed regardless.
                 promise = this.scheduler.queueEvent(event);
-                if (promise && this.scheduler.getQueueForEvent(event).length > 1) {
+                if (promise && this.scheduler.getQueueForEvent(event)!.length > 1) {
                     // event is processed FIFO so if the length is 2 or more we know
                     // this event is stuck behind an earlier event.
                     this.updatePendingEventStatus(room, event, EventStatus.QUEUED);
@@ -5433,7 +5432,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public paginateEventTimeline(eventTimeline: EventTimeline, opts: IPaginateOpts): Promise<boolean> {
         const isNotifTimeline = (eventTimeline.getTimelineSet() === this.notifTimelineSet);
-        const room = this.getRoom(eventTimeline.getRoomId());
+        const room = this.getRoom(eventTimeline.getRoomId()!);
         const isThreadTimeline = eventTimeline.getTimelineSet().isThreadTimeline;
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more
@@ -5511,7 +5510,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             promise = this.createThreadListMessagesRequest(
-                eventTimeline.getRoomId(),
+                eventTimeline.getRoomId()!,
                 token,
                 opts.limit,
                 dir,
@@ -5547,7 +5546,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             promise = this.createMessagesRequest(
-                eventTimeline.getRoomId(),
+                eventTimeline.getRoomId()!,
                 token,
                 opts.limit,
                 dir,

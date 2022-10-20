@@ -149,7 +149,7 @@ function runCallbacks(): void {
         if (!first || first.runAt > timestamp) {
             break;
         }
-        cb = callbackList.shift();
+        cb = callbackList.shift()!;
         debuglog("runCallbacks: popping", cb.key);
         callbacksToRun.push(cb);
     }
