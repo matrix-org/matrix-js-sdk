@@ -5552,6 +5552,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const opts: { prefix?: string } = {};
         if (Thread.hasServerSideListSupport === FeatureSupport.Experimental) {
             opts.prefix = "/_matrix/client/unstable/org.matrix.msc3856";
+        } else if (Thread.hasServerSideListSupport === FeatureSupport.Stable) {
+            opts.prefix = "/_matrix/client/v1";
         }
 
         return this.http.authedRequest<IThreadedMessagesResponse>(Method.Get, path, params, undefined, opts)
