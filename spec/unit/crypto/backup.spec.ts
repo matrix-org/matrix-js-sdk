@@ -449,7 +449,7 @@ describe("MegolmBackup", function() {
                             try {
                                 // make sure auth_data is signed by the master key
                                 olmlib.pkVerify(
-                                    (data as Record<string, any>).auth_data, client.getCrossSigningId(), "@alice:bar",
+                                    (data as Record<string, any>).auth_data, client.getCrossSigningId()!, "@alice:bar",
                                 );
                             } catch (e) {
                                 reject(e);
