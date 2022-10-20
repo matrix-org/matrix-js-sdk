@@ -97,8 +97,8 @@ export class EventTimeline {
     private baseIndex = 0;
     private startState: RoomState;
     private endState: RoomState;
-    private prevTimeline?: EventTimeline;
-    private nextTimeline?: EventTimeline;
+    private prevTimeline: EventTimeline | null = null;
+    private nextTimeline: EventTimeline | null = null;
     public paginationRequests: Record<Direction, Promise<boolean> | null> = {
         [Direction.Backward]: null,
         [Direction.Forward]: null,
@@ -321,7 +321,7 @@ export class EventTimeline {
      * @return {?EventTimeline} previous or following timeline, if they have been
      * joined up.
      */
-    public getNeighbouringTimeline(direction: Direction): EventTimeline | undefined {
+    public getNeighbouringTimeline(direction: Direction): EventTimeline | null {
         if (direction == EventTimeline.BACKWARDS) {
             return this.prevTimeline;
         } else if (direction == EventTimeline.FORWARDS) {

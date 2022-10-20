@@ -944,8 +944,8 @@ describe("Crypto", function() {
                 senderId: aliceClient.getUserId(),
                 senderKey: content.sender_key,
                 sessionId: content.session_id,
-                sessionKey: aliceKey.key,
-                keysClaimed: { ed25519: aliceKey.sender_claimed_ed25519_key },
+                sessionKey: aliceKey!.key,
+                keysClaimed: { ed25519: aliceKey!.sender_claimed_ed25519_key },
                 forwardingCurve25519KeyChain: ["akey"],
             }]);
         });

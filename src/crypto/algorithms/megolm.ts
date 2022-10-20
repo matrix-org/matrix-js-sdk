@@ -1263,7 +1263,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         let res: IDecryptedGroupMessage | null;
         try {
             res = await this.olmDevice.decryptGroupMessage(
-                event.getRoomId(), content.sender_key, content.session_id, content.ciphertext,
+                event.getRoomId()!, content.sender_key, content.session_id, content.ciphertext,
                 event.getId(), event.getTs(),
             );
         } catch (e) {
@@ -1364,7 +1364,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const recipients = event.getKeyRequestRecipients(this.userId);
 
         this.crypto.requestRoomKey({
-            room_id: event.getRoomId(),
+            room_id: event.getRoomId()!,
             algorithm: wireContent.algorithm,
             sender_key: wireContent.sender_key,
             session_id: wireContent.session_id,
@@ -1534,7 +1534,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 await this.crypto.cryptoStore.doTxn(
                     'readwrite',
                     ['parked_shared_history'],
-                    (txn) => this.crypto.cryptoStore.addParkedSharedHistory(content.room_id, parkedData, txn),
+                    (txn) => this.crypto.cryptoStore.addParkedSharedHistory(content.room_id!, parkedData, txn),
                     logger.withPrefix("[addParkedSharedHistory]"),
                 );
                 return;
@@ -1702,7 +1702,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
     public shareKeysWithDevice(keyRequest: IncomingRoomKeyRequest): void {
         const userId = keyRequest.userId;
         const deviceId = keyRequest.deviceId;
-        const deviceInfo = this.crypto.getStoredDevice(userId, deviceId);
+        const deviceInfo = this.crypto.getStoredDevice(userId, deviceId)!;
         const body = keyRequest.requestBody;
 
         this.olmlib.ensureOlmSessionsForDevices(
@@ -1743,7 +1743,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 this.olmDevice,
                 userId,
                 deviceInfo,
-                payload,
+                payload!,
             ).then(() => {
                 const contentMap = {
                     [userId]: {
@@ -1770,12 +1770,12 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 "algorithm": olmlib.MEGOLM_ALGORITHM,
                 "room_id": roomId,
                 "sender_key": senderKey,
-                "sender_claimed_ed25519_key": key.sender_claimed_ed25519_key!,
+                "sender_claimed_ed25519_key": key!.sender_claimed_ed25519_key!,
                 "session_id": sessionId,
-                "session_key": key.key,
-                "chain_index": key.chain_index,
-                "forwarding_curve25519_key_chain": key.forwarding_curve25519_key_chain,
-                "org.matrix.msc3061.shared_history": key.shared_history || false,
+                "session_key": key!.key,
+                "chain_index": key!.chain_index,
+                "forwarding_curve25519_key_chain": key!.forwarding_curve25519_key_chain,
+                "org.matrix.msc3061.shared_history": key!.shared_history || false,
             },
         };
     }
