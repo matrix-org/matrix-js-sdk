@@ -414,7 +414,7 @@ export class TimelineWindow {
             if (timeline === this.end?.timeline) {
                 break;
             } else {
-                timeline = timeline.getNeighbouringTimeline(EventTimeline.FORWARDS);
+                timeline = timeline.getNeighbouringTimeline(EventTimeline.FORWARDS)!;
             }
         }
 

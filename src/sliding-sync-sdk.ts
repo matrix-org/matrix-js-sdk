@@ -293,7 +293,7 @@ export class SlidingSyncSdk {
         this.processRoomData(this.client, room, roomData);
     }
 
-    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error | null): void {
+    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error): void {
         if (err) {
             logger.debug("onLifecycle", state, err);
         }
@@ -686,7 +686,7 @@ export class SlidingSyncSdk {
                 // slightly naughty by doctoring the invite event but this means all
                 // the code paths remain the same between invite/join display name stuff
                 // which is a worthy trade-off for some minor pollution.
-                const inviteEvent = member.events.member;
+                const inviteEvent = member.events.member!;
                 if (inviteEvent.getContent().membership !== "invite") {
                     // between resolving and now they have since joined, so don't clobber
                     return;
@@ -722,7 +722,7 @@ export class SlidingSyncSdk {
                 break;
             } catch (err) {
                 logger.error("Getting push rules failed", err);
-                if (this.shouldAbortSync(err)) {
+                if (this.shouldAbortSync(<MatrixError>err)) {
                     return;
                 }
             }

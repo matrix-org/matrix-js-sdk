@@ -48,7 +48,7 @@ export function internaliseString(str: string): string {
     }
 
     // Return any cached string reference
-    return interns.get(str);
+    return interns.get(str)!;
 }
 
 /**

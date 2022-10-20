@@ -822,7 +822,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // linkedlist to see which comes first.
 
         // first work forwards from timeline1
-        let tl = timeline1;
+        let tl: EventTimeline | undefined = timeline1;
         while (tl) {
             if (tl === timeline2) {
                 // timeline1 is before timeline2

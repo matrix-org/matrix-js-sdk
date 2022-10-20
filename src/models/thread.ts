@@ -83,7 +83,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
 
-    private lastEvent: MatrixEvent;
+    private lastEvent!: MatrixEvent;
     private replyCount = 0;
 
     public readonly room: Room;
@@ -185,7 +185,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.lastEvent = events.find(e => (
             !e.isRedacted() &&
             e.isRelation(THREAD_RELATION_TYPE.name)
-        )) ?? this.rootEvent;
+        )) ?? this.rootEvent!;
         this.emit(ThreadEvent.Update, this);
     };
 
@@ -289,7 +289,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
     }
 
-    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship {
+    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
@@ -302,7 +302,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
-            this._currentUserParticipated = bundledRelationship.current_user_participated;
+            this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
             const event = new MatrixEvent({
                 room_id: this.rootEvent.getRoomId(),

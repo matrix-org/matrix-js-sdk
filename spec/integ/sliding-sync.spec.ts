@@ -82,7 +82,7 @@ describe("SlidingSync", () => {
 
         it("should reset the connection on HTTP 400 and send everything again", async () => {
             // seed the connection with some lists, extensions and subscriptions to verify they are sent again
-            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client!, 1);
             const roomId = "!sub:localhost";
             const subInfo = {
                 timeline_limit: 42,
@@ -108,7 +108,7 @@ describe("SlidingSync", () => {
 
             // expect everything to be sent
             let txnId;
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toEqual({
@@ -117,7 +117,7 @@ describe("SlidingSync", () => {
                 expect(body.lists[0]).toEqual(listInfo);
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: true });
-                expect(req.queryParams["pos"]).toBeUndefined();
+                expect(req.queryParams!["pos"]).toBeUndefined();
                 txnId = body.txn_id;
             }).respond(200, function() {
                 return {
@@ -127,10 +127,10 @@ describe("SlidingSync", () => {
                     txn_id: txnId,
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
 
             // expect nothing but ranges and non-initial extensions to be sent
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
@@ -139,7 +139,7 @@ describe("SlidingSync", () => {
                 });
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: false });
-                expect(req.queryParams["pos"]).toEqual("11");
+                expect(req.queryParams!["pos"]).toEqual("11");
             }).respond(200, function() {
                 return {
                     pos: "12",
@@ -147,19 +147,19 @@ describe("SlidingSync", () => {
                     extensions: {},
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
 
             // now we expire the session
-            httpBackend.when("POST", syncUrl).respond(400, function() {
+            httpBackend!.when("POST", syncUrl).respond(400, function() {
                 logger.debug("sending session expired 400");
                 return {
                     error: "HTTP 400 : session expired",
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
 
             // ...and everything should be sent again
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toEqual({
@@ -168,7 +168,7 @@ describe("SlidingSync", () => {
                 expect(body.lists[0]).toEqual(listInfo);
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: true });
-                expect(req.queryParams["pos"]).toBeUndefined();
+                expect(req.queryParams!["pos"]).toBeUndefined();
             }).respond(200, function() {
                 return {
                     pos: "1",
@@ -176,7 +176,7 @@ describe("SlidingSync", () => {
                     extensions: {},
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             slidingSync.stop();
         });
     });

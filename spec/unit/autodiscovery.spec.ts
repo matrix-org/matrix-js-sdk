@@ -678,7 +678,7 @@ describe("AutoDiscovery", function() {
 
     it("should return FAIL_PROMPT for connection errors", () => {
         const httpBackend = getHttpBackend();
-        httpBackend.when("GET", "/.well-known/matrix/client").fail(0, undefined);
+        httpBackend.when("GET", "/.well-known/matrix/client").fail(0, undefined!);
         return Promise.all([
             httpBackend.flushAllExpected(),
             AutoDiscovery.findClientConfig("example.org").then((conf) => {

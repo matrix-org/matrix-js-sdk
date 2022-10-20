@@ -545,6 +545,7 @@ export interface IWellKnownConfig {
     error?: Error | string;
     // eslint-disable-next-line
     base_url?: string | null;
+    state
 }
 
 export interface IDelegatedAuthConfig { // MSC2965
