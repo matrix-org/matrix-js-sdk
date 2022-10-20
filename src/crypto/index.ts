@@ -3828,7 +3828,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
  * key will be returned. Otherwise null will be returned.
  *
  */
-export function fixBackupKey(key: string): string | null {
+export function fixBackupKey(key?: string): string | null {
     if (typeof key !== "string" || key.indexOf(",") < 0) {
         return null;
     }

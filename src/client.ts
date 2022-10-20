@@ -434,7 +434,7 @@ export interface IStartClientOpts {
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {
-    crypto: Crypto;
+    crypto?: Crypto;
     canResetEntireTimeline: ResetTimelineCallback;
 }
 
@@ -941,12 +941,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected verificationMethods: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
     protected roomList: RoomList;
-    protected syncApi: SlidingSyncSdk | SyncApi;
+    protected syncApi?: SlidingSyncSdk | SyncApi;
     public roomNameGenerator?: ICreateClientOpts["roomNameGenerator"];
-    public pushRules: IPushRules;
-    protected syncLeftRoomsPromise: Promise<Room[]>;
+    public pushRules?: IPushRules;
+    protected syncLeftRoomsPromise?: Promise<Room[]>;
     protected syncedLeftRooms = false;
-    protected clientOpts: IStoredClientOpts;
+    protected clientOpts?: IStoredClientOpts;
     protected clientWellKnownIntervalID?: ReturnType<typeof setInterval>;
     protected canResetTimelineCallback?: ResetTimelineCallback;
 
@@ -1587,7 +1587,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public retryImmediately(): boolean {
         // don't await for this promise: we just want to kick it off
         this.toDeviceMessageQueue.sendQueue();
-        return this.syncApi.retryImmediately();
+        return this.syncApi?.retryImmediately() ?? false;
     }
 
     /**
@@ -2393,7 +2393,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @return {string} the contents of the secret
      */
-    public getSecret(name: string): Promise<string> {
+    public getSecret(name: string): Promise<string | undefined> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3053,11 +3053,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // store the fixed version
         const fixedKey = fixBackupKey(storedKey);
         if (fixedKey) {
-            const [keyId] = await this.crypto.getSecretStorageKey();
-            await this.storeSecret("m.megolm_backup.v1", fixedKey, [keyId]);
+            const keys = await this.crypto.getSecretStorageKey();
+            await this.storeSecret("m.megolm_backup.v1", fixedKey, [keys![0]]);
         }
 
-        const privKey = decodeBase64(fixedKey || storedKey);
+        const privKey = decodeBase64(fixedKey || storedKey!);
         return this.restoreKeyBackup(
             privKey, targetRoomId, targetSessionId, backupInfo, opts,
         );
@@ -5103,7 +5103,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     room.oldState.paginationToken = null;
                 }
                 this.store.storeEvents(room, matrixEvents, res.end, true);
-                this.ongoingScrollbacks[room.roomId] = null;
+                delete this.ongoingScrollbacks[room.roomId];
                 resolve(room);
             }).catch((err) => {
                 this.ongoingScrollbacks[room.roomId] = {
@@ -5167,7 +5167,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         );
 
         let params: Record<string, string | string[]> | undefined = undefined;
-        if (this.clientOpts.lazyLoadMembers) {
+        if (this.clientOpts?.lazyLoadMembers) {
             params = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER) };
         }
 
@@ -5329,7 +5329,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let filter: IRoomEventFilter | null = null;
-        if (this.clientOpts.lazyLoadMembers) {
+        if (this.clientOpts?.lazyLoadMembers) {
             // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
             // so the timelineFilter doesn't get written into it below
             filter = Object.assign({}, Filter.LAZY_LOADING_MESSAGES_FILTER);
@@ -5379,7 +5379,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let filter: IRoomEventFilter | null = null;
-        if (this.clientOpts.lazyLoadMembers) {
+        if (this.clientOpts?.lazyLoadMembers) {
             // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
             // so the timelineFilter doesn't get written into it below
             filter = {
@@ -5928,7 +5928,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | undefined {
-        let promise: Promise<unknown>;
+        let promise: Promise<unknown> | undefined;
         let hasDontNotifyRule = false;
 
         // Get the existing room-kind push rule if any
@@ -5970,7 +5970,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (promise) {
             return new Promise<void>((resolve, reject) => {
                 // Update this.pushRules when the operation completes
-                promise.then(() => {
+                promise!.then(() => {
                     this.getPushRules().then((result) => {
                         this.pushRules = result;
                         resolve();
@@ -6157,7 +6157,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logger.log("Marking success of sync left room request");
             this.syncedLeftRooms = true; // flip the bit on success
         }).finally(() => {
-            this.syncLeftRoomsPromise = null; // cleanup ongoing request state
+            this.syncLeftRoomsPromise = undefined; // cleanup ongoing request state
         });
 
         return this.syncLeftRoomsPromise;
@@ -6675,7 +6675,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {boolean} Whether or not members are lazy loaded by this client
      */
     public hasLazyLoadMembersEnabled(): boolean {
-        return !!this.clientOpts.lazyLoadMembers;
+        return !!this.clientOpts?.lazyLoadMembers;
     }
 
     /**
