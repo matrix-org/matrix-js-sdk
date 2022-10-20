@@ -444,7 +444,10 @@ export class SyncApi {
             room_id: peekRoom.roomId,
             timeout: String(30 * 1000),
             from: token,
-        }, undefined, { localTimeoutMs: 50 * 1000 }).then((res) => {
+        }, undefined, {
+            localTimeoutMs: 50 * 1000,
+            abortSignal: this.abortController?.signal,
+        }).then((res) => {
             if (this._peekRoom !== peekRoom) {
                 debuglog("Stopped peeking in room %s", peekRoom.roomId);
                 return;

@@ -1584,8 +1584,9 @@ describe("MatrixClient syncing", () => {
                     sender: userA,
                 }],
             });
+            httpBackend!.when("GET", "/events").respond(200, { chunk: [] });
 
-            const prom = client?.peekInRoom(roomOne);
+            const prom = client!.peekInRoom(roomOne);
             await httpBackend!.flushAllExpected();
             const room = await prom;
 
@@ -1596,6 +1597,8 @@ describe("MatrixClient syncing", () => {
             expect(room.timeline[0].getContent().body).toBe("Message 1");
             expect(room.timeline[1].getContent().body).toBe("Message 2");
             client?.stopPeeking();
+            client?.stopClient();
+            await httpBackend!.flushAllExpected();
         });
     });
 
