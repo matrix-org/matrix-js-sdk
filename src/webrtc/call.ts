@@ -69,7 +69,7 @@ import { MatrixError } from "../http-api";
 
 interface CallOpts {
     roomId?: string;
-    client?: any; // Fix when client is TSified
+    client: MatrixClient;
     forceTURN?: boolean;
     turnServers?: Array<TurnServer>;
 }

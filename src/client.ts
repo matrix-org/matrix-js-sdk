@@ -947,8 +947,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected syncLeftRoomsPromise: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts: IStoredClientOpts;
-    protected clientWellKnownIntervalID: ReturnType<typeof setInterval>;
-    protected canResetTimelineCallback: ResetTimelineCallback;
+    protected clientWellKnownIntervalID?: ReturnType<typeof setInterval>;
+    protected canResetTimelineCallback?: ResetTimelineCallback;
 
     public canSupport = new Map<Feature, ServerSupport>();
 
@@ -3044,6 +3044,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         targetSessionId?: string,
         opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
+        if (!this.crypto) {
+            throw new Error("End-to-end encryption disabled");
+        }
         const storedKey = await this.getSecret("m.megolm_backup.v1");
 
         // ensure that the key is in the right format.  If not, fix the key and
@@ -6216,13 +6219,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async getOrCreateFilter(filterName: string, filter: Filter): Promise<string> {
         const filterId = this.store.getFilterIdByName(filterName);
-        let existingId = undefined;
+        let existingId: string | undefined;
 
         if (filterId) {
             // check that the existing filter matches our expectations
             try {
-                const existingFilter =
-                    await this.getFilter(this.credentials.userId, filterId, true);
+                const existingFilter = await this.getFilter(this.credentials.userId!, filterId, true);
                 if (existingFilter) {
                     const oldDef = existingFilter.getDefinition();
                     const newDef = filter.getDefinition();
@@ -6433,7 +6435,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private async fetchClientWellKnown(): Promise<void> {
         // `getRawClientConfig` does not throw or reject on network errors, instead
         // it absorbs errors and returns `{}`.
-        this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(this.getDomain());
+        this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(this.getDomain() ?? undefined);
         this.clientWellKnown = await this.clientWellKnownPromise;
         this.emit(ClientEvent.ClientWellKnown, this.clientWellKnown);
     }
@@ -6693,7 +6695,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get the callback set via `setCanResetTimelineCallback`.
      * @return {?Function} The callback or null
      */
-    public getCanResetTimelineCallback(): ResetTimelineCallback {
+    public getCanResetTimelineCallback(): ResetTimelineCallback | undefined {
         return this.canResetTimelineCallback;
     }
 

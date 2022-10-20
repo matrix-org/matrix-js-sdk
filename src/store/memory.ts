@@ -281,7 +281,7 @@ export class MemoryStore implements IStore {
         const key = "mxjssdk_memory_filter_" + filterName;
         try {
             if (isValidFilterId(filterId)) {
-                this.localStorage.setItem(key, filterId);
+                this.localStorage.setItem(key, filterId!);
             } else {
                 this.localStorage.removeItem(key);
             }

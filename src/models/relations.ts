@@ -107,7 +107,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             this.addAnnotationToAggregation(event);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement);
+            this.targetEvent.makeReplaced(lastReplacement!);
         }
 
         event.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -148,7 +148,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             this.removeAnnotationFromAggregation(event);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement);
+            this.targetEvent.makeReplaced(lastReplacement!);
         }
 
         this.emit(RelationsEvent.Remove, event);
@@ -261,7 +261,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             this.removeAnnotationFromAggregation(redactedEvent);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement);
+            this.targetEvent.makeReplaced(lastReplacement!);
         }
 
         redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -297,7 +297,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * An object with each relation sender as a key and the matching Set of
      * events for that sender as a value.
      */
-    public getAnnotationsBySender() {
+    public getAnnotationsBySender(): Record<string, Set<MatrixEvent>> | null {
         if (this.relationType !== RelationType.Annotation) {
             // Other relation types are not grouped currently.
             return null;

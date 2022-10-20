@@ -1026,8 +1026,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // in secret storage
             const fixedBackupKey = fixBackupKey(sessionBackupKey);
             if (fixedBackupKey) {
+                const keyId = newKeyId || oldKeyId;
                 await secretStorage.store("m.megolm_backup.v1",
-                    fixedBackupKey, [newKeyId || oldKeyId],
+                    fixedBackupKey, keyId ? [keyId] : null,
                 );
             }
             const decodedBackupKey = new Uint8Array(olmlib.decodeBase64(
@@ -1079,7 +1080,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return this.secretStorage.store(name, secret, keys);
     }
 
-    public getSecret(name: string): Promise<string> {
+    public getSecret(name: string): Promise<string | undefined> {
         return this.secretStorage.get(name);
     }
 
@@ -1494,7 +1495,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Check the copy of our cross-signing key that we have in the device list and
      * see if we can get the private key. If so, mark it as trusted.
      */
-    async checkOwnCrossSigningTrust({
+    public async checkOwnCrossSigningTrust({
         allowPrivateKeyRequests = false,
     }: ICheckOwnCrossSigningTrustOpts = {}): Promise<void> {
         const userId = this.userId;
@@ -1977,10 +1978,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     // returns a promise which resolves to the response
-    private async uploadOneTimeKeys() {
+    private async uploadOneTimeKeys(): Promise<IKeysUploadResponse> {
         const promises: Promise<unknown>[] = [];
 
-        let fallbackJson: Record<string, IOneTimeKey>;
+        let fallbackJson: Record<string, IOneTimeKey> | undefined;
         if (this.getNeedsNewFallback()) {
             fallbackJson = {};
             const fallbackKeys = await this.olmDevice.getFallbackKey();
