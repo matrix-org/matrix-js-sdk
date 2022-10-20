@@ -400,8 +400,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 // store the fixed version
                 const fixedKey = fixBackupKey(storedKey);
                 if (fixedKey) {
-                    const [keyId] = await this.getSecretStorageKey();
-                    await this.storeSecret("m.megolm_backup.v1", fixedKey, [keyId]);
+                    const keys = await this.getSecretStorageKey();
+                    await this.storeSecret("m.megolm_backup.v1", fixedKey, [keys![0]]);
                 }
 
                 return olmlib.decodeBase64(fixedKey || storedKey);

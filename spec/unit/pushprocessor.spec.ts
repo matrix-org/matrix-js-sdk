@@ -209,7 +209,7 @@ describe('NotificationService', function() {
                 msgtype: "m.text",
             },
         });
-        matrixClient.pushRules = PushProcessor.rewriteDefaultRules(matrixClient.pushRules);
+        matrixClient.pushRules = PushProcessor.rewriteDefaultRules(matrixClient.pushRules!);
         pushProcessor = new PushProcessor(matrixClient);
     });
 

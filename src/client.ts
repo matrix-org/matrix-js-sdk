@@ -936,7 +936,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected peekSync: SyncApi | null = null;
     protected isGuestAccount = false;
     protected ongoingScrollbacks: {[roomId: string]: {promise?: Promise<Room>, errorTs?: number}} = {};
-    protected notifTimelineSet: EventTimelineSet = null;
+    protected notifTimelineSet: EventTimelineSet | null = null;
     protected cryptoStore: CryptoStore;
     protected verificationMethods: VerificationMethod[];
     protected fallbackICEServerAllowed = false;
@@ -1232,7 +1232,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.clientRunning = false;
 
         this.syncApi?.stop();
-        this.syncApi = null;
+        this.syncApi = undefined;
 
         this.peekSync?.stopPeeking();
 
@@ -1595,7 +1595,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @return {EventTimelineSet} the globl notification EventTimelineSet
      */
-    public getNotifTimelineSet(): EventTimelineSet {
+    public getNotifTimelineSet(): EventTimelineSet | null {
         return this.notifTimelineSet;
     }
 
@@ -6457,7 +6457,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public storeClientOptions(): Promise<void> { // XXX: Intended private, used in code
         const primTypes = ["boolean", "string", "number"];
-        const serializableOpts = Object.entries(this.clientOpts)
+        const serializableOpts = Object.entries(this.clientOpts!)
             .filter(([key, value]) => {
                 return primTypes.includes(typeof value);
             })
