@@ -48,14 +48,18 @@ export class ToDeviceMessageQueue {
     public async queueBatch(batch: ToDeviceBatch): Promise<void> {
         const batches: ToDeviceBatchWithTxnId[] = [];
         for (let i = 0; i < batch.batch.length; i += MAX_BATCH_SIZE) {
-            batches.push({
+            const batchWithTxnId = {
                 eventType: batch.eventType,
                 batch: batch.batch.slice(i, i + MAX_BATCH_SIZE),
                 txnId: this.client.makeTxnId(),
-            });
+            };
+            batches.push(batchWithTxnId);
+            const recips = batchWithTxnId.batch.map((msg) => `${msg.userId}:${msg.deviceId}`);
+            logger.info(`Created batch of to-device messages with txn id ${batchWithTxnId.txnId} for ${recips}`);
         }
 
         await this.client.store.saveToDeviceBatches(batches);
+        logger.info(`Enqueued to-device messages with txn ids ${batches.map((batch) => batch.txnId)}`);
         this.sendQueue();
     }
 
@@ -118,7 +122,9 @@ export class ToDeviceMessageQueue {
             contentMap[item.userId][item.deviceId] = item.payload;
         }
 
-        logger.info(`Sending batch of ${batch.batch.length} to-device messages with ID ${batch.id}`);
+        logger.info(
+            `Sending batch of ${batch.batch.length} to-device messages with ID ${batch.id} and txnId ${batch.txnId}`,
+        );
 
         await this.client.sendToDevice(batch.eventType, contentMap, batch.txnId);
     }
