@@ -722,6 +722,7 @@ describe("MegolmBackup", function() {
 
             cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);
             await expect(client.flagAllGroupSessionsForBackup()).resolves.toBe(6);
+            client.stopClient();
         });
     });
 });
