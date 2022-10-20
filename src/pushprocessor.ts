@@ -93,7 +93,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
     },
     {
         // For homeservers which don't support MSC3401 yet
-        rule_id: ".org.matrix.msc3401.rule.room.call",
+        rule_id: ".org.matrix.msc3914.rule.room.call",
         default: true,
         enabled: true,
         conditions: [
@@ -101,6 +101,9 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "org.matrix.msc3401.call",
+            },
+            {
+                kind: ConditionKind.CallStarted,
             },
         ],
         actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Sound, value: "default" }],
