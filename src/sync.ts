@@ -189,7 +189,7 @@ export class SyncApi {
         }
 
         if (client.getNotifTimelineSet()) {
-            client.reEmitter.reEmit(client.getNotifTimelineSet(), [
+            client.reEmitter.reEmit(client.getNotifTimelineSet()!, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
             ]);
@@ -1454,7 +1454,7 @@ export class SyncApi {
                 return a.getTs() - b.getTs();
             });
             this.notifEvents.forEach(function(event) {
-                client.getNotifTimelineSet().addLiveEvent(event);
+                client.getNotifTimelineSet()?.addLiveEvent(event);
             });
         }
 

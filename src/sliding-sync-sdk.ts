@@ -259,7 +259,7 @@ export class SlidingSyncSdk {
         }
 
         if (client.getNotifTimelineSet()) {
-            client.reEmitter.reEmit(client.getNotifTimelineSet(), [
+            client.reEmitter.reEmit(client.getNotifTimelineSet()!, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
             ]);
@@ -357,7 +357,7 @@ export class SlidingSyncSdk {
      * store.
      */
     public async peek(_roomId: string): Promise<Room> {
-        return null; // TODO
+        return null!; // TODO
     }
 
     /**
@@ -786,7 +786,7 @@ export class SlidingSyncSdk {
             return a.getTs() - b.getTs();
         });
         this.notifEvents.forEach((event) => {
-            this.client.getNotifTimelineSet().addLiveEvent(event);
+            this.client.getNotifTimelineSet()?.addLiveEvent(event);
         });
         this.notifEvents = [];
     }
