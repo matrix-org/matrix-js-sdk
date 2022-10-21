@@ -342,6 +342,8 @@ describe("MatrixClient event timelines", function() {
         httpBackend.verifyNoOutstandingExpectation();
         client.stopClient();
         Thread.setServerSideSupport(FeatureSupport.None);
+        Thread.setServerSideListSupport(FeatureSupport.None);
+        Thread.setServerSideFwdPaginationSupport(FeatureSupport.None);
     });
 
     describe("getEventTimeline", function() {

@@ -5196,6 +5196,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const mapper = this.getEventMapper();
         const event = mapper(res.event);
+        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
+            logger.warn("Tried loading a regular timeline at the position of a thread event");
+            return undefined;
+        }
         const events = [
             // Order events from most recent to oldest (reverse-chronological).
             // We start with the last event, since that's the point at which we have known state.
@@ -6957,8 +6961,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return {
             originalEvent: originalEvent ?? null,
             events,
-            nextBatch: result.next_batch,
-            prevBatch: result.prev_batch,
+            nextBatch: result.next_batch ?? null,
+            prevBatch: result.prev_batch ?? null,
         };
     }
 
