@@ -2741,7 +2741,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     // TODO: Verify types
     public async prepareKeyBackupVersion(
-        password: string | Uint8Array | null,
+        password?: string | Uint8Array | null,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
     ): Promise<Pick<IPreparedKeyBackupVersion, "algorithm" | "auth_data" | "recovery_key">> {
         if (!this.crypto) {

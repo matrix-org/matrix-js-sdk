@@ -86,9 +86,7 @@ interface BackupAlgorithmClass {
     init(authData: AuthData, getKey: GetKey): Promise<BackupAlgorithm>;
 
     // prepare a brand new backup
-    prepare(
-        key: string | Uint8Array | null,
-    ): Promise<[Uint8Array, AuthData]>;
+    prepare(key?: string | Uint8Array | null): Promise<[Uint8Array, AuthData]>;
 
     checkBackupVersion(info: IKeyBackupInfo): void;
 }
@@ -194,7 +192,7 @@ export class BackupManager {
     }
 
     public async prepareKeyBackupVersion(
-        key: string | Uint8Array | null,
+        key?: string | Uint8Array | null,
         algorithm?: string | undefined,
     ): Promise<IPreparedKeyBackupVersion> {
         const Algorithm = algorithm ? algorithmsByName[algorithm] : DefaultAlgorithm;
@@ -630,7 +628,7 @@ export class Curve25519 implements BackupAlgorithm {
     }
 
     public static async prepare(
-        key: string | Uint8Array | null,
+        key?: string | Uint8Array | null,
     ): Promise<[Uint8Array, AuthData]> {
         const decryption = new global.Olm.PkDecryption();
         try {
@@ -761,7 +759,7 @@ export class Aes256 implements BackupAlgorithm {
     }
 
     public static async prepare(
-        key: string | Uint8Array | null,
+        key?: string | Uint8Array | null,
     ): Promise<[Uint8Array, AuthData]> {
         let outKey: Uint8Array;
         const authData: Partial<IAes256AuthData> = {};
