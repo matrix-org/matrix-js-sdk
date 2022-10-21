@@ -55,14 +55,14 @@ export class VerificationBase<
 > extends TypedEventEmitter<Events | VerificationEvent, Arguments, VerificationEventHandlerMap> {
     private cancelled = false;
     private _done = false;
-    private promise: Promise<void> = null;
-    private transactionTimeoutTimer: ReturnType<typeof setTimeout> = null;
-    protected expectedEvent: string;
-    private resolve: () => void;
-    private reject: (e: Error | MatrixEvent) => void;
-    private resolveEvent: (e: MatrixEvent) => void;
-    private rejectEvent: (e: Error) => void;
-    private started: boolean;
+    private promise: Promise<void> | null = null;
+    private transactionTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    protected expectedEvent?: string;
+    private resolve?: () => void;
+    private reject?: (e: Error | MatrixEvent) => void;
+    private resolveEvent?: (e: MatrixEvent) => void;
+    private rejectEvent?: (e: Error) => void;
+    private started?: boolean;
 
     /**
      * Base class for verification methods.
@@ -187,7 +187,7 @@ export class VerificationBase<
                 this.expectedEvent = undefined;
                 this.rejectEvent = undefined;
                 this.resetTimer();
-                this.resolveEvent(e);
+                this.resolveEvent?.(e);
             }
         } else if (e.getType() === EventType.KeyVerificationCancel) {
             const reject = this.reject;
@@ -218,11 +218,11 @@ export class VerificationBase<
         }
     }
 
-    public done(): Promise<KeysDuringVerification | void> {
+    public async done(): Promise<KeysDuringVerification | void> {
         this.endTimer(); // always kill the activity timer
         if (!this._done) {
             this.request.onVerifierFinished();
-            this.resolve();
+            this.resolve?.();
             return requestKeysDuringVerification(this.baseApis, this.userId, this.deviceId);
         }
     }
@@ -291,7 +291,7 @@ export class VerificationBase<
                 this.endTimer();
                 resolve(...args);
             };
-            this.reject = (e: Error) => {
+            this.reject = (e: Error | MatrixEvent) => {
                 this._done = true;
                 this.endTimer();
                 reject(e);
@@ -301,12 +301,12 @@ export class VerificationBase<
             this.started = true;
             this.resetTimer(); // restart the timeout
             new Promise<void>((resolve, reject) => {
-                const crossSignId = this.baseApis.crypto.deviceList.getStoredCrossSigningForUser(this.userId)?.getId();
+                const crossSignId = this.baseApis.crypto!.deviceList.getStoredCrossSigningForUser(this.userId)?.getId();
                 if (crossSignId === this.deviceId) {
                     reject(new Error("Device ID is the same as the cross-signing ID"));
                 }
                 resolve();
-            }).then(() => this.doVerification()).then(this.done.bind(this), this.cancel.bind(this));
+            }).then(() => this.doVerification!()).then(this.done.bind(this), this.cancel.bind(this));
         }
         return this.promise;
     }
@@ -326,7 +326,7 @@ export class VerificationBase<
                 verifier(keyId, device, keyInfo);
                 verifiedDevices.push([deviceId, keyId, device.keys[keyId]]);
             } else {
-                const crossSigningInfo = this.baseApis.crypto.deviceList.getStoredCrossSigningForUser(userId);
+                const crossSigningInfo = this.baseApis.crypto!.deviceList.getStoredCrossSigningForUser(userId);
                 if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
                     verifier(keyId, DeviceInfo.fromStorage({
                         keys: {
@@ -356,7 +356,7 @@ export class VerificationBase<
         // to upload each signature in a separate API call which is silly because the
         // API supports as many signatures as you like.
         for (const [deviceId, keyId, key] of verifiedDevices) {
-            await this.baseApis.crypto.setDeviceVerification(userId, deviceId, true, null, null, { [keyId]: key });
+            await this.baseApis.crypto!.setDeviceVerification(userId, deviceId, true, null, null, { [keyId]: key });
         }
 
         // if one of the user's own devices is being marked as verified / unverified,

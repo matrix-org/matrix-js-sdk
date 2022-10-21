@@ -1047,7 +1047,7 @@ describe("MatrixClient event timelines", function() {
             response = {
                 chunk: [THREAD_ROOT],
                 state: [],
-                next_batch: RANDOM_TOKEN,
+                next_batch: RANDOM_TOKEN as string | null,
             },
         ): ExpectedHttpRequest {
             const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {

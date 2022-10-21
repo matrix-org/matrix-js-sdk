@@ -601,7 +601,7 @@ describe("Room", function() {
     });
 
     const resetTimelineTests = function(timelineSupport) {
-        let events = null;
+        let events: MatrixEvent[];
 
         beforeEach(function() {
             room = new Room(roomId, new TestClient(userA).client, userA, { timelineSupport: timelineSupport });
@@ -1732,7 +1732,7 @@ describe("Room", function() {
 
             client.members.mockReturnValue({ chunk: [memberEvent] });
             await room.loadMembersIfNeeded();
-            const memberA = room.getMember("@user_a:bar");
+            const memberA = room.getMember("@user_a:bar")!;
             expect(memberA.name).toEqual("User A");
         });
     });
@@ -2455,28 +2455,28 @@ describe("Room", function() {
 
             room.addLiveEvents(events);
 
-            const thread = threadRoot.getThread();
+            const thread = threadRoot.getThread()!;
             expect(thread.rootEvent).toBe(threadRoot);
 
             const rootRelations = thread.timelineSet.relations.getChildEventsForEvent(
                 threadRoot.getId(),
                 RelationType.Annotation,
                 EventType.Reaction,
-            ).getSortedAnnotationsByKey();
+            )!.getSortedAnnotationsByKey();
             expect(rootRelations).toHaveLength(1);
-            expect(rootRelations[0][0]).toEqual(rootReaction.getRelation().key);
-            expect(rootRelations[0][1].size).toEqual(1);
-            expect(rootRelations[0][1].has(rootReaction)).toBeTruthy();
+            expect(rootRelations![0][0]).toEqual(rootReaction.getRelation()!.key);
+            expect(rootRelations![0][1].size).toEqual(1);
+            expect(rootRelations![0][1].has(rootReaction)).toBeTruthy();
 
             const responseRelations = thread.timelineSet.relations.getChildEventsForEvent(
                 threadResponse.getId(),
                 RelationType.Annotation,
                 EventType.Reaction,
-            ).getSortedAnnotationsByKey();
+            )!.getSortedAnnotationsByKey();
             expect(responseRelations).toHaveLength(1);
-            expect(responseRelations[0][0]).toEqual(threadReaction.getRelation().key);
-            expect(responseRelations[0][1].size).toEqual(1);
-            expect(responseRelations[0][1].has(threadReaction)).toBeTruthy();
+            expect(responseRelations![0][0]).toEqual(threadReaction.getRelation()!.key);
+            expect(responseRelations![0][1].size).toEqual(1);
+            expect(responseRelations![0][1].has(threadReaction)).toBeTruthy();
         });
     });
 

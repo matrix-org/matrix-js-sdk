@@ -49,7 +49,7 @@ type EventHandlerMap = {
  * @extends {module:crypto/verification/Base}
  */
 export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
-    public reciprocateQREvent: IReciprocateQr;
+    public reciprocateQREvent?: IReciprocateQr;
 
     public static factory(
         channel: IVerificationChannel,
@@ -76,7 +76,7 @@ export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
 
         const { qrCodeData } = this.request;
         // 1. check the secret
-        if (this.startEvent.getContent()['secret'] !== qrCodeData.encodedSharedSecret) {
+        if (this.startEvent.getContent()['secret'] !== qrCodeData?.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
 
@@ -92,21 +92,21 @@ export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
         // 3. determine key to sign / mark as trusted
         const keys: Record<string, string> = {};
 
-        switch (qrCodeData.mode) {
+        switch (qrCodeData?.mode) {
             case Mode.VerifyOtherUser: {
                 // add master key to keys to be signed, only if we're not doing self-verification
                 const masterKey = qrCodeData.otherUserMasterKey;
-                keys[`ed25519:${masterKey}`] = masterKey;
+                keys[`ed25519:${masterKey}`] = masterKey!;
                 break;
             }
             case Mode.VerifySelfTrusted: {
                 const deviceId = this.request.targetDevice.deviceId;
-                keys[`ed25519:${deviceId}`] = qrCodeData.otherDeviceKey;
+                keys[`ed25519:${deviceId}`] = qrCodeData.otherDeviceKey!;
                 break;
             }
             case Mode.VerifySelfUntrusted: {
                 const masterKey = qrCodeData.myMasterKey;
-                keys[`ed25519:${masterKey}`] = masterKey;
+                keys[`ed25519:${masterKey}`] = masterKey!;
                 break;
             }
         }
@@ -158,41 +158,41 @@ export class QRCodeData {
         public readonly mode: Mode,
         private readonly sharedSecret: string,
         // only set when mode is MODE_VERIFY_OTHER_USER, master key of other party at time of generating QR code
-        public readonly otherUserMasterKey: string | undefined,
+        public readonly otherUserMasterKey: string | null,
         // only set when mode is MODE_VERIFY_SELF_TRUSTED, device key of other party at time of generating QR code
-        public readonly otherDeviceKey: string | undefined,
+        public readonly otherDeviceKey: string | null,
         // only set when mode is MODE_VERIFY_SELF_UNTRUSTED, own master key at time of generating QR code
-        public readonly myMasterKey: string | undefined,
+        public readonly myMasterKey: string | null,
         private readonly buffer: Buffer,
     ) {}
 
     public static async create(request: VerificationRequest, client: MatrixClient): Promise<QRCodeData> {
         const sharedSecret = QRCodeData.generateSharedSecret();
         const mode = QRCodeData.determineMode(request, client);
-        let otherUserMasterKey = null;
-        let otherDeviceKey = null;
-        let myMasterKey = null;
+        let otherUserMasterKey: string | null = null;
+        let otherDeviceKey: string | null = null;
+        let myMasterKey: string | null = null;
         if (mode === Mode.VerifyOtherUser) {
-            const otherUserCrossSigningInfo =
-                client.getStoredCrossSigningForUser(request.otherUserId);
-            otherUserMasterKey = otherUserCrossSigningInfo.getId("master");
+            const otherUserCrossSigningInfo = client.getStoredCrossSigningForUser(request.otherUserId);
+            otherUserMasterKey = otherUserCrossSigningInfo!.getId("master");
         } else if (mode === Mode.VerifySelfTrusted) {
             otherDeviceKey = await QRCodeData.getOtherDeviceKey(request, client);
         } else if (mode === Mode.VerifySelfUntrusted) {
-            const myUserId = client.getUserId();
+            const myUserId = client.getUserId()!;
             const myCrossSigningInfo = client.getStoredCrossSigningForUser(myUserId);
-            myMasterKey = myCrossSigningInfo.getId("master");
+            myMasterKey = myCrossSigningInfo!.getId("master");
         }
         const qrData = QRCodeData.generateQrData(
-            request, client, mode,
+            request,
+            client,
+            mode,
             sharedSecret,
-            otherUserMasterKey,
-            otherDeviceKey,
-            myMasterKey,
+            otherUserMasterKey!,
+            otherDeviceKey!,
+            myMasterKey!,
         );
         const buffer = QRCodeData.generateBuffer(qrData);
-        return new QRCodeData(mode, sharedSecret,
-            otherUserMasterKey, otherDeviceKey, myMasterKey, buffer);
+        return new QRCodeData(mode, sharedSecret, otherUserMasterKey, otherDeviceKey, myMasterKey, buffer);
     }
 
     /**
@@ -213,12 +213,11 @@ export class QRCodeData {
     }
 
     private static async getOtherDeviceKey(request: VerificationRequest, client: MatrixClient): Promise<string> {
-        const myUserId = client.getUserId();
+        const myUserId = client.getUserId()!;
         const otherDevice = request.targetDevice;
-        const otherDeviceId = otherDevice ? otherDevice.deviceId : null;
-        const device = client.getStoredDevice(myUserId, otherDeviceId);
+        const device = otherDevice.deviceId ? client.getStoredDevice(myUserId, otherDevice.deviceId) : undefined;
         if (!device) {
-            throw new Error("could not find device " + otherDeviceId);
+            throw new Error("could not find device " + otherDevice?.deviceId);
         }
         return device.getFingerprint();
     }
@@ -245,11 +244,11 @@ export class QRCodeData {
         client: MatrixClient,
         mode: Mode,
         encodedSharedSecret: string,
-        otherUserMasterKey: string,
-        otherDeviceKey: string,
-        myMasterKey: string,
+        otherUserMasterKey?: string,
+        otherDeviceKey?: string,
+        myMasterKey?: string,
     ): IQrData {
-        const myUserId = client.getUserId();
+        const myUserId = client.getUserId()!;
         const transactionId = request.channel.transactionId;
         const qrData = {
             prefix: BINARY_PREFIX,
@@ -265,18 +264,18 @@ export class QRCodeData {
 
         if (mode === Mode.VerifyOtherUser) {
             // First key is our master cross signing key
-            qrData.firstKeyB64 = myCrossSigningInfo.getId("master");
+            qrData.firstKeyB64 = myCrossSigningInfo!.getId("master")!;
             // Second key is the other user's master cross signing key
-            qrData.secondKeyB64 = otherUserMasterKey;
+            qrData.secondKeyB64 = otherUserMasterKey!;
         } else if (mode === Mode.VerifySelfTrusted) {
             // First key is our master cross signing key
-            qrData.firstKeyB64 = myCrossSigningInfo.getId("master");
-            qrData.secondKeyB64 = otherDeviceKey;
+            qrData.firstKeyB64 = myCrossSigningInfo!.getId("master")!;
+            qrData.secondKeyB64 = otherDeviceKey!;
         } else if (mode === Mode.VerifySelfUntrusted) {
             // First key is our device's key
-            qrData.firstKeyB64 = client.getDeviceEd25519Key();
+            qrData.firstKeyB64 = client.getDeviceEd25519Key()!;
             // Second key is what we think our master cross signing key is
-            qrData.secondKeyB64 = myMasterKey;
+            qrData.secondKeyB64 = myMasterKey!;
         }
         return qrData;
     }

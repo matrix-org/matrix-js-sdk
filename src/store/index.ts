@@ -150,7 +150,7 @@ export interface IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    setFilterIdByName(filterName: string, filterId: string): void;
+    setFilterIdByName(filterName: string, filterId?: string): void;
 
     /**
      * Store user-scoped account data events

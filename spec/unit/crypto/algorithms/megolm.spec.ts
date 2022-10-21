@@ -32,8 +32,8 @@ import { ClientEvent, MatrixClient, RoomMember } from '../../../../src';
 import { DeviceInfo, IDevice } from '../../../../src/crypto/deviceinfo';
 import { DeviceTrustLevel } from '../../../../src/crypto/CrossSigning';
 
-const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
-const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
+const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2')!;
+const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get('m.megolm.v1.aes-sha2')!;
 
 const ROOM_ID = '!ROOM:ID';
 
@@ -331,7 +331,7 @@ describe("MegolmDecryption", function() {
                         },
                     },
                 });
-                mockBaseApis.sendToDevice.mockResolvedValue(undefined);
+                mockBaseApis.sendToDevice.mockResolvedValue({});
                 mockBaseApis.queueToDevice.mockResolvedValue(undefined);
 
                 aliceDeviceInfo = {
@@ -515,8 +515,8 @@ describe("MegolmDecryption", function() {
             bobdevice1: {
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
-                    "ed25519:Dynabook": bobDevice1.deviceEd25519Key,
-                    "curve25519:Dynabook": bobDevice1.deviceCurve25519Key,
+                    "ed25519:Dynabook": bobDevice1.deviceEd25519Key!,
+                    "curve25519:Dynabook": bobDevice1.deviceCurve25519Key!,
                 },
                 verified: 0,
                 known: false,
@@ -524,8 +524,8 @@ describe("MegolmDecryption", function() {
             bobdevice2: {
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
-                    "ed25519:Dynabook": bobDevice2.deviceEd25519Key,
-                    "curve25519:Dynabook": bobDevice2.deviceCurve25519Key,
+                    "ed25519:Dynabook": bobDevice2.deviceEd25519Key!,
+                    "curve25519:Dynabook": bobDevice2.deviceCurve25519Key!,
                 },
                 verified: -1,
                 known: false,
@@ -614,8 +614,8 @@ describe("MegolmDecryption", function() {
             bobdevice: {
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
-                    "ed25519:bobdevice": bobDevice.deviceEd25519Key,
-                    "curve25519:bobdevice": bobDevice.deviceCurve25519Key,
+                    "ed25519:bobdevice": bobDevice.deviceEd25519Key!,
+                    "curve25519:bobdevice": bobDevice.deviceCurve25519Key!,
                 },
                 verified: 0,
                 known: true,
@@ -718,8 +718,8 @@ describe("MegolmDecryption", function() {
                 device_id: "bobdevice",
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
-                    "ed25519:bobdevice": bobDevice.deviceEd25519Key,
-                    "curve25519:bobdevice": bobDevice.deviceCurve25519Key,
+                    "ed25519:bobdevice": bobDevice.deviceEd25519Key!,
+                    "curve25519:bobdevice": bobDevice.deviceCurve25519Key!,
                 },
                 known: true,
                 verified: 1,

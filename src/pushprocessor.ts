@@ -189,7 +189,7 @@ export class PushProcessor {
 
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
 
-    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule {
+    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule | null {
         for (let ruleKindIndex = 0; ruleKindIndex < RULEKINDS_IN_ORDER.length; ++ruleKindIndex) {
             const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
             const ruleset = kindset[kind];
@@ -346,18 +346,19 @@ export class PushProcessor {
     private eventFulfillsDisplayNameCondition(cond: IContainsDisplayNameCondition, ev: MatrixEvent): boolean {
         let content = ev.getContent();
         if (ev.isEncrypted() && ev.getClearContent()) {
-            content = ev.getClearContent();
+            content = ev.getClearContent()!;
         }
         if (!content || !content.body || typeof content.body != 'string') {
             return false;
         }
 
         const room = this.client.getRoom(ev.getRoomId());
-        if (!room?.currentState?.getMember(this.client.credentials.userId!)) {
+        const member = room?.currentState?.getMember(this.client.credentials.userId!);
+        if (!member) {
             return false;
         }
 
-        const displayName = room!.currentState!.getMember(this.client.credentials.userId!)!.name;
+        const displayName = member.name;
 
         // N.B. we can't use \b as it chokes on unicode. however \W seems to be okay
         // as shorthand for [^0-9A-Za-z_].
@@ -419,7 +420,7 @@ export class PushProcessor {
 
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
         const parts = key.split('.');
-        let val;
+        let val: any;
 
         // special-case the first component to deal with encrypted messages
         const firstPart = parts[0];
@@ -435,7 +436,7 @@ export class PushProcessor {
         }
 
         while (parts.length > 0) {
-            const thisPart = parts.shift();
+            const thisPart = parts.shift()!;
             if (isNullOrUndefined(val[thisPart])) {
                 return null;
             }
@@ -444,7 +445,7 @@ export class PushProcessor {
         return val;
     }
 
-    private matchingRuleForEventWithRulesets(ev: MatrixEvent, rulesets): IAnnotatedPushRule {
+    private matchingRuleForEventWithRulesets(ev: MatrixEvent, rulesets?: IPushRules): IAnnotatedPushRule | null {
         if (!rulesets) {
             return null;
         }
@@ -455,7 +456,7 @@ export class PushProcessor {
         return this.matchingRuleFromKindSet(ev, rulesets.global);
     }
 
-    private pushActionsForEventAndRulesets(ev: MatrixEvent, rulesets): IActionsObject {
+    private pushActionsForEventAndRulesets(ev: MatrixEvent, rulesets?: IPushRules): IActionsObject {
         const rule = this.matchingRuleForEventWithRulesets(ev, rulesets);
         if (!rule) {
             return {} as IActionsObject;
@@ -503,9 +504,9 @@ export class PushProcessor {
      * @param {string} ruleId The ID of the rule to search for
      * @return {object} The push rule, or null if no such rule was found
      */
-    public getPushRuleById(ruleId: string): IPushRule {
+    public getPushRuleById(ruleId: string): IPushRule | null {
         for (const scope of ['global']) {
-            if (this.client.pushRules[scope] === undefined) continue;
+            if (this.client.pushRules?.[scope] === undefined) continue;
 
             for (const kind of RULEKINDS_IN_ORDER) {
                 if (this.client.pushRules[scope][kind] === undefined) continue;

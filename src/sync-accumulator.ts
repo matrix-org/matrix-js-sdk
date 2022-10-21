@@ -191,7 +191,7 @@ export class SyncAccumulator {
     // accumulated. We remember this so that any caller can obtain a
     // coherent /sync response and know at what point they should be
     // streaming from without losing events.
-    private nextBatch: string = null;
+    private nextBatch: string | null = null;
 
     /**
      * @param {Object} opts
@@ -384,8 +384,8 @@ export class SyncAccumulator {
         if (data.unread_notifications) {
             currentData._unreadNotifications = data.unread_notifications;
         }
-        currentData._unreadThreadNotifications = data[UNREAD_THREAD_NOTIFICATIONS.stable]
-            ?? data[UNREAD_THREAD_NOTIFICATIONS.unstable]
+        currentData._unreadThreadNotifications = data[UNREAD_THREAD_NOTIFICATIONS.stable!]
+            ?? data[UNREAD_THREAD_NOTIFICATIONS.unstable!]
             ?? undefined;
 
         if (data.summary) {
@@ -429,7 +429,7 @@ export class SyncAccumulator {
                     Object.entries(e.content[eventId]).forEach(([key, value]) => {
                         if (!isSupportedReceiptType(key)) return;
 
-                        Object.keys(value).forEach((userId) => {
+                        Object.keys(value!).forEach((userId) => {
                             // clobber on user ID
                             currentData._readReceipts[userId] = {
                                 data: e.content[eventId][key][userId],
@@ -477,16 +477,16 @@ export class SyncAccumulator {
 
                 currentData._timeline.push({
                     event: transformedEvent,
-                    token: index === 0 ? data.timeline.prev_batch : null,
+                    token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
                 });
             });
         }
 
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.
-        if (currentData._timeline.length > this.opts.maxTimelineEntries) {
+        if (currentData._timeline.length > this.opts.maxTimelineEntries!) {
             const startIndex = (
-                currentData._timeline.length - this.opts.maxTimelineEntries
+                currentData._timeline.length - this.opts.maxTimelineEntries!
             );
             for (let i = startIndex; i < currentData._timeline.length; i++) {
                 if (currentData._timeline[i].token) {
@@ -657,14 +657,14 @@ export class SyncAccumulator {
         });
 
         return {
-            nextBatch: this.nextBatch,
+            nextBatch: this.nextBatch!,
             roomsData: data,
             accountData: accData,
         };
     }
 
     public getNextBatchToken(): string {
-        return this.nextBatch;
+        return this.nextBatch!;
     }
 }
 
