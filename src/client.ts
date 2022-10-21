@@ -8146,7 +8146,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(
             Method.Post, '/keys/signatures/upload', undefined,
             content, {
-                prefix: ClientPrefix.Unstable,
+                prefix: ClientPrefix.V3,
             },
         );
     }
