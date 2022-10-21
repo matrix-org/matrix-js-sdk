@@ -36,7 +36,7 @@ import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, suppor
 import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from './webrtc/callEventHandler';
 import * as utils from './utils';
-import { QueryDict, sleep } from './utils';
+import { replaceParam, QueryDict, sleep } from './utils';
 import { Direction, EventTimeline } from "./models/event-timeline";
 import { IActionsObject, PushProcessor } from "./pushprocessor";
 import { AutoDiscovery, AutoDiscoveryAction } from "./autodiscovery";
@@ -1188,9 +1188,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
         UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
 
-        const { threads, list } = await this.doesServerSupportThread();
+        const { threads, list, fwdPagination } = await this.doesServerSupportThread();
         Thread.setServerSideSupport(threads);
         Thread.setServerSideListSupport(list);
+        Thread.setServerSideFwdPaginationSupport(fwdPagination);
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
@@ -6640,25 +6641,40 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async doesServerSupportThread(): Promise<{
         threads: FeatureSupport;
         list: FeatureSupport;
+        fwdPagination: FeatureSupport;
     }> {
+        if (await this.isVersionSupported("v1.4")) {
+            return {
+                threads: FeatureSupport.Stable,
+                list: FeatureSupport.Stable,
+                fwdPagination: FeatureSupport.Stable,
+            };
+        }
+
         try {
-            const [threadUnstable, threadStable, listUnstable, listStable] = await Promise.all([
+            const [
+                threadUnstable, threadStable,
+                listUnstable, listStable,
+                fwdPaginationUnstable, fwdPaginationStable,
+            ] = await Promise.all([
                 this.doesServerSupportUnstableFeature("org.matrix.msc3440"),
                 this.doesServerSupportUnstableFeature("org.matrix.msc3440.stable"),
                 this.doesServerSupportUnstableFeature("org.matrix.msc3856"),
                 this.doesServerSupportUnstableFeature("org.matrix.msc3856.stable"),
+                this.doesServerSupportUnstableFeature("org.matrix.msc3715"),
+                this.doesServerSupportUnstableFeature("org.matrix.msc3715.stable"),
             ]);
-
-            // TODO: Use `this.isVersionSupported("v1.3")` for whatever spec version includes MSC3440 formally.
 
             return {
                 threads: determineFeatureSupport(threadStable, threadUnstable),
                 list: determineFeatureSupport(listStable, listUnstable),
+                fwdPagination: determineFeatureSupport(fwdPaginationStable, fwdPaginationUnstable),
             };
         } catch (e) {
             return {
                 threads: FeatureSupport.None,
                 list: FeatureSupport.None,
+                fwdPagination: FeatureSupport.None,
             };
         }
     }

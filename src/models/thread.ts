@@ -73,6 +73,7 @@ export function determineFeatureSupport(stable: boolean, unstable: boolean): Fea
 export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public static hasServerSideSupport = FeatureSupport.None;
     public static hasServerSideListSupport = FeatureSupport.None;
+    public static hasServerSideFwdPaginationSupport = FeatureSupport.None;
 
     /**
      * A reference to all the events ID at the bottom of the threads
@@ -166,6 +167,12 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         status: FeatureSupport,
     ): void {
         Thread.hasServerSideListSupport = status;
+    }
+
+    public static setServerSideFwdPaginationSupport(
+        status: FeatureSupport,
+    ): void {
+        Thread.hasServerSideFwdPaginationSupport = status;
     }
 
     private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent) => {
