@@ -28,7 +28,7 @@ describe("MatrixHttpApi", () => {
     const baseUrl = "http://baseUrl";
     const prefix = ClientPrefix.V3;
 
-    let xhr: Partial<Writeable<XMLHttpRequest>>;
+    let xhr: Writeable<XMLHttpRequest>;
     let upload: Promise<UploadResponse>;
 
     const DONE = 0;
@@ -44,7 +44,7 @@ describe("MatrixHttpApi", () => {
             setRequestHeader: jest.fn(),
             onreadystatechange: undefined,
             getResponseHeader: jest.fn(),
-        };
+        } as unknown as XMLHttpRequest;
         // We stub out XHR here as it is not available in JSDOM
         // @ts-ignore
         global.XMLHttpRequest = jest.fn().mockReturnValue(xhr);
@@ -62,7 +62,7 @@ describe("MatrixHttpApi", () => {
     });
 
     it("should fall back to `fetch` where xhr is unavailable", () => {
-        global.XMLHttpRequest = undefined;
+        global.XMLHttpRequest = undefined!;
         const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
         const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn });
         upload = api.uploadContent({} as File);
