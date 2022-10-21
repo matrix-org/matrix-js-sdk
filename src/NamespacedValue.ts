@@ -23,7 +23,10 @@ import { Optional } from "matrix-events-sdk/lib/types";
 export class NamespacedValue<S extends string, U extends string> {
     // Stable is optional, but one of the two parameters is required, hence the weird-looking types.
     // Goal is to to have developers explicitly say there is no stable value (if applicable).
-    public constructor(public readonly stable: S | null | undefined, public readonly unstable?: U) {
+    public constructor(stable: S, unstable: U);
+    public constructor(stable: S, unstable?: U);
+    public constructor(stable: null | undefined, unstable: U);
+    public constructor(public readonly stable?: S | null, public readonly unstable?: U) {
         if (!this.unstable && !this.stable) {
             throw new Error("One of stable or unstable values must be supplied");
         }
@@ -36,11 +39,11 @@ export class NamespacedValue<S extends string, U extends string> {
         return this.unstable!;
     }
 
-    public get altName(): U | S | null {
+    public get altName(): U | S | null | undefined {
         if (!this.stable) {
             return null;
         }
-        return this.unstable!;
+        return this.unstable;
     }
 
     public get names(): (U | S)[] {
