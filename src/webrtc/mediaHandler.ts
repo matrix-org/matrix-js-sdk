@@ -33,6 +33,11 @@ export type MediaHandlerEventHandlerMap = {
 export interface IScreensharingOpts {
     desktopCapturerSourceId?: string;
     audio?: boolean;
+    // For electron screen capture, there are very few options for detecting electron
+    // apart from inspecting the user agent or just trying getDisplayMedia() and
+    // catching the failure, so we do the latter - this flag tells the function to just
+    // throw an error so we can catch it in this case, rather than logging an emitting.
+    throwOnFail?: boolean;
 }
 
 export class MediaHandler extends TypedEventEmitter<
