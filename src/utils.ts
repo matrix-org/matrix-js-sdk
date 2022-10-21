@@ -77,6 +77,25 @@ export function encodeParams(params: QueryDict, urlSearchParams?: URLSearchParam
 export type QueryDict = Record<string, string[] | string | number | boolean | undefined>;
 
 /**
+ * Replace a stable parameter with the unstable naming for params
+ * @param stable
+ * @param unstable
+ * @param dict
+ */
+export function replaceParam(
+    stable: string,
+    unstable: string,
+    dict: QueryDict,
+): QueryDict {
+    const result = {
+        ...dict,
+        [unstable]: dict[stable],
+    };
+    delete result[stable];
+    return result;
+}
+
+/**
  * Decode a query string in `application/x-www-form-urlencoded` format.
  * @param {string} query A query string to decode e.g.
  * foo=bar&via=server1&server2

@@ -7284,7 +7284,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<IRelationsResponse> {
-        const queryString = utils.encodeParams(opts as Record<string, string | number>);
+        let params = opts as QueryDict;
+        if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
+            params = replaceParam("dir", "org.matrix.msc3715.dir", params);
+        }
+        const queryString = utils.encodeParams(params);
 
         let templatedUrl = "/rooms/$roomId/relations/$eventId";
         if (relationType !== null) {
