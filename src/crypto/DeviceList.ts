@@ -83,7 +83,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     // moment represented by the snapshot in the db.
     private syncToken: string | null = null;
 
-    private keyDownloadsInProgressByUser = new Map<string, Promise<void>>;
+    private keyDownloadsInProgressByUser: Map<string, Promise<void>> = new Map();
 
     // Set whenever changes are made other than setting the sync token
     private dirty = false;
