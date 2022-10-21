@@ -6906,7 +6906,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         nextBatch?: string;
         prevBatch?: string;
     }> {
-        const fetchedEventType = this.getEncryptedIfNeededEventType(roomId, eventType);
+        const fetchedEventType = eventType ? this.getEncryptedIfNeededEventType(roomId, eventType) : null;
         const result = await this.fetchRelations(
             roomId,
             eventId,
@@ -6930,7 +6930,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             events = events.filter(e => e.getSender() === originalEvent.getSender());
         }
         return {
-            originalEvent,
+            originalEvent: originalEvent ?? null,
             events,
             nextBatch: result.next_batch,
             prevBatch: result.prev_batch,

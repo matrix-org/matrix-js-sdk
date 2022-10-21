@@ -1540,7 +1540,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * @experimental
      */
-    public setThread(thread: Thread | null): void {
+    public setThread(thread?: Thread): void {
         if (this.thread) {
             this.reEmitter.stopReEmitting(this.thread, [ThreadEvent.Update]);
         }
@@ -1558,7 +1558,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.thread;
     }
 
-    public setThreadId(threadId: string): void {
+    public setThreadId(threadId?: string): void {
         this.threadId = threadId;
     }
 }
