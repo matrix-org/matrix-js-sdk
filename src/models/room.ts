@@ -146,6 +146,7 @@ export type RoomEmittedEvents = RoomEvent
     | ThreadEvent.New
     | ThreadEvent.Update
     | ThreadEvent.NewReply
+    | ThreadEvent.Delete
     | MatrixEventEvent.BeforeRedaction
     | BeaconEvent.New
     | BeaconEvent.Update
@@ -180,7 +181,7 @@ export type RoomEventHandlerMap = {
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
 } & Pick<
         ThreadHandlerMap,
-        ThreadEvent.Update | ThreadEvent.NewReply
+        ThreadEvent.Update | ThreadEvent.NewReply | ThreadEvent.Delete
     >
     & EventTimelineSetHandlerMap
     & Pick<MatrixEventHandlerMap, MatrixEventEvent.BeforeRedaction>
@@ -1661,8 +1662,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private async createThreadTimelineSet(filterType?: ThreadFilterType): Promise<EventTimelineSet> {
         let timelineSet: EventTimelineSet;
         if (Thread.hasServerSideListSupport) {
+            let threadListType: ThreadFilterType | null = null;
+            if (Thread.hasServerSideListSupport) {
+                threadListType = filterType ?? ThreadFilterType.All;
+            }
             timelineSet =
-                new EventTimelineSet(this, this.opts, undefined, undefined, Boolean(Thread.hasServerSideListSupport));
+                new EventTimelineSet(this, this.opts, undefined, undefined, threadListType);
             this.reEmitter.reEmit(timelineSet, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
@@ -1796,6 +1801,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         this.on(ThreadEvent.NewReply, this.onThreadNewReply);
+        this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
     }
 
@@ -1814,6 +1820,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             null,
             undefined,
             Direction.Backward,
+            timelineSet.threadListType,
             timelineSet.getFilter(),
         );
 
@@ -1834,8 +1841,21 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private onThreadNewReply(thread: Thread): void {
-        if (thread.length && thread.rootEvent) {
-            this.updateThreadRootEvents(thread, false);
+        this.updateThreadRootEvents(thread, false);
+    }
+
+    private onThreadDelete(thread: Thread): void {
+        this.threads.delete(thread.id);
+
+        const timeline = this.getTimelineForEvent(thread.id);
+        const roomEvent = timeline?.getEvents()?.find(it => it.getId() === thread.id);
+        if (roomEvent) {
+            thread.clearEventMetadata(roomEvent);
+        } else {
+            logger.debug("onThreadDelete: Could not find root event in room timeline");
+        }
+        for (const timelineSet of this.threadsTimelineSets) {
+            timelineSet.removeEvent(thread.id);
         }
     }
 
@@ -1948,9 +1968,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean) => {
-        this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline);
-        if (thread.hasCurrentUserParticipated) {
-            this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline);
+        if (thread.length) {
+            this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline);
+            if (thread.hasCurrentUserParticipated) {
+                this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline);
+            }
         }
     };
 
@@ -1959,18 +1981,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         thread: Thread,
         toStartOfTimeline: boolean,
     ) => {
-        if (Thread.hasServerSideSupport) {
-            timelineSet.addLiveEvent(thread.rootEvent, {
-                duplicateStrategy: DuplicateStrategy.Replace,
-                fromCache: false,
-                roomState: this.currentState,
-            });
-        } else {
-            timelineSet.addEventToTimeline(
-                thread.rootEvent,
-                timelineSet.getLiveTimeline(),
-                { toStartOfTimeline },
-            );
+        if (timelineSet && thread.rootEvent) {
+            if (Thread.hasServerSideSupport) {
+                timelineSet.addLiveEvent(thread.rootEvent, {
+                    duplicateStrategy: DuplicateStrategy.Replace,
+                    fromCache: false,
+                    roomState: this.currentState,
+                });
+            } else {
+                timelineSet.addEventToTimeline(
+                    thread.rootEvent,
+                    timelineSet.getLiveTimeline(),
+                    { toStartOfTimeline },
+                );
+            }
         }
     };
 
@@ -1994,23 +2018,33 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             client: this.client,
         });
 
+        // This is necessary to be able to jump to events in threads:
+        // If we jump to an event in a thread where neither the event, nor the root,
+        // nor any thread event are loaded yet, we'll load the event as well as the thread root, create the thread,
+        // and pass the event through this.
+        for (const event of events) {
+            thread.setEventMetadata(event);
+        }
+
         // If we managed to create a thread and figure out its `id` then we can use it
         this.threads.set(thread.id, thread);
         this.reEmitter.reEmit(thread, [
+            ThreadEvent.Delete,
             ThreadEvent.Update,
             ThreadEvent.NewReply,
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
         ]);
+        const isNewer = this.lastThread?.rootEvent
+            && rootEvent?.localTimestamp
+            && this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp;
 
-        if (!this.lastThread || this.lastThread.rootEvent?.localTimestamp < rootEvent?.localTimestamp) {
+        if (!this.lastThread || isNewer) {
             this.lastThread = thread;
         }
 
         if (this.threadsReady) {
-            if (thread.length && thread.rootEvent) {
-                this.updateThreadRootEvents(thread, toStartOfTimeline);
-            }
+            this.updateThreadRootEvents(thread, toStartOfTimeline);
         }
 
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);

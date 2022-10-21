@@ -32,6 +32,7 @@ export enum ThreadEvent {
     Update = "Thread.update",
     NewReply = "Thread.newReply",
     ViewThread = "Thread.viewThread",
+    Delete = "Thread.delete"
 }
 
 type EmittedEvents = Exclude<ThreadEvent, ThreadEvent.New>
@@ -42,6 +43,7 @@ export type EventHandlerMap = {
     [ThreadEvent.Update]: (thread: Thread) => void;
     [ThreadEvent.NewReply]: (thread: Thread, event: MatrixEvent) => void;
     [ThreadEvent.ViewThread]: () => void;
+    [ThreadEvent.Delete]: (thread: Thread) => void;
 } & EventTimelineSetHandlerMap;
 
 interface IThreadOpts {
@@ -88,6 +90,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public readonly room: Room;
     public readonly client: MatrixClient;
 
+    public initialEventsFetched = !Thread.hasServerSideSupport;
+
     constructor(
         public readonly id: string,
         public rootEvent: MatrixEvent | undefined,
@@ -122,8 +126,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
         this.initialiseThread();
-
-        this.rootEvent?.setThread(this);
+        this.setEventMetadata(this.rootEvent);
     }
 
     private async fetchRootEvent(): Promise<void> {
@@ -136,13 +139,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         } catch (e) {
             logger.error("Failed to fetch thread root to construct thread with", e);
         }
-
-        // The root event might be not be visible to the person requesting it.
-        // If it wasn't fetched successfully the thread will work in "limited" mode and won't
-        // benefit from all the APIs a homeserver can provide to enhance the thread experience
-        this.rootEvent?.setThread(this);
-
-        this.emit(ThreadEvent.Update, this);
+        await this.processEvent(this.rootEvent);
     }
 
     public static setServerSideSupport(
@@ -179,42 +176,26 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
     };
 
-    private onRedaction = (event: MatrixEvent) => {
+    private onRedaction = async (event: MatrixEvent) => {
         if (event.threadRootId !== this.id) return; // ignore redactions for other timelines
-        const events = [...this.timelineSet.getLiveTimeline().getEvents()].reverse();
-        this.lastEvent = events.find(e => (
-            !e.isRedacted() &&
-            e.isRelation(THREAD_RELATION_TYPE.name)
-        )) ?? this.rootEvent!;
+        if (this.replyCount <= 0) {
+            for (const threadEvent of this.events) {
+                this.clearEventMetadata(threadEvent);
+            }
+            this.emit(ThreadEvent.Delete, this);
+        } else {
+            await this.initialiseThread();
+        }
         this.emit(ThreadEvent.Update, this);
     };
 
-    private onEcho = (event: MatrixEvent) => {
+    private onEcho = async (event: MatrixEvent) => {
         if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
         if (this.lastEvent === event) return;
         if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
 
-        // There is a risk that the `localTimestamp` approximation will not be accurate
-        // when threads are used over federation. That could result in the reply
-        // count value drifting away from the value returned by the server
-        const isThreadReply = event.isRelation(THREAD_RELATION_TYPE.name);
-        if (!this.lastEvent || this.lastEvent.isRedacted() || (isThreadReply
-            && (event.getId() !== this.lastEvent.getId())
-            && (event.localTimestamp > this.lastEvent.localTimestamp))
-        ) {
-            this.lastEvent = event;
-            if (this.lastEvent.getId() !== this.id) {
-                // This counting only works when server side support is enabled as we started the counting
-                // from the value returned within the bundled relationship
-                if (Thread.hasServerSideSupport) {
-                    this.replyCount++;
-                }
-
-                this.emit(ThreadEvent.NewReply, this, event);
-            }
-        }
-
-        this.emit(ThreadEvent.Update, this);
+        await this.initialiseThread();
+        this.emit(ThreadEvent.NewReply, this, event);
     };
 
     public get roomState(): RoomState {
@@ -238,6 +219,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(ev => this.addEvent(ev, toStartOfTimeline, false));
         this.emit(ThreadEvent.Update, this);
+        this.initialiseThread();
     }
 
     /**
@@ -249,12 +231,11 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * to the start (and not the end) of the timeline.
      * @param {boolean} emit whether to emit the Update event if the thread was updated or not.
      */
-    public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): void {
-        event.setThread(this);
+    public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): Promise<void> {
+        this.setEventMetadata(event);
 
-        if (!this._currentUserParticipated && event.getSender() === this.client.getUserId()) {
-            this._currentUserParticipated = true;
-        }
+        const lastReply = this.lastReply();
+        const isNewestReply = !lastReply || event.localTimestamp > lastReply!.localTimestamp;
 
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
@@ -265,15 +246,13 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.addEventToTimeline(event, toStartOfTimeline);
 
             this.client.decryptEventIfNeeded(event, {});
-        } else if (!toStartOfTimeline &&
-            event.localTimestamp > this.lastReply()!.localTimestamp
-        ) {
-            this.fetchEditsWhereNeeded(event);
+        } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
+            await this.fetchEditsWhereNeeded(event);
             this.addEventToTimeline(event, false);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
             // Apply annotations and replace relations to the relations of the timeline only
-            this.timelineSet.relations.aggregateParentEvent(event);
-            this.timelineSet.relations.aggregateChildEvent(event, this.timelineSet);
+            this.timelineSet.relations?.aggregateParentEvent(event);
+            this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
             return;
         }
 
@@ -284,7 +263,15 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
 
         if (emit) {
-            this.emit(ThreadEvent.Update, this);
+            this.emit(ThreadEvent.NewReply, this, event);
+            this.initialiseThread();
+        }
+    }
+
+    public async processEvent(event: Optional<MatrixEvent>): Promise<void> {
+        if (event) {
+            this.setEventMetadata(event);
+            await this.fetchEditsWhereNeeded(event);
         }
     }
 
@@ -294,7 +281,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private async initialiseThread(): Promise<void> {
         let bundledRelationship = this.getRootEventBundledRelationship();
-        if (Thread.hasServerSideSupport && !bundledRelationship) {
+        if (Thread.hasServerSideSupport) {
             await this.fetchRootEvent();
             bundledRelationship = this.getRootEventBundledRelationship();
         }
@@ -303,22 +290,32 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
-            const event = new MatrixEvent({
-                room_id: this.rootEvent.getRoomId(),
-                ...bundledRelationship.latest_event,
-            });
-            this.setEventMetadata(event);
-            event.setThread(this);
-            this.lastEvent = event;
+            const mapper = this.client.getEventMapper();
+            this.lastEvent = mapper(bundledRelationship.latest_event);
+            await this.processEvent(this.lastEvent);
+        }
 
-            this.fetchEditsWhereNeeded(event);
+        if (!this.initialEventsFetched) {
+            this.initialEventsFetched = true;
+            // fetch initial event to allow proper pagination
+            try {
+                // if the thread has regular events, this will just load the last reply.
+                // if the thread is newly created, this will load the root event.
+                await this.client.paginateEventTimeline(this.liveTimeline, { backwards: true, limit: 1 });
+                // just to make sure that, if we've created a timeline window for this thread before the thread itself
+                // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
+                this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
+            } catch (e) {
+                logger.error("Failed to load start of newly created thread: ", e);
+                this.initialEventsFetched = false;
+            }
         }
 
         this.emit(ThreadEvent.Update, this);
     }
 
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
-    public async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
+    private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
         return Promise.all(events.filter(e => e.isEncrypted()).map((event: MatrixEvent) => {
             if (event.isRelation()) return; // skip - relations don't get edits
             return this.client.relations(this.roomId, event.getId(), RelationType.Replace, event.getType(), {
@@ -333,9 +330,18 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }));
     }
 
-    public setEventMetadata(event: MatrixEvent): void {
-        EventTimeline.setEventMetadata(event, this.roomState, false);
-        event.setThread(this);
+    public setEventMetadata(event: Optional<MatrixEvent>): void {
+        if (event) {
+            EventTimeline.setEventMetadata(event, this.roomState, false);
+            event.setThread(this);
+        }
+    }
+
+    public clearEventMetadata(event: Optional<MatrixEvent>): void {
+        if (event) {
+            event.setThread(null);
+            delete event.event?.unsigned?.["m.relations"]?.[THREAD_RELATION_TYPE.name];
+        }
     }
 
     /**
@@ -428,4 +434,13 @@ export const THREAD_RELATION_TYPE = new ServerControlledNamespacedValue(
 export enum ThreadFilterType {
     "My",
     "All"
+}
+
+export function threadFilterTypeToFilter(type: ThreadFilterType): 'all' | 'participated' {
+    switch (type) {
+        case ThreadFilterType.My:
+            return 'participated';
+        case ThreadFilterType.All:
+            return 'all';
+    }
 }

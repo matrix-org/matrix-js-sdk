@@ -27,7 +27,7 @@ import { RoomState } from "./room-state";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RelationsContainer } from "./relations-container";
 import { MatrixClient } from "../client";
-import { Thread } from "./thread";
+import { Thread, ThreadFilterType } from "./thread";
 
 const DEBUG = true;
 
@@ -140,7 +140,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         opts: IOpts = {},
         client?: MatrixClient,
         public readonly thread?: Thread,
-        public readonly isThreadTimeline: boolean = false,
+        public readonly threadListType: ThreadFilterType | null = null,
     ) {
         super();
 

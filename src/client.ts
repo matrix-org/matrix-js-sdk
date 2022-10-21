@@ -189,7 +189,14 @@ import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
-import { FeatureSupport, Thread, THREAD_RELATION_TYPE, determineFeatureSupport } from "./models/thread";
+import {
+    FeatureSupport,
+    Thread,
+    THREAD_RELATION_TYPE,
+    determineFeatureSupport,
+    ThreadFilterType,
+    threadFilterTypeToFilter,
+} from "./models/thread";
 import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
@@ -5160,7 +5167,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return timelineSet.getTimelineForEvent(eventId);
         }
 
-        if (this.supportsExperimentalThreads()) {
+        if (timelineSet.thread && this.supportsExperimentalThreads()) {
             return this.getThreadTimeline(timelineSet, eventId);
         }
 
@@ -5227,6 +5234,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("could not get thread timeline: no client support");
         }
 
+        if (!timelineSet.room) {
+            throw new Error("could not get thread timeline: not a room timeline");
+        }
+
+        if (!timelineSet.thread) {
+            throw new Error("could not get thread timeline: not a thread timeline");
+        }
+
         const path = utils.encodeUri(
             "/rooms/$roomId/context/$eventId", {
                 $roomId: timelineSet.room.roomId,
@@ -5257,14 +5272,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
 
                 const thread = timelineSet.thread;
-                const resOlder = await this.fetchRelations(
+                const resOlder: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
                     THREAD_RELATION_TYPE.name,
                     null,
                     { dir: Direction.Backward, from: res.start },
                 );
-                const resNewer = await this.fetchRelations(
+                const resNewer: IRelationsResponse = await this.fetchRelations(
                     timelineSet.room.roomId,
                     thread.id,
                     THREAD_RELATION_TYPE.name,
@@ -5279,7 +5294,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     event,
                     ...resOlder.chunk.map(mapper),
                 ];
-                await timelineSet.thread?.fetchEditsWhereNeeded(...events);
+                for (const event of events) {
+                    await timelineSet.thread?.processEvent(event);
+                }
 
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
                 let timeline = timelineSet.getTimelineForEvent(event.getId());
@@ -5317,10 +5334,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     null,
                     { dir: Direction.Backward, from: res.start },
                 );
-                const eventsNewer = [];
+                const eventsNewer: IEvent[] = [];
                 let nextBatch: Optional<string> = res.end;
                 while (nextBatch) {
-                    const resNewer = await this.fetchRelations(
+                    const resNewer: IRelationsResponse = await this.fetchRelations(
                         timelineSet.room.roomId,
                         thread.id,
                         THREAD_RELATION_TYPE.name,
@@ -5338,8 +5355,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     event,
                     ...resOlder.chunk.map(mapper),
                 ];
-
-                await timelineSet.thread?.fetchEditsWhereNeeded(...events);
+                for (const event of events) {
+                    await timelineSet.thread?.processEvent(event);
+                }
 
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread
                 // summaries.
@@ -5381,12 +5399,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let event;
-        if (timelineSet.isThreadTimeline) {
+        if (timelineSet.threadListType) {
             const res = await this.createThreadListMessagesRequest(
                 timelineSet.room.roomId,
                 null,
                 1,
                 Direction.Backward,
+                timelineSet.threadListType,
                 timelineSet.getFilter(),
             );
             event = res.chunk?.[0];
@@ -5490,6 +5509,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         fromToken: string | null,
         limit = 30,
         dir = Direction.Backward,
+        threadListType: ThreadFilterType = ThreadFilterType.All,
         timelineFilter?: Filter,
     ): Promise<IMessagesResponse> {
         const path = utils.encodeUri("/rooms/$roomId/threads", { $roomId: roomId });
@@ -5497,7 +5517,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const params: Record<string, string> = {
             limit: limit.toString(),
             dir: dir,
-            include: 'all',
+            include: threadFilterTypeToFilter(threadListType),
         };
 
         if (fromToken) {
@@ -5509,7 +5529,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // create a shallow copy of LAZY_LOADING_MESSAGES_FILTER,
             // so the timelineFilter doesn't get written into it below
             filter = {
-                ...filter,
                 ...Filter.LAZY_LOADING_MESSAGES_FILTER,
             };
         }
@@ -5525,10 +5544,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             params.filter = JSON.stringify(filter);
         }
 
-        const opts: { prefix?: string } = {};
-        if (Thread.hasServerSideListSupport === FeatureSupport.Experimental) {
-            opts.prefix = "/_matrix/client/unstable/org.matrix.msc3856";
-        }
+        const opts = {
+            prefix: Thread.hasServerSideListSupport === FeatureSupport.Stable
+                ? "/_matrix/client/v1"
+                : "/_matrix/client/unstable/org.matrix.msc3856",
+        };
 
         return this.http.authedRequest<IThreadedMessagesResponse>(Method.Get, path, params, undefined, opts)
             .then(res => ({
@@ -5555,8 +5575,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public paginateEventTimeline(eventTimeline: EventTimeline, opts: IPaginateOpts): Promise<boolean> {
         const isNotifTimeline = (eventTimeline.getTimelineSet() === this.notifTimelineSet);
         const room = this.getRoom(eventTimeline.getRoomId()!);
-        const isThreadListTimeline = eventTimeline.getTimelineSet().isThreadTimeline;
-        const isThreadTimeline = (eventTimeline.getTimelineSet().thread);
+        const threadListType = eventTimeline.getTimelineSet().threadListType;
+        const thread = eventTimeline.getTimelineSet().thread;
 
         // TODO: we should implement a backoff (as per scrollback()) to deal more
         // nicely with HTTP errors.
@@ -5627,7 +5647,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.paginationRequests[dir] = null;
             });
             eventTimeline.paginationRequests[dir] = promise;
-        } else if (isThreadListTimeline) {
+        } else if (threadListType) {
             if (!room) {
                 throw new Error("Unknown room " + eventTimeline.getRoomId());
             }
@@ -5641,6 +5661,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 token,
                 opts.limit,
                 dir,
+                threadListType,
                 eventTimeline.getFilter(),
             ).then((res) => {
                 if (res.state) {
@@ -5667,7 +5688,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.paginationRequests[dir] = null;
             });
             eventTimeline.paginationRequests[dir] = promise;
-        } else if (isThreadTimeline) {
+        } else if (thread) {
             const room = this.getRoom(eventTimeline.getRoomId());
             if (!room) {
                 throw new Error("Unknown room " + eventTimeline.getRoomId());
@@ -5675,14 +5696,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
             promise = this.fetchRelations(
                 eventTimeline.getRoomId(),
-                eventTimeline.getTimelineSet().thread?.id,
+                thread.id,
                 THREAD_RELATION_TYPE.name,
                 null,
-                { dir, limit: opts.limit, from: token },
-            ).then((res) => {
+                { dir, limit: opts.limit, from: token ?? undefined },
+            ).then(async (res) => {
                 const mapper = this.getEventMapper();
                 const matrixEvents = res.chunk.map(mapper);
-                eventTimeline.getTimelineSet().thread?.fetchEditsWhereNeeded(...matrixEvents);
+                for (const event of matrixEvents) {
+                    await eventTimeline.getTimelineSet()?.thread?.processEvent(event);
+                }
 
                 const newToken = res.next_batch;
 
@@ -5725,10 +5748,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const matrixEvents = res.chunk.map(this.getEventMapper());
 
                 const timelineSet = eventTimeline.getTimelineSet();
-                const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
+                const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
                 timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
                 this.processBeaconEvents(room, timelineEvents);
-                this.processThreadEvents(room, threadedEvents, backwards);
+                this.processThreadRoots(room,
+                    timelineEvents.filter(it => it.isRelation(THREAD_RELATION_TYPE.name)),
+                    false);
 
                 const atEnd = res.end === undefined || res.end === res.start;
 
