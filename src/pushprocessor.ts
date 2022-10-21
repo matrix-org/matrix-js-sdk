@@ -21,6 +21,8 @@ import { MatrixEvent } from "./models/event";
 import {
     ConditionKind,
     IAnnotatedPushRule,
+    ICallStartedCondition,
+    ICallStartedPrefixCondition,
     IContainsDisplayNameCondition,
     IEventMatchCondition,
     IPushRule,
@@ -92,8 +94,8 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         actions: [],
     },
     {
-        // For homeservers which don't support MSC3401 yet
-        rule_id: ".org.matrix.msc3401.rule.room.call",
+        // For homeservers which don't support MSC3914 yet
+        rule_id: ".org.matrix.msc3914.rule.room.call",
         default: true,
         enabled: true,
         conditions: [
@@ -101,6 +103,9 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
                 kind: ConditionKind.EventMatch,
                 key: "type",
                 pattern: "org.matrix.msc3401.call",
+            },
+            {
+                kind: ConditionKind.CallStarted,
             },
         ],
         actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Sound, value: "default" }],
@@ -269,6 +274,9 @@ export class PushProcessor {
                 return this.eventFulfillsRoomMemberCountCondition(cond, ev);
             case ConditionKind.SenderNotificationPermission:
                 return this.eventFulfillsSenderNotifPermCondition(cond, ev);
+            case ConditionKind.CallStarted:
+            case ConditionKind.CallStartedPrefix:
+                return this.eventFulfillsCallStartedCondition(cond, ev);
         }
 
         // unknown conditions: we previously matched all unknown conditions,
@@ -383,6 +391,22 @@ export class PushProcessor {
         return !!val.match(regex);
     }
 
+    private eventFulfillsCallStartedCondition(
+        _cond: ICallStartedCondition | ICallStartedPrefixCondition,
+        ev: MatrixEvent,
+    ): boolean {
+        // Since servers don't support properly sending push notification
+        // about MSC3401 call events, we do the handling ourselves
+        return (
+            ["m.ring", "m.prompt"].includes(ev.getContent()["m.intent"])
+            && !("m.terminated" in ev.getContent())
+            && (
+                (ev.getPrevContent()["m.terminated"] !== ev.getContent()["m.terminated"])
+                || deepCompare(ev.getPrevContent(), {})
+            )
+        );
+    }
+
     private createCachedRegex(prefix: string, glob: string, suffix: string): RegExp {
         if (PushProcessor.cachedGlobToRegex[glob]) {
             return PushProcessor.cachedGlobToRegex[glob];
@@ -438,37 +462,13 @@ export class PushProcessor {
             return {} as IActionsObject;
         }
 
-        let actionObj = PushProcessor.actionListToActionsObject(rule.actions);
+        const actionObj = PushProcessor.actionListToActionsObject(rule.actions);
 
         // Some actions are implicit in some situations: we add those here
         if (actionObj.tweaks.highlight === undefined) {
             // if it isn't specified, highlight if it's a content
             // rule but otherwise not
             actionObj.tweaks.highlight = (rule.kind == PushRuleKind.ContentSpecific);
-        }
-
-        actionObj = this.performCustomEventHandling(ev, actionObj);
-
-        return actionObj;
-    }
-
-    /**
-     * Some events require custom event handling e.g. due to missing server support
-     */
-    private performCustomEventHandling(ev: MatrixEvent, actionObj: IActionsObject): IActionsObject {
-        switch (ev.getType()) {
-            case "m.call":
-            case "org.matrix.msc3401.call":
-                // Since servers don't support properly sending push notification
-                // about MSC3401 call events, we do the handling ourselves
-                if (
-                    ev.getContent()["m.intent"] === "m.room"
-                    || ("m.terminated" in ev.getContent())
-                    || !("m.terminated" in ev.getPrevContent()) && !deepCompare(ev.getPrevContent(), {})
-                ) {
-                    actionObj.notify = false;
-                    actionObj.tweaks = {};
-                }
         }
 
         return actionObj;
