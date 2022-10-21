@@ -72,11 +72,11 @@ export function anySignal(signals: AbortSignal[]): {
  * @returns {Error}
  */
 export function parseErrorResponse(response: XMLHttpRequest | Response, body?: string): Error {
-    let contentType: ParsedMediaType;
+    let contentType: ParsedMediaType | null;
     try {
         contentType = getResponseContentType(response);
     } catch (e) {
-        return e;
+        return <Error>e;
     }
 
     if (contentType?.type === "application/json" && body) {

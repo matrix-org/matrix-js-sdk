@@ -36,11 +36,11 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
 
         const room = client.getRoom(plainOldJsObject.room_id);
 
-        let event: MatrixEvent;
+        let event: MatrixEvent | undefined;
         // If the event is already known to the room, let's re-use the model rather than duplicating.
         // We avoid doing this to state events as they may be forward or backwards looking which tweaks behaviour.
         if (room && plainOldJsObject.state_key === undefined) {
-            event = room.findEventById(plainOldJsObject.event_id);
+            event = room.findEventById(plainOldJsObject.event_id!);
         }
 
         if (!event || event.status) {

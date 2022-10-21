@@ -50,8 +50,8 @@ describe('EventTimelineSet', () => {
                 EventType.RoomMessage,
             );
             expect(relations).toBeDefined();
-            expect(relations.getRelations().length).toBe(1);
-            expect(relations.getRelations()[0].getId()).toBe(replyEvent.getId());
+            expect(relations!.getRelations().length).toBe(1);
+            expect(relations!.getRelations()[0].getId()).toBe(replyEvent.getId());
         });
     };
 

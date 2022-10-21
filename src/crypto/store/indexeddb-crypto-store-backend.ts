@@ -307,7 +307,7 @@ export class Backend implements CryptoStore {
         expectedState: number,
         updates: Partial<OutgoingRoomKeyRequest>,
     ): Promise<OutgoingRoomKeyRequest | null> {
-        let result: OutgoingRoomKeyRequest = null;
+        let result: OutgoingRoomKeyRequest | null = null;
 
         function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
             const cursor = this.result;
@@ -375,7 +375,7 @@ export class Backend implements CryptoStore {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -395,7 +395,7 @@ export class Backend implements CryptoStore {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -411,7 +411,7 @@ export class Backend implements CryptoStore {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -439,7 +439,7 @@ export class Backend implements CryptoStore {
             try {
                 func(countReq.result);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -465,7 +465,7 @@ export class Backend implements CryptoStore {
                 try {
                     func(results);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -475,7 +475,7 @@ export class Backend implements CryptoStore {
         deviceKey: string,
         sessionId: string,
         txn: IDBTransaction,
-        func: (sessions: { [ sessionId: string ]: ISessionInfo }) => void,
+        func: (session: ISessionInfo | null) => void,
     ): void {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.get([deviceKey, sessionId]);
@@ -490,12 +490,12 @@ export class Backend implements CryptoStore {
                     func(null);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
 
-    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo) => void): void {
+    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo | null) => void): void {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.openCursor();
         getReq.onsuccess = function() {
@@ -508,7 +508,7 @@ export class Backend implements CryptoStore {
                     func(null);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -537,11 +537,11 @@ export class Backend implements CryptoStore {
             fixed,
             time: Date.now(),
         });
-        return promiseifyTxn(txn);
+        await promiseifyTxn(txn);
     }
 
     public async getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null> {
-        let result;
+        let result: IProblem | null = null;
         const txn = this.db.transaction("session_problems", "readwrite");
         const objectStore = txn.objectStore("session_problems");
         const index = objectStore.index("deviceKey");
@@ -604,8 +604,8 @@ export class Backend implements CryptoStore {
         txn: IDBTransaction,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        let session: InboundGroupSessionData | boolean = false;
-        let withheld: IWithheld | boolean = false;
+        let session: InboundGroupSessionData | null | boolean = false;
+        let withheld: IWithheld | null | boolean = false;
         const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.get([senderCurve25519Key, sessionId]);
         getReq.onsuccess = function() {
@@ -619,7 +619,7 @@ export class Backend implements CryptoStore {
                     func(session as InboundGroupSessionData, withheld as IWithheld);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
 
@@ -636,7 +636,7 @@ export class Backend implements CryptoStore {
                     func(session as InboundGroupSessionData, withheld as IWithheld);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -654,14 +654,14 @@ export class Backend implements CryptoStore {
                         sessionData: cursor.value.session,
                     });
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
                 cursor.continue();
             } else {
                 try {
                     func(null);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -726,7 +726,7 @@ export class Backend implements CryptoStore {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -754,7 +754,7 @@ export class Backend implements CryptoStore {
                 try {
                     func(rooms);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -1050,7 +1050,7 @@ function abortWithException(txn: IDBTransaction, e: Error) {
     }
 }
 
-function promiseifyTxn<T>(txn: IDBTransaction): Promise<T> {
+function promiseifyTxn<T>(txn: IDBTransaction): Promise<T | null> {
     return new Promise((resolve, reject) => {
         txn.oncomplete = () => {
             if ((txn as IWrappedIDBTransaction)._mx_abortexception !== undefined) {

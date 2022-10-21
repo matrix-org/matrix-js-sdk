@@ -26,17 +26,19 @@ import {
     MockRTCPeerConnection,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
+import { EventType, MatrixClient } from "../../../src";
+import { MediaHandler } from "../../../src/webrtc/mediaHandler";
 
 const startVoiceCall = async (client: TestClient, call: MatrixCall): Promise<void> => {
     const callPromise = call.placeVoiceCall();
-    await client.httpBackend.flush("");
+    await client.httpBackend!.flush("");
     await callPromise;
 
     call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 };
 
 describe('Call', function() {
-    let client;
+    let client: TestClient;
     let call;
     let prevNavigator;
     let prevDocument;
@@ -71,10 +73,10 @@ describe('Call', function() {
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
         // We just stub out sendEvent: we're not interested in testing the client's
         // event sending code here
-        client.client.sendEvent = () => {};
-        client.client.mediaHandler = new MockMediaHandler;
-        client.client.getMediaHandler = () => client.client.mediaHandler;
-        client.httpBackend.when("GET", "/voip/turnServer").respond(200, {});
+        client.client.sendEvent = (() => {}) as unknown as MatrixClient["sendEvent"];
+        client.client["mediaHandler"] = new MockMediaHandler as unknown as MediaHandler;
+        client.client.getMediaHandler = () => client.client["mediaHandler"]!;
+        client.httpBackend!.when("GET", "/voip/turnServer").respond(200, {});
         call = new MatrixCall({
             client: client.client,
             roomId: '!foo:bar',
@@ -237,7 +239,7 @@ describe('Call', function() {
 
         expect(identChangedCallback).toHaveBeenCalled();
 
-        const ident = call.getRemoteAssertedIdentity();
+        const ident = call.getRemoteAssertedIdentity()!;
         expect(ident.id).toEqual("@steve:example.com");
         expect(ident.displayName).toEqual("Steve Gibbons");
 
@@ -306,19 +308,19 @@ describe('Call', function() {
     });
 
     it("should fallback to answering with no video", async () => {
-        await client.httpBackend.flush();
+        await client.httpBackend!.flush(undefined);
 
         call.shouldAnswerWithMediaType = (wantedValue: boolean) => wantedValue;
-        client.client.mediaHandler.getUserMediaStream = jest.fn().mockRejectedValue("reject");
+        client.client["mediaHandler"].getUserMediaStream = jest.fn().mockRejectedValue("reject");
 
         await call.answer(true, true);
 
-        expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(1, true, true);
-        expect(client.client.mediaHandler.getUserMediaStream).toHaveBeenNthCalledWith(2, true, false);
+        expect(client.client["mediaHandler"].getUserMediaStream).toHaveBeenNthCalledWith(1, true, true);
+        expect(client.client["mediaHandler"].getUserMediaStream).toHaveBeenNthCalledWith(2, true, false);
     });
 
     it("should handle mid-call device changes", async () => {
-        client.client.mediaHandler.getUserMediaStream = jest.fn().mockReturnValue(
+        client.client["mediaHandler"].getUserMediaStream = jest.fn().mockReturnValue(
             new MockMediaStream(
                 "stream", [
                     new MockMediaStreamTrack("audio_track", "audio"),
@@ -424,7 +426,7 @@ describe('Call', function() {
 
     it("should choose opponent member", async () => {
         const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush();
+        await client.httpBackend!.flush(undefined);
         await callPromise;
 
         const opponentMember = {
@@ -480,7 +482,7 @@ describe('Call', function() {
 
     it("should correctly generate local SDPStreamMetadata", async () => {
         const callPromise = call.placeCallWithCallFeeds([new CallFeed({
-            client,
+            client: client.client,
             // @ts-ignore Mock
             stream: new MockMediaStream("local_stream1", [new MockMediaStreamTrack("track_id", "audio")]),
             roomId: call.roomId,
@@ -489,7 +491,7 @@ describe('Call', function() {
             audioMuted: false,
             videoMuted: false,
         })]);
-        await client.httpBackend.flush();
+        await client.httpBackend!.flush(undefined);
         await callPromise;
         call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
@@ -521,7 +523,7 @@ describe('Call', function() {
 
         const callPromise = call.placeCallWithCallFeeds([
             new CallFeed({
-                client,
+                client: client.client,
                 userId: client.getUserId(),
                 // @ts-ignore Mock
                 stream: localUsermediaStream,
@@ -531,7 +533,7 @@ describe('Call', function() {
                 videoMuted: false,
             }),
             new CallFeed({
-                client,
+                client: client.client,
                 userId: client.getUserId(),
                 // @ts-ignore Mock
                 stream: localScreensharingStream,
@@ -541,7 +543,7 @@ describe('Call', function() {
                 videoMuted: false,
             }),
         ]);
-        await client.httpBackend.flush();
+        await client.httpBackend!.flush(undefined);
         await callPromise;
         call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
@@ -586,14 +588,14 @@ describe('Call', function() {
             getLocalAge: () => null,
         });
         call.feeds.push(new CallFeed({
-            client,
+            client: client.client,
             userId: "remote_user_id",
             // @ts-ignore Mock
             stream: new MockMediaStream("remote_stream_id", [new MockMediaStreamTrack("remote_tack_id")]),
             id: "remote_feed_id",
             purpose: SDPStreamMetadataPurpose.Usermedia,
         }));
-        await client.httpBackend.flush();
+        await client.httpBackend!.flush(undefined);
         await callPromise;
 
         const callHangupCallback = jest.fn();
@@ -664,10 +666,10 @@ describe('Call', function() {
         });
 
         it("should return false if window or document are undefined", () => {
-            global.window = undefined;
+            global.window = undefined!;
             expect(supportsMatrixCall()).toBe(false);
             global.window = prevWindow;
-            global.document = undefined;
+            global.document = undefined!;
             expect(supportsMatrixCall()).toBe(false);
         });
 
@@ -685,9 +687,9 @@ describe('Call', function() {
         it("should return false if RTCPeerConnection & RTCSessionDescription " +
             "& RTCIceCandidate & mediaDevices are unavailable",
         () => {
-            global.window.RTCPeerConnection = undefined;
-            global.window.RTCSessionDescription = undefined;
-            global.window.RTCIceCandidate = undefined;
+            global.window.RTCPeerConnection = undefined!;
+            global.window.RTCSessionDescription = undefined!;
+            global.window.RTCIceCandidate = undefined!;
             // @ts-ignore - writing to a read-only property as we are simulating faulty browsers
             global.navigator.mediaDevices = undefined;
             expect(supportsMatrixCall()).toBe(false);
@@ -750,6 +752,19 @@ describe('Call', function() {
             expect(call.getLocalFeeds().length).toBe(2);
             expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
             expect(call.pushLocalFeed).toHaveBeenCalled();
+        });
+    });
+
+    describe("transferToCall", () => {
+        it("should send the required events", async () => {
+            const targetCall = new MatrixCall({ client: client.client });
+            const sendEvent = jest.spyOn(client.client, "sendEvent");
+            await call.transferToCall(targetCall);
+
+            const newCallId = (sendEvent.mock.calls[0][2] as any)!.await_call;
+            expect(sendEvent).toHaveBeenCalledWith(call.roomId, EventType.CallReplaces, expect.objectContaining({
+                create_call: newCallId,
+            }));
         });
     });
 });

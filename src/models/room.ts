@@ -1604,7 +1604,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // find the earliest unfiltered timeline
             let timeline = unfilteredLiveTimeline;
             while (timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)) {
-                timeline = timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS);
+                timeline = timeline.getNeighbouringTimeline(EventTimeline.BACKWARDS)!;
             }
 
             timelineSet.getLiveTimeline().setPaginationToken(

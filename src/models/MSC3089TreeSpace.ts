@@ -86,7 +86,7 @@ export class MSC3089TreeSpace {
     public readonly room: Room;
 
     public constructor(private client: MatrixClient, public readonly roomId: string) {
-        this.room = this.client.getRoom(this.roomId);
+        this.room = this.client.getRoom(this.roomId)!;
 
         if (!this.room) throw new Error("Unknown room");
     }
@@ -282,7 +282,7 @@ export class MSC3089TreeSpace {
         const members = this.room.currentState.getStateEvents(EventType.RoomMember);
         for (const member of members) {
             const isNotUs = member.getStateKey() !== this.client.getUserId();
-            if (isNotUs && kickMemberships.includes(member.getContent().membership)) {
+            if (isNotUs && kickMemberships.includes(member.getContent().membership!)) {
                 const stateKey = member.getStateKey();
                 if (!stateKey) {
                     throw new Error("State key not found for branch");

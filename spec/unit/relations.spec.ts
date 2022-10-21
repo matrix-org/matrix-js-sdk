@@ -18,6 +18,7 @@ import { EventTimelineSet } from "../../src/models/event-timeline-set";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import { Relations } from "../../src/models/relations";
+import { TestClient } from "../TestClient";
 
 describe("Relations", function() {
     it("should deduplicate annotations", function() {
@@ -43,7 +44,7 @@ describe("Relations", function() {
         // Add the event once and check results
         {
             relations.addEvent(eventA);
-            const annotationsByKey = relations.getSortedAnnotationsByKey();
+            const annotationsByKey = relations.getSortedAnnotationsByKey()!;
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];
             expect(key).toEqual("👍️");
@@ -53,7 +54,7 @@ describe("Relations", function() {
         // Add the event again and expect the same
         {
             relations.addEvent(eventA);
-            const annotationsByKey = relations.getSortedAnnotationsByKey();
+            const annotationsByKey = relations.getSortedAnnotationsByKey()!;
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];
             expect(key).toEqual("👍️");
@@ -66,7 +67,7 @@ describe("Relations", function() {
         // Add the event again and expect the same
         {
             relations.addEvent(eventB);
-            const annotationsByKey = relations.getSortedAnnotationsByKey();
+            const annotationsByKey = relations.getSortedAnnotationsByKey()!;
             expect(annotationsByKey.length).toEqual(1);
             const [key, events] = annotationsByKey[0];
             expect(key).toEqual("👍️");
@@ -178,5 +179,29 @@ describe("Relations", function() {
         expect(originalTopic.getContent().topic).toBe("orig");
         expect(badlyEditedTopic.replacingEvent()).toBe(null);
         expect(badlyEditedTopic.getContent().topic).toBe("topic");
+    });
+
+    it("getSortedAnnotationsByKey should return null for non-annotation relations", async () => {
+        const userId = "@user:server";
+        const room = new Room("room123", new TestClient(userId).client, userId);
+        const relations = new Relations("m.replace", "m.room.message", room);
+
+        // Create an instance of an annotation
+        const eventData = {
+            "sender": "@bob:example.com",
+            "type": "m.room.message",
+            "event_id": "$cZ1biX33ENJqIm00ks0W_hgiO_6CHrsAc3ZQrnLeNTw",
+            "room_id": "!pzVjCQSoQPpXQeHpmK:example.com",
+            "content": {
+                "m.relates_to": {
+                    "event_id": "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
+                    "rel_type": "m.replace",
+                },
+            },
+        };
+        const eventA = new MatrixEvent(eventData);
+
+        relations.addEvent(eventA);
+        expect(relations.getSortedAnnotationsByKey()).toBeNull();
     });
 });

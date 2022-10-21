@@ -34,6 +34,7 @@ import { TypedReEmitter } from '../ReEmitter';
 import { MatrixError } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
+import { DecryptionError } from "../crypto/algorithms";
 
 export { EventStatus } from "./event-status";
 
@@ -685,14 +686,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * attempt is completed.
      */
     public async attemptDecryption(crypto: Crypto, options: IDecryptOptions = {}): Promise<void> {
-        // For backwards compatibility purposes
-        // The function signature used to be attemptDecryption(crypto, isRetry)
-        if (typeof options === "boolean") {
-            options = {
-                isRetry: options,
-            };
-        }
-
         // start with a couple of sanity checks.
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
@@ -822,15 +815,19 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(`Got error decrypting event (id=${this.getId()}: ${e.detailedString}), but retrying`, e);
+                    logger.log(`Got error decrypting event (id=${this.getId()}: ` +
+                        `${(<DecryptionError>e).detailedString}), but retrying`, e);
                     continue;
                 }
 
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
-                logger.warn(`Got error decrypting event (id=${this.getId()}: ${e.detailedString})`, e);
+                logger.warn(
+                    `Got error decrypting event (id=${this.getId()}: ${(<DecryptionError>e).detailedString})`,
+                    e,
+                );
 
-                res = this.badEncryptedMessage(e.message);
+                res = this.badEncryptedMessage((<DecryptionError>e).message);
             }
 
             // at this point, we've either successfully decrypted the event, or have given up

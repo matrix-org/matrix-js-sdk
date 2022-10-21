@@ -36,7 +36,7 @@ import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
-import { ContentHelpers, EventTimeline, Room } from "../../src";
+import { ContentHelpers, EventTimeline, MatrixError, Room } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import {
@@ -88,21 +88,22 @@ describe("MatrixClient", function() {
         data: SYNC_DATA,
     };
 
-    let httpLookups = [
-        // items are objects which look like:
-        // {
-        //   method: "GET",
-        //   path: "/initialSync",
-        //   data: {},
-        //   error: { errcode: M_FORBIDDEN } // if present will reject promise,
-        //   expectBody: {} // additional expects on the body
-        //   expectQueryParams: {} // additional expects on query params
-        //   thenCall: function(){} // function to call *AFTER* returning response.
-        // }
-        // items are popped off when processed and block if no items left.
-    ];
+    // items are popped off when processed and block if no items left.
+    let httpLookups: {
+        method: string;
+        path: string;
+        data?: object;
+        error?: object;
+        expectBody?: object;
+        expectQueryParams?: object;
+        thenCall?: Function;
+    }[] = [];
     let acceptKeepalives: boolean;
-    let pendingLookup = null;
+    let pendingLookup: {
+        promise: Promise<any>;
+        method: string;
+        path: string;
+    } | null = null;
     function httpReq(method, path, qp, data, prefix) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
@@ -144,7 +145,7 @@ describe("MatrixClient", function() {
             }
             if (next.expectQueryParams) {
                 Object.keys(next.expectQueryParams).forEach(function(k) {
-                    expect(qp[k]).toEqual(next.expectQueryParams[k]);
+                    expect(qp[k]).toEqual(next.expectQueryParams![k]);
                 });
             }
 
@@ -155,9 +156,9 @@ describe("MatrixClient", function() {
             if (next.error) {
                 // eslint-disable-next-line
                 return Promise.reject({
-                    errcode: next.error.errcode,
-                    httpStatus: next.error.httpStatus,
-                    name: next.error.errcode,
+                    errcode: (<MatrixError>next.error).errcode,
+                    httpStatus: (<MatrixError>next.error).httpStatus,
+                    name: (<MatrixError>next.error).errcode,
                     message: "Expected testing error",
                     data: next.error,
                 });
@@ -254,7 +255,7 @@ describe("MatrixClient", function() {
                         type: UNSTABLE_MSC3088_PURPOSE.unstable,
                         state_key: UNSTABLE_MSC3089_TREE_SUBTYPE.unstable,
                         content: {
-                            [UNSTABLE_MSC3088_ENABLED.unstable]: true,
+                            [UNSTABLE_MSC3088_ENABLED.unstable!]: true,
                         },
                     },
                     {
@@ -299,7 +300,7 @@ describe("MatrixClient", function() {
                         expect(stateKey).toEqual(UNSTABLE_MSC3089_TREE_SUBTYPE.unstable);
                         return new MatrixEvent({
                             content: {
-                                [UNSTABLE_MSC3088_ENABLED.unstable]: true,
+                                [UNSTABLE_MSC3088_ENABLED.unstable!]: true,
                             },
                         });
                     } else {
@@ -359,7 +360,7 @@ describe("MatrixClient", function() {
                         expect(stateKey).toEqual(UNSTABLE_MSC3089_TREE_SUBTYPE.unstable);
                         return new MatrixEvent({
                             content: {
-                                [UNSTABLE_MSC3088_ENABLED.unstable]: true,
+                                [UNSTABLE_MSC3088_ENABLED.unstable!]: true,
                             },
                         });
                     } else {
@@ -393,7 +394,7 @@ describe("MatrixClient", function() {
                         expect(stateKey).toEqual(UNSTABLE_MSC3089_TREE_SUBTYPE.unstable);
                         return new MatrixEvent({
                             content: {
-                                [UNSTABLE_MSC3088_ENABLED.unstable]: false,
+                                [UNSTABLE_MSC3088_ENABLED.unstable!]: false,
                             },
                         });
                     } else {
@@ -599,14 +600,14 @@ describe("MatrixClient", function() {
         }
 
         it("should transition null -> PREPARED after the first /sync", function(done) {
-            const expectedStates = [];
+            const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
             client.on("sync", syncChecker(expectedStates, done));
             client.startClient();
         });
 
         it("should transition null -> ERROR after a failed /filter", function(done) {
-            const expectedStates = [];
+            const expectedStates: [string, string | null][] = [];
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
@@ -620,36 +621,35 @@ describe("MatrixClient", function() {
         // Disabled because now `startClient` makes a legit call to `/versions`
         // And those tests are really unhappy about it... Not possible to figure
         // out what a good resolution would look like
-        xit("should transition ERROR -> CATCHUP after /sync if prev failed",
-            function(done) {
-                const expectedStates = [];
-                acceptKeepalives = false;
-                httpLookups = [];
-                httpLookups.push(PUSH_RULES_RESPONSE);
-                httpLookups.push(FILTER_RESPONSE);
-                httpLookups.push({
-                    method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
-                });
-                httpLookups.push({
-                    method: "GET", path: KEEP_ALIVE_PATH,
-                    error: { errcode: "KEEPALIVE_FAIL" },
-                });
-                httpLookups.push({
-                    method: "GET", path: KEEP_ALIVE_PATH, data: {},
-                });
-                httpLookups.push({
-                    method: "GET", path: "/sync", data: SYNC_DATA,
-                });
-
-                expectedStates.push(["RECONNECTING", null]);
-                expectedStates.push(["ERROR", "RECONNECTING"]);
-                expectedStates.push(["CATCHUP", "ERROR"]);
-                client.on("sync", syncChecker(expectedStates, done));
-                client.startClient();
+        xit("should transition ERROR -> CATCHUP after /sync if prev failed", function(done) {
+            const expectedStates: [string, string | null][] = [];
+            acceptKeepalives = false;
+            httpLookups = [];
+            httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push(FILTER_RESPONSE);
+            httpLookups.push({
+                method: "GET", path: "/sync", error: { errcode: "NOPE_NOPE_NOPE" },
+            });
+            httpLookups.push({
+                method: "GET", path: KEEP_ALIVE_PATH,
+                error: { errcode: "KEEPALIVE_FAIL" },
+            });
+            httpLookups.push({
+                method: "GET", path: KEEP_ALIVE_PATH, data: {},
+            });
+            httpLookups.push({
+                method: "GET", path: "/sync", data: SYNC_DATA,
             });
 
+            expectedStates.push(["RECONNECTING", null]);
+            expectedStates.push(["ERROR", "RECONNECTING"]);
+            expectedStates.push(["CATCHUP", "ERROR"]);
+            client.on("sync", syncChecker(expectedStates, done));
+            client.startClient();
+        });
+
         it("should transition PREPARED -> SYNCING after /sync", function(done) {
-            const expectedStates = [];
+            const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             client.on("sync", syncChecker(expectedStates, done));
@@ -658,7 +658,7 @@ describe("MatrixClient", function() {
 
         xit("should transition SYNCING -> ERROR after a failed /sync", function(done) {
             acceptKeepalives = false;
-            const expectedStates = [];
+            const expectedStates: [string, string | null][] = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
@@ -675,37 +675,35 @@ describe("MatrixClient", function() {
             client.startClient();
         });
 
-        xit("should transition ERROR -> SYNCING after /sync if prev failed",
-            function(done) {
-                const expectedStates = [];
-                httpLookups.push({
-                    method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
-                });
-                httpLookups.push(SYNC_RESPONSE);
-
-                expectedStates.push(["PREPARED", null]);
-                expectedStates.push(["SYNCING", "PREPARED"]);
-                expectedStates.push(["ERROR", "SYNCING"]);
-                client.on("sync", syncChecker(expectedStates, done));
-                client.startClient();
+        xit("should transition ERROR -> SYNCING after /sync if prev failed", function(done) {
+            const expectedStates: [string, string | null][] = [];
+            httpLookups.push({
+                method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });
+            httpLookups.push(SYNC_RESPONSE);
 
-        it("should transition SYNCING -> SYNCING on subsequent /sync successes",
-            function(done) {
-                const expectedStates = [];
-                httpLookups.push(SYNC_RESPONSE);
-                httpLookups.push(SYNC_RESPONSE);
+            expectedStates.push(["PREPARED", null]);
+            expectedStates.push(["SYNCING", "PREPARED"]);
+            expectedStates.push(["ERROR", "SYNCING"]);
+            client.on("sync", syncChecker(expectedStates, done));
+            client.startClient();
+        });
 
-                expectedStates.push(["PREPARED", null]);
-                expectedStates.push(["SYNCING", "PREPARED"]);
-                expectedStates.push(["SYNCING", "SYNCING"]);
-                client.on("sync", syncChecker(expectedStates, done));
-                client.startClient();
-            });
+        it("should transition SYNCING -> SYNCING on subsequent /sync successes", function(done) {
+            const expectedStates: [string, string | null][] = [];
+            httpLookups.push(SYNC_RESPONSE);
+            httpLookups.push(SYNC_RESPONSE);
+
+            expectedStates.push(["PREPARED", null]);
+            expectedStates.push(["SYNCING", "PREPARED"]);
+            expectedStates.push(["SYNCING", "SYNCING"]);
+            client.on("sync", syncChecker(expectedStates, done));
+            client.startClient();
+        });
 
         xit("should transition ERROR -> ERROR if keepalive keeps failing", function(done) {
             acceptKeepalives = false;
-            const expectedStates = [];
+            const expectedStates: [string, string | null][] = [];
             httpLookups.push({
                 method: "GET", path: "/sync", error: { errcode: "NONONONONO" },
             });

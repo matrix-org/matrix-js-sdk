@@ -48,7 +48,7 @@ export function internaliseString(str: string): string {
     }
 
     // Return any cached string reference
-    return interns.get(str);
+    return interns.get(str)!;
 }
 
 /**
@@ -412,7 +412,7 @@ export function defer<T = void>(): IDeferred<T> {
 
 export async function promiseMapSeries<T>(
     promises: Array<T | Promise<T>>,
-    fn: (t: T) => Promise<unknown> | void, // if async/promise we don't care about the type as we only await resolution
+    fn: (t: T) => Promise<unknown> | undefined, // if async we don't care about the type as we only await resolution
 ): Promise<void> {
     for (const o of promises) {
         await fn(await o);

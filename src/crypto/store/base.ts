@@ -90,14 +90,14 @@ export interface CryptoStore {
         deviceKey: string,
         sessionId: string,
         txn: unknown,
-        func: (session: ISessionInfo) => void,
+        func: (session: ISessionInfo | null) => void,
     ): void;
     getEndToEndSessions(
         deviceKey: string,
         txn: unknown,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void;
-    getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo) => void): void;
+    getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo | null) => void): void;
     storeEndToEndSession(deviceKey: string, sessionId: string, sessionInfo: ISessionInfo, txn: unknown): void;
     storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void>;
     getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null>;

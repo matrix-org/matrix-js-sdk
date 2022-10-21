@@ -18,7 +18,7 @@ import { logger, PrefixedLogger } from '../../logger';
 import { LocalStorageCryptoStore } from './localStorage-crypto-store';
 import { MemoryCryptoStore } from './memory-crypto-store';
 import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
-import { InvalidCryptoStoreError } from '../../errors';
+import { InvalidCryptoStoreError, InvalidCryptoStoreState } from '../../errors';
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
 import {
     CryptoStore,
@@ -64,8 +64,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
         return IndexedDBHelpers.exists(indexedDB, dbName);
     }
 
-    private backendPromise: Promise<CryptoStore> = null;
-    private backend: CryptoStore = null;
+    private backendPromise?: Promise<CryptoStore>;
+    private backend?: CryptoStore;
 
     /**
      * Create a new IndexedDBCryptoStore
@@ -141,7 +141,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
                 logger.warn("Crypto DB is too new for us to use!", e);
                 // don't fall back to a different store: the user has crypto data
                 // in this db so we should use it or nothing at all.
-                throw new InvalidCryptoStoreError(InvalidCryptoStoreError.TOO_NEW);
+                throw new InvalidCryptoStoreError(InvalidCryptoStoreState.TooNew);
             }
             logger.warn(
                 `unable to connect to indexeddb ${this.dbName}` +
@@ -213,7 +213,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *    same instance as passed in, or the existing one.
      */
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
-        return this.backend.getOrAddOutgoingRoomKeyRequest(request);
+        return this.backend!.getOrAddOutgoingRoomKeyRequest(request);
     }
 
     /**
@@ -227,7 +227,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *    not found
      */
     public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend.getOutgoingRoomKeyRequest(requestBody);
+        return this.backend!.getOutgoingRoomKeyRequest(requestBody);
     }
 
     /**
@@ -241,7 +241,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *    requests in those states, an arbitrary one is chosen.
      */
     public getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend.getOutgoingRoomKeyRequestByState(wantedStates);
+        return this.backend!.getOutgoingRoomKeyRequestByState(wantedStates);
     }
 
     /**
@@ -252,7 +252,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @return {Promise<Array<*>>} Returns an array of requests in the given state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
-        return this.backend.getAllOutgoingRoomKeyRequestsByState(wantedState);
+        return this.backend!.getAllOutgoingRoomKeyRequestsByState(wantedState);
     }
 
     /**
@@ -270,7 +270,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         deviceId: string,
         wantedStates: number[],
     ): Promise<OutgoingRoomKeyRequest[]> {
-        return this.backend.getOutgoingRoomKeyRequestsByTarget(
+        return this.backend!.getOutgoingRoomKeyRequestsByTarget(
             userId, deviceId, wantedStates,
         );
     }
@@ -292,7 +292,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         expectedState: number,
         updates: Partial<OutgoingRoomKeyRequest>,
     ): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend.updateOutgoingRoomKeyRequest(
+        return this.backend!.updateOutgoingRoomKeyRequest(
             requestId, expectedState, updates,
         );
     }
@@ -310,7 +310,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         requestId: string,
         expectedState: number,
     ): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend.deleteOutgoingRoomKeyRequest(requestId, expectedState);
+        return this.backend!.deleteOutgoingRoomKeyRequest(requestId, expectedState);
     }
 
     // Olm Account
@@ -323,7 +323,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(string)} func Called with the account pickle
      */
     public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void) {
-        this.backend.getAccount(txn, func);
+        this.backend!.getAccount(txn, func);
     }
 
     /**
@@ -334,7 +334,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {string} accountPickle The new account pickle to store.
      */
     public storeAccount(txn: IDBTransaction, accountPickle: string): void {
-        this.backend.storeAccount(txn, accountPickle);
+        this.backend!.storeAccount(txn, accountPickle);
     }
 
     /**
@@ -349,7 +349,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
         func: (keys: Record<string, ICrossSigningKey> | null) => void,
     ): void {
-        this.backend.getCrossSigningKeys(txn, func);
+        this.backend!.getCrossSigningKeys(txn, func);
     }
 
     /**
@@ -362,7 +362,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
     ): void {
-        this.backend.getSecretStorePrivateKey(txn, func, type);
+        this.backend!.getSecretStorePrivateKey(txn, func, type);
     }
 
     /**
@@ -372,7 +372,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {string} keys keys object as getCrossSigningKeys()
      */
     public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, ICrossSigningKey>): void {
-        this.backend.storeCrossSigningKeys(txn, keys);
+        this.backend!.storeCrossSigningKeys(txn, keys);
     }
 
     /**
@@ -387,7 +387,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         type: K,
         key: SecretStorePrivateKeys[K],
     ): void {
-        this.backend.storeSecretStorePrivateKey(txn, type, key);
+        this.backend!.storeSecretStorePrivateKey(txn, type, key);
     }
 
     // Olm sessions
@@ -398,7 +398,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(int)} func Called with the count of sessions
      */
     public countEndToEndSessions(txn: IDBTransaction, func: (count: number) => void): void {
-        this.backend.countEndToEndSessions(txn, func);
+        this.backend!.countEndToEndSessions(txn, func);
     }
 
     /**
@@ -417,9 +417,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
         deviceKey: string,
         sessionId: string,
         txn: IDBTransaction,
-        func: (sessions: { [ sessionId: string ]: ISessionInfo }) => void,
+        func: (session: ISessionInfo | null) => void,
     ): void {
-        this.backend.getEndToEndSession(deviceKey, sessionId, txn, func);
+        this.backend!.getEndToEndSession(deviceKey, sessionId, txn, func);
     }
 
     /**
@@ -438,7 +438,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void {
-        this.backend.getEndToEndSessions(deviceKey, txn, func);
+        this.backend!.getEndToEndSessions(deviceKey, txn, func);
     }
 
     /**
@@ -448,8 +448,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *     an object with, deviceKey, lastReceivedMessageTs, sessionId
      *     and session keys.
      */
-    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo) => void): void {
-        this.backend.getAllEndToEndSessions(txn, func);
+    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo | null) => void): void {
+        this.backend!.getAllEndToEndSessions(txn, func);
     }
 
     /**
@@ -465,19 +465,19 @@ export class IndexedDBCryptoStore implements CryptoStore {
         sessionInfo: ISessionInfo,
         txn: IDBTransaction,
     ): void {
-        this.backend.storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn);
+        this.backend!.storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn);
     }
 
     public storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
-        return this.backend.storeEndToEndSessionProblem(deviceKey, type, fixed);
+        return this.backend!.storeEndToEndSessionProblem(deviceKey, type, fixed);
     }
 
     public getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null> {
-        return this.backend.getEndToEndSessionProblem(deviceKey, timestamp);
+        return this.backend!.getEndToEndSessionProblem(deviceKey, timestamp);
     }
 
     public filterOutNotifiedErrorDevices(devices: IOlmDevice[]): Promise<IOlmDevice[]> {
-        return this.backend.filterOutNotifiedErrorDevices(devices);
+        return this.backend!.filterOutNotifiedErrorDevices(devices);
     }
 
     // Inbound group sessions
@@ -497,7 +497,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        this.backend.getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func);
+        this.backend!.getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func);
     }
 
     /**
@@ -511,7 +511,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
         func: (session: ISession | null) => void,
     ): void {
-        this.backend.getAllEndToEndInboundGroupSessions(txn, func);
+        this.backend!.getAllEndToEndInboundGroupSessions(txn, func);
     }
 
     /**
@@ -529,7 +529,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: IDBTransaction,
     ): void {
-        this.backend.addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
+        this.backend!.addEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
     }
 
     /**
@@ -547,7 +547,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: IDBTransaction,
     ): void {
-        this.backend.storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
+        this.backend!.storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
     }
 
     public storeEndToEndInboundGroupSessionWithheld(
@@ -556,7 +556,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         sessionData: IWithheld,
         txn: IDBTransaction,
     ): void {
-        this.backend.storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn);
+        this.backend!.storeEndToEndInboundGroupSessionWithheld(senderCurve25519Key, sessionId, sessionData, txn);
     }
 
     // End-to-end device tracking
@@ -572,7 +572,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     public storeEndToEndDeviceData(deviceData: IDeviceData, txn: IDBTransaction): void {
-        this.backend.storeEndToEndDeviceData(deviceData, txn);
+        this.backend!.storeEndToEndDeviceData(deviceData, txn);
     }
 
     /**
@@ -583,7 +583,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *     device data
      */
     public getEndToEndDeviceData(txn: IDBTransaction, func: (deviceData: IDeviceData | null) => void): void {
-        this.backend.getEndToEndDeviceData(txn, func);
+        this.backend!.getEndToEndDeviceData(txn, func);
     }
 
     // End to End Rooms
@@ -595,7 +595,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      */
     public storeEndToEndRoom(roomId: string, roomInfo: IRoomEncryption, txn: IDBTransaction): void {
-        this.backend.storeEndToEndRoom(roomId, roomInfo, txn);
+        this.backend!.storeEndToEndRoom(roomId, roomInfo, txn);
     }
 
     /**
@@ -604,7 +604,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {function(Object)} func Function called with the end to end encrypted rooms
      */
     public getEndToEndRooms(txn: IDBTransaction, func: (rooms: Record<string, IRoomEncryption>) => void): void {
-        this.backend.getEndToEndRooms(txn, func);
+        this.backend!.getEndToEndRooms(txn, func);
     }
 
     // session backups
@@ -616,7 +616,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @returns {Promise} resolves to an array of inbound group sessions
      */
     public getSessionsNeedingBackup(limit: number): Promise<ISession[]> {
-        return this.backend.getSessionsNeedingBackup(limit);
+        return this.backend!.getSessionsNeedingBackup(limit);
     }
 
     /**
@@ -625,7 +625,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @returns {Promise} resolves to the number of sessions
      */
     public countSessionsNeedingBackup(txn?: IDBTransaction): Promise<number> {
-        return this.backend.countSessionsNeedingBackup(txn);
+        return this.backend!.countSessionsNeedingBackup(txn);
     }
 
     /**
@@ -635,7 +635,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @returns {Promise} resolves when the sessions are unmarked
      */
     public unmarkSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
-        return this.backend.unmarkSessionsNeedingBackup(sessions, txn);
+        return this.backend!.unmarkSessionsNeedingBackup(sessions, txn);
     }
 
     /**
@@ -645,7 +645,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @returns {Promise} resolves when the sessions are marked
      */
     public markSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
-        return this.backend.markSessionsNeedingBackup(sessions, txn);
+        return this.backend!.markSessionsNeedingBackup(sessions, txn);
     }
 
     /**
@@ -661,7 +661,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         sessionId: string,
         txn?: IDBTransaction,
     ): void {
-        this.backend.addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn);
+        this.backend!.addSharedHistoryInboundGroupSession(roomId, senderKey, sessionId, txn);
     }
 
     /**
@@ -674,7 +674,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         roomId: string,
         txn?: IDBTransaction,
     ): Promise<[senderKey: string, sessionId: string][]> {
-        return this.backend.getSharedHistoryInboundGroupSessions(roomId, txn);
+        return this.backend!.getSharedHistoryInboundGroupSessions(roomId, txn);
     }
 
     /**
@@ -685,7 +685,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         parkedData: ParkedSharedHistory,
         txn?: IDBTransaction,
     ): void {
-        this.backend.addParkedSharedHistory(roomId, parkedData, txn);
+        this.backend!.addParkedSharedHistory(roomId, parkedData, txn);
     }
 
     /**
@@ -695,7 +695,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         roomId: string,
         txn?: IDBTransaction,
     ): Promise<ParkedSharedHistory[]> {
-        return this.backend.takeParkedSharedHistory(roomId, txn);
+        return this.backend!.takeParkedSharedHistory(roomId, txn);
     }
 
     /**
@@ -720,7 +720,12 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *     reject with that exception. On synchronous backends, the
      *     exception will propagate to the caller of the getFoo method.
      */
-    doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: IDBTransaction) => T, log?: PrefixedLogger): Promise<T> {
-        return this.backend.doTxn(mode, stores, func, log);
+    public doTxn<T>(
+        mode: Mode,
+        stores: Iterable<string>,
+        func: (txn: IDBTransaction) => T,
+        log?: PrefixedLogger,
+    ): Promise<T> {
+        return this.backend!.doTxn<T>(mode, stores, func as (txn: unknown) => T, log);
     }
 }

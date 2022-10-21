@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { IUsageLimit } from "../@types/partials";
+import { MatrixEvent } from "../models/event";
 
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
@@ -50,7 +51,12 @@ export class MatrixError extends HTTPError {
     public readonly errcode?: string;
     public readonly data: IErrorJson;
 
-    constructor(errorJson: IErrorJson = {}, public readonly httpStatus?: number, public url?: string) {
+    constructor(
+        errorJson: IErrorJson = {},
+        public readonly httpStatus?: number,
+        public url?: string,
+        public event?: MatrixEvent,
+    ) {
         let message = errorJson.error || "Unknown message";
         if (httpStatus) {
             message = `[${httpStatus}] ${message}`;

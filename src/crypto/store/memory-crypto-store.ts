@@ -54,7 +54,7 @@ export class MemoryCryptoStore implements CryptoStore {
     private inboundGroupSessions: { [sessionKey: string]: InboundGroupSessionData } = {};
     private inboundGroupSessionsWithheld: Record<string, IWithheld> = {};
     // Opaque device data object
-    private deviceData: IDeviceData = null;
+    private deviceData: IDeviceData | null = null;
     private rooms: { [roomId: string]: IRoomEncryption } = {};
     private sessionsNeedingBackup: { [sessionKey: string]: boolean } = {};
     private sharedHistoryInboundGroupSessions: { [roomId: string]: [senderKey: string, sessionId: string][] } = {};

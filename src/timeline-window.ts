@@ -16,6 +16,8 @@ limitations under the License.
 
 /** @module timeline-window */
 
+import { Optional } from "matrix-events-sdk";
+
 import { Direction, EventTimeline } from './models/event-timeline';
 import { logger } from './logger';
 import { MatrixClient } from "./client";
@@ -49,8 +51,8 @@ export class TimelineWindow {
     // 'end' of the window.
     //
     // start.index is inclusive; end.index is exclusive.
-    private start?: TimelineIndex = null;
-    private end?: TimelineIndex = null;
+    private start?: TimelineIndex;
+    private end?: TimelineIndex;
     private eventCount = 0;
 
     /**
@@ -102,7 +104,11 @@ export class TimelineWindow {
     public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
-        const initFields = (timeline: EventTimeline) => {
+        const initFields = (timeline: Optional<EventTimeline>) => {
+            if (!timeline) {
+                throw new Error("No timeline given to initFields");
+            }
+
             let eventIndex: number;
 
             const events = timeline.getEvents();
@@ -153,11 +159,11 @@ export class TimelineWindow {
      * @return {TimelineIndex} The requested timeline index if one exists, null
      * otherwise.
      */
-    public getTimelineIndex(direction: Direction): TimelineIndex {
+    public getTimelineIndex(direction: Direction): TimelineIndex | null {
         if (direction == EventTimeline.BACKWARDS) {
-            return this.start;
+            return this.start ?? null;
         } else if (direction == EventTimeline.FORWARDS) {
-            return this.end;
+            return this.end ?? null;
         } else {
             throw new Error("Invalid direction '" + direction + "'");
         }
@@ -299,7 +305,7 @@ export class TimelineWindow {
             backwards: direction == EventTimeline.BACKWARDS,
             limit: size,
         }).finally(function() {
-            tl.pendingPaginate = null;
+            tl.pendingPaginate = undefined;
         }).then((r) => {
             debuglog("TimelineWindow: request completed with result " + r);
             if (!r) {
@@ -334,11 +340,17 @@ export class TimelineWindow {
      */
     public unpaginate(delta: number, startOfTimeline: boolean): void {
         const tl = startOfTimeline ? this.start : this.end;
+        if (!tl) {
+            throw new Error(
+                `Attempting to unpaginate startOfTimeline=${startOfTimeline} but don't have this direction`,
+            );
+        }
 
         // sanity-check the delta
         if (delta > this.eventCount || delta < 0) {
-            throw new Error("Attemting to unpaginate " + delta + " events, but " +
-                "only have " + this.eventCount + " in the timeline");
+            throw new Error(
+                `Attemting to unpaginate ${delta} events, but only have ${this.eventCount} in the timeline`,
+            );
         }
 
         while (delta > 0) {
@@ -368,7 +380,7 @@ export class TimelineWindow {
             return [];
         }
 
-        const result = [];
+        const result: MatrixEvent[] = [];
 
         // iterate through each timeline between this.start and this.end
         // (inclusive).
@@ -390,7 +402,7 @@ export class TimelineWindow {
             if (timeline === this.start.timeline) {
                 startIndex = this.start.index + timeline.getBaseIndex();
             }
-            if (timeline === this.end.timeline) {
+            if (timeline === this.end?.timeline) {
                 endIndex = this.end.index + timeline.getBaseIndex();
             }
 
@@ -399,10 +411,10 @@ export class TimelineWindow {
             }
 
             // if we're not done, iterate to the next timeline.
-            if (timeline === this.end.timeline) {
+            if (timeline === this.end?.timeline) {
                 break;
             } else {
-                timeline = timeline.getNeighbouringTimeline(EventTimeline.FORWARDS);
+                timeline = timeline.getNeighbouringTimeline(EventTimeline.FORWARDS)!;
             }
         }
 
