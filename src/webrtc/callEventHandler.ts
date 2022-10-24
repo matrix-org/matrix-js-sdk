@@ -251,7 +251,7 @@ export class CallEventHandler {
                     groupCallId,
                     opponentSessionId: content.sender_session_id,
                 },
-            );
+            ) ?? undefined;
             if (!call) {
                 logger.log(
                     "Incoming call ID " + content.call_id + " but this client " +
@@ -277,13 +277,13 @@ export class CallEventHandler {
 
             // if we stashed candidate events for that call ID, play them back now
             if (this.candidateEventsByCall.get(call.callId)) {
-                for (const ev of this.candidateEventsByCall.get(call.callId)) {
+                for (const ev of this.candidateEventsByCall.get(call.callId)!) {
                     call.onRemoteIceCandidatesReceived(ev);
                 }
             }
 
             // Were we trying to call that user (room)?
-            let existingCall: MatrixCall;
+            let existingCall: MatrixCall | undefined;
             for (const thisCall of this.calls.values()) {
                 const isCalling = [CallState.WaitLocalMedia, CallState.CreateOffer, CallState.InviteSent].includes(
                     thisCall.state,
@@ -326,7 +326,7 @@ export class CallEventHandler {
                 if (!this.candidateEventsByCall.has(content.call_id)) {
                     this.candidateEventsByCall.set(content.call_id, []);
                 }
-                this.candidateEventsByCall.get(content.call_id).push(event);
+                this.candidateEventsByCall.get(content.call_id)!.push(event);
             } else {
                 call.onRemoteIceCandidatesReceived(event);
             }
@@ -345,7 +345,7 @@ export class CallEventHandler {
                         opponentDeviceId,
                         opponentSessionId: content.sender_session_id,
                     },
-                );
+                ) ?? undefined;
                 if (call) {
                     call.callId = content.call_id;
                     call.initWithHangup(event);

@@ -32,7 +32,7 @@ describe("eventMapperFor", function() {
             fetchFn: function() {} as any, // NOP
             store: {
                 getRoom(roomId: string): Room | null {
-                    return rooms.find(r => r.roomId === roomId);
+                    return rooms.find(r => r.roomId === roomId) ?? null;
                 },
             } as IStore,
             scheduler: {

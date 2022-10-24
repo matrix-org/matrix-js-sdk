@@ -31,7 +31,7 @@ import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
 import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
-import { CryptoStore } from "./store/base";
+import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ISecretStorageKeyInfo } from "./api";
 
 const KEY_REQUEST_TIMEOUT_MS = 1000 * 60;
@@ -114,10 +114,10 @@ export class CrossSigningInfo {
         }
 
         if (expectedPubkey === undefined) {
-            expectedPubkey = this.getId(type);
+            expectedPubkey = this.getId(type)!;
         }
 
-        function validateKey(key: Uint8Array): [string, PkSigning] {
+        function validateKey(key: Uint8Array | null): [string, PkSigning] | undefined {
             if (!key) return;
             const signing = new global.Olm.PkSigning();
             const gotPubkey = signing.init_with_seed(key);
@@ -127,7 +127,7 @@ export class CrossSigningInfo {
             signing.free();
         }
 
-        let privkey;
+        let privkey: Uint8Array | null = null;
         if (this.cacheCallbacks.getCrossSigningKeyCache && shouldCache) {
             privkey = await this.cacheCallbacks.getCrossSigningKeyCache(type, expectedPubkey);
         }
@@ -141,7 +141,7 @@ export class CrossSigningInfo {
         const result = validateKey(privkey);
         if (result) {
             if (this.cacheCallbacks.storeCrossSigningKeyCache && shouldCache) {
-                await this.cacheCallbacks.storeCrossSigningKeyCache(type, privkey);
+                await this.cacheCallbacks.storeCrossSigningKeyCache(type, privkey!);
             }
             return result;
         }
@@ -169,7 +169,7 @@ export class CrossSigningInfo {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStoredInSecretStorage(secretStorage: SecretStorage): Promise<Record<string, object>> {
+    public async isStoredInSecretStorage(secretStorage: SecretStorage): Promise<Record<string, object> | null> {
         // check what SSSS keys have encrypted the master key (if any)
         const stored = await secretStorage.isStored("m.cross_signing.master") || {};
         // then check which of those SSSS keys have also encrypted the SSK and USK
@@ -213,7 +213,7 @@ export class CrossSigningInfo {
      * @param {SecretStorage} secretStorage The secret store using account data
      * @return {Uint8Array} The private key
      */
-    public static async getFromSecretStorage(type: string, secretStorage: SecretStorage): Promise<Uint8Array> {
+    public static async getFromSecretStorage(type: string, secretStorage: SecretStorage): Promise<Uint8Array | null> {
         const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
         if (!encodedKey) {
             return null;
@@ -233,7 +233,7 @@ export class CrossSigningInfo {
         if (!cacheCallbacks) return false;
         const types = type ? [type] : ["master", "self_signing", "user_signing"];
         for (const t of types) {
-            if (!await cacheCallbacks.getCrossSigningKeyCache(t)) {
+            if (!await cacheCallbacks.getCrossSigningKeyCache?.(t)) {
                 return false;
             }
         }
@@ -250,7 +250,7 @@ export class CrossSigningInfo {
         const cacheCallbacks = this.cacheCallbacks;
         if (!cacheCallbacks) return keys;
         for (const type of ["master", "self_signing", "user_signing"]) {
-            const privKey = await cacheCallbacks.getCrossSigningKeyCache(type);
+            const privKey = await cacheCallbacks.getCrossSigningKeyCache?.(type);
             if (!privKey) {
                 continue;
             }
@@ -268,7 +268,7 @@ export class CrossSigningInfo {
      *
      * @return {string} the ID
      */
-    public getId(type = "master"): string {
+    public getId(type = "master"): string | null {
         if (!this.keys[type]) return null;
         const keyInfo = this.keys[type];
         return publicKeyFromKeyInfo(keyInfo);
@@ -469,7 +469,7 @@ export class CrossSigningInfo {
         }
     }
 
-    public async signUser(key: CrossSigningInfo): Promise<ICrossSigningKey> {
+    public async signUser(key: CrossSigningInfo): Promise<ICrossSigningKey | undefined> {
         if (!this.keys.user_signing) {
             logger.info("No user signing key: not signing user");
             return;
@@ -477,7 +477,7 @@ export class CrossSigningInfo {
         return this.signObject(key.keys.master, "user_signing");
     }
 
-    public async signDevice(userId: string, device: DeviceInfo): Promise<ISignedKey> {
+    public async signDevice(userId: string, device: DeviceInfo): Promise<ISignedKey | undefined> {
         if (userId !== this.userId) {
             throw new Error(
                 `Trying to sign ${userId}'s device; can only sign our own device`,
@@ -521,9 +521,9 @@ export class CrossSigningInfo {
             return new UserTrustLevel(false, false, userCrossSigning.firstUse);
         }
 
-        let userTrusted;
+        let userTrusted: boolean;
         const userMaster = userCrossSigning.keys.master;
-        const uskId = this.getId('user_signing');
+        const uskId = this.getId('user_signing')!;
         try {
             pkVerify(userMaster, uskId, this.userId);
             userTrusted = true;
@@ -567,7 +567,7 @@ export class CrossSigningInfo {
         const deviceObj = deviceToObject(device, userCrossSigning.userId);
         try {
             // if we can verify the user's SSK from their master key...
-            pkVerify(userSSK, userCrossSigning.getId(), userCrossSigning.userId);
+            pkVerify(userSSK, userCrossSigning.getId()!, userCrossSigning.userId);
             // ...and this device's key from their SSK...
             pkVerify(deviceObj, publicKeyFromKeyInfo(userSSK), userCrossSigning.userId);
             // ...then we trust this device as much as far as we trust the user
@@ -699,7 +699,10 @@ export class DeviceTrustLevel {
 
 export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: OlmDevice): ICacheCallbacks {
     return {
-        getCrossSigningKeyCache: async function(type: string, _expectedPublicKey: string): Promise<Uint8Array> {
+        getCrossSigningKeyCache: async function(
+            type: keyof SecretStorePrivateKeys,
+            _expectedPublicKey: string,
+        ): Promise<Uint8Array> {
             const key = await new Promise<any>((resolve) => {
                 return store.doTxn(
                     'readonly',
@@ -718,7 +721,10 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
                 return key;
             }
         },
-        storeCrossSigningKeyCache: async function(type: string, key: Uint8Array): Promise<void> {
+        storeCrossSigningKeyCache: async function(
+            type: keyof SecretStorePrivateKeys,
+            key: Uint8Array,
+        ): Promise<void> {
             if (!(key instanceof Uint8Array)) {
                 throw new Error(
                     `storeCrossSigningKeyCache expects Uint8Array, got ${key}`,
@@ -746,7 +752,7 @@ export type KeysDuringVerification = [[string, PkSigning], [string, PkSigning], 
  * @param {string} userId The user ID being verified
  * @param {string} deviceId The device ID being verified
  */
-export function requestKeysDuringVerification(
+export async function requestKeysDuringVerification(
     baseApis: MatrixClient,
     userId: string,
     deviceId: string,
@@ -760,7 +766,7 @@ export function requestKeysDuringVerification(
     // it. We return here in order to test.
     return new Promise<KeysDuringVerification | void>((resolve, reject) => {
         const client = baseApis;
-        const original = client.crypto.crossSigningInfo;
+        const original = client.crypto!.crossSigningInfo;
 
         // We already have all of the infrastructure we need to validate and
         // cache cross-signing keys, so instead of replicating that, here we set
@@ -795,7 +801,7 @@ export function requestKeysDuringVerification(
 
         // also request and cache the key backup key
         const backupKeyPromise = (async () => {
-            const cachedKey = await client.crypto.getSessionBackupPrivateKey();
+            const cachedKey = await client.crypto!.getSessionBackupPrivateKey();
             if (!cachedKey) {
                 logger.info("No cached backup key found. Requesting...");
                 const secretReq = client.requestSecret(
@@ -805,13 +811,13 @@ export function requestKeysDuringVerification(
                 logger.info("Got key backup key, decoding...");
                 const decodedKey = decodeBase64(base64Key);
                 logger.info("Decoded backup key, storing...");
-                await client.crypto.storeSessionBackupPrivateKey(
+                await client.crypto!.storeSessionBackupPrivateKey(
                     Uint8Array.from(decodedKey),
                 );
                 logger.info("Backup key stored. Starting backup restore...");
                 const backupInfo = await client.getKeyBackupVersion();
                 // no need to await for this - just let it go in the bg
-                client.restoreKeyBackupWithCache(undefined, undefined, backupInfo).then(() => {
+                client.restoreKeyBackupWithCache(undefined, undefined, backupInfo!).then(() => {
                     logger.info("Backup restored.");
                 });
             }

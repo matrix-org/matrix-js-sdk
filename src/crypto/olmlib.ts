@@ -21,7 +21,6 @@ limitations under the License.
  */
 
 import anotherjson from "another-json";
-import { Logger } from "loglevel";
 
 import type { PkSigning } from "@matrix-org/olm";
 import { OlmDevice } from "./OlmDevice";
@@ -56,7 +55,7 @@ export const MEGOLM_BACKUP_ALGORITHM = Algorithm.MegolmBackup;
 
 export interface IOlmSessionResult {
     device: DeviceInfo;
-    sessionId?: string;
+    sessionId: string | null;
 }
 
 /**
@@ -137,7 +136,7 @@ export async function encryptMessageForDevice(
 
 interface IExistingOlmSession {
     device: DeviceInfo;
-    sessionId?: string;
+    sessionId: string | null;
 }
 
 /**
@@ -225,19 +224,8 @@ export async function ensureOlmSessionsForDevices(
     force = false,
     otkTimeout?: number,
     failedServers?: string[],
-    log: Logger = logger,
+    log = logger,
 ): Promise<Record<string, Record<string, IOlmSessionResult>>> {
-    if (typeof force === "number") {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore - backwards compatibility
-        log = failedServers;
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore - backwards compatibility
-        failedServers = otkTimeout;
-        otkTimeout = force;
-        force = false;
-    }
-
     const devicesWithoutSession: [string, string][] = [
         // [userId, deviceId], ...
     ];
@@ -365,7 +353,7 @@ export async function ensureOlmSessionsForDevices(
             }
 
             const deviceRes = userRes[deviceId] || {};
-            let oneTimeKey: IOneTimeKey = null;
+            let oneTimeKey: IOneTimeKey | null = null;
             for (const keyId in deviceRes) {
                 if (keyId.indexOf(oneTimeKeyAlgorithm + ":") === 0) {
                     oneTimeKey = deviceRes[keyId];
@@ -388,7 +376,7 @@ export async function ensureOlmSessionsForDevices(
                     olmDevice, oneTimeKey, userId, deviceInfo,
                 ).then((sid) => {
                     if (resolveSession[key]) {
-                        resolveSession[key](sid);
+                        resolveSession[key](sid ?? undefined);
                     }
                     result[userId][deviceId].sessionId = sid;
                 }, (e) => {
@@ -413,7 +401,7 @@ async function _verifyKeyAndStartSession(
     oneTimeKey: IOneTimeKey,
     userId: string,
     deviceInfo: DeviceInfo,
-): Promise<string> {
+): Promise<string | null> {
     const deviceId = deviceInfo.deviceId;
     try {
         await verifySignature(

@@ -36,7 +36,7 @@ import { IndexedToDeviceBatch, ToDeviceBatch } from "../models/ToDeviceMessage";
  */
 export class StubStore implements IStore {
     public readonly accountData = {}; // stub
-    private fromToken: string = null;
+    private fromToken: string | null = null;
 
     /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
     public isNewlyCreated(): Promise<boolean> {
@@ -170,7 +170,7 @@ export class StubStore implements IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    public setFilterIdByName(filterName: string, filterId: string) {}
+    public setFilterIdByName(filterName: string, filterId?: string) {}
 
     /**
      * Store user-scoped account data events
@@ -223,7 +223,7 @@ export class StubStore implements IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync(): Promise<ISavedSync> {
+    public getSavedSync(): Promise<ISavedSync | null> {
         return Promise.resolve(null);
     }
 
@@ -244,7 +244,7 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getOutOfBandMembers(): Promise<IStateEventWithRoomId[]> {
+    public getOutOfBandMembers(): Promise<IStateEventWithRoomId[] | null> {
         return Promise.resolve(null);
     }
 

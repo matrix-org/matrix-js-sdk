@@ -84,7 +84,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
 
-    private lastEvent: MatrixEvent;
+    private lastEvent!: MatrixEvent;
     private replyCount = 0;
 
     public readonly room: Room;
@@ -186,7 +186,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.lastEvent = events.find(e => (
             !e.isRedacted() &&
             e.isRelation(THREAD_RELATION_TYPE.name)
-        )) ?? this.rootEvent;
+        )) ?? this.rootEvent!;
         this.emit(ThreadEvent.Update, this);
     };
 
@@ -268,7 +268,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.client.decryptEventIfNeeded(event, {});
         } else if (!toStartOfTimeline &&
             this.initialEventsFetched &&
-            event.localTimestamp > this.lastReply()?.localTimestamp
+            event.localTimestamp > this.lastReply()!.localTimestamp
         ) {
             this.fetchEditsWhereNeeded(event);
             this.addEventToTimeline(event, false);
@@ -290,7 +290,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
     }
 
-    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship {
+    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
@@ -303,7 +303,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
-            this._currentUserParticipated = bundledRelationship.current_user_participated;
+            this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
             const event = new MatrixEvent({
                 room_id: this.rootEvent.getRoomId(),
@@ -408,7 +408,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     }
 
     public async fetchEvents(opts: IRelationsRequestOpts = { limit: 20, dir: Direction.Backward }): Promise<{
-        originalEvent: MatrixEvent;
+        originalEvent?: MatrixEvent;
         events: MatrixEvent[];
         nextBatch?: string | null;
         prevBatch?: string;
@@ -428,7 +428,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         // When there's no nextBatch returned with a `from` request we have reached
         // the end of the thread, and therefore want to return an empty one
-        if (!opts.to && !nextBatch) {
+        if (!opts.to && !nextBatch && originalEvent) {
             events = [...events, originalEvent];
         }
 

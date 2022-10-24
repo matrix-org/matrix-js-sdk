@@ -42,7 +42,7 @@ export enum IdentityPrefix {
     /**
      * URI path for the v2 identity API
      */
-    V2 = "/_matrix/identity/api/v2",
+    V2 = "/_matrix/identity/v2",
 }
 
 export enum MediaPrefix {

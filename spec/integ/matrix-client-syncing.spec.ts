@@ -1276,9 +1276,9 @@ describe("MatrixClient syncing", () => {
             client!.on(RoomEvent.TimelineReset, (room) => {
                 resetCallCount++;
 
-                const tl = room.getLiveTimeline();
-                expect(tl.getEvents().length).toEqual(0);
-                const tok = tl.getPaginationToken(EventTimeline.BACKWARDS);
+                const tl = room?.getLiveTimeline();
+                expect(tl?.getEvents().length).toEqual(0);
+                const tok = tl?.getPaginationToken(EventTimeline.BACKWARDS);
                 expect(tok).toEqual("newerTok");
             });
 
@@ -1538,6 +1538,107 @@ describe("MatrixClient syncing", () => {
                     return httpBackend!.flushAllExpected();
                 }),
             ]);
+        });
+    });
+
+    describe("peek", () => {
+        beforeEach(() => {
+            httpBackend!.expectedRequests = [];
+        });
+
+        it("should return a room based on the room initialSync API", async () => {
+            httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomOne)}/initialSync`).respond(200, {
+                room_id: roomOne,
+                membership: "leave",
+                messages: {
+                    start: "start",
+                    end: "end",
+                    chunk: [{
+                        content: { body: "Message 1" },
+                        type: "m.room.message",
+                        event_id: "$eventId1",
+                        sender: userA,
+                        origin_server_ts: 12313525,
+                        room_id: roomOne,
+                    }, {
+                        content: { body: "Message 2" },
+                        type: "m.room.message",
+                        event_id: "$eventId2",
+                        sender: userB,
+                        origin_server_ts: 12315625,
+                        room_id: roomOne,
+                    }],
+                },
+                state: [{
+                    content: { name: "Room Name" },
+                    type: "m.room.name",
+                    event_id: "$eventId",
+                    sender: userA,
+                    origin_server_ts: 12314525,
+                    state_key: "",
+                    room_id: roomOne,
+                }],
+                presence: [{
+                    content: {},
+                    type: "m.presence",
+                    sender: userA,
+                }],
+            });
+            httpBackend!.when("GET", "/events").respond(200, { chunk: [] });
+
+            const prom = client!.peekInRoom(roomOne);
+            await httpBackend!.flushAllExpected();
+            const room = await prom;
+
+            expect(room.roomId).toBe(roomOne);
+            expect(room.getMyMembership()).toBe("leave");
+            expect(room.name).toBe("Room Name");
+            expect(room.currentState.getStateEvents("m.room.name", "").getId()).toBe("$eventId");
+            expect(room.timeline[0].getContent().body).toBe("Message 1");
+            expect(room.timeline[1].getContent().body).toBe("Message 2");
+            client?.stopPeeking();
+            httpBackend!.when("GET", "/events").respond(200, { chunk: [] });
+            await httpBackend!.flushAllExpected();
+        });
+    });
+
+    describe("user account data", () => {
+        it("should include correct prevEv in the ClientEvent.AccountData emit", async () => {
+            const eventA1 = new MatrixEvent({ type: "a", content: { body: "1" } });
+            const eventA2 = new MatrixEvent({ type: "a", content: { body: "2" } });
+            const eventB1 = new MatrixEvent({ type: "b", content: { body: "1" } });
+            const eventB2 = new MatrixEvent({ type: "b", content: { body: "2" } });
+
+            client!.store.storeAccountDataEvents([eventA1, eventB1]);
+            const fn = jest.fn();
+            client!.on(ClientEvent.AccountData, fn);
+
+            httpBackend!.when("GET", "/sync").respond(200, {
+                next_batch: "batch_token",
+                rooms: {},
+                presence: {},
+                account_data: {
+                    events: [eventA2.event, eventB2.event],
+                },
+            });
+
+            await Promise.all([
+                client!.startClient(),
+                httpBackend!.flushAllExpected(),
+            ]);
+
+            const eventA = client?.getAccountData("a");
+            expect(eventA).not.toBe(eventA1);
+            const eventB = client?.getAccountData("b");
+            expect(eventB).not.toBe(eventB1);
+
+            expect(fn).toHaveBeenCalledWith(eventA, eventA1);
+            expect(fn).toHaveBeenCalledWith(eventB, eventB1);
+
+            expect(eventA?.getContent().body).toBe("2");
+            expect(eventB?.getContent().body).toBe("2");
+
+            client!.off(ClientEvent.AccountData, fn);
         });
     });
 
