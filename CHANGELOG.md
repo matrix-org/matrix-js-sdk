@@ -1,3 +1,8 @@
+Changes in [21.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.0.0-rc.2) (2022-10-24)
+============================================================================================================
+
+ * Fix POST data not being passed for registerWithIdentityServer ([\#2769](https://github.com/matrix-org/matrix-js-sdk/pull/2769)). Fixes matrix-org/element-web-rageshakes#16206.
+
 Changes in [21.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.0.0-rc.1) (2022-10-18)
 ============================================================================================================
 
