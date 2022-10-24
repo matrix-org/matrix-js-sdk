@@ -374,8 +374,11 @@ export function globToRegexp(glob: string, extended = false): string {
     );
 }
 
-export function ensureNoTrailingSlash(url: string): string {
-    if (url && url.endsWith("/")) {
+export function ensureNoTrailingSlash(url: string): string;
+export function ensureNoTrailingSlash(url: undefined): undefined;
+export function ensureNoTrailingSlash(url?: string): string | undefined;
+export function ensureNoTrailingSlash(url?: string): string | undefined {
+    if (url?.endsWith("/")) {
         return url.slice(0, -1);
     } else {
         return url;

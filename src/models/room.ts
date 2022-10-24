@@ -972,11 +972,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // of using the `/context` historical token (ex. `t12-13_0_0_0_0_0_0_0_0`)
             // so that it matches the next response from `/sync` and we can properly
             // continue the timeline.
-            newTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
+            newTimeline!.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
 
             // Set our new fresh timeline as the live timeline to continue syncing
             // forwards and back paginating from.
-            timelineSet.setLiveTimeline(newTimeline);
+            timelineSet.setLiveTimeline(newTimeline!);
             // Fixup `this.oldstate` so that `scrollback` has the pagination tokens
             // available
             this.fixUpLegacyTimelineFields();
