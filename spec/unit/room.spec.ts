@@ -66,7 +66,7 @@ describe("Room", function() {
             "body": "Reply :: " + Math.random(),
             "m.relates_to": {
                 "m.in_reply_to": {
-                    "event_id": target.getId(),
+                    "event_id": target.getId()!,
                 },
             },
         },
@@ -84,7 +84,7 @@ describe("Room", function() {
             },
             "m.relates_to": {
                 rel_type: RelationType.Replace,
-                event_id: target.getId(),
+                event_id: target.getId()!,
             },
         },
     }, room.client);
@@ -97,9 +97,9 @@ describe("Room", function() {
         content: {
             "body": "Thread response :: " + Math.random(),
             "m.relates_to": {
-                "event_id": root.getId(),
+                "event_id": root.getId()!,
                 "m.in_reply_to": {
-                    "event_id": root.getId(),
+                    "event_id": root.getId()!,
                 },
                 "rel_type": "m.thread",
             },
@@ -114,7 +114,7 @@ describe("Room", function() {
         content: {
             "m.relates_to": {
                 "rel_type": RelationType.Annotation,
-                "event_id": target.getId(),
+                "event_id": target.getId()!,
                 "key": Math.random().toString(),
             },
         },
@@ -125,7 +125,7 @@ describe("Room", function() {
         type: EventType.RoomRedaction,
         user: userA,
         room: roomId,
-        redacts: target.getId(),
+        redacts: target.getId()!,
         content: {},
     }, room.client);
 
@@ -722,13 +722,13 @@ describe("Room", function() {
         it("should handle events in the same timeline", function() {
             room.addLiveEvents(events);
 
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId()!,
                 events[1].getId()))
                 .toBeLessThan(0);
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[2].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[2].getId()!,
                 events[1].getId()))
                 .toBeGreaterThan(0);
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId()!,
                 events[1].getId()))
                 .toEqual(0);
         });
@@ -741,10 +741,10 @@ describe("Room", function() {
             room.addEventsToTimeline([events[0]], false, oldTimeline);
             room.addLiveEvents([events[1]]);
 
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId()!,
                 events[1].getId()))
                 .toBeLessThan(0);
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId()!,
                 events[0].getId()))
                 .toBeGreaterThan(0);
         });
@@ -755,10 +755,10 @@ describe("Room", function() {
             room.addEventsToTimeline([events[0]], false, oldTimeline);
             room.addLiveEvents([events[1]]);
 
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId()!,
                 events[1].getId()))
                 .toBe(null);
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId(),
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId()!,
                 events[0].getId()))
                 .toBe(null);
         });
@@ -767,13 +767,13 @@ describe("Room", function() {
             room.addLiveEvents(events);
 
             expect(room.getUnfilteredTimelineSet()
-                .compareEventOrdering(events[0].getId(), "xxx"))
+                .compareEventOrdering(events[0].getId()!, "xxx"))
                 .toBe(null);
             expect(room.getUnfilteredTimelineSet()
                 .compareEventOrdering("xxx", events[0].getId()))
                 .toBe(null);
             expect(room.getUnfilteredTimelineSet()
-                .compareEventOrdering(events[0].getId(), events[0].getId()))
+                .compareEventOrdering(events[0].getId()!, events[0].getId()))
                 .toBe(0);
         });
     });
@@ -1228,7 +1228,7 @@ describe("Room", function() {
             it("should store the receipt so it can be obtained via getReceiptsForEvent", function() {
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                    mkRecord(eventToAck.getId()!, "m.read", userB, ts),
                 ]));
                 expect(room.getReceiptsForEvent(eventToAck)).toEqual([{
                     type: "m.read",
@@ -1247,7 +1247,7 @@ describe("Room", function() {
                     const ts = 13787898424;
 
                     const receiptEvent = mkReceipt(roomId, [
-                        mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                        mkRecord(eventToAck.getId()!, "m.read", userB, ts),
                     ]);
 
                     room.addReceipt(receiptEvent);
@@ -1261,11 +1261,11 @@ describe("Room", function() {
                 });
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                    mkRecord(eventToAck.getId()!, "m.read", userB, ts),
                 ]));
                 const ts2 = 13787899999;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(nextEventToAck.getId(), "m.read", userB, ts2),
+                    mkRecord(nextEventToAck.getId()!, "m.read", userB, ts2),
                 ]));
                 expect(room.getReceiptsForEvent(eventToAck)).toEqual([]);
                 expect(room.getReceiptsForEvent(nextEventToAck)).toEqual([{
@@ -1280,9 +1280,9 @@ describe("Room", function() {
             it("should persist multiple receipts for a single event ID", function() {
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
-                    mkRecord(eventToAck.getId(), "m.read", userC, ts),
-                    mkRecord(eventToAck.getId(), "m.read", userD, ts),
+                    mkRecord(eventToAck.getId()!, "m.read", userB, ts),
+                    mkRecord(eventToAck.getId()!, "m.read", userC, ts),
+                    mkRecord(eventToAck.getId()!, "m.read", userD, ts),
                 ]));
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual(
                     [userB, userC, userD],
@@ -1300,9 +1300,9 @@ describe("Room", function() {
                 });
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
-                    mkRecord(eventTwo.getId(), "m.read", userC, ts),
-                    mkRecord(eventThree.getId(), "m.read", userD, ts),
+                    mkRecord(eventToAck.getId()!, "m.read", userB, ts),
+                    mkRecord(eventTwo.getId()!, "m.read", userC, ts),
+                    mkRecord(eventThree.getId()!, "m.read", userD, ts),
                 ]));
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual([userB]);
                 expect(room.getUsersReadUpTo(eventTwo)).toEqual([userC]);
@@ -1311,9 +1311,9 @@ describe("Room", function() {
 
             it("should persist multiple receipts for a single user ID", function() {
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.delivered", userB, 13787898424),
-                    mkRecord(eventToAck.getId(), "m.read", userB, 22222222),
-                    mkRecord(eventToAck.getId(), "m.seen", userB, 33333333),
+                    mkRecord(eventToAck.getId()!, "m.delivered", userB, 13787898424),
+                    mkRecord(eventToAck.getId()!, "m.read", userB, 22222222),
+                    mkRecord(eventToAck.getId()!, "m.seen", userB, 33333333),
                 ]));
                 expect(room.getReceiptsForEvent(eventToAck)).toEqual([
                     {
@@ -1361,19 +1361,19 @@ describe("Room", function() {
 
                 // check it initialises correctly
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(events[0].getId(), "m.read", userB, ts),
+                    mkRecord(events[0].getId()!, "m.read", userB, ts),
                 ]));
                 expect(room.getEventReadUpTo(userB)).toEqual(events[0].getId());
 
                 // 2>0, so it should move forward
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(events[2].getId(), "m.read", userB, ts),
+                    mkRecord(events[2].getId()!, "m.read", userB, ts),
                 ]));
                 expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
 
                 // 1<2, so it should stay put
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(events[1].getId(), "m.read", userB, ts),
+                    mkRecord(events[1].getId()!, "m.read", userB, ts),
                 ]));
                 expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
             });
@@ -1399,13 +1399,13 @@ describe("Room", function() {
 
                 // check it initialises correctly
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(events[0].getId(), "m.read", userB, ts),
+                    mkRecord(events[0].getId()!, "m.read", userB, ts),
                 ]));
                 expect(room.getEventReadUpTo(userB)).toEqual(events[0].getId());
 
                 // 2>0, so it should move forward
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(events[2].getId(), "m.read", userB, ts),
+                    mkRecord(events[2].getId()!, "m.read", userB, ts),
                 ]), true);
                 expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
                 expect(room.getReceiptsForEvent(events[2])).toEqual([
@@ -1414,7 +1414,7 @@ describe("Room", function() {
 
                 // 1<2, so it should stay put
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(events[1].getId(), "m.read", userB, ts),
+                    mkRecord(events[1].getId()!, "m.read", userB, ts),
                 ]));
                 expect(room.getEventReadUpTo(userB)).toEqual(events[2].getId());
                 expect(room.getEventReadUpTo(userB, true)).toEqual(events[1].getId());
@@ -1428,7 +1428,7 @@ describe("Room", function() {
             it("should return user IDs read up to the given event", function() {
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                    mkRecord(eventToAck.getId()!, "m.read", userB, ts),
                 ]));
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual([userB]);
             });
@@ -1438,9 +1438,9 @@ describe("Room", function() {
             it("should acknowledge if an event has been read", function() {
                 const ts = 13787898424;
                 room.addReceipt(mkReceipt(roomId, [
-                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                    mkRecord(eventToAck.getId()!, "m.read", userB, ts),
                 ]));
-                expect(room.hasUserReadEvent(userB, eventToAck.getId())).toEqual(true);
+                expect(room.hasUserReadEvent(userB, eventToAck.getId()!)).toEqual(true);
             });
             it("return false for an unknown event", function() {
                 expect(room.hasUserReadEvent(userB, "unknown_event")).toEqual(false);
@@ -1556,7 +1556,7 @@ describe("Room", function() {
                 user: userA,
                 type: EventType.RoomRedaction,
                 content: {},
-                redacts: eventA.getId(),
+                redacts: eventA.getId()!,
                 event: true,
             });
             redactA.status = EventStatus.SENDING;
@@ -1744,23 +1744,25 @@ describe("Room", function() {
                 room.updateMyMembership(JoinRule.Invite);
                 expect(room.getMyMembership()).toEqual(JoinRule.Invite);
             });
-        it("should emit a Room.myMembership event on a change",
-            function() {
-                const room = new Room(roomId, null!, userA);
-                const events = [];
-                room.on(RoomEvent.MyMembership, (_room, membership, oldMembership) => {
-                    events.push({ membership, oldMembership });
-                });
-                room.updateMyMembership(JoinRule.Invite);
-                expect(room.getMyMembership()).toEqual(JoinRule.Invite);
-                expect(events[0]).toEqual({ membership: "invite", oldMembership: undefined });
-                events.splice(0);   //clear
-                room.updateMyMembership(JoinRule.Invite);
-                expect(events.length).toEqual(0);
-                room.updateMyMembership("join");
-                expect(room.getMyMembership()).toEqual("join");
-                expect(events[0]).toEqual({ membership: "join", oldMembership: "invite" });
+        it("should emit a Room.myMembership event on a change", function() {
+            const room = new Room(roomId, null!, userA);
+            const events: {
+                membership: string;
+                oldMembership?: string;
+            }[] = [];
+            room.on(RoomEvent.MyMembership, (_room, membership, oldMembership) => {
+                events.push({ membership, oldMembership });
             });
+            room.updateMyMembership(JoinRule.Invite);
+            expect(room.getMyMembership()).toEqual(JoinRule.Invite);
+            expect(events[0]).toEqual({ membership: "invite", oldMembership: undefined });
+            events.splice(0);   //clear
+            room.updateMyMembership(JoinRule.Invite);
+            expect(events.length).toEqual(0);
+            room.updateMyMembership("join");
+            expect(room.getMyMembership()).toEqual("join");
+            expect(events[0]).toEqual({ membership: "join", oldMembership: "invite" });
+        });
     });
 
     describe("guessDMUserId", function() {
@@ -2118,7 +2120,7 @@ describe("Room", function() {
                 },
             });
 
-            expect(() => room.createThread(rootEvent.getId(), rootEvent, [])).not.toThrow();
+            expect(() => room.createThread(rootEvent.getId()!, rootEvent, [])).not.toThrow();
         });
 
         it("creating thread from edited event should not conflate old versions of the event", () => {
@@ -2339,7 +2341,7 @@ describe("Room", function() {
             const threadReaction2 = mkReaction(threadRoot);
             const threadReaction2Redaction = mkRedaction(threadReaction2);
 
-            const roots = new Set([threadRoot.getId()]);
+            const roots = new Set([threadRoot.getId()!]);
             const events = [
                 randomMessage,
                 threadRoot,
@@ -2377,7 +2379,7 @@ describe("Room", function() {
             const threadReaction2 = mkReaction(threadResponse1);
             const threadReaction2Redaction = mkRedaction(threadReaction2);
 
-            const roots = new Set([threadRoot.getId()]);
+            const roots = new Set([threadRoot.getId()!]);
             const events = [threadRoot, threadResponse1, threadReaction1, threadReaction2, threadReaction2Redaction];
 
             expect(room.eventShouldLiveIn(threadReaction1, events, roots).shouldLiveInRoom).toBeFalsy();
@@ -2399,7 +2401,7 @@ describe("Room", function() {
             const reaction2 = mkReaction(reply1);
             const reaction2Redaction = mkRedaction(reply1);
 
-            const roots = new Set([threadRoot.getId()]);
+            const roots = new Set([threadRoot.getId()!]);
             const events = [
                 threadRoot,
                 threadResponse1,
@@ -2425,7 +2427,7 @@ describe("Room", function() {
             const reply1 = mkReply(threadRoot);
             const reply2 = mkReply(reply1);
 
-            const roots = new Set([threadRoot.getId()]);
+            const roots = new Set([threadRoot.getId()!]);
             const events = [
                 threadRoot,
                 threadResponse1,
@@ -2459,7 +2461,7 @@ describe("Room", function() {
             expect(thread.rootEvent).toBe(threadRoot);
 
             const rootRelations = thread.timelineSet.relations.getChildEventsForEvent(
-                threadRoot.getId(),
+                threadRoot.getId()!,
                 RelationType.Annotation,
                 EventType.Reaction,
             )!.getSortedAnnotationsByKey();
@@ -2469,7 +2471,7 @@ describe("Room", function() {
             expect(rootRelations![0][1].has(rootReaction)).toBeTruthy();
 
             const responseRelations = thread.timelineSet.relations.getChildEventsForEvent(
-                threadResponse.getId(),
+                threadResponse.getId()!,
                 RelationType.Annotation,
                 EventType.Reaction,
             )!.getSortedAnnotationsByKey();
@@ -2744,7 +2746,7 @@ describe("Room", function() {
         expect(pendingEvents[1].isBeingDecrypted()).toBeFalsy();
         expect(pendingEvents[1].isEncrypted()).toBeTruthy();
         for (const ev of pendingEvents) {
-            expect(room.getPendingEvent(ev.getId())).toBe(ev);
+            expect(room.getPendingEvent(ev.getId()!)).toBe(ev);
         }
     });
 });

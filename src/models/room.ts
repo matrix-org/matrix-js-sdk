@@ -63,6 +63,7 @@ import {
     synthesizeReceipt,
 } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
+import { Optional } from "matrix-events-sdk";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -702,7 +703,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (this.selfMembership === "invite") {
             // fall back to summary information
             const memberCount = this.getInvitedAndJoinedMemberCount();
-            if (memberCount == 2 && this.summaryHeroes.length) {
+            if (memberCount == 2 && this.summaryHeroes?.length) {
                 return this.summaryHeroes[0];
             }
         }
@@ -720,11 +721,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 return inviterId;
             }
         }
-        // remember, we're assuming this room is a DM,
-        // so returning the first member we find should be fine
-        const hasHeroes = Array.isArray(this.summaryHeroes) &&
-            this.summaryHeroes.length;
-        if (hasHeroes) {
+        // Remember, we're assuming this room is a DM, so returning the first member we find should be fine
+        if (Array.isArray(this.summaryHeroes) && this.summaryHeroes.length) {
             return this.summaryHeroes[0];
         }
         const members = this.currentState.getMembers();
@@ -743,10 +741,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (memberCount > 2) {
             return;
         }
-        const hasHeroes = Array.isArray(this.summaryHeroes) &&
-            this.summaryHeroes.length;
+        const hasHeroes = Array.isArray(this.summaryHeroes) && this.summaryHeroes.length;
         if (hasHeroes) {
-            const availableMember = this.summaryHeroes.map((userId) => {
+            const availableMember = this.summaryHeroes!.map((userId) => {
                 return this.getMember(userId);
             }).find((member) => !!member);
             if (availableMember) {
@@ -767,7 +764,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // if all else fails, try falling back to a user,
         // and create a one-off member for it
         if (hasHeroes) {
-            const availableUser = this.summaryHeroes.map((userId) => {
+            const availableUser = this.summaryHeroes!.map((userId) => {
                 return this.client.getUser(userId);
             }).find((user) => !!user);
             if (availableUser) {
@@ -934,7 +931,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Get the main TimelineSet
         const timelineSet = this.getUnfilteredTimelineSet();
 
-        let newTimeline: EventTimeline;
+        let newTimeline: Optional<EventTimeline>;
         // If there isn't any event in the timeline, let's go fetch the latest
         // event and construct a timeline from it.
         //
@@ -965,7 +962,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // we reset everything. The `timelineSet` we pass in needs to be empty
             // in order for this function to call `/context` and generate a new
             // timeline.
-            newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId());
+            newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId()!);
         }
 
         // If a racing `/sync` beat us to creating a new timeline, use that
@@ -1712,8 +1709,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 this.currentState,
                 toStartOfTimeline,
             );
-            if (!this.getThread(rootEvent.getId())) {
-                this.createThread(rootEvent.getId(), rootEvent, [], toStartOfTimeline);
+            if (!this.getThread(rootEvent.getId()!)) {
+                this.createThread(rootEvent.getId()!, rootEvent, [], toStartOfTimeline);
             }
         }
     }
@@ -1870,7 +1867,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         // A thread root is always shown in both timelines
-        if (event.isThreadRoot || roots?.has(event.getId())) {
+        if (event.isThreadRoot || roots?.has(event.getId()!)) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
@@ -2270,14 +2267,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @private
      */
     public handleRemoteEcho(remoteEvent: MatrixEvent, localEvent: MatrixEvent): void {
-        const oldEventId = localEvent.getId();
-        const newEventId = remoteEvent.getId();
+        const oldEventId = localEvent.getId()!;
+        const newEventId = remoteEvent.getId()!;
         const oldStatus = localEvent.status;
 
         logger.debug(`Got remote echo for event ${oldEventId} -> ${newEventId} old status ${oldStatus}`);
 
         // no longer pending
-        delete this.txnToEvent[remoteEvent.getUnsigned().transaction_id];
+        delete this.txnToEvent[remoteEvent.getUnsigned().transaction_id!];
 
         // if it's in the pending list, remove it
         if (this.pendingEventList) {
@@ -2289,7 +2286,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         localEvent.handleRemoteEcho(remoteEvent.event);
 
         const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(remoteEvent);
-        const thread = this.getThread(threadId);
+        const thread = threadId ? this.getThread(threadId) : null;
         thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
         if (shouldLiveInRoom) {
@@ -2345,7 +2342,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     remoteEvent.setUnsigned(unsigned);
                     // the remote event is _already_ in the timeline, so we need to remove it so
                     // we can convert the local event into the final event.
-                    this.removeEvent(remoteEvent.getId());
+                    this.removeEvent(remoteEvent.getId()!);
                     this.handleRemoteEcho(remoteEvent, event);
                 }
                 return;
@@ -2353,17 +2350,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         const oldStatus = event.status;
-        const oldEventId = event.getId();
+        const oldEventId = event.getId()!;
 
         if (!oldStatus) {
-            throw new Error("updatePendingEventStatus called on an event which is " +
-                "not a local echo.");
+            throw new Error("updatePendingEventStatus called on an event which is not a local echo.");
         }
 
         const allowed = ALLOWED_TRANSITIONS[oldStatus];
-        if (!allowed || allowed.indexOf(newStatus) < 0) {
-            throw new Error("Invalid EventStatus transition " + oldStatus + "->" +
-                newStatus);
+        if (!allowed?.includes(newStatus)) {
+            throw new Error(`Invalid EventStatus transition ${oldStatus}->${newStatus}`);
         }
 
         event.setStatus(newStatus);
@@ -3060,8 +3055,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             throw new Error("expected a visibility change event");
         }
         const relation = event.getRelation();
-        const originalEventId = relation.event_id;
-        const visibilityEventsOnOriginalEvent = this.visibilityEvents.get(originalEventId);
+        const originalEventId = relation?.event_id;
+        const visibilityEventsOnOriginalEvent = this.visibilityEvents.get(originalEventId!);
         if (!visibilityEventsOnOriginalEvent) {
             // No visibility changes on the original event.
             // In particular, this change event was not recorded,
@@ -3079,13 +3074,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         // If we removed the latest visibility change event, propagate changes.
         if (index === visibilityEventsOnOriginalEvent.length) {
-            const originalEvent = this.findEventById(originalEventId);
+            const originalEvent = this.findEventById(originalEventId!);
             if (!originalEvent) {
                 return;
             }
             if (index === 0) {
                 // We have just removed the only visibility change event.
-                this.visibilityEvents.delete(originalEventId);
+                this.visibilityEvents.delete(originalEventId!);
                 originalEvent.applyVisibilityEvent();
             } else {
                 const newEvent = visibilityEventsOnOriginalEvent[visibilityEventsOnOriginalEvent.length - 1];
@@ -3110,7 +3105,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * change event.
      */
     private applyPendingVisibilityEvents(event: MatrixEvent): void {
-        const visibilityEvents = this.visibilityEvents.get(event.getId());
+        const visibilityEvents = this.visibilityEvents.get(event.getId()!);
         if (!visibilityEvents || visibilityEvents.length == 0) {
             // No pending visibility change in store.
             return;

@@ -187,7 +187,7 @@ export class InRoomChannel implements IVerificationChannel {
     public async handleEvent(event: MatrixEvent, request: VerificationRequest, isLiveEvent = false): Promise<void> {
         // prevent processing the same event multiple times, as under
         // some circumstances Room.timeline can get emitted twice for the same event
-        if (request.hasEventId(event.getId())) {
+        if (request.hasEventId(event.getId()!)) {
             return;
         }
         const type = InRoomChannel.getEventType(event);

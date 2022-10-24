@@ -748,12 +748,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // original sending device if it wasn't us.
         const wireContent = this.getWireContent();
         const recipients = [{
-            userId, deviceId: '*',
+            userId,
+            deviceId: '*',
         }];
         const sender = this.getSender();
         if (sender !== userId) {
             recipients.push({
-                userId: sender, deviceId: wireContent.device_id,
+                userId: sender!,
+                deviceId: wireContent.device_id,
             });
         }
         return recipients;

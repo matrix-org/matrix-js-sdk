@@ -372,7 +372,7 @@ export class VerificationRequest<
         const myCancel = this.eventsByUs.get(CANCEL_TYPE);
         const theirCancel = this.eventsByThem.get(CANCEL_TYPE);
 
-        if (myCancel && (!theirCancel || myCancel.getId() < theirCancel.getId())) {
+        if (myCancel && (!theirCancel || myCancel.getId()! < theirCancel.getId()!)) {
             return myCancel.getSender();
         }
         if (theirCancel) {
@@ -559,7 +559,9 @@ export class VerificationRequest<
             const ourStartEvent = this.eventsByUs.get(START_TYPE);
             // any party can send .start after a .ready or unsent
             if (theirStartEvent && ourStartEvent) {
-                startEvent = theirStartEvent.getSender() < ourStartEvent.getSender() ? theirStartEvent : ourStartEvent;
+                startEvent = theirStartEvent.getSender()! < ourStartEvent.getSender()!
+                    ? theirStartEvent
+                    : ourStartEvent;
             } else {
                 startEvent = theirStartEvent ? theirStartEvent : ourStartEvent;
             }

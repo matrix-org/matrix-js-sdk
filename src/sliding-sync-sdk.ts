@@ -208,7 +208,7 @@ class ExtensionAccountData implements Extension {
     private processGlobalAccountData(globalAccountData: object[]): void {
         const events = mapEvents(this.client, undefined, globalAccountData);
         const prevEventsMap = events.reduce((m, c) => {
-            m[c.getId()] = this.client.store.getAccountData(c.getType());
+            m[c.getType()] = this.client.store.getAccountData(c.getType());
             return m;
         }, {});
         this.client.store.storeAccountDataEvents(events);
@@ -222,7 +222,7 @@ class ExtensionAccountData implements Extension {
                     const rules = accountDataEvent.getContent<IPushRules>();
                     this.client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                 }
-                const prevEvent = prevEventsMap[accountDataEvent.getId()];
+                const prevEvent = prevEventsMap[accountDataEvent.getType()];
                 this.client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                 return accountDataEvent;
             },
@@ -418,7 +418,7 @@ export class SlidingSyncSdk {
             // this room, then timeline_limit: 50).
             const knownEvents = new Set<string>();
             room.getLiveTimeline().getEvents().forEach((e) => {
-                knownEvents.add(e.getId());
+                knownEvents.add(e.getId()!);
             });
             // all unknown events BEFORE a known event must be scrollback e.g:
             //       D E   <-- what we know
@@ -433,7 +433,7 @@ export class SlidingSyncSdk {
             let seenKnownEvent = false;
             for (let i = timelineEvents.length-1; i >= 0; i--) {
                 const recvEvent = timelineEvents[i];
-                if (knownEvents.has(recvEvent.getId())) {
+                if (knownEvents.has(recvEvent.getId()!)) {
                     seenKnownEvent = true;
                     continue; // don't include this event, it's a dupe
                 }

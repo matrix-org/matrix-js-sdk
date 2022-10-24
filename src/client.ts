@@ -1919,7 +1919,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns {module:crypto/verification/request/VerificationRequest?} the VerificationRequest that is in progress, if any
      */
-    public findVerificationRequestDMInProgress(roomId: string): VerificationRequest {
+    public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3571,7 +3571,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // if the event is currently being encrypted then
         if (event.status === EventStatus.ENCRYPTING) {
-            this.pendingEventEncryption.delete(event.getId());
+            this.pendingEventEncryption.delete(event.getId()!);
         } else if (this.scheduler && event.status === EventStatus.QUEUED) {
             // tell the scheduler to forget about it, if it's queued
             this.scheduler.removeEventFromQueue(event);
@@ -3843,7 +3843,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (targetId?.startsWith("~")) {
             const target = room?.getPendingEvents().find(e => e.getId() === targetId);
             target?.once(MatrixEventEvent.LocalEventIdReplaced, () => {
-                localEvent.updateAssociatedId(target.getId());
+                localEvent.updateAssociatedId(target.getId()!);
             });
         }
 
@@ -3882,10 +3882,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const encryptionPromise = this.encryptEventIfNeeded(event, room ?? undefined);
             if (!encryptionPromise) return null; // doesn't need encryption
 
-            this.pendingEventEncryption.set(event.getId(), encryptionPromise);
+            this.pendingEventEncryption.set(event.getId()!, encryptionPromise);
             this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
             return encryptionPromise.then(() => {
-                if (!this.pendingEventEncryption.has(event.getId())) {
+                if (!this.pendingEventEncryption.has(event.getId()!)) {
                     // cancelled via MatrixClient::cancelPendingEvent
                     cancelled = true;
                     return;
@@ -4476,9 +4476,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const path = utils.encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-            $roomId: event.getRoomId(),
+            $roomId: event.getRoomId()!,
             $receiptType: receiptType,
-            $eventId: event.getId(),
+            $eventId: event.getId()!,
         });
 
         // TODO: Add a check for which spec version this will be released in
@@ -4510,9 +4510,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         receiptType = ReceiptType.Read,
     ): Promise<{} | undefined> {
         if (!event) return;
-        const eventId = event.getId();
+        const eventId = event.getId()!;
         const room = this.getRoom(event.getRoomId());
-        if (room && room.hasPendingEvent(eventId)) {
+        if (room?.hasPendingEvent(eventId)) {
             throw new Error(`Cannot set read receipt to a pending event (${eventId})`);
         }
 
@@ -4545,23 +4545,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // Add the optional RR update, do local echo like `sendReceipt`
-        let rrEventId: string;
+        let rrEventId: string | undefined;
         if (rrEvent) {
-            rrEventId = rrEvent.getId();
+            rrEventId = rrEvent.getId()!;
             if (room?.hasPendingEvent(rrEventId)) {
                 throw new Error(`Cannot set read receipt to a pending event (${rrEventId})`);
             }
-            room?.addLocalEchoReceipt(this.credentials.userId, rrEvent, ReceiptType.Read);
+            room?.addLocalEchoReceipt(this.credentials.userId!, rrEvent, ReceiptType.Read);
         }
 
         // Add the optional private RR update, do local echo like `sendReceipt`
-        let rpEventId: string;
+        let rpEventId: string | undefined;
         if (rpEvent) {
-            rpEventId = rpEvent.getId();
+            rpEventId = rpEvent.getId()!;
             if (room?.hasPendingEvent(rpEventId)) {
                 throw new Error(`Cannot set read receipt to a pending event (${rpEventId})`);
             }
-            room?.addLocalEchoReceipt(this.credentials.userId, rpEvent, ReceiptType.ReadPrivate);
+            room?.addLocalEchoReceipt(this.credentials.userId!, rpEvent, ReceiptType.ReadPrivate);
         }
 
         return await this.setRoomReadMarkersHttpRequest(roomId, rmEventId, rrEventId, rpEventId);
@@ -5227,7 +5227,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
-        let timeline = timelineSet.getTimelineForEvent(events[0].getId());
+        let timeline = timelineSet.getTimelineForEvent(events[0].getId()!);
         if (timeline) {
             timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
         } else {
@@ -6127,7 +6127,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (room) {
                 // Copy over a known event sender if we can
                 for (const ev of sr.context.getTimeline()) {
-                    const sender = room.getMember(ev.getSender());
+                    const sender = room.getMember(ev.getSender()!);
                     if (!ev.sender && sender) ev.sender = sender;
                 }
             }
@@ -7453,8 +7453,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async setRoomReadMarkersHttpRequest(
         roomId: string,
         rmEventId: string,
-        rrEventId: string,
-        rpEventId: string,
+        rrEventId?: string,
+        rpEventId?: string,
     ): Promise<{}> {
         const path = utils.encodeUri("/rooms/$roomId/read_markers", {
             $roomId: roomId,
@@ -9021,8 +9021,8 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
         const hasReadEvent = isThreadEvent
-            ? room.getThread(event.threadRootId)?.hasUserReadEvent(cli.getUserId()!, event.getId())
-            : room.hasUserReadEvent(cli.getUserId()!, event.getId());
+            ? room.getThread(event.threadRootId)?.hasUserReadEvent(cli.getUserId()!, event.getId()!)
+            : room.hasUserReadEvent(cli.getUserId()!, event.getId()!);
 
         if (!hasReadEvent) {
             let newCount = currentCount;

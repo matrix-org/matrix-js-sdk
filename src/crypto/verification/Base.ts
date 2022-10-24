@@ -34,7 +34,7 @@ import { ListenerMap, TypedEventEmitter } from "../../models/typed-event-emitter
 const timeoutException = new Error("Verification timed out");
 
 export class SwitchStartEventError extends Error {
-    constructor(public readonly startEvent: MatrixEvent) {
+    constructor(public readonly startEvent: MatrixEvent | null) {
         super();
     }
 }

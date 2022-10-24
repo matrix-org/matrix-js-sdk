@@ -400,7 +400,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
     private async doRespondVerification(): Promise<void> {
         // as m.related_to is not included in the encrypted content in e2e rooms,
         // we need to make sure it is added
-        let content = this.channel.completedContentFromEvent(this.startEvent);
+        let content = this.channel.completedContentFromEvent(this.startEvent!);
 
         // Note: we intersect using our pre-made lists, rather than the sets,
         // so that the result will be in our order of preference.  Then
