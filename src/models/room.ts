@@ -210,7 +210,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     // read by megolm via getter; boolean value - null indicates "use global value"
     private blacklistUnverifiedDevices?: boolean;
     private selfMembership?: string;
-    private summaryHeroes: string[] = null;
+    private summaryHeroes: string[] | null = null;
     // flags to stop logspam about missing m.room.create events
     private getTypeWarning = false;
     private getVersionWarning = false;
@@ -238,25 +238,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * The room summary.
      */
-    public summary: RoomSummary = null;
+    public summary: RoomSummary | null = null;
     // legacy fields
     /**
      * The live event timeline for this room, with the oldest event at index 0.
      * Present for backwards compatibility - prefer getLiveTimeline().getEvents()
      */
-    public timeline: MatrixEvent[];
+    public timeline!: MatrixEvent[];
     /**
      * oldState The state of the room at the time of the oldest
      * event in the live timeline. Present for backwards compatibility -
      * prefer getLiveTimeline().getState(EventTimeline.BACKWARDS).
      */
-    public oldState: RoomState;
+    public oldState!: RoomState;
     /**
      * currentState The state of the room at the time of the
      * newest event in the timeline. Present for backwards compatibility -
      * prefer getLiveTimeline().getState(EventTimeline.FORWARDS).
      */
-    public currentState: RoomState;
+    public currentState!: RoomState;
     public readonly relations = new RelationsContainer(this.client, this);
 
     /**

@@ -222,7 +222,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     }
 
     private addEventToTimeline(event: MatrixEvent, toStartOfTimeline: boolean): void {
-        if (!this.findEventById(event.getId())) {
+        if (!this.findEventById(event.getId()!)) {
             this.timelineSet.addEventToTimeline(
                 event,
                 this.liveTimeline,
@@ -305,7 +305,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
             const event = new MatrixEvent({
-                room_id: this.rootEvent.getRoomId(),
+                room_id: this.room.roomId,
                 ...bundledRelationship.latest_event,
             });
             this.setEventMetadata(event);
@@ -322,7 +322,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
         return Promise.all(events.filter(e => e.isEncrypted()).map((event: MatrixEvent) => {
             if (event.isRelation()) return; // skip - relations don't get edits
-            return this.client.relations(this.roomId, event.getId(), RelationType.Replace, event.getType(), {
+            return this.client.relations(this.roomId, event.getId()!, RelationType.Replace, event.getType(), {
                 limit: 1,
             }).then(relations => {
                 if (relations.events.length) {

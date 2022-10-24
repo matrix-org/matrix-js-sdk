@@ -205,17 +205,17 @@ export class InteractiveAuth {
     private readonly requestEmailTokenCallback: IOpts["requestEmailToken"];
 
     private data: IAuthData;
-    private emailSid?: string;
+    private emailSid: string | null;
     private requestingEmailToken = false;
-    private attemptAuthDeferred: IDeferred<IAuthData> = null;
-    private chosenFlow: IFlow = null;
-    private currentStage: string = null;
+    private attemptAuthDeferred: IDeferred<IAuthData> | null = null;
+    private chosenFlow: IFlow | null = null;
+    private currentStage: string | null = null;
 
     private emailAttempt = 1;
 
     // if we are currently trying to submit an auth dict (which includes polling)
     // the promise the will resolve/reject when it completes
-    private submitPromise: Promise<void> = null;
+    private submitPromise: Promise<void> | null = null;
 
     constructor(opts: IOpts) {
         this.matrixClient = opts.matrixClient;
@@ -308,7 +308,7 @@ export class InteractiveAuth {
      *
      * @return {string} session id
      */
-    public getSessionId(): string {
+    public getSessionId(): string | undefined {
         return this.data?.session;
     }
 
@@ -332,7 +332,7 @@ export class InteractiveAuth {
         return this.data.params?.[loginType];
     }
 
-    public getChosenFlow(): IFlow {
+    public getChosenFlow(): IFlow | null {
         return this.chosenFlow;
     }
 
@@ -399,7 +399,7 @@ export class InteractiveAuth {
      *
      * @returns {string} The sid of the email auth session
      */
-    public getEmailSid(): string {
+    public getEmailSid(): string | null {
         return this.emailSid;
     }
 
@@ -457,7 +457,7 @@ export class InteractiveAuth {
     private async doRequest(auth: IAuthData, background = false): Promise<void> {
         try {
             const result = await this.requestCallback(auth, background);
-            this.attemptAuthDeferred.resolve(result);
+            this.attemptAuthDeferred!.resolve(result);
             this.attemptAuthDeferred = null;
         } catch (error) {
             // sometimes UI auth errors don't come with flows
@@ -491,7 +491,7 @@ export class InteractiveAuth {
             try {
                 this.startNextAuthStage();
             } catch (e) {
-                this.attemptAuthDeferred.reject(e);
+                this.attemptAuthDeferred!.reject(e);
                 this.attemptAuthDeferred = null;
                 return;
             }
@@ -512,7 +512,7 @@ export class InteractiveAuth {
                     // to do) or it could be a network failure. Either way, pass
                     // the failure up as the user can't complete auth if we can't
                     // send the email, for whatever reason.
-                    this.attemptAuthDeferred.reject(e);
+                    this.attemptAuthDeferred!.reject(e);
                     this.attemptAuthDeferred = null;
                 }
             }
@@ -559,7 +559,7 @@ export class InteractiveAuth {
      * @return {string?} login type
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
-    private chooseStage(): AuthType {
+    private chooseStage(): AuthType | undefined {
         if (this.chosenFlow === null) {
             this.chosenFlow = this.chooseFlow();
         }
@@ -625,7 +625,7 @@ export class InteractiveAuth {
      * @param {object} flow
      * @return {string} login type
      */
-    private firstUncompletedStage(flow: IFlow): AuthType {
+    private firstUncompletedStage(flow: IFlow): AuthType | undefined {
         const completed = this.data.completed || [];
         for (let i = 0; i < flow.stages.length; ++i) {
             const stageType = flow.stages[i];

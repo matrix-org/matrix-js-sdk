@@ -71,7 +71,7 @@ export interface IEvent {
     type: string;
     content: IContent;
     sender: string;
-    room_id: string;
+    room_id?: string;
     origin_server_ts: number;
     txn_id?: string;
     state_key?: string;
@@ -392,7 +392,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @return {string} The event ID, e.g. <code>$143350589368169JsLZx:localhost
      * </code>
      */
-    public getId(): string {
+    public getId(): string | undefined {
         return this.event.event_id;
     }
 
@@ -400,7 +400,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the user_id for this event.
      * @return {string} The user ID, e.g. <code>@alice:matrix.org</code>
      */
-    public getSender(): string {
+    public getSender(): string | undefined {
         return this.event.sender || this.event.user_id; // v2 / v1
     }
 
@@ -521,7 +521,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return !!threadDetails || (this.getThread()?.id === this.getId());
     }
 
-    public get replyEventId(): string {
+    public get replyEventId(): string | undefined {
         // We're prefer ev.getContent() over ev.getWireContent() to make sure
         // we grab the latest edit with potentially new relations. But we also
         // can't just rely on ev.getContent() by itself because historically we
@@ -1387,7 +1387,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 return new Date(ts);
             }
         } else if (this._replacingEvent) {
-            return this._replacingEvent.getDate();
+            return this._replacingEvent.getDate() ?? undefined;
         }
     }
 

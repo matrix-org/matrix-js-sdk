@@ -96,7 +96,7 @@ export class VerificationBase<
         public readonly baseApis: MatrixClient,
         public readonly userId: string,
         public readonly deviceId: string,
-        public startEvent: MatrixEvent,
+        public startEvent: MatrixEvent | null,
         public readonly request: VerificationRequest,
     ) {
         super();

@@ -355,7 +355,9 @@ export function globToRegexp(glob: string, extended = false): string {
     const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
         [/\\\*/g, '.*'],
         [/\?/g, '.'],
-        !extended && [
+    ];
+    if (!extended) {
+        replacements.push([
             /\\\[(!|)(.*)\\]/g,
             (_match: string, neg: string, pat: string) => [
                 '[',
@@ -363,8 +365,8 @@ export function globToRegexp(glob: string, extended = false): string {
                 pat.replace(/\\-/, '-'),
                 ']',
             ].join(''),
-        ],
-    ];
+        ]);
+    }
     return replacements.reduce(
         // https://github.com/microsoft/TypeScript/issues/30134
         (pat, args) => args ? pat.replace(args[0], args[1] as any) : pat,

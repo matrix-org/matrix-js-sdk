@@ -53,10 +53,10 @@ export class EncryptionSetupBuilder {
     public readonly crossSigningCallbacks: CrossSigningCallbacks;
     public readonly ssssCryptoCallbacks: SSSSCryptoCallbacks;
 
-    private crossSigningKeys: ICrossSigningKeys = null;
-    private keySignatures: KeySignatures = null;
-    private keyBackupInfo: IKeyBackupInfo = null;
-    private sessionBackupPrivateKey: Uint8Array;
+    private crossSigningKeys?: ICrossSigningKeys;
+    private keySignatures?: KeySignatures;
+    private keyBackupInfo?: IKeyBackupInfo;
+    private sessionBackupPrivateKey?: Uint8Array;
 
     /**
      * @param {Object.<String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
@@ -162,14 +162,14 @@ export class EncryptionSetupBuilder {
             for (const type of ["master", "self_signing", "user_signing"]) {
                 logger.log(`Cache ${type} cross-signing private key locally`);
                 const privateKey = this.crossSigningCallbacks.privateKeys.get(type);
-                await cacheCallbacks.storeCrossSigningKeyCache(type, privateKey);
+                await cacheCallbacks.storeCrossSigningKeyCache?.(type, privateKey);
             }
             // store own cross-sign pubkeys as trusted
             await crypto.cryptoStore.doTxn(
                 'readwrite', [IndexedDBCryptoStore.STORE_ACCOUNT],
                 (txn) => {
                     crypto.cryptoStore.storeCrossSigningKeys(
-                        txn, this.crossSigningKeys.keys);
+                        txn, this.crossSigningKeys!.keys);
                 },
             );
         }
@@ -195,9 +195,9 @@ export class EncryptionSetupOperation {
      */
     constructor(
         private readonly accountData: Map<string, object>,
-        private readonly crossSigningKeys: ICrossSigningKeys,
-        private readonly keyBackupInfo: IKeyBackupInfo,
-        private readonly keySignatures: KeySignatures,
+        private readonly crossSigningKeys?: ICrossSigningKeys,
+        private readonly keyBackupInfo?: IKeyBackupInfo,
+        private readonly keySignatures?: KeySignatures,
     ) {}
 
     /**
@@ -215,7 +215,7 @@ export class EncryptionSetupOperation {
 
             // We must only call `uploadDeviceSigningKeys` from inside this auth
             // helper to ensure we properly handle auth errors.
-            await this.crossSigningKeys.authUpload(authDict => {
+            await this.crossSigningKeys.authUpload?.(authDict => {
                 return baseApis.uploadDeviceSigningKeys(authDict, keys as CrossSigningKeys);
             });
 
@@ -289,7 +289,7 @@ class AccountDataClientAdapter
      * @param  {String} type
      * @return {Object} the content of the account data
      */
-    public getAccountData(type: string): MatrixEvent {
+    public getAccountData(type: string): MatrixEvent | null {
         const modifiedValue = this.values.get(type);
         if (modifiedValue) {
             return modifiedValue;
@@ -329,7 +329,7 @@ class CrossSigningCallbacks implements ICryptoCallbacks, ICacheCallbacks {
     public readonly privateKeys = new Map<string, Uint8Array>();
 
     // cache callbacks
-    public getCrossSigningKeyCache(type: string, expectedPublicKey: string): Promise<Uint8Array> {
+    public getCrossSigningKeyCache(type: string, expectedPublicKey: string): Promise<Uint8Array | null> {
         return this.getCrossSigningKey(type, expectedPublicKey);
     }
 
@@ -339,8 +339,8 @@ class CrossSigningCallbacks implements ICryptoCallbacks, ICacheCallbacks {
     }
 
     // non-cache callbacks
-    public getCrossSigningKey(type: string, expectedPubkey: string): Promise<Uint8Array> {
-        return Promise.resolve(this.privateKeys.get(type));
+    public getCrossSigningKey(type: string, expectedPubkey: string): Promise<Uint8Array | null> {
+        return Promise.resolve(this.privateKeys.get(type) ?? null);
     }
 
     public saveCrossSigningKeys(privateKeys: Record<string, Uint8Array>) {

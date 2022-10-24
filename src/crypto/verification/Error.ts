@@ -23,7 +23,7 @@ limitations under the License.
 import { MatrixEvent } from "../../models/event";
 import { EventType } from '../../@types/event';
 
-export function newVerificationError(code: string, reason: string, extraData: Record<string, any>): MatrixEvent {
+export function newVerificationError(code: string, reason: string, extraData?: Record<string, any>): MatrixEvent {
     const content = Object.assign({}, { code, reason }, extraData);
     return new MatrixEvent({
         type: EventType.KeyVerificationCancel,

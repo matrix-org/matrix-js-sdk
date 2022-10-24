@@ -62,7 +62,7 @@ export class ReEmitter {
         if (!reEmittersByEvent) return; // We were never re-emitting these events in the first place
 
         for (const eventName of eventNames) {
-            source.off(eventName, reEmittersByEvent.get(eventName));
+            source.off(eventName, reEmittersByEvent.get(eventName)!);
             reEmittersByEvent.delete(eventName);
         }
 

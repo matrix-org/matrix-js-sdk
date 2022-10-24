@@ -24,7 +24,7 @@ import {
     DuplicateStrategy,
     EventStatus,
     EventTimelineSet,
-    EventType,
+    EventType, IStateEventWithRoomId,
     JoinRule,
     MatrixEvent,
     MatrixEventEvent,
@@ -1609,7 +1609,7 @@ describe("Room", function() {
         });
 
         it("should remove cancelled events from the timeline", function() {
-            const room = new Room(roomId, null, userA);
+            const room = new Room(roomId, null!, userA);
             const eventA = utils.mkMessage({
                 room: roomId, user: userA, event: true,
             });
@@ -1643,7 +1643,7 @@ describe("Room", function() {
     });
 
     describe("loadMembersIfNeeded", function() {
-        function createClientMock(serverResponse, storageResponse = null) {
+        function createClientMock(serverResponse, storageResponse: MatrixEvent[] | Error | null = null) {
             return {
                 getEventMapper: function() {
                     // events should already be MatrixEvents
@@ -1664,7 +1664,7 @@ describe("Room", function() {
                 }),
                 store: {
                     storageResponse,
-                    storedMembers: null,
+                    storedMembers: [] as IStateEventWithRoomId[] | null,
                     getOutOfBandMembers: function() {
                         if (this.storageResponse instanceof Error) {
                             return Promise.reject(this.storageResponse);
@@ -1693,11 +1693,11 @@ describe("Room", function() {
 
         it("should load members from server on first call", async function() {
             const client = createClientMock([memberEvent]);
-            const room = new Room(roomId, client as any, null, { lazyLoadMembers: true });
+            const room = new Room(roomId, client as any, null!, { lazyLoadMembers: true });
             await room.loadMembersIfNeeded();
-            const memberA = room.getMember("@user_a:bar");
+            const memberA = room.getMember("@user_a:bar")!;
             expect(memberA.name).toEqual("User A");
-            const storedMembers = client.store.storedMembers;
+            const storedMembers = client.store.storedMembers!;
             expect(storedMembers.length).toEqual(1);
             expect(storedMembers[0].event_id).toEqual(memberEvent.getId());
         });
@@ -1711,17 +1711,17 @@ describe("Room", function() {
                 name: "Ms A",
             });
             const client = createClientMock([memberEvent2], [memberEvent]);
-            const room = new Room(roomId, client as any, null, { lazyLoadMembers: true });
+            const room = new Room(roomId, client as any, null!, { lazyLoadMembers: true });
 
             await room.loadMembersIfNeeded();
 
-            const memberA = room.getMember("@user_a:bar");
+            const memberA = room.getMember("@user_a:bar")!;
             expect(memberA.name).toEqual("User A");
         });
 
         it("should allow retry on error", async function() {
             const client = createClientMock(new Error("server says no"));
-            const room = new Room(roomId, client as any, null, { lazyLoadMembers: true });
+            const room = new Room(roomId, client as any, null!, { lazyLoadMembers: true });
             let hasThrown = false;
             try {
                 await room.loadMembersIfNeeded();
@@ -1740,13 +1740,13 @@ describe("Room", function() {
     describe("getMyMembership", function() {
         it("should return synced membership if membership isn't available yet",
             function() {
-                const room = new Room(roomId, null, userA);
+                const room = new Room(roomId, null!, userA);
                 room.updateMyMembership(JoinRule.Invite);
                 expect(room.getMyMembership()).toEqual(JoinRule.Invite);
             });
         it("should emit a Room.myMembership event on a change",
             function() {
-                const room = new Room(roomId, null, userA);
+                const room = new Room(roomId, null!, userA);
                 const events = [];
                 room.on(RoomEvent.MyMembership, (_room, membership, oldMembership) => {
                     events.push({ membership, oldMembership });

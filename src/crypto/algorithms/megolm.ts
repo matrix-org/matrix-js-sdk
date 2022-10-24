@@ -24,6 +24,7 @@ import { logger } from '../../logger';
 import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
+    DecryptionClassParams,
     DecryptionError,
     EncryptionAlgorithm,
     IParams,
@@ -251,8 +252,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
         startTime: number;
     };
 
-    constructor(params: IParams) {
+    protected readonly roomId: string;
+
+    constructor(params: IParams & Required<Pick<IParams, "roomId">>) {
         super(params);
+        this.roomId = params.roomId;
 
         this.sessionRotationPeriodMsgs = params.config?.rotation_period_msgs ?? 100;
         this.sessionRotationPeriodMs = params.config?.rotation_period_ms ?? 7 * 24 * 3600 * 1000;
@@ -1230,6 +1234,13 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
     // this gets stubbed out by the unit tests.
     private olmlib = olmlib;
+
+    protected readonly roomId: string;
+
+    constructor(params: DecryptionClassParams<IParams & Required<Pick<IParams, "roomId">>>) {
+        super(params);
+        this.roomId = params.roomId;
+    }
 
     /**
      * @inheritdoc

@@ -71,7 +71,7 @@ export interface IKeyBackupCheck {
 export interface IPreparedKeyBackupVersion {
     algorithm: string;
     auth_data: AuthData;
-    recovery_key: string;
+    recovery_key?: string;
     privateKey: Uint8Array;
 }
 /* eslint-enable camelcase */

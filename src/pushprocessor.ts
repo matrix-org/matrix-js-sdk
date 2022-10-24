@@ -302,7 +302,7 @@ export class PushProcessor {
         // Note that this should not be the current state of the room but the state at
         // the point the event is in the DAG. Unfortunately the js-sdk does not store
         // this.
-        return room.currentState.mayTriggerNotifOfType(notifLevelKey, ev.getSender());
+        return room.currentState.mayTriggerNotifOfType(notifLevelKey, ev.getSender()!);
     }
 
     private eventFulfillsRoomMemberCountCondition(cond: IRoomMemberCountCondition, ev: MatrixEvent): boolean {

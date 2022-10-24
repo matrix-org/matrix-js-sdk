@@ -678,7 +678,7 @@ export class Backend implements CryptoStore {
             senderCurve25519Key, sessionId, session: sessionData,
         });
         addReq.onerror = (ev) => {
-            if (addReq.error.name === 'ConstraintError') {
+            if (addReq.error?.name === 'ConstraintError') {
                 // This stops the error from triggering the txn's onerror
                 ev.stopPropagation();
                 // ...and this stops it from aborting the transaction

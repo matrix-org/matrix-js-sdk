@@ -147,7 +147,7 @@ interface IQrData {
     prefix: string;
     version: number;
     mode: Mode;
-    transactionId: string;
+    transactionId?: string;
     firstKeyB64: string;
     secondKeyB64: string;
     secretB64: string;
@@ -250,7 +250,7 @@ export class QRCodeData {
     ): IQrData {
         const myUserId = client.getUserId()!;
         const transactionId = request.channel.transactionId;
-        const qrData = {
+        const qrData: IQrData = {
             prefix: BINARY_PREFIX,
             version: CODE_VERSION,
             mode,

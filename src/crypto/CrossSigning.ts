@@ -44,8 +44,8 @@ function publicKeyFromKeyInfo(keyInfo: ICrossSigningKey): string {
 }
 
 export interface ICacheCallbacks {
-    getCrossSigningKeyCache?(type: string, expectedPublicKey?: string): Promise<Uint8Array>;
-    storeCrossSigningKeyCache?(type: string, key: Uint8Array): Promise<void>;
+    getCrossSigningKeyCache?(type: string, expectedPublicKey?: string): Promise<Uint8Array | null>;
+    storeCrossSigningKeyCache?(type: string, key?: Uint8Array): Promise<void>;
 }
 
 export interface ICrossSigningInfo {
@@ -433,10 +433,9 @@ export class CrossSigningInfo {
         // if everything checks out, then save the keys
         if (keys.master) {
             this.keys.master = keys.master;
-            // if the master key is set, then the old self-signing and
-            // user-signing keys are obsolete
-            this.keys.self_signing = null;
-            this.keys.user_signing = null;
+            // if the master key is set, then the old self-signing and user-signing keys are obsolete
+            delete this.keys["self_signing"];
+            delete this.keys["user_signing"];
         }
         if (keys.self_signing) {
             this.keys.self_signing = keys.self_signing;
@@ -723,7 +722,7 @@ export function createCryptoStoreCacheCallbacks(store: CryptoStore, olmDevice: O
         },
         storeCrossSigningKeyCache: async function(
             type: keyof SecretStorePrivateKeys,
-            key: Uint8Array,
+            key?: Uint8Array,
         ): Promise<void> {
             if (!(key instanceof Uint8Array)) {
                 throw new Error(

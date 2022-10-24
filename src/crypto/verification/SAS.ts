@@ -233,10 +233,10 @@ type EventHandlerMap = {
  * @extends {module:crypto/verification/Base}
  */
 export class SAS extends Base<SasEvent, EventHandlerMap> {
-    private waitingForAccept: boolean;
-    public ourSASPubKey: string;
-    public theirSASPubKey: string;
-    public sasEvent: ISasEvent;
+    private waitingForAccept?: boolean;
+    public ourSASPubKey?: string;
+    public theirSASPubKey?: string;
+    public sasEvent?: ISasEvent;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static get NAME(): string {
@@ -279,7 +279,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             return false;
         }
         const content = event.getContent();
-        return content && content.method === SAS.NAME && this.waitingForAccept;
+        return content?.method === SAS.NAME && !!this.waitingForAccept;
     }
 
     private async sendStart(): Promise<Record<string, any>> {

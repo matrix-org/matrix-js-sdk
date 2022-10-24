@@ -312,7 +312,7 @@ describe("MSC3089Branch", () => {
         } as MatrixEvent);
 
         const events = [await branch.getFileEvent(), await branch2.getFileEvent(), {
-            replacingEventId: (): string => null,
+            replacingEventId: (): string | undefined => undefined,
             getId: () => "$unknown",
         }];
         staticRoom.getLiveTimeline = () => ({ getEvents: () => events }) as EventTimeline;

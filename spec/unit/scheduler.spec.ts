@@ -160,10 +160,10 @@ describe("MatrixScheduler", function() {
         const eventD = utils.mkMessage({ user: "@b:bar", room: roomId, event: true });
 
         const buckets = {};
-        buckets[eventA.getId()] = "queue_A";
-        buckets[eventD.getId()] = "queue_A";
-        buckets[eventB.getId()] = "queue_B";
-        buckets[eventC.getId()] = "queue_B";
+        buckets[eventA.getId()!] = "queue_A";
+        buckets[eventD.getId()!] = "queue_A";
+        buckets[eventB.getId()!] = "queue_B";
+        buckets[eventC.getId()!] = "queue_B";
 
         retryFn = function() {
             return 0;

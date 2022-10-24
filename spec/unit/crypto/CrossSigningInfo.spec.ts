@@ -222,9 +222,9 @@ describe.each([
     ["IndexedDBCryptoStore",
         () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
     ["LocalStorageCryptoStore",
-        () => new IndexedDBCryptoStore(undefined, "tests")],
+        () => new IndexedDBCryptoStore(undefined!, "tests")],
     ["MemoryCryptoStore", () => {
-        const store = new IndexedDBCryptoStore(undefined, "tests");
+        const store = new IndexedDBCryptoStore(undefined!, "tests");
         // @ts-ignore set private properties
         store._backend = new MemoryCryptoStore();
         // @ts-ignore
@@ -255,6 +255,6 @@ describe.each([
         expect(nokey).toBeNull();
 
         const key = await getCrossSigningKeyCache!("self_signing", "");
-        expect(new Uint8Array(key)).toEqual(testKey);
+        expect(new Uint8Array(key!)).toEqual(testKey);
     });
 });
