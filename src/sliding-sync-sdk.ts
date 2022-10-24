@@ -208,7 +208,7 @@ class ExtensionAccountData implements Extension {
     private processGlobalAccountData(globalAccountData: object[]): void {
         const events = mapEvents(this.client, undefined, globalAccountData);
         const prevEventsMap = events.reduce((m, c) => {
-            m[c.getId()] = this.client.store.getAccountData(c.getType());
+            m[c.getType()] = this.client.store.getAccountData(c.getType());
             return m;
         }, {});
         this.client.store.storeAccountDataEvents(events);
@@ -222,7 +222,7 @@ class ExtensionAccountData implements Extension {
                     const rules = accountDataEvent.getContent<IPushRules>();
                     this.client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                 }
-                const prevEvent = prevEventsMap[accountDataEvent.getId()];
+                const prevEvent = prevEventsMap[accountDataEvent.getType()];
                 this.client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                 return accountDataEvent;
             },
