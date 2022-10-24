@@ -1097,7 +1097,7 @@ export class SyncApi {
         if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.map(client.getEventMapper());
             const prevEventsMap = events.reduce((m, c) => {
-                m[c.getId()] = client.store.getAccountData(c.getType());
+                m[c.getType()] = client.store.getAccountData(c.getType());
                 return m;
             }, {});
             client.store.storeAccountDataEvents(events);
@@ -1111,7 +1111,7 @@ export class SyncApi {
                         const rules = accountDataEvent.getContent<IPushRules>();
                         client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                     }
-                    const prevEvent = prevEventsMap[accountDataEvent.getId()];
+                    const prevEvent = prevEventsMap[accountDataEvent.getType()];
                     client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                     return accountDataEvent;
                 },

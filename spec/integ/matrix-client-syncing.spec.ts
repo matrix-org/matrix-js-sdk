@@ -1602,6 +1602,46 @@ describe("MatrixClient syncing", () => {
         });
     });
 
+    describe("user account data", () => {
+        it("should include correct prevEv in the ClientEvent.AccountData emit", async () => {
+            const eventA1 = new MatrixEvent({ type: "a", content: { body: "1" } });
+            const eventA2 = new MatrixEvent({ type: "a", content: { body: "2" } });
+            const eventB1 = new MatrixEvent({ type: "b", content: { body: "1" } });
+            const eventB2 = new MatrixEvent({ type: "b", content: { body: "2" } });
+
+            client!.store.storeAccountDataEvents([eventA1, eventB1]);
+            const fn = jest.fn();
+            client!.on(ClientEvent.AccountData, fn);
+
+            httpBackend!.when("GET", "/sync").respond(200, {
+                next_batch: "batch_token",
+                rooms: {},
+                presence: {},
+                account_data: {
+                    events: [eventA2.event, eventB2.event],
+                },
+            });
+
+            await Promise.all([
+                client!.startClient(),
+                httpBackend!.flushAllExpected(),
+            ]);
+
+            const eventA = client?.getAccountData("a");
+            expect(eventA).not.toBe(eventA1);
+            const eventB = client?.getAccountData("b");
+            expect(eventB).not.toBe(eventB1);
+
+            expect(fn).toHaveBeenCalledWith(eventA, eventA1);
+            expect(fn).toHaveBeenCalledWith(eventB, eventB1);
+
+            expect(eventA?.getContent().body).toBe("2");
+            expect(eventB?.getContent().body).toBe("2");
+
+            client!.off(ClientEvent.AccountData, fn);
+        });
+    });
+
     /**
      * waits for the MatrixClient to emit one or more 'sync' events.
      *
