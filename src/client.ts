@@ -3980,9 +3980,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param room
      * @param event
      * @returns {Promise} returns a promise which resolves with the result of the send request
-     * @private
      */
-    private encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse> {
+    protected encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse> {
         let cancelled = false;
         // Add an extra Promise.resolve() to turn synchronous exceptions into promise rejections,
         // so that we can handle synchronous and asynchronous exceptions with the
@@ -4107,7 +4106,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.isRoomEncrypted(roomId) ? EventType.RoomMessageEncrypted : eventType;
     }
 
-    private updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus) {
+    protected updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus) {
         if (room) {
             room.updatePendingEvent(event, newStatus);
         } else {
