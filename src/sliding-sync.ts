@@ -33,7 +33,6 @@ const BUFFER_PERIOD_MS = 10 * 1000;
 export interface MSC3575RoomSubscription {
     required_state?: string[][];
     timeline_limit?: number;
-    include_old_rooms?: MSC3575RoomSubscription;
 }
 
 /**
@@ -43,6 +42,7 @@ export interface MSC3575Filter {
     is_dm?: boolean;
     is_encrypted?: boolean;
     is_invite?: boolean;
+    is_tombstoned?: boolean;
     room_name_like?: string;
     room_types?: string[];
     not_room_types?: string[];
