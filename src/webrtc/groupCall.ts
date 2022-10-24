@@ -600,6 +600,7 @@ export class GroupCall extends TypedEventEmitter<
 
                 return true;
             } catch (error) {
+                if (opts.throwOnFail) throw error;
                 logger.error("Enabling screensharing error", error);
                 this.emit(GroupCallEvent.Error,
                     new GroupCallError(GroupCallErrorCode.NoUserMedia, "Failed to get screen-sharing stream: ", error),
