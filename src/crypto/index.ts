@@ -3301,7 +3301,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             if (!deviceId) {
                 return;
             }
-            const userId = event.getSender();
+            const userId = event.getSender()!;
             const channel = new ToDeviceChannel(
                 this.baseApis,
                 userId,
@@ -3859,7 +3859,7 @@ export class IncomingRoomKeyRequest {
     constructor(event: MatrixEvent) {
         const content = event.getContent();
 
-        this.userId = event.getSender();
+        this.userId = event.getSender()!;
         this.deviceId = content.requesting_device_id;
         this.requestId = content.request_id;
         this.requestBody = content.body || {};
@@ -3884,7 +3884,7 @@ class IncomingRoomKeyRequestCancellation {
     constructor(event: MatrixEvent) {
         const content = event.getContent();
 
-        this.userId = event.getSender();
+        this.userId = event.getSender()!;
         this.deviceId = content.requesting_device_id;
         this.requestId = content.request_id;
     }

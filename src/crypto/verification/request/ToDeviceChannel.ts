@@ -46,7 +46,7 @@ export class ToDeviceChannel implements IVerificationChannel {
         private readonly client: MatrixClient,
         public readonly userId: string,
         private readonly devices: string[],
-        public transactionId: string,
+        public transactionId?: string,
         public deviceId?: string,
     ) {}
 
@@ -296,13 +296,13 @@ export class ToDeviceRequests implements IRequestsMap {
 
     public getRequest(event: MatrixEvent): Request | undefined {
         return this.getRequestBySenderAndTxnId(
-            event.getSender(),
+            event.getSender()!,
             ToDeviceChannel.getTransactionId(event),
         );
     }
 
     public getRequestByChannel(channel: ToDeviceChannel): Request | undefined {
-        return this.getRequestBySenderAndTxnId(channel.userId, channel.transactionId);
+        return this.getRequestBySenderAndTxnId(channel.userId, channel.transactionId!);
     }
 
     public getRequestBySenderAndTxnId(sender: string, txnId: string): Request | undefined {
@@ -313,11 +313,11 @@ export class ToDeviceRequests implements IRequestsMap {
     }
 
     public setRequest(event: MatrixEvent, request: Request): void {
-        this.setRequestBySenderAndTxnId(event.getSender(), ToDeviceChannel.getTransactionId(event), request);
+        this.setRequestBySenderAndTxnId(event.getSender()!, ToDeviceChannel.getTransactionId(event), request);
     }
 
     public setRequestByChannel(channel: ToDeviceChannel, request: Request): void {
-        this.setRequestBySenderAndTxnId(channel.userId, channel.transactionId, request);
+        this.setRequestBySenderAndTxnId(channel.userId, channel.transactionId!, request);
     }
 
     public setRequestBySenderAndTxnId(sender: string, txnId: string, request: Request): void {
@@ -330,7 +330,7 @@ export class ToDeviceRequests implements IRequestsMap {
     }
 
     public removeRequest(event: MatrixEvent): void {
-        const userId = event.getSender();
+        const userId = event.getSender()!;
         const requestsByTxnId = this.requestsByUserId.get(userId);
         if (requestsByTxnId) {
             requestsByTxnId.delete(ToDeviceChannel.getTransactionId(event));

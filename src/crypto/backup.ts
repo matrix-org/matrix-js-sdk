@@ -71,7 +71,7 @@ export interface IKeyBackupCheck {
 export interface IPreparedKeyBackupVersion {
     algorithm: string;
     auth_data: AuthData;
-    recovery_key?: string;
+    recovery_key: string;
     privateKey: Uint8Array;
 }
 /* eslint-enable camelcase */
@@ -201,7 +201,7 @@ export class BackupManager {
         }
 
         const [privateKey, authData] = await Algorithm.prepare(key);
-        const recoveryKey = encodeRecoveryKey(privateKey);
+        const recoveryKey = encodeRecoveryKey(privateKey)!;
         return {
             algorithm: Algorithm.algorithmName,
             auth_data: authData,
