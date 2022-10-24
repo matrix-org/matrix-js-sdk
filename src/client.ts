@@ -6308,9 +6308,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Get the unix timestamp (in milliseconds) at which the current
      * TURN credentials (from getTurnServers) expire
-     * @return {number} The expiry timestamp, in milliseconds, or null if no credentials
+     * @return {number} The expiry timestamp in milliseconds
      */
-    public getTurnServersExpiry(): number | null {
+    public getTurnServersExpiry(): number {
         return this.turnServersExpiry;
     }
 
@@ -6319,7 +6319,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     // XXX: Intended private, used in code.
-    public async checkTurnServers(): Promise<boolean> {
+    public async checkTurnServers(): Promise<boolean | undefined> {
         if (!this.canSupportVoip) {
             return;
         }
