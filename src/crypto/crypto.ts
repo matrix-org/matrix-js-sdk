@@ -14,18 +14,37 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { logger } from "../logger";
+
 export let crypto = global.window?.crypto;
 export let subtleCrypto = global.window?.crypto?.subtle ?? global.window?.crypto?.webkitSubtle;
 export let TextEncoder = global.window?.TextEncoder;
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 if (!crypto) {
-    crypto = require("crypto").webcrypto;
+    try {
+        crypto = require("crypto").webcrypto;
+    } catch (e) {
+        logger.error("Failed to load webcrypto", e);
+    }
 }
 if (!subtleCrypto) {
     subtleCrypto = crypto?.subtle;
 }
 if (!TextEncoder) {
-    TextEncoder = require("util").TextEncoder;
+    try {
+        TextEncoder = require("util").TextEncoder;
+    } catch (e) {
+        logger.error("Failed to load TextEncoder util", e);
+    }
 }
 /* eslint-enable @typescript-eslint/no-var-requires */
+
+export function setCrypto(_crypto: Crypto): void {
+    crypto = _crypto;
+    subtleCrypto = _crypto.subtle ?? _crypto.webkitSubtle;
+}
+
+export function setTextEncoder(_TextEncoder: typeof TextEncoder): void {
+    TextEncoder = _TextEncoder;
+}
