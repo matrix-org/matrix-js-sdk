@@ -301,7 +301,7 @@ host the API reference from the source files like this:
 ```
   $ yarn gendoc
   $ cd .jsdoc
-  $ python -m SimpleHTTPServer 8005
+  $ python -m http.server 8005
 ```
 
 Then visit ``http://localhost:8005`` to see the API docs.

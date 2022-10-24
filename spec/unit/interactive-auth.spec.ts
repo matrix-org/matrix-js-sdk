@@ -18,7 +18,7 @@ limitations under the License.
 import { MatrixClient } from "../../src/client";
 import { logger } from "../../src/logger";
 import { InteractiveAuth, AuthType } from "../../src/interactive-auth";
-import { MatrixError } from "../../src/http-api";
+import { HTTPError, MatrixError } from "../../src/http-api";
 import { sleep } from "../../src/utils";
 import { randomString } from "../../src/randomstring";
 
@@ -219,8 +219,7 @@ describe("InteractiveAuth", () => {
                 params: {
                     [AuthType.Password]: { param: "aa" },
                 },
-            });
-            err.httpStatus = 401;
+            }, 401);
             throw err;
         });
 
@@ -260,7 +259,6 @@ describe("InteractiveAuth", () => {
         const requestEmailToken = jest.fn();
 
         const ia = new InteractiveAuth({
-            authData: null,
             matrixClient: getFakeClient(),
             stateUpdated,
             doRequest,
@@ -282,8 +280,7 @@ describe("InteractiveAuth", () => {
                 params: {
                     [AuthType.Password]: { param: "aa" },
                 },
-            });
-            err.httpStatus = 401;
+            }, 401);
             throw err;
         });
 
@@ -338,8 +335,7 @@ describe("InteractiveAuth", () => {
                 params: {
                     [AuthType.Password]: { param: "aa" },
                 },
-            });
-            err.httpStatus = 401;
+            }, 401);
             throw err;
         });
 
@@ -374,8 +370,7 @@ describe("InteractiveAuth", () => {
                 },
                 error: "Mock Error 1",
                 errcode: "MOCKERR1",
-            });
-            err.httpStatus = 401;
+            }, 401);
             throw err;
         });
 
@@ -402,8 +397,7 @@ describe("InteractiveAuth", () => {
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual({ "session": "sessionId" }); // has existing sessionId
-            const err = new Error('myerror');
-            (err as any).httpStatus = 401;
+            const err = new HTTPError('myerror', 401);
             throw err;
         });
 

@@ -242,7 +242,7 @@ export abstract class DecryptionAlgorithm {
 export class DecryptionError extends Error {
     public readonly detailedString: string;
 
-    constructor(public readonly code: string, msg: string, details?: Record<string, string>) {
+    constructor(public readonly code: string, msg: string, details?: Record<string, string | Error>) {
         super(msg);
         this.code = code;
         this.name = 'DecryptionError';
@@ -250,7 +250,7 @@ export class DecryptionError extends Error {
     }
 }
 
-function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string>): string {
+function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string | Error>): string {
     let result = err.name + '[msg: ' + err.message;
 
     if (details) {
@@ -272,7 +272,11 @@ function detailedStringForDecryptionError(err: DecryptionError, details?: Record
  * @extends Error
  */
 export class UnknownDeviceError extends Error {
-    constructor(msg: string, public readonly devices: Record<string, Record<string, object>>) {
+    constructor(
+        msg: string,
+        public readonly devices: Record<string, Record<string, object>>,
+        public event?: MatrixEvent,
+    ) {
         super(msg);
         this.name = "UnknownDeviceError";
         this.devices = devices;
@@ -295,7 +299,7 @@ export class UnknownDeviceError extends Error {
 export function registerAlgorithm(
     algorithm: string,
     encryptor: new (params: IParams) => EncryptionAlgorithm,
-    decryptor: new (params: Omit<IParams, "deviceId">) => DecryptionAlgorithm,
+    decryptor: new (params: DecryptionClassParams) => DecryptionAlgorithm,
 ): void {
     ENCRYPTION_CLASSES.set(algorithm, encryptor);
     DECRYPTION_CLASSES.set(algorithm, decryptor);

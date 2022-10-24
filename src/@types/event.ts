@@ -33,10 +33,6 @@ export enum EventType {
     RoomGuestAccess = "m.room.guest_access",
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
-    /**
-     * @deprecated Should not be used.
-     */
-    RoomAliases = "m.room.aliases", // deprecated https://matrix.org/docs/spec/client_server/r0.6.1#historical-events
 
     SpaceChild = "m.space.child",
     SpaceParent = "m.space.parent",
@@ -63,6 +59,10 @@ export enum EventType {
     KeyVerificationCancel = "m.key.verification.cancel",
     KeyVerificationMac = "m.key.verification.mac",
     KeyVerificationDone = "m.key.verification.done",
+    KeyVerificationKey = "m.key.verification.key",
+    KeyVerificationAccept = "m.key.verification.accept",
+    // XXX this event is not yet supported by js-sdk
+    KeyVerificationReady = "m.key.verification.ready",
     // use of this is discouraged https://matrix.org/docs/spec/client_server/r0.6.1#m-room-message-feedback
     RoomMessageFeedback = "m.room.message.feedback",
     Reaction = "m.reaction",

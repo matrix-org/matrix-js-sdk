@@ -21,7 +21,7 @@ describe("EventTimeline", function() {
     const getTimeline = (): EventTimeline => {
         const room = new Room(roomId, mockClient, userA);
         const timelineSet = new EventTimelineSet(room);
-        jest.spyOn(timelineSet.room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
+        jest.spyOn(room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
 
         return new EventTimeline(timelineSet);
     };

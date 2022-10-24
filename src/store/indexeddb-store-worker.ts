@@ -20,7 +20,7 @@ import { logger } from '../logger';
 interface ICmd {
     command: string;
     seq: number;
-    args?: any[];
+    args: any[];
 }
 
 /**
@@ -39,7 +39,7 @@ interface ICmd {
  *
  */
 export class IndexedDBStoreWorker {
-    private backend: LocalIndexedDBStoreBackend = null;
+    private backend?: LocalIndexedDBStoreBackend;
 
     /**
      * @param {function} postMessage The web worker postMessage function that
@@ -58,59 +58,59 @@ export class IndexedDBStoreWorker {
         let prom;
 
         switch (msg.command) {
-            case '_setupWorker':
+            case 'setupWorker':
                 // this is the 'indexedDB' global (where global != window
                 // because it's a web worker and there is no window).
                 this.backend = new LocalIndexedDBStoreBackend(indexedDB, msg.args[0]);
                 prom = Promise.resolve();
                 break;
             case 'connect':
-                prom = this.backend.connect();
+                prom = this.backend?.connect();
                 break;
             case 'isNewlyCreated':
-                prom = this.backend.isNewlyCreated();
+                prom = this.backend?.isNewlyCreated();
                 break;
             case 'clearDatabase':
-                prom = this.backend.clearDatabase();
+                prom = this.backend?.clearDatabase();
                 break;
             case 'getSavedSync':
-                prom = this.backend.getSavedSync(false);
+                prom = this.backend?.getSavedSync(false);
                 break;
             case 'setSyncData':
-                prom = this.backend.setSyncData(msg.args[0]);
+                prom = this.backend?.setSyncData(msg.args[0]);
                 break;
             case 'syncToDatabase':
-                prom = this.backend.syncToDatabase(msg.args[0]);
+                prom = this.backend?.syncToDatabase(msg.args[0]);
                 break;
             case 'getUserPresenceEvents':
-                prom = this.backend.getUserPresenceEvents();
+                prom = this.backend?.getUserPresenceEvents();
                 break;
             case 'getNextBatchToken':
-                prom = this.backend.getNextBatchToken();
+                prom = this.backend?.getNextBatchToken();
                 break;
             case 'getOutOfBandMembers':
-                prom = this.backend.getOutOfBandMembers(msg.args[0]);
+                prom = this.backend?.getOutOfBandMembers(msg.args[0]);
                 break;
             case 'clearOutOfBandMembers':
-                prom = this.backend.clearOutOfBandMembers(msg.args[0]);
+                prom = this.backend?.clearOutOfBandMembers(msg.args[0]);
                 break;
             case 'setOutOfBandMembers':
-                prom = this.backend.setOutOfBandMembers(msg.args[0], msg.args[1]);
+                prom = this.backend?.setOutOfBandMembers(msg.args[0], msg.args[1]);
                 break;
             case 'getClientOptions':
-                prom = this.backend.getClientOptions();
+                prom = this.backend?.getClientOptions();
                 break;
             case 'storeClientOptions':
-                prom = this.backend.storeClientOptions(msg.args[0]);
+                prom = this.backend?.storeClientOptions(msg.args[0]);
                 break;
             case 'saveToDeviceBatches':
-                prom = this.backend.saveToDeviceBatches(msg.args[0]);
+                prom = this.backend?.saveToDeviceBatches(msg.args[0]);
                 break;
             case 'getOldestToDeviceBatch':
-                prom = this.backend.getOldestToDeviceBatch();
+                prom = this.backend?.getOldestToDeviceBatch();
                 break;
             case 'removeToDeviceBatch':
-                prom = this.backend.removeToDeviceBatch(msg.args[0]);
+                prom = this.backend?.removeToDeviceBatch(msg.args[0]);
                 break;
         }
 

@@ -90,7 +90,7 @@ const signedDeviceList2: IDownloadKeyResult = {
 describe('DeviceList', function() {
     let downloadSpy;
     let cryptoStore;
-    let deviceLists = [];
+    let deviceLists: DeviceList[] = [];
 
     beforeEach(function() {
         deviceLists = [];

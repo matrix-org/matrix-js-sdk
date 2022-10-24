@@ -468,7 +468,7 @@ describe("SlidingSyncSdk", () => {
         it("emits SyncState.Reconnecting when < FAILED_SYNC_ERROR_THRESHOLD & SyncState.Error when over", async () => {
             mockSlidingSync!.emit(
                 SlidingSyncEvent.Lifecycle, SlidingSyncState.Complete,
-                { pos: "h", lists: [], rooms: {}, extensions: {} }, null,
+                { pos: "h", lists: [], rooms: {}, extensions: {} },
             );
             expect(sdk!.getSyncState()).toEqual(SyncState.Syncing);
 
@@ -490,7 +490,6 @@ describe("SlidingSyncSdk", () => {
                 SlidingSyncEvent.Lifecycle,
                 SlidingSyncState.Complete,
                 { pos: "i", lists: [], rooms: {}, extensions: {} },
-                null,
             );
             expect(sdk!.getSyncState()).toEqual(SyncState.Syncing);
         });
