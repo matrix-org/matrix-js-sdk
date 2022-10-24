@@ -59,7 +59,7 @@ async function bobUploadsDeviceKeys(): Promise<void> {
         bobTestClient.client.uploadKeys(),
         bobTestClient.httpBackend.flushAllExpected(),
     ]);
-    expect(Object.keys(bobTestClient.deviceKeys).length).not.toEqual(0);
+    expect(Object.keys(bobTestClient.deviceKeys!).length).not.toEqual(0);
 }
 
 /**
@@ -99,7 +99,7 @@ async function expectAliClaimKeys(): Promise<void> {
         expect(claimType).toEqual("signed_curve25519");
         let keyId = '';
         for (keyId in keys) {
-            if (bobTestClient.oneTimeKeys.hasOwnProperty(keyId)) {
+            if (bobTestClient.oneTimeKeys!.hasOwnProperty(keyId)) {
                 if (keyId.indexOf(claimType + ":") === 0) {
                     break;
                 }
@@ -137,7 +137,7 @@ async function aliDownloadsKeys(): Promise<void> {
     // @ts-ignore - protected
     aliTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
         const devices = data!.devices[bobUserId]!;
-        expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys.keys);
+        expect(devices[bobDeviceId].keys).toEqual(bobTestClient.deviceKeys!.keys);
         expect(devices[bobDeviceId].verified).
             toBe(DeviceInfo.DeviceVerification.UNVERIFIED);
     });
@@ -223,7 +223,7 @@ async function expectBobSendMessageRequest(): Promise<OlmPayload> {
     const content = await expectSendMessageRequest(bobTestClient.httpBackend);
     bobMessages.push(content);
     const aliKeyId = "curve25519:" + aliDeviceId;
-    const aliDeviceCurve25519Key = aliTestClient.deviceKeys.keys[aliKeyId];
+    const aliDeviceCurve25519Key = aliTestClient.deviceKeys!.keys[aliKeyId];
     expect(Object.keys(content.ciphertext)).toEqual([aliDeviceCurve25519Key]);
     const ciphertext = content.ciphertext[aliDeviceCurve25519Key];
     expect(ciphertext).toBeTruthy();
@@ -393,7 +393,7 @@ describe("MatrixClient crypto", () => {
     it("Ali gets keys with an invalid signature", async () => {
         await bobUploadsDeviceKeys();
         // tamper bob's keys
-        const bobDeviceKeys = bobTestClient.deviceKeys;
+        const bobDeviceKeys = bobTestClient.deviceKeys!;
         expect(bobDeviceKeys.keys["curve25519:" + bobDeviceId]).toBeTruthy();
         bobDeviceKeys.keys["curve25519:" + bobDeviceId] += "abc";
         await Promise.all([
@@ -479,7 +479,7 @@ describe("MatrixClient crypto", () => {
         await bobTestClient.start();
         const keys = await bobTestClient.awaitOneTimeKeyUpload();
         expect(Object.keys(keys).length).toEqual(5);
-        expect(Object.keys(bobTestClient.deviceKeys).length).not.toEqual(0);
+        expect(Object.keys(bobTestClient.deviceKeys!).length).not.toEqual(0);
     });
 
     it("Ali sends a message", async () => {

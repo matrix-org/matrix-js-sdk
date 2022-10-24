@@ -67,13 +67,13 @@ describe("OlmDevice", function() {
             const sid = await setupSession(aliceOlmDevice, bobOlmDevice);
 
             const ciphertext = await aliceOlmDevice.encryptMessage(
-                bobOlmDevice.deviceCurve25519Key,
+                bobOlmDevice.deviceCurve25519Key!,
                 sid,
                 "The olm or proteus is an aquatic salamander in the family Proteidae",
             ) as any; // OlmDevice.encryptMessage has incorrect return type
 
             const result = await bobOlmDevice.createInboundSession(
-                aliceOlmDevice.deviceCurve25519Key,
+                aliceOlmDevice.deviceCurve25519Key!,
                 ciphertext.type,
                 ciphertext.body,
             );
@@ -94,7 +94,7 @@ describe("OlmDevice", function() {
                 + " in the family Proteidae"
             );
             const ciphertext = await aliceOlmDevice.encryptMessage(
-                bobOlmDevice.deviceCurve25519Key,
+                bobOlmDevice.deviceCurve25519Key!,
                 sessionId,
                 MESSAGE,
             ) as any; // OlmDevice.encryptMessage has incorrect return type
@@ -103,7 +103,7 @@ describe("OlmDevice", function() {
             bobRecreatedOlmDevice.init({ fromExportedDevice: exported });
 
             const decrypted = await bobRecreatedOlmDevice.createInboundSession(
-                aliceOlmDevice.deviceCurve25519Key,
+                aliceOlmDevice.deviceCurve25519Key!,
                 ciphertext.type,
                 ciphertext.body,
             );
@@ -118,7 +118,7 @@ describe("OlmDevice", function() {
                 + " the olm is entirely aquatic"
             );
             const ciphertext2 = await aliceOlmDevice.encryptMessage(
-                bobOlmDevice.deviceCurve25519Key,
+                bobOlmDevice.deviceCurve25519Key!,
                 sessionId,
                 MESSAGE_2,
             ) as any; // OlmDevice.encryptMessage has incorrect return type
@@ -128,7 +128,7 @@ describe("OlmDevice", function() {
 
             // Note: "decrypted_2" does not have the same structure as "decrypted"
             const decrypted2 = await bobRecreatedAgainOlmDevice.decryptMessage(
-                aliceOlmDevice.deviceCurve25519Key,
+                aliceOlmDevice.deviceCurve25519Key!,
                 decrypted.session_id,
                 ciphertext2.type,
                 ciphertext2.body,

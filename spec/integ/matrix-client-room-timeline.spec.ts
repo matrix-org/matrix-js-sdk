@@ -160,8 +160,8 @@ describe("MatrixClient room timelines", function() {
                 expect(room.timeline[1].status).toEqual(EventStatus.SENDING);
                 // check member
                 const member = room.timeline[1].sender;
-                expect(member.userId).toEqual(userId);
-                expect(member.name).toEqual(userName);
+                expect(member?.userId).toEqual(userId);
+                expect(member?.name).toEqual(userName);
 
                 httpBackend!.flush("/sync", 1).then(function() {
                     done();
@@ -327,11 +327,11 @@ describe("MatrixClient room timelines", function() {
                 client!.scrollback(room).then(function() {
                     expect(room.timeline.length).toEqual(5);
                     const joinMsg = room.timeline[0];
-                    expect(joinMsg.sender.name).toEqual("Old Alice");
+                    expect(joinMsg.sender?.name).toEqual("Old Alice");
                     const oldMsg = room.timeline[1];
-                    expect(oldMsg.sender.name).toEqual("Old Alice");
+                    expect(oldMsg.sender?.name).toEqual("Old Alice");
                     const newMsg = room.timeline[3];
-                    expect(newMsg.sender.name).toEqual(userName);
+                    expect(newMsg.sender?.name).toEqual(userName);
 
                     // still have a sync to flush
                     httpBackend!.flush("/sync", 1).then(() => {
@@ -468,8 +468,8 @@ describe("MatrixClient room timelines", function() {
                 ]).then(function() {
                     const preNameEvent = room.timeline[room.timeline.length - 3];
                     const postNameEvent = room.timeline[room.timeline.length - 1];
-                    expect(preNameEvent.sender.name).toEqual(userName);
-                    expect(postNameEvent.sender.name).toEqual("New Name");
+                    expect(preNameEvent.sender?.name).toEqual(userName);
+                    expect(postNameEvent.sender?.name).toEqual("New Name");
                 });
             });
         });

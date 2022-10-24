@@ -73,7 +73,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
     public idServerRequest<T extends {}>(
         method: Method,
         path: string,
-        params: Record<string, string | string[]>,
+        params: Record<string, string | string[]> | undefined,
         prefix: string,
         accessToken?: string,
     ): Promise<ResponseType<T, O>> {
@@ -96,7 +96,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             headers: {},
         };
         if (accessToken) {
-            opts.headers.Authorization = `Bearer ${accessToken}`;
+            opts.headers!.Authorization = `Bearer ${accessToken}`;
         }
 
         return this.requestOtherUrl(method, fullUri, body, opts);
@@ -286,10 +286,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 credentials: "omit", // we send credentials via headers
             });
         } catch (e) {
-            if (e.name === "AbortError") {
+            if ((<Error>e).name === "AbortError") {
                 throw e;
             }
-            throw new ConnectionError("fetch failed", e);
+            throw new ConnectionError("fetch failed", <Error>e);
         } finally {
             cleanup();
         }

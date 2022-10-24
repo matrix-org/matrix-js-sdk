@@ -34,7 +34,7 @@ import { MatrixScheduler } from '../../../src';
 
 const Olm = global.Olm;
 
-const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2');
+const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2')!;
 
 const ROOM_ID = '!ROOM:ID';
 
@@ -197,7 +197,7 @@ describe("MegolmBackup", function() {
             // to tick the clock between the first try and the retry.
             const realSetTimeout = global.setTimeout;
             jest.spyOn(global, 'setTimeout').mockImplementation(function(f, n) {
-                return realSetTimeout(f!, n/100);
+                return realSetTimeout(f!, n!/100);
             });
         });
 
@@ -318,7 +318,7 @@ describe("MegolmBackup", function() {
                             resolve();
                             return Promise.resolve({} as T);
                         };
-                        client.crypto.backupManager.backupGroupSession(
+                        client.crypto!.backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                             groupSession.session_id(),
                         );
@@ -349,7 +349,7 @@ describe("MegolmBackup", function() {
 
             return client.initCrypto()
                 .then(() => {
-                    return client.crypto.storeSessionBackupPrivateKey(new Uint8Array(32));
+                    return client.crypto!.storeSessionBackupPrivateKey(new Uint8Array(32));
                 })
                 .then(() => {
                     return cryptoStore.doTxn(
@@ -401,7 +401,7 @@ describe("MegolmBackup", function() {
                             resolve();
                             return Promise.resolve({} as T);
                         };
-                        client.crypto.backupManager.backupGroupSession(
+                        client.crypto!.backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                             groupSession.session_id(),
                         );
@@ -449,7 +449,7 @@ describe("MegolmBackup", function() {
                             try {
                                 // make sure auth_data is signed by the master key
                                 olmlib.pkVerify(
-                                    (data as Record<string, any>).auth_data, client.getCrossSigningId(), "@alice:bar",
+                                    (data as Record<string, any>).auth_data, client.getCrossSigningId()!, "@alice:bar",
                                 );
                             } catch (e) {
                                 reject(e);
@@ -568,7 +568,7 @@ describe("MegolmBackup", function() {
                         );
                     }
                 };
-                return client.crypto.backupManager.backupGroupSession(
+                return client.crypto!.backupManager.backupGroupSession(
                     "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                     groupSession.session_id(),
                 );
@@ -697,6 +697,32 @@ describe("MegolmBackup", function() {
                 SESSION_ID,
                 BAD_BACKUP_INFO,
             )).rejects.toThrow();
+        });
+    });
+
+    describe("flagAllGroupSessionsForBackup", () => {
+        it("should return number of sesions needing backup", async () => {
+            const scheduler = [
+                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
+                "setProcessFunction",
+            ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {}) as MockedObject<MatrixScheduler>;
+            const store = new StubStore();
+            const client = new MatrixClient({
+                baseUrl: "https://my.home.server",
+                idBaseUrl: "https://identity.server",
+                accessToken: "my.access.token",
+                fetchFn: jest.fn(), // NOP
+                store,
+                scheduler,
+                userId: "@alice:bar",
+                deviceId: "device",
+                cryptoStore,
+            });
+            await client.initCrypto();
+
+            cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);
+            await expect(client.flagAllGroupSessionsForBackup()).resolves.toBe(6);
+            client.stopClient();
         });
     });
 });

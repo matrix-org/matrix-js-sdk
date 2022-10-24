@@ -347,7 +347,7 @@ export class AutoDiscovery {
      * @returns {Promise<object>} Resolves to the domain's client config. Can
      * be an empty object.
      */
-    public static async getRawClientConfig(domain: string): Promise<IClientWellKnown> {
+    public static async getRawClientConfig(domain?: string): Promise<IClientWellKnown> {
         if (!domain || typeof(domain) !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }

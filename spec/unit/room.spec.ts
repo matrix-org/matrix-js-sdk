@@ -27,6 +27,7 @@ import {
     EventType,
     JoinRule,
     MatrixEvent,
+    MatrixEventEvent,
     PendingEventOrdering,
     RelationType,
     RoomEvent,
@@ -40,6 +41,7 @@ import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
 import { WrappedReceipt } from "../../src/models/read-receipt";
+import { Crypto } from "../../src/crypto";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -337,12 +339,12 @@ describe("Room", function() {
                             expect(event.getId()).toEqual(localEventId);
                             expect(event.status).toEqual(EventStatus.SENDING);
                             expect(emitRoom).toEqual(room);
-                            expect(oldEventId).toBe(null);
-                            expect(oldStatus).toBe(null);
+                            expect(oldEventId).toBeUndefined();
+                            expect(oldStatus).toBeUndefined();
                             break;
                         case 1:
                             expect(event.getId()).toEqual(remoteEventId);
-                            expect(event.status).toBe(null);
+                            expect(event.status).toBeNull();
                             expect(emitRoom).toEqual(room);
                             expect(oldEventId).toEqual(localEventId);
                             expect(oldStatus).toBe(EventStatus.SENDING);
@@ -371,7 +373,7 @@ describe("Room", function() {
             delete eventJson["event_id"];
             const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp" }, eventJson));
             localEvent.status = EventStatus.SENDING;
-            expect(localEvent.getTxnId()).toBeNull();
+            expect(localEvent.getTxnId()).toBeUndefined();
             expect(room.timeline.length).toEqual(0);
 
             // first add the local echo. This is done before the /send request is even sent.
@@ -386,7 +388,7 @@ describe("Room", function() {
 
             // then /sync returns the remoteEvent, it should de-dupe based on the event ID.
             const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
-            expect(remoteEvent.getTxnId()).toBeNull();
+            expect(remoteEvent.getTxnId()).toBeUndefined();
             room.addLiveEvents([remoteEvent]);
             // the duplicate strategy code should ensure we don't add a 2nd event to the live timeline
             expect(room.timeline.length).toEqual(1);
@@ -599,7 +601,7 @@ describe("Room", function() {
     });
 
     const resetTimelineTests = function(timelineSupport) {
-        let events = null;
+        let events: MatrixEvent[];
 
         beforeEach(function() {
             room = new Room(roomId, new TestClient(userA).client, userA, { timelineSupport: timelineSupport });
@@ -1535,6 +1537,36 @@ describe("Room", function() {
                 [eventA, eventB, eventC],
             );
         });
+
+        it("should apply redactions eagerly in the pending event list", () => {
+            const client = (new TestClient("@alice:example.com", "alicedevice")).client;
+            const room = new Room(roomId, client, userA, {
+                pendingEventOrdering: PendingEventOrdering.Detached,
+            });
+
+            const eventA = utils.mkMessage({
+                room: roomId,
+                user: userA,
+                msg: "remote 1",
+                event: true,
+            });
+            eventA.status = EventStatus.SENDING;
+            const redactA = utils.mkEvent({
+                room: roomId,
+                user: userA,
+                type: EventType.RoomRedaction,
+                content: {},
+                redacts: eventA.getId(),
+                event: true,
+            });
+            redactA.status = EventStatus.SENDING;
+
+            room.addPendingEvent(eventA, "TXN1");
+            expect(room.getPendingEvents()).toEqual([eventA]);
+            room.addPendingEvent(redactA, "TXN2");
+            expect(room.getPendingEvents()).toEqual([eventA, redactA]);
+            expect(eventA.isRedacted()).toBeTruthy();
+        });
     });
 
     describe("updatePendingEvent", function() {
@@ -1700,7 +1732,7 @@ describe("Room", function() {
 
             client.members.mockReturnValue({ chunk: [memberEvent] });
             await room.loadMembersIfNeeded();
-            const memberA = room.getMember("@user_a:bar");
+            const memberA = room.getMember("@user_a:bar")!;
             expect(memberA.name).toEqual("User A");
         });
     });
@@ -1721,7 +1753,7 @@ describe("Room", function() {
                 });
                 room.updateMyMembership(JoinRule.Invite);
                 expect(room.getMyMembership()).toEqual(JoinRule.Invite);
-                expect(events[0]).toEqual({ membership: "invite", oldMembership: null });
+                expect(events[0]).toEqual({ membership: "invite", oldMembership: undefined });
                 events.splice(0);   //clear
                 room.updateMyMembership(JoinRule.Invite);
                 expect(events.length).toEqual(0);
@@ -2423,28 +2455,28 @@ describe("Room", function() {
 
             room.addLiveEvents(events);
 
-            const thread = threadRoot.getThread();
+            const thread = threadRoot.getThread()!;
             expect(thread.rootEvent).toBe(threadRoot);
 
             const rootRelations = thread.timelineSet.relations.getChildEventsForEvent(
                 threadRoot.getId(),
                 RelationType.Annotation,
                 EventType.Reaction,
-            ).getSortedAnnotationsByKey();
+            )!.getSortedAnnotationsByKey();
             expect(rootRelations).toHaveLength(1);
-            expect(rootRelations[0][0]).toEqual(rootReaction.getRelation().key);
-            expect(rootRelations[0][1].size).toEqual(1);
-            expect(rootRelations[0][1].has(rootReaction)).toBeTruthy();
+            expect(rootRelations![0][0]).toEqual(rootReaction.getRelation()!.key);
+            expect(rootRelations![0][1].size).toEqual(1);
+            expect(rootRelations![0][1].has(rootReaction)).toBeTruthy();
 
             const responseRelations = thread.timelineSet.relations.getChildEventsForEvent(
                 threadResponse.getId(),
                 RelationType.Annotation,
                 EventType.Reaction,
-            ).getSortedAnnotationsByKey();
+            )!.getSortedAnnotationsByKey();
             expect(responseRelations).toHaveLength(1);
-            expect(responseRelations[0][0]).toEqual(threadReaction.getRelation().key);
-            expect(responseRelations[0][1].size).toEqual(1);
-            expect(responseRelations[0][1].has(threadReaction)).toBeTruthy();
+            expect(responseRelations![0][0]).toEqual(threadReaction.getRelation()!.key);
+            expect(responseRelations![0][1].size).toEqual(1);
+            expect(responseRelations![0][1].has(threadReaction)).toBeTruthy();
         });
     });
 
@@ -2592,11 +2624,11 @@ describe("Room", function() {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 123);
 
-            expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Highlight);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
 
             room.resetThreadUnreadNotificationCount();
 
-            expect(room.getThreadsAggregateNotificationType()).toBe(null);
+            expect(room.threadsAggregateNotificationType).toBe(null);
 
             expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(0);
             expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(0);
@@ -2604,11 +2636,21 @@ describe("Room", function() {
 
         it("sets the room threads notification type", () => {
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
-            expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Total);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 123);
-            expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Highlight);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
             room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 333);
-            expect(room.getThreadsAggregateNotificationType()).toBe(NotificationCountType.Highlight);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+        });
+
+        it("partially resets room notifications", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
+            room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
+
+            room.resetThreadUnreadNotificationCount(["123"]);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(666);
+            expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(0);
         });
     });
 
@@ -2635,5 +2677,74 @@ describe("Room", function() {
 
             expect(room.hasThreadUnreadNotification()).toBe(false);
         });
+    });
+
+    describe("threadsAggregateNotificationType", () => {
+        it("defaults to null", () => {
+            expect(room.threadsAggregateNotificationType).toBeNull();
+        });
+
+        it("counts multiple threads", () => {
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 0);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+        });
+
+        it("allows reset", () => {
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 1);
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+
+            room.resetThreadUnreadNotificationCount();
+
+            expect(room.threadsAggregateNotificationType).toBeNull();
+        });
+    });
+
+    it("should load pending events from from the store and decrypt if needed", async () => {
+        const client = new TestClient(userA).client;
+        client.crypto = {
+            decryptEvent: jest.fn().mockResolvedValue({ clearEvent: { body: "enc" } }),
+        } as unknown as Crypto;
+        client.store.getPendingEvents = jest.fn(async roomId => [{
+            event_id: "$1:server",
+            type: "m.room.message",
+            content: { body: "1" },
+            sender: "@1:server",
+            room_id: roomId,
+            origin_server_ts: 1,
+            txn_id: "txn1",
+        }, {
+            event_id: "$2:server",
+            type: "m.room.encrypted",
+            content: { body: "2" },
+            sender: "@2:server",
+            room_id: roomId,
+            origin_server_ts: 2,
+            txn_id: "txn2",
+        }]);
+        const room = new Room(roomId, client, userA, {
+            pendingEventOrdering: PendingEventOrdering.Detached,
+        });
+        await emitPromise(room, RoomEvent.LocalEchoUpdated);
+        await emitPromise(client, MatrixEventEvent.Decrypted);
+        await emitPromise(room, RoomEvent.LocalEchoUpdated);
+        const pendingEvents = room.getPendingEvents();
+        expect(pendingEvents).toHaveLength(2);
+        expect(pendingEvents[1].isDecryptionFailure()).toBeFalsy();
+        expect(pendingEvents[1].isBeingDecrypted()).toBeFalsy();
+        expect(pendingEvents[1].isEncrypted()).toBeTruthy();
+        for (const ev of pendingEvents) {
+            expect(room.getPendingEvent(ev.getId())).toBe(ev);
+        }
     });
 });

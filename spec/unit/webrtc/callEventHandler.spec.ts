@@ -153,7 +153,7 @@ describe("CallEventHandler", () => {
         client.on(CallEventHandlerEvent.Incoming, incomingCallEmitted);
 
         client.getSyncState = jest.fn().mockReturnValue(SyncState.Syncing);
-        client.emit(ClientEvent.Sync, SyncState.Syncing);
+        client.emit(ClientEvent.Sync, SyncState.Syncing, null);
 
         expect(incomingCallEmitted).not.toHaveBeenCalled();
     });

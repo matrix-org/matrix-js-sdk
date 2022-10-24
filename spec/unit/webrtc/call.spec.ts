@@ -50,7 +50,7 @@ const CALL_LIFETIME = 60000;
 
 const startVoiceCall = async (client: TestClient, call: MatrixCall, userId?: string): Promise<void> => {
     const callPromise = call.placeVoiceCall();
-    await client.httpBackend.flush("");
+    await client.httpBackend!.flush("");
     await callPromise;
 
     call.getOpponentMember = jest.fn().mockReturnValue({ userId: userId ?? "@bob:bar.uk" });
@@ -269,7 +269,7 @@ describe('Call', function() {
 
         expect(identChangedCallback).toHaveBeenCalled();
 
-        const ident = call.getRemoteAssertedIdentity();
+        const ident = call.getRemoteAssertedIdentity()!;
         expect(ident.id).toEqual("@steve:example.com");
         expect(ident.displayName).toEqual("Steve Gibbons");
     });
@@ -327,7 +327,7 @@ describe('Call', function() {
     });
 
     it("should fallback to answering with no video", async () => {
-        await client.httpBackend.flush("");
+        await client.httpBackend!.flush("");
 
         (call as any).shouldAnswerWithMediaType = (wantedValue: boolean) => wantedValue;
         client.client.getMediaHandler().getUserMediaStream = jest.fn().mockRejectedValue("reject");
@@ -437,7 +437,7 @@ describe('Call', function() {
 
     it("should choose opponent member", async () => {
         const callPromise = call.placeVoiceCall();
-        await client.httpBackend.flush("");
+        await client.httpBackend!.flush("");
         await callPromise;
 
         const opponentMember = {
@@ -529,7 +529,7 @@ describe('Call', function() {
             audioMuted: false,
             videoMuted: false,
         })]);
-        await client.httpBackend.flush("");
+        await client.httpBackend!.flush("");
         await callPromise;
         call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
@@ -581,7 +581,7 @@ describe('Call', function() {
                 videoMuted: false,
             }),
         ]);
-        await client.httpBackend.flush("");
+        await client.httpBackend!.flush("");
         await callPromise;
         call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
@@ -681,10 +681,10 @@ describe('Call', function() {
         });
 
         it("should return false if window or document are undefined", () => {
-            global.window = undefined;
+            global.window = undefined!;
             expect(supportsMatrixCall()).toBe(false);
             global.window = prevWindow;
-            global.document = undefined;
+            global.document = undefined!;
             expect(supportsMatrixCall()).toBe(false);
         });
 
@@ -702,9 +702,9 @@ describe('Call', function() {
         it("should return false if RTCPeerConnection & RTCSessionDescription " +
             "& RTCIceCandidate & mediaDevices are unavailable",
         () => {
-            global.window.RTCPeerConnection = undefined;
-            global.window.RTCSessionDescription = undefined;
-            global.window.RTCIceCandidate = undefined;
+            global.window.RTCPeerConnection = undefined!;
+            global.window.RTCSessionDescription = undefined!;
+            global.window.RTCIceCandidate = undefined!;
             // @ts-ignore - writing to a read-only property as we are simulating faulty browsers
             global.navigator.mediaDevices = undefined;
             expect(supportsMatrixCall()).toBe(false);

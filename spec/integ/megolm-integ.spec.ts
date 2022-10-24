@@ -1133,10 +1133,10 @@ describe("megolm", () => {
             'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string) => {
+                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
                     const account = new global.Olm.Account();
                     try {
-                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount);
+                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, aliceTestClient.getDeviceKey(), aliceOtk.key);
                     } finally {
                         account.free();
@@ -1160,11 +1160,11 @@ describe("megolm", () => {
                 "algorithm": 'm.megolm.v1.aes-sha2',
                 "room_id": ROOM_ID,
                 "sender_key": content.sender_key,
-                "sender_claimed_ed25519_key": groupSessionKey.sender_claimed_ed25519_key,
+                "sender_claimed_ed25519_key": groupSessionKey!.sender_claimed_ed25519_key,
                 "session_id": content.session_id,
-                "session_key": groupSessionKey.key,
-                "chain_index": groupSessionKey.chain_index,
-                "forwarding_curve25519_key_chain": groupSessionKey.forwarding_curve25519_key_chain,
+                "session_key": groupSessionKey!.key,
+                "chain_index": groupSessionKey!.chain_index,
+                "forwarding_curve25519_key_chain": groupSessionKey!.forwarding_curve25519_key_chain,
                 "org.matrix.msc3061.shared_history": true,
             },
             plaintype: 'm.forwarded_room_key',
@@ -1271,10 +1271,10 @@ describe("megolm", () => {
             'readonly',
             [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
-                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string) => {
+                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
                     const account = new global.Olm.Account();
                     try {
-                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount);
+                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
                         p2pSession.create_outbound(account, aliceTestClient.getDeviceKey(), aliceOtk.key);
                     } finally {
                         account.free();
@@ -1298,11 +1298,11 @@ describe("megolm", () => {
                 "algorithm": 'm.megolm.v1.aes-sha2',
                 "room_id": ROOM_ID,
                 "sender_key": content.sender_key,
-                "sender_claimed_ed25519_key": groupSessionKey.sender_claimed_ed25519_key,
+                "sender_claimed_ed25519_key": groupSessionKey!.sender_claimed_ed25519_key,
                 "session_id": content.session_id,
-                "session_key": groupSessionKey.key,
-                "chain_index": groupSessionKey.chain_index,
-                "forwarding_curve25519_key_chain": groupSessionKey.forwarding_curve25519_key_chain,
+                "session_key": groupSessionKey!.key,
+                "chain_index": groupSessionKey!.chain_index,
+                "forwarding_curve25519_key_chain": groupSessionKey!.forwarding_curve25519_key_chain,
                 "org.matrix.msc3061.shared_history": true,
             },
             plaintype: 'm.forwarded_room_key',

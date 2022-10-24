@@ -319,7 +319,7 @@ export class MockMediaHandler {
     public screensharingStreams: MockMediaStream[] = [];
 
     getUserMediaStream(audio: boolean, video: boolean) {
-        const tracks = [];
+        const tracks: MockMediaStreamTrack[] = [];
         if (audio) tracks.push(new MockMediaStreamTrack("usermedia_audio_track", "audio"));
         if (video) tracks.push(new MockMediaStreamTrack("usermedia_video_track", "video"));
 
