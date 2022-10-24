@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { logger } from "../logger";
-import { MatrixEvent } from "../models/event";
+import { IContent, MatrixEvent } from "../models/event";
 import { createCryptoStoreCacheCallbacks, ICacheCallbacks } from "./CrossSigning";
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import { Method, ClientPrefix } from "../http-api";
@@ -281,15 +281,15 @@ class AccountDataClientAdapter
      * @param  {String} type
      * @return {Promise<Object>} the content of the account data
      */
-    public getAccountDataFromServer(type: string): Promise<any> {
-        return Promise.resolve(this.getAccountData(type));
+    public getAccountDataFromServer<T extends {[k: string]: any}>(type: string): Promise<T> {
+        return Promise.resolve(this.getAccountData(type) as T);
     }
 
     /**
      * @param  {String} type
      * @return {Object} the content of the account data
      */
-    public getAccountData(type: string): MatrixEvent | null {
+    public getAccountData(type: string): IContent | null {
         const modifiedValue = this.values.get(type);
         if (modifiedValue) {
             return modifiedValue;

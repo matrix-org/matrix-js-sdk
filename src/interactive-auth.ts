@@ -205,7 +205,7 @@ export class InteractiveAuth {
     private readonly requestEmailTokenCallback: IOpts["requestEmailToken"];
 
     private data: IAuthData;
-    private emailSid: string | null;
+    private emailSid?: string;
     private requestingEmailToken = false;
     private attemptAuthDeferred: IDeferred<IAuthData> | null = null;
     private chosenFlow: IFlow | null = null;
@@ -229,7 +229,7 @@ export class InteractiveAuth {
 
         if (opts.sessionId) this.data.session = opts.sessionId;
         this.clientSecret = opts.clientSecret || this.matrixClient.generateClientSecret();
-        this.emailSid = opts.emailSid ?? null;
+        this.emailSid = opts.emailSid;
     }
 
     /**
@@ -399,7 +399,7 @@ export class InteractiveAuth {
      *
      * @returns {string} The sid of the email auth session
      */
-    public getEmailSid(): string | null {
+    public getEmailSid(): string | undefined {
         return this.emailSid;
     }
 
@@ -496,7 +496,7 @@ export class InteractiveAuth {
                 return;
             }
 
-            if (!this.emailSid && this.chosenFlow.stages.includes(AuthType.Email)) {
+            if (!this.emailSid && this.chosenFlow?.stages.includes(AuthType.Email)) {
                 try {
                     await this.requestEmailToken();
                     // NB. promise is not resolved here - at some point, doRequest

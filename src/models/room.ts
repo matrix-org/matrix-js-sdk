@@ -18,6 +18,8 @@ limitations under the License.
  * @module models/room
  */
 
+import { Optional } from "matrix-events-sdk";
+
 import {
     EventTimelineSet,
     DuplicateStrategy,
@@ -63,7 +65,6 @@ import {
     synthesizeReceipt,
 } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
-import { Optional } from "matrix-events-sdk";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -593,7 +594,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
      */
     public getPendingEvents(): MatrixEvent[] {
-        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
+        if (!this.pendingEventList) {
             throw new Error(
                 "Cannot call getPendingEvents with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
@@ -609,7 +610,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @return {boolean} True if an element was removed.
      */
     public removePendingEvent(eventId: string): boolean {
-        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
+        if (!this.pendingEventList) {
             throw new Error(
                 "Cannot call removePendingEvent with pendingEventOrdering == " +
                 this.opts.pendingEventOrdering);
@@ -635,11 +636,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @return {boolean}
      */
     public hasPendingEvent(eventId: string): boolean {
-        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
-            return false;
-        }
-
-        return this.pendingEventList.some(event => event.getId() === eventId);
+        return this.pendingEventList?.some(event => event.getId() === eventId) ?? false;
     }
 
     /**
@@ -649,11 +646,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @return {MatrixEvent}
      */
     public getPendingEvent(eventId: string): MatrixEvent | null {
-        if (this.opts.pendingEventOrdering !== PendingEventOrdering.Detached) {
-            return null;
-        }
-
-        return this.pendingEventList.find(event => event.getId() === eventId) ?? null;
+        return this.pendingEventList?.find(event => event.getId() === eventId) ?? null;
     }
 
     /**
@@ -1761,7 +1754,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         threadBMetadata.latest_event.origin_server_ts;
                 });
 
-            let latestMyThreadsRootEvent: MatrixEvent;
+            let latestMyThreadsRootEvent: MatrixEvent | undefined;
             const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
             for (const rootEvent of threadRoots) {
                 this.threadsTimelineSets[0].addLiveEvent(rootEvent, {
@@ -1884,7 +1877,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        const parentEventId = event.getAssociatedId();
+        const parentEventId = event.getAssociatedId()!;
         const parentEvent = this.findEventById(parentEventId) ?? events?.find(e => e.getId() === parentEventId);
 
         // Treat relations and redactions as extensions of their parents so evaluate parentEvent instead
@@ -1893,7 +1886,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         // Edge case where we know the event is a relation but don't have the parentEvent
-        if (roots?.has(event.relationEventId)) {
+        if (roots?.has(event.relationEventId!)) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: true,
@@ -1937,10 +1930,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
         for (const event of events) {
             const { threadId, shouldLiveInThread } = this.eventShouldLiveIn(event);
-            if (shouldLiveInThread && !eventsByThread[threadId]) {
-                eventsByThread[threadId] = [];
+            if (shouldLiveInThread && !eventsByThread[threadId!]) {
+                eventsByThread[threadId!] = [];
             }
-            eventsByThread[threadId]?.push(event);
+            eventsByThread[threadId!]?.push(event);
         }
 
         Object.entries(eventsByThread).map(([threadId, threadEvents]) => (
@@ -1955,7 +1948,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         toStartOfTimeline: boolean,
     ): Thread {
         if (rootEvent) {
-            const relatedEvents = this.relations.getAllChildEventsForEvent(rootEvent.getId());
+            const relatedEvents = this.relations.getAllChildEventsForEvent(rootEvent.getId()!);
             if (relatedEvents?.length) {
                 // Include all relations of the root event, given it'll be visible in both timelines,
                 // except `m.replace` as that will already be applied atop the event using `MatrixEvent::makeReplaced`
@@ -2959,7 +2952,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }).map((m) => m.name);
         }
 
-        let oldName: string;
+        let oldName: string | undefined;
         if (leftNames.length) {
             oldName = this.roomNameGenerator({
                 type: RoomNameType.Generated,
