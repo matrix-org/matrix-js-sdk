@@ -1627,8 +1627,8 @@ export class SyncApi {
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
         room.getMembersWithMembership("invite").forEach(function(member) {
-            if (member._requestedProfileInfo) return;
-            member._requestedProfileInfo = true;
+            if (member.requestedProfileInfo) return;
+            member.requestedProfileInfo = true;
             // try to get a cached copy first.
             const user = client.getUser(member.userId);
             let promise;
