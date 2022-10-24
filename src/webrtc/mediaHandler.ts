@@ -65,14 +65,14 @@ export class MediaHandler {
         if (this.userMediaStreams.length === 0) return;
 
         const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
-        for (const call of this.client.callEventHandler.calls.values()) {
+        for (const call of this.client.callEventHandler!.calls.values()) {
             callMediaStreamParams.set(call.callId, {
                 audio: call.hasLocalUserMediaAudioTrack,
                 video: call.hasLocalUserMediaVideoTrack,
             });
         }
 
-        for (const call of this.client.callEventHandler.calls.values()) {
+        for (const call of this.client.callEventHandler!.calls.values()) {
             if (call.state === CallState.Ended || !callMediaStreamParams.has(call.callId)) continue;
 
             const { audio, video } = callMediaStreamParams.get(call.callId)!;

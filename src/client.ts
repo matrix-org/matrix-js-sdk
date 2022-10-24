@@ -1707,7 +1707,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.store,
             this.cryptoStore,
             this.roomList,
-            this.verificationMethods,
+            this.verificationMethods!,
         );
 
         this.reEmitter.reEmit(crypto, [
@@ -2867,7 +2867,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let path: string;
         if (sessionId !== undefined) {
             path = utils.encodeUri("/room_keys/keys/$roomId/$sessionId", {
-                $roomId: roomId,
+                $roomId: roomId!,
                 $sessionId: sessionId,
             });
         } else if (roomId !== undefined) {

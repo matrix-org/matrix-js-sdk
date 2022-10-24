@@ -1010,7 +1010,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public resetLiveTimeline(backPaginationToken: string | null, forwardPaginationToken: string | null): void {
         for (let i = 0; i < this.timelineSets.length; i++) {
             this.timelineSets[i].resetLiveTimeline(
-                backPaginationToken, forwardPaginationToken,
+                backPaginationToken ?? undefined,
+                forwardPaginationToken ?? undefined,
             );
         }
 
@@ -1120,7 +1121,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @return {?module:models/event-timeline~EventTimeline} timeline containing
      * the given event, or null if unknown
      */
-    public getTimelineForEvent(eventId: string): EventTimeline {
+    public getTimelineForEvent(eventId: string): EventTimeline | null {
         const event = this.findEventById(eventId);
         const thread = this.findThreadForEvent(event);
         if (thread) {
@@ -1747,9 +1748,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                      * is only meant as a short term patch
                      */
                     const threadAMetadata = eventA
-                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name)!;
                     const threadBMetadata = eventB
-                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+                        .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name)!;
                     return threadAMetadata.latest_event.origin_server_ts -
                         threadBMetadata.latest_event.origin_server_ts;
                 });

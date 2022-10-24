@@ -298,10 +298,10 @@ export class BackupManager {
 
         const now = new Date().getTime();
         if (
-            !this.sessionLastCheckAttemptedTime[targetSessionId]
-                || now - this.sessionLastCheckAttemptedTime[targetSessionId] > KEY_BACKUP_CHECK_RATE_LIMIT
+            !this.sessionLastCheckAttemptedTime[targetSessionId!]
+                || now - this.sessionLastCheckAttemptedTime[targetSessionId!] > KEY_BACKUP_CHECK_RATE_LIMIT
         ) {
-            this.sessionLastCheckAttemptedTime[targetSessionId] = now;
+            this.sessionLastCheckAttemptedTime[targetSessionId!] = now;
             await this.baseApis.restoreKeyBackupWithCache(targetRoomId, targetSessionId, this.backupInfo, {});
         }
     }

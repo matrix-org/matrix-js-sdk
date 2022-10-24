@@ -66,7 +66,7 @@ interface ISecretInfo {
  * Implements Secure Secret Storage and Sharing (MSC1946)
  * @module crypto/SecretStorage
  */
-export class SecretStorage<B extends MatrixClient | undefined> {
+export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     private requests = new Map<string, ISecretRequestInternal>();
 
     // In it's pure javascript days, this was relying on some proper Javascript-style

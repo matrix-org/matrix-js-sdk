@@ -764,7 +764,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         ) {
             const secretStorage = new SecretStorage(
                 builder.accountDataClientAdapter,
-                builder.ssssCryptoCallbacks);
+                builder.ssssCryptoCallbacks,
+                undefined,
+            );
             if (await secretStorage.hasKey()) {
                 logger.log("Storing new cross-signing private keys in secret storage");
                 // This is writing to in-memory account data in
@@ -836,6 +838,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const secretStorage = new SecretStorage(
             builder.accountDataClientAdapter,
             builder.ssssCryptoCallbacks,
+            undefined,
         );
 
         // the ID of the new SSSS key, if we create one

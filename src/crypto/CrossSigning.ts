@@ -169,7 +169,9 @@ export class CrossSigningInfo {
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
-    public async isStoredInSecretStorage(secretStorage: SecretStorage): Promise<Record<string, object> | null> {
+    public async isStoredInSecretStorage(
+        secretStorage: SecretStorage<MatrixClient | undefined>,
+    ): Promise<Record<string, object> | null> {
         // check what SSSS keys have encrypted the master key (if any)
         const stored = await secretStorage.isStored("m.cross_signing.master") || {};
         // then check which of those SSSS keys have also encrypted the SSK and USK
@@ -196,7 +198,7 @@ export class CrossSigningInfo {
      */
     public static async storeInSecretStorage(
         keys: Map<string, Uint8Array>,
-        secretStorage: SecretStorage,
+        secretStorage: SecretStorage<undefined>,
     ): Promise<void> {
         for (const [type, privateKey] of keys) {
             const encodedKey = encodeBase64(privateKey);
