@@ -43,8 +43,8 @@ export interface IScreensharingOpts {
 export class MediaHandler extends TypedEventEmitter<
     MediaHandlerEvent.LocalStreamsChanged, MediaHandlerEventHandlerMap
 > {
-    private audioInput: string;
-    private videoInput: string;
+    private audioInput?: string;
+    private videoInput?: string;
     private localUserMediaStream?: MediaStream;
     public userMediaStreams: MediaStream[] = [];
     public screensharingStreams: MediaStream[] = [];
@@ -128,7 +128,7 @@ export class MediaHandler extends TypedEventEmitter<
                 continue;
             }
 
-            const { audio, video } = callMediaStreamParams.get(call.callId);
+            const { audio, video } = callMediaStreamParams.get(call.callId)!;
 
             logger.log(`mediaHandler updateLocalUsermediaStreams getUserMediaStream call ${call.callId}`);
             const stream = await this.getUserMediaStream(audio, video);
@@ -218,9 +218,9 @@ export class MediaHandler extends TypedEventEmitter<
                 const settings = track.getSettings();
 
                 if (track.kind === "audio") {
-                    this.audioInput = settings.deviceId;
+                    this.audioInput = settings.deviceId!;
                 } else if (track.kind === "video") {
-                    this.videoInput = settings.deviceId;
+                    this.videoInput = settings.deviceId!;
                 }
             }
 

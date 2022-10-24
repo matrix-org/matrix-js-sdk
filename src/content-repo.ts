@@ -35,7 +35,7 @@ import * as utils from "./utils";
  */
 export function getHttpUriForMxc(
     baseUrl: string,
-    mxc: string,
+    mxc?: string,
     width?: number,
     height?: number,
     resizeMethod?: string,

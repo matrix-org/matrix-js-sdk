@@ -49,7 +49,7 @@ describe("verification request integration tests with crypto layer", function() 
                 verificationMethods: [verificationMethods.SAS],
             },
         );
-        alice.client.crypto.deviceList.getRawStoredDevicesForUser = function() {
+        alice.client.crypto!.deviceList.getRawStoredDevicesForUser = function() {
             return {
                 Dynabook: {
                     algorithms: [],

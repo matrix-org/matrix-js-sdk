@@ -23,7 +23,7 @@ export interface IIndexedDBBackend {
     syncToDatabase(userTuples: UserTuple[]): Promise<void>;
     isNewlyCreated(): Promise<boolean>;
     setSyncData(syncData: ISyncResponse): Promise<void>;
-    getSavedSync(): Promise<ISavedSync>;
+    getSavedSync(): Promise<ISavedSync | null>;
     getNextBatchToken(): Promise<string>;
     clearDatabase(): Promise<void>;
     getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null>;

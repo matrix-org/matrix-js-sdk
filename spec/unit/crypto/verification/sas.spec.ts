@@ -17,16 +17,17 @@ limitations under the License.
 import "../../../olm-loader";
 import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
 import { MatrixEvent } from "../../../../src/models/event";
-import { SAS } from "../../../../src/crypto/verification/SAS";
+import { ISasEvent, SAS, SasEvent } from "../../../../src/crypto/verification/SAS";
 import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
 import { CryptoEvent, verificationMethods } from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { logger } from "../../../../src/logger";
 import { resetCrossSigningKeys } from "../crypto-utils";
-import { VerificationBase } from "../../../../src/crypto/verification/Base";
+import { VerificationBase as Verification, VerificationBase } from "../../../../src/crypto/verification/Base";
 import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
 import { MatrixClient } from "../../../../src";
 import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
+import { TestClient } from "../../../TestClient";
 
 const Olm = global.Olm;
 
@@ -75,13 +76,13 @@ describe("SAS verification", function() {
     });
 
     describe("verification", () => {
-        let alice;
-        let bob;
-        let aliceSasEvent;
-        let bobSasEvent;
-        let aliceVerifier;
-        let bobPromise;
-        let clearTestClientTimeouts;
+        let alice: TestClient;
+        let bob: TestClient;
+        let aliceSasEvent: ISasEvent | null;
+        let bobSasEvent: ISasEvent | null;
+        let aliceVerifier: Verification<any, any>;
+        let bobPromise: Promise<VerificationBase<any, any>>;
+        let clearTestClientTimeouts: () => void;
 
         beforeEach(async () => {
             [[alice, bob], clearTestClientTimeouts] = await makeTestClients(
@@ -94,8 +95,8 @@ describe("SAS verification", function() {
                 },
             );
 
-            const aliceDevice = alice.client.crypto.olmDevice;
-            const bobDevice = bob.client.crypto.olmDevice;
+            const aliceDevice = alice.client.crypto!.olmDevice;
+            const bobDevice = bob.client.crypto!.olmDevice;
 
             ALICE_DEVICES = {
                 Osborne2: {
@@ -121,26 +122,26 @@ describe("SAS verification", function() {
                 },
             };
 
-            alice.client.crypto.deviceList.storeDevicesForUser(
+            alice.client.crypto!.deviceList.storeDevicesForUser(
                 "@bob:example.com", BOB_DEVICES,
             );
             alice.client.downloadKeys = () => {
-                return Promise.resolve();
+                return Promise.resolve({});
             };
 
-            bob.client.crypto.deviceList.storeDevicesForUser(
+            bob.client.crypto!.deviceList.storeDevicesForUser(
                 "@alice:example.com", ALICE_DEVICES,
             );
             bob.client.downloadKeys = () => {
-                return Promise.resolve();
+                return Promise.resolve({});
             };
 
             aliceSasEvent = null;
             bobSasEvent = null;
 
-            bobPromise = new Promise((resolve, reject) => {
-                bob.client.on("crypto.verification.request", request => {
-                    request.verifier.on("show_sas", (e) => {
+            bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
+                bob.client.on(CryptoEvent.VerificationRequest, request => {
+                    request.verifier!.on("show_sas", (e) => {
                         if (!e.sas.emoji || !e.sas.decimal) {
                             e.cancel();
                         } else if (!aliceSasEvent) {
@@ -156,14 +157,14 @@ describe("SAS verification", function() {
                             }
                         }
                     });
-                    resolve(request.verifier);
+                    resolve(request.verifier!);
                 });
             });
 
             aliceVerifier = alice.client.beginKeyVerification(
-                verificationMethods.SAS, bob.client.getUserId(), bob.deviceId,
+                verificationMethods.SAS, bob.client.getUserId()!, bob.deviceId!,
             );
-            aliceVerifier.on("show_sas", (e) => {
+            aliceVerifier.on(SasEvent.ShowSas, (e) => {
                 if (!e.sas.emoji || !e.sas.decimal) {
                     e.cancel();
                 } else if (!bobSasEvent) {
@@ -195,9 +196,9 @@ describe("SAS verification", function() {
             const origSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = function(type, map) {
                 if (type === "m.key.verification.accept") {
-                    macMethod = map[alice.client.getUserId()][alice.client.deviceId]
+                    macMethod = map[alice.client.getUserId()!][alice.client.deviceId!]
                         .message_authentication_code;
-                    keyAgreement = map[alice.client.getUserId()][alice.client.deviceId]
+                    keyAgreement = map[alice.client.getUserId()!][alice.client.deviceId!]
                         .key_agreement_protocol;
                 }
                 return origSendToDevice(type, map);
@@ -219,8 +220,8 @@ describe("SAS verification", function() {
             await Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => verifier.verify()),
-                alice.httpBackend.flush(),
-                bob.httpBackend.flush(),
+                alice.httpBackend.flush(undefined),
+                bob.httpBackend.flush(undefined),
             ]);
 
             // make sure that it uses the preferred method
@@ -230,10 +231,10 @@ describe("SAS verification", function() {
             // make sure Alice and Bob verified each other
             const bobDevice
                   = await alice.client.getStoredDevice("@bob:example.com", "Dynabook");
-            expect(bobDevice.isVerified()).toBeTruthy();
+            expect(bobDevice?.isVerified()).toBeTruthy();
             const aliceDevice
                   = await bob.client.getStoredDevice("@alice:example.com", "Osborne2");
-            expect(aliceDevice.isVerified()).toBeTruthy();
+            expect(aliceDevice?.isVerified()).toBeTruthy();
         });
 
         it("should be able to verify using the old base64", async () => {
@@ -248,7 +249,7 @@ describe("SAS verification", function() {
                     // has, since it is the same object.  If this does not
                     // happen, the verification will fail due to a hash
                     // commitment mismatch.
-                    map[bob.client.getUserId()][bob.client.deviceId]
+                    map[bob.client.getUserId()!][bob.client.deviceId!]
                         .message_authentication_codes = ['hkdf-hmac-sha256'];
                 }
                 return aliceOrigSendToDevice(type, map);
@@ -256,7 +257,7 @@ describe("SAS verification", function() {
             const bobOrigSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = (type, map) => {
                 if (type === "m.key.verification.accept") {
-                    macMethod = map[alice.client.getUserId()][alice.client.deviceId]
+                    macMethod = map[alice.client.getUserId()!][alice.client.deviceId!]
                         .message_authentication_code;
                 }
                 return bobOrigSendToDevice(type, map);
@@ -278,18 +279,18 @@ describe("SAS verification", function() {
             await Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => verifier.verify()),
-                alice.httpBackend.flush(),
-                bob.httpBackend.flush(),
+                alice.httpBackend.flush(undefined),
+                bob.httpBackend.flush(undefined),
             ]);
 
             expect(macMethod).toBe("hkdf-hmac-sha256");
 
             const bobDevice
                   = await alice.client.getStoredDevice("@bob:example.com", "Dynabook");
-            expect(bobDevice.isVerified()).toBeTruthy();
+            expect(bobDevice!.isVerified()).toBeTruthy();
             const aliceDevice
                   = await bob.client.getStoredDevice("@alice:example.com", "Osborne2");
-            expect(aliceDevice.isVerified()).toBeTruthy();
+            expect(aliceDevice!.isVerified()).toBeTruthy();
         });
 
         it("should be able to verify using the old MAC", async () => {
@@ -304,7 +305,7 @@ describe("SAS verification", function() {
                     // has, since it is the same object.  If this does not
                     // happen, the verification will fail due to a hash
                     // commitment mismatch.
-                    map[bob.client.getUserId()][bob.client.deviceId]
+                    map[bob.client.getUserId()!][bob.client.deviceId!]
                         .message_authentication_codes = ['hmac-sha256'];
                 }
                 return aliceOrigSendToDevice(type, map);
@@ -312,7 +313,7 @@ describe("SAS verification", function() {
             const bobOrigSendToDevice = bob.client.sendToDevice.bind(bob.client);
             bob.client.sendToDevice = (type, map) => {
                 if (type === "m.key.verification.accept") {
-                    macMethod = map[alice.client.getUserId()][alice.client.deviceId]
+                    macMethod = map[alice.client.getUserId()!][alice.client.deviceId!]
                         .message_authentication_code;
                 }
                 return bobOrigSendToDevice(type, map);
@@ -334,18 +335,18 @@ describe("SAS verification", function() {
             await Promise.all([
                 aliceVerifier.verify(),
                 bobPromise.then((verifier) => verifier.verify()),
-                alice.httpBackend.flush(),
-                bob.httpBackend.flush(),
+                alice.httpBackend.flush(undefined),
+                bob.httpBackend.flush(undefined),
             ]);
 
             expect(macMethod).toBe("hmac-sha256");
 
             const bobDevice
                   = await alice.client.getStoredDevice("@bob:example.com", "Dynabook");
-            expect(bobDevice.isVerified()).toBeTruthy();
+            expect(bobDevice?.isVerified()).toBeTruthy();
             const aliceDevice
                   = await bob.client.getStoredDevice("@alice:example.com", "Osborne2");
-            expect(aliceDevice.isVerified()).toBeTruthy();
+            expect(aliceDevice?.isVerified()).toBeTruthy();
         });
 
         it("should verify a cross-signing key", async () => {
@@ -361,9 +362,11 @@ describe("SAS verification", function() {
 
             await resetCrossSigningKeys(bob.client);
 
-            bob.client.crypto.deviceList.storeCrossSigningForUser(
+            bob.client.crypto!.deviceList.storeCrossSigningForUser(
                 "@alice:example.com", {
-                    keys: alice.client.crypto.crossSigningInfo.keys,
+                    keys: alice.client.crypto!.crossSigningInfo.keys,
+                    crossSigningVerifiedBefore: false,
+                    firstUse: true,
                 },
             );
 
@@ -415,10 +418,10 @@ describe("SAS verification", function() {
 
         const bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
             bob.client.on(CryptoEvent.VerificationRequest, request => {
-                request.verifier.on("show_sas", (e) => {
+                request.verifier!.on("show_sas", (e) => {
                     e.mismatch();
                 });
-                resolve(request.verifier);
+                resolve(request.verifier!);
             });
         });
 
@@ -464,7 +467,7 @@ describe("SAS verification", function() {
                 },
             );
 
-            alice.client.crypto.setDeviceVerification = jest.fn();
+            alice.client.crypto!.setDeviceVerification = jest.fn();
             alice.client.getDeviceEd25519Key = () => {
                 return "alice+base64+ed25519+key";
             };
@@ -482,7 +485,7 @@ describe("SAS verification", function() {
                 return Promise.resolve();
             };
 
-            bob.client.crypto.setDeviceVerification = jest.fn();
+            bob.client.crypto!.setDeviceVerification = jest.fn();
             bob.client.getStoredDevice = () => {
                 return DeviceInfo.fromStorage(
                     {
@@ -565,7 +568,7 @@ describe("SAS verification", function() {
             ]);
 
             // make sure Alice and Bob verified each other
-            expect(alice.client.crypto.setDeviceVerification)
+            expect(alice.client.crypto!.setDeviceVerification)
                 .toHaveBeenCalledWith(
                     bob.client.getUserId(),
                     bob.client.deviceId,
@@ -574,7 +577,7 @@ describe("SAS verification", function() {
                     null,
                     { "ed25519:Dynabook": "bob+base64+ed25519+key" },
                 );
-            expect(bob.client.crypto.setDeviceVerification)
+            expect(bob.client.crypto!.setDeviceVerification)
                 .toHaveBeenCalledWith(
                     alice.client.getUserId(),
                     alice.client.deviceId,

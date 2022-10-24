@@ -23,18 +23,18 @@ export interface Curve25519SessionData {
     mac: string;
 }
 
-export interface IKeyBackupSession {
-    first_message_index: number; // eslint-disable-line camelcase
-    forwarded_count: number; // eslint-disable-line camelcase
-    is_verified: boolean; // eslint-disable-line camelcase
-    session_data: Curve25519SessionData | IEncryptedPayload; // eslint-disable-line camelcase
+/* eslint-disable camelcase */
+export interface IKeyBackupSession<T = Curve25519SessionData | IEncryptedPayload> {
+    first_message_index: number;
+    forwarded_count: number;
+    is_verified: boolean;
+    session_data: T;
 }
 
 export interface IKeyBackupRoomSessions {
     [sessionId: string]: IKeyBackupSession;
 }
 
-/* eslint-disable camelcase */
 export interface ICurve25519AuthData {
     public_key: string;
     private_key_salt?: string;

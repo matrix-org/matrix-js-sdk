@@ -39,7 +39,7 @@ export async function createSecretStorageKey(): Promise<IRecoveryKey> {
     decryption.free();
     return {
         // `pubkey` not used anymore with symmetric 4S
-        keyInfo: { pubkey: storagePublicKey, key: undefined },
+        keyInfo: { pubkey: storagePublicKey, key: undefined! },
         privateKey: storagePrivateKey,
     };
 }

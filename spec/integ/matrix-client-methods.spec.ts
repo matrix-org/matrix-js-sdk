@@ -139,7 +139,7 @@ describe("MatrixClient", function() {
             const r = client!.cancelUpload(prom);
             expect(r).toBe(true);
             await expect(prom).rejects.toThrow("Aborted");
-            expect(client.getCurrentUploads()).toHaveLength(0);
+            expect(client!.getCurrentUploads()).toHaveLength(0);
         });
     });
 
@@ -178,7 +178,7 @@ describe("MatrixClient", function() {
                 expect(request.data.third_party_signed).toEqual(signature);
             }).respond(200, { room_id: roomId });
 
-            const prom = client.joinRoom(roomId, {
+            const prom = client!.joinRoom(roomId, {
                 inviteSignUrl,
                 viaServers,
             });
@@ -1164,18 +1164,18 @@ describe("MatrixClient", function() {
 
     describe("logout", () => {
         it("should abort pending requests when called with stopClient=true", async () => {
-            httpBackend.when("POST", "/logout").respond(200, {});
+            httpBackend!.when("POST", "/logout").respond(200, {});
             const fn = jest.fn();
-            client.http.request(Method.Get, "/test").catch(fn);
-            client.logout(true);
-            await httpBackend.flush(undefined);
+            client!.http.request(Method.Get, "/test").catch(fn);
+            client!.logout(true);
+            await httpBackend!.flush(undefined);
             expect(fn).toHaveBeenCalled();
         });
     });
 
     describe("sendHtmlEmote", () => {
         it("should send valid html emote", async () => {
-            httpBackend.when("PUT", "/send").check(req => {
+            httpBackend!.when("PUT", "/send").check(req => {
                 expect(req.data).toStrictEqual({
                     "msgtype": "m.emote",
                     "body": "Body",
@@ -1184,15 +1184,15 @@ describe("MatrixClient", function() {
                     "org.matrix.msc1767.message": expect.anything(),
                 });
             }).respond(200, { event_id: "$foobar" });
-            const prom = client.sendHtmlEmote("!room:server", "Body", "<h1>Body</h1>");
-            await httpBackend.flush(undefined);
+            const prom = client!.sendHtmlEmote("!room:server", "Body", "<h1>Body</h1>");
+            await httpBackend!.flush(undefined);
             await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
         });
     });
 
     describe("sendHtmlMessage", () => {
         it("should send valid html message", async () => {
-            httpBackend.when("PUT", "/send").check(req => {
+            httpBackend!.when("PUT", "/send").check(req => {
                 expect(req.data).toStrictEqual({
                     "msgtype": "m.text",
                     "body": "Body",
@@ -1201,24 +1201,24 @@ describe("MatrixClient", function() {
                     "org.matrix.msc1767.message": expect.anything(),
                 });
             }).respond(200, { event_id: "$foobar" });
-            const prom = client.sendHtmlMessage("!room:server", "Body", "<h1>Body</h1>");
-            await httpBackend.flush(undefined);
+            const prom = client!.sendHtmlMessage("!room:server", "Body", "<h1>Body</h1>");
+            await httpBackend!.flush(undefined);
             await expect(prom).resolves.toStrictEqual({ event_id: "$foobar" });
         });
     });
 
     describe("forget", () => {
         it("should remove from store by default", async () => {
-            const room = new Room("!roomId:server", client, userId);
-            client.store.storeRoom(room);
-            expect(client.store.getRooms()).toContain(room);
+            const room = new Room("!roomId:server", client!, userId);
+            client!.store.storeRoom(room);
+            expect(client!.store.getRooms()).toContain(room);
 
-            httpBackend.when("POST", "/forget").respond(200, {});
+            httpBackend!.when("POST", "/forget").respond(200, {});
             await Promise.all([
-                client.forget(room.roomId),
-                httpBackend.flushAllExpected(),
+                client!.forget(room.roomId),
+                httpBackend!.flushAllExpected(),
             ]);
-            expect(client.store.getRooms()).not.toContain(room);
+            expect(client!.store.getRooms()).not.toContain(room);
         });
     });
 
@@ -1254,6 +1254,20 @@ describe("MatrixClient", function() {
         });
     });
 
+    describe("agreeToTerms", () => {
+        it("should send `user_accepts` via body of POST request", async () => {
+            const terms = ["https://vector.im/notice-1"];
+
+            httpBackend!.when("POST", "/terms").check(req => {
+                expect(req.data.user_accepts).toStrictEqual(terms);
+            }).respond(200, {});
+
+            const prom = client!.agreeToTerms(SERVICE_TYPES.IS, "https://vector.im", "at", terms);
+            await httpBackend!.flushAllExpected();
+            await prom;
+        });
+    });
+
     describe("publicRooms", () => {
         it("should use GET request if no server or filter is specified", () => {
             httpBackend!.when("GET", "/publicRooms").respond(200, {});
@@ -1263,7 +1277,7 @@ describe("MatrixClient", function() {
 
         it("should use GET request if only server is specified", () => {
             httpBackend!.when("GET", "/publicRooms").check(request => {
-                expect(request.queryParams.server).toBe("server1");
+                expect(request.queryParams?.server).toBe("server1");
             }).respond(200, {});
             client!.publicRooms({ server: "server1" });
             return httpBackend!.flushAllExpected();
@@ -1292,8 +1306,32 @@ describe("MatrixClient", function() {
             const resp = await prom;
             expect(resp.access_token).toBe(token);
             expect(resp.user_id).toBe(userId);
-            expect(client.getUserId()).toBe(userId);
-            expect(client.http.opts.accessToken).toBe(token);
+            expect(client!.getUserId()).toBe(userId);
+            expect(client!.http.opts.accessToken).toBe(token);
+        });
+    });
+
+    describe("registerWithIdentityServer", () => {
+        it("should pass data to POST request", async () => {
+            const token = {
+                access_token: "access_token",
+                token_type: "Bearer",
+                matrix_server_name: "server_name",
+                expires_in: 12345,
+            };
+
+            httpBackend!.when("POST", "/account/register").check(req => {
+                expect(req.data).toStrictEqual(token);
+            }).respond(200, {
+                access_token: "at",
+                token: "tt",
+            });
+
+            const prom = client!.registerWithIdentityServer(token);
+            await httpBackend!.flushAllExpected();
+            const resp = await prom;
+            expect(resp.access_token).toBe("at");
+            expect(resp.token).toBe("tt");
         });
     });
 });

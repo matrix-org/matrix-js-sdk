@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MethodKeysOf, mocked, MockedObject } from "jest-mock";
+import { MethodLikeKeys, mocked, MockedObject } from "jest-mock";
 
 import { ClientEventHandlerMap, EmittedEvents, MatrixClient } from "../../src/client";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
@@ -26,7 +26,7 @@ import { User } from "../../src/models/user";
  * to MatrixClient events
  */
 export class MockClientWithEventEmitter extends TypedEventEmitter<EmittedEvents, ClientEventHandlerMap> {
-    constructor(mockProperties: Partial<Record<MethodKeysOf<MatrixClient>, unknown>> = {}) {
+    constructor(mockProperties: Partial<Record<MethodLikeKeys<MatrixClient>, unknown>> = {}) {
         super();
         Object.assign(this, mockProperties);
     }
@@ -44,7 +44,7 @@ export class MockClientWithEventEmitter extends TypedEventEmitter<EmittedEvents,
  * ```
  */
 export const getMockClientWithEventEmitter = (
-    mockProperties: Partial<Record<MethodKeysOf<MatrixClient>, unknown>>,
+    mockProperties: Partial<Record<MethodLikeKeys<MatrixClient>, unknown>>,
 ): MockedObject<MatrixClient> => {
     const mock = mocked(new MockClientWithEventEmitter(mockProperties) as unknown as MatrixClient);
     return mock;
@@ -84,7 +84,7 @@ export const mockClientMethodsEvents = () => ({
 /**
  * Returns basic mocked client methods related to server support
  */
-export const mockClientMethodsServer = (): Partial<Record<MethodKeysOf<MatrixClient>, unknown>> => ({
+export const mockClientMethodsServer = (): Partial<Record<MethodLikeKeys<MatrixClient>, unknown>> => ({
     doesServerSupportSeparateAddAndBind: jest.fn(),
     getIdentityServerUrl: jest.fn(),
     getHomeserverUrl: jest.fn(),

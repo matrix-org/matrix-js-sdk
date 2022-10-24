@@ -20,7 +20,7 @@ import { MediaPrefix } from "./prefix";
 import * as utils from "../utils";
 import * as callbacks from "../realtime-callbacks";
 import { Method } from "./method";
-import { ConnectionError, MatrixError } from "./errors";
+import { ConnectionError } from "./errors";
 import { parseErrorResponse } from "./utils";
 
 export * from "./interface";
@@ -112,13 +112,11 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                                 defer.resolve(JSON.parse(xhr.responseText));
                             }
                         } catch (err) {
-                            if (err.name === "AbortError") {
+                            if ((<Error>err).name === "AbortError") {
                                 defer.reject(err);
                                 return;
                             }
-
-                            (<MatrixError>err).httpStatus = xhr.status;
-                            defer.reject(new ConnectionError("request failed", err));
+                            defer.reject(new ConnectionError("request failed", <Error>err));
                         }
                         break;
                 }
@@ -209,7 +207,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             base: this.opts.baseUrl,
             path: MediaPrefix.R0 + "/upload",
             params: {
-                access_token: this.opts.accessToken,
+                access_token: this.opts.accessToken!,
             },
         };
     }
