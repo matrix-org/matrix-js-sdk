@@ -30,7 +30,7 @@ import {
     ITurnServer,
 } from "matrix-widget-api";
 
-import { createRoomWidgetClient } from "../../src/matrix";
+import { createRoomWidgetClient, MsgType } from "../../src/matrix";
 import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
 import { SyncState } from "../../src/sync";
 import { ICapabilities } from "../../src/embedded";
@@ -43,10 +43,15 @@ class MockWidgetApi extends EventEmitter {
     public requestCapability = jest.fn();
     public requestCapabilities = jest.fn();
     public requestCapabilityForRoomTimeline = jest.fn();
+    public requestCapabilityToSendEvent = jest.fn();
+    public requestCapabilityToReceiveEvent = jest.fn();
+    public requestCapabilityToSendMessage = jest.fn();
+    public requestCapabilityToReceiveMessage = jest.fn();
     public requestCapabilityToSendState = jest.fn();
     public requestCapabilityToReceiveState = jest.fn();
     public requestCapabilityToSendToDevice = jest.fn();
     public requestCapabilityToReceiveToDevice = jest.fn();
+    public sendRoomEvent = jest.fn(() => ({ event_id: `$${Math.random()}` }));
     public sendStateEvent = jest.fn();
     public sendToDevice = jest.fn();
     public readStateEvents = jest.fn(() => []);
@@ -74,6 +79,66 @@ describe("RoomWidgetClient", () => {
         widgetApi.emit("ready");
         await client.startClient();
     };
+
+    describe("events", () => {
+        it("sends", async () => {
+            await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
+            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+            expect(widgetApi.requestCapabilityToSendEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
+            await client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 });
+            expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
+                "org.matrix.rageshake_request", { request_id: 123 }, "!1:example.org",
+            );
+        });
+
+        it("receives", async () => {
+            const event = new MatrixEvent({
+                type: "org.matrix.rageshake_request",
+                event_id: "$pduhfiidph",
+                room_id: "!1:example.org",
+                sender: "@alice:example.org",
+                content: { request_id: 123 },
+            }).getEffectiveEvent();
+
+            await makeClient({ receiveEvent: ["org.matrix.rageshake_request"] });
+            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+            expect(widgetApi.requestCapabilityToReceiveEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
+
+            const emittedEvent = new Promise<MatrixEvent>(resolve => client.once(ClientEvent.Event, resolve));
+            const emittedSync = new Promise<SyncState>(resolve => client.once(ClientEvent.Sync, resolve));
+            widgetApi.emit(
+                `action:${WidgetApiToWidgetAction.SendEvent}`,
+                new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
+            );
+
+            // The client should've emitted about the received event
+            expect((await emittedEvent).getEffectiveEvent()).toEqual(event);
+            expect(await emittedSync).toEqual(SyncState.Syncing);
+            // It should've also inserted the event into the room object
+            const room = client.getRoom("!1:example.org");
+            expect(room).not.toBeNull();
+            expect(room!.getLiveTimeline().getEvents().map(e => e.getEffectiveEvent())).toEqual([event]);
+        });
+    });
+
+    describe("messages", () => {
+        it("requests permissions for specific message types", async () => {
+            await makeClient({ sendMessage: [MsgType.Text], receiveMessage: [MsgType.Text] });
+            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+            expect(widgetApi.requestCapabilityToSendMessage).toHaveBeenCalledWith(MsgType.Text);
+            expect(widgetApi.requestCapabilityToReceiveMessage).toHaveBeenCalledWith(MsgType.Text);
+        });
+
+        it("requests permissions for all message types", async () => {
+            await makeClient({ sendMessage: true, receiveMessage: true });
+            expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
+            expect(widgetApi.requestCapabilityToSendMessage).toHaveBeenCalledWith();
+            expect(widgetApi.requestCapabilityToReceiveMessage).toHaveBeenCalledWith();
+        });
+
+        // No point in testing sending and receiving since it's done exactly the
+        // same way as non-message events
+    });
 
     describe("state events", () => {
         const event = new MatrixEvent({
