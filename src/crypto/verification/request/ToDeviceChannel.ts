@@ -250,10 +250,11 @@ export class ToDeviceChannel implements IVerificationChannel {
      * @returns {Promise} the promise of the request
      */
     public async sendCompleted(type: string, content: Record<string, any>): Promise<void> {
+        let result;
         if (type === REQUEST_TYPE || (type === CANCEL_TYPE && !this.deviceId)) {
-            await this.sendToDevices(type, content, this.devices);
+            result = await this.sendToDevices(type, content, this.devices);
         } else {
-            await this.sendToDevices(type, content, [this.deviceId!]);
+            result = await this.sendToDevices(type, content, [this.deviceId!]);
         }
         // the VerificationRequest state machine requires remote echos of the event
         // the client sends itself, so we fake this for to_device messages
@@ -269,6 +270,7 @@ export class ToDeviceChannel implements IVerificationChannel {
             /*isRemoteEcho=*/true,
             /*isSentByUs=*/true,
         );
+        return result;
     }
 
     private async sendToDevices(type: string, content: Record<string, any>, devices: string[]): Promise<void> {

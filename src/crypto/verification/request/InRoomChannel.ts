@@ -198,7 +198,7 @@ export class InRoomChannel implements IVerificationChannel {
             return;
         }
         // set userId if not set already
-        if (this.userId === null) {
+        if (!this.userId) {
             const userId = InRoomChannel.getOtherPartyUserId(event, this.client);
             if (userId) {
                 this.userId = userId;
@@ -207,7 +207,7 @@ export class InRoomChannel implements IVerificationChannel {
         // ignore events not sent by us or the other party
         const ownUserId = this.client.getUserId();
         const sender = event.getSender();
-        if (this.userId !== null) {
+        if (this.userId) {
             if (sender !== ownUserId && sender !== this.userId) {
                 logger.log(`InRoomChannel: ignoring verification event from non-participating sender ${sender}`);
                 return;
