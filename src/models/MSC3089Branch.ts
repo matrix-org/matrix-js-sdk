@@ -62,7 +62,7 @@ export class MSC3089Branch {
     }
 
     private get roomId(): string {
-        return this.indexEvent.getRoomId();
+        return this.indexEvent.getRoomId()!;
     }
 
     /**
@@ -223,7 +223,7 @@ export class MSC3089Branch {
         do {
             childEvent = timelineEvents.find(e => e.replacingEventId() === parentEvent.getId());
             if (childEvent) {
-                const branch = this.directory.getFile(childEvent.getId());
+                const branch = this.directory.getFile(childEvent.getId()!);
                 if (branch) {
                     fileHistory.push(branch);
                     parentEvent = childEvent;

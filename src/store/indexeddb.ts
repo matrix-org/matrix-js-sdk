@@ -28,6 +28,7 @@ import { ISyncResponse } from "../sync-accumulator";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
+import { IStoredClientOpts } from "../client";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -269,11 +270,11 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.clearOutOfBandMembers(roomId);
     }, "clearOutOfBandMembers");
 
-    public getClientOptions = this.degradable((): Promise<object> => {
+    public getClientOptions = this.degradable((): Promise<IStoredClientOpts | undefined> => {
         return this.backend.getClientOptions();
     }, "getClientOptions");
 
-    public storeClientOptions = this.degradable((options: object): Promise<void> => {
+    public storeClientOptions = this.degradable((options: IStoredClientOpts): Promise<void> => {
         super.storeClientOptions(options);
         return this.backend.storeClientOptions(options);
     }, "storeClientOptions");

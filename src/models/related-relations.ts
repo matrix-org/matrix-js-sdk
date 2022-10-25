@@ -26,7 +26,7 @@ export class RelatedRelations {
     }
 
     public getRelations(): MatrixEvent[] {
-        return this.relations.reduce((c, p) => [...c, ...p.getRelations()], []);
+        return this.relations.reduce<MatrixEvent[]>((c, p) => [...c, ...p.getRelations()], []);
     }
 
     public on<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>) {

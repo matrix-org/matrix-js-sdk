@@ -379,7 +379,9 @@ export function globToRegexp(glob: string, extended = false): string {
     const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
         [/\\\*/g, '.*'],
         [/\?/g, '.'],
-        !extended && [
+    ];
+    if (!extended) {
+        replacements.push([
             /\\\[(!|)(.*)\\]/g,
             (_match: string, neg: string, pat: string) => [
                 '[',
@@ -387,8 +389,8 @@ export function globToRegexp(glob: string, extended = false): string {
                 pat.replace(/\\-/, '-'),
                 ']',
             ].join(''),
-        ],
-    ];
+        ]);
+    }
     return replacements.reduce(
         // https://github.com/microsoft/TypeScript/issues/30134
         (pat, args) => args ? pat.replace(args[0], args[1] as any) : pat,
@@ -396,8 +398,11 @@ export function globToRegexp(glob: string, extended = false): string {
     );
 }
 
-export function ensureNoTrailingSlash(url: string): string {
-    if (url && url.endsWith("/")) {
+export function ensureNoTrailingSlash(url: string): string;
+export function ensureNoTrailingSlash(url: undefined): undefined;
+export function ensureNoTrailingSlash(url?: string): string | undefined;
+export function ensureNoTrailingSlash(url?: string): string | undefined {
+    if (url?.endsWith("/")) {
         return url.slice(0, -1);
     } else {
         return url;

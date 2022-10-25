@@ -140,11 +140,11 @@ describe.each([
             ],
         });
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
-        expect(httpBackend.flushSync(null, 1)).toEqual(1);
+        expect(httpBackend.flushSync(undefined, 1)).toEqual(1);
 
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
 
-        expect(httpBackend.flushSync(null, 1)).toEqual(1);
+        expect(httpBackend.flushSync(undefined, 1)).toEqual(1);
 
         // flush, as per comment in first test
         await flushPromises();
@@ -164,7 +164,7 @@ describe.each([
             ],
         });
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
-        expect(httpBackend.flushSync(null, 1)).toEqual(1);
+        expect(httpBackend.flushSync(undefined, 1)).toEqual(1);
 
         // Asserting that another request is never made is obviously
         // a bit tricky - we just flush the queue what should hopefully
@@ -200,7 +200,7 @@ describe.each([
             ],
         });
         await flushAndRunTimersUntil(() => httpBackend.requests.length > 0);
-        expect(httpBackend.flushSync(null, 1)).toEqual(1);
+        expect(httpBackend.flushSync(undefined, 1)).toEqual(1);
         await flushPromises();
 
         logger.info("Advancing clock to just before expected retry time...");
@@ -215,7 +215,7 @@ describe.each([
         jest.advanceTimersByTime(2000);
         await flushPromises();
 
-        expect(httpBackend.flushSync(null, 1)).toEqual(1);
+        expect(httpBackend.flushSync(undefined, 1)).toEqual(1);
     });
 
     it("retries on retryImmediately()", async function() {
@@ -223,7 +223,7 @@ describe.each([
             versions: ["r0.0.1"],
         });
 
-        await Promise.all([client.startClient(), httpBackend.flush(null, 1, 20)]);
+        await Promise.all([client.startClient(), httpBackend.flush(undefined, 1, 20)]);
 
         httpBackend.when(
             "PUT", "/sendToDevice/org.example.foo/",
@@ -239,13 +239,13 @@ describe.each([
                 FAKE_MSG,
             ],
         });
-        expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
+        expect(await httpBackend.flush(undefined, 1, 1)).toEqual(1);
         await flushPromises();
 
         client.retryImmediately();
 
         // longer timeout here to try & avoid flakiness
-        expect(await httpBackend.flush(null, 1, 3000)).toEqual(1);
+        expect(await httpBackend.flush(undefined, 1, 3000)).toEqual(1);
     });
 
     it("retries on when client is started", async function() {
@@ -269,13 +269,13 @@ describe.each([
                 FAKE_MSG,
             ],
         });
-        expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
+        expect(await httpBackend.flush(undefined, 1, 1)).toEqual(1);
         await flushPromises();
 
         client.stopClient();
         await Promise.all([client.startClient(), httpBackend.flush("/_matrix/client/versions", 1, 20)]);
 
-        expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
+        expect(await httpBackend.flush(undefined, 1, 20)).toEqual(1);
     });
 
     it("retries when a message is retried", async function() {
@@ -283,7 +283,7 @@ describe.each([
             versions: ["r0.0.1"],
         });
 
-        await Promise.all([client.startClient(), httpBackend.flush(null, 1, 20)]);
+        await Promise.all([client.startClient(), httpBackend.flush(undefined, 1, 20)]);
 
         httpBackend.when(
             "PUT", "/sendToDevice/org.example.foo/",
@@ -300,7 +300,7 @@ describe.each([
             ],
         });
 
-        expect(await httpBackend.flush(null, 1, 1)).toEqual(1);
+        expect(await httpBackend.flush(undefined, 1, 1)).toEqual(1);
         await flushPromises();
 
         const dummyEvent = new MatrixEvent({
@@ -311,7 +311,7 @@ describe.each([
         } as unknown as Room;
         client.resendEvent(dummyEvent, mockRoom);
 
-        expect(await httpBackend.flush(null, 1, 20)).toEqual(1);
+        expect(await httpBackend.flush(undefined, 1, 20)).toEqual(1);
     });
 
     it("splits many messages into multiple HTTP requests", async function() {

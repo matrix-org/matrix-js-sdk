@@ -172,7 +172,7 @@ describe("RoomState", function() {
             state.on(RoomStateEvent.Members, function(ev, st, mem) {
                 expect(ev).toEqual(memberEvents[emitCount]);
                 expect(st).toEqual(state);
-                expect(mem).toEqual(state.getMember(ev.getSender()));
+                expect(mem).toEqual(state.getMember(ev.getSender()!));
                 emitCount += 1;
             });
             state.setStateEvents(memberEvents);

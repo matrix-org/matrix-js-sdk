@@ -73,7 +73,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     }
 
     public get beaconInfoId(): string {
-        return this.rootEvent.getId();
+        return this.rootEvent.getId()!;
     }
 
     public get beaconInfoOwner(): string {

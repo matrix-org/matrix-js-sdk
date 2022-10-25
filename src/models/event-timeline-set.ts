@@ -459,7 +459,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         let lastEventWasNew = false;
         for (let i = 0; i < events.length; i++) {
             const event = events[i];
-            const eventId = event.getId();
+            const eventId = event.getId()!;
 
             const existingTimeline = this._eventIdToTimeline.get(eventId);
 
@@ -612,7 +612,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             }
         }
 
-        const timeline = this._eventIdToTimeline.get(event.getId());
+        const timeline = this._eventIdToTimeline.get(event.getId()!);
         if (timeline) {
             if (duplicateStrategy === DuplicateStrategy.Replace) {
                 debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " + event.getId());
@@ -702,7 +702,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
         }
 
-        const eventId = event.getId();
+        const eventId = event.getId()!;
         timeline.addEvent(event, {
             toStartOfTimeline,
             roomState,

@@ -437,6 +437,7 @@ describe("Secrets", function() {
                                     return [keyId, secretStorageKeys[keyId]];
                                 }
                             }
+                            return null;
                         },
                     },
                 },
@@ -571,6 +572,7 @@ describe("Secrets", function() {
                                     return [keyId, secretStorageKeys[keyId]];
                                 }
                             }
+                            return null;
                         },
                     },
                 },

@@ -161,7 +161,7 @@ export class CallEventHandler {
             logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
             call = createNewMatrixCall(
                 this.client,
-                event.getRoomId(),
+                event.getRoomId()!,
                 { forceTURN: this.client.forceTURN },
             ) ?? undefined;
             if (!call) {
@@ -250,7 +250,7 @@ export class CallEventHandler {
                 // if not live, store the fact that the call has ended because
                 // we're probably getting events backwards so
                 // the hangup will come before the invite
-                call = createNewMatrixCall(this.client, event.getRoomId()) ?? undefined;
+                call = createNewMatrixCall(this.client, event.getRoomId()!) ?? undefined;
                 if (call) {
                     call.callId = content.call_id;
                     call.initWithHangup(event);

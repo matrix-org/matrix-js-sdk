@@ -131,7 +131,11 @@ function makeRemoteEcho(event) {
     }));
 }
 
-async function distributeEvent(ownRequest, theirRequest, event) {
+async function distributeEvent(
+    ownRequest: VerificationRequest,
+    theirRequest: VerificationRequest,
+    event: MatrixEvent,
+): Promise<void> {
     await ownRequest.channel.handleEvent(
         makeRemoteEcho(event),
         ownRequest,

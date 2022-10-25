@@ -2134,7 +2134,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.direction = CallDirection.Outbound;
 
         // XXX Find a better way to do this
-        this.client.callEventHandler.calls.set(this.callId, this);
+        this.client.callEventHandler!.calls.set(this.callId, this);
 
         // make sure we have valid turn creds. Unless something's gone wrong, it should
         // poll and keep the credentials valid so this should be instant.
