@@ -1,10 +1,5 @@
-Changes in [21.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.0.0-rc.2) (2022-10-24)
-============================================================================================================
-
- * Fix POST data not being passed for registerWithIdentityServer ([\#2769](https://github.com/matrix-org/matrix-js-sdk/pull/2769)). Fixes matrix-org/element-web-rageshakes#16206.
-
-Changes in [21.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.0.0-rc.1) (2022-10-18)
-============================================================================================================
+Changes in [21.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.0.0) (2022-10-25)
+==================================================================================================
 
 ## 🚨 BREAKING CHANGES
  * Changes the `uploadContent` API, kills off `request` and `browser-request` in favour of `fetch`, removed callback support on a lot of the methods, adds a lot of tests. ([\#2719](https://github.com/matrix-org/matrix-js-sdk/pull/2719)). Fixes #2415 and #801.
@@ -22,6 +17,7 @@ Changes in [21.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
  * Use stable calls to `/room_keys` ([\#2729](https://github.com/matrix-org/matrix-js-sdk/pull/2729)). Fixes vector-im/element-web#22839.
 
 ## 🐛 Bug Fixes
+ * Fix POST data not being passed for registerWithIdentityServer ([\#2769](https://github.com/matrix-org/matrix-js-sdk/pull/2769)). Fixes matrix-org/element-web-rageshakes#16206.
  * Fix IdentityPrefix.V2 containing spurious `/api` ([\#2761](https://github.com/matrix-org/matrix-js-sdk/pull/2761)). Fixes vector-im/element-web#23505.
  * Always send back an httpStatus property if one is known ([\#2753](https://github.com/matrix-org/matrix-js-sdk/pull/2753)).
  * Check for AbortError, not any generic connection error, to avoid tightlooping ([\#2752](https://github.com/matrix-org/matrix-js-sdk/pull/2752)).
