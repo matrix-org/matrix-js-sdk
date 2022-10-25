@@ -690,7 +690,6 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             // Everything higher than the gap needs to be shifted left.
             this.removeEntry(listIndex, gapIndex);
         }
-        console.log("post-process", listIndex, JSON.stringify(this.lists[listIndex].roomIndexToRoomId));
     }
 
     /**
