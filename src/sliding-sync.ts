@@ -641,8 +641,12 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             // starting at the gap so we can just shift each element in turn
                             this.shiftLeft(listIndex, op.index, gapIndex);
                         }
-                        gapIndex = -1; // forget the gap, we don't need it anymore.
                     }
+                    // forget the gap, we don't need it anymore. This is outside the check for
+                    // a room being present in this index position because INSERTs always universally
+                    // forget the gap, not conditionally based on the presence of a room in the INSERT
+                    // position. Without this, DELETE 0; INSERT 0; would do the wrong thing.
+                    gapIndex = -1;
                     this.lists[listIndex].roomIndexToRoomId[op.index] = op.room_id;
                     break;
                 }
@@ -686,6 +690,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             // Everything higher than the gap needs to be shifted left.
             this.removeEntry(listIndex, gapIndex);
         }
+        console.log("post-process", listIndex, JSON.stringify(this.lists[listIndex].roomIndexToRoomId));
     }
 
     /**
