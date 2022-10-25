@@ -25,6 +25,7 @@ import {
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
+import * as utils from "./utils";
 
 /**
  * @param {Object} obj
@@ -125,7 +126,7 @@ export class Filter {
      * @return {Object} The filter definition
      */
     public getDefinition(): IFilterDefinition {
-        return this.definition;
+        return utils.deepCopy(this.definition);
     }
 
     /**

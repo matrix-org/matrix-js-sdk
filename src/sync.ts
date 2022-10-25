@@ -627,6 +627,20 @@ export class SyncApi {
         }
     };
 
+    private async getOrCreateFilter(filter: Filter, suffix?: string): Promise<string | null> {
+        try {
+            return await this.client.getOrCreateFilter(getFilterName(this.client.getUserId()!, suffix), filter);
+        } catch (err) {
+            logger.error("Getting filter failed", err);
+            if (this.shouldAbortSync(<MatrixError>err)) return null;
+            // wait for saved sync to complete before doing anything else,
+            // otherwise the sync state will end up being incorrect
+            debuglog("Waiting for saved sync before retrying filter...");
+            await this.recoverFromSyncStartupError(this.savedSyncPromise, <Error>err);
+            return this.getOrCreateFilter(filter, suffix); // try again
+        }
+    }
+
     private getFilter = async (): Promise<{
         filterId?: string;
         filter?: Filter;
@@ -639,18 +653,8 @@ export class SyncApi {
             filter = this.buildDefaultFilter();
         }
 
-        let filterId: string;
-        try {
-            filterId = await this.client.getOrCreateFilter(getFilterName(this.client.credentials.userId!), filter);
-        } catch (err) {
-            logger.error("Getting filter failed", err);
-            if (this.shouldAbortSync(<MatrixError>err)) return {};
-            // wait for saved sync to complete before doing anything else,
-            // otherwise the sync state will end up being incorrect
-            debuglog("Waiting for saved sync before retrying filter...");
-            await this.recoverFromSyncStartupError(this.savedSyncPromise, <Error>err);
-            return this.getFilter(); // try again
-        }
+        const filterId = await this.getOrCreateFilter(filter);
+        if (!filterId) return {};
         return { filter, filterId };
     };
 
@@ -718,11 +722,16 @@ export class SyncApi {
                 debuglog("Sending first sync request...");
             } else {
                 debuglog("Sending initial sync request...");
+                const limit = this.opts.initialSyncLimit!;
                 const initialFilter = this.buildDefaultFilter();
                 initialFilter.setDefinition(filter.getDefinition());
-                initialFilter.setTimelineLimit(this.opts.initialSyncLimit!);
-                // Use an inline filter, no point uploading it for a single usage
-                firstSyncFilter = JSON.stringify(initialFilter.getDefinition());
+                initialFilter.setTimelineLimit(limit);
+
+                if (!utils.deepCompare(filter.getDefinition(), initialFilter.getDefinition())) {
+                    const initialFilterId = await this.getOrCreateFilter(initialFilter, `initial-${limit}`);
+                    if (!initialFilterId) return; // bail, getFilter failed
+                    firstSyncFilter = initialFilterId;
+                }
             }
 
             // Send this first sync request here so we can then wait for the saved

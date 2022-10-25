@@ -210,10 +210,14 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should honour lazyLoadMembers if user is not a guest", () => {
+            httpBackend!.expectedRequests = httpBackend!.expectedRequests.filter(req => req.path !== "/filter");
             client!.doesServerSupportLazyLoading = jest.fn().mockResolvedValue(true);
 
+            httpBackend!.when("POST", "/filter").check(req => {
+                expect(req.data.room.state.lazy_load_members).toBeTruthy();
+            }).respond(200, { filter_id: "initial-filter-id" });
             httpBackend!.when("GET", "/sync").check((req) => {
-                expect(JSON.parse(req.queryParams!.filter).room.state.lazy_load_members).toBeTruthy();
+                expect(req.queryParams!.filter).toBe("initial-filter-id");
             }).respond(200, syncData);
 
             client!.setGuest(false);
@@ -284,9 +288,13 @@ describe("MatrixClient syncing", () => {
         };
 
         it("should only apply initialSyncLimit to the initial sync", () => {
+            httpBackend!.when("POST", "/filter").check(req => {
+                expect(req.data.room?.timeline?.limit).toEqual(1);
+            }).respond(200, { filter_id: "initial-filter-id" });
+
             // 1st request
             httpBackend!.when("GET", "/sync").check((req) => {
-                expect(JSON.parse(req.queryParams!.filter).room.timeline.limit).toEqual(1);
+                expect(req.queryParams!.filter).toEqual("initial-filter-id");
             }).respond(200, syncData);
             // 2nd request
             httpBackend!.when("GET", "/sync").check((req) => {
