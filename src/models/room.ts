@@ -687,17 +687,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @return {string} user id of the inviter
      */
     public getDMInviter(): string | undefined {
-        if (this.myUserId) {
-            const me = this.getMember(this.myUserId);
-            if (me) {
-                return me.getDMInviter();
-            }
+        const me = this.getMember(this.myUserId);
+        if (me) {
+            return me.getDMInviter();
         }
+
         if (this.selfMembership === "invite") {
             // fall back to summary information
             const memberCount = this.getInvitedAndJoinedMemberCount();
-            if (memberCount == 2 && this.summaryHeroes?.length) {
-                return this.summaryHeroes[0];
+            if (memberCount === 2) {
+                return this.summaryHeroes?.[0];
             }
         }
     }

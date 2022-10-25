@@ -286,7 +286,7 @@ export class InteractiveAuth {
                     client_secret: this.clientSecret,
                 };
                 if (await this.matrixClient.doesServerRequireIdServerParam()) {
-                    const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl());
+                    const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl()!);
                     creds.id_server = idServerParsedUrl.host;
                 }
                 authDict = {

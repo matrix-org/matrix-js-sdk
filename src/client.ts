@@ -6229,7 +6229,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {Filter} filter
      * @return {Promise<String>} Filter ID
      */
-    public async getOrCreateFilter(filterName: string, filter: Filter): Promise<string | undefined> {
+    public async getOrCreateFilter(filterName: string, filter: Filter): Promise<string> {
         const filterId = this.store.getFilterIdByName(filterName);
         let existingId: string | undefined;
 
@@ -6275,7 +6275,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // debuglog("Created new filter ID %s: %s", createdFilter.filterId,
         //          JSON.stringify(createdFilter.getDefinition()));
         this.store.setFilterIdByName(filterName, createdFilter.filterId);
-        return createdFilter.filterId;
+        return createdFilter.filterId!;
     }
 
     /**
@@ -6326,7 +6326,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public get pollingTurnServers(): boolean {
-        return this.checkTurnServersIntervalID !== null;
+        return this.checkTurnServersIntervalID !== undefined;
     }
 
     // XXX: Intended private, used in code.

@@ -1765,6 +1765,45 @@ describe("Room", function() {
         });
     });
 
+    describe("getDMInviter", () => {
+        it("should delegate to RoomMember::getDMInviter if available", () => {
+            const room = new Room(roomId, null!, userA);
+            room.currentState.markOutOfBandMembersStarted();
+            room.currentState.setOutOfBandMembers([
+                new MatrixEvent({
+                    type: EventType.RoomMember,
+                    state_key: userA,
+                    sender: userB,
+                    content: {
+                        membership: "invite",
+                        is_direct: true,
+                    },
+                }),
+            ]);
+
+            expect(room.getDMInviter()).toBe(userB);
+        });
+
+        it("should fall back to summary heroes and return the first one", () => {
+            const room = new Room(roomId, null!, userA);
+            room.updateMyMembership("invite");
+            room.setSummary({
+                "m.heroes": [userA, userC],
+                "m.joined_member_count": 1,
+                "m.invited_member_count": 1,
+            });
+
+            expect(room.getDMInviter()).toBe(userC);
+        });
+
+        it("should return undefined if we're not joined or invited to the room", () => {
+            const room = new Room(roomId, null!, userA);
+            expect(room.getDMInviter()).toBeUndefined();
+            room.updateMyMembership("leave");
+            expect(room.getDMInviter()).toBeUndefined();
+        });
+    });
+
     describe("guessDMUserId", function() {
         it("should return first hero id", function() {
             const room = new Room(roomId, new TestClient(userA).client, userA);
@@ -1788,6 +1827,36 @@ describe("Room", function() {
         it("should return self if only member present", function() {
             const room = new Room(roomId, new TestClient(userA).client, userA);
             expect(room.guessDMUserId()).toEqual(userA);
+        });
+    });
+
+    describe("getAvatarFallbackMember", () => {
+        it("should should return undefined if the room isn't a 1:1", () => {
+            const room = new Room(roomId, null!, userA);
+            room.currentState.setJoinedMemberCount(2);
+            room.currentState.setInvitedMemberCount(1);
+            expect(room.getAvatarFallbackMember()).toBeUndefined();
+        });
+
+        it("should use summary heroes member if 1:1", () => {
+            const room = new Room(roomId, null!, userA);
+            room.currentState.markOutOfBandMembersStarted();
+            room.currentState.setOutOfBandMembers([
+                new MatrixEvent({
+                    type: EventType.RoomMember,
+                    state_key: userD,
+                    sender: userD,
+                    content: {
+                        membership: "join",
+                    },
+                }),
+            ]);
+            room.setSummary({
+                "m.heroes": [userA, userD],
+                "m.joined_member_count": 1,
+                "m.invited_member_count": 1,
+            });
+            expect(room.getAvatarFallbackMember()?.userId).toBe(userD);
         });
     });
 
