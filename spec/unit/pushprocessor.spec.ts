@@ -163,6 +163,22 @@ describe('NotificationService', function() {
                         "enabled": true,
                         "rule_id": ".m.rule.room_one_to_one",
                     },
+                    {
+                        rule_id: ".org.matrix.msc3914.rule.room.call",
+                        default: true,
+                        enabled: true,
+                        conditions: [
+                            {
+                                kind: "event_match",
+                                key: "type",
+                                pattern: "org.matrix.msc3401.call",
+                            },
+                            {
+                                kind: "call_started",
+                            },
+                        ],
+                        actions: ["notify", { set_tweak: "sound", value: "default" }],
+                    },
                 ],
                 "room": [],
                 "sender": [],
@@ -337,7 +353,11 @@ describe('NotificationService', function() {
         }, testEvent)).toBe(true);
     });
 
-    describe("performCustomEventHandling()", () => {
+    describe("group call started push rule", () => {
+        beforeEach(() => {
+            matrixClient.pushRules!.global!.underride!.find(r => r.rule_id === ".m.rule.fallback")!.enabled = false;
+        });
+
         const getActionsForEvent = (prevContent: IContent, content: IContent): IActionsObject => {
             testEvent = utils.mkEvent({
                 type: "org.matrix.msc3401.call",
@@ -353,15 +373,15 @@ describe('NotificationService', function() {
         };
 
         const assertDoesNotify = (actions: IActionsObject): void => {
-            expect(actions.notify).toBeTruthy();
-            expect(actions.tweaks.sound).toBeTruthy();
-            expect(actions.tweaks.highlight).toBeFalsy();
+            expect(actions?.notify).toBeTruthy();
+            expect(actions?.tweaks?.sound).toBeTruthy();
+            expect(actions?.tweaks?.highlight).toBeFalsy();
         };
 
         const assertDoesNotNotify = (actions: IActionsObject): void => {
-            expect(actions.notify).toBeFalsy();
-            expect(actions.tweaks.sound).toBeFalsy();
-            expect(actions.tweaks.highlight).toBeFalsy();
+            expect(actions?.notify).toBeFalsy();
+            expect(actions?.tweaks?.sound).toBeFalsy();
+            expect(actions?.tweaks?.highlight).toBeFalsy();
         };
 
         it.each(

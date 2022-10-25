@@ -677,6 +677,7 @@ export interface IPublicRoomsChunkRoom {
     world_readable: boolean;
     guest_can_join: boolean;
     num_joined_members: number;
+    room_type?: RoomType | string; // Added by MSC3827
 }
 
 interface IPublicRoomsResponse {

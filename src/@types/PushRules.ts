@@ -65,6 +65,8 @@ export enum ConditionKind {
     ContainsDisplayName = "contains_display_name",
     RoomMemberCount = "room_member_count",
     SenderNotificationPermission = "sender_notification_permission",
+    CallStarted = "call_started",
+    CallStartedPrefix = "org.matrix.msc3914.call_started",
 }
 
 export interface IPushRuleCondition<N extends ConditionKind | string> {
@@ -90,12 +92,22 @@ export interface ISenderNotificationPermissionCondition
     key: string;
 }
 
+export interface ICallStartedCondition extends IPushRuleCondition<ConditionKind.CallStarted> {
+    // no additional fields
+}
+
+export interface ICallStartedPrefixCondition extends IPushRuleCondition<ConditionKind.CallStartedPrefix> {
+    // no additional fields
+}
+
 // XXX: custom conditions are possible but always fail, and break the typescript discriminated union so ignore them here
 // IPushRuleCondition<Exclude<string, ConditionKind>> unfortunately does not resolve this at the time of writing.
 export type PushRuleCondition = IEventMatchCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
-    | ISenderNotificationPermissionCondition;
+    | ISenderNotificationPermissionCondition
+    | ICallStartedCondition
+    | ICallStartedPrefixCondition;
 
 export enum PushRuleKind {
     Override = "override",
