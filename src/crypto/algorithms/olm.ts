@@ -228,7 +228,7 @@ class OlmDecryption extends DecryptionAlgorithm {
         // assume that the device logged out.  Some event handlers, such as
         // secret sharing, may be more strict and reject events that come from
         // unknown devices.
-        await this.crypto.deviceList.downloadKeys([event.getSender()], false);
+        await this.crypto.deviceList.downloadKeys([event.getSender()!], false);
         const senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(
             olmlib.OLM_ALGORITHM,
             deviceKey,
@@ -250,7 +250,7 @@ class OlmDecryption extends DecryptionAlgorithm {
             throw new DecryptionError(
                 "OLM_FORWARDED_MESSAGE",
                 "Message forwarded from " + payload.sender, {
-                    reported_sender: event.getSender(),
+                    reported_sender: event.getSender()!,
                 },
             );
         }

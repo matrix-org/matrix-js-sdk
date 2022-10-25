@@ -24,6 +24,7 @@ import { logger } from '../../logger';
 import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
+    DecryptionClassParams,
     DecryptionError,
     EncryptionAlgorithm,
     IParams,
@@ -251,8 +252,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
         startTime: number;
     };
 
-    constructor(params: IParams) {
+    protected readonly roomId: string;
+
+    constructor(params: IParams & Required<Pick<IParams, "roomId">>) {
         super(params);
+        this.roomId = params.roomId;
 
         this.sessionRotationPeriodMsgs = params.config?.rotation_period_msgs ?? 100;
         this.sessionRotationPeriodMs = params.config?.rotation_period_ms ?? 7 * 24 * 3600 * 1000;
@@ -1231,6 +1235,13 @@ class MegolmDecryption extends DecryptionAlgorithm {
     // this gets stubbed out by the unit tests.
     private olmlib = olmlib;
 
+    protected readonly roomId: string;
+
+    constructor(params: DecryptionClassParams<IParams & Required<Pick<IParams, "roomId">>>) {
+        super(params);
+        this.roomId = params.roomId;
+    }
+
     /**
      * @inheritdoc
      *
@@ -1264,7 +1275,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         try {
             res = await this.olmDevice.decryptGroupMessage(
                 event.getRoomId()!, content.sender_key, content.session_id, content.ciphertext,
-                event.getId(), event.getTs(),
+                event.getId()!, event.getTs(),
             );
         } catch (e) {
             if ((<Error>e).name === "DecryptionError") {
@@ -1464,7 +1475,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 return;
             }
             const outgoingRequests = deviceInfo ? await this.crypto.cryptoStore.getOutgoingRoomKeyRequestsByTarget(
-                event.getSender(), deviceInfo.deviceId, [RoomKeyRequestState.Sent],
+                event.getSender()!, deviceInfo.deviceId, [RoomKeyRequestState.Sent],
             ) : [];
             const weRequested = outgoingRequests.some((req) => (
                 req.requestBody.room_id === content.room_id && req.requestBody.session_id === content.session_id
@@ -1524,7 +1535,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             // that room later
             if (!room) {
                 const parkedData = {
-                    senderId: event.getSender(),
+                    senderId: event.getSender()!,
                     senderKey: content.sender_key,
                     sessionId: content.session_id,
                     sessionKey: content.session_key,
@@ -1544,7 +1555,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 olmlib.OLM_ALGORITHM,
                 senderKey,
             ) ?? undefined;
-            const deviceTrust = this.crypto.checkDeviceInfoTrust(event.getSender(), sendingDevice);
+            const deviceTrust = this.crypto.checkDeviceInfoTrust(event.getSender()!, sendingDevice);
 
             if (fromUs && !deviceTrust.isVerified()) {
                 return;
@@ -1608,7 +1619,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const senderKey = content.sender_key;
 
         if (content.code === "m.no_olm") {
-            const sender = event.getSender();
+            const sender = event.getSender()!;
             logger.warn(
                 `${sender}:${senderKey} was unable to establish an olm session with us`,
             );

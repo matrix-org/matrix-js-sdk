@@ -35,7 +35,7 @@ const DEFAULT_NAMESPACE = "matrix";
 // console methods at initialization time by a factory that looks up the console methods
 // when logging so we always get the current value of console methods.
 log.methodFactory = function(methodName, logLevel, loggerName) {
-    return function(...args) {
+    return function(this: PrefixedLogger, ...args) {
         /* eslint-disable @typescript-eslint/no-invalid-this */
         if (this.prefix) {
             args.unshift(this.prefix);

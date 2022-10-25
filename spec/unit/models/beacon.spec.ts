@@ -263,7 +263,7 @@ describe('Beacon', () => {
                     roomId,
                 );
                 // less than the original event
-                oldUpdateEvent.event.origin_server_ts = liveBeaconEvent.event.origin_server_ts - 1000;
+                oldUpdateEvent.event.origin_server_ts = liveBeaconEvent.event.origin_server_ts! - 1000;
 
                 beacon.update(oldUpdateEvent);
                 // didnt update

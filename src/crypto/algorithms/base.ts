@@ -36,7 +36,7 @@ import { IRoomEncryption } from "../RoomList";
  */
 export const ENCRYPTION_CLASSES = new Map<string, new (params: IParams) => EncryptionAlgorithm>();
 
-type DecryptionClassParams = Omit<IParams, "deviceId" | "config">;
+export type DecryptionClassParams<P extends IParams = IParams> = Omit<P, "deviceId" | "config">;
 
 /**
  * map of registered encryption algorithm classes. Map from string to {@link
@@ -52,7 +52,7 @@ export interface IParams {
     crypto: Crypto;
     olmDevice: OlmDevice;
     baseApis: MatrixClient;
-    roomId: string;
+    roomId?: string;
     config: IRoomEncryption & object;
 }
 
@@ -76,7 +76,7 @@ export abstract class EncryptionAlgorithm {
     protected readonly crypto: Crypto;
     protected readonly olmDevice: OlmDevice;
     protected readonly baseApis: MatrixClient;
-    protected readonly roomId: string;
+    protected readonly roomId?: string;
 
     constructor(params: IParams) {
         this.userId = params.userId;
@@ -148,7 +148,7 @@ export abstract class DecryptionAlgorithm {
     protected readonly crypto: Crypto;
     protected readonly olmDevice: OlmDevice;
     protected readonly baseApis: MatrixClient;
-    protected readonly roomId: string;
+    protected readonly roomId?: string;
 
     constructor(params: DecryptionClassParams) {
         this.userId = params.userId;
@@ -296,11 +296,11 @@ export class UnknownDeviceError extends Error {
  *     module:crypto/algorithms/base.DecryptionAlgorithm|DecryptionAlgorithm}
  *     implementation
  */
-export function registerAlgorithm(
+export function registerAlgorithm<P extends IParams = IParams>(
     algorithm: string,
-    encryptor: new (params: IParams) => EncryptionAlgorithm,
-    decryptor: new (params: DecryptionClassParams) => DecryptionAlgorithm,
+    encryptor: new (params: P) => EncryptionAlgorithm,
+    decryptor: new (params: DecryptionClassParams<P>) => DecryptionAlgorithm,
 ): void {
-    ENCRYPTION_CLASSES.set(algorithm, encryptor);
-    DECRYPTION_CLASSES.set(algorithm, decryptor);
+    ENCRYPTION_CLASSES.set(algorithm, encryptor as new (params: IParams) => EncryptionAlgorithm);
+    DECRYPTION_CLASSES.set(algorithm, decryptor as new (params: DecryptionClassParams) => DecryptionAlgorithm);
 }
