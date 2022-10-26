@@ -116,8 +116,8 @@ class MockCall {
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
         stream: new MockMediaStream("stream"),
     };
-    public remoteUsermediaFeed: CallFeed;
-    public remoteScreensharingFeed: CallFeed;
+    public remoteUsermediaFeed?: CallFeed;
+    public remoteScreensharingFeed?: CallFeed;
 
     public reject = jest.fn<void, []>();
     public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
@@ -128,7 +128,7 @@ class MockCall {
     on = jest.fn();
     removeListener = jest.fn();
 
-    getOpponentMember() {
+    getOpponentMember(): Partial<RoomMember> {
         return {
             userId: this.opponentUserId,
         };
@@ -276,7 +276,7 @@ describe('Group Call', function() {
 
                 await groupCall.initLocalCallFeed();
 
-                const oldStream = groupCall.localCallFeed.stream as unknown as MockMediaStream;
+                const oldStream = groupCall.localCallFeed?.stream as unknown as MockMediaStream;
 
                 // arbitrary values, important part is that they're the same afterwards
                 await groupCall.setLocalVideoMuted(true);
@@ -286,7 +286,7 @@ describe('Group Call', function() {
 
                 groupCall.updateLocalUsermediaStream(newStream);
 
-                expect(groupCall.localCallFeed.stream).toBe(newStream);
+                expect(groupCall.localCallFeed?.stream).toBe(newStream);
 
                 expect(groupCall.isLocalVideoMuted()).toEqual(true);
                 expect(groupCall.isMicrophoneMuted()).toEqual(false);
@@ -474,7 +474,7 @@ describe('Group Call', function() {
                 // we should still be muted at this point because the metadata update hasn't sent
                 expect(groupCall.isMicrophoneMuted()).toEqual(true);
                 expect(mockCall.localUsermediaFeed.setAudioVideoMuted).not.toHaveBeenCalled();
-                metadataUpdateResolve();
+                metadataUpdateResolve!();
 
                 await mutePromise;
 
@@ -500,7 +500,7 @@ describe('Group Call', function() {
                 // we should be muted at this point, before the metadata update has been sent
                 expect(groupCall.isMicrophoneMuted()).toEqual(true);
                 expect(mockCall.localUsermediaFeed.setAudioVideoMuted).toHaveBeenCalled();
-                metadataUpdateResolve();
+                metadataUpdateResolve!();
 
                 await mutePromise;
 
@@ -550,7 +550,7 @@ describe('Group Call', function() {
                     groupCall1.onMemberStateChanged(fakeEvent);
                     groupCall2.onMemberStateChanged(fakeEvent);
                 }
-                return Promise.resolve(null);
+                return Promise.resolve({ "event_id": "foo" });
             };
 
             client1.sendStateEvent.mockImplementation(fakeSendStateEvents);
@@ -644,7 +644,7 @@ describe('Group Call', function() {
                 expect(client1.sendToDevice).toHaveBeenCalled();
 
                 const oldCall = groupCall1.getCallByUserId(client2.userId);
-                oldCall.emit(CallEvent.Hangup, oldCall);
+                oldCall!.emit(CallEvent.Hangup, oldCall!);
 
                 client1.sendToDevice.mockClear();
 
@@ -660,11 +660,11 @@ describe('Group Call', function() {
                 // when we placed the call, we could await on enter which waited for the call to
                 // be made. We don't have that luxury now, so first have to wait for the call
                 // to even be created...
-                let newCall: MatrixCall;
+                let newCall: MatrixCall | undefined;
                 while (
                     (newCall = groupCall1.getCallByUserId(client2.userId)) === undefined ||
                     newCall.peerConn === undefined ||
-                    newCall.callId == oldCall.callId
+                    newCall.callId == oldCall!.callId
                 ) {
                     await flushPromises();
                 }
@@ -704,7 +704,7 @@ describe('Group Call', function() {
                 groupCall1.setMicrophoneMuted(false);
                 groupCall1.setLocalVideoMuted(false);
 
-                const call = groupCall1.getCallByUserId(client2.userId);
+                const call = groupCall1.getCallByUserId(client2.userId)!;
                 call.isMicrophoneMuted = jest.fn().mockReturnValue(true);
                 call.setMicrophoneMuted = jest.fn();
                 call.isLocalVideoMuted = jest.fn().mockReturnValue(true);
@@ -743,13 +743,13 @@ describe('Group Call', function() {
             it("should mute local audio when calling setMicrophoneMuted()", async () => {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
 
-                groupCall.localCallFeed.setAudioVideoMuted = jest.fn();
+                groupCall.localCallFeed!.setAudioVideoMuted = jest.fn();
                 const setAVMutedArray = groupCall.calls.map(call => {
-                    call.localUsermediaFeed.setAudioVideoMuted = jest.fn();
-                    return call.localUsermediaFeed.setAudioVideoMuted;
+                    call.localUsermediaFeed!.setAudioVideoMuted = jest.fn();
+                    return call.localUsermediaFeed!.setAudioVideoMuted;
                 });
-                const tracksArray = groupCall.calls.reduce((acc, call) => {
-                    acc.push(...call.localUsermediaStream.getAudioTracks());
+                const tracksArray = groupCall.calls.reduce((acc: MediaStreamTrack[], call: MatrixCall) => {
+                    acc.push(...call.localUsermediaStream!.getAudioTracks());
                     return acc;
                 }, []);
                 const sendMetadataUpdateArray = groupCall.calls.map(call => {
@@ -759,8 +759,8 @@ describe('Group Call', function() {
 
                 await groupCall.setMicrophoneMuted(true);
 
-                groupCall.localCallFeed.stream.getAudioTracks().forEach(track => expect(track.enabled).toBe(false));
-                expect(groupCall.localCallFeed.setAudioVideoMuted).toHaveBeenCalledWith(true, null);
+                groupCall.localCallFeed!.stream.getAudioTracks().forEach(track => expect(track.enabled).toBe(false));
+                expect(groupCall.localCallFeed!.setAudioVideoMuted).toHaveBeenCalledWith(true, null);
                 setAVMutedArray.forEach(f => expect(f).toHaveBeenCalledWith(true, null));
                 tracksArray.forEach(track => expect(track.enabled).toBe(false));
                 sendMetadataUpdateArray.forEach(f => expect(f).toHaveBeenCalled());
@@ -771,14 +771,14 @@ describe('Group Call', function() {
             it("should mute local video when calling setLocalVideoMuted()", async () => {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
 
-                groupCall.localCallFeed.setAudioVideoMuted = jest.fn();
+                groupCall.localCallFeed!.setAudioVideoMuted = jest.fn();
                 const setAVMutedArray = groupCall.calls.map(call => {
-                    call.localUsermediaFeed.setAudioVideoMuted = jest.fn();
-                    call.localUsermediaFeed.isVideoMuted = jest.fn().mockReturnValue(true);
-                    return call.localUsermediaFeed.setAudioVideoMuted;
+                    call.localUsermediaFeed!.setAudioVideoMuted = jest.fn();
+                    call.localUsermediaFeed!.isVideoMuted = jest.fn().mockReturnValue(true);
+                    return call.localUsermediaFeed!.setAudioVideoMuted;
                 });
-                const tracksArray = groupCall.calls.reduce((acc, call) => {
-                    acc.push(...call.localUsermediaStream.getVideoTracks());
+                const tracksArray = groupCall.calls.reduce((acc: MediaStreamTrack[], call: MatrixCall) => {
+                    acc.push(...call.localUsermediaStream!.getVideoTracks());
                     return acc;
                 }, []);
                 const sendMetadataUpdateArray = groupCall.calls.map(call => {
@@ -788,8 +788,8 @@ describe('Group Call', function() {
 
                 await groupCall.setLocalVideoMuted(true);
 
-                groupCall.localCallFeed.stream.getVideoTracks().forEach(track => expect(track.enabled).toBe(false));
-                expect(groupCall.localCallFeed.setAudioVideoMuted).toHaveBeenCalledWith(null, true);
+                groupCall.localCallFeed!.stream.getVideoTracks().forEach(track => expect(track.enabled).toBe(false));
+                expect(groupCall.localCallFeed!.setAudioVideoMuted).toHaveBeenCalledWith(null, true);
                 setAVMutedArray.forEach(f => expect(f).toHaveBeenCalledWith(null, true));
                 tracksArray.forEach(track => expect(track.enabled).toBe(false));
                 sendMetadataUpdateArray.forEach(f => expect(f).toHaveBeenCalled());
@@ -827,9 +827,9 @@ describe('Group Call', function() {
                 ]));
                 call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
-                const feed = groupCall.getUserMediaFeedByUserId(call.invitee);
-                expect(feed.isAudioMuted()).toBe(true);
-                expect(feed.isVideoMuted()).toBe(false);
+                const feed = groupCall.getUserMediaFeedByUserId(call.invitee!);
+                expect(feed!.isAudioMuted()).toBe(true);
+                expect(feed!.isVideoMuted()).toBe(false);
 
                 groupCall.terminate();
             });
@@ -850,9 +850,9 @@ describe('Group Call', function() {
                 ]));
                 call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
-                const feed = groupCall.getUserMediaFeedByUserId(call.invitee);
-                expect(feed.isAudioMuted()).toBe(false);
-                expect(feed.isVideoMuted()).toBe(true);
+                const feed = groupCall.getUserMediaFeedByUserId(call.invitee!);
+                expect(feed!.isAudioMuted()).toBe(false);
+                expect(feed!.isVideoMuted()).toBe(true);
 
                 groupCall.terminate();
             });
