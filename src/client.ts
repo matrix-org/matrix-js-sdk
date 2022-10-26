@@ -7544,7 +7544,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves to an object containing the event.
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public fetchRoomEvent(roomId: string, eventId: string): Promise<IMinimalEvent> {
+    public fetchRoomEvent(roomId: string, eventId: string): Promise<Partial<IEvent>> {
         const path = utils.encodeUri(
             "/rooms/$roomId/event/$eventId", {
                 $roomId: roomId,
