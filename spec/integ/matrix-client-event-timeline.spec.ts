@@ -346,6 +346,10 @@ describe("MatrixClient event timelines", function() {
         Thread.setServerSideFwdPaginationSupport(FeatureSupport.None);
     });
 
+    async function flushHttp<T>(promise: Promise<T>): Promise<T> {
+        return Promise.all([promise, httpBackend.flushAllExpected()]).then(([result]) => result);
+    }
+
     describe("getEventTimeline", function() {
         it("should create a new timeline for new events", function() {
             const room = client.getRoom(roomId)!;
@@ -597,22 +601,8 @@ describe("MatrixClient event timelines", function() {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
-            client.stopClient(); // we don't need the client to be syncing at this time
+            await client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
-            const thread = room.createThread(THREAD_ROOT.event_id!, undefined, [], false);
-            const timelineSet = thread.timelineSet;
-
-            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_REPLY.event_id!))
-                .respond(200, function() {
-                    return {
-                        start: "start_token0",
-                        events_before: [],
-                        event: THREAD_REPLY,
-                        events_after: [],
-                        end: "end_token0",
-                        state: [],
-                    };
-                });
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, function() {
@@ -621,7 +611,7 @@ describe("MatrixClient event timelines", function() {
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
-                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?limit=20")
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&limit=1")
                 .respond(200, function() {
                     return {
                         original_event: THREAD_ROOT,
@@ -630,9 +620,11 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!);
+            const thread = room.createThread(THREAD_ROOT.event_id!, undefined, [], false);
             await httpBackend.flushAllExpected();
+            const timelineSet = thread.timelineSet;
 
+            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!);
             const timeline = await timelinePromise;
 
             expect(timeline!.getEvents().find(e => e.getId() === THREAD_ROOT.event_id!)).toBeTruthy();
@@ -1027,10 +1019,6 @@ describe("MatrixClient event timelines", function() {
     });
 
     describe("paginateEventTimeline for thread list timeline", function() {
-        async function flushHttp<T>(promise: Promise<T>): Promise<T> {
-            return Promise.all([promise, httpBackend.flushAllExpected()]).then(([result]) => result);
-        }
-
         const RANDOM_TOKEN = "7280349c7bee430f91defe2a38a0a08c";
 
         function respondToFilter(): ExpectedHttpRequest {

@@ -122,6 +122,6 @@ describe("MatrixClient relations", () => {
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "chunk": [], "next_batch": "NEXT", "originalEvent": null, "prevBatch": null });
+        expect(await response).toEqual({ "chunk": [], "next_batch": "NEXT" });
     });
 });
