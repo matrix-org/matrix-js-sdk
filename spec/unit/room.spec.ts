@@ -2723,6 +2723,19 @@ describe("Room", function() {
             expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(666);
             expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(0);
         });
+
+        it("emits event on notifications reset", () => {
+            const cb = jest.fn();
+
+            room.on(RoomEvent.UnreadNotifications, cb);
+
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
+            room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
+
+            room.resetThreadUnreadNotificationCount();
+
+            expect(cb).toHaveBeenLastCalledWith();
+        });
     });
 
     describe("hasThreadUnreadNotification", () => {
