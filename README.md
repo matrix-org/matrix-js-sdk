@@ -39,7 +39,9 @@ If you wish to use a ponyfill or adapter of some sort then pass it as `fetchFn` 
 Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
 if you do not have it already.
 
-``yarn add matrix-js-sdk``
+```bash 
+  yarn add matrix-js-sdk
+```
 
 ```javascript
   import * as sdk from "matrix-js-sdk";
@@ -248,7 +250,7 @@ core functionality of the SDK. These examples assume the SDK is setup like this:
 ```
 
 Output:
-```
+```bash
   (My Room) @megan:localhost :: Hello world
   (My Room) @megan:localhost :: how are you?
   (My Room) @example:localhost :: I am good
@@ -280,7 +282,7 @@ Output:
 ```
 
 Output:
-```
+```bash
   My Room
   =======
   (join) @example:localhost
@@ -298,7 +300,7 @@ http://matrix-org.github.io/matrix-js-sdk/index.html
 This SDK uses JSDoc3 style comments. You can manually build and
 host the API reference from the source files like this:
 
-```
+```bash
   $ yarn gendoc
   $ cd .jsdoc
   $ python -m http.server 8005
@@ -352,7 +354,7 @@ Contributing
 want to use this SDK, skip this section.*
 
 First, you need to pull in the right build tools:
-```
+```bash
  $ yarn install
 ```
 
@@ -360,16 +362,16 @@ Building
 --------
 
 To build a browser version from scratch when developing::
-```
+```bash
  $ yarn build
 ```
 
 To run tests (Jasmine)::
-```
+```bash
  $ yarn test
 ```
 
 To run linting:
-```
+```bash
  $ yarn lint
 ```
