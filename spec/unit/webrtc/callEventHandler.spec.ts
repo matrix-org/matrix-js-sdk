@@ -50,8 +50,8 @@ describe("CallEventHandler", () => {
     });
 
     afterEach(() => {
-        client.callEventHandler.stop();
-        client.groupCallEventHandler.stop();
+        client.callEventHandler!.stop();
+        client.groupCallEventHandler!.stop();
     });
 
     const sync = async () => {
@@ -63,7 +63,7 @@ describe("CallEventHandler", () => {
     };
 
     it("should enforce inbound toDevice message ordering", async () => {
-        const callEventHandler = client.callEventHandler;
+        const callEventHandler = client.callEventHandler!;
         const event1 = new MatrixEvent({
             type: EventType.CallInvite,
             content: {
@@ -227,7 +227,7 @@ describe("CallEventHandler", () => {
             const DEVICE_ID = "device_id";
 
             incomingCallListener.mockImplementation((c) => call = c);
-            jest.spyOn(client.groupCallEventHandler, "getGroupCallById").mockReturnValue(groupCall);
+            jest.spyOn(client.groupCallEventHandler!, "getGroupCallById").mockReturnValue(groupCall);
             // @ts-ignore Mock onIncomingCall is private
             jest.spyOn(groupCall, "onIncomingCall");
 

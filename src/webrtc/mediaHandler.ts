@@ -123,7 +123,7 @@ export class MediaHandler extends TypedEventEmitter<
         this.userMediaStreams = [];
         this.localUserMediaStream = undefined;
 
-        for (const call of this.client.callEventHandler.calls.values()) {
+        for (const call of this.client.callEventHandler!.calls.values()) {
             if (call.callHasEnded() || !callMediaStreamParams.has(call.callId)) {
                 continue;
             }
@@ -140,7 +140,7 @@ export class MediaHandler extends TypedEventEmitter<
             await call.updateLocalUsermediaStream(stream);
         }
 
-        for (const groupCall of this.client.groupCallEventHandler.groupCalls.values()) {
+        for (const groupCall of this.client.groupCallEventHandler!.groupCalls.values()) {
             if (!groupCall.localCallFeed) {
                 continue;
             }

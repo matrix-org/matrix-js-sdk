@@ -101,12 +101,12 @@ export class MockAudioContext {
 export class MockRTCPeerConnection {
     private static instances: MockRTCPeerConnection[] = [];
 
-    private negotiationNeededListener: () => void;
+    private negotiationNeededListener?: () => void;
     public iceCandidateListener?: (e: RTCPeerConnectionIceEvent) => void;
     public onTrackListener?: (e: RTCTrackEvent) => void;
     public needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
-    private onReadyToNegotiate: () => void;
+    private onReadyToNegotiate?: () => void;
     localDescription: RTCSessionDescription;
     signalingState: RTCSignalingState = "stable";
     public transceivers: MockRTCRtpTransceiver[] = [];
@@ -171,7 +171,7 @@ export class MockRTCPeerConnection {
     getStats() { return []; }
     addTransceiver(track: MockMediaStreamTrack): MockRTCRtpTransceiver {
         this.needsNegotiation = true;
-        this.onReadyToNegotiate();
+        if (this.onReadyToNegotiate) this.onReadyToNegotiate();
 
         const newSender = new MockRTCRtpSender(track);
         const newReceiver = new MockRTCRtpReceiver(track);
@@ -190,7 +190,7 @@ export class MockRTCPeerConnection {
 
     removeTrack() {
         this.needsNegotiation = true;
-        this.onReadyToNegotiate();
+        if (this.onReadyToNegotiate) this.onReadyToNegotiate();
     }
 
     getTransceivers(): MockRTCRtpTransceiver[] { return this.transceivers; }
@@ -217,8 +217,8 @@ export class MockRTCRtpReceiver {
 export class MockRTCRtpTransceiver {
     constructor(private peerConn: MockRTCPeerConnection) {}
 
-    public sender: RTCRtpSender;
-    public receiver: RTCRtpReceiver;
+    public sender?: RTCRtpSender;
+    public receiver?: RTCRtpReceiver;
 
     public set direction(_: string) {
         this.peerConn.needsNegotiation = true;
@@ -234,9 +234,9 @@ export class MockMediaStreamTrack {
 
     listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
-    public settings: MediaTrackSettings;
+    public settings?: MediaTrackSettings;
 
-    getSettings(): MediaTrackSettings { return this.settings; }
+    getSettings(): MediaTrackSettings { return this.settings!; }
 
     // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
     // implementation
@@ -409,7 +409,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     getUseE2eForGroupCall = () => false;
     checkTurnServers = () => null;
 
-    getSyncState = jest.fn<SyncState, []>().mockReturnValue(SyncState.Syncing);
+    getSyncState = jest.fn<SyncState | null, []>().mockReturnValue(SyncState.Syncing);
 
     getRooms = jest.fn<Room[], []>().mockReturnValue([]);
     getRoom = jest.fn();

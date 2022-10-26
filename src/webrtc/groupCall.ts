@@ -207,7 +207,7 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public async create() {
-        this.client.groupCallEventHandler.groupCalls.set(this.room.roomId, this);
+        this.client.groupCallEventHandler!.groupCalls.set(this.room.roomId, this);
 
         await this.client.sendStateEvent(
             this.room.roomId,
@@ -324,7 +324,7 @@ export class GroupCall extends TypedEventEmitter<
 
         this.client.on(CallEventHandlerEvent.Incoming, this.onIncomingCall);
 
-        const calls = this.client.callEventHandler.calls.values();
+        const calls = this.client.callEventHandler!.calls.values();
 
         for (const call of calls) {
             this.onIncomingCall(call);
@@ -406,7 +406,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         this.participants = [];
-        this.client.groupCallEventHandler.groupCalls.delete(this.room.roomId);
+        this.client.groupCallEventHandler!.groupCalls.delete(this.room.roomId);
 
         if (emitStateEvent) {
             const existingStateEvent = this.room.currentState.getStateEvents(
@@ -699,7 +699,7 @@ export class GroupCall extends TypedEventEmitter<
             "m.call_id": this.groupCallId,
             "m.devices": [
                 {
-                    "device_id": this.client.getDeviceId(),
+                    "device_id": this.client.getDeviceId()!,
                     "session_id": this.client.getSessionId(),
                     "feeds": this.getLocalFeeds().map((feed) => ({
                         purpose: feed.purpose,
