@@ -23,7 +23,7 @@ export const MAIN_ROOM_TIMELINE = "main";
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
         content: {
-            [event.getId()]: {
+            [event.getId()!]: {
                 [receiptType]: {
                     [userId]: {
                         ts: event.getTs(),
@@ -243,7 +243,7 @@ export abstract class ReadReceipt<
      * an empty list.
      */
     public getReceiptsForEvent(event: MatrixEvent): CachedReceipt[] {
-        return this.receiptCacheByEventId[event.getId()] || [];
+        return this.receiptCacheByEventId[event.getId()!] || [];
     }
 
     public abstract addReceipt(event: MatrixEvent, synthetic: boolean): void;

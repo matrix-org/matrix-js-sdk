@@ -135,7 +135,7 @@ describe("MSC3089TreeSpace", () => {
             // noinspection ExceptionCaughtLocallyJS
             throw new Error("Failed to fail");
         } catch (e) {
-            expect(e.errcode).toEqual("M_FORBIDDEN");
+            expect((<MatrixError>e).errcode).toEqual("M_FORBIDDEN");
         }
 
         expect(fn).toHaveBeenCalledTimes(1);
@@ -513,7 +513,7 @@ describe("MSC3089TreeSpace", () => {
         function expectOrder(childRoomId: string, order: number) {
             const child = childTrees.find(c => c.roomId === childRoomId);
             expect(child).toBeDefined();
-            expect(child.getOrder()).toEqual(order);
+            expect(child!.getOrder()).toEqual(order);
         }
 
         function makeMockChildRoom(roomId: string): Room {
@@ -608,7 +608,7 @@ describe("MSC3089TreeSpace", () => {
                 // noinspection ExceptionCaughtLocallyJS
                 throw new Error("Failed to fail");
             } catch (e) {
-                expect(e.message).toEqual("Cannot set order of top level spaces currently");
+                expect((<Error>e).message).toEqual("Cannot set order of top level spaces currently");
             }
         });
 
@@ -706,7 +706,7 @@ describe("MSC3089TreeSpace", () => {
 
             const treeA = childTrees.find(c => c.roomId === a);
             expect(treeA).toBeDefined();
-            await treeA.setOrder(1);
+            await treeA!.setOrder(1);
 
             expect(clientSendStateFn).toHaveBeenCalledTimes(3);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
@@ -743,7 +743,7 @@ describe("MSC3089TreeSpace", () => {
 
             const treeA = childTrees.find(c => c.roomId === a);
             expect(treeA).toBeDefined();
-            await treeA.setOrder(1);
+            await treeA!.setOrder(1);
 
             expect(clientSendStateFn).toHaveBeenCalledTimes(1);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
@@ -771,7 +771,7 @@ describe("MSC3089TreeSpace", () => {
 
             const treeA = childTrees.find(c => c.roomId === a);
             expect(treeA).toBeDefined();
-            await treeA.setOrder(2);
+            await treeA!.setOrder(2);
 
             expect(clientSendStateFn).toHaveBeenCalledTimes(1);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
@@ -800,7 +800,7 @@ describe("MSC3089TreeSpace", () => {
 
             const treeB = childTrees.find(c => c.roomId === b);
             expect(treeB).toBeDefined();
-            await treeB.setOrder(2);
+            await treeB!.setOrder(2);
 
             expect(clientSendStateFn).toHaveBeenCalledTimes(1);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
@@ -829,7 +829,7 @@ describe("MSC3089TreeSpace", () => {
 
             const treeC = childTrees.find(ch => ch.roomId === c);
             expect(treeC).toBeDefined();
-            await treeC.setOrder(1);
+            await treeC!.setOrder(1);
 
             expect(clientSendStateFn).toHaveBeenCalledTimes(1);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
@@ -858,7 +858,7 @@ describe("MSC3089TreeSpace", () => {
 
             const treeB = childTrees.find(ch => ch.roomId === b);
             expect(treeB).toBeDefined();
-            await treeB.setOrder(2);
+            await treeB!.setOrder(2);
 
             expect(clientSendStateFn).toHaveBeenCalledTimes(2);
             expect(clientSendStateFn).toHaveBeenCalledWith(tree.roomId, EventType.SpaceChild, expect.objectContaining({
@@ -903,7 +903,7 @@ describe("MSC3089TreeSpace", () => {
                 url: mxc,
                 file: fileInfo,
                 metadata: true, // additional content from test
-                [UNSTABLE_MSC3089_LEAF.unstable]: {}, // test to ensure we're definitely using unstable
+                [UNSTABLE_MSC3089_LEAF.unstable!]: {}, // test to ensure we're definitely using unstable
             });
 
             return Promise.resolve({ event_id: fileEventId }); // eslint-disable-line camelcase
@@ -965,7 +965,7 @@ describe("MSC3089TreeSpace", () => {
             expect(contents).toMatchObject({
                 ...content,
                 "m.new_content": content,
-                [UNSTABLE_MSC3089_LEAF.unstable]: {}, // test to ensure we're definitely using unstable
+                [UNSTABLE_MSC3089_LEAF.unstable!]: {}, // test to ensure we're definitely using unstable
             });
 
             return Promise.resolve({ event_id: fileEventId }); // eslint-disable-line camelcase
@@ -1010,7 +1010,7 @@ describe("MSC3089TreeSpace", () => {
 
         const file = tree.getFile(fileEventId);
         expect(file).toBeDefined();
-        expect(file.indexEvent).toBe(fileEvent);
+        expect(file!.indexEvent).toBe(fileEvent);
     });
 
     it('should return falsy for unknown files', () => {

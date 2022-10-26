@@ -97,7 +97,7 @@ describe("Read receipt", () => {
                 "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
                     $roomId: ROOM_ID,
                     $receiptType: ReceiptType.Read,
-                    $eventId: threadEvent.getId(),
+                    $eventId: threadEvent.getId()!,
                 }),
             ).check((request) => {
                 expect(request.data.thread_id).toEqual(THREAD_ID);
@@ -115,7 +115,7 @@ describe("Read receipt", () => {
                 "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
                     $roomId: ROOM_ID,
                     $receiptType: ReceiptType.Read,
-                    $eventId: roomEvent.getId(),
+                    $eventId: roomEvent.getId()!,
                 }),
             ).check((request) => {
                 expect(request.data.thread_id).toEqual(MAIN_ROOM_TIMELINE);
@@ -133,7 +133,7 @@ describe("Read receipt", () => {
                 "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
                     $roomId: ROOM_ID,
                     $receiptType: ReceiptType.Read,
-                    $eventId: threadEvent.getId(),
+                    $eventId: threadEvent.getId()!,
                 }),
             ).check((request) => {
                 expect(request.data.thread_id).toBeUndefined();
@@ -151,7 +151,7 @@ describe("Read receipt", () => {
                 "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
                     $roomId: ROOM_ID,
                     $receiptType: ReceiptType.Read,
-                    $eventId: threadEvent.getId(),
+                    $eventId: threadEvent.getId()!,
                 }),
             ).check((request) => {
                 expect(request.data).toEqual({});

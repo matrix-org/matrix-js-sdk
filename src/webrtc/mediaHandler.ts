@@ -106,7 +106,7 @@ export class MediaHandler extends TypedEventEmitter<
         if (this.userMediaStreams.length === 0) return;
 
         const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
-        for (const call of this.client.callEventHandler.calls.values()) {
+        for (const call of this.client.callEventHandler!.calls.values()) {
             callMediaStreamParams.set(call.callId, {
                 audio: call.hasLocalUserMediaAudioTrack,
                 video: call.hasLocalUserMediaVideoTrack,

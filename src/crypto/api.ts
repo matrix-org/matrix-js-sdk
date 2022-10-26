@@ -117,10 +117,10 @@ export interface IPassphraseInfo {
 }
 
 export interface IAddSecretStorageKeyOpts {
-    pubkey: string;
+    pubkey?: string;
     passphrase?: IPassphraseInfo;
     name?: string;
-    key: Uint8Array;
+    key?: Uint8Array;
 }
 
 export interface IImportOpts {
