@@ -183,11 +183,11 @@ export class CallEventHandler {
         const content = event.getContent();
         const callRoomId = (
             event.getRoomId() ||
-            this.client.groupCallEventHandler.getGroupCallById(content.conf_id)?.room?.roomId
+            this.client.groupCallEventHandler!.getGroupCallById(content.conf_id)?.room?.roomId
         );
         const groupCallId = content.conf_id;
         const type = event.getType() as EventType;
-        const senderId = event.getSender();
+        const senderId = event.getSender()!;
         const weSentTheEvent = senderId === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
         //console.info("RECV %s content=%s", type, JSON.stringify(content));
@@ -196,7 +196,7 @@ export class CallEventHandler {
 
         let groupCall: GroupCall | undefined;
         if (groupCallId) {
-            groupCall = this.client.groupCallEventHandler.getGroupCallById(groupCallId);
+            groupCall = this.client.groupCallEventHandler!.getGroupCallById(groupCallId);
 
             if (!groupCall) {
                 logger.warn(`Cannot find a group call ${groupCallId} for event ${type}. Ignoring event.`);

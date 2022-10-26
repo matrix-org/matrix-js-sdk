@@ -2462,7 +2462,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.emit(CallEvent.Hangup, this);
         }
 
-        this.client.callEventHandler.calls.delete(this.callId);
+        this.client.callEventHandler!.calls.delete(this.callId);
     }
 
     private stopAllMedia(): void {
@@ -2670,7 +2670,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = this.client.getRoom(this.roomId)!.getMember(ev.getSender()) ?? undefined;
+        this.opponentMember = this.client.getRoom(this.roomId)!.getMember(ev.getSender()!) ?? undefined;
     }
 
     private async addBufferedIceCandidates(): Promise<void> {
