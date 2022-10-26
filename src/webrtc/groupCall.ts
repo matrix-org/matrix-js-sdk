@@ -726,10 +726,13 @@ export class GroupCall extends TypedEventEmitter<
     private async removeMemberStateEvent(): Promise<ISendEventResponse> {
         if (this.resendMemberStateTimer !== null) clearInterval(this.resendMemberStateTimer);
         this.resendMemberStateTimer = null;
-        return await this.updateMemberCallState(undefined);
+        return await this.updateMemberCallState(undefined, true);
     }
 
-    private async updateMemberCallState(memberCallState?: IGroupCallRoomMemberCallState): Promise<ISendEventResponse> {
+    private async updateMemberCallState(
+        memberCallState?: IGroupCallRoomMemberCallState,
+        keepAlive = false,
+    ): Promise<ISendEventResponse> {
         const localUserId = this.client.getUserId()!;
 
         const memberState = this.getMemberStateEvents(localUserId)?.getContent<IGroupCallRoomMemberState>();
@@ -758,7 +761,9 @@ export class GroupCall extends TypedEventEmitter<
             "m.expires_ts": Date.now() + CALL_MEMBER_STATE_TIMEOUT,
         };
 
-        return this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId);
+        return this.client.sendStateEvent(
+            this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId, keepAlive,
+        );
     }
 
     public onMemberStateChanged = async (event: MatrixEvent) => {

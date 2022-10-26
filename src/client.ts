@@ -7517,6 +7517,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} eventType
      * @param {Object} content
      * @param {string} stateKey
+     * @param {boolean} keepAlive Whether the request should outlive the window.
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -7525,6 +7526,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventType: string,
         content: any,
         stateKey = "",
+        keepAlive = false,
     ): Promise<ISendEventResponse> {
         const pathParams = {
             $roomId: roomId,
@@ -7535,7 +7537,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(Method.Put, path, undefined, content);
+        return this.http.authedRequest(Method.Put, path, undefined, content, { keepAlive });
     }
 
     /**

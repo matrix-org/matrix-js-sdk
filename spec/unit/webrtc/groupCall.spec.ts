@@ -212,10 +212,30 @@ describe('Group Call', function() {
                         ],
                     }),
                     FAKE_USER_ID_1,
+                    false,
                 );
             } finally {
                 groupCall.leave();
             }
+        });
+
+        it("sends member state event to room on leave", async () => {
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+            } as unknown as RoomMember;
+
+            await groupCall.create();
+            await groupCall.enter();
+            mockSendState.mockClear();
+
+            groupCall.leave();
+            expect(mockSendState).toHaveBeenCalledWith(
+                FAKE_ROOM_ID,
+                EventType.GroupCallMemberPrefix,
+                expect.objectContaining({ "m.calls": [] }),
+                FAKE_USER_ID_1,
+                true, // Request should outlive the window
+            );
         });
 
         it("starts with mic unmuted in regular calls", async () => {
