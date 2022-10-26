@@ -339,7 +339,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public clearEventMetadata(event: Optional<MatrixEvent>): void {
         if (event) {
-            event.setThread(null);
+            event.setThread(undefined);
             delete event.event?.unsigned?.["m.relations"]?.[THREAD_RELATION_TYPE.name];
         }
     }
@@ -436,11 +436,11 @@ export enum ThreadFilterType {
     "All"
 }
 
-export function threadFilterTypeToFilter(type: ThreadFilterType): 'all' | 'participated' {
+export function threadFilterTypeToFilter(type: ThreadFilterType | null): 'all' | 'participated' {
     switch (type) {
         case ThreadFilterType.My:
             return 'participated';
-        case ThreadFilterType.All:
+        default:
             return 'all';
     }
 }

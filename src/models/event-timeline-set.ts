@@ -359,7 +359,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         events: MatrixEvent[],
         toStartOfTimeline: boolean,
         timeline: EventTimeline,
-        paginationToken?: string,
+        paginationToken?: string | null,
     ): void {
         if (!timeline) {
             throw new Error(

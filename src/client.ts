@@ -5268,7 +5268,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const params: Record<string, string | string[]> = {
             limit: "0",
         };
-        if (this.clientOpts.lazyLoadMembers) {
+        if (this.clientOpts?.lazyLoadMembers) {
             params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
         }
 
@@ -5444,7 +5444,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const params: Record<string, string | string[]> = {
                 dir: 'b',
             };
-            if (this.clientOpts.lazyLoadMembers) {
+            if (this.clientOpts?.lazyLoadMembers) {
                 params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
             }
 
@@ -5525,7 +5525,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         fromToken: string | null,
         limit = 30,
         dir = Direction.Backward,
-        threadListType: ThreadFilterType = ThreadFilterType.All,
+        threadListType: ThreadFilterType | null = ThreadFilterType.All,
         timelineFilter?: Filter,
     ): Promise<IMessagesResponse> {
         const path = utils.encodeUri("/rooms/$roomId/threads", { $roomId: roomId });
@@ -5705,13 +5705,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
             eventTimeline.paginationRequests[dir] = promise;
         } else if (thread) {
-            const room = this.getRoom(eventTimeline.getRoomId());
+            const room = this.getRoom(eventTimeline.getRoomId() ?? undefined);
             if (!room) {
                 throw new Error("Unknown room " + eventTimeline.getRoomId());
             }
 
             promise = this.fetchRelations(
-                eventTimeline.getRoomId(),
+                eventTimeline.getRoomId() ?? "",
                 thread.id,
                 THREAD_RELATION_TYPE.name,
                 null,
@@ -6945,10 +6945,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventType?: EventType | string | null,
         opts: IRelationsRequestOpts = { dir: Direction.Backward },
     ): Promise<{
-        originalEvent?: MatrixEvent;
+        originalEvent?: MatrixEvent | null;
         events: MatrixEvent[];
-        nextBatch?: string;
-        prevBatch?: string;
+        nextBatch?: string | null;
+        prevBatch?: string | null;
     }> {
         const fetchedEventType = eventType ? this.getEncryptedIfNeededEventType(roomId, eventType) : null;
         const result = await this.fetchRelations(
