@@ -182,11 +182,12 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             for (const threadEvent of this.events) {
                 this.clearEventMetadata(threadEvent);
             }
+            this.lastEvent = this.rootEvent;
+            this._currentUserParticipated = false;
             this.emit(ThreadEvent.Delete, this);
         } else {
             await this.initialiseThread();
         }
-        this.emit(ThreadEvent.Update, this);
     };
 
     private onEcho = async (event: MatrixEvent) => {
@@ -218,7 +219,6 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(ev => this.addEvent(ev, toStartOfTimeline, false));
-        this.emit(ThreadEvent.Update, this);
         this.initialiseThread();
     }
 
@@ -279,7 +279,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
-    private async initialiseThread(): Promise<void> {
+    public async initialiseThread(): Promise<void> {
         let bundledRelationship = this.getRootEventBundledRelationship();
         if (Thread.hasServerSideSupport) {
             await this.fetchRootEvent();
