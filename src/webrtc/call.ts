@@ -565,8 +565,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private async initOpponentCrypto() {
-        if (!this.client.crypto) throw new Error("Crypto is not initialised.");
-
         if (!this.opponentDeviceId) return;
         if (!this.client.getUseE2eForGroupCall()) return;
         // It's possible to want E2EE and yet not have the means to manage E2EE
@@ -576,6 +574,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentDeviceInfo = new DeviceInfo(this.opponentDeviceId);
             return;
         }
+        // if we've got to this point, we do want to init crypto, so throw if we can't
+        if (!this.client.crypto) throw new Error("Crypto is not initialised.");
 
         const userId = this.invitee || this.getOpponentMember()?.userId;
 
