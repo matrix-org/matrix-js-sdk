@@ -584,6 +584,8 @@ describe('Group Call', function() {
         });
 
         afterEach(function() {
+            groupCall1.leave();
+            groupCall2.leave();
             jest.useRealTimers();
 
             MockRTCPeerConnection.resetInstances();
