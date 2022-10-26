@@ -20,7 +20,7 @@ import * as bs58 from 'bs58';
 // (which are also base58 encoded, but bitcoin's involve a lot more hashing)
 const OLM_RECOVERY_KEY_PREFIX = [0x8B, 0x01];
 
-export function encodeRecoveryKey(key: ArrayLike<number>): string {
+export function encodeRecoveryKey(key: ArrayLike<number>): string | undefined {
     const buf = Buffer.alloc(OLM_RECOVERY_KEY_PREFIX.length + key.length + 1);
     buf.set(OLM_RECOVERY_KEY_PREFIX, 0);
     buf.set(key, OLM_RECOVERY_KEY_PREFIX.length);
@@ -32,7 +32,7 @@ export function encodeRecoveryKey(key: ArrayLike<number>): string {
     buf[buf.length - 1] = parity;
     const base58key = bs58.encode(buf);
 
-    return base58key.match(/.{1,4}/g).join(" ");
+    return base58key.match(/.{1,4}/g)?.join(" ");
 }
 
 export function decodeRecoveryKey(recoveryKey: string): Uint8Array {

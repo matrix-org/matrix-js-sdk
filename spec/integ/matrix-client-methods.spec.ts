@@ -658,7 +658,7 @@ describe("MatrixClient", function() {
 
             // The vote event has been copied into the thread
             const eventRefWithThreadId = withThreadId(
-                eventPollResponseReference, eventPollStartThreadRoot.getId());
+                eventPollResponseReference, eventPollStartThreadRoot.getId()!);
             expect(eventRefWithThreadId.threadRootId).toBeTruthy();
 
             expect(threaded).toEqual([
@@ -695,7 +695,7 @@ describe("MatrixClient", function() {
             expect(threaded).toEqual([
                 eventPollStartThreadRoot,
                 eventMessageInThread,
-                withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
+                withThreadId(eventReaction, eventPollStartThreadRoot.getId()!),
             ]);
         });
 
@@ -725,7 +725,7 @@ describe("MatrixClient", function() {
 
             expect(threaded).toEqual([
                 eventPollStartThreadRoot,
-                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
+                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()!),
                 eventMessageInThread,
             ]);
         });
@@ -757,7 +757,7 @@ describe("MatrixClient", function() {
             expect(threaded).toEqual([
                 eventPollStartThreadRoot,
                 eventMessageInThread,
-                withThreadId(eventReaction, eventPollStartThreadRoot.getId()),
+                withThreadId(eventReaction, eventPollStartThreadRoot.getId()!),
             ]);
         });
 
@@ -813,7 +813,7 @@ describe("MatrixClient", function() {
             // Thread should contain only stuff that happened in the thread - no room state events
             expect(threaded).toEqual([
                 eventPollStartThreadRoot,
-                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()),
+                withThreadId(eventPollResponseReference, eventPollStartThreadRoot.getId()!),
                 eventMessageInThread,
             ]);
         });
@@ -1334,6 +1334,30 @@ describe("MatrixClient", function() {
             expect(resp.token).toBe("tt");
         });
     });
+
+    describe("registerWithIdentityServer", () => {
+        it("should pass data to POST request", async () => {
+            const token = {
+                access_token: "access_token",
+                token_type: "Bearer",
+                matrix_server_name: "server_name",
+                expires_in: 12345,
+            };
+
+            httpBackend!.when("POST", "/account/register").check(req => {
+                expect(req.data).toStrictEqual(token);
+            }).respond(200, {
+                access_token: "at",
+                token: "tt",
+            });
+
+            const prom = client!.registerWithIdentityServer(token);
+            await httpBackend!.flushAllExpected();
+            const resp = await prom;
+            expect(resp.access_token).toBe("at");
+            expect(resp.token).toBe("tt");
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
@@ -1351,7 +1375,7 @@ const buildEventMessageInThread = (root: MatrixEvent) => new MatrixEvent({
         "m.relates_to": {
             "event_id": root.getId(),
             "m.in_reply_to": {
-                "event_id": root.getId(),
+                "event_id": root.getId()!,
             },
             "rel_type": "m.thread",
         },
@@ -1450,13 +1474,13 @@ const buildEventReply = (target: MatrixEvent) => new MatrixEvent({
         "device_id": "XISFUZSKHH",
         "m.relates_to": {
             "m.in_reply_to": {
-                "event_id": target.getId(),
+                "event_id": target.getId()!,
             },
         },
         "sender_key": "i3N3CtG/CD2bGB8rA9fW6adLYSDvlUhf2iuU73L65Vg",
         "session_id": "Ja11R/KG6ua0wdk8zAzognrxjio1Gm/RK2Gn6lFL804",
     },
-    "event_id": target.getId() + Math.random(),
+    "event_id": target.getId()! + Math.random(),
     "origin_server_ts": 1643815466378,
     "room_id": "!STrMRsukXHtqQdSeHa:matrix.org",
     "sender": "@andybalaam-test1:matrix.org",

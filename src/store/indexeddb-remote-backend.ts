@@ -17,7 +17,7 @@ limitations under the License.
 import { logger } from "../logger";
 import { defer, IDeferred } from "../utils";
 import { ISavedSync } from "./index";
-import { IStartClientOpts } from "../client";
+import { IStoredClientOpts } from "../client";
 import { IStateEventWithRoomId, ISyncResponse } from "../matrix";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
@@ -118,11 +118,11 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         return this.doCmd('clearOutOfBandMembers', [roomId]);
     }
 
-    public getClientOptions(): Promise<IStartClientOpts> {
+    public getClientOptions(): Promise<IStoredClientOpts | undefined> {
         return this.doCmd('getClientOptions');
     }
 
-    public storeClientOptions(options: IStartClientOpts): Promise<void> {
+    public storeClientOptions(options: IStoredClientOpts): Promise<void> {
         return this.doCmd('storeClientOptions', [options]);
     }
 

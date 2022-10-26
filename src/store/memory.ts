@@ -31,6 +31,7 @@ import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
 import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
+import { IStoredClientOpts } from "../client";
 
 function isValidFilterId(filterId?: string | number | null): boolean {
     const isValidStr = typeof filterId === "string" &&
@@ -64,7 +65,7 @@ export class MemoryStore implements IStore {
     protected readonly localStorage?: Storage;
     private oobMembers: Record<string, IStateEventWithRoomId[]> = {}; // roomId: [member events]
     private pendingEvents: { [roomId: string]: Partial<IEvent>[] } = {};
-    private clientOptions = {};
+    private clientOptions?: IStoredClientOpts;
     private pendingToDeviceBatches: IndexedToDeviceBatch[] = [];
     private nextToDeviceBatchId = 0;
 
@@ -169,7 +170,7 @@ export class MemoryStore implements IStore {
      */
     public getRoomSummaries(): RoomSummary[] {
         return Object.values(this.rooms).map(function(room) {
-            return room.summary;
+            return room.summary!;
         });
     }
 
@@ -412,11 +413,11 @@ export class MemoryStore implements IStore {
         return Promise.resolve();
     }
 
-    public getClientOptions(): Promise<object> {
+    public getClientOptions(): Promise<IStoredClientOpts | undefined> {
         return Promise.resolve(this.clientOptions);
     }
 
-    public storeClientOptions(options: object): Promise<void> {
+    public storeClientOptions(options: IStoredClientOpts): Promise<void> {
         this.clientOptions = Object.assign({}, options);
         return Promise.resolve();
     }

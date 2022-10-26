@@ -19,10 +19,10 @@ import { VerificationRequest } from "./VerificationRequest";
 
 export interface IVerificationChannel {
     request?: VerificationRequest;
-    readonly userId: string;
+    readonly userId?: string;
     readonly roomId?: string;
     readonly deviceId?: string;
-    readonly transactionId: string;
+    readonly transactionId?: string;
     readonly receiveStartFromOtherDevices?: boolean;
     getTimestamp(event: MatrixEvent): number;
     send(type: string, uncompletedContent: Record<string, any>): Promise<void>;

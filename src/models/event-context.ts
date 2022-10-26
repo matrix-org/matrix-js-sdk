@@ -95,8 +95,8 @@ export class EventContext {
      * @param {boolean} backwards   true to set the pagination token for going
      *                                   backwards in time
      */
-    public setPaginateToken(token: string, backwards = false): void {
-        this.paginateTokens[backwards ? Direction.Backward : Direction.Forward] = token;
+    public setPaginateToken(token?: string, backwards = false): void {
+        this.paginateTokens[backwards ? Direction.Backward : Direction.Forward] = token ?? null;
     }
 
     /**

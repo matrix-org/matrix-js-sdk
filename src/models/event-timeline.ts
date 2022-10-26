@@ -74,7 +74,7 @@ export class EventTimeline {
         // check this to avoid overriding non-sentinel members by sentinel ones
         // when adding the event to a filtered timeline
         if (!event.sender?.events?.member) {
-            event.sender = stateContext.getSentinelMember(event.getSender());
+            event.sender = stateContext.getSentinelMember(event.getSender()!);
         }
         if (!event.target?.events?.member && event.getType() === EventType.RoomMember) {
             event.target = stateContext.getSentinelMember(event.getStateKey()!);
