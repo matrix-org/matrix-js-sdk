@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MatrixEvent } from '../models/event';
 import { logger } from '../logger';
-import { CallDirection, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
+import { CallDirection, CallError, CallErrorCode, CallState, createNewMatrixCall, MatrixCall } from './call';
 import { EventType } from '../@types/event';
 import { ClientEvent, MatrixClient } from '../client';
 import { MCallAnswer, MCallHangupReject } from "./callEventTypes";
@@ -152,7 +152,7 @@ export class CallEventHandler {
                 this.toDeviceEventBuffers.set(content.call_id, []);
             }
 
-            const buffer = this.toDeviceEventBuffers.get(content.call_id);
+            const buffer = this.toDeviceEventBuffers.get(content.call_id)!;
             const index = buffer.findIndex((e) => e.getContent().seq > content.seq);
 
             if (index === -1) {
@@ -172,7 +172,7 @@ export class CallEventHandler {
             while (nextEvent && nextEvent.getContent().seq === this.nextSeqByCall.get(callId)) {
                 this.callEventBuffer.push(nextEvent);
                 this.nextSeqByCall.set(callId, nextEvent.getContent().seq + 1);
-                nextEvent = buffer.shift();
+                nextEvent = buffer!.shift();
             }
         }
     };
@@ -194,7 +194,7 @@ export class CallEventHandler {
 
         let opponentDeviceId: string | undefined;
 
-        let groupCall: GroupCall;
+        let groupCall: GroupCall | undefined;
         if (groupCallId) {
             groupCall = this.client.groupCallEventHandler.getGroupCallById(groupCallId);
 
@@ -241,7 +241,7 @@ export class CallEventHandler {
                 return; // This invite was meant for another user in the room
             }
 
-            const timeUntilTurnCresExpire = this.client.getTurnServersExpiry() - Date.now();
+            const timeUntilTurnCresExpire = (this.client.getTurnServersExpiry() ?? 0) - Date.now();
             logger.info("Current turn creds expire in " + timeUntilTurnCresExpire + " ms");
             call = createNewMatrixCall(
                 this.client,
@@ -267,10 +267,12 @@ export class CallEventHandler {
             try {
                 await call.initWithInvite(event);
             } catch (e) {
-                if (e.code === GroupCallErrorCode.UnknownDevice) {
-                    groupCall?.emit(GroupCallEvent.Error, e);
-                } else {
-                    logger.error(e);
+                if (e instanceof CallError) {
+                    if (e.code === GroupCallErrorCode.UnknownDevice) {
+                        groupCall?.emit(GroupCallEvent.Error, e);
+                    } else {
+                        logger.error(e);
+                    }
                 }
             }
             this.calls.set(call.callId, call);
@@ -292,7 +294,7 @@ export class CallEventHandler {
                 if (
                     call.roomId === thisCall.roomId &&
                     thisCall.direction === CallDirection.Outbound &&
-                    call.getOpponentMember().userId === thisCall.invitee &&
+                    call.getOpponentMember()?.userId === thisCall.invitee &&
                     isCalling
                 ) {
                     existingCall = thisCall;

@@ -38,7 +38,7 @@ export const acquireContext = (): AudioContext => {
 export const releaseContext = () => {
     refCount--;
     if (refCount === 0) {
-        audioContext.close();
+        audioContext?.close();
         audioContext = null;
     }
 };
