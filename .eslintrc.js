@@ -20,7 +20,7 @@ module.exports = {
     // NOTE: These rules are frozen and new rules should not be added here.
     // New changes belong in https://github.com/matrix-org/eslint-plugin-matrix-org/
     rules: {
-        "no-var": ["warn"],
+        "no-var": ["error"],
         "prefer-rest-params": ["error"],
         "prefer-spread": ["error"],
         "one-var": ["error"],
