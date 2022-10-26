@@ -1040,7 +1040,7 @@ describe("MatrixClient event timelines", function() {
                 next_batch: RANDOM_TOKEN as string | null,
             },
         ): ExpectedHttpRequest {
-            const request = httpBackend.when("GET", encodeUri("/_matrix/client/r0/rooms/$roomId/threads", {
+            const request = httpBackend.when("GET", encodeUri("/_matrix/client/v1/rooms/$roomId/threads", {
                 $roomId: roomId,
             }));
             request.respond(200, response);
@@ -1079,8 +1079,9 @@ describe("MatrixClient event timelines", function() {
             beforeEach(() => {
                 // @ts-ignore
                 client.clientOpts.experimentalThreadSupport = true;
-                Thread.setServerSideSupport(FeatureSupport.Experimental);
+                Thread.setServerSideSupport(FeatureSupport.Stable);
                 Thread.setServerSideListSupport(FeatureSupport.Stable);
+                Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
             });
 
             async function testPagination(timelineSet: EventTimelineSet, direction: Direction) {
@@ -1101,7 +1102,7 @@ describe("MatrixClient event timelines", function() {
 
             it("should allow you to paginate all threads backwards", async function() {
                 const room = client.getRoom(roomId);
-                const timelineSets = await (room?.createThreadsTimelineSets());
+                const timelineSets = await room!.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
                 const [allThreads, myThreads] = timelineSets!;
                 await testPagination(allThreads, Direction.Backward);
@@ -1110,7 +1111,7 @@ describe("MatrixClient event timelines", function() {
 
             it("should allow you to paginate all threads forwards", async function() {
                 const room = client.getRoom(roomId);
-                const timelineSets = await (room?.createThreadsTimelineSets());
+                const timelineSets = await room!.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
                 const [allThreads, myThreads] = timelineSets!;
 
@@ -1120,7 +1121,7 @@ describe("MatrixClient event timelines", function() {
 
             it("should allow fetching all threads", async function() {
                 const room = client.getRoom(roomId)!;
-                const timelineSets = await room.createThreadsTimelineSets();
+                const timelineSets = await room!.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
                 respondToThreads();
                 respondToThreads();
@@ -1445,18 +1446,23 @@ describe("MatrixClient event timelines", function() {
             });
         httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
             encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
-            encodeURIComponent(THREAD_RELATION_TYPE.name) + "?limit=20")
+            encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&from=start_token")
+            .respond(200, function() {
+                return {
+                    original_event: THREAD_ROOT,
+                    chunk: [],
+                };
+            });
+        httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
+            encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=f&from=end_token")
             .respond(200, function() {
                 return {
                     original_event: THREAD_ROOT,
                     chunk: [THREAD_REPLY],
-                    // no next batch as this is the oldest end of the timeline
                 };
             });
-        await Promise.all([
-            client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!),
-            httpBackend.flushAllExpected(),
-        ]);
+        await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
 
         httpBackend.when("GET", "/sync").respond(200, {
             next_batch: "s_5_5",

@@ -1650,12 +1650,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private async createThreadTimelineSet(filterType?: ThreadFilterType): Promise<EventTimelineSet> {
         let timelineSet: EventTimelineSet;
         if (Thread.hasServerSideListSupport) {
-            let threadListType: ThreadFilterType | null = null;
-            if (Thread.hasServerSideListSupport) {
-                threadListType = filterType ?? ThreadFilterType.All;
-            }
             timelineSet =
-                new EventTimelineSet(this, this.opts, undefined, undefined, threadListType);
+                new EventTimelineSet(this, this.opts, undefined, undefined, filterType ?? ThreadFilterType.All);
             this.reEmitter.reEmit(timelineSet, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,

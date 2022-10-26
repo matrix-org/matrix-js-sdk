@@ -5415,7 +5415,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         let event;
-        if (timelineSet.threadListType) {
+        if (timelineSet.threadListType !== null) {
             const res = await this.createThreadListMessagesRequest(
                 timelineSet.room.roomId,
                 null,
@@ -5663,7 +5663,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.paginationRequests[dir] = null;
             });
             eventTimeline.paginationRequests[dir] = promise;
-        } else if (threadListType) {
+        } else if (threadListType !== null) {
             if (!room) {
                 throw new Error("Unknown room " + eventTimeline.getRoomId());
             }
