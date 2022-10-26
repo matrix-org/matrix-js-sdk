@@ -33,6 +33,7 @@ const BUFFER_PERIOD_MS = 10 * 1000;
 export interface MSC3575RoomSubscription {
     required_state?: string[][];
     timeline_limit?: number;
+    include_old_rooms?: MSC3575RoomSubscription;
 }
 
 /**
@@ -42,7 +43,6 @@ export interface MSC3575Filter {
     is_dm?: boolean;
     is_encrypted?: boolean;
     is_invite?: boolean;
-    is_tombstoned?: boolean;
     room_name_like?: string;
     room_types?: string[];
     not_room_types?: string[];
@@ -641,8 +641,12 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             // starting at the gap so we can just shift each element in turn
                             this.shiftLeft(listIndex, op.index, gapIndex);
                         }
-                        gapIndex = -1; // forget the gap, we don't need it anymore.
                     }
+                    // forget the gap, we don't need it anymore. This is outside the check for
+                    // a room being present in this index position because INSERTs always universally
+                    // forget the gap, not conditionally based on the presence of a room in the INSERT
+                    // position. Without this, DELETE 0; INSERT 0; would do the wrong thing.
+                    gapIndex = -1;
                     this.lists[listIndex].roomIndexToRoomId[op.index] = op.room_id;
                     break;
                 }

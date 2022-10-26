@@ -174,7 +174,7 @@ export type RoomEventHandlerMap = {
         room: Room,
     ) => void;
     [RoomEvent.UnreadNotifications]: (
-        unreadNotifications: NotificationCount,
+        unreadNotifications?: NotificationCount,
         threadId?: string,
     ) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
@@ -1278,6 +1278,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             this.threadNotifications.clear();
         }
+        this.emit(RoomEvent.UnreadNotifications);
     }
 
     /**
