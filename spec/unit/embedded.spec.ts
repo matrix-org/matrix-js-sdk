@@ -28,6 +28,7 @@ import {
     WidgetApiToWidgetAction,
     MatrixCapabilities,
     ITurnServer,
+    IRoomEvent,
 } from "matrix-widget-api";
 
 import { createRoomWidgetClient, MsgType } from "../../src/matrix";
@@ -184,7 +185,7 @@ describe("RoomWidgetClient", () => {
         it("backfills", async () => {
             widgetApi.readStateEvents.mockImplementation(async (eventType, limit, stateKey) =>
                 eventType === "org.example.foo" && (limit ?? Infinity) > 0 && stateKey === "bar"
-                    ? [event]
+                    ? [event as IRoomEvent]
                     : [],
             );
 

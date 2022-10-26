@@ -208,7 +208,7 @@ export class MSC3906Rendezvous {
         await this.send({
             type: PayloadType.Finish,
             outcome: Outcome.Verified,
-            verifying_device_id: this.client.getDeviceId(),
+            verifying_device_id: this.client.getDeviceId()!,
             verifying_device_key: this.client.getDeviceEd25519Key()!,
             master_key: masterPublicKey,
         });

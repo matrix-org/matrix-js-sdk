@@ -139,8 +139,7 @@ export const getTextForLocationEvent = (
 /**
  * Generates the content for a Location event
  * @param uri a geo:// uri for the location
- * @param timestamp the timestamp when the location was correct (milliseconds since
- *           the UNIX epoch)
+ * @param timestamp the timestamp when the location was correct (milliseconds since the UNIX epoch)
  * @param description the (optional) label for this location on the map
  * @param assetType the (optional) asset type of this location e.g. "m.self"
  * @param text optional. A text for the location
@@ -150,7 +149,7 @@ export const makeLocationContent = (
     // to avoid a breaking change
     text: string | undefined,
     uri: string,
-    timestamp?: number,
+    timestamp: number,
     description?: string,
     assetType?: LocationAssetType,
 ): LegacyLocationEventContent & MLocationEventContent => {

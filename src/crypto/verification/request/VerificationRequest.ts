@@ -112,8 +112,8 @@ export class VerificationRequest<
     private requestReceivedAt: number | null = null;
 
     private commonMethods: VerificationMethod[] = [];
-    private _phase: Phase;
-    public _cancellingUserId: string; // Used in tests only
+    private _phase!: Phase;
+    public _cancellingUserId?: string; // Used in tests only
     private _verifier?: VerificationBase<any, any>;
 
     constructor(
@@ -357,7 +357,7 @@ export class VerificationRequest<
 
     /** The user id of the other party in this request */
     public get otherUserId(): string {
-        return this.channel.userId;
+        return this.channel.userId!;
     }
 
     public get isSelfVerification(): boolean {
@@ -372,7 +372,7 @@ export class VerificationRequest<
         const myCancel = this.eventsByUs.get(CANCEL_TYPE);
         const theirCancel = this.eventsByThem.get(CANCEL_TYPE);
 
-        if (myCancel && (!theirCancel || myCancel.getId() < theirCancel.getId())) {
+        if (myCancel && (!theirCancel || myCancel.getId()! < theirCancel.getId()!)) {
             return myCancel.getSender();
         }
         if (theirCancel) {
@@ -405,8 +405,8 @@ export class VerificationRequest<
             this.eventsByThem.get(REQUEST_TYPE) ||
             this.eventsByThem.get(READY_TYPE) ||
             this.eventsByThem.get(START_TYPE);
-        const theirFirstContent = theirFirstEvent.getContent();
-        const fromDevice = theirFirstContent.from_device;
+        const theirFirstContent = theirFirstEvent?.getContent();
+        const fromDevice = theirFirstContent?.from_device;
         return {
             userId: this.otherUserId,
             deviceId: fromDevice,
@@ -559,7 +559,9 @@ export class VerificationRequest<
             const ourStartEvent = this.eventsByUs.get(START_TYPE);
             // any party can send .start after a .ready or unsent
             if (theirStartEvent && ourStartEvent) {
-                startEvent = theirStartEvent.getSender() < ourStartEvent.getSender() ? theirStartEvent : ourStartEvent;
+                startEvent = theirStartEvent.getSender()! < ourStartEvent.getSender()!
+                    ? theirStartEvent
+                    : ourStartEvent;
             } else {
                 startEvent = theirStartEvent ? theirStartEvent : ourStartEvent;
             }
@@ -595,7 +597,7 @@ export class VerificationRequest<
         // get common methods
         if (phase === PHASE_REQUESTED || phase === PHASE_READY) {
             if (!this.wasSentByOwnDevice(event)) {
-                const content = event.getContent<{
+                const content = event!.getContent<{
                     methods: string[];
                 }>();
                 this.commonMethods =
@@ -620,7 +622,7 @@ export class VerificationRequest<
         }
         // create verifier
         if (phase === PHASE_STARTED) {
-            const { method } = event.getContent();
+            const { method } = event!.getContent();
             if (!this._verifier && !this.observeOnly) {
                 this._verifier = this.createVerifier(method, event);
                 if (!this._verifier) {
@@ -903,19 +905,19 @@ export class VerificationRequest<
             logger.warn("could not find verifier constructor for method", method);
             return;
         }
-        return new VerifierCtor(this.channel, this.client, userId, deviceId, startEvent, this);
+        return new VerifierCtor(this.channel, this.client, userId!, deviceId!, startEvent, this);
     }
 
-    private wasSentByOwnUser(event: MatrixEvent): boolean {
-        return event.getSender() === this.client.getUserId();
+    private wasSentByOwnUser(event?: MatrixEvent): boolean {
+        return event?.getSender() === this.client.getUserId();
     }
 
     // only for .request, .ready or .start
-    private wasSentByOwnDevice(event: MatrixEvent): boolean {
+    private wasSentByOwnDevice(event?: MatrixEvent): boolean {
         if (!this.wasSentByOwnUser(event)) {
             return false;
         }
-        const content = event.getContent();
+        const content = event!.getContent();
         if (!content || content.from_device !== this.client.getDeviceId()) {
             return false;
         }

@@ -76,7 +76,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * The new relation event to be added.
      */
     public async addEvent(event: MatrixEvent) {
-        if (this.relationEventIds.has(event.getId())) {
+        if (this.relationEventIds.has(event.getId()!)) {
             return;
         }
 
@@ -101,7 +101,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         }
 
         this.relations.add(event);
-        this.relationEventIds.add(event.getId());
+        this.relationEventIds.add(event.getId()!);
 
         if (this.relationType === RelationType.Annotation) {
             this.addAnnotationToAggregation(event);
@@ -206,7 +206,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             return bEvents.size - aEvents.size;
         });
 
-        const sender = event.getSender();
+        const sender = event.getSender()!;
         let eventsFromSender = this.annotationsBySender[sender];
         if (!eventsFromSender) {
             eventsFromSender = this.annotationsBySender[sender] = new Set();
@@ -231,7 +231,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             });
         }
 
-        const sender = event.getSender();
+        const sender = event.getSender()!;
         const eventsFromSender = this.annotationsBySender[sender];
         if (eventsFromSender) {
             eventsFromSender.delete(event);

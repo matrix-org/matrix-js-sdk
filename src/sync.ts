@@ -1081,11 +1081,11 @@ export class SyncApi {
         if (Array.isArray(data.presence?.events)) {
             data.presence!.events.map(client.getEventMapper()).forEach(
                 function(presenceEvent) {
-                    let user = client.store.getUser(presenceEvent.getSender());
+                    let user = client.store.getUser(presenceEvent.getSender()!);
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = createNewUser(client, presenceEvent.getSender());
+                        user = createNewUser(client, presenceEvent.getSender()!);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
@@ -1097,7 +1097,7 @@ export class SyncApi {
         if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.map(client.getEventMapper());
             const prevEventsMap = events.reduce((m, c) => {
-                m[c.getType()] = client.store.getAccountData(c.getType());
+                m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
             }, {});
             client.store.storeAccountDataEvents(events);
@@ -1111,7 +1111,7 @@ export class SyncApi {
                         const rules = accountDataEvent.getContent<IPushRules>();
                         client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                     }
-                    const prevEvent = prevEventsMap[accountDataEvent.getType()];
+                    const prevEvent = prevEventsMap[accountDataEvent.getType()!];
                     client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                     return accountDataEvent;
                 },
@@ -1330,10 +1330,9 @@ export class SyncApi {
                 // will stop us linking the empty timeline into the chain).
                 //
                 for (let i = events.length - 1; i >= 0; i--) {
-                    const eventId = events[i].getId();
+                    const eventId = events[i].getId()!;
                     if (room.getTimelineForEvent(eventId)) {
-                        debuglog("Already have event " + eventId + " in limited " +
-                            "sync - not resetting");
+                        debuglog(`Already have event ${eventId} in limited sync - not resetting`);
                         limited = false;
 
                         // we might still be missing some of the events before i;

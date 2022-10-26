@@ -74,7 +74,7 @@ export class RelationsContainer {
      * @param {MatrixEvent} event The event to check as relation target.
      */
     public aggregateParentEvent(event: MatrixEvent): void {
-        const relationsForEvent = this.relations.get(event.getId());
+        const relationsForEvent = this.relations.get(event.getId()!);
         if (!relationsForEvent) return;
 
         for (const relationsWithRelType of relationsForEvent.values()) {

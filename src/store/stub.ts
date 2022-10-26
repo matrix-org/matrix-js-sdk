@@ -29,6 +29,7 @@ import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
 import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatch } from "../models/ToDeviceMessage";
+import { IStoredClientOpts } from "../client";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
@@ -256,11 +257,11 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getClientOptions(): Promise<object> {
-        return Promise.resolve({});
+    public getClientOptions(): Promise<IStoredClientOpts | undefined> {
+        return Promise.resolve(undefined);
     }
 
-    public storeClientOptions(options: object): Promise<void> {
+    public storeClientOptions(options: IStoredClientOpts): Promise<void> {
         return Promise.resolve();
     }
 
