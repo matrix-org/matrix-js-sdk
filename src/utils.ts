@@ -232,7 +232,7 @@ export function deepCompare(x: any, y: any): boolean {
     }
 
     // the object algorithm works for Array, but it's sub-optimal.
-    if (x instanceof Array) {
+    if (Array.isArray(x)) {
         if (x.length !== y.length) {
             return false;
         }
