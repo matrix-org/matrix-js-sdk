@@ -84,7 +84,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
 
-    private lastEvent!: MatrixEvent;
+    private lastEvent: MatrixEvent | undefined;
     private replyCount = 0;
 
     public readonly room: Room;
