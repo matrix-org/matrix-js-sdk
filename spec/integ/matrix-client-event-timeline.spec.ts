@@ -1411,7 +1411,6 @@ describe("MatrixClient event timelines", function() {
 
     describe("should re-insert room IDs for bundled thread relation events", () => {
         async function doTest() {
-
             httpBackend.when("GET", "/sync").respond(200, {
                 next_batch: "s_5_4",
                 rooms: {
