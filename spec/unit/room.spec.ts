@@ -2201,7 +2201,7 @@ describe("Room", function() {
             expect(thread).toHaveLength(0);
         });
 
-        xit("Edits update the lastReply event", async () => {
+        it("Edits update the lastReply event", async () => {
             room.client.supportsExperimentalThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
@@ -2234,10 +2234,27 @@ describe("Room", function() {
             expect(thread.replyToEvent.event).toEqual(threadResponse.event);
             expect(thread.replyToEvent.getContent().body).toBe(threadResponse.getContent().body);
 
+            room.client.fetchRoomEvent = (eventId: string) => Promise.resolve({
+                ...threadRoot.event,
+                unsigned: {
+                    "age": 123,
+                    "m.relations": {
+                        [THREAD_RELATION_TYPE.name]: {
+                            latest_event: {
+                                ...threadResponse.event,
+                                prev_content: threadResponse.event.content,
+                                content: threadResponseEdit.event.content,
+                            },
+                            count: 2,
+                            current_user_participated: true,
+                        },
+                    },
+                },
+            });
+
             prom = emitPromise(room, ThreadEvent.Update);
             room.addLiveEvents([threadResponseEdit]);
             await prom;
-            await emitPromise(room, ThreadEvent.Update);
             expect(thread.replyToEvent.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
         });
 
