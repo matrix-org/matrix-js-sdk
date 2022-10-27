@@ -212,7 +212,7 @@ describe('Group Call', function() {
                         ],
                     }),
                     FAKE_USER_ID_1,
-                    false,
+                    { keepAlive: false },
                 );
             } finally {
                 groupCall.leave();
@@ -234,7 +234,7 @@ describe('Group Call', function() {
                 EventType.GroupCallMemberPrefix,
                 expect.objectContaining({ "m.calls": [] }),
                 FAKE_USER_ID_1,
-                true, // Request should outlive the window
+                { keepAlive: true }, // Request should outlive the window
             );
         });
 

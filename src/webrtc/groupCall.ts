@@ -762,7 +762,7 @@ export class GroupCall extends TypedEventEmitter<
         };
 
         return this.client.sendStateEvent(
-            this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId, keepAlive,
+            this.room.roomId, EventType.GroupCallMemberPrefix, content, localUserId, { keepAlive },
         );
     }
 
