@@ -806,6 +806,91 @@ describe("SlidingSync", () => {
             await listPromise;
             slidingSync.stop();
         });
+
+        // Regression test to make sure things like DELETE 0 INSERT 0 work correctly and we don't
+        // end up losing room IDs.
+        it("should handle insertions with a spurious DELETE correctly", async () => {
+            slidingSync = new SlidingSync(proxyBaseUrl, [
+                {
+                    ranges: [[0, 20]],
+                },
+            ], {}, client!, 1);
+            // initially start with nothing
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "a",
+                lists: [{
+                    count: 0,
+                    ops: [],
+                }],
+            });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({});
+
+            // insert a room
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "b",
+                lists: [{
+                    count: 1,
+                    ops: [
+                        {
+                            op: "DELETE", index: 0,
+                        },
+                        {
+                            op: "INSERT", index: 0, room_id: roomA,
+                        },
+                    ],
+                }],
+            });
+            await httpBackend!.flushAllExpected();
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
+                0: roomA,
+            });
+
+            // insert another room
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "c",
+                lists: [{
+                    count: 1,
+                    ops: [
+                        {
+                            op: "DELETE", index: 1,
+                        },
+                        {
+                            op: "INSERT", index: 0, room_id: roomB,
+                        },
+                    ],
+                }],
+            });
+            await httpBackend!.flushAllExpected();
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
+                0: roomB,
+                1: roomA,
+            });
+
+            // insert a final room
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "c",
+                lists: [{
+                    count: 1,
+                    ops: [
+                        {
+                            op: "DELETE", index: 2,
+                        },
+                        {
+                            op: "INSERT", index: 0, room_id: roomC,
+                        },
+                    ],
+                }],
+            });
+            await httpBackend!.flushAllExpected();
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
+                0: roomC,
+                1: roomB,
+                2: roomA,
+            });
+            slidingSync.stop();
+        });
     });
 
     describe("transaction IDs", () => {

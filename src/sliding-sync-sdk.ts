@@ -85,7 +85,7 @@ class ExtensionE2EE implements Extension {
             const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.crypto.setNeedsNewFallback(
-                unusedFallbackKeys instanceof Array &&
+                Array.isArray(unusedFallbackKeys) &&
                 !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }

@@ -217,7 +217,7 @@ const MAC_SET = new Set(MAC_LIST);
 const SAS_SET = new Set(SAS_LIST);
 
 function intersection<T>(anArray: T[], aSet: Set<T>): T[] {
-    return anArray instanceof Array ? anArray.filter(x => aSet.has(x)) : [];
+    return Array.isArray(anArray) ? anArray.filter(x => aSet.has(x)) : [];
 }
 
 export enum SasEvent {
