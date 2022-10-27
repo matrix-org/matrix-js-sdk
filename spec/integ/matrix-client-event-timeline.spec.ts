@@ -1479,7 +1479,7 @@ describe("MatrixClient event timelines", function() {
 
             await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
 
-            expect(timeline.getEvents()[1].event).toEqual(THREAD_REPLY);
+            expect(timeline.getEvents()[1]!.event).toEqual(THREAD_REPLY);
         }
 
         it("in stable mode", async () => {
