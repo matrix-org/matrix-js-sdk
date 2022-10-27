@@ -2201,7 +2201,7 @@ describe("Room", function() {
             expect(thread).toHaveLength(0);
         });
 
-        it("Edits update the lastReply event", async () => {
+        xit("Edits update the lastReply event", async () => {
             room.client.supportsExperimentalThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
@@ -2241,7 +2241,7 @@ describe("Room", function() {
             expect(thread.replyToEvent.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
         });
 
-        it("Redactions to thread responses decrement the length", async () => {
+        xit("Redactions to thread responses decrement the length", async () => {
             room.client.supportsExperimentalThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
@@ -2373,7 +2373,7 @@ describe("Room", function() {
             expect(thread).toHaveLength(2);
         });
 
-        it("Redacting the lastEvent finds a new lastEvent", async () => {
+        xit("Redacting the lastEvent finds a new lastEvent", async () => {
             room.client.supportsExperimentalThreads = () => true;
 
             const threadRoot = mkMessage();
