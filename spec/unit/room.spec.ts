@@ -2242,7 +2242,6 @@ describe("Room", function() {
                         [THREAD_RELATION_TYPE.name]: {
                             latest_event: {
                                 ...threadResponse.event,
-                                prev_content: threadResponse.event.content,
                                 content: threadResponseEdit.event.content,
                             },
                             count: 2,
