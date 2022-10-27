@@ -1409,79 +1409,98 @@ describe("MatrixClient event timelines", function() {
         });
     });
 
-    it("should re-insert room IDs for bundled thread relation events", async () => {
-        // @ts-ignore
-        client.clientOpts.experimentalThreadSupport = true;
-        Thread.setServerSideSupport(FeatureSupport.Experimental);
+    describe("should re-insert room IDs for bundled thread relation events", () => {
+        async function doTest() {
 
-        httpBackend.when("GET", "/sync").respond(200, {
-            next_batch: "s_5_4",
-            rooms: {
-                join: {
-                    [roomId]: {
-                        timeline: {
-                            events: [
-                                SYNC_THREAD_ROOT,
-                            ],
-                            prev_batch: "f_1_1",
+            httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: "s_5_4",
+                rooms: {
+                    join: {
+                        [roomId]: {
+                            timeline: {
+                                events: [
+                                    SYNC_THREAD_ROOT,
+                                ],
+                                prev_batch: "f_1_1",
+                            },
                         },
                     },
                 },
-            },
-        });
-        await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
-
-        const room = client.getRoom(roomId)!;
-        const thread = room.getThread(THREAD_ROOT.event_id!)!;
-        const timelineSet = thread.timelineSet;
-
-        httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
-            .respond(200, {
-                start: "start_token",
-                events_before: [],
-                event: THREAD_ROOT,
-                events_after: [],
-                state: [],
-                end: "end_token",
             });
-        httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
-            encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
-            encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&from=start_token")
-            .respond(200, function() {
-                return {
-                    original_event: THREAD_ROOT,
-                    chunk: [],
-                };
-            });
-        httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
-            encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
-            encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=f&from=end_token")
-            .respond(200, function() {
-                return {
-                    original_event: THREAD_ROOT,
-                    chunk: [THREAD_REPLY],
-                };
-            });
-        await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
+            await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
 
-        httpBackend.when("GET", "/sync").respond(200, {
-            next_batch: "s_5_5",
-            rooms: {
-                join: {
-                    [roomId]: {
-                        timeline: {
-                            events: [
-                                SYNC_THREAD_REPLY,
-                            ],
-                            prev_batch: "f_1_2",
+            const room = client.getRoom(roomId)!;
+            const thread = room.getThread(THREAD_ROOT.event_id!)!;
+            const timelineSet = thread.timelineSet;
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, {
+                    start: "start_token",
+                    events_before: [],
+                    event: THREAD_ROOT,
+                    events_after: [],
+                    state: [],
+                    end: "end_token",
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+                encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&from=start_token")
+                .respond(200, function() {
+                    return {
+                        original_event: THREAD_ROOT,
+                        chunk: [],
+                    };
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+                encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=f&from=end_token")
+                .respond(200, function() {
+                    return {
+                        original_event: THREAD_ROOT,
+                        chunk: [THREAD_REPLY],
+                    };
+                });
+            const timeline = await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
+
+            httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: "s_5_5",
+                rooms: {
+                    join: {
+                        [roomId]: {
+                            timeline: {
+                                events: [
+                                    SYNC_THREAD_REPLY,
+                                ],
+                                prev_batch: "f_1_2",
+                            },
                         },
                     },
                 },
-            },
+            });
+
+            await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
+
+            expect(timeline.getEvents()[1].event).toEqual(THREAD_REPLY);
+        }
+
+        it("in stable mode", async () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+            Thread.setServerSideListSupport(FeatureSupport.Stable);
+            Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
+
+            return doTest();
         });
 
-        await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
+        it("in backwards compatible mode", async () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
+            Thread.setServerSideListSupport(FeatureSupport.None);
+            Thread.setServerSideFwdPaginationSupport(FeatureSupport.None);
 
-        expect(thread.liveTimeline.getEvents()[1].event).toEqual(THREAD_REPLY);
+            return doTest();
+        });
     });
 });
