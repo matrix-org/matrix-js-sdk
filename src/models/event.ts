@@ -913,7 +913,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns {Object} The clear event of the encrypted event.
      */
     public getClearEvent(): IClearEvent | null {
-        return this.clearEvent || null
+        return this.clearEvent || null;
     }
 
     /**
