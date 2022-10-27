@@ -2265,7 +2265,7 @@ describe("Room", function() {
                 },
             });
 
-            let prom = emitPromise(room, ThreadEvent.New);
+            const prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
             const thread = await prom;
             await thread.initialiseThread();
