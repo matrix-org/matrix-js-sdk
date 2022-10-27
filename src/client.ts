@@ -1607,7 +1607,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *          have been processed.
      */
     public waitUntilRoomReadyForGroupCalls(roomId: string): Promise<void> {
-        return this.groupCallEventHandler.waitUntilRoomReadyForGroupCalls(roomId);
+        return this.groupCallEventHandler!.waitUntilRoomReadyForGroupCalls(roomId);
     }
 
     /**
@@ -1616,7 +1616,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns {GroupCall} The group call or null if it doesn't already exist.
      */
     public getGroupCallForRoom(roomId: string): GroupCall | null {
-        return this.groupCallEventHandler.groupCalls.get(roomId) || null;
+        return this.groupCallEventHandler!.groupCalls.get(roomId) || null;
     }
 
     /**
@@ -6397,8 +6397,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private startCallEventHandler = (): void => {
         if (this.isInitialSyncComplete()) {
-            this.callEventHandler.start();
-            this.groupCallEventHandler.start();
+            this.callEventHandler!.start();
+            this.groupCallEventHandler!.start();
             this.off(ClientEvent.Sync, this.startCallEventHandler);
         }
     };
