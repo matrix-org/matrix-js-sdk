@@ -631,6 +631,40 @@ describe("MatrixClient event timelines", function() {
             expect(timeline!.getEvents().find(e => e.getId() === THREAD_REPLY.event_id!)).toBeTruthy();
         });
 
+        it("should handle thread replies with server support by fetching a contiguous thread timeline", async () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
+            await client.stopClient(); // we don't need the client to be syncing at this time
+            const room = client.getRoom(roomId)!;
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+                encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&limit=1")
+                .respond(200, function() {
+                    return {
+                        original_event: THREAD_ROOT,
+                        chunk: [THREAD_REPLY],
+                        // no next batch as this is the oldest end of the timeline
+                    };
+                });
+
+            const thread = room.createThread(THREAD_ROOT.event_id!, undefined, [], false);
+            await httpBackend.flushAllExpected();
+            const timelineSet = thread.timelineSet;
+
+            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!);
+            const timeline = await timelinePromise;
+
+            expect(timeline!.getEvents().find(e => e.getId() === THREAD_ROOT.event_id!)).toBeTruthy();
+            expect(timeline!.getEvents().find(e => e.getId() === THREAD_REPLY.event_id!)).toBeTruthy();
+        });
+
         it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
@@ -1432,6 +1466,14 @@ describe("MatrixClient event timelines", function() {
             const thread = room.getThread(THREAD_ROOT.event_id!)!;
             const timelineSet = thread.timelineSet;
 
+            const buildParams = (direction: Direction, token: string): string => {
+                if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
+                    return `?from=${token}&org.matrix.msc3715.dir=${direction}`;
+                } else {
+                    return `?dir=${direction}&from=${token}`;
+                }
+            };
+
             httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
                 .respond(200, {
                     start: "start_token",
@@ -1443,7 +1485,7 @@ describe("MatrixClient event timelines", function() {
                 });
             httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
-                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&from=start_token")
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + buildParams(Direction.Backward, "start_token"))
                 .respond(200, function() {
                     return {
                         original_event: THREAD_ROOT,
@@ -1452,7 +1494,7 @@ describe("MatrixClient event timelines", function() {
                 });
             httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
-                encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=f&from=end_token")
+                encodeURIComponent(THREAD_RELATION_TYPE.name) + buildParams(Direction.Forward, "end_token"))
                 .respond(200, function() {
                     return {
                         original_event: THREAD_ROOT,
@@ -1488,6 +1530,16 @@ describe("MatrixClient event timelines", function() {
             Thread.setServerSideSupport(FeatureSupport.Stable);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
+
+            return doTest();
+        });
+
+        it("in backwards compatible unstable mode", async () => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+            Thread.setServerSideSupport(FeatureSupport.Experimental);
+            Thread.setServerSideListSupport(FeatureSupport.Experimental);
+            Thread.setServerSideFwdPaginationSupport(FeatureSupport.Experimental);
 
             return doTest();
         });
