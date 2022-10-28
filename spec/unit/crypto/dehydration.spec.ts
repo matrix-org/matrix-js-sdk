@@ -82,7 +82,7 @@ describe("Dehydration", function() {
             errcode: "M_NOT_FOUND",
         });
 
-        let pickledAccount: string = "";
+        let pickledAccount = "";
 
         alice.httpBackend.when("PUT", "/dehydrated_device")
             .check((req) => {
