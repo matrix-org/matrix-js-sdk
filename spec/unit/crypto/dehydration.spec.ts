@@ -15,18 +15,9 @@ limitations under the License.
 */
 
 import '../../olm-loader';
-import * as olmlib from "../../../src/crypto/olmlib";
 import { TestClient } from '../../TestClient';
-import { ICreateClientOpts } from '../../../src/client';
+import { logger } from '../../../src/logger';
 import { DEHYDRATION_ALGORITHM } from '../../../src/crypto/dehydration';
-
-async function makeTestClient(userInfo: { userId: string, deviceId: string}, options: Partial<ICreateClientOpts> = {}) {
-    const client = (new TestClient(
-        userInfo.userId, userInfo.deviceId, undefined, undefined, options,
-    )).client;
-
-    return client;
-}
 
 const Olm = global.Olm;
 
@@ -62,7 +53,7 @@ describe("Dehydration", function() {
             },
         });
         alice.httpBackend.when("POST", "/dehydrated_device/claim").respond(200, {
-            success: true
+            success: true,
         });
 
         expect((await Promise.all([
@@ -91,7 +82,7 @@ describe("Dehydration", function() {
             errcode: "M_NOT_FOUND",
         });
 
-        let pickled_account: String;
+        let pickledAccount: string;
 
         alice.httpBackend.when("PUT", "/dehydrated_device")
             .check((req) => {
@@ -99,10 +90,10 @@ describe("Dehydration", function() {
                     algorithm: DEHYDRATION_ALGORITHM,
                     account: expect.any(String),
                 });
-                pickled_account = req.data.device_data.account;
+                pickledAccount = req.data.device_data.account;
             })
             .respond(200, {
-                device_id: "ABCDEFG"
+                device_id: "ABCDEFG",
             });
         alice.httpBackend.when("POST", "/keys/upload/ABCDEFG")
             .check((req) => {
@@ -134,10 +125,12 @@ describe("Dehydration", function() {
                     alice.httpBackend.flushAllExpected(),
                 ]))[0];
 
+            expect(deviceId).toEqual("ABCDEFG");
+
             // try to rehydrate the dehydrated device
             const rehydrated = new Olm.Account();
             try {
-                rehydrated.unpickle(new Uint8Array(key), pickled_account);
+                rehydrated.unpickle(new Uint8Array(key), pickledAccount);
             } finally {
                 rehydrated.free();
             }
