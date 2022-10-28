@@ -60,7 +60,7 @@ describe("MatrixClient relations", () => {
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
+        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT", "originalEvent": null, "prevBatch": null });
     });
 
     it("should read related events with relation type", async () => {
@@ -72,7 +72,7 @@ describe("MatrixClient relations", () => {
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
+        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT", "originalEvent": null, "prevBatch": null });
     });
 
     it("should read related events with relation type and event type", async () => {
@@ -87,7 +87,7 @@ describe("MatrixClient relations", () => {
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
+        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT", "originalEvent": null, "prevBatch": null });
     });
 
     it("should read related events with custom options", async () => {
@@ -107,7 +107,7 @@ describe("MatrixClient relations", () => {
 
         await httpBackend!.flushAllExpected();
 
-        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT" });
+        expect(await response).toEqual({ "events": [], "nextBatch": "NEXT", "originalEvent": null, "prevBatch": null });
     });
 
     it('should use default direction in the fetchRelations endpoint', async () => {
