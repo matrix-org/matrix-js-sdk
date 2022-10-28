@@ -82,7 +82,7 @@ describe("Dehydration", function() {
             errcode: "M_NOT_FOUND",
         });
 
-        let pickledAccount: string;
+        let pickledAccount: string = "";
 
         alice.httpBackend.when("PUT", "/dehydrated_device")
             .check((req) => {
@@ -126,6 +126,7 @@ describe("Dehydration", function() {
                 ]))[0];
 
             expect(deviceId).toEqual("ABCDEFG");
+            expect(deviceId).not.toEqual("");
 
             // try to rehydrate the dehydrated device
             const rehydrated = new Olm.Account();
@@ -135,7 +136,7 @@ describe("Dehydration", function() {
                 rehydrated.free();
             }
         } finally {
-            alice.client.crypto.dehydrationManager.stop();
+            alice.client?.crypto?.dehydrationManager?.stop();
         }
     });
 });
