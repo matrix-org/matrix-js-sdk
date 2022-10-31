@@ -7875,7 +7875,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setPassword(
-        authDict: any,
+        authDict: IAuthDict,
         newPassword: string,
         logoutDevices?: boolean,
     ): Promise<{}> {
