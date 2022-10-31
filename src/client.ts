@@ -6726,7 +6726,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     prefix: '',
                 },
             );
-            // throw "YOLO";
         } catch (e) {
             // Need to unset this if it fails, otherwise we'll never retry
             this.serverVersionsPromise = undefined;
