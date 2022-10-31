@@ -6717,21 +6717,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return this.serverVersionsPromise;
         }
 
-        try {
-            this.serverVersionsPromise = this.http.request<IServerVersions>(
-                Method.Get, "/_matrix/client/versions",
-                undefined, // queryParams
-                undefined, // data
-                {
-                    prefix: '',
-                },
-            );
-        } catch (e) {
+        this.serverVersionsPromise = this.http.request<IServerVersions>(
+            Method.Get, "/_matrix/client/versions",
+            undefined, // queryParams
+            undefined, // data
+            {
+                prefix: '',
+            },
+        ).catch(e => {
             // Need to unset this if it fails, otherwise we'll never retry
             this.serverVersionsPromise = undefined;
             // but rethrow the exception to anything that was waiting
             throw e;
-        }
+        });
 
         const serverVersions = await this.serverVersionsPromise;
         this.canSupport = await buildFeatureSupportMap(serverVersions);
