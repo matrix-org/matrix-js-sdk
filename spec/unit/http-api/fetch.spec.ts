@@ -220,4 +220,14 @@ describe("FetchHttpApi", () => {
             expect(api.authedRequest(Method.Get, "/path")).rejects.toThrow("Ye shall ask for consent"),
         ]);
     });
+
+    describe("authedRequest", () => {
+        it("should not include token if unset", () => {
+            const fetchFn = jest.fn();
+            const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
+            const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn });
+            api.authedRequest(Method.Post, "/account/password");
+            expect(fetchFn.mock.calls[0][1].headers.Authorization).toBeUndefined();
+        });
+    });
 });
