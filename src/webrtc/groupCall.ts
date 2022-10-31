@@ -257,12 +257,25 @@ export class GroupCall extends TypedEventEmitter<
 
         let stream: MediaStream;
 
+        let disposed = false;
+        const onState = (state: GroupCallState) => {
+            if (state === GroupCallState.LocalCallFeedUninitialized) {
+                disposed = true;
+            }
+        };
+        this.on(GroupCallEvent.GroupCallStateChanged, onState);
+
         try {
             stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === GroupCallType.Video);
         } catch (error) {
             this.setState(GroupCallState.LocalCallFeedUninitialized);
             throw error;
+        } finally {
+            this.off(GroupCallEvent.GroupCallStateChanged, onState);
         }
+
+        // The call could've been disposed while we were waiting
+        if (disposed) throw new Error("Group call disposed");
 
         const userId = this.client.getUserId()!;
 
