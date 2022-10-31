@@ -274,6 +274,15 @@ describe("MatrixClient syncing", () => {
 
             expect(fires).toBe(1);
         });
+
+        it("should work when all network calls fail", async () => {
+            httpBackend!.when("GET", "").fail(0, new Error("CORS or something"));
+            const prom = client!.startClient();
+            await Promise.all([
+                expect(prom).resolves.toBeUndefined(),
+            httpBackend!.flushAllExpected(),
+            ]);
+        });
     });
 
     describe("initial sync", () => {
