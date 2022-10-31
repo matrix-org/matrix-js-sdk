@@ -77,12 +77,12 @@ export class IgnoredInvites {
     // Used to ensure that only one async task of this class
     // is creating a new target room and modifying the
     // `target` property of account key `IGNORE_INVITES_POLICIES`.
-    private getOrCreateTargetRoomPromise: Promise<Room> | null = null;
+    private lockGetOrCreateTargetRoom: Promise<Room> | null = null;
 
     // A lock around method `withIgnoreInvitesPoliciesLock`.
     // Used to ensure that only one async task of this class is
     // modifying `IGNORE_INVITES_POLICIES` at any point in time.
-    private withIgnoreInvitesPoliciesPromise: Promise<{}> = Promise.resolve({});
+    private lockWithIgnoreInvitesPolicies: Promise<{}> = Promise.resolve({});
 
     constructor(
         private readonly client: MatrixClient,
@@ -92,16 +92,16 @@ export class IgnoredInvites {
     /**
      * Add a new rule.
      *
-     * @param scope The scope for this rule.
-     * @param entity The entity covered by this rule. Globs are supported.
-     * @param reason A human-readable reason for introducing this new rule.
-     * @return The event id for the new rule.
-     *
      * # Safety
      *
      * This method will rewrite the `Policies` object in the user's account data.
      * This rewrite is inherently racy and could overwrite or be overwritten by
      * other concurrent rewrites of the same object.
+     *
+     * @param scope The scope for this rule.
+     * @param entity The entity covered by this rule. Globs are supported.
+     * @param reason A human-readable reason for introducing this new rule.
+     * @return The event id for the new rule.
      */
     public async addRule(scope: PolicyScope, entity: string, reason: string): Promise<string> {
         const target = await this.getOrCreateTargetRoom();
@@ -137,12 +137,8 @@ export class IgnoredInvites {
      * other concurrent rewrites of the same object.
      */
     public async addSource(roomId: string): Promise<boolean> {
-        // We attempt to join the room *before* calling
-        // `await this.getSourceRooms()` to decrease the duration
-        // of the racy section.
         await this.client.joinRoom(roomId);
-        const sources = this.getSourceRooms()
-            .map(room => room.roomId);
+        const sources = this.getSourceRooms().map(room => room.roomId);
         if (sources.includes(roomId)) {
             return false;
         }
@@ -239,11 +235,11 @@ export class IgnoredInvites {
         // Thanks to run-to-completion, the uninterruptible behavior of this
         // method is the following:
         // 1. Execute all the code until the first `await`, including
-        //    * all the code before testing whether `this._getOrCreateTargetRoomPromise`
+        //    * all the code before testing whether `this.lockGetOrCreateTargetRoom`
         //      is set;
-        //    * if `this._getOrCreateTargetRoomPromise` isn't set, all the code within
+        //    * if `this.lockGetOrCreateTargetRoom` isn't set, all the code within
         //      the anonymous async function until that anonymous function yields control;
-        //    * the code that sets `this._getOrCreateTargetRoomPromise`
+        //    * the code that sets `this.lockGetOrCreateTargetRoom`
         // 2. Now, possibly yield control to the stack or the runtime.
         const ignoreInvitesPolicies = this.getIgnoreInvitesPolicies();
         let target = ignoreInvitesPolicies.target;
@@ -263,15 +259,15 @@ export class IgnoredInvites {
         // If we reach this line, we need to setup the target room.
         // However, it is possible that other callers within this client
         // may be racing with us.
-        if (this.getOrCreateTargetRoomPromise) {
+        if (this.lockGetOrCreateTargetRoom) {
             // Another caller is already calling this method.
             // Merge the calls.
-            return this.getOrCreateTargetRoomPromise;
+            return this.lockGetOrCreateTargetRoom;
         }
         try {
             // Nobody is calling the method at the moment.
             // Register ourselves as the leader and start creating our policy room.
-            this.getOrCreateTargetRoomPromise = (async () => {
+            this.lockGetOrCreateTargetRoom = (async () => {
                 // We need to create our own policy room for ignoring invites.
                 target = (await this.client.createRoom({
                     name: "Individual Policy Room",
@@ -290,14 +286,14 @@ export class IgnoredInvites {
                 // the room during the call to `this.withIgnoreInvitesPolicies`.
                 return this.client.getRoom(target)!;
             })();
-            return await this.getOrCreateTargetRoomPromise;
+            return await this.lockGetOrCreateTargetRoom;
         } finally {
             // Don't forget to release the lock.
             //
             // If, for some reason, the async function has failed (e.g. network
-            // errors), the next call to `getOrCreateTargetRoomPromise` needs to
+            // errors), the next call to `lockGetOrCreateTargetRoom` needs to
             // be able to retry.
-            this.getOrCreateTargetRoomPromise = null;
+            this.lockGetOrCreateTargetRoom = null;
         }
     }
 
@@ -353,10 +349,10 @@ export class IgnoredInvites {
     private async withIgnoreInvitesPolicies(cb: (ignoreInvitesPolicies: {[key: string]: any}) => void) {
         const { policies, ignoreInvitesPolicies } = this.getPoliciesAndIgnoreInvitesPolicies();
         cb(ignoreInvitesPolicies);
-        await this.withIgnoreInvitesPoliciesPromise;
+        await this.lockWithIgnoreInvitesPolicies;
         policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name] = ignoreInvitesPolicies;
-        this.withIgnoreInvitesPoliciesPromise = this.client.setAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name, policies);
-        return this.withIgnoreInvitesPoliciesPromise;
+        this.lockWithIgnoreInvitesPolicies = this.client.setAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name, policies);
+        return this.lockWithIgnoreInvitesPolicies;
     }
 
     /**
