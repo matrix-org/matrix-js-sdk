@@ -1193,16 +1193,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        const serverVersions = await this.getVersions();
-        this.canSupport = await buildFeatureSupportMap(serverVersions);
+        try {
+            await this.getVersions();
 
-        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
-        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
-
-        const { threads, list, fwdPagination } = await this.doesServerSupportThread();
-        Thread.setServerSideSupport(threads);
-        Thread.setServerSideListSupport(list);
-        Thread.setServerSideFwdPaginationSupport(fwdPagination);
+            // This should be done with `canSupport`
+            // TODO: https://github.com/vector-im/element-web/issues/23643
+            const { threads, list, fwdPagination } = await this.doesServerSupportThread();
+            Thread.setServerSideSupport(threads);
+            Thread.setServerSideListSupport(list);
+            Thread.setServerSideFwdPaginationSupport(fwdPagination);
+        } catch (e) {
+            logger.error("Can't fetch server versions, continuing to initialise sync, this will be retried later", e);
+        }
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
@@ -6712,7 +6714,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * unstable APIs it supports
      * @return {Promise<object>} The server /versions response
      */
-    public getVersions(): Promise<IServerVersions> {
+    public async getVersions(): Promise<IServerVersions> {
         if (this.serverVersionsPromise) {
             return this.serverVersionsPromise;
         }
@@ -6724,12 +6726,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             {
                 prefix: '',
             },
-        ).catch((e: Error) => {
+        ).catch(e => {
             // Need to unset this if it fails, otherwise we'll never retry
             this.serverVersionsPromise = undefined;
             // but rethrow the exception to anything that was waiting
             throw e;
         });
+
+        const serverVersions = await this.serverVersionsPromise;
+        this.canSupport = await buildFeatureSupportMap(serverVersions);
+
+        // We can set flag values to use their stable or unstable version
+        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
+        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
 
         return this.serverVersionsPromise;
     }
