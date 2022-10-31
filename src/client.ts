@@ -1195,14 +1195,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         try {
             await this.getVersions();
+
+            // This should be done with `canSupport`
+            // TODO: https://github.com/vector-im/element-web/issues/23643
+            const { threads, list, fwdPagination } = await this.doesServerSupportThread();
+            Thread.setServerSideSupport(threads);
+            Thread.setServerSideListSupport(list);
+            Thread.setServerSideFwdPaginationSupport(fwdPagination);
         } catch (e) {
             logger.error("Can't fetch server versions, continuing to initialise sync, this will be retried later", e);
         }
-
-        const { threads, list, fwdPagination } = await this.doesServerSupportThread();
-        Thread.setServerSideSupport(threads);
-        Thread.setServerSideListSupport(list);
-        Thread.setServerSideFwdPaginationSupport(fwdPagination);
 
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
