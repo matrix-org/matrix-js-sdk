@@ -51,15 +51,6 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
      * @param {string=} opts.type   Content-type for the upload. Defaults to
      *   <tt>file.type</tt>, or <tt>application/octet-stream</tt>.
      *
-     * @param {boolean=} opts.rawResponse Return the raw body, rather than
-     *   parsing the JSON. Defaults to false (except on node.js, where it
-     *   defaults to true for backwards compatibility).
-     *
-     * @param {boolean=} opts.onlyContentUri Just return the content URI,
-     *   rather than the whole body. Defaults to false (except on browsers,
-     *   where it defaults to true for backwards compatibility). Ignored if
-     *   opts.rawResponse is true.
-     *
      * @param {Function=} opts.progressHandler Optional. Called when a chunk of
      *    data has been uploaded, with an object containing the fields `loaded`
      *    (number of bytes transferred) and `total` (total size, if known).
