@@ -276,6 +276,7 @@ describe("MatrixClient syncing", () => {
         });
 
         it("should work when all network calls fail", async () => {
+            httpBackend!.expectedRequests = [];
             httpBackend!.when("GET", "").fail(0, new Error("CORS or something"));
             const prom = client!.startClient();
             await Promise.all([
