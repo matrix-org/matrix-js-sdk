@@ -1193,11 +1193,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        const serverVersions = await this.getVersions();
-        this.canSupport = await buildFeatureSupportMap(serverVersions);
-
-        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
-        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
+        try {
+            await this.getVersions();
+        } catch (e) {
+            logger.error("Can't fetch server versions, continuing to initialise sync, this will be retried later", e);
+        }
 
         const { threads, list, fwdPagination } = await this.doesServerSupportThread();
         Thread.setServerSideSupport(threads);
@@ -6712,24 +6712,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * unstable APIs it supports
      * @return {Promise<object>} The server /versions response
      */
-    public getVersions(): Promise<IServerVersions> {
+    public async getVersions(): Promise<IServerVersions> {
         if (this.serverVersionsPromise) {
             return this.serverVersionsPromise;
         }
 
-        this.serverVersionsPromise = this.http.request<IServerVersions>(
-            Method.Get, "/_matrix/client/versions",
-            undefined, // queryParams
-            undefined, // data
-            {
-                prefix: '',
-            },
-        ).catch((e: Error) => {
+        try {
+            this.serverVersionsPromise = this.http.request<IServerVersions>(
+                Method.Get, "/_matrix/client/versions",
+                undefined, // queryParams
+                undefined, // data
+                {
+                    prefix: '',
+                },
+            );
+            // throw "YOLO";
+        } catch (e) {
             // Need to unset this if it fails, otherwise we'll never retry
             this.serverVersionsPromise = undefined;
             // but rethrow the exception to anything that was waiting
             throw e;
-        });
+        }
+
+        const serverVersions = await this.serverVersionsPromise;
+        this.canSupport = await buildFeatureSupportMap(serverVersions);
+
+        // We can set flag values to use their stable or unstable version
+        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
+        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
 
         return this.serverVersionsPromise;
     }
