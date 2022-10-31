@@ -231,6 +231,130 @@ describe("MatrixClient", function() {
         client.stopClient();
     });
 
+    describe("sendEvent", () => {
+        const roomId = "!room:example.org";
+        const body = "This is the body";
+        const content = { body };
+
+        it("overload without threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: content,
+            }];
+
+            await client.sendEvent(roomId, EventType.RoomMessage, { ...content }, txnId);
+        });
+
+        it("overload with null threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: content,
+            }];
+
+            await client.sendEvent(roomId, null, EventType.RoomMessage, { ...content }, txnId);
+        });
+
+        it("overload with threadId works", async () => {
+            const eventId = "$eventId:example.org";
+            const txnId = client.makeTxnId();
+            const threadId = "$threadId:server";
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: {
+                    ...content,
+                    "m.relates_to": {
+                        "event_id": threadId,
+                        "is_falling_back": true,
+                        "rel_type": "m.thread",
+                    },
+                },
+            }];
+
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
+        });
+
+        it("should add thread relation if threadId is passed and the relation is missing", async () => {
+            const eventId = "$eventId:example.org";
+            const threadId = "$threadId:server";
+            const txnId = client.makeTxnId();
+
+            const room = new Room(roomId, client, userId);
+            store.getRoom.mockReturnValue(room);
+
+            const rootEvent = new MatrixEvent({ event_id: threadId });
+            room.createThread(threadId, rootEvent, [rootEvent], false);
+
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: {
+                    ...content,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: threadId,
+                        },
+                        "event_id": threadId,
+                        "is_falling_back": true,
+                        "rel_type": "m.thread",
+                    },
+                },
+            }];
+
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
+        });
+
+        it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
+            const eventId = "$eventId:example.org";
+            const threadId = "$threadId:server";
+            const txnId = client.makeTxnId();
+
+            const content = {
+                body,
+                "m.relates_to": {
+                    "m.in_reply_to": {
+                        event_id: "$other:event",
+                    },
+                },
+            };
+
+            const room = new Room(roomId, client, userId);
+            store.getRoom.mockReturnValue(room);
+
+            const rootEvent = new MatrixEvent({ event_id: threadId });
+            room.createThread(threadId, rootEvent, [rootEvent], false);
+
+            httpLookups = [{
+                method: "PUT",
+                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                data: { event_id: eventId },
+                expectBody: {
+                    ...content,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: "$other:event",
+                        },
+                        "event_id": threadId,
+                        "is_falling_back": false,
+                        "rel_type": "m.thread",
+                    },
+                },
+            }];
+
+            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
+        });
+    });
+
     it("should create (unstable) file trees", async () => {
         const userId = "@test:example.org";
         const roomId = "!room:example.org";
@@ -774,130 +898,6 @@ describe("MatrixClient", function() {
             }];
             client.getPresence(userId);
             expect(httpLookups.length).toEqual(0);
-        });
-    });
-
-    describe("sendEvent", () => {
-        const roomId = "!room:example.org";
-        const body = "This is the body";
-        const content = { body };
-
-        it("overload without threadId works", async () => {
-            const eventId = "$eventId:example.org";
-            const txnId = client.makeTxnId();
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: content,
-            }];
-
-            await client.sendEvent(roomId, EventType.RoomMessage, { ...content }, txnId);
-        });
-
-        it("overload with null threadId works", async () => {
-            const eventId = "$eventId:example.org";
-            const txnId = client.makeTxnId();
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: content,
-            }];
-
-            await client.sendEvent(roomId, null, EventType.RoomMessage, { ...content }, txnId);
-        });
-
-        it("overload with threadId works", async () => {
-            const eventId = "$eventId:example.org";
-            const txnId = client.makeTxnId();
-            const threadId = "$threadId:server";
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: {
-                    ...content,
-                    "m.relates_to": {
-                        "event_id": threadId,
-                        "is_falling_back": true,
-                        "rel_type": "m.thread",
-                    },
-                },
-            }];
-
-            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
-        });
-
-        it("should add thread relation if threadId is passed and the relation is missing", async () => {
-            const eventId = "$eventId:example.org";
-            const threadId = "$threadId:server";
-            const txnId = client.makeTxnId();
-
-            const room = new Room(roomId, client, userId);
-            store.getRoom.mockReturnValue(room);
-
-            const rootEvent = new MatrixEvent({ event_id: threadId });
-            room.createThread(threadId, rootEvent, [rootEvent], false);
-
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: {
-                    ...content,
-                    "m.relates_to": {
-                        "m.in_reply_to": {
-                            event_id: threadId,
-                        },
-                        "event_id": threadId,
-                        "is_falling_back": true,
-                        "rel_type": "m.thread",
-                    },
-                },
-            }];
-
-            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
-        });
-
-        it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
-            const eventId = "$eventId:example.org";
-            const threadId = "$threadId:server";
-            const txnId = client.makeTxnId();
-
-            const content = {
-                body,
-                "m.relates_to": {
-                    "m.in_reply_to": {
-                        event_id: "$other:event",
-                    },
-                },
-            };
-
-            const room = new Room(roomId, client, userId);
-            store.getRoom.mockReturnValue(room);
-
-            const rootEvent = new MatrixEvent({ event_id: threadId });
-            room.createThread(threadId, rootEvent, [rootEvent], false);
-
-            httpLookups = [{
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
-                data: { event_id: eventId },
-                expectBody: {
-                    ...content,
-                    "m.relates_to": {
-                        "m.in_reply_to": {
-                            event_id: "$other:event",
-                        },
-                        "event_id": threadId,
-                        "is_falling_back": false,
-                        "rel_type": "m.thread",
-                    },
-                },
-            }];
-
-            await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
     });
 
