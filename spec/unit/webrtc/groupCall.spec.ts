@@ -23,7 +23,7 @@ import {
     Room,
     RoomMember,
 } from '../../../src';
-import { GroupCall, GroupCallEvent } from "../../../src/webrtc/groupCall";
+import { GroupCall, GroupCallEvent, GroupCallState } from "../../../src/webrtc/groupCall";
 import { MatrixClient } from "../../../src/client";
 import {
     installWebRTCMocks,
@@ -172,6 +172,13 @@ describe('Group Call', function() {
             expect(groupCall.initLocalCallFeed).not.toHaveBeenCalled();
 
             groupCall.leave();
+        });
+
+        it("stops initializing local call feed when leaving", async () => {
+            const initPromise = groupCall.initLocalCallFeed();
+            groupCall.leave();
+            await expect(initPromise).rejects.toBeDefined();
+            expect(groupCall.state).toBe(GroupCallState.LocalCallFeedUninitialized);
         });
 
         it("sends state event to room when creating", async () => {
