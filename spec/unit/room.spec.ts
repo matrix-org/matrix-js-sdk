@@ -2737,4 +2737,15 @@ describe("Room", function() {
             expect(room.getPendingEvent(ev.getId())).toBe(ev);
         }
     });
+
+    describe("getBlacklistUnverifiedDevices", () => {
+        it("defaults to null", () => {
+            expect(room.getBlacklistUnverifiedDevices()).toBeNull();
+        });
+
+        it("is updated by setBlacklistUnverifiedDevices", () => {
+            room.setBlacklistUnverifiedDevices(false);
+            expect(room.getBlacklistUnverifiedDevices()).toBe(false);
+        });
+    });
 });
