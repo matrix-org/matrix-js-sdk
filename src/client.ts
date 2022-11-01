@@ -1197,7 +1197,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
             // This should be done with `canSupport`
             // TODO: https://github.com/vector-im/element-web/issues/23643
-            const { threads, list, fwdPagination } = await this.doesServerSupportThread();
+            const { threads, list } = await this.doesServerSupportThread();
             Thread.setServerSideSupport(threads);
             Thread.setServerSideListSupport(list);
         } catch (e) {
