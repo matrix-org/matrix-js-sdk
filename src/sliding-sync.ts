@@ -353,6 +353,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private desiredRoomSubscriptions = new Set<string>(); // the *desired* room subscriptions
     private confirmedRoomSubscriptions = new Set<string>();
 
+    // map of custom subscription name to the subscription
+    private customSubscriptions: Record<string, MSC3575RoomSubscription> = {};
+    // map of room ID to custom subscription name
+    private roomIdToCustomSubscription: Record<string, string> = {};
+
     private pendingReq?: Promise<MSC3575SlidingSyncResponse>;
     private abortController?: AbortController;
 
@@ -373,6 +378,30 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     ) {
         super();
         this.lists = lists.map((l) => new SlidingList(l));
+    }
+
+    /**
+     * Add a custom room subscription, referred to by an arbitrary name. If a subscription with this
+     * name already exists, it is replaced. No requests are sent by calling this method.
+     * @param name The name of the subscription. Only used to reference this subscription in
+     * useCustomSubscription.
+     * @param sub The subscription information.
+     */
+    public addCustomSubscription(name: string, sub :MSC3575RoomSubscription) {
+        this.customSubscriptions[name] = sub;
+    }
+
+    /**
+     * Use a custom subscription previously added via addCustomSubscription. No requests are sent
+     * by calling this method. Use modifyRoomSubscriptions to resend subscription information.
+     * @param roomId The room to use the subscription in.
+     * @param name The name of the subscription. If this name is unknown, the default subscription
+     * will be used.
+     */
+    public useCustomSubscription(roomId: string, name: string) {
+        this.roomIdToCustomSubscription[roomId] = name;
+        // unconfirm this subscription so a resend() will send it up afresh.
+        this.confirmedRoomSubscriptions.delete(roomId);
     }
 
     /**
@@ -806,7 +835,12 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 if (newSubscriptions.size > 0) {
                     reqBody.room_subscriptions = {};
                     for (const roomId of newSubscriptions) {
-                        reqBody.room_subscriptions[roomId] = this.roomSubscriptionInfo;
+                        const customSubName = this.roomIdToCustomSubscription[roomId];
+                        let sub = this.roomSubscriptionInfo;
+                        if (customSubName && this.customSubscriptions[customSubName]) {
+                            sub = this.customSubscriptions[customSubName];
+                        }
+                        reqBody.room_subscriptions[roomId] = sub;
                     }
                 }
                 if (this.txnId) {
