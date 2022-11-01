@@ -71,7 +71,7 @@ export enum GroupCallErrorCode {
 }
 
 export class GroupCallError extends Error {
-    code: string;
+    public code: string;
 
     constructor(code: GroupCallErrorCode, msg: string, err?: Error) {
         // Still don't think there's any way to have proper nested errors

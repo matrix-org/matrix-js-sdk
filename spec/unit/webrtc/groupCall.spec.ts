@@ -125,16 +125,16 @@ class MockCall {
 
     public sendMetadataUpdate = jest.fn<void, []>();
 
-    on = jest.fn();
-    removeListener = jest.fn();
+    public on = jest.fn();
+    public removeListener = jest.fn();
 
-    getOpponentMember(): Partial<RoomMember> {
+    public getOpponentMember(): Partial<RoomMember> {
         return {
             userId: this.opponentUserId,
         };
     }
 
-    typed(): MatrixCall { return this as unknown as MatrixCall; }
+    public typed(): MatrixCall { return this as unknown as MatrixCall; }
 }
 
 describe('Group Call', function() {
