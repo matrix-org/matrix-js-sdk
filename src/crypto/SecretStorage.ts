@@ -19,10 +19,11 @@ import * as olmlib from './olmlib';
 import { encodeBase64 } from './olmlib';
 import { randomString } from '../randomstring';
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from './aes';
-import { ClientEvent, ICryptoCallbacks, MatrixEvent } from '../matrix';
+import { ClientEvent, IContent, ICryptoCallbacks, MatrixEvent } from '../matrix';
 import { ClientEventHandlerMap, MatrixClient } from "../client";
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
 import { TypedEventEmitter } from '../models/typed-event-emitter';
+import { defer, IDeferred } from "../utils";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -39,15 +40,14 @@ export interface ISecretRequest {
 export interface IAccountDataClient extends TypedEventEmitter<ClientEvent.AccountData, ClientEventHandlerMap> {
     // Subset of MatrixClient (which also uses any for the event content)
     getAccountDataFromServer: <T extends {[k: string]: any}>(eventType: string) => Promise<T>;
-    getAccountData: (eventType: string) => MatrixEvent;
+    getAccountData: (eventType: string) => IContent | null;
     setAccountData: (eventType: string, content: any) => Promise<{}>;
 }
 
 interface ISecretRequestInternal {
     name: string;
     devices: string[];
-    resolve: (reason: string) => void;
-    reject: (error: Error) => void;
+    deferred: IDeferred<string>;
 }
 
 interface IDecryptors {
@@ -66,7 +66,7 @@ interface ISecretInfo {
  * Implements Secure Secret Storage and Sharing (MSC1946)
  * @module crypto/SecretStorage
  */
-export class SecretStorage {
+export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     private requests = new Map<string, ISecretRequestInternal>();
 
     // In it's pure javascript days, this was relying on some proper Javascript-style
@@ -80,7 +80,7 @@ export class SecretStorage {
     constructor(
         private readonly accountDataAdapter: IAccountDataClient,
         private readonly cryptoCallbacks: ICryptoCallbacks,
-        private readonly baseApis?: MatrixClient,
+        private readonly baseApis: B,
     ) {}
 
     public async getDefaultKeyId(): Promise<string | null> {
@@ -129,12 +129,10 @@ export class SecretStorage {
      */
     public async addKey(
         algorithm: string,
-        opts: IAddSecretStorageKeyOpts,
+        opts: IAddSecretStorageKeyOpts = {},
         keyId?: string,
     ): Promise<SecretStorageKeyObject> {
         const keyInfo = { algorithm } as ISecretStorageKeyInfo;
-
-        if (!opts) opts = {} as IAddSecretStorageKeyOpts;
 
         if (opts.name) {
             keyInfo.name = opts.name;
@@ -182,7 +180,7 @@ export class SecretStorage {
      *     the form [keyId, keyInfo].  Otherwise, null is returned.
      *     XXX: why is this an array when addKey returns an object?
      */
-    public async getKey(keyId: string): Promise<SecretStorageKeyTuple | null> {
+    public async getKey(keyId?: string | null): Promise<SecretStorageKeyTuple | null> {
         if (!keyId) {
             keyId = await this.getDefaultKeyId();
         }
@@ -237,7 +235,7 @@ export class SecretStorage {
      * @param {Array} keys The IDs of the keys to use to encrypt the secret
      *     or null/undefined to use the default key.
      */
-    public async store(name: string, secret: string, keys?: string[]): Promise<void> {
+    public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
         const encrypted: Record<string, IEncryptedPayload> = {};
 
         if (!keys) {
@@ -284,7 +282,7 @@ export class SecretStorage {
      *
      * @return {string} the contents of the secret
      */
-    public async get(name: string): Promise<string> {
+    public async get(name: string): Promise<string | undefined> {
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) {
             return;
@@ -376,21 +374,11 @@ export class SecretStorage {
      * @param {string} name the name of the secret to request
      * @param {string[]} devices the devices to request the secret from
      */
-    public request(name: string, devices: string[]): ISecretRequest {
+    public request(this: SecretStorage<MatrixClient>, name: string, devices: string[]): ISecretRequest {
         const requestId = this.baseApis.makeTxnId();
 
-        let resolve: (s: string) => void;
-        let reject: (e: Error) => void;
-        const promise = new Promise<string>((res, rej) => {
-            resolve = res;
-            reject = rej;
-        });
-        this.requests.set(requestId, {
-            name,
-            devices,
-            resolve,
-            reject,
-        });
+        const deferred = defer<string>();
+        this.requests.set(requestId, { name, devices, deferred });
 
         const cancel = (reason: string) => {
             // send cancellation event
@@ -404,12 +392,12 @@ export class SecretStorage {
                 toDevice[device] = cancelData;
             }
             this.baseApis.sendToDevice("m.secret.request", {
-                [this.baseApis.getUserId()]: toDevice,
+                [this.baseApis.getUserId()!]: toDevice,
             });
 
             // and reject the promise so that anyone waiting on it will be
             // notified
-            reject(new Error(reason || "Cancelled"));
+            deferred.reject(new Error(reason || "Cancelled"));
         };
 
         // send request to devices
@@ -425,22 +413,23 @@ export class SecretStorage {
         }
         logger.info(`Request secret ${name} from ${devices}, id ${requestId}`);
         this.baseApis.sendToDevice("m.secret.request", {
-            [this.baseApis.getUserId()]: toDevice,
+            [this.baseApis.getUserId()!]: toDevice,
         });
 
         return {
             requestId,
-            promise,
+            promise: deferred.promise,
             cancel,
         };
     }
 
-    public async onRequestReceived(event: MatrixEvent): Promise<void> {
+    public async onRequestReceived(this: SecretStorage<MatrixClient>, event: MatrixEvent): Promise<void> {
         const sender = event.getSender();
         const content = event.getContent();
         if (sender !== this.baseApis.getUserId()
             || !(content.name && content.action
-                 && content.requesting_device_id && content.request_id)) {
+                 && content.requesting_device_id && content.request_id)
+        ) {
             // ignore requests from anyone else, for now
             return;
         }
@@ -498,25 +487,25 @@ export class SecretStorage {
                 };
                 const encryptedContent = {
                     algorithm: olmlib.OLM_ALGORITHM,
-                    sender_key: this.baseApis.crypto.olmDevice.deviceCurve25519Key,
+                    sender_key: this.baseApis.crypto!.olmDevice.deviceCurve25519Key,
                     ciphertext: {},
                 };
                 await olmlib.ensureOlmSessionsForDevices(
-                    this.baseApis.crypto.olmDevice,
+                    this.baseApis.crypto!.olmDevice,
                     this.baseApis,
                     {
                         [sender]: [
-                            this.baseApis.getStoredDevice(sender, deviceId),
+                            this.baseApis.getStoredDevice(sender, deviceId)!,
                         ],
                     },
                 );
                 await olmlib.encryptMessageForDevice(
                     encryptedContent.ciphertext,
-                    this.baseApis.getUserId(),
-                    this.baseApis.deviceId,
-                    this.baseApis.crypto.olmDevice,
+                    this.baseApis.getUserId()!,
+                    this.baseApis.deviceId!,
+                    this.baseApis.crypto!.olmDevice,
                     sender,
-                    this.baseApis.getStoredDevice(sender, deviceId),
+                    this.baseApis.getStoredDevice(sender, deviceId)!,
                     payload,
                 );
                 const contentMap = {
@@ -533,7 +522,7 @@ export class SecretStorage {
         }
     }
 
-    public onSecretReceived(event: MatrixEvent): void {
+    public onSecretReceived(this: SecretStorage<MatrixClient>, event: MatrixEvent): void {
         if (event.getSender() !== this.baseApis.getUserId()) {
             // we shouldn't be receiving secrets from anyone else, so ignore
             // because someone could be trying to send us bogus data
@@ -547,7 +536,7 @@ export class SecretStorage {
 
         const content = event.getContent();
 
-        const senderKeyUser = this.baseApis.crypto.deviceList.getUserByIdentityKey(
+        const senderKeyUser = this.baseApis.crypto!.deviceList.getUserByIdentityKey(
             olmlib.OLM_ALGORITHM,
             event.getSenderKey() || "",
         );
@@ -561,9 +550,9 @@ export class SecretStorage {
         if (requestControl) {
             // make sure that the device that sent it is one of the devices that
             // we requested from
-            const deviceInfo = this.baseApis.crypto.deviceList.getDeviceByIdentityKey(
+            const deviceInfo = this.baseApis.crypto!.deviceList.getDeviceByIdentityKey(
                 olmlib.OLM_ALGORITHM,
-                event.getSenderKey(),
+                event.getSenderKey()!,
             );
             if (!deviceInfo) {
                 logger.log(
@@ -578,7 +567,7 @@ export class SecretStorage {
             // unsure that the sender is trusted.  In theory, this check is
             // unnecessary since we only accept secret shares from devices that
             // we requested from, but it doesn't hurt.
-            const deviceTrust = this.baseApis.crypto.checkDeviceInfoTrust(event.getSender(), deviceInfo);
+            const deviceTrust = this.baseApis.crypto!.checkDeviceInfoTrust(event.getSender()!, deviceInfo);
             if (!deviceTrust.isVerified()) {
                 logger.log("secret share from unverified device");
                 return;
@@ -588,7 +577,7 @@ export class SecretStorage {
                 `Successfully received secret ${requestControl.name} ` +
                 `from ${deviceInfo.deviceId}`,
             );
-            requestControl.resolve(content.secret);
+            requestControl.deferred.resolve(content.secret);
         }
     }
 

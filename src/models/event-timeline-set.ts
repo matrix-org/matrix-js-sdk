@@ -27,7 +27,7 @@ import { RoomState } from "./room-state";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RelationsContainer } from "./relations-container";
 import { MatrixClient } from "../client";
-import { Thread } from "./thread";
+import { Thread, ThreadFilterType } from "./thread";
 
 const DEBUG = true;
 
@@ -140,7 +140,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         opts: IOpts = {},
         client?: MatrixClient,
         public readonly thread?: Thread,
-        public readonly isThreadTimeline: boolean = false,
+        public readonly threadListType: ThreadFilterType | null = null,
     ) {
         super();
 
@@ -297,8 +297,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @return {?module:models/event-timeline~EventTimeline} timeline containing
      * the given event, or null if unknown
      */
-    public getTimelineForEvent(eventId: string | null): EventTimeline | null {
-        if (eventId === null) { return null; }
+    public getTimelineForEvent(eventId?: string): EventTimeline | null {
+        if (eventId === null || eventId === undefined) { return null; }
         const res = this._eventIdToTimeline.get(eventId);
         return (res === undefined) ? null : res;
     }
@@ -359,7 +359,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         events: MatrixEvent[],
         toStartOfTimeline: boolean,
         timeline: EventTimeline,
-        paginationToken?: string,
+        paginationToken?: string | null,
     ): void {
         if (!timeline) {
             throw new Error(
@@ -459,7 +459,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         let lastEventWasNew = false;
         for (let i = 0; i < events.length; i++) {
             const event = events[i];
-            const eventId = event.getId();
+            const eventId = event.getId()!;
 
             const existingTimeline = this._eventIdToTimeline.get(eventId);
 
@@ -612,7 +612,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             }
         }
 
-        const timeline = this._eventIdToTimeline.get(event.getId());
+        const timeline = this._eventIdToTimeline.get(event.getId()!);
         if (timeline) {
             if (duplicateStrategy === DuplicateStrategy.Replace) {
                 debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " + event.getId());
@@ -702,7 +702,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
         }
 
-        const eventId = event.getId();
+        const eventId = event.getId()!;
         timeline.addEvent(event, {
             toStartOfTimeline,
             roomState,
@@ -822,7 +822,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // linkedlist to see which comes first.
 
         // first work forwards from timeline1
-        let tl = timeline1;
+        let tl: EventTimeline | null = timeline1;
         while (tl) {
             if (tl === timeline2) {
                 // timeline1 is before timeline2

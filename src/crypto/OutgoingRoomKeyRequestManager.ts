@@ -75,10 +75,26 @@ export enum RoomKeyRequestState {
     CancellationPendingAndWillResend,
 }
 
+interface RequestMessageBase {
+    requesting_device_id: string;
+    request_id: string;
+}
+
+interface RequestMessageRequest extends RequestMessageBase {
+    action: "request";
+    body: IRoomKeyRequestBody;
+}
+
+interface RequestMessageCancellation extends RequestMessageBase {
+    action: "request_cancellation";
+}
+
+type RequestMessage = RequestMessageRequest | RequestMessageCancellation;
+
 export class OutgoingRoomKeyRequestManager {
     // handle for the delayed call to sendOutgoingRoomKeyRequests. Non-null
     // if the callback has been set, or if it is still running.
-    private sendOutgoingRoomKeyRequestsTimer: ReturnType<typeof setTimeout> = null;
+    private sendOutgoingRoomKeyRequestsTimer?: ReturnType<typeof setTimeout>;
 
     // sanity check to ensure that we don't end up with two concurrent runs
     // of sendOutgoingRoomKeyRequests
@@ -369,43 +385,42 @@ export class OutgoingRoomKeyRequestManager {
     // look for and send any queued requests. Runs itself recursively until
     // there are no more requests, or there is an error (in which case, the
     // timer will be restarted before the promise resolves).
-    private sendOutgoingRoomKeyRequests(): Promise<void> {
+    private async sendOutgoingRoomKeyRequests(): Promise<void> {
         if (!this.clientRunning) {
-            this.sendOutgoingRoomKeyRequestsTimer = null;
-            return Promise.resolve();
+            this.sendOutgoingRoomKeyRequestsTimer = undefined;
+            return;
         }
 
-        return this.cryptoStore.getOutgoingRoomKeyRequestByState([
+        const req = await this.cryptoStore.getOutgoingRoomKeyRequestByState([
             RoomKeyRequestState.CancellationPending,
             RoomKeyRequestState.CancellationPendingAndWillResend,
             RoomKeyRequestState.Unsent,
-        ]).then((req: OutgoingRoomKeyRequest) => {
-            if (!req) {
-                this.sendOutgoingRoomKeyRequestsTimer = null;
-                return;
-            }
+        ]);
 
-            let prom;
+        if (!req) {
+            this.sendOutgoingRoomKeyRequestsTimer = undefined;
+            return;
+        }
+
+        try {
             switch (req.state) {
                 case RoomKeyRequestState.Unsent:
-                    prom = this.sendOutgoingRoomKeyRequest(req);
+                    await this.sendOutgoingRoomKeyRequest(req);
                     break;
                 case RoomKeyRequestState.CancellationPending:
-                    prom = this.sendOutgoingRoomKeyRequestCancellation(req);
+                    await this.sendOutgoingRoomKeyRequestCancellation(req);
                     break;
                 case RoomKeyRequestState.CancellationPendingAndWillResend:
-                    prom = this.sendOutgoingRoomKeyRequestCancellation(req, true);
+                    await this.sendOutgoingRoomKeyRequestCancellation(req, true);
                     break;
             }
 
-            return prom.then(() => {
-                // go around the loop again
-                return this.sendOutgoingRoomKeyRequests();
-            }).catch((e) => {
-                logger.error("Error sending room key request; will retry later.", e);
-                this.sendOutgoingRoomKeyRequestsTimer = null;
-            });
-        });
+            // go around the loop again
+            return this.sendOutgoingRoomKeyRequests();
+        } catch (e) {
+            logger.error("Error sending room key request; will retry later.", e);
+            this.sendOutgoingRoomKeyRequestsTimer = undefined;
+        }
     }
 
     // given a RoomKeyRequest, send it and update the request record
@@ -416,16 +431,14 @@ export class OutgoingRoomKeyRequestManager {
             `(id ${req.requestId})`,
         );
 
-        const requestMessage = {
+        const requestMessage: RequestMessage = {
             action: "request",
             requesting_device_id: this.deviceId,
             request_id: req.requestId,
             body: req.requestBody,
         };
 
-        return this.sendMessageToDevices(
-            requestMessage, req.recipients, req.requestTxnId || req.requestId,
-        ).then(() => {
+        return this.sendMessageToDevices(requestMessage, req.recipients, req.requestTxnId || req.requestId).then(() => {
             return this.cryptoStore.updateOutgoingRoomKeyRequest(
                 req.requestId, RoomKeyRequestState.Unsent,
                 { state: RoomKeyRequestState.Sent },
@@ -443,7 +456,7 @@ export class OutgoingRoomKeyRequestManager {
             `(cancellation id ${req.cancellationTxnId})`,
         );
 
-        const requestMessage = {
+        const requestMessage: RequestMessage = {
             action: "request_cancellation",
             requesting_device_id: this.deviceId,
             request_id: req.requestId,
@@ -467,7 +480,11 @@ export class OutgoingRoomKeyRequestManager {
     }
 
     // send a RoomKeyRequest to a list of recipients
-    private sendMessageToDevices(message, recipients, txnId: string): Promise<{}> {
+    private sendMessageToDevices(
+        message: RequestMessage,
+        recipients: IRoomKeyRequestRecipient[],
+        txnId?: string,
+    ): Promise<{}> {
         const contentMap: Record<string, Record<string, Record<string, any>>> = {};
         for (const recip of recipients) {
             if (!contentMap[recip.userId]) {
@@ -480,15 +497,13 @@ export class OutgoingRoomKeyRequestManager {
     }
 }
 
-function stringifyRequestBody(requestBody) {
+function stringifyRequestBody(requestBody: IRoomKeyRequestBody): string {
     // we assume that the request is for megolm keys, which are identified by
     // room id and session id
     return requestBody.room_id + " / " + requestBody.session_id;
 }
 
-function stringifyRecipientList(recipients) {
-    return '['
-        + recipients.map((r) => `${r.userId}:${r.deviceId}`).join(",")
-        + ']';
+function stringifyRecipientList(recipients: IRoomKeyRequestRecipient[]): string {
+    return `[${recipients.map((r) => `${r.userId}:${r.deviceId}`).join(",")}]`;
 }
 

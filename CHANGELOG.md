@@ -1,3 +1,38 @@
+Changes in [21.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.0.1) (2022-11-01)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix default behavior of Room.getBlacklistUnverifiedDevices ([\#2830](https://github.com/matrix-org/matrix-js-sdk/pull/2830)). Contributed by @duxovni.
+ * Catch server versions API call exception when starting the client ([\#2828](https://github.com/matrix-org/matrix-js-sdk/pull/2828)). Fixes vector-im/element-web#23634.
+ * Fix authedRequest including `Authorization: Bearer undefined` for password resets ([\#2822](https://github.com/matrix-org/matrix-js-sdk/pull/2822)). Fixes vector-im/element-web#23655.
+
+Changes in [21.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.0.0) (2022-10-25)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Changes the `uploadContent` API, kills off `request` and `browser-request` in favour of `fetch`, removed callback support on a lot of the methods, adds a lot of tests. ([\#2719](https://github.com/matrix-org/matrix-js-sdk/pull/2719)). Fixes #2415 and #801.
+ * Remove deprecated `m.room.aliases` references ([\#2759](https://github.com/matrix-org/matrix-js-sdk/pull/2759)). Fixes vector-im/element-web#12680.
+
+## ✨ Features
+ * Remove node-specific crypto bits, use Node 16's WebCrypto ([\#2762](https://github.com/matrix-org/matrix-js-sdk/pull/2762)). Fixes #2760.
+ * Export types for MatrixEvent and Room emitted events, and make event handler map types stricter ([\#2750](https://github.com/matrix-org/matrix-js-sdk/pull/2750)). Contributed by @stas-demydiuk.
+ * Use even more stable calls to `/room_keys` ([\#2746](https://github.com/matrix-org/matrix-js-sdk/pull/2746)).
+ * Upgrade to Olm 3.2.13 which has been repackaged to support Node 18 ([\#2744](https://github.com/matrix-org/matrix-js-sdk/pull/2744)).
+ * Fix `power_level_content_override` type ([\#2741](https://github.com/matrix-org/matrix-js-sdk/pull/2741)).
+ * Add custom notification handling for MSC3401 call events  ([\#2720](https://github.com/matrix-org/matrix-js-sdk/pull/2720)).
+ * Add support for unread thread notifications ([\#2726](https://github.com/matrix-org/matrix-js-sdk/pull/2726)).
+ * Load Thread List with server-side assistance (MSC3856) ([\#2602](https://github.com/matrix-org/matrix-js-sdk/pull/2602)).
+ * Use stable calls to `/room_keys` ([\#2729](https://github.com/matrix-org/matrix-js-sdk/pull/2729)). Fixes vector-im/element-web#22839.
+
+## 🐛 Bug Fixes
+ * Fix POST data not being passed for registerWithIdentityServer ([\#2769](https://github.com/matrix-org/matrix-js-sdk/pull/2769)). Fixes matrix-org/element-web-rageshakes#16206.
+ * Fix IdentityPrefix.V2 containing spurious `/api` ([\#2761](https://github.com/matrix-org/matrix-js-sdk/pull/2761)). Fixes vector-im/element-web#23505.
+ * Always send back an httpStatus property if one is known ([\#2753](https://github.com/matrix-org/matrix-js-sdk/pull/2753)).
+ * Check for AbortError, not any generic connection error, to avoid tightlooping ([\#2752](https://github.com/matrix-org/matrix-js-sdk/pull/2752)).
+ * Correct the dir parameter of MSC3715 ([\#2745](https://github.com/matrix-org/matrix-js-sdk/pull/2745)). Contributed by @dhenneke.
+ * Fix sync init when thread unread notif is not supported ([\#2739](https://github.com/matrix-org/matrix-js-sdk/pull/2739)). Fixes vector-im/element-web#23435.
+ * Use the correct sender key when checking shared secret ([\#2730](https://github.com/matrix-org/matrix-js-sdk/pull/2730)). Fixes vector-im/element-web#23374.
+
 Changes in [20.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v20.1.0) (2022-10-11)
 ============================================================================================================
 

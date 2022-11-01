@@ -22,8 +22,8 @@ import { MatrixClient } from "../client";
 import { CallState } from "./call";
 
 export class MediaHandler {
-    private audioInput: string;
-    private videoInput: string;
+    private audioInput?: string;
+    private videoInput?: string;
     private localUserMediaStream?: MediaStream;
     public userMediaStreams: MediaStream[] = [];
     public screensharingStreams: MediaStream[] = [];
@@ -65,17 +65,17 @@ export class MediaHandler {
         if (this.userMediaStreams.length === 0) return;
 
         const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
-        for (const call of this.client.callEventHandler.calls.values()) {
+        for (const call of this.client.callEventHandler!.calls.values()) {
             callMediaStreamParams.set(call.callId, {
                 audio: call.hasLocalUserMediaAudioTrack,
                 video: call.hasLocalUserMediaVideoTrack,
             });
         }
 
-        for (const call of this.client.callEventHandler.calls.values()) {
+        for (const call of this.client.callEventHandler!.calls.values()) {
             if (call.state === CallState.Ended || !callMediaStreamParams.has(call.callId)) continue;
 
-            const { audio, video } = callMediaStreamParams.get(call.callId);
+            const { audio, video } = callMediaStreamParams.get(call.callId)!;
 
             // This stream won't be reusable as we will replace the tracks of the old stream
             const stream = await this.getUserMediaStream(audio, video, false);
@@ -121,9 +121,9 @@ export class MediaHandler {
                 const settings = track.getSettings();
 
                 if (track.kind === "audio") {
-                    this.audioInput = settings.deviceId;
+                    this.audioInput = settings.deviceId!;
                 } else if (track.kind === "video") {
-                    this.videoInput = settings.deviceId;
+                    this.videoInput = settings.deviceId!;
                 }
             }
 
@@ -179,7 +179,10 @@ export class MediaHandler {
      * @param reusable is allowed to be reused by the MediaHandler
      * @returns {MediaStream} based on passed parameters
      */
-    public async getScreensharingStream(desktopCapturerSourceId: string, reusable = true): Promise<MediaStream | null> {
+    public async getScreensharingStream(
+        desktopCapturerSourceId?: string,
+        reusable = true,
+    ): Promise<MediaStream | null> {
         let stream: MediaStream;
 
         if (this.screensharingStreams.length === 0) {

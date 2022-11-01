@@ -37,7 +37,7 @@ const M_RELATES_TO = "m.relates_to";
  * Uses the event id of the initial m.key.verification.request event as a transaction id.
  */
 export class InRoomChannel implements IVerificationChannel {
-    private requestEventId: string = null;
+    private requestEventId?: string;
 
     /**
      * @param {MatrixClient} client the matrix client, to send messages with and get current user & device from.
@@ -47,7 +47,7 @@ export class InRoomChannel implements IVerificationChannel {
     constructor(
         private readonly client: MatrixClient,
         public readonly roomId: string,
-        public userId: string = null,
+        public userId?: string,
     ) {
     }
 
@@ -56,11 +56,11 @@ export class InRoomChannel implements IVerificationChannel {
     }
 
     /** The transaction id generated/used by this verification channel */
-    public get transactionId(): string {
+    public get transactionId(): string | undefined {
         return this.requestEventId;
     }
 
-    public static getOtherPartyUserId(event: MatrixEvent, client: MatrixClient): string {
+    public static getOtherPartyUserId(event: MatrixEvent, client: MatrixClient): string | undefined {
         const type = InRoomChannel.getEventType(event);
         if (type !== REQUEST_TYPE) {
             return;
@@ -103,12 +103,12 @@ export class InRoomChannel implements IVerificationChannel {
      * @param {MatrixEvent} event the event
      * @returns {string} the transaction id
      */
-    public static getTransactionId(event: MatrixEvent): string {
+    public static getTransactionId(event: MatrixEvent): string | undefined {
         if (InRoomChannel.getEventType(event) === REQUEST_TYPE) {
             return event.getId();
         } else {
             const relation = event.getRelation();
-            if (relation && relation.rel_type === M_REFERENCE) {
+            if (relation?.rel_type === M_REFERENCE) {
                 return relation.event_id;
             }
         }
@@ -184,10 +184,10 @@ export class InRoomChannel implements IVerificationChannel {
      * @param {boolean} isLiveEvent whether this is an even received through sync or not
      * @returns {Promise} a promise that resolves when any requests as an answer to the passed-in event are sent.
      */
-    public handleEvent(event: MatrixEvent, request: VerificationRequest, isLiveEvent = false): Promise<void> {
+    public async handleEvent(event: MatrixEvent, request: VerificationRequest, isLiveEvent = false): Promise<void> {
         // prevent processing the same event multiple times, as under
         // some circumstances Room.timeline can get emitted twice for the same event
-        if (request.hasEventId(event.getId())) {
+        if (request.hasEventId(event.getId()!)) {
             return;
         }
         const type = InRoomChannel.getEventType(event);
@@ -198,7 +198,7 @@ export class InRoomChannel implements IVerificationChannel {
             return;
         }
         // set userId if not set already
-        if (this.userId === null) {
+        if (!this.userId) {
             const userId = InRoomChannel.getOtherPartyUserId(event, this.client);
             if (userId) {
                 this.userId = userId;
@@ -207,14 +207,13 @@ export class InRoomChannel implements IVerificationChannel {
         // ignore events not sent by us or the other party
         const ownUserId = this.client.getUserId();
         const sender = event.getSender();
-        if (this.userId !== null) {
+        if (this.userId) {
             if (sender !== ownUserId && sender !== this.userId) {
-                logger.log(`InRoomChannel: ignoring verification event from ` +
-                    `non-participating sender ${sender}`);
+                logger.log(`InRoomChannel: ignoring verification event from non-participating sender ${sender}`);
                 return;
             }
         }
-        if (this.requestEventId === null) {
+        if (!this.requestEventId) {
             this.requestEventId = InRoomChannel.getTransactionId(event);
         }
 
@@ -236,7 +235,7 @@ export class InRoomChannel implements IVerificationChannel {
         // ensure m.related_to is included in e2ee rooms
         // as the field is excluded from encryption
         const content = Object.assign({}, event.getContent());
-        content[M_RELATES_TO] = event.getRelation();
+        content[M_RELATES_TO] = event.getRelation()!;
         return content;
     }
 
@@ -307,17 +306,17 @@ export class InRoomChannel implements IVerificationChannel {
 export class InRoomRequests implements IRequestsMap {
     private requestsByRoomId = new Map<string, Map<string, VerificationRequest>>();
 
-    public getRequest(event: MatrixEvent): VerificationRequest {
-        const roomId = event.getRoomId();
-        const txnId = InRoomChannel.getTransactionId(event);
+    public getRequest(event: MatrixEvent): VerificationRequest | undefined {
+        const roomId = event.getRoomId()!;
+        const txnId = InRoomChannel.getTransactionId(event)!;
         return this.getRequestByTxnId(roomId, txnId);
     }
 
-    public getRequestByChannel(channel: InRoomChannel): VerificationRequest {
-        return this.getRequestByTxnId(channel.roomId, channel.transactionId);
+    public getRequestByChannel(channel: InRoomChannel): VerificationRequest | undefined {
+        return this.getRequestByTxnId(channel.roomId, channel.transactionId!);
     }
 
-    private getRequestByTxnId(roomId: string, txnId: string): VerificationRequest {
+    private getRequestByTxnId(roomId: string, txnId: string): VerificationRequest | undefined {
         const requestsByTxnId = this.requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
             return requestsByTxnId.get(txnId);
@@ -325,11 +324,11 @@ export class InRoomRequests implements IRequestsMap {
     }
 
     public setRequest(event: MatrixEvent, request: VerificationRequest): void {
-        this.doSetRequest(event.getRoomId(), InRoomChannel.getTransactionId(event), request);
+        this.doSetRequest(event.getRoomId()!, InRoomChannel.getTransactionId(event)!, request);
     }
 
     public setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void {
-        this.doSetRequest(channel.roomId, channel.transactionId, request);
+        this.doSetRequest(channel.roomId!, channel.transactionId!, request);
     }
 
     private doSetRequest(roomId: string, txnId: string, request: VerificationRequest): void {
@@ -342,17 +341,17 @@ export class InRoomRequests implements IRequestsMap {
     }
 
     public removeRequest(event: MatrixEvent): void {
-        const roomId = event.getRoomId();
+        const roomId = event.getRoomId()!;
         const requestsByTxnId = this.requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
-            requestsByTxnId.delete(InRoomChannel.getTransactionId(event));
+            requestsByTxnId.delete(InRoomChannel.getTransactionId(event)!);
             if (requestsByTxnId.size === 0) {
                 this.requestsByRoomId.delete(roomId);
             }
         }
     }
 
-    public findRequestInProgress(roomId: string): VerificationRequest {
+    public findRequestInProgress(roomId: string): VerificationRequest | undefined {
         const requestsByTxnId = this.requestsByRoomId.get(roomId);
         if (requestsByTxnId) {
             for (const request of requestsByTxnId.values()) {

@@ -68,7 +68,7 @@ export function setCryptoStoreFactory(fac) {
 }
 
 export interface ICryptoCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array>;
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (
         users: Record<string, any>

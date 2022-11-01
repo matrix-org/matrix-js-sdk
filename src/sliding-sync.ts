@@ -19,6 +19,7 @@ import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { sleep, IDeferred, defer } from "./utils";
+import { HTTPError } from "./http-api";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -32,6 +33,7 @@ const BUFFER_PERIOD_MS = 10 * 1000;
 export interface MSC3575RoomSubscription {
     required_state?: string[][];
     timeline_limit?: number;
+    include_old_rooms?: MSC3575RoomSubscription;
 }
 
 /**
@@ -41,7 +43,6 @@ export interface MSC3575Filter {
     is_dm?: boolean;
     is_encrypted?: boolean;
     is_invite?: boolean;
-    is_tombstoned?: boolean;
     room_name_like?: string;
     room_types?: string[];
     not_room_types?: string[];
@@ -153,12 +154,12 @@ export enum SlidingSyncState {
  * multiple sliding windows, and maintains the index->room_id mapping.
  */
 class SlidingList {
-    private list: MSC3575List;
-    private isModified: boolean;
+    private list!: MSC3575List;
+    private isModified?: boolean;
 
     // returned data
-    public roomIndexToRoomId: Record<number, string>;
-    public joinedCount: number;
+    public roomIndexToRoomId: Record<number, string> = {};
+    public joinedCount = 0;
 
     /**
      * Construct a new sliding list.
@@ -271,7 +272,7 @@ export interface Extension {
      * @param isInitial True when this is part of the initial request (send sticky params)
      * @returns The request JSON to send.
      */
-    onRequest(isInitial: boolean): object;
+    onRequest(isInitial: boolean): object | undefined;
     /**
      * A function which is called when there is response JSON under this extension.
      * @param data The response JSON under the extension name.
@@ -322,7 +323,7 @@ export enum SlidingSyncEvent {
 export type SlidingSyncEventHandlerMap = {
     [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
     [SlidingSyncEvent.Lifecycle]: (
-        state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error | null,
+        state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error,
     ) => void;
     [SlidingSyncEvent.List]: (
         listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number, string>,
@@ -342,7 +343,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     // flag set when resend() is called because we cannot rely on detecting AbortError in JS SDK :(
     private needsResend = false;
     // the txn_id to send with the next request.
-    private txnId?: string = null;
+    private txnId: string | null = null;
     // a list (in chronological order of when they were sent) of objects containing the txn ID and
     // a defer to resolve/reject depending on whether they were successfully sent or not.
     private txnIdDefers: (IDeferred<string> & { txnId: string})[] = [];
@@ -387,7 +388,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The list index
      * @returns The list data which contains the rooms in this list
      */
-    public getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} {
+    public getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} | null {
         if (!this.lists[index]) {
             return null;
         }
@@ -403,7 +404,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The list index to get the list for.
      * @returns A copy of the list or undefined.
      */
-    public getList(index: number): MSC3575List {
+    public getList(index: number): MSC3575List | null {
         if (!this.lists[index]) {
             return null;
         }
@@ -532,7 +533,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param {object} resp The raw sync response JSON
      * @param {Error?} err Any error that occurred when making the request e.g. network errors.
      */
-    private invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
+    private invokeLifecycleListeners(
+        state: SlidingSyncState,
+        resp: MSC3575SlidingSyncResponse | null,
+        err?: Error,
+    ): void {
         this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
     }
 
@@ -636,8 +641,12 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             // starting at the gap so we can just shift each element in turn
                             this.shiftLeft(listIndex, op.index, gapIndex);
                         }
-                        gapIndex = -1; // forget the gap, we don't need it anymore.
                     }
+                    // forget the gap, we don't need it anymore. This is outside the check for
+                    // a room being present in this index position because INSERTs always universally
+                    // forget the gap, not conditionally based on the presence of a room in the INSERT
+                    // position. Without this, DELETE 0; INSERT 0; would do the wrong thing.
+                    gapIndex = -1;
                     this.lists[listIndex].roomIndexToRoomId[op.index] = op.room_id;
                     break;
                 }
@@ -772,11 +781,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     public async start() {
         this.abortController = new AbortController();
 
-        let currentPos: string;
+        let currentPos: string | undefined;
         while (!this.terminated) {
             this.needsResend = false;
             let doNotUpdateList = false;
-            let resp: MSC3575SlidingSyncResponse;
+            let resp: MSC3575SlidingSyncResponse | undefined;
             try {
                 const listModifiedCount = this.listModifiedCount;
                 const reqBody: MSC3575SlidingSyncRequest = {
@@ -837,13 +846,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     resp,
                 );
             } catch (err) {
-                if (err.httpStatus) {
+                if ((<HTTPError>err).httpStatus) {
                     this.invokeLifecycleListeners(
                         SlidingSyncState.RequestFinished,
                         null,
-                        err,
+                        <Error>err,
                     );
-                    if (err.httpStatus === 400) {
+                    if ((<HTTPError>err).httpStatus === 400) {
                         // session probably expired TODO: assign an errcode
                         // so drop state and re-request
                         this.resetup();
@@ -851,7 +860,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         await sleep(50); // in case the 400 was for something else; don't tightloop
                         continue;
                     } // else fallthrough to generic error handling
-                } else if (this.needsResend || err.name === "AbortError") {
+                } else if (this.needsResend || (<Error>err).name === "AbortError") {
                     continue; // don't sleep as we caused this error by abort()ing the request.
                 }
                 logger.error(err);
@@ -865,7 +874,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             Object.keys(resp.rooms).forEach((roomId) => {
                 this.invokeRoomDataListeners(
                     roomId,
-                    resp.rooms[roomId],
+                    resp!.rooms[roomId],
                 );
             });
 

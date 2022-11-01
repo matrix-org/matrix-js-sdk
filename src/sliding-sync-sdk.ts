@@ -52,7 +52,7 @@ class ExtensionE2EE implements Extension {
         return ExtensionState.PreProcess;
     }
 
-    public onRequest(isInitial: boolean): object {
+    public onRequest(isInitial: boolean): object | undefined {
         if (!isInitial) {
             return undefined;
         }
@@ -82,7 +82,7 @@ class ExtensionE2EE implements Extension {
             const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.crypto.setNeedsNewFallback(
-                unusedFallbackKeys instanceof Array &&
+                Array.isArray(unusedFallbackKeys) &&
                 !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
@@ -90,7 +90,7 @@ class ExtensionE2EE implements Extension {
 }
 
 class ExtensionToDevice implements Extension {
-    private nextBatch?: string = null;
+    private nextBatch: string | null = null;
 
     constructor(private readonly client: MatrixClient) {}
 
@@ -114,7 +114,7 @@ class ExtensionToDevice implements Extension {
     }
 
     public async onResponse(data: object): Promise<void> {
-        const cancelledKeyVerificationTxns = [];
+        const cancelledKeyVerificationTxns: string[] = [];
         data["events"] = data["events"] || [];
         data["events"]
             .map(this.client.getEventMapper())
@@ -125,7 +125,7 @@ class ExtensionToDevice implements Extension {
                 // so we can flag the verification events as cancelled in the loop
                 // below.
                 if (toDeviceEvent.getType() === "m.key.verification.cancel") {
-                    const txnId = toDeviceEvent.getContent()['transaction_id'];
+                    const txnId: string | undefined = toDeviceEvent.getContent()['transaction_id'];
                     if (txnId) {
                         cancelledKeyVerificationTxns.push(txnId);
                     }
@@ -177,7 +177,7 @@ class ExtensionAccountData implements Extension {
         return ExtensionState.PostProcess;
     }
 
-    public onRequest(isInitial: boolean): object {
+    public onRequest(isInitial: boolean): object | undefined {
         if (!isInitial) {
             return undefined;
         }
@@ -208,7 +208,7 @@ class ExtensionAccountData implements Extension {
     private processGlobalAccountData(globalAccountData: object[]): void {
         const events = mapEvents(this.client, undefined, globalAccountData);
         const prevEventsMap = events.reduce((m, c) => {
-            m[c.getId()] = this.client.store.getAccountData(c.getType());
+            m[c.getType()] = this.client.store.getAccountData(c.getType());
             return m;
         }, {});
         this.client.store.storeAccountDataEvents(events);
@@ -222,7 +222,7 @@ class ExtensionAccountData implements Extension {
                     const rules = accountDataEvent.getContent<IPushRules>();
                     this.client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                 }
-                const prevEvent = prevEventsMap[accountDataEvent.getId()];
+                const prevEvent = prevEventsMap[accountDataEvent.getType()];
                 this.client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                 return accountDataEvent;
             },
@@ -235,9 +235,9 @@ class ExtensionAccountData implements Extension {
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
  */
 export class SlidingSyncSdk {
-    private syncState: SyncState = null;
-    private syncStateData: ISyncStateData;
-    private lastPos: string = null;
+    private syncState: SyncState | null = null;
+    private syncStateData?: ISyncStateData;
+    private lastPos: string | null = null;
     private failCount = 0;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
 
@@ -259,7 +259,7 @@ export class SlidingSyncSdk {
         }
 
         if (client.getNotifTimelineSet()) {
-            client.reEmitter.reEmit(client.getNotifTimelineSet(), [
+            client.reEmitter.reEmit(client.getNotifTimelineSet()!, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
             ]);
@@ -293,7 +293,7 @@ export class SlidingSyncSdk {
         this.processRoomData(this.client, room, roomData);
     }
 
-    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err: Error | null): void {
+    private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error): void {
         if (err) {
             logger.debug("onLifecycle", state, err);
         }
@@ -306,7 +306,7 @@ export class SlidingSyncSdk {
                 // Element won't stop showing the initial loading spinner unless we fire SyncState.Prepared
                 if (!this.lastPos) {
                     this.updateSyncState(SyncState.Prepared, {
-                        oldSyncToken: this.lastPos,
+                        oldSyncToken: undefined,
                         nextSyncToken: resp.pos,
                         catchingUp: false,
                         fromCache: false,
@@ -315,7 +315,7 @@ export class SlidingSyncSdk {
                 // Conversely, Element won't show the room list unless there is at least 1x SyncState.Syncing
                 // so hence for the very first sync we will fire prepared then immediately syncing.
                 this.updateSyncState(SyncState.Syncing, {
-                    oldSyncToken: this.lastPos,
+                    oldSyncToken: this.lastPos!,
                     nextSyncToken: resp.pos,
                     catchingUp: false,
                     fromCache: false,
@@ -357,7 +357,7 @@ export class SlidingSyncSdk {
      * store.
      */
     public async peek(_roomId: string): Promise<Room> {
-        return null; // TODO
+        return null!; // TODO
     }
 
     /**
@@ -373,7 +373,7 @@ export class SlidingSyncSdk {
      * @see module:client~MatrixClient#event:"sync"
      * @return {?String}
      */
-    public getSyncState(): SyncState {
+    public getSyncState(): SyncState | null {
         return this.syncState;
     }
 
@@ -385,8 +385,8 @@ export class SlidingSyncSdk {
      * this object.
      * @return {?Object}
      */
-    public getSyncStateData(): ISyncStateData {
-        return this.syncStateData;
+    public getSyncStateData(): ISyncStateData | null {
+        return this.syncStateData ?? null;
     }
 
     private shouldAbortSync(error: MatrixError): boolean {
@@ -418,7 +418,7 @@ export class SlidingSyncSdk {
             // this room, then timeline_limit: 50).
             const knownEvents = new Set<string>();
             room.getLiveTimeline().getEvents().forEach((e) => {
-                knownEvents.add(e.getId());
+                knownEvents.add(e.getId()!);
             });
             // all unknown events BEFORE a known event must be scrollback e.g:
             //       D E   <-- what we know
@@ -433,7 +433,7 @@ export class SlidingSyncSdk {
             let seenKnownEvent = false;
             for (let i = timelineEvents.length-1; i >= 0; i--) {
                 const recvEvent = timelineEvents[i];
-                if (knownEvents.has(recvEvent.getId())) {
+                if (knownEvents.has(recvEvent.getId()!)) {
                     seenKnownEvent = true;
                     continue; // don't include this event, it's a dupe
                 }
@@ -500,8 +500,7 @@ export class SlidingSyncSdk {
         if (roomData.initial) {
             // set the back-pagination token. Do this *before* adding any
             // events so that clients can start back-paginating.
-            room.getLiveTimeline().setPaginationToken(
-                roomData.prev_batch, EventTimeline.BACKWARDS);
+            room.getLiveTimeline().setPaginationToken(roomData.prev_batch ?? null, EventTimeline.BACKWARDS);
         }
 
         /* TODO
@@ -687,7 +686,7 @@ export class SlidingSyncSdk {
                 // slightly naughty by doctoring the invite event but this means all
                 // the code paths remain the same between invite/join display name stuff
                 // which is a worthy trade-off for some minor pollution.
-                const inviteEvent = member.events.member;
+                const inviteEvent = member.events.member!;
                 if (inviteEvent.getContent().membership !== "invite") {
                     // between resolving and now they have since joined, so don't clobber
                     return;
@@ -723,7 +722,7 @@ export class SlidingSyncSdk {
                 break;
             } catch (err) {
                 logger.error("Getting push rules failed", err);
-                if (this.shouldAbortSync(err)) {
+                if (this.shouldAbortSync(<MatrixError>err)) {
                     return;
                 }
             }
@@ -787,7 +786,7 @@ export class SlidingSyncSdk {
             return a.getTs() - b.getTs();
         });
         this.notifEvents.forEach((event) => {
-            this.client.getNotifTimelineSet().addLiveEvent(event);
+            this.client.getNotifTimelineSet()?.addLiveEvent(event);
         });
         this.notifEvents = [];
     }
@@ -815,7 +814,7 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
         content: {
             name: roomData.name,
         },
-        sender: client.getUserId(),
+        sender: client.getUserId()!,
         origin_server_ts: new Date().getTime(),
     });
     return roomData;
@@ -824,7 +823,7 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
 // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
 // just outside the class.
 
-function mapEvents(client: MatrixClient, roomId: string, events: object[], decrypt = true): MatrixEvent[] {
+function mapEvents(client: MatrixClient, roomId: string | undefined, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });
     return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
         e["room_id"] = roomId;

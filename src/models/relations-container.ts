@@ -74,7 +74,7 @@ export class RelationsContainer {
      * @param {MatrixEvent} event The event to check as relation target.
      */
     public aggregateParentEvent(event: MatrixEvent): void {
-        const relationsForEvent = this.relations.get(event.getId());
+        const relationsForEvent = this.relations.get(event.getId()!);
         if (!relationsForEvent) return;
 
         for (const relationsWithRelType of relationsForEvent.values()) {
@@ -118,31 +118,31 @@ export class RelationsContainer {
         const { event_id: relatesToEventId, rel_type: relationType } = relation;
         const eventType = event.getType();
 
-        let relationsForEvent = this.relations.get(relatesToEventId);
+        let relationsForEvent = this.relations.get(relatesToEventId!);
         if (!relationsForEvent) {
             relationsForEvent = new Map<RelationType | string, Map<EventType | string, Relations>>();
-            this.relations.set(relatesToEventId, relationsForEvent);
+            this.relations.set(relatesToEventId!, relationsForEvent);
         }
 
-        let relationsWithRelType = relationsForEvent.get(relationType);
+        let relationsWithRelType = relationsForEvent.get(relationType!);
         if (!relationsWithRelType) {
             relationsWithRelType = new Map<EventType | string, Relations>();
-            relationsForEvent.set(relationType, relationsWithRelType);
+            relationsForEvent.set(relationType!, relationsWithRelType);
         }
 
         let relationsWithEventType = relationsWithRelType.get(eventType);
         if (!relationsWithEventType) {
             relationsWithEventType = new Relations(
-                relationType,
+                relationType!,
                 eventType,
                 this.client,
             );
             relationsWithRelType.set(eventType, relationsWithEventType);
 
             const room = this.room ?? timelineSet?.room;
-            const relatesToEvent = timelineSet?.findEventById(relatesToEventId)
-                ?? room?.findEventById(relatesToEventId)
-                ?? room?.getPendingEvent(relatesToEventId);
+            const relatesToEvent = timelineSet?.findEventById(relatesToEventId!)
+                ?? room?.findEventById(relatesToEventId!)
+                ?? room?.getPendingEvent(relatesToEventId!);
             if (relatesToEvent) {
                 relationsWithEventType.setTargetEvent(relatesToEvent);
             }

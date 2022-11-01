@@ -307,7 +307,7 @@ export function mkReplyMessage(
                 "rel_type": "m.in_reply_to",
                 "event_id": opts.replyToMessage.getId(),
                 "m.in_reply_to": {
-                    "event_id": opts.replyToMessage.getId(),
+                    "event_id": opts.replyToMessage.getId()!,
                 },
             },
         },

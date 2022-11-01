@@ -33,7 +33,7 @@ import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
 import { PushProcessor } from "./pushprocessor";
 import { logger } from './logger';
-import { InvalidStoreError } from './errors';
+import { InvalidStoreError, InvalidStoreState } from './errors';
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
 import {
     IEphemeral,
@@ -117,7 +117,7 @@ interface ISyncOptions {
 }
 
 export interface ISyncStateData {
-    error?: MatrixError;
+    error?: Error;
     oldSyncToken?: string;
     nextSyncToken?: string;
     catchingUp?: boolean;
@@ -163,14 +163,14 @@ type WrappedRoom<T> = T & {
  */
 export class SyncApi {
     private _peekRoom: Optional<Room> = null;
-    private currentSyncRequest: Optional<Promise<ISyncResponse>> = null;
+    private currentSyncRequest?: Promise<ISyncResponse>;
     private abortController?: AbortController;
-    private syncState: Optional<SyncState> = null;
-    private syncStateData: Optional<ISyncStateData> = null; // additional data (eg. error object for failed sync)
+    private syncState: SyncState | null = null;
+    private syncStateData?: ISyncStateData; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
-    private keepAliveTimer: Optional<ReturnType<typeof setTimeout>> = null;
-    private connectionReturnedDefer: Optional<IDeferred<boolean>> = null;
+    private keepAliveTimer?: ReturnType<typeof setTimeout>;
+    private connectionReturnedDefer?: IDeferred<boolean>;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
@@ -189,7 +189,7 @@ export class SyncApi {
         }
 
         if (client.getNotifTimelineSet()) {
-            client.reEmitter.reEmit(client.getNotifTimelineSet(), [
+            client.reEmitter.reEmit(client.getNotifTimelineSet()!, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
             ]);
@@ -281,7 +281,7 @@ export class SyncApi {
      * Sync rooms the user has left.
      * @return {Promise} Resolved when they've been added to the store.
      */
-    public syncLeftRooms() {
+    public async syncLeftRooms(): Promise<Room[]> {
         const client = this.client;
 
         // grab a filter with limit=1 and include_leave=true
@@ -289,55 +289,62 @@ export class SyncApi {
         filter.setTimelineLimit(1);
         filter.setIncludeLeaveRooms(true);
 
-        const localTimeoutMs = this.opts.pollTimeout + BUFFER_PERIOD_MS;
+        const localTimeoutMs = this.opts.pollTimeout! + BUFFER_PERIOD_MS;
+
+        const filterId = await client.getOrCreateFilter(
+            getFilterName(client.credentials.userId!, "LEFT_ROOMS"), filter,
+        );
+
         const qps: ISyncParams = {
             timeout: 0, // don't want to block since this is a single isolated req
+            filter: filterId,
         };
 
-        return client.getOrCreateFilter(
-            getFilterName(client.credentials.userId, "LEFT_ROOMS"), filter,
-        ).then(function(filterId) {
-            qps.filter = filterId;
-            return client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
-                localTimeoutMs,
-            });
-        }).then(async (data) => {
-            let leaveRooms = [];
-            if (data.rooms?.leave) {
-                leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
-            }
-            return Promise.all(leaveRooms.map(async (leaveObj) => {
-                const room = leaveObj.room;
-                if (!leaveObj.isBrandNewRoom) {
-                    // the intention behind syncLeftRooms is to add in rooms which were
-                    // *omitted* from the initial /sync. Rooms the user were joined to
-                    // but then left whilst the app is running will appear in this list
-                    // and we do not want to bother with them since they will have the
-                    // current state already (and may get dupe messages if we add
-                    // yet more timeline events!), so skip them.
-                    // NB: When we persist rooms to localStorage this will be more
-                    //     complicated...
-                    return;
-                }
-                leaveObj.timeline = leaveObj.timeline || {};
-                const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
-
-                const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
-
-                // set the back-pagination token. Do this *before* adding any
-                // events so that clients can start back-paginating.
-                room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
-
-                await this.processRoomEvents(room, stateEvents, events);
-
-                room.recalculate();
-                client.store.storeRoom(room);
-                client.emit(ClientEvent.Room, room);
-
-                this.processEventsForNotifs(room, events);
-                return room;
-            }));
+        const data = await client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
+            localTimeoutMs,
         });
+
+        let leaveRooms: WrappedRoom<ILeftRoom>[] = [];
+        if (data.rooms?.leave) {
+            leaveRooms = this.mapSyncResponseToRoomArray(data.rooms.leave);
+        }
+
+        const rooms = await Promise.all(leaveRooms.map(async (leaveObj) => {
+            const room = leaveObj.room;
+            if (!leaveObj.isBrandNewRoom) {
+                // the intention behind syncLeftRooms is to add in rooms which were
+                // *omitted* from the initial /sync. Rooms the user were joined to
+                // but then left whilst the app is running will appear in this list
+                // and we do not want to bother with them since they will have the
+                // current state already (and may get dupe messages if we add
+                // yet more timeline events!), so skip them.
+                // NB: When we persist rooms to localStorage this will be more
+                //     complicated...
+                return;
+            }
+            leaveObj.timeline = leaveObj.timeline || {
+                prev_batch: null,
+                events: [],
+            };
+            const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
+
+            const stateEvents = this.mapSyncEventsFormat(leaveObj.state, room);
+
+            // set the back-pagination token. Do this *before* adding any
+            // events so that clients can start back-paginating.
+            room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
+
+            await this.processRoomEvents(room, stateEvents, events);
+
+            room.recalculate();
+            client.store.storeRoom(room);
+            client.emit(ClientEvent.Room, room);
+
+            this.processEventsForNotifs(room, events);
+            return room;
+        }));
+
+        return rooms.filter(Boolean) as Room[];
     }
 
     /**
@@ -348,7 +355,7 @@ export class SyncApi {
      * store.
      */
     public peek(roomId: string): Promise<Room> {
-        if (this._peekRoom && this._peekRoom.roomId === roomId) {
+        if (this._peekRoom?.roomId === roomId) {
             return Promise.resolve(this._peekRoom);
         }
 
@@ -388,28 +395,28 @@ export class SyncApi {
             // fire off pagination requests in response to the Room.timeline
             // events.
             if (response.messages.start) {
-                this._peekRoom.oldState.paginationToken = response.messages.start;
+                this._peekRoom!.oldState.paginationToken = response.messages.start;
             }
 
             // set the state of the room to as it was after the timeline executes
-            this._peekRoom.oldState.setStateEvents(oldStateEvents);
-            this._peekRoom.currentState.setStateEvents(stateEvents);
+            this._peekRoom!.oldState.setStateEvents(oldStateEvents);
+            this._peekRoom!.currentState.setStateEvents(stateEvents);
 
-            this.resolveInvites(this._peekRoom);
-            this._peekRoom.recalculate();
+            this.resolveInvites(this._peekRoom!);
+            this._peekRoom!.recalculate();
 
             // roll backwards to diverge old state. addEventsToTimeline
             // will overwrite the pagination token, so make sure it overwrites
             // it with the right thing.
-            this._peekRoom.addEventsToTimeline(messages.reverse(), true,
-                this._peekRoom.getLiveTimeline(),
+            this._peekRoom!.addEventsToTimeline(messages.reverse(), true,
+                this._peekRoom!.getLiveTimeline(),
                 response.messages.start);
 
-            client.store.storeRoom(this._peekRoom);
-            client.emit(ClientEvent.Room, this._peekRoom);
+            client.store.storeRoom(this._peekRoom!);
+            client.emit(ClientEvent.Room, this._peekRoom!);
 
-            this.peekPoll(this._peekRoom);
-            return this._peekRoom;
+            this.peekPoll(this._peekRoom!);
+            return this._peekRoom!;
         });
     }
 
@@ -437,7 +444,10 @@ export class SyncApi {
             room_id: peekRoom.roomId,
             timeout: String(30 * 1000),
             from: token,
-        }, undefined, { localTimeoutMs: 50 * 1000 }).then((res) => {
+        }, undefined, {
+            localTimeoutMs: 50 * 1000,
+            abortSignal: this.abortController?.signal,
+        }).then((res) => {
             if (this._peekRoom !== peekRoom) {
                 debuglog("Stopped peeking in room %s", peekRoom.roomId);
                 return;
@@ -487,7 +497,7 @@ export class SyncApi {
      * @see module:client~MatrixClient#event:"sync"
      * @return {?String}
      */
-    public getSyncState(): SyncState {
+    public getSyncState(): SyncState | null {
         return this.syncState;
     }
 
@@ -499,18 +509,18 @@ export class SyncApi {
      * this object.
      * @return {?Object}
      */
-    public getSyncStateData(): ISyncStateData {
-        return this.syncStateData;
+    public getSyncStateData(): ISyncStateData | null {
+        return this.syncStateData ?? null;
     }
 
-    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void>, err: MatrixError): Promise<void> {
+    public async recoverFromSyncStartupError(savedSyncPromise: Promise<void> | undefined, error: Error): Promise<void> {
         // Wait for the saved sync to complete - we send the pushrules and filter requests
         // before the saved sync has finished so they can run in parallel, but only process
         // the results after the saved sync is done. Equivalently, we wait for it to finish
         // before reporting failures from these functions.
         await savedSyncPromise;
         const keepaliveProm = this.startKeepAlives();
-        this.updateSyncState(SyncState.Error, { error: err });
+        this.updateSyncState(SyncState.Error, { error });
         await keepaliveProm;
     }
 
@@ -553,11 +563,11 @@ export class SyncApi {
             this.client.pushRules = result;
         } catch (err) {
             logger.error("Getting push rules failed", err);
-            if (this.shouldAbortSync(err)) return;
+            if (this.shouldAbortSync(<MatrixError>err)) return;
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
             debuglog("Waiting for saved sync before retrying push rules...");
-            await this.recoverFromSyncStartupError(this.savedSyncPromise, err);
+            await this.recoverFromSyncStartupError(this.savedSyncPromise, <Error>err);
             return this.getPushRules(); // try again
         }
     };
@@ -595,8 +605,7 @@ export class SyncApi {
         const shouldClear = await this.wasLazyLoadingToggled(this.opts.lazyLoadMembers);
         if (shouldClear) {
             this.storeIsInvalid = true;
-            const reason = InvalidStoreError.TOGGLED_LAZY_LOADING;
-            const error = new InvalidStoreError(reason, !!this.opts.lazyLoadMembers);
+            const error = new InvalidStoreError(InvalidStoreState.ToggledLazyLoading, !!this.opts.lazyLoadMembers);
             this.updateSyncState(SyncState.Error, { error });
             // bail out of the sync loop now: the app needs to respond to this error.
             // we leave the state as 'ERROR' which isn't great since this normally means
@@ -632,20 +641,20 @@ export class SyncApi {
 
         let filterId: string;
         try {
-            filterId = await this.client.getOrCreateFilter(getFilterName(this.client.credentials.userId), filter);
+            filterId = await this.client.getOrCreateFilter(getFilterName(this.client.credentials.userId!), filter);
         } catch (err) {
             logger.error("Getting filter failed", err);
-            if (this.shouldAbortSync(err)) return {};
+            if (this.shouldAbortSync(<MatrixError>err)) return {};
             // wait for saved sync to complete before doing anything else,
             // otherwise the sync state will end up being incorrect
             debuglog("Waiting for saved sync before retrying filter...");
-            await this.recoverFromSyncStartupError(this.savedSyncPromise, err);
+            await this.recoverFromSyncStartupError(this.savedSyncPromise, <Error>err);
             return this.getFilter(); // try again
         }
         return { filter, filterId };
     };
 
-    private savedSyncPromise: Promise<void>;
+    private savedSyncPromise?: Promise<void>;
 
     /**
      * Main entry point
@@ -701,7 +710,7 @@ export class SyncApi {
         // /notifications API somehow.
         this.client.resetNotifTimelineSet();
 
-        if (this.currentSyncRequest === null) {
+        if (!this.currentSyncRequest) {
             let firstSyncFilter = filterId;
             const savedSyncToken = await savedSyncTokenPromise;
 
@@ -711,7 +720,7 @@ export class SyncApi {
                 debuglog("Sending initial sync request...");
                 const initialFilter = this.buildDefaultFilter();
                 initialFilter.setDefinition(filter.getDefinition());
-                initialFilter.setTimelineLimit(this.opts.initialSyncLimit);
+                initialFilter.setTimelineLimit(this.opts.initialSyncLimit!);
                 // Use an inline filter, no point uploading it for a single usage
                 firstSyncFilter = JSON.stringify(initialFilter.getDefinition());
             }
@@ -742,7 +751,7 @@ export class SyncApi {
         this.abortController?.abort();
         if (this.keepAliveTimer) {
             clearTimeout(this.keepAliveTimer);
-            this.keepAliveTimer = null;
+            this.keepAliveTimer = undefined;
         }
     }
 
@@ -813,16 +822,16 @@ export class SyncApi {
             let data: ISyncResponse;
             try {
                 //debuglog('Starting sync since=' + syncToken);
-                if (this.currentSyncRequest === null) {
+                if (!this.currentSyncRequest) {
                     this.currentSyncRequest = this.doSyncRequest(syncOptions, syncToken);
                 }
                 data = await this.currentSyncRequest;
             } catch (e) {
-                const abort = await this.onSyncError(e);
+                const abort = await this.onSyncError(<MatrixError>e);
                 if (abort) return;
                 continue;
             } finally {
-                this.currentSyncRequest = null;
+                this.currentSyncRequest = undefined;
             }
 
             //debuglog('Completed sync, next_batch=' + data.next_batch);
@@ -838,7 +847,7 @@ export class SyncApi {
             await this.client.store.setSyncData(data);
 
             const syncEventData = {
-                oldSyncToken: syncToken,
+                oldSyncToken: syncToken ?? undefined,
                 nextSyncToken: data.next_batch,
                 catchingUp: this.catchingUp,
             };
@@ -857,7 +866,7 @@ export class SyncApi {
                 logger.error("Caught /sync error", e);
 
                 // Emit the exception for client handling
-                this.client.emit(ClientEvent.SyncUnexpectedError, e);
+                this.client.emit(ClientEvent.SyncUnexpectedError, <Error>e);
             }
 
             // update this as it may have changed
@@ -897,13 +906,13 @@ export class SyncApi {
             debuglog("Sync no longer running: exiting.");
             if (this.connectionReturnedDefer) {
                 this.connectionReturnedDefer.reject();
-                this.connectionReturnedDefer = null;
+                this.connectionReturnedDefer = undefined;
             }
             this.updateSyncState(SyncState.Stopped);
         }
     }
 
-    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string): Promise<ISyncResponse> {
+    private doSyncRequest(syncOptions: ISyncOptions, syncToken: string | null): Promise<ISyncResponse> {
         const qps = this.getSyncParams(syncOptions, syncToken);
         return this.client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
             localTimeoutMs: qps.timeout + BUFFER_PERIOD_MS,
@@ -911,8 +920,8 @@ export class SyncApi {
         });
     }
 
-    private getSyncParams(syncOptions: ISyncOptions, syncToken: string): ISyncParams {
-        let pollTimeout = this.opts.pollTimeout;
+    private getSyncParams(syncOptions: ISyncOptions, syncToken: string | null): ISyncParams {
+        let timeout = this.opts.pollTimeout!;
 
         if (this.getSyncState() !== SyncState.Syncing || this.catchingUp) {
             // unless we are happily syncing already, we want the server to return
@@ -927,7 +936,7 @@ export class SyncApi {
             //   for us. We do that by calling it with a zero timeout until it
             //   doesn't give us any more to_device messages.
             this.catchingUp = true;
-            pollTimeout = 0;
+            timeout = 0;
         }
 
         let filter = syncOptions.filter;
@@ -935,10 +944,7 @@ export class SyncApi {
             filter = this.getGuestFilter();
         }
 
-        const qps: ISyncParams = {
-            filter,
-            timeout: pollTimeout,
-        };
+        const qps: ISyncParams = { filter, timeout };
 
         if (this.opts.disablePresence) {
             qps.set_presence = SetPresence.Offline;
@@ -953,7 +959,7 @@ export class SyncApi {
             qps._cacheBuster = Date.now();
         }
 
-        if ([SyncState.Reconnecting, SyncState.Error].includes(this.getSyncState())) {
+        if ([SyncState.Reconnecting, SyncState.Error].includes(this.getSyncState()!)) {
             // we think the connection is dead. If it comes back up, we won't know
             // about it till /sync returns. If the timeout= is high, this could
             // be a long time. Set it to 0 when doing retries so we don't have to wait
@@ -969,7 +975,7 @@ export class SyncApi {
             debuglog("Sync no longer running: exiting");
             if (this.connectionReturnedDefer) {
                 this.connectionReturnedDefer.reject();
-                this.connectionReturnedDefer = null;
+                this.connectionReturnedDefer = undefined;
             }
             this.updateSyncState(SyncState.Stopped);
             return true; // abort
@@ -994,7 +1000,7 @@ export class SyncApi {
         // if they wish.
         const keepAlivePromise = this.startKeepAlives();
 
-        this.currentSyncRequest = null;
+        this.currentSyncRequest = undefined;
         // Transition from RECONNECTING to ERROR after a given number of failed syncs
         this.updateSyncState(
             this.failedSyncCount >= FAILED_SYNC_ERROR_THRESHOLD ?
@@ -1073,13 +1079,13 @@ export class SyncApi {
 
         // handle presence events (User objects)
         if (Array.isArray(data.presence?.events)) {
-            data.presence.events.map(client.getEventMapper()).forEach(
+            data.presence!.events.map(client.getEventMapper()).forEach(
                 function(presenceEvent) {
-                    let user = client.store.getUser(presenceEvent.getSender());
+                    let user = client.store.getUser(presenceEvent.getSender()!);
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = createNewUser(client, presenceEvent.getSender());
+                        user = createNewUser(client, presenceEvent.getSender()!);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
@@ -1091,7 +1097,7 @@ export class SyncApi {
         if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.map(client.getEventMapper());
             const prevEventsMap = events.reduce((m, c) => {
-                m[c.getId()] = client.store.getAccountData(c.getType());
+                m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
             }, {});
             client.store.storeAccountDataEvents(events);
@@ -1105,7 +1111,7 @@ export class SyncApi {
                         const rules = accountDataEvent.getContent<IPushRules>();
                         client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                     }
-                    const prevEvent = prevEventsMap[accountDataEvent.getId()];
+                    const prevEvent = prevEventsMap[accountDataEvent.getType()!];
                     client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                     return accountDataEvent;
                 },
@@ -1113,9 +1119,9 @@ export class SyncApi {
         }
 
         // handle to-device events
-        if (Array.isArray(data.to_device?.events) && data.to_device.events.length > 0) {
-            const cancelledKeyVerificationTxns = [];
-            data.to_device.events
+        if (Array.isArray(data.to_device?.events) && data.to_device!.events.length > 0) {
+            const cancelledKeyVerificationTxns: string[] = [];
+            data.to_device!.events
                 .filter((eventJSON) => {
                     if (
                         eventJSON.type === EventType.RoomMessageEncrypted &&
@@ -1137,7 +1143,7 @@ export class SyncApi {
                     // so we can flag the verification events as cancelled in the loop
                     // below.
                     if (toDeviceEvent.getType() === "m.key.verification.cancel") {
-                        const txnId = toDeviceEvent.getContent()['transaction_id'];
+                        const txnId: string = toDeviceEvent.getContent()['transaction_id'];
                         if (txnId) {
                             cancelledKeyVerificationTxns.push(txnId);
                         }
@@ -1206,13 +1212,13 @@ export class SyncApi {
 
             await this.processRoomEvents(room, stateEvents);
 
-            const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId())?.getSender();
+            const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId()!)?.getSender();
 
             if (client.isCryptoEnabled()) {
-                const parkedHistory = await client.crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
+                const parkedHistory = await client.crypto!.cryptoStore.takeParkedSharedHistory(room.roomId);
                 for (const parked of parkedHistory) {
                     if (parked.senderId === inviter) {
-                        await client.crypto.olmDevice.addInboundGroupSession(
+                        await client.crypto!.olmDevice.addInboundGroupSession(
                             room.roomId,
                             parked.senderKey,
                             parked.forwardingCurve25519KeyChain,
@@ -1256,7 +1262,7 @@ export class SyncApi {
             if (joinObj.unread_notifications) {
                 room.setUnreadNotificationCount(
                     NotificationCountType.Total,
-                    joinObj.unread_notifications.notification_count,
+                    joinObj.unread_notifications.notification_count ?? 0,
                 );
 
                 // We track unread notifications ourselves in encrypted rooms, so don't
@@ -1266,20 +1272,24 @@ export class SyncApi {
                 if (!encrypted || room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0) {
                     room.setUnreadNotificationCount(
                         NotificationCountType.Highlight,
-                        joinObj.unread_notifications.highlight_count,
+                        joinObj.unread_notifications.highlight_count ?? 0,
                     );
                 }
             }
 
-            room.resetThreadUnreadNotificationCount();
             const unreadThreadNotifications = joinObj[UNREAD_THREAD_NOTIFICATIONS.name]
-                ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName];
+                ?? joinObj[UNREAD_THREAD_NOTIFICATIONS.altName!];
             if (unreadThreadNotifications) {
-                Object.entries(unreadThreadNotifications).forEach(([threadId, unreadNotification]) => {
+                // Only partially reset unread notification
+                // We want to keep the client-generated count. Particularly important
+                // for encrypted room that refresh their notification count on event
+                // decryption
+                room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
+                for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
                     room.setThreadUnreadNotificationCount(
                         threadId,
                         NotificationCountType.Total,
-                        unreadNotification.notification_count,
+                        unreadNotification.notification_count ?? 0,
                     );
 
                     const hasNoNotifications =
@@ -1288,10 +1298,12 @@ export class SyncApi {
                         room.setThreadUnreadNotificationCount(
                             threadId,
                             NotificationCountType.Highlight,
-                            unreadNotification.highlight_count,
+                            unreadNotification.highlight_count ?? 0,
                         );
                     }
-                });
+                }
+            } else {
+                room.resetThreadUnreadNotificationCount();
             }
 
             joinObj.timeline = joinObj.timeline || {} as ITimeline;
@@ -1318,10 +1330,9 @@ export class SyncApi {
                 // will stop us linking the empty timeline into the chain).
                 //
                 for (let i = events.length - 1; i >= 0; i--) {
-                    const eventId = events[i].getId();
+                    const eventId = events[i].getId()!;
                     if (room.getTimelineForEvent(eventId)) {
-                        debuglog("Already have event " + eventId + " in limited " +
-                            "sync - not resetting");
+                        debuglog(`Already have event ${eventId} in limited sync - not resetting`);
                         limited = false;
 
                         // we might still be missing some of the events before i;
@@ -1343,8 +1354,8 @@ export class SyncApi {
                 if (limited) {
                     room.resetLiveTimeline(
                         joinObj.timeline.prev_batch,
-                        this.opts.canResetEntireTimeline(room.roomId) ?
-                            null : syncEventData.oldSyncToken,
+                        this.opts.canResetEntireTimeline!(room.roomId) ?
+                            null : (syncEventData.oldSyncToken ?? null),
                     );
 
                     // We have to assume any gap in any timeline is
@@ -1442,7 +1453,7 @@ export class SyncApi {
                 return a.getTs() - b.getTs();
             });
             this.notifEvents.forEach(function(event) {
-                client.getNotifTimelineSet().addLiveEvent(event);
+                client.getNotifTimelineSet()?.addLiveEvent(event);
             });
         }
 
@@ -1471,7 +1482,7 @@ export class SyncApi {
             const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.opts.crypto.setNeedsNewFallback(
-                unusedFallbackKeys instanceof Array &&
+                Array.isArray(unusedFallbackKeys) &&
                 !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
@@ -1517,7 +1528,7 @@ export class SyncApi {
             clearTimeout(this.keepAliveTimer);
             if (this.connectionReturnedDefer) {
                 this.connectionReturnedDefer.resolve(connDidFail);
-                this.connectionReturnedDefer = null;
+                this.connectionReturnedDefer = undefined;
             }
         };
 
@@ -1633,7 +1644,7 @@ export class SyncApi {
                 // the code paths remain the same between invite/join display name stuff
                 // which is a worthy trade-off for some minor pollution.
                 const inviteEvent = member.events.member;
-                if (inviteEvent.getContent().membership !== "invite") {
+                if (inviteEvent?.getContent().membership !== "invite") {
                     // between resolving and now they have since joined, so don't clobber
                     return;
                 }
@@ -1796,7 +1807,7 @@ function createNewUser(client: MatrixClient, userId: string): User {
 export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts: Partial<IStoredClientOpts>): Room {
     const { timelineSupport } = client;
 
-    const room = new Room(roomId, client, client.getUserId(), {
+    const room = new Room(roomId, client, client.getUserId()!, {
         lazyLoadMembers: opts.lazyLoadMembers,
         pendingEventOrdering: opts.pendingEventOrdering,
         timelineSupport,
@@ -1826,7 +1837,7 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
     // We need to add a listener for RoomState.members in order to hook them
     // correctly.
     room.on(RoomStateEvent.NewMember, (event, state, member) => {
-        member.user = client.getUser(member.userId);
+        member.user = client.getUser(member.userId) ?? undefined;
         client.reEmitter.reEmit(member, [
             RoomMemberEvent.Name,
             RoomMemberEvent.Typing,

@@ -82,7 +82,7 @@ describe("SlidingSync", () => {
 
         it("should reset the connection on HTTP 400 and send everything again", async () => {
             // seed the connection with some lists, extensions and subscriptions to verify they are sent again
-            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client, 1);
+            slidingSync = new SlidingSync(proxyBaseUrl, [], {}, client!, 1);
             const roomId = "!sub:localhost";
             const subInfo = {
                 timeline_limit: 42,
@@ -108,7 +108,7 @@ describe("SlidingSync", () => {
 
             // expect everything to be sent
             let txnId;
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toEqual({
@@ -117,7 +117,7 @@ describe("SlidingSync", () => {
                 expect(body.lists[0]).toEqual(listInfo);
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: true });
-                expect(req.queryParams["pos"]).toBeUndefined();
+                expect(req.queryParams!["pos"]).toBeUndefined();
                 txnId = body.txn_id;
             }).respond(200, function() {
                 return {
@@ -127,10 +127,10 @@ describe("SlidingSync", () => {
                     txn_id: txnId,
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
 
             // expect nothing but ranges and non-initial extensions to be sent
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toBeFalsy();
@@ -139,7 +139,7 @@ describe("SlidingSync", () => {
                 });
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: false });
-                expect(req.queryParams["pos"]).toEqual("11");
+                expect(req.queryParams!["pos"]).toEqual("11");
             }).respond(200, function() {
                 return {
                     pos: "12",
@@ -147,19 +147,19 @@ describe("SlidingSync", () => {
                     extensions: {},
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
 
             // now we expire the session
-            httpBackend.when("POST", syncUrl).respond(400, function() {
+            httpBackend!.when("POST", syncUrl).respond(400, function() {
                 logger.debug("sending session expired 400");
                 return {
                     error: "HTTP 400 : session expired",
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
 
             // ...and everything should be sent again
-            httpBackend.when("POST", syncUrl).check(function(req) {
+            httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
                 expect(body.room_subscriptions).toEqual({
@@ -168,7 +168,7 @@ describe("SlidingSync", () => {
                 expect(body.lists[0]).toEqual(listInfo);
                 expect(body.extensions).toBeTruthy();
                 expect(body.extensions["custom_extension"]).toEqual({ initial: true });
-                expect(req.queryParams["pos"]).toBeUndefined();
+                expect(req.queryParams!["pos"]).toBeUndefined();
             }).respond(200, function() {
                 return {
                     pos: "1",
@@ -176,7 +176,7 @@ describe("SlidingSync", () => {
                     extensions: {},
                 };
             });
-            await httpBackend.flushAllExpected();
+            await httpBackend!.flushAllExpected();
             slidingSync.stop();
         });
     });
@@ -415,7 +415,7 @@ describe("SlidingSync", () => {
             expect(slidingSync.getList(0)).toBeDefined();
             expect(slidingSync.getList(5)).toBeNull();
             expect(slidingSync.getListData(5)).toBeNull();
-            const syncData = slidingSync.getListData(0);
+            const syncData = slidingSync.getListData(0)!;
             expect(syncData.joinedCount).toEqual(500); // from previous test
             expect(syncData.roomIndexToRoomId).toEqual({
                 0: roomA,
@@ -665,7 +665,7 @@ describe("SlidingSync", () => {
                 0: roomB,
                 1: roomC,
             };
-            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual(indexToRoomId);
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual(indexToRoomId);
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "f",
                 // currently the list is [B,C] so we will insert D then immediately delete it
@@ -703,7 +703,7 @@ describe("SlidingSync", () => {
         });
 
         it("should handle deletions correctly", async () => {
-            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual({
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
                 0: roomB,
                 1: roomC,
             });
@@ -739,7 +739,7 @@ describe("SlidingSync", () => {
         });
 
         it("should handle insertions correctly", async () => {
-            expect(slidingSync.getListData(0).roomIndexToRoomId).toEqual({
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
                 0: roomC,
             });
             httpBackend!.when("POST", syncUrl).respond(200, {
@@ -804,6 +804,91 @@ describe("SlidingSync", () => {
             await httpBackend!.flushAllExpected();
             await responseProcessed;
             await listPromise;
+            slidingSync.stop();
+        });
+
+        // Regression test to make sure things like DELETE 0 INSERT 0 work correctly and we don't
+        // end up losing room IDs.
+        it("should handle insertions with a spurious DELETE correctly", async () => {
+            slidingSync = new SlidingSync(proxyBaseUrl, [
+                {
+                    ranges: [[0, 20]],
+                },
+            ], {}, client!, 1);
+            // initially start with nothing
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "a",
+                lists: [{
+                    count: 0,
+                    ops: [],
+                }],
+            });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({});
+
+            // insert a room
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "b",
+                lists: [{
+                    count: 1,
+                    ops: [
+                        {
+                            op: "DELETE", index: 0,
+                        },
+                        {
+                            op: "INSERT", index: 0, room_id: roomA,
+                        },
+                    ],
+                }],
+            });
+            await httpBackend!.flushAllExpected();
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
+                0: roomA,
+            });
+
+            // insert another room
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "c",
+                lists: [{
+                    count: 1,
+                    ops: [
+                        {
+                            op: "DELETE", index: 1,
+                        },
+                        {
+                            op: "INSERT", index: 0, room_id: roomB,
+                        },
+                    ],
+                }],
+            });
+            await httpBackend!.flushAllExpected();
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
+                0: roomB,
+                1: roomA,
+            });
+
+            // insert a final room
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "c",
+                lists: [{
+                    count: 1,
+                    ops: [
+                        {
+                            op: "DELETE", index: 2,
+                        },
+                        {
+                            op: "INSERT", index: 0, room_id: roomC,
+                        },
+                    ],
+                }],
+            });
+            await httpBackend!.flushAllExpected();
+            expect(slidingSync.getListData(0)!.roomIndexToRoomId).toEqual({
+                0: roomC,
+                1: roomB,
+                2: roomA,
+            });
             slidingSync.stop();
         });
     });

@@ -22,8 +22,8 @@ limitations under the License.
 
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
+import { Optional } from "matrix-events-sdk";
 
-import type * as NodeCrypto from "crypto";
 import { MatrixEvent } from "./models/event";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
@@ -49,7 +49,7 @@ export function internaliseString(str: string): string {
     }
 
     // Return any cached string reference
-    return interns.get(str);
+    return interns.get(str)!;
 }
 
 /**
@@ -78,6 +78,25 @@ export function encodeParams(params: QueryDict, urlSearchParams?: URLSearchParam
 export type QueryDict = Record<string, string[] | string | number | boolean | undefined>;
 
 /**
+ * Replace a stable parameter with the unstable naming for params
+ * @param stable
+ * @param unstable
+ * @param dict
+ */
+export function replaceParam(
+    stable: string,
+    unstable: string,
+    dict: QueryDict,
+): QueryDict {
+    const result = {
+        ...dict,
+        [unstable]: dict[stable],
+    };
+    delete result[stable];
+    return result;
+}
+
+/**
  * Decode a query string in `application/x-www-form-urlencoded` format.
  * @param {string} query A query string to decode e.g.
  * foo=bar&via=server1&server2
@@ -104,13 +123,17 @@ export function decodeParams(query: string): Record<string, string | string[]> {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate: string, variables: Record<string, string>): string {
+export function encodeUri(pathTemplate: string, variables: Record<string, Optional<string>>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
         }
+        const value = variables[key];
+        if (value === undefined || value === null) {
+            continue;
+        }
         pathTemplate = pathTemplate.replace(
-            key, encodeURIComponent(variables[key]),
+            key, encodeURIComponent(value),
         );
     }
     return pathTemplate;
@@ -233,7 +256,7 @@ export function deepCompare(x: any, y: any): boolean {
     }
 
     // the object algorithm works for Array, but it's sub-optimal.
-    if (x instanceof Array) {
+    if (Array.isArray(x)) {
         if (x.length !== y.length) {
             return false;
         }
@@ -356,7 +379,9 @@ export function globToRegexp(glob: string, extended = false): string {
     const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
         [/\\\*/g, '.*'],
         [/\?/g, '.'],
-        !extended && [
+    ];
+    if (!extended) {
+        replacements.push([
             /\\\[(!|)(.*)\\]/g,
             (_match: string, neg: string, pat: string) => [
                 '[',
@@ -364,8 +389,8 @@ export function globToRegexp(glob: string, extended = false): string {
                 pat.replace(/\\-/, '-'),
                 ']',
             ].join(''),
-        ],
-    ];
+        ]);
+    }
     return replacements.reduce(
         // https://github.com/microsoft/TypeScript/issues/30134
         (pat, args) => args ? pat.replace(args[0], args[1] as any) : pat,
@@ -373,8 +398,11 @@ export function globToRegexp(glob: string, extended = false): string {
     );
 }
 
-export function ensureNoTrailingSlash(url: string): string {
-    if (url && url.endsWith("/")) {
+export function ensureNoTrailingSlash(url: string): string;
+export function ensureNoTrailingSlash(url: undefined): undefined;
+export function ensureNoTrailingSlash(url?: string): string | undefined;
+export function ensureNoTrailingSlash(url?: string): string | undefined {
+    if (url?.endsWith("/")) {
         return url.slice(0, -1);
     } else {
         return url;
@@ -413,7 +441,7 @@ export function defer<T = void>(): IDeferred<T> {
 
 export async function promiseMapSeries<T>(
     promises: Array<T | Promise<T>>,
-    fn: (t: T) => Promise<unknown> | void, // if async/promise we don't care about the type as we only await resolution
+    fn: (t: T) => Promise<unknown> | undefined, // if async we don't care about the type as we only await resolution
 ): Promise<void> {
     for (const o of promises) {
         await fn(await o);
@@ -451,20 +479,6 @@ export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<
         minTimeout: 3000, // ms
         maxTimeout: 15000, // ms
     });
-}
-
-// We need to be able to access the Node.js crypto library from within the
-// Matrix SDK without needing to `require("crypto")`, which will fail in
-// browsers.  So `index.ts` will call `setCrypto` to store it, and when we need
-// it, we can call `getCrypto`.
-let crypto: typeof NodeCrypto;
-
-export function setCrypto(c: typeof NodeCrypto) {
-    crypto = c;
-}
-
-export function getCrypto(): typeof NodeCrypto {
-    return crypto;
 }
 
 // String averaging inspired by https://stackoverflow.com/a/2510816

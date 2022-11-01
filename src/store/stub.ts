@@ -29,6 +29,7 @@ import { RoomSummary } from "../models/room-summary";
 import { ISyncResponse } from "../sync-accumulator";
 import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatch } from "../models/ToDeviceMessage";
+import { IStoredClientOpts } from "../client";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
@@ -36,7 +37,7 @@ import { IndexedToDeviceBatch, ToDeviceBatch } from "../models/ToDeviceMessage";
  */
 export class StubStore implements IStore {
     public readonly accountData = {}; // stub
-    private fromToken: string = null;
+    private fromToken: string | null = null;
 
     /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
     public isNewlyCreated(): Promise<boolean> {
@@ -170,7 +171,7 @@ export class StubStore implements IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    public setFilterIdByName(filterName: string, filterId: string) {}
+    public setFilterIdByName(filterName: string, filterId?: string) {}
 
     /**
      * Store user-scoped account data events
@@ -223,7 +224,7 @@ export class StubStore implements IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync(): Promise<ISavedSync> {
+    public getSavedSync(): Promise<ISavedSync | null> {
         return Promise.resolve(null);
     }
 
@@ -244,7 +245,7 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getOutOfBandMembers(): Promise<IStateEventWithRoomId[]> {
+    public getOutOfBandMembers(): Promise<IStateEventWithRoomId[] | null> {
         return Promise.resolve(null);
     }
 
@@ -256,11 +257,11 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
-    public getClientOptions(): Promise<object> {
-        return Promise.resolve({});
+    public getClientOptions(): Promise<IStoredClientOpts | undefined> {
+        return Promise.resolve(undefined);
     }
 
-    public storeClientOptions(options: object): Promise<void> {
+    public storeClientOptions(options: IStoredClientOpts): Promise<void> {
         return Promise.resolve();
     }
 

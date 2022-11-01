@@ -135,7 +135,7 @@ export class MockMediaDeviceInfo {
 
 export class MockMediaHandler {
     getUserMediaStream(audio: boolean, video: boolean) {
-        const tracks = [];
+        const tracks: MockMediaStreamTrack[] = [];
         if (audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
         if (video) tracks.push(new MockMediaStreamTrack("video_track", "video"));
 

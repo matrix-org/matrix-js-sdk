@@ -45,13 +45,13 @@ describe('EventTimelineSet', () => {
         it('should return the related events', () => {
             eventTimelineSet.relations.aggregateChildEvent(messageEvent);
             const relations = eventTimelineSet.relations.getChildEventsForEvent(
-                messageEvent.getId(),
+                messageEvent.getId()!,
                 "m.in_reply_to",
                 EventType.RoomMessage,
             );
             expect(relations).toBeDefined();
-            expect(relations.getRelations().length).toBe(1);
-            expect(relations.getRelations()[0].getId()).toBe(replyEvent.getId());
+            expect(relations!.getRelations().length).toBe(1);
+            expect(relations!.getRelations()[0].getId()).toBe(replyEvent.getId());
         });
     };
 
@@ -193,7 +193,7 @@ describe('EventTimelineSet', () => {
             it('should not return the related events', () => {
                 eventTimelineSet.relations.aggregateChildEvent(messageEvent);
                 const relations = eventTimelineSet.relations.getChildEventsForEvent(
-                    messageEvent.getId(),
+                    messageEvent.getId()!,
                     "m.in_reply_to",
                     EventType.RoomMessage,
                 );
@@ -236,7 +236,7 @@ describe('EventTimelineSet', () => {
                 "m.relates_to": {
                     "event_id": root.getId(),
                     "m.in_reply_to": {
-                        "event_id": root.getId(),
+                        "event_id": root.getId()!,
                     },
                     "rel_type": "m.thread",
                 },
@@ -278,14 +278,14 @@ describe('EventTimelineSet', () => {
         });
 
         it("should return true if the timeline set is for a thread and the event is its thread root", () => {
-            const thread = new Thread(messageEvent.getId(), messageEvent, { room, client });
+            const thread = new Thread(messageEvent.getId()!, messageEvent, { room, client });
             const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
             messageEvent.setThread(thread);
             expect(eventTimelineSet.canContain(messageEvent)).toBeTruthy();
         });
 
         it("should return true if the timeline set is for a thread and the event is a response to it", () => {
-            const thread = new Thread(messageEvent.getId(), messageEvent, { room, client });
+            const thread = new Thread(messageEvent.getId()!, messageEvent, { room, client });
             const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
             messageEvent.setThread(thread);
             const event = mkThreadResponse(messageEvent);
@@ -310,7 +310,7 @@ describe('EventTimelineSet', () => {
                 content: { body: "test" },
                 event_id: "!test1:server",
             });
-            eventTimelineSet.handleRemoteEcho(roomMessageEvent, "~!local-event-id:server", roomMessageEvent.getId());
+            eventTimelineSet.handleRemoteEcho(roomMessageEvent, "~!local-event-id:server", roomMessageEvent.getId()!);
             expect(eventTimelineSet.getLiveTimeline().getEvents()).toContain(roomMessageEvent);
 
             const roomFilteredEvent = new MatrixEvent({
@@ -318,7 +318,7 @@ describe('EventTimelineSet', () => {
                 content: { body: "test" },
                 event_id: "!test2:server",
             });
-            eventTimelineSet.handleRemoteEcho(roomFilteredEvent, "~!local-event-id:server", roomFilteredEvent.getId());
+            eventTimelineSet.handleRemoteEcho(roomFilteredEvent, "~!local-event-id:server", roomFilteredEvent.getId()!);
             expect(eventTimelineSet.getLiveTimeline().getEvents()).not.toContain(roomFilteredEvent);
         });
     });

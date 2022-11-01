@@ -23,7 +23,10 @@ import { Optional } from "matrix-events-sdk/lib/types";
 export class NamespacedValue<S extends string, U extends string> {
     // Stable is optional, but one of the two parameters is required, hence the weird-looking types.
     // Goal is to to have developers explicitly say there is no stable value (if applicable).
-    public constructor(public readonly stable: S | null | undefined, public readonly unstable?: U) {
+    public constructor(stable: S, unstable: U);
+    public constructor(stable: S, unstable?: U);
+    public constructor(stable: null | undefined, unstable: U);
+    public constructor(public readonly stable?: S | null, public readonly unstable?: U) {
         if (!this.unstable && !this.stable) {
             throw new Error("One of stable or unstable values must be supplied");
         }
@@ -33,10 +36,10 @@ export class NamespacedValue<S extends string, U extends string> {
         if (this.stable) {
             return this.stable;
         }
-        return this.unstable;
+        return this.unstable!;
     }
 
-    public get altName(): U | S | null {
+    public get altName(): U | S | null | undefined {
         if (!this.stable) {
             return null;
         }
@@ -57,7 +60,7 @@ export class NamespacedValue<S extends string, U extends string> {
     // this desperately wants https://github.com/microsoft/TypeScript/pull/26349 at the top level of the class
     // so we can instantiate `NamespacedValue<string, _, _>` as a default type for that namespace.
     public findIn<T>(obj: any): Optional<T> {
-        let val: T;
+        let val: T | undefined = undefined;
         if (this.name) {
             val = obj?.[this.name];
         }
@@ -91,7 +94,7 @@ export class ServerControlledNamespacedValue<S extends string, U extends string>
         if (this.stable && !this.preferUnstable) {
             return this.stable;
         }
-        return this.unstable;
+        return this.unstable!;
     }
 }
 
@@ -109,10 +112,10 @@ export class UnstableValue<S extends string, U extends string> extends Namespace
     }
 
     public get name(): U {
-        return this.unstable;
+        return this.unstable!;
     }
 
     public get altName(): S {
-        return this.stable;
+        return this.stable!;
     }
 }

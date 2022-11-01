@@ -222,9 +222,9 @@ describe.each([
     ["IndexedDBCryptoStore",
         () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
     ["LocalStorageCryptoStore",
-        () => new IndexedDBCryptoStore(undefined, "tests")],
+        () => new IndexedDBCryptoStore(undefined!, "tests")],
     ["MemoryCryptoStore", () => {
-        const store = new IndexedDBCryptoStore(undefined, "tests");
+        const store = new IndexedDBCryptoStore(undefined!, "tests");
         // @ts-ignore set private properties
         store._backend = new MemoryCryptoStore();
         // @ts-ignore
@@ -247,14 +247,14 @@ describe.each([
         const olmDevice = new OlmDevice(store);
         const { getCrossSigningKeyCache, storeCrossSigningKeyCache } =
               createCryptoStoreCacheCallbacks(store, olmDevice);
-        await storeCrossSigningKeyCache("self_signing", testKey);
+        await storeCrossSigningKeyCache!("self_signing", testKey);
 
         // If we've not saved anything, don't expect anything
         // Definitely don't accidentally return the wrong key for the type
-        const nokey = await getCrossSigningKeyCache("self", "");
+        const nokey = await getCrossSigningKeyCache!("self", "");
         expect(nokey).toBeNull();
 
-        const key = await getCrossSigningKeyCache("self_signing", "");
-        expect(new Uint8Array(key)).toEqual(testKey);
+        const key = await getCrossSigningKeyCache!("self_signing", "");
+        expect(new Uint8Array(key!)).toEqual(testKey);
     });
 });

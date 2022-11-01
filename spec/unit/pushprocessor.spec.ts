@@ -163,6 +163,22 @@ describe('NotificationService', function() {
                         "enabled": true,
                         "rule_id": ".m.rule.room_one_to_one",
                     },
+                    {
+                        rule_id: ".org.matrix.msc3914.rule.room.call",
+                        default: true,
+                        enabled: true,
+                        conditions: [
+                            {
+                                kind: "event_match",
+                                key: "type",
+                                pattern: "org.matrix.msc3401.call",
+                            },
+                            {
+                                kind: "call_started",
+                            },
+                        ],
+                        actions: ["notify", { set_tweak: "sound", value: "default" }],
+                    },
                 ],
                 "room": [],
                 "sender": [],
@@ -209,32 +225,32 @@ describe('NotificationService', function() {
                 msgtype: "m.text",
             },
         });
-        matrixClient.pushRules = PushProcessor.rewriteDefaultRules(matrixClient.pushRules);
+        matrixClient.pushRules = PushProcessor.rewriteDefaultRules(matrixClient.pushRules!);
         pushProcessor = new PushProcessor(matrixClient);
     });
 
     // User IDs
 
     it('should bing on a user ID.', function() {
-        testEvent.event.content.body = "Hello @ali:matrix.org, how are you?";
+        testEvent.event.content!.body = "Hello @ali:matrix.org, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on a partial user ID with an @.', function() {
-        testEvent.event.content.body = "Hello @ali, how are you?";
+        testEvent.event.content!.body = "Hello @ali, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on a partial user ID without @.', function() {
-        testEvent.event.content.body = "Hello ali, how are you?";
+        testEvent.event.content!.body = "Hello ali, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on a case-insensitive user ID.', function() {
-        testEvent.event.content.body = "Hello @AlI:matrix.org, how are you?";
+        testEvent.event.content!.body = "Hello @AlI:matrix.org, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
@@ -242,13 +258,13 @@ describe('NotificationService', function() {
     // Display names
 
     it('should bing on a display name.', function() {
-        testEvent.event.content.body = "Hello Alice M, how are you?";
+        testEvent.event.content!.body = "Hello Alice M, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on a case-insensitive display name.', function() {
-        testEvent.event.content.body = "Hello ALICE M, how are you?";
+        testEvent.event.content!.body = "Hello ALICE M, how are you?";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
@@ -256,43 +272,43 @@ describe('NotificationService', function() {
     // Bing words
 
     it('should bing on a bing word.', function() {
-        testEvent.event.content.body = "I really like coffee";
+        testEvent.event.content!.body = "I really like coffee";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on case-insensitive bing words.', function() {
-        testEvent.event.content.body = "Coffee is great";
+        testEvent.event.content!.body = "Coffee is great";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on wildcard (.*) bing words.', function() {
-        testEvent.event.content.body = "It was foomahbar I think.";
+        testEvent.event.content!.body = "It was foomahbar I think.";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on character group ([abc]) bing words.', function() {
-        testEvent.event.content.body = "Ping!";
+        testEvent.event.content!.body = "Ping!";
         let actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
-        testEvent.event.content.body = "Pong!";
+        testEvent.event.content!.body = "Pong!";
         actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on character range ([a-z]) bing words.', function() {
-        testEvent.event.content.body = "I ate 6 pies";
+        testEvent.event.content!.body = "I ate 6 pies";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
     it('should bing on character negation ([!a]) bing words.', function() {
-        testEvent.event.content.body = "boke";
+        testEvent.event.content!.body = "boke";
         let actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
-        testEvent.event.content.body = "bake";
+        testEvent.event.content!.body = "bake";
         actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
     });
@@ -316,7 +332,7 @@ describe('NotificationService', function() {
     // invalid
 
     it('should gracefully handle bad input.', function() {
-        testEvent.event.content.body = { "foo": "bar" };
+        testEvent.event.content!.body = { "foo": "bar" };
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
     });
@@ -337,7 +353,11 @@ describe('NotificationService', function() {
         }, testEvent)).toBe(true);
     });
 
-    describe("performCustomEventHandling()", () => {
+    describe("group call started push rule", () => {
+        beforeEach(() => {
+            matrixClient.pushRules!.global!.underride!.find(r => r.rule_id === ".m.rule.fallback")!.enabled = false;
+        });
+
         const getActionsForEvent = (prevContent: IContent, content: IContent): IActionsObject => {
             testEvent = utils.mkEvent({
                 type: "org.matrix.msc3401.call",
@@ -353,15 +373,15 @@ describe('NotificationService', function() {
         };
 
         const assertDoesNotify = (actions: IActionsObject): void => {
-            expect(actions.notify).toBeTruthy();
-            expect(actions.tweaks.sound).toBeTruthy();
-            expect(actions.tweaks.highlight).toBeFalsy();
+            expect(actions?.notify).toBeTruthy();
+            expect(actions?.tweaks?.sound).toBeTruthy();
+            expect(actions?.tweaks?.highlight).toBeFalsy();
         };
 
         const assertDoesNotNotify = (actions: IActionsObject): void => {
-            expect(actions.notify).toBeFalsy();
-            expect(actions.tweaks.sound).toBeFalsy();
-            expect(actions.tweaks.highlight).toBeFalsy();
+            expect(actions?.notify).toBeFalsy();
+            expect(actions?.tweaks?.sound).toBeFalsy();
+            expect(actions?.tweaks?.highlight).toBeFalsy();
         };
 
         it.each(

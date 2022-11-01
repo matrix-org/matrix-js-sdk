@@ -34,6 +34,7 @@ import { TypedReEmitter } from '../ReEmitter';
 import { MatrixError } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
+import { DecryptionError } from "../crypto/algorithms";
 
 export { EventStatus } from "./event-status";
 
@@ -70,7 +71,7 @@ export interface IEvent {
     type: string;
     content: IContent;
     sender: string;
-    room_id: string;
+    room_id?: string;
     origin_server_ts: number;
     txn_id?: string;
     state_key?: string;
@@ -391,7 +392,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @return {string} The event ID, e.g. <code>$143350589368169JsLZx:localhost
      * </code>
      */
-    public getId(): string {
+    public getId(): string | undefined {
         return this.event.event_id;
     }
 
@@ -399,7 +400,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the user_id for this event.
      * @return {string} The user ID, e.g. <code>@alice:matrix.org</code>
      */
-    public getSender(): string {
+    public getSender(): string | undefined {
         return this.event.sender || this.event.user_id; // v2 / v1
     }
 
@@ -520,7 +521,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return !!threadDetails || (this.getThread()?.id === this.getId());
     }
 
-    public get replyEventId(): string {
+    public get replyEventId(): string | undefined {
         // We're prefer ev.getContent() over ev.getWireContent() to make sure
         // we grab the latest edit with potentially new relations. But we also
         // can't just rely on ev.getContent() by itself because historically we
@@ -685,14 +686,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * attempt is completed.
      */
     public async attemptDecryption(crypto: Crypto, options: IDecryptOptions = {}): Promise<void> {
-        // For backwards compatibility purposes
-        // The function signature used to be attemptDecryption(crypto, isRetry)
-        if (typeof options === "boolean") {
-            options = {
-                isRetry: options,
-            };
-        }
-
         // start with a couple of sanity checks.
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
@@ -755,12 +748,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // original sending device if it wasn't us.
         const wireContent = this.getWireContent();
         const recipients = [{
-            userId, deviceId: '*',
+            userId,
+            deviceId: '*',
         }];
         const sender = this.getSender();
         if (sender !== userId) {
             recipients.push({
-                userId: sender, deviceId: wireContent.device_id,
+                userId: sender!,
+                deviceId: wireContent.device_id,
             });
         }
         return recipients;
@@ -822,15 +817,19 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(`Got error decrypting event (id=${this.getId()}: ${e.detailedString}), but retrying`, e);
+                    logger.log(`Got error decrypting event (id=${this.getId()}: ` +
+                        `${(<DecryptionError>e).detailedString}), but retrying`, e);
                     continue;
                 }
 
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
-                logger.warn(`Got error decrypting event (id=${this.getId()}: ${e.detailedString})`, e);
+                logger.warn(
+                    `Got error decrypting event (id=${this.getId()}: ${(<DecryptionError>e).detailedString})`,
+                    e,
+                );
 
-                res = this.badEncryptedMessage(e.message);
+                res = this.badEncryptedMessage((<DecryptionError>e).message);
             }
 
             // at this point, we've either successfully decrypted the event, or have given up
@@ -1390,7 +1389,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 return new Date(ts);
             }
         } else if (this._replacingEvent) {
-            return this._replacingEvent.getDate();
+            return this._replacingEvent.getDate() ?? undefined;
         }
     }
 
@@ -1543,10 +1542,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * @experimental
      */
-    public setThread(thread: Thread): void {
+    public setThread(thread?: Thread): void {
+        if (this.thread) {
+            this.reEmitter.stopReEmitting(this.thread, [ThreadEvent.Update]);
+        }
         this.thread = thread;
-        this.setThreadId(thread.id);
-        this.reEmitter.reEmit(thread, [ThreadEvent.Update]);
+        this.setThreadId(thread?.id);
+        if (thread) {
+            this.reEmitter.reEmit(thread, [ThreadEvent.Update]);
+        }
     }
 
     /**
@@ -1556,7 +1560,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.thread;
     }
 
-    public setThreadId(threadId: string): void {
+    public setThreadId(threadId?: string): void {
         this.threadId = threadId;
     }
 }

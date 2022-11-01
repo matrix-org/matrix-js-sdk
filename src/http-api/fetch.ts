@@ -73,7 +73,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
     public idServerRequest<T extends {}>(
         method: Method,
         path: string,
-        params: Record<string, string | string[]>,
+        params: Record<string, string | string[]> | undefined,
         prefix: string,
         accessToken?: string,
     ): Promise<ResponseType<T, O>> {
@@ -96,7 +96,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             headers: {},
         };
         if (accessToken) {
-            opts.headers.Authorization = `Bearer ${accessToken}`;
+            opts.headers!.Authorization = `Bearer ${accessToken}`;
         }
 
         return this.requestOtherUrl(method, fullUri, body, opts);
@@ -143,18 +143,20 @@ export class FetchHttpApi<O extends IHttpOpts> {
     ): Promise<ResponseType<T, O>> {
         if (!queryParams) queryParams = {};
 
-        if (this.opts.useAuthorizationHeader) {
-            if (!opts.headers) {
-                opts.headers = {};
+        if (this.opts.accessToken) {
+            if (this.opts.useAuthorizationHeader) {
+                if (!opts.headers) {
+                    opts.headers = {};
+                }
+                if (!opts.headers.Authorization) {
+                    opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+                }
+                if (queryParams.access_token) {
+                    delete queryParams.access_token;
+                }
+            } else if (!queryParams.access_token) {
+                queryParams.access_token = this.opts.accessToken;
             }
-            if (!opts.headers.Authorization) {
-                opts.headers.Authorization = "Bearer " + this.opts.accessToken;
-            }
-            if (queryParams.access_token) {
-                delete queryParams.access_token;
-            }
-        } else if (!queryParams.access_token) {
-            queryParams.access_token = this.opts.accessToken;
         }
 
         const requestPromise = this.request<T>(method, path, queryParams, body, opts);
@@ -286,10 +288,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 credentials: "omit", // we send credentials via headers
             });
         } catch (e) {
-            if (e.name === "AbortError") {
+            if ((<Error>e).name === "AbortError") {
                 throw e;
             }
-            throw new ConnectionError("fetch failed", e);
+            throw new ConnectionError("fetch failed", <Error>e);
         } finally {
             cleanup();
         }

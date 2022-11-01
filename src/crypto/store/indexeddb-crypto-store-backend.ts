@@ -25,14 +25,13 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory,
+    ParkedSharedHistory, SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
 const PROFILE_TRANSACTIONS = false;
 
@@ -308,7 +307,7 @@ export class Backend implements CryptoStore {
         expectedState: number,
         updates: Partial<OutgoingRoomKeyRequest>,
     ): Promise<OutgoingRoomKeyRequest | null> {
-        let result: OutgoingRoomKeyRequest = null;
+        let result: OutgoingRoomKeyRequest | null = null;
 
         function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
             const cursor = this.result;
@@ -369,14 +368,14 @@ export class Backend implements CryptoStore {
 
     // Olm Account
 
-    public getAccount(txn: IDBTransaction, func: (accountPickle: string) => void): void {
+    public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("-");
         getReq.onsuccess = function() {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -386,22 +385,25 @@ export class Backend implements CryptoStore {
         objectStore.put(accountPickle, "-");
     }
 
-    public getCrossSigningKeys(txn: IDBTransaction, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(
+        txn: IDBTransaction,
+        func: (keys: Record<string, ICrossSigningKey> | null) => void,
+    ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("crossSigningKeys");
         getReq.onsuccess = function() {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
 
-    public getSecretStorePrivateKey(
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: IDBTransaction,
-        func: (key: IEncryptedPayload | null) => void,
-        type: string,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
     ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get(`ssss_cache:${type}`);
@@ -409,7 +411,7 @@ export class Backend implements CryptoStore {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -419,7 +421,11 @@ export class Backend implements CryptoStore {
         objectStore.put(keys, "crossSigningKeys");
     }
 
-    public storeSecretStorePrivateKey(txn: IDBTransaction, type: string, key: IEncryptedPayload): void {
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: IDBTransaction,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
         const objectStore = txn.objectStore("account");
         objectStore.put(key, `ssss_cache:${type}`);
     }
@@ -433,7 +439,7 @@ export class Backend implements CryptoStore {
             try {
                 func(countReq.result);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -459,7 +465,7 @@ export class Backend implements CryptoStore {
                 try {
                     func(results);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -469,7 +475,7 @@ export class Backend implements CryptoStore {
         deviceKey: string,
         sessionId: string,
         txn: IDBTransaction,
-        func: (sessions: { [ sessionId: string ]: ISessionInfo }) => void,
+        func: (session: ISessionInfo | null) => void,
     ): void {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.get([deviceKey, sessionId]);
@@ -484,12 +490,12 @@ export class Backend implements CryptoStore {
                     func(null);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
 
-    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo) => void): void {
+    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo | null) => void): void {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.openCursor();
         getReq.onsuccess = function() {
@@ -502,7 +508,7 @@ export class Backend implements CryptoStore {
                     func(null);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -531,11 +537,11 @@ export class Backend implements CryptoStore {
             fixed,
             time: Date.now(),
         });
-        return promiseifyTxn(txn);
+        await promiseifyTxn(txn);
     }
 
     public async getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null> {
-        let result;
+        let result: IProblem | null = null;
         const txn = this.db.transaction("session_problems", "readwrite");
         const objectStore = txn.objectStore("session_problems");
         const index = objectStore.index("deviceKey");
@@ -598,8 +604,8 @@ export class Backend implements CryptoStore {
         txn: IDBTransaction,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        let session: InboundGroupSessionData | boolean = false;
-        let withheld: IWithheld | boolean = false;
+        let session: InboundGroupSessionData | null | boolean = false;
+        let withheld: IWithheld | null | boolean = false;
         const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.get([senderCurve25519Key, sessionId]);
         getReq.onsuccess = function() {
@@ -613,7 +619,7 @@ export class Backend implements CryptoStore {
                     func(session as InboundGroupSessionData, withheld as IWithheld);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
 
@@ -630,7 +636,7 @@ export class Backend implements CryptoStore {
                     func(session as InboundGroupSessionData, withheld as IWithheld);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -648,14 +654,14 @@ export class Backend implements CryptoStore {
                         sessionData: cursor.value.session,
                     });
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
                 cursor.continue();
             } else {
                 try {
                     func(null);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -672,7 +678,7 @@ export class Backend implements CryptoStore {
             senderCurve25519Key, sessionId, session: sessionData,
         });
         addReq.onerror = (ev) => {
-            if (addReq.error.name === 'ConstraintError') {
+            if (addReq.error?.name === 'ConstraintError') {
                 // This stops the error from triggering the txn's onerror
                 ev.stopPropagation();
                 // ...and this stops it from aborting the transaction
@@ -720,7 +726,7 @@ export class Backend implements CryptoStore {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -748,7 +754,7 @@ export class Backend implements CryptoStore {
                 try {
                     func(rooms);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -1044,7 +1050,7 @@ function abortWithException(txn: IDBTransaction, e: Error) {
     }
 }
 
-function promiseifyTxn<T>(txn: IDBTransaction): Promise<T> {
+function promiseifyTxn<T>(txn: IDBTransaction): Promise<T | null> {
     return new Promise((resolve, reject) => {
         txn.oncomplete = () => {
             if ((txn as IWrappedIDBTransaction)._mx_abortexception !== undefined) {

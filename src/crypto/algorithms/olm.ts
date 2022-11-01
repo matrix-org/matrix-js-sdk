@@ -180,14 +180,14 @@ class OlmDecryption extends DecryptionAlgorithm {
             );
         }
 
-        if (!(this.olmDevice.deviceCurve25519Key in ciphertext)) {
+        if (!(this.olmDevice.deviceCurve25519Key! in ciphertext)) {
             throw new DecryptionError(
                 "OLM_NOT_INCLUDED_IN_RECIPIENTS",
                 "Not included in recipients",
             );
         }
-        const message = ciphertext[this.olmDevice.deviceCurve25519Key];
-        let payloadString;
+        const message = ciphertext[this.olmDevice.deviceCurve25519Key!];
+        let payloadString: string;
 
         try {
             payloadString = await this.decryptMessage(deviceKey, message);
@@ -196,7 +196,7 @@ class OlmDecryption extends DecryptionAlgorithm {
                 "OLM_BAD_ENCRYPTED_MESSAGE",
                 "Bad Encrypted Message", {
                     sender: deviceKey,
-                    err: e,
+                    err: e as Error,
                 },
             );
         }
@@ -217,7 +217,7 @@ class OlmDecryption extends DecryptionAlgorithm {
                 "OLM_BAD_RECIPIENT_KEY",
                 "Message not intended for this device", {
                     intended: payload.recipient_keys.ed25519,
-                    our_key: this.olmDevice.deviceEd25519Key,
+                    our_key: this.olmDevice.deviceEd25519Key!,
                 },
             );
         }
@@ -228,12 +228,12 @@ class OlmDecryption extends DecryptionAlgorithm {
         // assume that the device logged out.  Some event handlers, such as
         // secret sharing, may be more strict and reject events that come from
         // unknown devices.
-        await this.crypto.deviceList.downloadKeys([event.getSender()], false);
+        await this.crypto.deviceList.downloadKeys([event.getSender()!], false);
         const senderKeyUser = this.crypto.deviceList.getUserByIdentityKey(
             olmlib.OLM_ALGORITHM,
             deviceKey,
         );
-        if (senderKeyUser !== event.getSender() && senderKeyUser !== undefined) {
+        if (senderKeyUser !== event.getSender() && senderKeyUser != undefined) {
             throw new DecryptionError(
                 "OLM_BAD_SENDER",
                 "Message claimed to be from " + event.getSender(), {
@@ -250,7 +250,7 @@ class OlmDecryption extends DecryptionAlgorithm {
             throw new DecryptionError(
                 "OLM_FORWARDED_MESSAGE",
                 "Message forwarded from " + payload.sender, {
-                    reported_sender: event.getSender(),
+                    reported_sender: event.getSender()!,
                 },
             );
         }
@@ -325,13 +325,13 @@ class OlmDecryption extends DecryptionAlgorithm {
                     // session, so it should have worked.
                     throw new Error(
                         "Error decrypting prekey message with existing session id " +
-                        sessionId + ": " + e.message,
+                        sessionId + ": " + (<Error>e).message,
                     );
                 }
 
                 // otherwise it's probably a message for another session; carry on, but
                 // keep a record of the error
-                decryptionErrors[sessionId] = e.message;
+                decryptionErrors[sessionId] = (<Error>e).message;
             }
         }
 
@@ -358,7 +358,7 @@ class OlmDecryption extends DecryptionAlgorithm {
                 theirDeviceIdentityKey, message.type, message.body,
             );
         } catch (e) {
-            decryptionErrors["(new)"] = e.message;
+            decryptionErrors["(new)"] = (<Error>e).message;
             throw new Error(
                 "Error decrypting prekey message: " +
                 JSON.stringify(decryptionErrors),

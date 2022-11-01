@@ -47,7 +47,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     private annotationsByKey: Record<string, Set<MatrixEvent>> = {};
     private annotationsBySender: Record<string, Set<MatrixEvent>> = {};
     private sortedAnnotationsByKey: [string, Set<MatrixEvent>][] = [];
-    private targetEvent: MatrixEvent = null;
+    private targetEvent: MatrixEvent | null = null;
     private creationEmitted = false;
     private readonly client: MatrixClient;
 
@@ -76,7 +76,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * The new relation event to be added.
      */
     public async addEvent(event: MatrixEvent) {
-        if (this.relationEventIds.has(event.getId())) {
+        if (this.relationEventIds.has(event.getId()!)) {
             return;
         }
 
@@ -101,13 +101,13 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         }
 
         this.relations.add(event);
-        this.relationEventIds.add(event.getId());
+        this.relationEventIds.add(event.getId()!);
 
         if (this.relationType === RelationType.Annotation) {
             this.addAnnotationToAggregation(event);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement);
+            this.targetEvent.makeReplaced(lastReplacement!);
         }
 
         event.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -148,7 +148,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             this.removeAnnotationFromAggregation(event);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement);
+            this.targetEvent.makeReplaced(lastReplacement!);
         }
 
         this.emit(RelationsEvent.Remove, event);
@@ -189,10 +189,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     }
 
     private addAnnotationToAggregation(event: MatrixEvent): void {
-        const { key } = event.getRelation();
-        if (!key) {
-            return;
-        }
+        const { key } = event.getRelation() ?? {};
+        if (!key) return;
 
         let eventsForKey = this.annotationsByKey[key];
         if (!eventsForKey) {
@@ -208,7 +206,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             return bEvents.size - aEvents.size;
         });
 
-        const sender = event.getSender();
+        const sender = event.getSender()!;
         let eventsFromSender = this.annotationsBySender[sender];
         if (!eventsFromSender) {
             eventsFromSender = this.annotationsBySender[sender] = new Set();
@@ -218,10 +216,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     }
 
     private removeAnnotationFromAggregation(event: MatrixEvent): void {
-        const { key } = event.getRelation();
-        if (!key) {
-            return;
-        }
+        const { key } = event.getRelation() ?? {};
+        if (!key) return;
 
         const eventsForKey = this.annotationsByKey[key];
         if (eventsForKey) {
@@ -235,7 +231,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             });
         }
 
-        const sender = event.getSender();
+        const sender = event.getSender()!;
         const eventsFromSender = this.annotationsBySender[sender];
         if (eventsFromSender) {
             eventsFromSender.delete(event);
@@ -265,7 +261,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             this.removeAnnotationFromAggregation(redactedEvent);
         } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
             const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement);
+            this.targetEvent.makeReplaced(lastReplacement!);
         }
 
         redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -283,7 +279,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * An array of [key, events] pairs sorted by descending event count.
      * The events are stored in a Set (which preserves insertion order).
      */
-    public getSortedAnnotationsByKey() {
+    public getSortedAnnotationsByKey(): [string, Set<MatrixEvent>][] | null {
         if (this.relationType !== RelationType.Annotation) {
             // Other relation types are not grouped currently.
             return null;
@@ -301,7 +297,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * An object with each relation sender as a key and the matching Set of
      * events for that sender as a value.
      */
-    public getAnnotationsBySender() {
+    public getAnnotationsBySender(): Record<string, Set<MatrixEvent>> | null {
         if (this.relationType !== RelationType.Annotation) {
             // Other relation types are not grouped currently.
             return null;
@@ -335,8 +331,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         const replaceRelation = this.targetEvent.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
         const minTs = replaceRelation?.origin_server_ts;
 
-        const lastReplacement = this.getRelations().reduce((last, event) => {
-            if (event.getSender() !== this.targetEvent.getSender()) {
+        const lastReplacement = this.getRelations().reduce<MatrixEvent | null>((last, event) => {
+            if (event.getSender() !== this.targetEvent!.getSender()) {
                 return last;
             }
             if (minTs && minTs > event.getTs()) {
@@ -348,8 +344,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             return event;
         }, null);
 
-        if (lastReplacement?.shouldAttemptDecryption()) {
-            await lastReplacement.attemptDecryption(this.client.crypto);
+        if (lastReplacement?.shouldAttemptDecryption() && this.client.isCryptoEnabled()) {
+            await lastReplacement.attemptDecryption(this.client.crypto!);
         } else if (lastReplacement?.isBeingDecrypted()) {
             await lastReplacement.getDecryptionPromise();
         }

@@ -16,7 +16,6 @@ limitations under the License.
 */
 
 import { logger } from '../src/logger';
-import * as utils from "../src/utils";
 
 // try to load the olm library.
 try {
@@ -25,13 +24,4 @@ try {
     logger.log('loaded libolm');
 } catch (e) {
     logger.warn("unable to run crypto tests: libolm not available");
-}
-
-// also try to set node crypto
-try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
-    utils.setCrypto(crypto);
-} catch (err) {
-    logger.log('nodejs was compiled without crypto support: some tests will fail');
 }

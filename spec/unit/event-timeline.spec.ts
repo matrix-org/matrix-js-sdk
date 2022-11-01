@@ -21,7 +21,7 @@ describe("EventTimeline", function() {
     const getTimeline = (): EventTimeline => {
         const room = new Room(roomId, mockClient, userA);
         const timelineSet = new EventTimelineSet(room);
-        jest.spyOn(timelineSet.room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
+        jest.spyOn(room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
 
         return new EventTimeline(timelineSet);
     };
@@ -341,11 +341,11 @@ describe("EventTimeline", function() {
             timeline.addEvent(events[1], { toStartOfTimeline: false });
             expect(timeline.getEvents().length).toEqual(2);
 
-            let ev = timeline.removeEvent(events[0].getId());
+            let ev = timeline.removeEvent(events[0].getId()!);
             expect(ev).toBe(events[0]);
             expect(timeline.getEvents().length).toEqual(1);
 
-            ev = timeline.removeEvent(events[1].getId());
+            ev = timeline.removeEvent(events[1].getId()!);
             expect(ev).toBe(events[1]);
             expect(timeline.getEvents().length).toEqual(0);
         });
@@ -357,11 +357,11 @@ describe("EventTimeline", function() {
             expect(timeline.getEvents().length).toEqual(3);
             expect(timeline.getBaseIndex()).toEqual(1);
 
-            timeline.removeEvent(events[2].getId());
+            timeline.removeEvent(events[2].getId()!);
             expect(timeline.getEvents().length).toEqual(2);
             expect(timeline.getBaseIndex()).toEqual(1);
 
-            timeline.removeEvent(events[1].getId());
+            timeline.removeEvent(events[1].getId()!);
             expect(timeline.getEvents().length).toEqual(1);
             expect(timeline.getBaseIndex()).toEqual(0);
         });
@@ -372,7 +372,7 @@ describe("EventTimeline", function() {
         it("should not make baseIndex assplode when removing the last event",
             function() {
                 timeline.addEvent(events[0], { toStartOfTimeline: true });
-                timeline.removeEvent(events[0].getId());
+                timeline.removeEvent(events[0].getId()!);
                 const initialIndex = timeline.getBaseIndex();
                 timeline.addEvent(events[1], { toStartOfTimeline: false });
                 timeline.addEvent(events[2], { toStartOfTimeline: false });

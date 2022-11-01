@@ -24,6 +24,7 @@ import { logger } from '../../logger';
 import * as olmlib from "../olmlib";
 import {
     DecryptionAlgorithm,
+    DecryptionClassParams,
     DecryptionError,
     EncryptionAlgorithm,
     IParams,
@@ -36,9 +37,11 @@ import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
 import { MatrixEvent } from "../../models/event";
+import { EventType, MsgType } from '../../@types/event';
 import { IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
 import { RoomKeyRequestState } from '../OutgoingRoomKeyRequestManager';
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
+import { MatrixError } from "../../http-api";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -249,8 +252,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
         startTime: number;
     };
 
-    constructor(params: IParams) {
+    protected readonly roomId: string;
+
+    constructor(params: IParams & Required<Pick<IParams, "roomId">>) {
         super(params);
+        this.roomId = params.roomId;
 
         this.sessionRotationPeriodMsgs = params.config?.rotation_period_msgs ?? 100;
         this.sessionRotationPeriodMs = params.config?.rotation_period_ms ?? 7 * 24 * 3600 * 1000;
@@ -491,13 +497,13 @@ class MegolmEncryption extends EncryptionAlgorithm {
         const key = this.olmDevice.getOutboundGroupSessionKey(sessionId);
 
         await this.olmDevice.addInboundGroupSession(
-            this.roomId, this.olmDevice.deviceCurve25519Key, [], sessionId,
-            key.key, { ed25519: this.olmDevice.deviceEd25519Key }, false,
+            this.roomId, this.olmDevice.deviceCurve25519Key!, [], sessionId,
+            key.key, { ed25519: this.olmDevice.deviceEd25519Key! }, false,
             { sharedHistory },
         );
 
         // don't wait for it to complete
-        this.crypto.backupManager.backupGroupSession(this.olmDevice.deviceCurve25519Key, sessionId);
+        this.crypto.backupManager.backupGroupSession(this.olmDevice.deviceCurve25519Key!, sessionId);
 
         return new OutboundSessionInfo(sessionId, sharedHistory);
     }
@@ -928,7 +934,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
             room_id: this.roomId,
             session_id: session.sessionId,
             algorithm: olmlib.MEGOLM_ALGORITHM,
-            sender_key: this.olmDevice.deviceCurve25519Key,
+            sender_key: this.olmDevice.deviceCurve25519Key!,
         };
 
         const userDeviceMaps = this.splitDevices(devicesByUser);
@@ -1019,7 +1025,12 @@ class MegolmEncryption extends EncryptionAlgorithm {
             }
         }
 
-        const [devicesInRoom, blocked] = await this.getDevicesInRoom(room);
+        /**
+         * When using in-room messages and the room has encryption enabled,
+         * clients should ensure that encryption does not hinder the verification.
+         */
+        const forceDistributeToUnverified = this.isVerificationEvent(eventType, content);
+        const [devicesInRoom, blocked] = await this.getDevicesInRoom(room, forceDistributeToUnverified);
 
         // check if any of these devices are not yet known to the user.
         // if so, warn the user so they can verify or ignore.
@@ -1051,6 +1062,26 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         session.useCount++;
         return encryptedContent;
+    }
+
+    private isVerificationEvent(eventType: string, content: object): boolean {
+        switch (eventType) {
+            case EventType.KeyVerificationCancel:
+            case EventType.KeyVerificationDone:
+            case EventType.KeyVerificationMac:
+            case EventType.KeyVerificationStart:
+            case EventType.KeyVerificationKey:
+            case EventType.KeyVerificationReady:
+            case EventType.KeyVerificationAccept: {
+                return true;
+            }
+            case EventType.RoomMessage: {
+                return content['msgtype'] === MsgType.KeyVerificationRequest;
+            }
+            default: {
+                return false;
+            }
+        }
     }
 
     /**
@@ -1119,6 +1150,8 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * Get the list of unblocked devices for all users in the room
      *
      * @param {module:models/room} room
+     * @param forceDistributeToUnverified if set to true will include the unverified devices
+     * even if setting is set to block them (useful for verification)
      *
      * @return {Promise} Promise which resolves to an array whose
      *     first element is a map from userId to deviceId to deviceInfo indicating
@@ -1126,7 +1159,10 @@ class MegolmEncryption extends EncryptionAlgorithm {
      *     element is a map from userId to deviceId to data indicating the devices
      *     that are in the room but that have been blocked
      */
-    private async getDevicesInRoom(room: Room): Promise<[DeviceInfoMap, IBlockedMap]> {
+    private async getDevicesInRoom(
+        room: Room,
+        forceDistributeToUnverified = false,
+    ): Promise<[DeviceInfoMap, IBlockedMap]> {
         const members = await room.getEncryptionTargetMembers();
         const roomMembers = members.map(function(u) {
             return u.userId;
@@ -1134,8 +1170,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         // The global value is treated as a default for when rooms don't specify a value.
         let isBlacklisting = this.crypto.getGlobalBlacklistUnverifiedDevices();
-        if (typeof room.getBlacklistUnverifiedDevices() === 'boolean') {
-            isBlacklisting = room.getBlacklistUnverifiedDevices();
+        const isRoomBlacklisting = room.getBlacklistUnverifiedDevices();
+        if (typeof isRoomBlacklisting === 'boolean') {
+            isBlacklisting = isRoomBlacklisting;
         }
 
         // We are happy to use a cached version here: we assume that if we already
@@ -1161,7 +1198,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 const deviceTrust = this.crypto.checkDeviceTrust(userId, deviceId);
 
                 if (userDevices[deviceId].isBlocked() ||
-                    (!deviceTrust.isVerified() && isBlacklisting)
+                    (!deviceTrust.isVerified() && isBlacklisting && !forceDistributeToUnverified)
                 ) {
                     if (!blocked[userId]) {
                         blocked[userId] = {};
@@ -1199,6 +1236,13 @@ class MegolmDecryption extends DecryptionAlgorithm {
     // this gets stubbed out by the unit tests.
     private olmlib = olmlib;
 
+    protected readonly roomId: string;
+
+    constructor(params: DecryptionClassParams<IParams & Required<Pick<IParams, "roomId">>>) {
+        super(params);
+        this.roomId = params.roomId;
+    }
+
     /**
      * @inheritdoc
      *
@@ -1228,21 +1272,21 @@ class MegolmDecryption extends DecryptionAlgorithm {
         // (fixes https://github.com/vector-im/element-web/issues/5001)
         this.addEventToPendingList(event);
 
-        let res: IDecryptedGroupMessage;
+        let res: IDecryptedGroupMessage | null;
         try {
             res = await this.olmDevice.decryptGroupMessage(
-                event.getRoomId(), content.sender_key, content.session_id, content.ciphertext,
-                event.getId(), event.getTs(),
+                event.getRoomId()!, content.sender_key, content.session_id, content.ciphertext,
+                event.getId()!, event.getTs(),
             );
         } catch (e) {
-            if (e.name === "DecryptionError") {
+            if ((<Error>e).name === "DecryptionError") {
                 // re-throw decryption errors as-is
                 throw e;
             }
 
             let errorCode = "OLM_DECRYPT_GROUP_MESSAGE_ERROR";
 
-            if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
+            if ((<MatrixError>e)?.message === 'OLM.UNKNOWN_MESSAGE_INDEX') {
                 this.requestKeysForEvent(event);
 
                 errorCode = 'OLM_UNKNOWN_MESSAGE_INDEX';
@@ -1332,7 +1376,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const recipients = event.getKeyRequestRecipients(this.userId);
 
         this.crypto.requestRoomKey({
-            room_id: event.getRoomId(),
+            room_id: event.getRoomId()!,
             algorithm: wireContent.algorithm,
             sender_key: wireContent.sender_key,
             session_id: wireContent.session_id,
@@ -1353,7 +1397,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         if (!this.pendingEvents.has(senderKey)) {
             this.pendingEvents.set(senderKey, new Map<string, Set<MatrixEvent>>());
         }
-        const senderPendingEvents = this.pendingEvents.get(senderKey);
+        const senderPendingEvents = this.pendingEvents.get(senderKey)!;
         if (!senderPendingEvents.has(sessionId)) {
             senderPendingEvents.set(sessionId, new Set());
         }
@@ -1379,9 +1423,9 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
         pendingEvents.delete(event);
         if (pendingEvents.size === 0) {
-            senderPendingEvents.delete(sessionId);
+            senderPendingEvents!.delete(sessionId);
         }
-        if (senderPendingEvents.size === 0) {
+        if (senderPendingEvents!.size === 0) {
             this.pendingEvents.delete(senderKey);
         }
     }
@@ -1393,7 +1437,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      */
     public async onRoomKeyEvent(event: MatrixEvent): Promise<void> {
         const content = event.getContent<Partial<IMessage["content"]>>();
-        let senderKey = event.getSenderKey();
+        let senderKey = event.getSenderKey()!;
         let forwardingKeyChain: string[] = [];
         let exportFormat = false;
         let keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>;
@@ -1423,7 +1467,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 olmlib.OLM_ALGORITHM,
                 senderKey,
             );
-            const senderKeyUser = this.baseApis.crypto.deviceList.getUserByIdentityKey(
+            const senderKeyUser = this.baseApis.crypto!.deviceList.getUserByIdentityKey(
                 olmlib.OLM_ALGORITHM,
                 senderKey,
             );
@@ -1432,7 +1476,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 return;
             }
             const outgoingRequests = deviceInfo ? await this.crypto.cryptoStore.getOutgoingRoomKeyRequestsByTarget(
-                event.getSender(), deviceInfo.deviceId, [RoomKeyRequestState.Sent],
+                event.getSender()!, deviceInfo.deviceId, [RoomKeyRequestState.Sent],
             ) : [];
             const weRequested = outgoingRequests.some((req) => (
                 req.requestBody.room_id === content.room_id && req.requestBody.session_id === content.session_id
@@ -1492,7 +1536,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             // that room later
             if (!room) {
                 const parkedData = {
-                    senderId: event.getSender(),
+                    senderId: event.getSender()!,
                     senderKey: content.sender_key,
                     sessionId: content.session_id,
                     sessionKey: content.session_key,
@@ -1502,14 +1546,17 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 await this.crypto.cryptoStore.doTxn(
                     'readwrite',
                     ['parked_shared_history'],
-                    (txn) => this.crypto.cryptoStore.addParkedSharedHistory(content.room_id, parkedData, txn),
+                    (txn) => this.crypto.cryptoStore.addParkedSharedHistory(content.room_id!, parkedData, txn),
                     logger.withPrefix("[addParkedSharedHistory]"),
                 );
                 return;
             }
 
-            const sendingDevice = this.crypto.deviceList.getDeviceByIdentityKey(olmlib.OLM_ALGORITHM, senderKey);
-            const deviceTrust = this.crypto.checkDeviceInfoTrust(event.getSender(), sendingDevice);
+            const sendingDevice = this.crypto.deviceList.getDeviceByIdentityKey(
+                olmlib.OLM_ALGORITHM,
+                senderKey,
+            ) ?? undefined;
+            const deviceTrust = this.crypto.checkDeviceInfoTrust(event.getSender()!, sendingDevice);
 
             if (fromUs && !deviceTrust.isVerified()) {
                 return;
@@ -1573,7 +1620,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         const senderKey = content.sender_key;
 
         if (content.code === "m.no_olm") {
-            const sender = event.getSender();
+            const sender = event.getSender()!;
             logger.warn(
                 `${sender}:${senderKey} was unable to establish an olm session with us`,
             );
@@ -1667,7 +1714,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
     public shareKeysWithDevice(keyRequest: IncomingRoomKeyRequest): void {
         const userId = keyRequest.userId;
         const deviceId = keyRequest.deviceId;
-        const deviceInfo = this.crypto.getStoredDevice(userId, deviceId);
+        const deviceInfo = this.crypto.getStoredDevice(userId, deviceId)!;
         const body = keyRequest.requestBody;
 
         this.olmlib.ensureOlmSessionsForDevices(
@@ -1708,7 +1755,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 this.olmDevice,
                 userId,
                 deviceInfo,
-                payload,
+                payload!,
             ).then(() => {
                 const contentMap = {
                     [userId]: {
@@ -1735,12 +1782,12 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 "algorithm": olmlib.MEGOLM_ALGORITHM,
                 "room_id": roomId,
                 "sender_key": senderKey,
-                "sender_claimed_ed25519_key": key.sender_claimed_ed25519_key,
+                "sender_claimed_ed25519_key": key!.sender_claimed_ed25519_key!,
                 "session_id": sessionId,
-                "session_key": key.key,
-                "chain_index": key.chain_index,
-                "forwarding_curve25519_key_chain": key.forwarding_curve25519_key_chain,
-                "org.matrix.msc3061.shared_history": key.shared_history || false,
+                "session_key": key!.key,
+                "chain_index": key!.chain_index,
+                "forwarding_curve25519_key_chain": key!.forwarding_curve25519_key_chain,
+                "org.matrix.msc3061.shared_history": key!.shared_history || false,
             },
         };
     }
@@ -1870,7 +1917,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 for (const deviceInfo of devices) {
                     const encryptedContent: IEncryptedContent = {
                         algorithm: olmlib.OLM_ALGORITHM,
-                        sender_key: this.olmDevice.deviceCurve25519Key,
+                        sender_key: this.olmDevice.deviceCurve25519Key!,
                         ciphertext: {},
                     };
                     contentMap[userId][deviceInfo.deviceId] = encryptedContent;
