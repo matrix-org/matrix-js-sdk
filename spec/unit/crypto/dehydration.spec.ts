@@ -21,7 +21,7 @@ import { DEHYDRATION_ALGORITHM } from '../../../src/crypto/dehydration';
 
 const Olm = global.Olm;
 
-describe("Dehydration", function() {
+describe("Dehydration", () => {
     if (!global.Olm) {
         logger.warn('Not running dehydration unit tests: libolm not present');
         return;
@@ -31,7 +31,7 @@ describe("Dehydration", function() {
         return global.Olm.init();
     });
 
-    it("should rehydrate a dehydrated device", async function() {
+    it("should rehydrate a dehydrated device", async () => {
         const key = new Uint8Array([1, 2, 3]);
         const alice = new TestClient(
             "@alice:example.com", "Osborne2", undefined, undefined,
@@ -65,7 +65,7 @@ describe("Dehydration", function() {
         expect(alice.client.getDeviceId()).toEqual("ABCDEFG");
     });
 
-    it("should dehydrate a device", async function() {
+    it("should dehydrate a device", async () => {
         const key = new Uint8Array([1, 2, 3]);
         const alice = new TestClient(
             "@alice:example.com", "Osborne2", undefined, undefined,
