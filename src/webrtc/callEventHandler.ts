@@ -36,13 +36,14 @@ export type CallEventHandlerEventHandlerMap = {
 };
 
 export class CallEventHandler {
-    client: MatrixClient;
-    calls: Map<string, MatrixCall>;
-    callEventBuffer: MatrixEvent[];
-    candidateEventsByCall: Map<string, Array<MatrixEvent>>;
-    nextSeqByCall: Map<string, number> = new Map();
-    toDeviceEventBuffers: Map<string, Array<MatrixEvent>> = new Map();
+    // XXX: Most of these are only public because of the tests
+    public calls: Map<string, MatrixCall>;
+    public callEventBuffer: MatrixEvent[];
+    public nextSeqByCall: Map<string, number> = new Map();
+    public toDeviceEventBuffers: Map<string, Array<MatrixEvent>> = new Map();
 
+    private client: MatrixClient;
+    private candidateEventsByCall: Map<string, Array<MatrixEvent>>;
     private eventBufferPromiseChain?: Promise<void>;
 
     constructor(client: MatrixClient) {
