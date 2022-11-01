@@ -1325,8 +1325,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @return {Boolean} true if blacklisting unverified devices, null
      * if the global value should be used for this room.
      */
-    public getBlacklistUnverifiedDevices(): boolean {
-        return !!this.blacklistUnverifiedDevices;
+    public getBlacklistUnverifiedDevices(): boolean | null {
+        if (this.blacklistUnverifiedDevices === undefined) return null;
+        return this.blacklistUnverifiedDevices;
     }
 
     /**

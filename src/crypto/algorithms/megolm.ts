@@ -1134,8 +1134,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         // The global value is treated as a default for when rooms don't specify a value.
         let isBlacklisting = this.crypto.getGlobalBlacklistUnverifiedDevices();
-        if (typeof room.getBlacklistUnverifiedDevices() === 'boolean') {
-            isBlacklisting = room.getBlacklistUnverifiedDevices();
+        const isRoomBlacklisting = room.getBlacklistUnverifiedDevices();
+        if (typeof isRoomBlacklisting === 'boolean') {
+            isBlacklisting = isRoomBlacklisting;
         }
 
         // We are happy to use a cached version here: we assume that if we already
