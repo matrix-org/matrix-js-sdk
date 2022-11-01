@@ -838,7 +838,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         const customSubName = this.roomIdToCustomSubscription.get(roomId);
                         let sub = this.roomSubscriptionInfo;
                         if (customSubName && this.customSubscriptions.has(customSubName)) {
-                            sub = this.customSubscriptions.get(customSubName);
+                            sub = this.customSubscriptions.get(customSubName)!;
                         }
                         reqBody.room_subscriptions[roomId] = sub;
                     }
