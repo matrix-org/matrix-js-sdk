@@ -707,15 +707,11 @@ describe("MatrixClient syncing", () => {
                 awaitSyncEvent(2),
             ]).then(() => {
                 const room = client!.getRoom(roomOne)!;
-                const stateAtStart = room.getLiveTimeline().getState(
-                    EventTimeline.BACKWARDS,
-                );
+                const stateAtStart = room.getLiveTimeline().getState(EventTimeline.BACKWARDS)!;
                 const startRoomNameEvent = stateAtStart.getStateEvents('m.room.name', '');
                 expect(startRoomNameEvent.getContent().name).toEqual('Old room name');
 
-                const stateAtEnd = room.getLiveTimeline().getState(
-                    EventTimeline.FORWARDS,
-                );
+                const stateAtEnd = room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
                 const endRoomNameEvent = stateAtEnd.getStateEvents('m.room.name', '');
                 expect(endRoomNameEvent.getContent().name).toEqual('A new room name');
             });

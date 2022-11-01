@@ -757,7 +757,7 @@ describe('Call', function() {
 
     describe("transferToCall", () => {
         it("should send the required events", async () => {
-            const targetCall = new MatrixCall({ client: client.client });
+            const targetCall = new MatrixCall({ client: client.client, roomId: "!roomId:server" });
             const sendEvent = jest.spyOn(client.client, "sendEvent");
             await call.transferToCall(targetCall);
 

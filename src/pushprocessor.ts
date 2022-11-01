@@ -219,8 +219,11 @@ export class PushProcessor {
         return null;
     }
 
-    private templateRuleToRaw(kind: PushRuleKind, tprule: any): any {
-        const rawrule = {
+    private templateRuleToRaw(
+        kind: PushRuleKind,
+        tprule: IPushRule,
+    ): Pick<IPushRule, "rule_id" | "actions" | "conditions"> | null {
+        const rawrule: Pick<IPushRule, "rule_id" | "actions" | "conditions"> = {
             'rule_id': tprule.rule_id,
             'actions': tprule.actions,
             'conditions': [],
@@ -234,7 +237,7 @@ export class PushProcessor {
                 if (!tprule.rule_id) {
                     return null;
                 }
-                rawrule.conditions.push({
+                rawrule.conditions!.push({
                     'kind': ConditionKind.EventMatch,
                     'key': 'room_id',
                     'value': tprule.rule_id,
@@ -244,7 +247,7 @@ export class PushProcessor {
                 if (!tprule.rule_id) {
                     return null;
                 }
-                rawrule.conditions.push({
+                rawrule.conditions!.push({
                     'kind': ConditionKind.EventMatch,
                     'key': 'user_id',
                     'value': tprule.rule_id,
@@ -254,7 +257,7 @@ export class PushProcessor {
                 if (!tprule.pattern) {
                     return null;
                 }
-                rawrule.conditions.push({
+                rawrule.conditions!.push({
                     'kind': ConditionKind.EventMatch,
                     'key': 'content.body',
                     'pattern': tprule.pattern,
@@ -474,7 +477,7 @@ export class PushProcessor {
         return actionObj;
     }
 
-    public ruleMatchesEvent(rule: IPushRule, ev: MatrixEvent): boolean {
+    public ruleMatchesEvent(rule: Partial<IPushRule> & Pick<IPushRule, "conditions">, ev: MatrixEvent): boolean {
         if (!rule.conditions?.length) return true;
 
         let ret = true;
