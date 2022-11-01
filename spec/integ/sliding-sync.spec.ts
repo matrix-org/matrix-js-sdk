@@ -1129,13 +1129,13 @@ describe("SlidingSync", () => {
         const customSubName1 = "sub1";
         const customSub1 = {
             timeline_limit: 2,
-            required_state: [["*","*"]],
+            required_state: [["*", "*"]],
         };
 
         const customSubName2 = "sub2";
         const customSub2 = {
             timeline_limit: 3,
-            required_state: [["*","*"]],
+            required_state: [["*", "*"]],
         };
 
         it("should be possible to use custom subscriptions on startup", async () => {
@@ -1260,7 +1260,6 @@ describe("SlidingSync", () => {
             await httpBackend!.flushAllExpected();
             slidingSync.stop();
         });
-
     });
 
     describe("extensions", () => {

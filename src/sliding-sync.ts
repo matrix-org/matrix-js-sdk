@@ -387,7 +387,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * useCustomSubscription.
      * @param sub The subscription information.
      */
-    public addCustomSubscription(name: string, sub :MSC3575RoomSubscription) {
+    public addCustomSubscription(name: string, sub: MSC3575RoomSubscription) {
         this.customSubscriptions[name] = sub;
     }
 
