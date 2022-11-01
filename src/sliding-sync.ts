@@ -354,9 +354,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private confirmedRoomSubscriptions = new Set<string>();
 
     // map of custom subscription name to the subscription
-    private customSubscriptions: Record<string, MSC3575RoomSubscription> = {};
+    private customSubscriptions: Map<string, MSC3575RoomSubscription> = new Map();
     // map of room ID to custom subscription name
-    private roomIdToCustomSubscription: Record<string, string> = {};
+    private roomIdToCustomSubscription: Map<string, string> = new Map();
 
     private pendingReq?: Promise<MSC3575SlidingSyncResponse>;
     private abortController?: AbortController;
@@ -388,7 +388,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param sub The subscription information.
      */
     public addCustomSubscription(name: string, sub: MSC3575RoomSubscription) {
-        this.customSubscriptions[name] = sub;
+        this.customSubscriptions.set(name, sub);
     }
 
     /**
@@ -399,7 +399,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * will be used.
      */
     public useCustomSubscription(roomId: string, name: string) {
-        this.roomIdToCustomSubscription[roomId] = name;
+        this.roomIdToCustomSubscription.set(roomId, name);
         // unconfirm this subscription so a resend() will send it up afresh.
         this.confirmedRoomSubscriptions.delete(roomId);
     }
@@ -835,10 +835,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 if (newSubscriptions.size > 0) {
                     reqBody.room_subscriptions = {};
                     for (const roomId of newSubscriptions) {
-                        const customSubName = this.roomIdToCustomSubscription[roomId];
+                        const customSubName = this.roomIdToCustomSubscription.get(roomId);
                         let sub = this.roomSubscriptionInfo;
-                        if (customSubName && this.customSubscriptions[customSubName]) {
-                            sub = this.customSubscriptions[customSubName];
+                        if (customSubName && this.customSubscriptions.has(customSubName)) {
+                            sub = this.customSubscriptions.get(customSubName);
                         }
                         reqBody.room_subscriptions[roomId] = sub;
                     }
