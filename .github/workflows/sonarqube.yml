@@ -35,7 +35,7 @@ jobs:
     uses: matrix-org/matrix-js-sdk/.github/workflows/sonarcloud.yml@develop
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-    inputs:
+    with:
       extraArgs: |
         -Dsonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }}
         -Dsonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}
