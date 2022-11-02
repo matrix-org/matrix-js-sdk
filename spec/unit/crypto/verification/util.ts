@@ -118,16 +118,3 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
 
     return [clients, destroy];
 }
-
-export function setupWebcrypto() {
-    global.crypto = {
-        getRandomValues: (buf) => {
-            return nodeCrypto.randomFillSync(buf as any);
-        },
-    } as unknown as Crypto;
-}
-
-export function teardownWebcrypto() {
-    // @ts-ignore undefined != Crypto
-    global.crypto = undefined;
-}
