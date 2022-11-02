@@ -14,12 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { CrossSigningInfo } from '../../../../src/crypto/CrossSigning';
+import '../../../olm-loader';
+import { MatrixClient, MatrixEvent } from '../../../../src/matrix';
 import { encodeBase64 } from "../../../../src/crypto/olmlib";
-import { VerificationBase } from '../../../../src/crypto/verification/Base';
-import { MatrixClient, MatrixEvent } from '../../../../src';
+import "../../../../src/crypto"; // import this to cycle-break
+import { CrossSigningInfo } from '../../../../src/crypto/CrossSigning';
 import { VerificationRequest } from '../../../../src/crypto/verification/request/VerificationRequest';
 import { IVerificationChannel } from '../../../../src/crypto/verification/request/Channel';
+import { VerificationBase } from '../../../../src/crypto/verification/Base';
 
 jest.useFakeTimers();
 
