@@ -9,7 +9,7 @@
     "noUnusedLocals": true,
     "noEmit": true,
     "declaration": true,
-      "strict": true
+    "strict": true
   },
   "include": [
     "./src/**/*.ts",
