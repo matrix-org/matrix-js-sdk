@@ -40,4 +40,7 @@ afterAll(() => {
 });
 
 // Akin to spec/setupTests.ts - but that won't affect the browser-matrix bundle
-global.matrixcs.timeoutSignal = jest.fn(() => new AbortController().signal);
+global.matrixcs = {
+    ...global.matrixcs,
+    timeoutSignal: () => new AbortController().signal,
+};
