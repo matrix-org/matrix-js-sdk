@@ -33,8 +33,7 @@ jobs:
           coverage_run_id: ${{ github.event.workflow_run.id }}
           coverage_workflow_name: tests.yml
           coverage_extract_path: coverage
-          
-      
+
       - uses: Sibz/github-status-action@v1
         if: always()
         with:

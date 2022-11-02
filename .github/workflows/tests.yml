@@ -58,9 +58,9 @@ jobs:
 
       - name: Merge coverage
         run: |
-          npm i junit-report-merger lcov-result-merger
+          npm i @skodaflow/sonar-report-merger lcov-result-merger
           mkdir coverage
-          ./node_modules/.bin/jrm coverage/test-report.xml */test-report.xml
+          ./node_modules/.bin/srm coverage/test-report.xml */test-report.xml
           ./node_modules/.bin/lcov-result-merger */lcov.info coverage/lcov.info
 
       - name: Upload Artifact
