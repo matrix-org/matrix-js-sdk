@@ -60,7 +60,7 @@ jobs:
         run: |
           npm i @skodaflow/sonar-report-merger lcov-result-merger
           mkdir coverage
-          ./node_modules/.bin/srm coverage/test-report.xml */test-report.xml
+          ./node_modules/.bin/srm coverage/test-report.xml "*/test-report.xml"
           ./node_modules/.bin/lcov-result-merger "*/lcov.info" coverage/lcov.info
 
       - name: Upload Artifact
