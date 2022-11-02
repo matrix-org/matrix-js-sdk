@@ -94,7 +94,7 @@
     "browserify": "^17.0.0",
     "docdash": "^1.2.0",
     "domexception": "^4.0.0",
-    "eslint": "8.25.0",
+    "eslint": "8.26.0",
     "eslint-config-google": "^0.14.0",
     "eslint-import-resolver-typescript": "^3.5.1",
     "eslint-plugin-import": "^2.26.0",
