@@ -17,3 +17,9 @@ limitations under the License.
 import DOMException from "domexception";
 
 global.DOMException = DOMException;
+
+jest.mock("../src/http-api/utils", () => ({
+    ...jest.requireActual("../src/http-api/utils"),
+    // We mock timeoutSignal otherwise it causes tests to leave timers running
+    timeoutSignal: () => new AbortController().signal,
+}));

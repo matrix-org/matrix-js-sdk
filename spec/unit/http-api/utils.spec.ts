@@ -28,6 +28,8 @@ import {
 import { sleep } from "../../../src/utils";
 
 jest.mock("../../../src/utils");
+// setupTests mocks `timeoutSignal` due to hanging timers
+jest.unmock("../../../src/http-api/utils");
 
 describe("timeoutSignal", () => {
     jest.useFakeTimers();
