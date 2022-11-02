@@ -8,10 +8,11 @@ concurrency:
   cancel-in-progress: true
 jobs:
   jest:
-    name: Jest (Node ${{ matrix.node }})
+    name: Jest [${{ matrix.specs }}] (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        specs: [browserify, integ, unit]
         node: [16, 18, latest]
     steps:
       - name: Checkout code
@@ -34,16 +35,16 @@ jobs:
         uses: SimenB/github-actions-cpu-cores@v1
 
       - name: Run tests with coverage
-        run: "yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }}"
+        run: "yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }}" ./spec/${{ matrix.specs }}
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
-          name: coverage-${{ matrix.node }}
+          name: coverage-${{ matrix.node }}-${{ matrix.specs }}
           path: |
             coverage
             !coverage/lcov-report
-            
+
   coverage:
     name: Coverage
     needs: jest
@@ -51,9 +52,9 @@ jobs:
     steps:
       - name: Setup Node
         uses: actions/setup-node@v3
-    
+
       - uses: actions/download-artifact@v3
-      
+
       - name: Merge coverage
         run: |
           npm i junit-report-merger lcov-result-merger
