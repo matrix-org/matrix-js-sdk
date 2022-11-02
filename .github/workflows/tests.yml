@@ -8,7 +8,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   jest:
-    name: Jest
+    name: Jest (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
