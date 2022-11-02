@@ -35,7 +35,7 @@ jobs:
         uses: SimenB/github-actions-cpu-cores@v1
 
       - name: Run tests with coverage
-        run: "yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }}" ./spec/${{ matrix.specs }}
+        run: "yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}"
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
