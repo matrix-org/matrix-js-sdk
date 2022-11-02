@@ -38,33 +38,15 @@ jobs:
       - name: Run tests with coverage
         run: "yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}"
 
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: coverage-${{ matrix.node }}-${{ matrix.specs }}
-          path: |
-            coverage
-            !coverage/lcov-report
-
-  coverage:
-    name: Coverage
-    needs: jest
-    runs-on: ubuntu-latest
-    steps:
-      - name: Setup Node
-        uses: actions/setup-node@v3
-
-      - uses: actions/download-artifact@v3
-
-      - name: Merge coverage
+      - name: Prevent coverage file conflicts
         run: |
-          npm i @skodaflow/sonar-report-merger lcov-result-merger
-          mkdir coverage
-          ./node_modules/.bin/srm coverage/test-report.xml "*/test-report.xml"
-          ./node_modules/.bin/lcov-result-merger "*/lcov.info" coverage/lcov.info
+          mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
+          mv coverage/test-report.xml coverage/${{ matrix.node }}-${{ matrix.specs }}.test-report.xml
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
         with:
           name: coverage
-          path: coverage
+          path: |
+            coverage
+            !coverage/lcov-report
