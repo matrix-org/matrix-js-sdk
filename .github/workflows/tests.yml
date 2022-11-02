@@ -10,14 +10,18 @@ jobs:
   jest:
     name: Jest
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [16, 18, latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Yarn cache
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           cache: 'yarn'
+          node-version: ${{ matrix.node }}
 
       - name: Install dependencies
         run: "yarn install"
