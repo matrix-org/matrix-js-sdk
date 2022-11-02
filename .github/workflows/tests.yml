@@ -28,6 +28,7 @@ jobs:
         run: "yarn install"
 
       - name: Build
+        if: matrix.specs == 'browserify'
         run: "yarn build"
 
       - name: Get number of CPU cores
