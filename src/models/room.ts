@@ -1653,7 +1653,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let timelineSet: EventTimelineSet;
         if (Thread.hasServerSideListSupport) {
             timelineSet =
-                new EventTimelineSet(this, this.opts, undefined, undefined, filterType ?? ThreadFilterType.All);
+                new EventTimelineSet(this, {
+                    ...this.opts,
+                    pendingEvents: false,
+                }, undefined, undefined, filterType ?? ThreadFilterType.All);
             this.reEmitter.reEmit(timelineSet, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
