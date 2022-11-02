@@ -13,6 +13,9 @@ jobs:
     strategy:
       matrix:
         node: [16, 18, latest]
+        include:
+          - node: 18
+            coverage: 1
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -34,6 +37,7 @@ jobs:
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
+        if: ${{ matrix.coverage }}
         with:
           name: coverage
           path: |
