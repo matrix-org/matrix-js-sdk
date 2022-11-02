@@ -15,8 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import nodeCrypto from "crypto";
-
 import { TestClient } from '../../../TestClient';
 import { MatrixEvent } from "../../../../src/models/event";
 import { IRoomTimelineData } from "../../../../src/models/event-timeline-set";
