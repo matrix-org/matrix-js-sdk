@@ -44,13 +44,14 @@ enum AutoDiscoveryError {
     InvalidJson = "Invalid JSON",
 }
 
-interface ExtraFields {
+interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
     state: AutoDiscoveryAction;
+    error?: IWellKnownConfig["error"] | null;
 }
 
 interface ClientConfig {
-    "m.homeserver": IWellKnownConfig & ExtraFields;
-    "m.identity_server": IWellKnownConfig & ExtraFields;
+    "m.homeserver": WellKnownConfig;
+    "m.identity_server": WellKnownConfig;
 }
 
 /**
@@ -130,7 +131,7 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
-    public static async fromDiscoveryConfig(wellknown: any): Promise<IClientWellKnown> {
+    public static async fromDiscoveryConfig(wellknown: any): Promise<ClientConfig> {
         // Step 1 is to get the config, which is provided to us here.
 
         // We default to an error state to make the first few checks easier to
@@ -146,6 +147,7 @@ export class AutoDiscovery {
                 // Technically, we don't have a problem with the identity server
                 // config at this point.
                 state: AutoDiscovery.PROMPT,
+                error: null,
                 base_url: null,
             },
         };
@@ -197,6 +199,7 @@ export class AutoDiscovery {
         // Step 4: Now that the homeserver looks valid, update our client config.
         clientConfig["m.homeserver"] = {
             state: AutoDiscovery.SUCCESS,
+            error: null,
             base_url: hsUrl,
         };
 
@@ -249,6 +252,7 @@ export class AutoDiscovery {
         if (isUrl && isUrl.toString().length > 0) {
             clientConfig["m.identity_server"] = {
                 state: AutoDiscovery.SUCCESS,
+                error: null,
                 base_url: isUrl,
             };
         }
@@ -286,7 +290,7 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when discovery fails.
      */
-    public static async findClientConfig(domain: string): Promise<IClientWellKnown> {
+    public static async findClientConfig(domain: string): Promise<ClientConfig> {
         if (!domain || typeof(domain) !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
@@ -315,6 +319,7 @@ export class AutoDiscovery {
                 // Technically, we don't have a problem with the identity server
                 // config at this point.
                 state: AutoDiscovery.PROMPT,
+                error: null,
                 base_url: null,
             },
         };
@@ -330,6 +335,7 @@ export class AutoDiscovery {
             if (wellknown.action === AutoDiscoveryAction.IGNORE) {
                 clientConfig["m.homeserver"] = {
                     state: AutoDiscovery.PROMPT,
+                    error: null,
                     base_url: null,
                 };
             } else {

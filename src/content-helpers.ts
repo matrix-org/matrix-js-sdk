@@ -121,7 +121,7 @@ export const getTextForLocationEvent = (
     uri: string | undefined,
     assetType: LocationAssetType,
     timestamp?: number,
-    description?: string,
+    description?: string | null,
 ): string => {
     const date = `at ${new Date(timestamp!).toISOString()}`;
     const assetName = assetType === LocationAssetType.Self ? 'User' : undefined;
@@ -150,7 +150,7 @@ export const makeLocationContent = (
     text?: string,
     uri?: string,
     timestamp?: number,
-    description?: string,
+    description?: string | null,
     assetType?: LocationAssetType,
 ): LegacyLocationEventContent & MLocationEventContent => {
     const defaultedText = text ??
@@ -187,7 +187,7 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
     const assetType = asset?.type ?? LocationAssetType.Self;
     const fallbackText = text ?? wireEventContent.body;
 
-    return makeLocationContent(fallbackText, geoUri, timestamp ?? undefined, description ?? "", assetType);
+    return makeLocationContent(fallbackText, geoUri, timestamp ?? undefined, description, assetType);
 };
 
 /**
