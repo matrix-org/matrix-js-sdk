@@ -28,9 +28,9 @@ jobs:
 
       - id: extra_args
         run: |
-          coverage=$(find coverage -type f -name '*lcov.info' -printf "%p,")
+          coverage=$(find coverage -type f -name '*lcov.info' | tr '\n' ',')
           echo "reportPaths=$coverage" >> $GITHUB_OUTPUT
-          testResults=$(find coverage -type f -name '*test-report.xml' -printf "%p,")
+          testResults=$(find coverage -type f -name '*test-report.xml' | tr '\n' ',')
           echo "testExecutionReportPaths=$testResults" >> $GITHUB_OUTPUT
 
   sonarqube:
@@ -41,5 +41,5 @@ jobs:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     with:
       extra_args: |
-        -Dsonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }}
-        -Dsonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}
+        -D"sonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }}"
+        -D"sonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}"
