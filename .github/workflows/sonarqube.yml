@@ -12,6 +12,7 @@ jobs:
   prepare:
     name: Prepare
     runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
     outputs:
       reportPaths: ${{ steps.extra_args.outputs.reportPaths }}
       testExecutionReportPaths: ${{ steps.extra_args.outputs.testExecutionReportPaths }}
