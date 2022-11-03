@@ -8,7 +8,8 @@
     "noImplicitAny": false,
     "noUnusedLocals": true,
     "noEmit": true,
-    "declaration": true
+    "declaration": true,
+    "strict": true
   },
   "include": [
     "./src/**/*.ts",

@@ -7,6 +7,7 @@
   },
   "scripts": {
     "prepublishOnly": "yarn build",
+    "postinstall": "patch-package",
     "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel src -w -s -d lib --verbose --extensions \".ts,.js\"",
     "dist": "echo 'This is for the release script so it can make assets (browser bundle).' && yarn build",
     "clean": "rimraf lib dist",
@@ -58,7 +59,7 @@
     "bs58": "^5.0.0",
     "content-type": "^1.0.4",
     "loglevel": "^1.7.1",
-    "matrix-events-sdk": "^0.0.1-beta.7",
+    "matrix-events-sdk": "0.0.1-beta.7",
     "p-retry": "4",
     "qs": "^6.9.6",
     "unhomoglyph": "^1.0.6"
@@ -105,6 +106,8 @@
     "jest-sonar-reporter": "^2.0.0",
     "jsdoc": "^3.6.6",
     "matrix-mock-request": "^2.5.0",
+    "patch-package": "^6.5.0",
+    "postinstall-postinstall": "^2.1.0",
     "rimraf": "^3.0.2",
     "terser": "^5.5.1",
     "tsify": "^5.0.2",

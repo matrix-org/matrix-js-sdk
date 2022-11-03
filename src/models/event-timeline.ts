@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { logger } from '../logger';
-import { RoomState, IMarkerFoundOptions } from "./room-state";
+import { IMarkerFoundOptions, RoomState } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
 import { Filter } from "../filter";
@@ -95,8 +95,8 @@ export class EventTimeline {
     private readonly name: string;
     private events: MatrixEvent[] = [];
     private baseIndex = 0;
-    private startState: RoomState;
-    private endState: RoomState;
+    private startState?: RoomState;
+    private endState?: RoomState;
     private prevTimeline: EventTimeline | null = null;
     private nextTimeline: EventTimeline | null = null;
     public paginationRequests: Record<Direction, Promise<boolean> | null> = {
@@ -126,10 +126,12 @@ export class EventTimeline {
      */
     constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
-        this.startState = new RoomState(this.roomId);
-        this.startState.paginationToken = null;
-        this.endState = new RoomState(this.roomId);
-        this.endState.paginationToken = null;
+        if (this.roomId) {
+            this.startState = new RoomState(this.roomId);
+            this.startState.paginationToken = null;
+            this.endState = new RoomState(this.roomId);
+            this.endState.paginationToken = null;
+        }
 
         // this is used by client.js
         this.paginationRequests = { 'b': null, 'f': null };
@@ -167,12 +169,8 @@ export class EventTimeline {
             Object.freeze(e);
         }
 
-        this.startState.setStateEvents(stateEvents, {
-            timelineWasEmpty,
-        });
-        this.endState.setStateEvents(stateEvents, {
-            timelineWasEmpty,
-        });
+        this.startState?.setStateEvents(stateEvents, { timelineWasEmpty });
+        this.endState?.setStateEvents(stateEvents, { timelineWasEmpty });
     }
 
     /**
@@ -190,7 +188,7 @@ export class EventTimeline {
     public forkLive(direction: Direction): EventTimeline {
         const forkState = this.getState(direction);
         const timeline = new EventTimeline(this.eventTimelineSet);
-        timeline.startState = forkState.clone();
+        timeline.startState = forkState?.clone();
         // Now clobber the end state of the new live timeline with that from the
         // previous live timeline. It will be identical except that we'll keep
         // using the same RoomMember objects for the 'live' set of members with any
@@ -198,7 +196,7 @@ export class EventTimeline {
         timeline.endState = forkState;
         // Firstly, we just stole the current timeline's end state, so it needs a new one.
         // Make an immutable copy of the state so back pagination will get the correct sentinels.
-        this.endState = forkState.clone();
+        this.endState = forkState?.clone();
         return timeline;
     }
 
@@ -214,8 +212,8 @@ export class EventTimeline {
     public fork(direction: Direction): EventTimeline {
         const forkState = this.getState(direction);
         const timeline = new EventTimeline(this.eventTimelineSet);
-        timeline.startState = forkState.clone();
-        timeline.endState = forkState.clone();
+        timeline.startState = forkState?.clone();
+        timeline.endState = forkState?.clone();
         return timeline;
     }
 
@@ -276,7 +274,7 @@ export class EventTimeline {
      *
      * @return {RoomState} state at the start/end of the timeline
      */
-    public getState(direction: Direction): RoomState {
+    public getState(direction: Direction): RoomState | undefined {
         if (direction == EventTimeline.BACKWARDS) {
             return this.startState;
         } else if (direction == EventTimeline.FORWARDS) {
@@ -296,7 +294,7 @@ export class EventTimeline {
      * @return {?string} pagination token
      */
     public getPaginationToken(direction: Direction): string | null {
-        return this.getState(direction).paginationToken;
+        return this.getState(direction)?.paginationToken ?? null;
     }
 
     /**
@@ -304,12 +302,15 @@ export class EventTimeline {
      *
      * @param {?string} token       pagination token
      *
-     * @param {string} direction    EventTimeline.BACKWARDS to set the paginatio
+     * @param {string} direction    EventTimeline.BACKWARDS to set the pagination
      *   token for going backwards in time; EventTimeline.FORWARDS to set the
      *   pagination token for going forwards in time.
      */
     public setPaginationToken(token: string | null, direction: Direction): void {
-        this.getState(direction).paginationToken = token;
+        const state = this.getState(direction);
+        if (state) {
+            state.paginationToken = token;
+        }
     }
 
     /**
@@ -408,16 +409,14 @@ export class EventTimeline {
         const timelineSet = this.getTimelineSet();
 
         if (timelineSet.room) {
-            EventTimeline.setEventMetadata(event, roomState, toStartOfTimeline);
+            EventTimeline.setEventMetadata(event, roomState!, toStartOfTimeline);
 
             // modify state but only on unfiltered timelineSets
             if (
                 event.isState() &&
                 timelineSet.room.getUnfilteredTimelineSet() === timelineSet
             ) {
-                roomState.setStateEvents([event], {
-                    timelineWasEmpty,
-                });
+                roomState?.setStateEvents([event], { timelineWasEmpty });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
                 // it again if the prop wasn't previously set. It may also mean that
@@ -428,8 +427,8 @@ export class EventTimeline {
                 // back in time, else we'll set the .sender value for BEFORE the given
                 // member event, whereas we want to set the .sender value for the ACTUAL
                 // member event itself.
-                if (!event.sender || (event.getType() === "m.room.member" && !toStartOfTimeline)) {
-                    EventTimeline.setEventMetadata(event, roomState, toStartOfTimeline);
+                if (!event.sender || (event.getType() === EventType.RoomMember && !toStartOfTimeline)) {
+                    EventTimeline.setEventMetadata(event, roomState!, toStartOfTimeline);
                 }
             }
         }
