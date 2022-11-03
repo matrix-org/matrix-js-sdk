@@ -68,7 +68,7 @@ import { MatrixError } from "../http-api";
  */
 
 interface CallOpts {
-    roomId?: string;
+    roomId: string;
     client: MatrixClient;
     forceTURN?: boolean;
     turnServers?: Array<TurnServer>;
@@ -278,7 +278,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public ourPartyId: string;
 
     private readonly client: MatrixClient;
-    private readonly forceTURN: boolean;
+    private readonly forceTURN?: boolean;
     private readonly turnServers: Array<TurnServer>;
     // A queue for candidates waiting to go out.
     // We try to amalgamate candidates into a single candidate message where
@@ -291,7 +291,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private usermediaSenders: Array<RTCRtpSender> = [];
     private screensharingSenders: Array<RTCRtpSender> = [];
     private inviteOrAnswerSent = false;
-    private waitForLocalAVStream: boolean;
+    private waitForLocalAVStream?: boolean;
     private successor?: MatrixCall;
     private opponentMember?: RoomMember;
     private opponentVersion?: number | string;
@@ -312,7 +312,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     // Perfect negotiation state: https://www.w3.org/TR/webrtc/#perfect-negotiation-example
     private makingOffer = false;
-    private ignoreOffer: boolean;
+    private ignoreOffer?: boolean;
 
     // If candidates arrive before we've picked an opponent (which, in particular,
     // will happen if the opponent sends candidates eagerly before the user answers
@@ -330,7 +330,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.roomId = opts.roomId;
         this.client = opts.client;
         this.forceTURN = opts.forceTURN;
-        this.ourPartyId = this.client.deviceId;
+        this.ourPartyId = this.client.deviceId!;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -695,7 +695,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!this.peerConn) return;
 
         const statsReport = await this.peerConn.getStats();
-        const stats = [];
+        const stats: any[] = [];
         statsReport.forEach(item => {
             stats.push(item);
         });
@@ -797,9 +797,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 `Unable to answer with ${type}=${wantedValue} because the other side doesn't support it. ` +
                 `Answering with ${type}=${valueOfTheOtherSide}.`,
             );
-            return valueOfTheOtherSide;
+            return valueOfTheOtherSide!;
         }
-        return wantedValue ?? valueOfTheOtherSide;
+        return wantedValue ?? valueOfTheOtherSide!;
     }
 
     /**
@@ -1407,9 +1407,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.opponentPartyId === undefined) {
             // we haven't picked an opponent yet so save the candidates
             logger.info(`Buffering ${candidates.length} candidates until we pick an opponent`);
-            const bufferedCandidates = this.remoteCandidateBuffer.get(fromPartyId) || [];
+            const bufferedCandidates = this.remoteCandidateBuffer.get(fromPartyId!) || [];
             bufferedCandidates.push(...candidates);
-            this.remoteCandidateBuffer.set(fromPartyId, bufferedCandidates);
+            this.remoteCandidateBuffer.set(fromPartyId!, bufferedCandidates);
             return;
         }
 

@@ -145,7 +145,7 @@ export class MSC3089Branch {
         let event: MatrixEvent | undefined = room.getUnfilteredTimelineSet().findEventById(this.id);
 
         // keep scrolling back if needed until we find the event or reach the start of the room:
-        while (!event && room.getLiveTimeline().getState(EventTimeline.BACKWARDS).paginationToken) {
+        while (!event && room.getLiveTimeline().getState(EventTimeline.BACKWARDS)!.paginationToken) {
             await this.client.scrollback(room, 100);
             event = room.getUnfilteredTimelineSet().findEventById(this.id);
         }
