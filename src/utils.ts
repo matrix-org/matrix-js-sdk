@@ -22,6 +22,7 @@ limitations under the License.
 
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
+import { Optional } from "matrix-events-sdk";
 
 import { MatrixEvent } from "./models/event";
 import { M_TIMESTAMP } from "./@types/location";
@@ -77,6 +78,25 @@ export function encodeParams(params: QueryDict, urlSearchParams?: URLSearchParam
 export type QueryDict = Record<string, string[] | string | number | boolean | undefined>;
 
 /**
+ * Replace a stable parameter with the unstable naming for params
+ * @param stable
+ * @param unstable
+ * @param dict
+ */
+export function replaceParam(
+    stable: string,
+    unstable: string,
+    dict: QueryDict,
+): QueryDict {
+    const result = {
+        ...dict,
+        [unstable]: dict[stable],
+    };
+    delete result[stable];
+    return result;
+}
+
+/**
  * Decode a query string in `application/x-www-form-urlencoded` format.
  * @param {string} query A query string to decode e.g.
  * foo=bar&via=server1&server2
@@ -103,13 +123,17 @@ export function decodeParams(query: string): Record<string, string | string[]> {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate: string, variables: Record<string, string>): string {
+export function encodeUri(pathTemplate: string, variables: Record<string, Optional<string>>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
         }
+        const value = variables[key];
+        if (value === undefined || value === null) {
+            continue;
+        }
         pathTemplate = pathTemplate.replace(
-            key, encodeURIComponent(variables[key]),
+            key, encodeURIComponent(value),
         );
     }
     return pathTemplate;
@@ -232,7 +256,7 @@ export function deepCompare(x: any, y: any): boolean {
     }
 
     // the object algorithm works for Array, but it's sub-optimal.
-    if (x instanceof Array) {
+    if (Array.isArray(x)) {
         if (x.length !== y.length) {
             return false;
         }

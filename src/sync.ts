@@ -1491,7 +1491,7 @@ export class SyncApi {
             const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.opts.crypto.setNeedsNewFallback(
-                unusedFallbackKeys instanceof Array &&
+                Array.isArray(unusedFallbackKeys) &&
                 !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
