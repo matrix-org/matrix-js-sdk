@@ -625,7 +625,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                         }
                         EventTimeline.setEventMetadata(
                             event,
-                            roomState,
+                            roomState!,
                             false,
                         );
                         tlEvents[j] = event;

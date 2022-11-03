@@ -32,6 +32,28 @@ export enum AutoDiscoveryAction {
     FAIL_ERROR = "FAIL_ERROR",
 }
 
+enum AutoDiscoveryError {
+    Invalid = "Invalid homeserver discovery response",
+    GenericFailure = "Failed to get autodiscovery configuration from server",
+    InvalidHsBaseUrl = "Invalid base_url for m.homeserver",
+    InvalidHomeserver = "Homeserver URL does not appear to be a valid Matrix homeserver",
+    InvalidIsBaseUrl = "Invalid base_url for m.identity_server",
+    InvalidIdentityServer = "Identity server URL does not appear to be a valid identity server",
+    InvalidIs = "Invalid identity server discovery response",
+    MissingWellknown = "No .well-known JSON file found",
+    InvalidJson = "Invalid JSON",
+}
+
+interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
+    state: AutoDiscoveryAction;
+    error?: IWellKnownConfig["error"] | null;
+}
+
+interface ClientConfig {
+    "m.homeserver": WellKnownConfig;
+    "m.identity_server": WellKnownConfig;
+}
+
 /**
  * Utilities for automatically discovery resources, such as homeservers
  * for users to log in to.
@@ -42,36 +64,25 @@ export class AutoDiscovery {
     // translate the meaning of the states in the spec, but also
     // support our own if needed.
 
-    public static readonly ERROR_INVALID = "Invalid homeserver discovery response";
+    public static readonly ERROR_INVALID = AutoDiscoveryError.Invalid;
 
-    public static readonly ERROR_GENERIC_FAILURE = "Failed to get autodiscovery configuration from server";
+    public static readonly ERROR_GENERIC_FAILURE = AutoDiscoveryError.GenericFailure;
 
-    public static readonly ERROR_INVALID_HS_BASE_URL = "Invalid base_url for m.homeserver";
+    public static readonly ERROR_INVALID_HS_BASE_URL = AutoDiscoveryError.InvalidHsBaseUrl;
 
-    public static readonly ERROR_INVALID_HOMESERVER = "Homeserver URL does not appear to be a valid Matrix homeserver";
+    public static readonly ERROR_INVALID_HOMESERVER = AutoDiscoveryError.InvalidHomeserver;
 
-    public static readonly ERROR_INVALID_IS_BASE_URL = "Invalid base_url for m.identity_server";
+    public static readonly ERROR_INVALID_IS_BASE_URL = AutoDiscoveryError.InvalidIsBaseUrl;
 
-    // eslint-disable-next-line
-    public static readonly ERROR_INVALID_IDENTITY_SERVER = "Identity server URL does not appear to be a valid identity server";
+    public static readonly ERROR_INVALID_IDENTITY_SERVER = AutoDiscoveryError.InvalidIdentityServer;
 
-    public static readonly ERROR_INVALID_IS = "Invalid identity server discovery response";
+    public static readonly ERROR_INVALID_IS = AutoDiscoveryError.InvalidIs;
 
-    public static readonly ERROR_MISSING_WELLKNOWN = "No .well-known JSON file found";
+    public static readonly ERROR_MISSING_WELLKNOWN = AutoDiscoveryError.MissingWellknown;
 
-    public static readonly ERROR_INVALID_JSON = "Invalid JSON";
+    public static readonly ERROR_INVALID_JSON = AutoDiscoveryError.InvalidJson;
 
-    public static readonly ALL_ERRORS = [
-        AutoDiscovery.ERROR_INVALID,
-        AutoDiscovery.ERROR_GENERIC_FAILURE,
-        AutoDiscovery.ERROR_INVALID_HS_BASE_URL,
-        AutoDiscovery.ERROR_INVALID_HOMESERVER,
-        AutoDiscovery.ERROR_INVALID_IS_BASE_URL,
-        AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER,
-        AutoDiscovery.ERROR_INVALID_IS,
-        AutoDiscovery.ERROR_MISSING_WELLKNOWN,
-        AutoDiscovery.ERROR_INVALID_JSON,
-    ];
+    public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError);
 
     /**
      * The auto discovery failed. The client is expected to communicate
@@ -120,13 +131,13 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
-    public static async fromDiscoveryConfig(wellknown: any): Promise<IClientWellKnown> {
+    public static async fromDiscoveryConfig(wellknown: any): Promise<ClientConfig> {
         // Step 1 is to get the config, which is provided to us here.
 
         // We default to an error state to make the first few checks easier to
         // write. We'll update the properties of this object over the duration
         // of this function.
-        const clientConfig = {
+        const clientConfig: ClientConfig = {
             "m.homeserver": {
                 state: AutoDiscovery.FAIL_ERROR,
                 error: AutoDiscovery.ERROR_INVALID,
@@ -197,7 +208,7 @@ export class AutoDiscovery {
         if (wellknown["m.identity_server"]) {
             // We prepare a failing identity server response to save lines later
             // in this branch.
-            const failingClientConfig = {
+            const failingClientConfig: ClientConfig = {
                 "m.homeserver": clientConfig["m.homeserver"],
                 "m.identity_server": {
                     state: AutoDiscovery.FAIL_PROMPT,
@@ -279,7 +290,7 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when discovery fails.
      */
-    public static async findClientConfig(domain: string): Promise<IClientWellKnown> {
+    public static async findClientConfig(domain: string): Promise<ClientConfig> {
         if (!domain || typeof(domain) !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
@@ -298,7 +309,7 @@ export class AutoDiscovery {
         // We default to an error state to make the first few checks easier to
         // write. We'll update the properties of this object over the duration
         // of this function.
-        const clientConfig = {
+        const clientConfig: ClientConfig = {
             "m.homeserver": {
                 state: AutoDiscovery.FAIL_ERROR,
                 error: AutoDiscovery.ERROR_INVALID,
@@ -367,18 +378,18 @@ export class AutoDiscovery {
      * @return {string|boolean} The sanitized URL or a falsey value if the URL is invalid.
      * @private
      */
-    private static sanitizeWellKnownUrl(url: string): string | boolean {
+    private static sanitizeWellKnownUrl(url: string): string | false {
         if (!url) return false;
 
         try {
-            let parsed = null;
+            let parsed: URL | undefined;
             try {
                 parsed = new URL(url);
             } catch (e) {
                 logger.error("Could not parse url", e);
             }
 
-            if (!parsed || !parsed.hostname) return false;
+            if (!parsed?.hostname) return false;
             if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
 
             const port = parsed.port ? `:${parsed.port}` : "";
@@ -448,12 +459,17 @@ export class AutoDiscovery {
                 };
             }
         } catch (err) {
-            const error = err as Error | string | undefined;
+            const error = err as AutoDiscoveryError | string | undefined;
+            let reason = "";
+            if (typeof error === "object") {
+                reason = (<Error>error)?.message;
+            }
+
             return {
                 error,
                 raw: {},
                 action: AutoDiscoveryAction.FAIL_PROMPT,
-                reason: (<Error>error)?.message || "General failure",
+                reason: reason || "General failure",
             };
         }
 
@@ -463,7 +479,7 @@ export class AutoDiscovery {
                 action: AutoDiscoveryAction.SUCCESS,
             };
         } catch (err) {
-            const error = err as Error | string | undefined;
+            const error = err as Error;
             return {
                 error,
                 raw: {},

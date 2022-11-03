@@ -200,7 +200,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     };
 
     public get roomState(): RoomState {
-        return this.room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        return this.room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
     }
 
     private addEventToTimeline(event: MatrixEvent, toStartOfTimeline: boolean): void {
