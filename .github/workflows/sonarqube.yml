@@ -13,8 +13,8 @@ jobs:
     name: Prepare
     runs-on: ubuntu-latest
     outputs:
-      reportPaths: ${{ steps.extraArgs.outputs.reportPaths }}
-      testExecutionReportPaths: ${{ steps.extraArgs.outputs.testExecutionReportPaths }}
+      reportPaths: ${{ steps.extra_args.outputs.reportPaths }}
+      testExecutionReportPaths: ${{ steps.extra_args.outputs.testExecutionReportPaths }}
     steps:
       - name: Download Artifact
         uses: actions/download-artifact@v3
@@ -22,7 +22,7 @@ jobs:
           name: coverage
           path: coverage
 
-      - id: extraArgs
+      - id: extra_args
         run: |
           coverage=$(find coverage -type f -name '*lcov.info' -printf "%p,")
           echo "{reportPaths}={$coverage}" >> $GITHUB_OUTPUT
@@ -36,6 +36,6 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     with:
-      extraArgs: |
+      extra_args: |
         -Dsonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }}
         -Dsonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}
