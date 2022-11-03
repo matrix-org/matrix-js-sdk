@@ -28,9 +28,9 @@ jobs:
 
       - id: extra_args
         run: |
-          coverage=$(find coverage -type f -name '*lcov.info' | tr '\n' ',')
+          coverage=$(find coverage -type f -name '*lcov.info' | tr '\n' ',' | sed 's/,$//g')
           echo "reportPaths=$coverage" >> $GITHUB_OUTPUT
-          reports=$(find coverage -type f -name 'jest-sonar-report*.xml' | tr '\n' ',')
+          reports=$(find coverage -type f -name 'jest-sonar-report*.xml' | tr '\n' ',' | sed 's/,$//g')
           echo "testExecutionReportPaths=$reports" >> $GITHUB_OUTPUT
 
   sonarqube:
@@ -40,4 +40,4 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     with:
-      extra_args: -D"sonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }}" -D"sonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}"
+      extra_args: -Dsonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }} -Dsonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}
