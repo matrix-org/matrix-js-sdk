@@ -137,6 +137,7 @@ describe("Dehydration", () => {
             }
         } finally {
             alice.client?.crypto?.dehydrationManager?.stop();
+            alice.client?.crypto?.deviceList.stop();
         }
     });
 });
