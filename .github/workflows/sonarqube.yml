@@ -30,8 +30,8 @@ jobs:
         run: |
           coverage=$(find coverage -type f -name '*lcov.info' | tr '\n' ',')
           echo "reportPaths=$coverage" >> $GITHUB_OUTPUT
-          testResults=$(find coverage -type f -name '*test-report.xml' | tr '\n' ',')
-          echo "testExecutionReportPaths=$testResults" >> $GITHUB_OUTPUT
+          reports=$(find coverage -type f -name 'jest-sonar-report*.xml' | tr '\n' ',')
+          echo "testExecutionReportPaths=$reports" >> $GITHUB_OUTPUT
 
   sonarqube:
     name: 🩻 SonarQube
