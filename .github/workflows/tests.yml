@@ -10,6 +10,7 @@ jobs:
   jest:
     name: 'Jest [${{ matrix.specs }}] (Node ${{ matrix.node }})'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         specs: [browserify, integ, unit]
