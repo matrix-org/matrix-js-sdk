@@ -151,22 +151,6 @@ export class EventTimeline {
             throw new Error("Cannot initialise state after events are added");
         }
 
-        // We previously deep copied events here and used different copies in
-        // the oldState and state events: this decision seems to date back
-        // quite a way and was apparently made to fix a bug where modifications
-        // made to the start state leaked through to the end state.
-        // This really shouldn't be possible though: the events themselves should
-        // not change. Duplicating the events uses a lot of extra memory,
-        // so we now no longer do it. To assert that they really do never change,
-        // freeze them! Note that we can't do this for events in general:
-        // although it looks like the only things preventing us are the
-        // 'status' flag, forwardLooking (which is only set once when adding to the
-        // timeline) and possibly the sender (which seems like it should never be
-        // reset but in practice causes a lot of the tests to break).
-        for (const e of stateEvents) {
-            Object.freeze(e);
-        }
-
         this.startState.setStateEvents(stateEvents, {
             timelineWasEmpty,
         });
