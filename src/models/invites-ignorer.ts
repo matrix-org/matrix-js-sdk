@@ -153,11 +153,25 @@ export class IgnoredInvites {
     /**
      * Find out whether an invite should be ignored.
      *
+     * @deprecated Please use `getRuleForInviteSync` instead.
      * @param sender The user id for the user who issued the invite.
      * @param roomId The room to which the user is invited.
      * @returns A rule matching the entity, if any was found, `null` otherwise.
      */
-    public getRuleForInvite({ sender, roomId }: {
+    public async getRuleForInvite({ sender, roomId }: {sender: string;
+        roomId: string;
+    }): Promise<Readonly<MatrixEvent | null>> {
+        return this.getRuleForInviteSync({ sender, roomId });
+    }
+
+    /**
+     * Find out whether an invite should be ignored.
+     *
+     * @param sender The user id for the user who issued the invite.
+     * @param roomId The room to which the user is invited.
+     * @returns A rule matching the entity, if any was found, `null` otherwise.
+     */
+    public getRuleForInviteSync({ sender, roomId }: {
         sender: string;
         roomId: string;
     }): Readonly<MatrixEvent | null> {
@@ -326,6 +340,60 @@ export class IgnoredInvites {
             .filter(roomId => typeof roomId === "string")
             .map(roomId => this.client.getRoom(roomId))
             .filter(room => !!room);
+        return sourceRooms;
+    }
+
+    /**
+     * Get the list of source rooms, i.e. the rooms from which rules need to be read.
+     *
+     * If no source rooms are setup, the target room is used as sole source room.
+     *
+     * Note: This method is public for testing reasons. Most clients should not need
+     * to call it directly.
+     *
+     * # Safety
+     *
+     * This method will rewrite the `Policies` object in the user's account data.
+     * This rewrite is inherently racy and could overwrite or be overwritten by
+     * other concurrent rewrites of the same object.
+     *
+     * @deprecated Please use getSourceRooms().
+     */
+    public async getOrCreateSourceRooms(): Promise<Room[]> {
+        const ignoreInvitesPolicies = this.getIgnoreInvitesPolicies();
+        let sources = ignoreInvitesPolicies.sources;
+
+        // Validate `sources`. If it is invalid, trash out the current `sources`
+        // and create a new list of sources from `target`.
+        let hasChanges = false;
+        if (!Array.isArray(sources)) {
+            // `sources` could not be an array.
+            hasChanges = true;
+            sources = [];
+        }
+        let sourceRooms: Room[] = sources
+            // `sources` could contain non-string / invalid room ids
+            // `sources` could contain non-string / invalid room ids
+            .filter(roomId => typeof roomId === "string")
+            .map(roomId => this.client.getRoom(roomId))
+            .filter(room => !!room);
+        if (sourceRooms.length != sources.length) {
+            hasChanges = true;
+        }
+        if (sourceRooms.length == 0) {
+            // `sources` could be empty (possibly because we've removed
+            // invalid content)
+            const target = await this.getOrCreateTargetRoom();
+            hasChanges = true;
+            sourceRooms = [target];
+        }
+        if (hasChanges) {
+            // Reload `policies`/`ignoreInvitesPolicies` in case it has been changed
+            // during or by our call to `this.getTargetRoom()`.
+            await this.withIgnoreInvitesPolicies(ignoreInvitesPolicies => {
+                ignoreInvitesPolicies.sources = sources;
+            });
+        }
         return sourceRooms;
     }
 
