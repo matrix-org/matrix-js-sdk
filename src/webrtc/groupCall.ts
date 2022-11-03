@@ -794,6 +794,10 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
+        // Don't process your own member.
+        const localUserId = this.client.getUserId()!;
+        if (member.userId === localUserId) return;
+
         logger.debug(`Processing member state event for ${member.userId}`);
 
         const ignore = () => {
@@ -836,13 +840,6 @@ export class GroupCall extends TypedEventEmitter<
             logger.warn(`Call member state for ${member.userId} has expired`);
             this.removeParticipant(member);
         }, content["m.expires_ts"] - Date.now()));
-
-        // Don't process your own member.
-        const localUserId = this.client.getUserId()!;
-
-        if (member.userId === localUserId) {
-            return;
-        }
 
         // Only initiate a call with a user who has a userId that is lexicographically
         // less than your own. Otherwise, that user will call you.
