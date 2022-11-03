@@ -30,7 +30,7 @@ export enum TweakName {
 
 export type Tweak<N extends TweakName, V> = {
     set_tweak: N;
-    value: V;
+    value?: V;
 };
 
 export type TweakHighlight = Tweak<TweakName.Highlight, boolean>;
@@ -76,7 +76,8 @@ export interface IPushRuleCondition<N extends ConditionKind | string> {
 
 export interface IEventMatchCondition extends IPushRuleCondition<ConditionKind.EventMatch> {
     key: string;
-    pattern: string;
+    pattern?: string;
+    value?: string;
 }
 
 export interface IContainsDisplayNameCondition extends IPushRuleCondition<ConditionKind.ContainsDisplayName> {
