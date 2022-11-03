@@ -12,18 +12,21 @@ jobs:
   prepare:
     name: Prepare
     runs-on: ubuntu-latest
-    if: github.event.workflow_run.conclusion == 'success'
     outputs:
-      reportPaths: ${{ steps.extra_args.outputs.reportPaths }}
-      testExecutionReportPaths: ${{ steps.extra_args.outputs.testExecutionReportPaths }}
+      reportPaths: ${{ steps.extraArgs.outputs.reportPaths }}
+      testExecutionReportPaths: ${{ steps.extraArgs.outputs.testExecutionReportPaths }}
     steps:
-      - name: Download Artifact
-        uses: actions/download-artifact@v3
+      # There's a 'download artifact' action, but it hasn't been updated for the workflow_run action
+      # (https://github.com/actions/download-artifact/issues/60) so instead we get this mess:
+      - name: 📥 Download artifact
+        uses: dawidd6/action-download-artifact@v2
         with:
+          workflow: tests.yaml
+          run_id: ${{ github.event.workflow_run.id }}
           name: coverage
           path: coverage
 
-      - id: extra_args
+      - id: extraArgs
         run: |
           coverage=$(find coverage -type f -name '*lcov.info' -printf "%p,")
           echo "{reportPaths}={$coverage}" >> $GITHUB_OUTPUT
@@ -37,6 +40,6 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     with:
-      extra_args: |
+      extraArgs: |
         -Dsonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }}
         -Dsonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}
