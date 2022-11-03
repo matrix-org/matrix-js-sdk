@@ -40,6 +40,4 @@ jobs:
     secrets:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     with:
-      extra_args: |
-        -D"sonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }}"
-        -D"sonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}"
+      extra_args: -D"sonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }}" -D"sonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}"
