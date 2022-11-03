@@ -6,7 +6,7 @@ on:
       SONAR_TOKEN:
         required: true
     inputs:
-      extraArgs:
+      extra_args:
         type: string
         required: false
         description: "Extra args to pass to SonarCloud"
@@ -38,7 +38,7 @@ jobs:
           coverage_run_id: ${{ github.event.workflow_run.id }}
           coverage_workflow_name: tests.yml
           coverage_extract_path: coverage
-          extraArgs: ${{ inputs.extraArgs }}
+          extra_args: ${{ inputs.extra_args }}
 
       - uses: Sibz/github-status-action@v1
         if: always()
