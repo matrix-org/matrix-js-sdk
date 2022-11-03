@@ -1,0 +1,12 @@
+diff --git a/node_modules/matrix-events-sdk/lib/NamespacedMap.d.ts b/node_modules/matrix-events-sdk/lib/NamespacedMap.d.ts
+index c141b11..461f528 100644
+--- a/node_modules/matrix-events-sdk/lib/NamespacedMap.d.ts
++++ b/node_modules/matrix-events-sdk/lib/NamespacedMap.d.ts
+@@ -1,6 +1,6 @@
+ import { NamespacedValue } from "./NamespacedValue";
+ import { Optional } from "./types";
+-declare type NS = NamespacedValue<Optional<string>, Optional<string>>;
++declare type NS = NamespacedValue<string, string>;
+ /**
+  * A `Map` implementation which accepts a NamespacedValue as a key, and arbitrary value. The
+  * namespaced value must be a string type.
