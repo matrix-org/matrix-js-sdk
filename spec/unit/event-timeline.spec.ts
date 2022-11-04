@@ -55,13 +55,13 @@ describe("EventTimeline", function() {
             ];
             timeline.initialiseState(events);
             // @ts-ignore private prop
-            const timelineStartState = timeline.startState;
+            const timelineStartState = timeline.startState!;
             expect(mocked(timelineStartState).setStateEvents).toHaveBeenCalledWith(
                 events,
                 { timelineWasEmpty: undefined },
             );
             // @ts-ignore private prop
-            const timelineEndState = timeline.endState;
+            const timelineEndState = timeline.endState!;
             expect(mocked(timelineEndState).setStateEvents).toHaveBeenCalledWith(
                 events,
                 { timelineWasEmpty: undefined },
@@ -185,14 +185,14 @@ describe("EventTimeline", function() {
             sentinel.name = "Old Alice";
             sentinel.membership = "join";
 
-            mocked(timeline.getState(EventTimeline.FORWARDS)).getSentinelMember
+            mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember
                 .mockImplementation(function(uid) {
                     if (uid === userA) {
                         return sentinel;
                     }
                     return null;
                 });
-            mocked(timeline.getState(EventTimeline.BACKWARDS)).getSentinelMember
+            mocked(timeline.getState(EventTimeline.BACKWARDS)!).getSentinelMember
                 .mockImplementation(function(uid) {
                     if (uid === userA) {
                         return oldSentinel;
@@ -225,14 +225,14 @@ describe("EventTimeline", function() {
                 sentinel.name = "Old Alice";
                 sentinel.membership = "join";
 
-                mocked(timeline.getState(EventTimeline.FORWARDS)).getSentinelMember
+                mocked(timeline.getState(EventTimeline.FORWARDS)!).getSentinelMember
                     .mockImplementation(function(uid) {
                         if (uid === userA) {
                             return sentinel;
                         }
                         return null;
                     });
-                mocked(timeline.getState(EventTimeline.BACKWARDS)).getSentinelMember
+                mocked(timeline.getState(EventTimeline.BACKWARDS)!).getSentinelMember
                     .mockImplementation(function(uid) {
                         if (uid === userA) {
                             return oldSentinel;
@@ -269,15 +269,15 @@ describe("EventTimeline", function() {
             timeline.addEvent(events[0], { toStartOfTimeline: false });
             timeline.addEvent(events[1], { toStartOfTimeline: false });
 
-            expect(timeline.getState(EventTimeline.FORWARDS).setStateEvents).
+            expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).
                 toHaveBeenCalledWith([events[0]], { timelineWasEmpty: undefined });
-            expect(timeline.getState(EventTimeline.FORWARDS).setStateEvents).
+            expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).
                 toHaveBeenCalledWith([events[1]], { timelineWasEmpty: undefined });
 
             expect(events[0].forwardLooking).toBe(true);
             expect(events[1].forwardLooking).toBe(true);
 
-            expect(timeline.getState(EventTimeline.BACKWARDS).setStateEvents).
+            expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).
                 not.toHaveBeenCalled();
         });
 
@@ -298,15 +298,15 @@ describe("EventTimeline", function() {
             timeline.addEvent(events[0], { toStartOfTimeline: true });
             timeline.addEvent(events[1], { toStartOfTimeline: true });
 
-            expect(timeline.getState(EventTimeline.BACKWARDS).setStateEvents).
+            expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).
                 toHaveBeenCalledWith([events[0]], { timelineWasEmpty: undefined });
-            expect(timeline.getState(EventTimeline.BACKWARDS).setStateEvents).
+            expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).
                 toHaveBeenCalledWith([events[1]], { timelineWasEmpty: undefined });
 
             expect(events[0].forwardLooking).toBe(false);
             expect(events[1].forwardLooking).toBe(false);
 
-            expect(timeline.getState(EventTimeline.FORWARDS).setStateEvents).
+            expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).
                 not.toHaveBeenCalled();
         });
 

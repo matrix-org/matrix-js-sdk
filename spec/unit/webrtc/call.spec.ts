@@ -768,6 +768,19 @@ describe('Call', function() {
         });
     });
 
+    describe("transferToCall", () => {
+        it("should send the required events", async () => {
+            const targetCall = new MatrixCall({ client: client.client, roomId: "!roomId:server" });
+            const sendEvent = jest.spyOn(client.client, "sendEvent");
+            await call.transferToCall(targetCall);
+
+            const newCallId = (sendEvent.mock.calls[0][2] as any)!.await_call;
+            expect(sendEvent).toHaveBeenCalledWith(call.roomId, EventType.CallReplaces, expect.objectContaining({
+                create_call: newCallId,
+            }));
+        });
+    });
+
     describe("muting", () => {
         let mockSendVoipEvent: jest.Mock<Promise<void>, [string, object]>;
         beforeEach(async () => {

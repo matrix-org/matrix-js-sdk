@@ -1032,10 +1032,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // state at the start and end of that timeline. These are more
         // for backwards-compatibility than anything else.
         this.timeline = this.getLiveTimeline().getEvents();
-        this.oldState = this.getLiveTimeline()
-            .getState(EventTimeline.BACKWARDS);
-        this.currentState = this.getLiveTimeline()
-            .getState(EventTimeline.FORWARDS);
+        this.oldState = this.getLiveTimeline().getState(EventTimeline.BACKWARDS)!;
+        this.currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
 
         // Let people know to register new listeners for the new state
         // references. The reference won't necessarily change every time so only
@@ -1564,8 +1562,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             pendingEvents = true,
         }: ICreateFilterOpts = {},
     ): EventTimelineSet {
-        if (this.filteredTimelineSets[filter.filterId]) {
-            return this.filteredTimelineSets[filter.filterId];
+        if (this.filteredTimelineSets[filter.filterId!]) {
+            return this.filteredTimelineSets[filter.filterId!];
         }
         const opts = Object.assign({ filter, pendingEvents }, this.opts);
         const timelineSet = new EventTimelineSet(this, opts);
@@ -1574,7 +1572,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
         if (useSyncEvents) {
-            this.filteredTimelineSets[filter.filterId] = timelineSet;
+            this.filteredTimelineSets[filter.filterId!] = timelineSet;
             this.timelineSets.push(timelineSet);
         }
 
@@ -1623,7 +1621,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private async getThreadListFilter(filterType = ThreadFilterType.All): Promise<Filter> {
-        const myUserId = this.client.getUserId();
+        const myUserId = this.client.getUserId()!;
         const filter = new Filter(myUserId);
 
         const definition: IFilterDefinition = {
@@ -1635,7 +1633,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         };
 
         if (filterType === ThreadFilterType.My) {
-            definition.room.timeline[FILTER_RELATED_BY_SENDERS.name] = [myUserId];
+            definition!.room!.timeline![FILTER_RELATED_BY_SENDERS.name] = [myUserId];
         }
 
         filter.setDefinition(definition);
@@ -1681,7 +1679,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         return event.getSender() === this.client.getUserId();
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
-                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
+                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent!, {
                             toStartOfTimeline: false,
                         });
                     }
@@ -1851,8 +1849,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {Filter} filter the filter whose timelineSet is to be forgotten
      */
     public removeFilteredTimelineSet(filter: Filter): void {
-        const timelineSet = this.filteredTimelineSets[filter.filterId];
-        delete this.filteredTimelineSets[filter.filterId];
+        const timelineSet = this.filteredTimelineSets[filter.filterId!];
+        delete this.filteredTimelineSets[filter.filterId!];
         const i = this.timelineSets.indexOf(timelineSet);
         if (i > -1) {
             this.timelineSets.splice(i, 1);
@@ -2187,7 +2185,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // call setEventMetadata to set up event.sender etc
         // as event is shared over all timelineSets, we set up its metadata based
         // on the unfiltered timelineSet.
-        EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS), false);
+        EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS)!, false);
 
         this.txnToEvent[txnId] = event;
         if (this.pendingEventList) {
