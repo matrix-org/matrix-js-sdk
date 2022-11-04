@@ -1862,7 +1862,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (!this.client.supportsExperimentalThreads()) {
+        if (!this.client?.supportsExperimentalThreads()) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
