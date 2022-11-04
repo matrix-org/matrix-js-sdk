@@ -829,7 +829,7 @@ describe("MatrixClient room timelines", function() {
             expect(room.timeline.length).toEqual(0);
 
             // `/messages` request for `refreshLiveTimeline()` ->
-            // `getLatestTimeline()` to construct a new timeline from.
+            // `getLatestLiveTimeline()` to construct a new timeline from.
             httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomId)}/messages`)
                 .respond(200, function() {
                     return {
@@ -840,7 +840,7 @@ describe("MatrixClient room timelines", function() {
                     };
                 });
             // `/context` request for `refreshLiveTimeline()` ->
-            // `getLatestTimeline()` -> `getEventTimeline()` to construct a new
+            // `getLatestLiveTimeline()` -> `getEventTimeline()` to construct a new
             // timeline from.
             httpBackend!.when("GET", contextUrl)
                 .respond(200, function() {

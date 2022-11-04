@@ -5400,13 +5400,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get an EventTimeline for the latest events in the room. This will just
      * call `/messages` to get the latest message in the room, then use
      * `client.getEventTimeline(...)` to construct a new timeline from it.
+     * Always returns timeline in the given `timelineSet`.
      *
      * @param {EventTimelineSet} timelineSet  The timelineSet to find or add the timeline to
      *
      * @return {Promise} Resolves:
      *    {@link module:models/event-timeline~EventTimeline} timeline with the latest events in the room
      */
-    public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<Optional<EventTimeline>> {
+    public async getLatestLiveTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
@@ -5414,51 +5415,101 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (!timelineSet.room) {
-            throw new Error("getLatestTimeline only supports room timelines");
+            throw new Error("getLatestLiveTimeline only supports room timelines");
         }
 
-        let event;
-        if (timelineSet.threadListType !== null) {
-            const res = await this.createThreadListMessagesRequest(
-                timelineSet.room.roomId,
-                null,
-                1,
-                Direction.Backward,
-                timelineSet.threadListType,
-                timelineSet.getFilter(),
+        if (timelineSet.threadListType !== null || timelineSet.thread && Thread.hasServerSideSupport) {
+            throw new Error("getLatestLiveTimeline only supports live timelines");
+        }
+
+        const messagesPath = utils.encodeUri(
+            "/rooms/$roomId/messages", {
+                $roomId: timelineSet.room.roomId,
+            },
+        );
+        const messageRequestParams: Record<string, string | string[]> = {
+            dir: 'b',
+            // Since we only use the latest message in the response, we only need to
+            // fetch the one message here.
+            limit: "1",
+        };
+        if (this.clientOpts?.lazyLoadMembers) {
+            messageRequestParams.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+        }
+        const messagesRes = await this.http.authedRequest<IMessagesResponse>(
+            Method.Get,
+            messagesPath,
+            messageRequestParams,
+        );
+        const latestEventInTimeline = messagesRes.chunk?.[0];
+        const latestEventIdInTimeline = latestEventInTimeline?.event_id;
+        if (!latestEventIdInTimeline) {
+            throw new Error("No message returned when trying to construct getLatestLiveTimeline");
+        }
+
+        const contextPath = utils.encodeUri(
+            "/rooms/$roomId/context/$eventId", {
+                $roomId: timelineSet.room.roomId,
+                $eventId: latestEventIdInTimeline,
+            },
+        );
+        let contextRequestParams: Record<string, string | string[]> | undefined = undefined;
+        if (this.clientOpts?.lazyLoadMembers) {
+            contextRequestParams = { filter: JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER) };
+        }
+        const contextRes = await this.http.authedRequest<IContextResponse>(
+            Method.Get,
+            contextPath,
+            contextRequestParams,
+        );
+        if (!contextRes.event || contextRes.event.event_id !== latestEventIdInTimeline) {
+            throw new Error(
+                `getLatestLiveTimeline: \`/context\` response did not include latestEventIdInTimeline=` +
+                `${latestEventIdInTimeline} which we were asking about. This is probably a bug in the ` +
+                `homeserver since we just saw the event with the other request above and now the server ` +
+                `claims it does not exist.`,
             );
-            event = res.chunk?.[0];
-        } else if (timelineSet.thread && Thread.hasServerSideSupport) {
-            const res = await this.fetchRelations(
-                timelineSet.room.roomId,
-                timelineSet.thread.id,
-                THREAD_RELATION_TYPE.name,
-                null,
-                { dir: Direction.Backward, limit: 1 },
-            );
-            event = res.chunk?.[0];
+        }
+
+        // By the time the request completes, the event might have ended up in the timeline.
+        const shortcutTimelineForEvent = timelineSet.getTimelineForEvent(latestEventIdInTimeline);
+        if (shortcutTimelineForEvent) {
+            return shortcutTimelineForEvent;
+        }
+
+        const mapper = this.getEventMapper();
+        const latestMatrixEventInTimeline = mapper(contextRes.event);
+        const events = [
+            // Order events from most recent to oldest (reverse-chronological).
+            // We start with the last event, since that's the point at which we have known state.
+            // events_after is already backwards; events_before is forwards.
+            ...contextRes.events_after.reverse().map(mapper),
+            latestMatrixEventInTimeline,
+            ...contextRes.events_before.map(mapper),
+        ];
+
+        // This function handles non-thread timelines only, but we still process any
+        // thread events to populate thread summaries.
+        let timeline = timelineSet.getTimelineForEvent(events[0].getId()!);
+        if (timeline) {
+            timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(contextRes.state.map(mapper));
         } else {
-            const messagesPath = utils.encodeUri(
-                "/rooms/$roomId/messages", {
-                    $roomId: timelineSet.room.roomId,
-                },
-            );
-
-            const params: Record<string, string | string[]> = {
-                dir: 'b',
-            };
-            if (this.clientOpts?.lazyLoadMembers) {
-                params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
-            }
-
-            const res = await this.http.authedRequest<IMessagesResponse>(Method.Get, messagesPath, params);
-            event = res.chunk?.[0];
-        }
-        if (!event) {
-            throw new Error("No message returned when trying to construct getLatestTimeline");
+            // If the `latestEventIdInTimeline` does not belong to this `timelineSet`
+            // then it will be ignored and not added to the `timelineSet`. We'll instead
+            // just create a new blank timeline in the `timelineSet` with the proper
+            // pagination tokens setup to continue paginating.
+            timeline = timelineSet.addTimeline();
+            timeline.initialiseState(contextRes.state.map(mapper));
+            timeline.getState(EventTimeline.FORWARDS)!.paginationToken = contextRes.end;
         }
 
-        return this.getEventTimeline(timelineSet, event.event_id);
+        const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
+        timelineSet.addEventsToTimeline(timelineEvents, true, timeline, contextRes.start);
+        // The target event is not in a thread but process the contextual events, so we can show any threads around it.
+        this.processThreadEvents(timelineSet.room, threadedEvents, true);
+        this.processBeaconEvents(timelineSet.room, timelineEvents);
+
+        return timelineSet.getTimelineForEvent(latestEventIdInTimeline) ?? timeline;
     }
 
     /**

@@ -913,9 +913,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const backwardPaginationToken = liveTimelineBefore.getPaginationToken(EventTimeline.BACKWARDS);
         const eventsBefore = liveTimelineBefore.getEvents();
         const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
+        const mostRecentEventIdInTimeline = mostRecentEventInTimeline.getId();
         logger.log(
             `[refreshLiveTimeline for ${this.roomId}] at ` +
-            `mostRecentEventInTimeline=${mostRecentEventInTimeline && mostRecentEventInTimeline.getId()} ` +
+            `mostRecentEventIdInTimeline=${mostRecentEventIdInTimeline} ` +
             `liveTimelineBefore=${liveTimelineBefore.toString()} ` +
             `forwardPaginationToken=${forwardPaginationToken} ` +
             `backwardPaginationToken=${backwardPaginationToken}`,
@@ -924,15 +925,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Get the main TimelineSet
         const timelineSet = this.getUnfilteredTimelineSet();
 
-        let newTimeline: Optional<EventTimeline>;
+        let newTimeline: EventTimeline;
         // If there isn't any event in the timeline, let's go fetch the latest
         // event and construct a timeline from it.
         //
         // This should only really happen if the user ran into an error
         // with refreshing the timeline before which left them in a blank
         // timeline from `resetLiveTimeline`.
-        if (!mostRecentEventInTimeline) {
-            newTimeline = await this.client.getLatestTimeline(timelineSet);
+        if (!mostRecentEventIdInTimeline) {
+            newTimeline = await this.client.getLatestLiveTimeline(timelineSet);
         } else {
             // Empty out all of `this.timelineSets`. But we also need to keep the
             // same `timelineSet` references around so the React code updates
@@ -955,7 +956,22 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // we reset everything. The `timelineSet` we pass in needs to be empty
             // in order for this function to call `/context` and generate a new
             // timeline.
-            newTimeline = await this.client.getEventTimeline(timelineSet, mostRecentEventInTimeline.getId()!);
+            const timelineForMostRecentEvent = await this.client.getEventTimeline(
+                timelineSet,
+                mostRecentEventIdInTimeline,
+            );
+
+            if (!timelineForMostRecentEvent) {
+                throw new Error(
+                    `refreshLiveTimeline: No new timeline was returned by \`getEventTimeline(...)\`. ` +
+                    `This probably means that mostRecentEventIdInTimeline=${mostRecentEventIdInTimeline}` +
+                    `which was in the live timeline before, wasn't supposed to be there in the first place ` +
+                    `(maybe a problem with threads leaking into the main live timeline). ` +
+                    `This is a problem with Element, please report this error.`,
+                );
+            }
+
+            newTimeline = timelineForMostRecentEvent;
         }
 
         // If a racing `/sync` beat us to creating a new timeline, use that
@@ -972,11 +988,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // of using the `/context` historical token (ex. `t12-13_0_0_0_0_0_0_0_0`)
             // so that it matches the next response from `/sync` and we can properly
             // continue the timeline.
-            newTimeline!.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
+            newTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
 
             // Set our new fresh timeline as the live timeline to continue syncing
             // forwards and back paginating from.
-            timelineSet.setLiveTimeline(newTimeline!);
+            timelineSet.setLiveTimeline(newTimeline);
             // Fixup `this.oldstate` so that `scrollback` has the pagination tokens
             // available
             this.fixUpLegacyTimelineFields();
