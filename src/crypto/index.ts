@@ -2681,7 +2681,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
         const devicesByUser: Record<string, DeviceInfo[]> = {};
 
-        for (const userId in users) {
+        for (const userId of users) {
             devicesByUser[userId] = [];
 
             const devices = this.getStoredDevicesForUser(userId) || [];
