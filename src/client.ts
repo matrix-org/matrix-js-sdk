@@ -4181,7 +4181,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.sendEvent(
             roomId,
-            threadId,
+            threadId as string | null,
             eventType,
             sendContent,
             txnId,
