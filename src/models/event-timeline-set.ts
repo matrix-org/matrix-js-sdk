@@ -713,9 +713,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // We can only run this check for timelines with a `room` because `canContain`
         // requires it
         if (this.room && !this.canContain(event)) {
+            let eventDebugString = `event=${event.getId()}`;
+            if (event.threadRootId) {
+                eventDebugString += `(belongs to thread=${event.threadRootId})`;
+            }
             logger.warn(
-                `EventTimelineSet.addEventToTimeline: Ignoring event=${event.getId()}` +
-                `${event.threadRootId ? ` (belongs to thread=${event.threadRootId})` : ''} that does not belong ` +
+                `EventTimelineSet.addEventToTimeline: Ignoring ${eventDebugString} that does not belong ` +
                 `in timeline=${timeline.toString()} timelineSet(threadId=${this.thread?.id})`,
             );
             return;
