@@ -203,6 +203,23 @@ describe('EventTimelineSet', () => {
             });
             expect(liveTimeline.getEvents().length).toStrictEqual(0);
         });
+
+        describe('non-room timeline', () => {
+            fit('Adds event to timeline', () => {
+                const nonRoomEventTimelineSet = new EventTimelineSet(
+                    // This is what we're specifically testing against, a timeline
+                    // without a `room` defined
+                    undefined,
+                );
+                const nonRoomEventTimeline = new EventTimeline(nonRoomEventTimelineSet);
+
+                expect(nonRoomEventTimeline.getEvents().length).toStrictEqual(0);
+                nonRoomEventTimelineSet.addEventToTimeline(messageEvent, nonRoomEventTimeline, {
+                    toStartOfTimeline: true,
+                });
+                expect(nonRoomEventTimeline.getEvents().length).toStrictEqual(1);
+            });
+        });
     });
 
     describe('aggregateRelations', () => {
