@@ -65,7 +65,7 @@ describe('EventTimelineSet', () => {
             "m.relates_to": {
                 "event_id": root.getId(),
                 "m.in_reply_to": {
-                    "event_id": root.getId()!,
+                    "event_id": root.getId(),
                 },
                 "rel_type": "m.thread",
             },
