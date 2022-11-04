@@ -707,9 +707,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 "in timelineSet(threadId=${this.thread?.id})`);
         }
 
-        // Make sure events don't get mixed in timelines they shouldn't be in
-        // (e.g. a threaded message should not be in the main timeline).
-        if (!this.canContain(event)) {
+        // Make sure events don't get mixed in timelines they shouldn't be in (e.g. a
+        // threaded message should not be in the main timeline).
+        //
+        // We can only run this check for timelines with a `room` because `canContain`
+        // requires it
+        if (this.room && !this.canContain(event)) {
             logger.warn(`EventTimelineSet.addEventToTimeline: Ignoring event=${event.getId()} that does not belong " + 
                 "in timeline=${timeline.toString()} timelineSet(threadId=${this.thread?.id})`);
             return;
