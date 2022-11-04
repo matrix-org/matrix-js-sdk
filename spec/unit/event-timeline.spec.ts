@@ -98,7 +98,17 @@ describe("EventTimeline", function() {
             expect(timeline.getPaginationToken(EventTimeline.FORWARDS)).toBe(null);
         });
 
-        it("setPaginationToken should set  token", function() {
+        it("setPaginationToken should set token", function() {
+            timeline.setPaginationToken("back", EventTimeline.BACKWARDS);
+            timeline.setPaginationToken("fwd", EventTimeline.FORWARDS);
+            expect(timeline.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("back");
+            expect(timeline.getPaginationToken(EventTimeline.FORWARDS)).toEqual("fwd");
+        });
+
+        it("should be able to store pagination tokens for mixed room timelines", () => {
+            const timelineSet = new EventTimelineSet(undefined);
+            const timeline = new EventTimeline(timelineSet);
+
             timeline.setPaginationToken("back", EventTimeline.BACKWARDS);
             timeline.setPaginationToken("fwd", EventTimeline.FORWARDS);
             expect(timeline.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("back");
