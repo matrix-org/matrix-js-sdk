@@ -140,7 +140,6 @@ export class CallEventHandler {
         const type = event.getType() as EventType;
         const weSentTheEvent = event.getSender() === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
-        //console.info("RECV %s content=%s", type, JSON.stringify(content));
 
         if (type === EventType.CallInvite) {
             // ignore invites you send

@@ -335,8 +335,7 @@ export async function ensureOlmSessionsForDevices(
     const promises: Promise<void>[] = [];
     for (const [userId, devices] of Object.entries(devicesByUser)) {
         const userRes = otkResult[userId] || {};
-        for (let j = 0; j < devices.length; j++) {
-            const deviceInfo = devices[j];
+        for (const deviceInfo of devices) {
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
 

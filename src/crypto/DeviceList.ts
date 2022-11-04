@@ -230,7 +230,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
             }, delay);
         }
 
-        return savePromise!;
+        return savePromise;
     }
 
     /**

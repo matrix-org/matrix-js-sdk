@@ -135,8 +135,7 @@ export class PushProcessor {
      */
     public static actionListToActionsObject(actionList: PushRuleAction[]): IActionsObject {
         const actionObj: IActionsObject = { notify: false, tweaks: {} };
-        for (let i = 0; i < actionList.length; ++i) {
-            const action = actionList[i];
+        for (const action of actionList) {
             if (action === PushRuleActionName.Notify) {
                 actionObj.notify = true;
             } else if (typeof action === 'object') {
@@ -190,15 +189,13 @@ export class PushProcessor {
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
 
     private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule | null {
-        for (let ruleKindIndex = 0; ruleKindIndex < RULEKINDS_IN_ORDER.length; ++ruleKindIndex) {
-            const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
+        for (const kind of RULEKINDS_IN_ORDER) {
             const ruleset = kindset[kind];
             if (!ruleset) {
                 continue;
             }
 
-            for (let ruleIndex = 0; ruleIndex < ruleset.length; ++ruleIndex) {
-                const rule = ruleset[ruleIndex];
+            for (const rule of ruleset) {
                 if (!rule.enabled) {
                     continue;
                 }
@@ -478,16 +475,7 @@ export class PushProcessor {
     }
 
     public ruleMatchesEvent(rule: Partial<IPushRule> & Pick<IPushRule, "conditions">, ev: MatrixEvent): boolean {
-        if (!rule.conditions?.length) return true;
-
-        let ret = true;
-        for (let i = 0; i < rule.conditions.length; ++i) {
-            const cond = rule.conditions[i];
-            // @ts-ignore
-            ret &= this.eventFulfillsCondition(cond, ev);
-        }
-        //console.log("Rule "+rule.rule_id+(ret ? " matches" : " doesn't match"));
-        return ret;
+        return !rule.conditions?.some(cond => !this.eventFulfillsCondition(cond, ev));
     }
 
     /**

@@ -119,12 +119,10 @@ class OlmEncryption extends EncryptionAlgorithm {
 
         const promises: Promise<void>[] = [];
 
-        for (let i = 0; i < users.length; ++i) {
-            const userId = users[i];
+        for (const userId of users) {
             const devices = this.crypto.getStoredDevicesForUser(userId) || [];
 
-            for (let j = 0; j < devices.length; ++j) {
-                const deviceInfo = devices[j];
+            for (const deviceInfo of devices) {
                 const key = deviceInfo.getIdentityKey();
                 if (key == this.olmDevice.deviceCurve25519Key) {
                     // don't bother sending to ourself
@@ -304,8 +302,7 @@ class OlmDecryption extends DecryptionAlgorithm {
 
         // try each session in turn.
         const decryptionErrors: Record<string, string> = {};
-        for (let i = 0; i < sessionIds.length; i++) {
-            const sessionId = sessionIds[i];
+        for (const sessionId of sessionIds) {
             try {
                 const payload = await this.olmDevice.decryptMessage(
                     theirDeviceIdentityKey, sessionId, message.type, message.body,
