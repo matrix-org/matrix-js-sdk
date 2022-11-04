@@ -518,7 +518,7 @@ export interface IUploadKeySignaturesResponse {
 }
 
 export interface IPreviewUrlResponse {
-    [key: string]: string | number;
+    [key: string]: undefined | string | number;
     "og:title": string;
     "og:type": string;
     "og:url": string;
@@ -716,8 +716,9 @@ export interface IMyDevice {
     display_name?: string;
     last_seen_ip?: string;
     last_seen_ts?: number;
-    [UNSTABLE_MSC3852_LAST_SEEN_UA.stable]?: string;
-    [UNSTABLE_MSC3852_LAST_SEEN_UA.unstable]?: string;
+    // UNSTABLE_MSC3852_LAST_SEEN_UA
+    last_seen_user_agent?: string;
+    "org.matrix.msc3852.last_seen_user_agent"?: string;
 }
 
 export interface Keys {
@@ -3225,7 +3226,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = decodeRecoveryKey(recoveryKey);
-        return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
+        return this.restoreKeyBackup(privKey, targetRoomId!, targetSessionId!, backupInfo, opts);
     }
 
     public async restoreKeyBackupWithCache(
@@ -3387,7 +3388,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
-        const path = this.makeKeyBackupPath(roomId, sessionId, version);
+        const path = this.makeKeyBackupPath(roomId!, sessionId!, version!);
         await this.http.authedRequest(
             Method.Delete, path.path, path.queryData, undefined,
             { prefix: ClientPrefix.V3 },
@@ -3879,7 +3880,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         threadId: string | null,
         eventType: string | IContent,
-        content: IContent | string,
+        content?: IContent | string,
         txnId?: string,
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
@@ -3891,10 +3892,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // If we expect that an event is part of a thread but is missing the relation
         // we need to add it manually, as well as the reply fallback
-        if (threadId && !content["m.relates_to"]?.rel_type) {
-            const isReply = !!content["m.relates_to"]?.["m.in_reply_to"];
-            content["m.relates_to"] = {
-                ...content["m.relates_to"],
+        if (threadId && !content!["m.relates_to"]?.rel_type) {
+            const isReply = !!content!["m.relates_to"]?.["m.in_reply_to"];
+            content!["m.relates_to"] = {
+                ...content!["m.relates_to"],
                 "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
                 // Set is_falling_back to true unless this is actually intended to be a reply
@@ -3902,7 +3903,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             };
             const thread = this.getRoom(roomId)?.getThread(threadId);
             if (thread && !isReply) {
-                content["m.relates_to"]["m.in_reply_to"] = {
+                content!["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
                         return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
                     })?.getId() ?? threadId,
@@ -4200,7 +4201,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!eventId?.startsWith(EVENT_ID_PREFIX)) {
             opts = txnId as IRedactOpts;
             txnId = eventId;
-            eventId = threadId;
+            eventId = threadId!;
             threadId = null;
         }
         const reason = opts?.reason;
@@ -4233,7 +4234,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendMessage(
         roomId: string,
         threadId: string | null | IContent,
-        content: IContent | string,
+        content?: IContent | string,
         txnId?: string,
     ): Promise<ISendEventResponse> {
         if (typeof threadId !== "string" && threadId !== null) {
@@ -4417,7 +4418,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendImageMessage(
         roomId: string,
         threadId: string | null,
-        url: string | IImageInfo,
+        url?: string | IImageInfo,
         info?: IImageInfo | string,
         text = "Image",
     ): Promise<ISendEventResponse> {
@@ -4461,7 +4462,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendStickerMessage(
         roomId: string,
         threadId: string | null,
-        url: string | IImageInfo,
+        url?: string | IImageInfo,
         info?: IImageInfo | string,
         text = "Sticker",
     ): Promise<ISendEventResponse> {
@@ -5329,11 +5330,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
         let timeline = timelineSet.getTimelineForEvent(events[0].getId()!);
         if (timeline) {
-            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+            timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
         } else {
             timeline = timelineSet.addTimeline();
             timeline.initialiseState(res.state.map(mapper));
-            timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
+            timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
         }
 
         const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
@@ -5422,7 +5423,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
                 let timeline = timelineSet.getTimelineForEvent(event.getId());
                 if (timeline) {
-                    timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+                    timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
                 } else {
                     timeline = timelineSet.addTimeline();
                     timeline.initialiseState(res.state.map(mapper));
@@ -5483,7 +5484,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread
                 // summaries.
                 const timeline = timelineSet.getLiveTimeline();
-                timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+                timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
 
                 timelineSet.addEventsToTimeline(events, true, timeline, null);
                 if (!resOlder.next_batch) {
@@ -5786,7 +5787,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.getFilter(),
             ).then((res) => {
                 if (res.state) {
-                    const roomState = eventTimeline.getState(dir);
+                    const roomState = eventTimeline.getState(dir)!;
                     const stateEvents = res.state.map(this.getEventMapper());
                     roomState.setUnknownStateEvents(stateEvents);
                 }
@@ -5861,7 +5862,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.getFilter(),
             ).then((res) => {
                 if (res.state) {
-                    const roomState = eventTimeline.getState(dir);
+                    const roomState = eventTimeline.getState(dir)!;
                     const stateEvents = res.state.map(this.getEventMapper());
                     roomState.setUnknownStateEvents(stateEvents);
                 }

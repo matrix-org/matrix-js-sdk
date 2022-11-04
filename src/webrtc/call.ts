@@ -347,7 +347,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public isPtt = false;
 
     private readonly client: MatrixClient;
-    private readonly forceTURN: boolean;
+    private readonly forceTURN?: boolean;
     private readonly turnServers: Array<TurnServer>;
     // A queue for candidates waiting to go out.
     // We try to amalgamate candidates into a single candidate message where
@@ -979,9 +979,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     wantedValue} because the other side doesn't support it. Answering with ${
                     type}=${valueOfTheOtherSide}.`,
             );
-            return valueOfTheOtherSide;
+            return valueOfTheOtherSide!;
         }
-        return wantedValue ?? valueOfTheOtherSide;
+        return wantedValue ?? valueOfTheOtherSide!;
     }
 
     /**

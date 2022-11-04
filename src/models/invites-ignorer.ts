@@ -164,7 +164,7 @@ export class IgnoredInvites {
         const senderServer = sender.split(":")[1];
         const roomServer = roomId.split(":")[1];
         for (const room of policyRooms) {
-            const state = room.getUnfilteredTimelineSet().getLiveTimeline().getState(EventTimeline.FORWARDS);
+            const state = room.getUnfilteredTimelineSet().getLiveTimeline().getState(EventTimeline.FORWARDS)!;
 
             for (const { scope, entities } of [
                 { scope: PolicyScope.Room, entities: [roomId] },

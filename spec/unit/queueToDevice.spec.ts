@@ -23,6 +23,7 @@ import { ToDeviceBatch } from '../../src/models/ToDeviceMessage';
 import { logger } from '../../src/logger';
 import { IStore } from '../../src/store';
 import { flushPromises } from '../test-utils/flushPromises';
+import { removeElement } from "../../src/utils";
 
 const FAKE_USER = "@alice:example.org";
 const FAKE_DEVICE_ID = "AAAAAAAA";
@@ -63,6 +64,8 @@ describe.each([
     let client: MatrixClient;
 
     beforeEach(async function() {
+        jest.runOnlyPendingTimers();
+        jest.useRealTimers();
         httpBackend = new MockHttpBackend();
 
         let store: IStore;
@@ -288,7 +291,7 @@ describe.each([
             ],
         });
 
-        expect(await httpBackend.flush(undefined, 1, 1)).toEqual(1);
+        expect(await httpBackend.flush(undefined, 1, 20)).toEqual(1);
         await flushPromises();
 
         const dummyEvent = new MatrixEvent({
@@ -316,12 +319,12 @@ describe.each([
             });
         }
 
+        const expectedCounts = [20, 1];
         httpBackend.when(
             "PUT", "/sendToDevice/org.example.foo/",
         ).check((request) => {
-            expect(Object.keys(request.data.messages).length).toEqual(20);
+            expect(removeElement(expectedCounts, c => c === Object.keys(request.data.messages).length)).toBeTruthy();
         }).respond(200, {});
-
         httpBackend.when(
             "PUT", "/sendToDevice/org.example.foo/",
         ).check((request) => {
