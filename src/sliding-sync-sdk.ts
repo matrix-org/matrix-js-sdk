@@ -396,7 +396,7 @@ export class SlidingSyncSdk {
 
     public createRoom(roomId: string): Room { // XXX cargoculted from sync.ts
         const { timelineSupport } = this.client;
-        const room = new Room(roomId, this.client, this.client.getUserId(), {
+        const room = new Room(roomId, this.client, this.client.getUserId()!, {
             lazyLoadMembers: this.opts.lazyLoadMembers,
             pendingEventOrdering: this.opts.pendingEventOrdering,
             timelineSupport,
@@ -428,7 +428,7 @@ export class SlidingSyncSdk {
             RoomStateEvent.Update,
         ]);
         room.currentState.on(RoomStateEvent.NewMember, (event, state, member) => {
-            member.user = this.client.getUser(member.userId);
+            member.user = this.client.getUser(member.userId) ?? undefined;
             this.client.reEmitter.reEmit(member, [
                 RoomMemberEvent.Name,
                 RoomMemberEvent.Typing,
