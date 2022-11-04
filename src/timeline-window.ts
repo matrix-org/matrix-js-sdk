@@ -101,7 +101,7 @@ export class TimelineWindow {
      *
      * @return {Promise}
      */
-    public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
+    public async load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
         const initFields = (timeline: Optional<EventTimeline>) => {
@@ -135,13 +135,14 @@ export class TimelineWindow {
         // which is important to keep room-switching feeling snappy.
         if (this.timelineSet.getTimelineForEvent(initialEventId)) {
             initFields(this.timelineSet.getTimelineForEvent(initialEventId));
-            return Promise.resolve();
+            return;
         } else if (initialEventId) {
-            return this.client.getEventTimeline(this.timelineSet, initialEventId)
+            await this.client.getEventTimeline(this.timelineSet, initialEventId)
                 .then(initFields);
+            return;
         } else {
             initFields(this.timelineSet.getLiveTimeline());
-            return Promise.resolve();
+            return;
         }
     }
 
