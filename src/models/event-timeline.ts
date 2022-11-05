@@ -95,8 +95,14 @@ export class EventTimeline {
     private readonly name: string;
     private events: MatrixEvent[] = [];
     private baseIndex = 0;
+
     private startState?: RoomState;
     private endState?: RoomState;
+    // If we have a roomId then we delegate pagination token storage to the room state objects `startState` and
+    // `endState`, but for things like the notification timeline which mix multiple rooms we store the tokens ourselves.
+    private startToken: string | null = null;
+    private endToken: string | null = null;
+
     private prevTimeline: EventTimeline | null = null;
     private nextTimeline: EventTimeline | null = null;
     public paginationRequests: Record<Direction, Promise<boolean> | null> = {
@@ -128,9 +134,7 @@ export class EventTimeline {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
         if (this.roomId) {
             this.startState = new RoomState(this.roomId);
-            this.startState.paginationToken = null;
             this.endState = new RoomState(this.roomId);
-            this.endState.paginationToken = null;
         }
 
         // this is used by client.js
@@ -278,7 +282,13 @@ export class EventTimeline {
      * @return {?string} pagination token
      */
     public getPaginationToken(direction: Direction): string | null {
-        return this.getState(direction)?.paginationToken ?? null;
+        if (this.roomId) {
+            return this.getState(direction)!.paginationToken;
+        } else if (direction === Direction.Backward) {
+            return this.startToken;
+        } else {
+            return this.endToken;
+        }
     }
 
     /**
@@ -291,9 +301,12 @@ export class EventTimeline {
      *   pagination token for going forwards in time.
      */
     public setPaginationToken(token: string | null, direction: Direction): void {
-        const state = this.getState(direction);
-        if (state) {
-            state.paginationToken = token;
+        if (this.roomId) {
+            this.getState(direction)!.paginationToken = token;
+        } else if (direction === Direction.Backward) {
+            this.startToken = token;
+        } else {
+            this.endToken = token;
         }
     }
 
