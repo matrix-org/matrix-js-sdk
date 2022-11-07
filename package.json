@@ -63,6 +63,8 @@
     "matrix-events-sdk": "0.0.1-beta.7",
     "matrix-widget-api": "^1.0.0",
     "p-retry": "4",
+    "patch-package": "^6.5.0",
+    "postinstall-postinstall": "^2.1.0",
     "qs": "^6.9.6",
     "sdp-transform": "^2.14.1",
     "unhomoglyph": "^1.0.6"
@@ -110,8 +112,6 @@
     "jest-mock": "^29.0.0",
     "jsdoc": "^3.6.6",
     "matrix-mock-request": "^2.5.0",
-    "patch-package": "^6.5.0",
-    "postinstall-postinstall": "^2.1.0",
     "rimraf": "^3.0.2",
     "terser": "^5.5.1",
     "tsify": "^5.0.2",
