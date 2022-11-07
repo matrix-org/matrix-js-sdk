@@ -631,11 +631,6 @@ export class InteractiveAuth {
      */
     private firstUncompletedStage(flow: IFlow): AuthType | undefined {
         const completed = this.data.completed || [];
-        for (let i = 0; i < flow.stages.length; ++i) {
-            const stageType = flow.stages[i];
-            if (completed.indexOf(stageType) === -1) {
-                return stageType;
-            }
-        }
+        return flow.stages.find(stageType => !completed.includes(stageType));
     }
 }

@@ -95,8 +95,14 @@ export class EventTimeline {
     private readonly name: string;
     private events: MatrixEvent[] = [];
     private baseIndex = 0;
+
     private startState?: RoomState;
     private endState?: RoomState;
+    // If we have a roomId then we delegate pagination token storage to the room state objects `startState` and
+    // `endState`, but for things like the notification timeline which mix multiple rooms we store the tokens ourselves.
+    private startToken: string | null = null;
+    private endToken: string | null = null;
+
     private prevTimeline: EventTimeline | null = null;
     private nextTimeline: EventTimeline | null = null;
     public paginationRequests: Record<Direction, Promise<boolean> | null> = {
@@ -128,9 +134,7 @@ export class EventTimeline {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
         if (this.roomId) {
             this.startState = new RoomState(this.roomId);
-            this.startState.paginationToken = null;
             this.endState = new RoomState(this.roomId);
-            this.endState.paginationToken = null;
         }
 
         // this is used by client.js
@@ -151,22 +155,6 @@ export class EventTimeline {
     public initialiseState(stateEvents: MatrixEvent[], { timelineWasEmpty }: IInitialiseStateOptions = {}): void {
         if (this.events.length > 0) {
             throw new Error("Cannot initialise state after events are added");
-        }
-
-        // We previously deep copied events here and used different copies in
-        // the oldState and state events: this decision seems to date back
-        // quite a way and was apparently made to fix a bug where modifications
-        // made to the start state leaked through to the end state.
-        // This really shouldn't be possible though: the events themselves should
-        // not change. Duplicating the events uses a lot of extra memory,
-        // so we now no longer do it. To assert that they really do never change,
-        // freeze them! Note that we can't do this for events in general:
-        // although it looks like the only things preventing us are the
-        // 'status' flag, forwardLooking (which is only set once when adding to the
-        // timeline) and possibly the sender (which seems like it should never be
-        // reset but in practice causes a lot of the tests to break).
-        for (const e of stateEvents) {
-            Object.freeze(e);
         }
 
         this.startState?.setStateEvents(stateEvents, { timelineWasEmpty });
@@ -294,7 +282,13 @@ export class EventTimeline {
      * @return {?string} pagination token
      */
     public getPaginationToken(direction: Direction): string | null {
-        return this.getState(direction)?.paginationToken ?? null;
+        if (this.roomId) {
+            return this.getState(direction)!.paginationToken;
+        } else if (direction === Direction.Backward) {
+            return this.startToken;
+        } else {
+            return this.endToken;
+        }
     }
 
     /**
@@ -307,9 +301,12 @@ export class EventTimeline {
      *   pagination token for going forwards in time.
      */
     public setPaginationToken(token: string | null, direction: Direction): void {
-        const state = this.getState(direction);
-        if (state) {
-            state.paginationToken = token;
+        if (this.roomId) {
+            this.getState(direction)!.paginationToken = token;
+        } else if (direction === Direction.Backward) {
+            this.startToken = token;
+        } else {
+            this.endToken = token;
         }
     }
 

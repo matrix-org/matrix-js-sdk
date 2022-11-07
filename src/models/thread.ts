@@ -16,12 +16,13 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { MatrixClient, MatrixEventEvent, RelationType, RoomEvent } from "../matrix";
+import { MatrixClient } from "../client";
 import { TypedReEmitter } from "../ReEmitter";
-import { IThreadBundledRelationship, MatrixEvent } from "./event";
+import { RelationType } from "../@types/event";
+import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
-import { Room } from './room';
+import { Room, RoomEvent } from './room';
 import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";

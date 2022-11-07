@@ -29,7 +29,7 @@ import { DeviceInfo } from "./deviceinfo";
 import { SecretStorage } from "./SecretStorage";
 import { ICrossSigningKey, ISignedKey, MatrixClient } from "../client";
 import { OlmDevice } from "./OlmDevice";
-import { ICryptoCallbacks } from "../matrix";
+import { ICryptoCallbacks } from ".";
 import { ISignatures } from "../@types/signed";
 import { CryptoStore, SecretStorePrivateKeys } from "./store/base";
 import { ISecretStorageKeyInfo } from "./api";

@@ -454,8 +454,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         return utils.promiseTry<void>(() => {
             const txn = this.db!.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
-            for (let i = 0; i < accountData.length; i++) {
-                store.put(accountData[i]); // put == UPSERT
+            for (const event of accountData) {
+                store.put(event); // put == UPSERT
             }
             return txnAsPromise(txn).then();
         });

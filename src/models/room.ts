@@ -1024,8 +1024,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Removing just the old live timeline whilst preserving previous ones is not supported.
      */
     public resetLiveTimeline(backPaginationToken?: string | null, forwardPaginationToken?: string | null): void {
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].resetLiveTimeline(
+        for (const timelineSet of this.timelineSets) {
+            timelineSet.resetLiveTimeline(
                 backPaginationToken ?? undefined,
                 forwardPaginationToken ?? undefined,
             );
@@ -1878,7 +1878,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (!this.client.supportsExperimentalThreads()) {
+        if (!this.client?.supportsExperimentalThreads()) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2144,8 +2144,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const { duplicateStrategy, timelineWasEmpty, fromCache } = addLiveEventOptions;
 
         // add to our timeline sets
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].addLiveEvent(event, {
+        for (const timelineSet of this.timelineSets) {
+            timelineSet.addLiveEvent(event, {
                 duplicateStrategy,
                 fromCache,
                 timelineWasEmpty,
@@ -2230,8 +2230,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 }
             }
         } else {
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
+            for (const timelineSet of this.timelineSets) {
                 if (timelineSet.getFilter()) {
                     if (timelineSet.getFilter()!.filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event,
@@ -2338,9 +2337,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
         if (shouldLiveInRoom) {
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
-
+            for (const timelineSet of this.timelineSets) {
                 // if it's already in the timeline, update the timeline map. If it's not, add it.
                 timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
             }
@@ -2423,8 +2420,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 // if the event was already in the timeline (which will be the case if
                 // opts.pendingEventOrdering==chronological), we need to update the
                 // timeline map.
-                for (let i = 0; i < this.timelineSets.length; i++) {
-                    this.timelineSets[i].replaceEventId(oldEventId, newEventId!);
+                for (const timelineSet of this.timelineSets) {
+                    timelineSet.replaceEventId(oldEventId, newEventId!);
                 }
             }
         } else if (newStatus == EventStatus.CANCELLED) {
@@ -2659,8 +2656,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {String[]} eventIds A list of eventIds to remove.
      */
     public removeEvents(eventIds: string[]): void {
-        for (let i = 0; i < eventIds.length; ++i) {
-            this.removeEvent(eventIds[i]);
+        for (const eventId of eventIds) {
+            this.removeEvent(eventId);
         }
     }
 
@@ -2673,8 +2670,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public removeEvent(eventId: string): boolean {
         let removedAny = false;
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            const removed = this.timelineSets[i].removeEvent(eventId);
+        for (const timelineSet of this.timelineSets) {
+            const removed = timelineSet.removeEvent(eventId);
             if (removed) {
                 if (removed.isRedaction()) {
                     this.revertRedactionLocalEcho(removed);
@@ -2756,8 +2753,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {Array<MatrixEvent>} events an array of account_data events to add
      */
     public addAccountData(events: MatrixEvent[]): void {
-        for (let i = 0; i < events.length; i++) {
-            const event = events[i];
+        for (const event of events) {
             if (event.getType() === "m.tag") {
                 this.addTags(event);
             }

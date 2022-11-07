@@ -16,7 +16,7 @@ limitations under the License.
 
 import { MBeaconEventContent } from "../@types/beacon";
 import { BeaconInfoState, BeaconLocationState, parseBeaconContent, parseBeaconInfoContent } from "../content-helpers";
-import { MatrixEvent } from "../matrix";
+import { MatrixEvent } from "./event";
 import { sortEventsByLatestContentTimestamp } from "../utils";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
