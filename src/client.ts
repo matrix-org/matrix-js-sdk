@@ -3034,7 +3034,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
-        const path = this.makeKeyBackupPath(roomId!, sessionId!, version!);
+        const path = this.makeKeyBackupPath(roomId!, sessionId!, version);
         await this.http.authedRequest(
             Method.Put, path.path, path.queryData, data,
             { prefix: ClientPrefix.V3 },
@@ -3388,7 +3388,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
-        const path = this.makeKeyBackupPath(roomId!, sessionId!, version!);
+        const path = this.makeKeyBackupPath(roomId!, sessionId!, version);
         await this.http.authedRequest(
             Method.Delete, path.path, path.queryData, undefined,
             { prefix: ClientPrefix.V3 },
@@ -4284,7 +4284,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.sendEvent(
             roomId,
-            threadId as (string | null),
+            threadId as string | null,
             eventType,
             sendContent,
             txnId,
@@ -5328,7 +5328,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ];
 
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
-        let timeline = timelineSet.getTimelineForEvent(events[0].getId()!);
+        let timeline = timelineSet.getTimelineForEvent(events[0].getId());
         if (timeline) {
             timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
         } else {
@@ -6218,15 +6218,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // There can be only room-kind push rule per room
         // and its id is the room id.
         if (this.pushRules) {
-            if (!this.pushRules[scope] || !this.pushRules[scope].room) {
-                return;
-            }
-            for (let i = 0; i < this.pushRules[scope].room.length; i++) {
-                const rule = this.pushRules[scope].room[i];
-                if (rule.rule_id === roomId) {
-                    return rule;
-                }
-            }
+            return this.pushRules[scope]?.room?.find(rule => rule.rule_id === roomId);
         } else {
             throw new Error(
                 "SyncApi.sync() must be done before accessing to push rules.",
@@ -6576,8 +6568,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // create a new filter
         const createdFilter = await this.createFilter(filter.getDefinition());
 
-        // debuglog("Created new filter ID %s: %s", createdFilter.filterId,
-        //          JSON.stringify(createdFilter.getDefinition()));
         this.store.setFilterIdByName(filterName, createdFilter.filterId);
         return createdFilter.filterId!;
     }
@@ -8540,9 +8530,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             keyAlgorithm = "signed_curve25519";
         }
 
-        for (let i = 0; i < devices.length; ++i) {
-            const userId = devices[i][0];
-            const deviceId = devices[i][1];
+        for (const [userId, deviceId] of devices) {
             const query = queries[userId] || {};
             queries[userId] = query;
             query[deviceId] = keyAlgorithm;

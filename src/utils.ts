@@ -190,9 +190,9 @@ export function isFunction(value: any) {
  */
 // note using 'keys' here would shadow the 'keys' function defined above
 export function checkObjectHasKeys(obj: object, keys: string[]) {
-    for (let i = 0; i < keys.length; i++) {
-        if (!obj.hasOwnProperty(keys[i])) {
-            throw new Error("Missing required key: " + keys[i]);
+    for (const key of keys) {
+        if (!obj.hasOwnProperty(key)) {
+            throw new Error("Missing required key: " + key);
         }
     }
 }

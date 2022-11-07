@@ -457,8 +457,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         let didUpdate = false;
         let lastEventWasNew = false;
-        for (let i = 0; i < events.length; i++) {
-            const event = events[i];
+        for (const event of events) {
             const eventId = event.getId()!;
 
             const existingTimeline = this._eventIdToTimeline.get(eventId);

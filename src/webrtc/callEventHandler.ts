@@ -191,7 +191,6 @@ export class CallEventHandler {
         const senderId = event.getSender()!;
         const weSentTheEvent = senderId === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
-        //console.info("RECV %s content=%s", type, JSON.stringify(content));
 
         let opponentDeviceId: string | undefined;
 

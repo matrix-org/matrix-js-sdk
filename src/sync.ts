@@ -821,7 +821,6 @@ export class SyncApi {
 
             let data: ISyncResponse;
             try {
-                //debuglog('Starting sync since=' + syncToken);
                 if (!this.currentSyncRequest) {
                     this.currentSyncRequest = this.doSyncRequest(syncOptions, syncToken);
                 }
@@ -833,8 +832,6 @@ export class SyncApi {
             } finally {
                 this.currentSyncRequest = undefined;
             }
-
-            //debuglog('Completed sync, next_batch=' + data.next_batch);
 
             // set the sync token NOW *before* processing the events. We do this so
             // if something barfs on an event we can skip it rather than constantly
@@ -1748,11 +1745,10 @@ export class SyncApi {
     private processEventsForNotifs(room: Room, timelineEventList: MatrixEvent[]): void {
         // gather our notifications into this.notifEvents
         if (this.client.getNotifTimelineSet()) {
-            for (let i = 0; i < timelineEventList.length; i++) {
-                const pushActions = this.client.getPushActionsForEvent(timelineEventList[i]);
-                if (pushActions && pushActions.notify &&
-                    pushActions.tweaks && pushActions.tweaks.highlight) {
-                    this.notifEvents.push(timelineEventList[i]);
+            for (const event of timelineEventList) {
+                const pushActions = this.client.getPushActionsForEvent(event);
+                if (pushActions?.notify && pushActions.tweaks?.highlight) {
+                    this.notifEvents.push(event);
                 }
             }
         }

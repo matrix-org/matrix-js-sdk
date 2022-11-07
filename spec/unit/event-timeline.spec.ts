@@ -1,14 +1,12 @@
 import { mocked } from 'jest-mock';
 
 import * as utils from "../test-utils/test-utils";
-import { EventTimeline } from "../../src/models/event-timeline";
+import { Direction, EventTimeline } from "../../src/models/event-timeline";
 import { RoomState } from "../../src/models/room-state";
 import { MatrixClient } from "../../src/matrix";
 import { Room } from "../../src/models/room";
 import { RoomMember } from "../../src/models/room-member";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
-
-jest.mock("../../src/models/room-state");
 
 describe("EventTimeline", function() {
     const roomId = "!foo:bar";
@@ -23,7 +21,14 @@ describe("EventTimeline", function() {
         const timelineSet = new EventTimelineSet(room);
         jest.spyOn(room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
 
-        return new EventTimeline(timelineSet);
+        const timeline = new EventTimeline(timelineSet);
+        // We manually stub the methods we'll be mocking out later instead of mocking the whole module
+        // otherwise the default member property values (e.g. paginationToken) will be incorrect
+        timeline.getState(Direction.Backward)!.setStateEvents = jest.fn();
+        timeline.getState(Direction.Backward)!.getSentinelMember = jest.fn();
+        timeline.getState(Direction.Forward)!.setStateEvents = jest.fn();
+        timeline.getState(Direction.Forward)!.getSentinelMember = jest.fn();
+        return timeline;
     };
 
     beforeEach(function() {
@@ -98,7 +103,17 @@ describe("EventTimeline", function() {
             expect(timeline.getPaginationToken(EventTimeline.FORWARDS)).toBe(null);
         });
 
-        it("setPaginationToken should set  token", function() {
+        it("setPaginationToken should set token", function() {
+            timeline.setPaginationToken("back", EventTimeline.BACKWARDS);
+            timeline.setPaginationToken("fwd", EventTimeline.FORWARDS);
+            expect(timeline.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("back");
+            expect(timeline.getPaginationToken(EventTimeline.FORWARDS)).toEqual("fwd");
+        });
+
+        it("should be able to store pagination tokens for mixed room timelines", () => {
+            const timelineSet = new EventTimelineSet(undefined);
+            const timeline = new EventTimeline(timelineSet);
+
             timeline.setPaginationToken("back", EventTimeline.BACKWARDS);
             timeline.setPaginationToken("fwd", EventTimeline.FORWARDS);
             expect(timeline.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("back");

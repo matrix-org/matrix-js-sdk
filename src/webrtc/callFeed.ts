@@ -239,9 +239,9 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.analyser.getFloatFrequencyData(this.frequencyBinCount!);
 
         let maxVolume = -Infinity;
-        for (let i = 0; i < this.frequencyBinCount!.length; i++) {
-            if (this.frequencyBinCount![i] > maxVolume) {
-                maxVolume = this.frequencyBinCount![i];
+        for (const volume of this.frequencyBinCount!) {
+            if (volume > maxVolume) {
+                maxVolume = volume;
             }
         }
 
@@ -252,9 +252,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         let newSpeaking = false;
 
-        for (let i = 0; i < this.speakingVolumeSamples.length; i++) {
-            const volume = this.speakingVolumeSamples[i];
-
+        for (const volume of this.speakingVolumeSamples) {
             if (volume > this.speakingThreshold) {
                 newSpeaking = true;
                 break;
