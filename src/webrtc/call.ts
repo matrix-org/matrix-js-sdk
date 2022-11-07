@@ -2237,8 +2237,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 }
 
 function setTracksEnabled(tracks: Array<MediaStreamTrack>, enabled: boolean): void {
-    for (let i = 0; i < tracks.length; i++) {
-        tracks[i].enabled = enabled;
+    for (const track of tracks) {
+        track.enabled = enabled;
     }
 }
 

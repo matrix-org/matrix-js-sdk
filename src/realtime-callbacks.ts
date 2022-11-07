@@ -101,7 +101,7 @@ export function clearTimeout(key: number): void {
     }
 
     // remove the element from the list
-    let i;
+    let i: number;
     for (i = 0; i < callbackList.length; i++) {
         const cb = callbackList[i];
         if (cb.key == key) {
@@ -137,7 +137,6 @@ function scheduleRealCallback(): void {
 }
 
 function runCallbacks(): void {
-    let cb: Callback;
     const timestamp = Date.now();
     debuglog("runCallbacks: now:", timestamp);
 
@@ -149,7 +148,7 @@ function runCallbacks(): void {
         if (!first || first.runAt > timestamp) {
             break;
         }
-        cb = callbackList.shift()!;
+        const cb = callbackList.shift()!;
         debuglog("runCallbacks: popping", cb.key);
         callbacksToRun.push(cb);
     }
@@ -159,8 +158,7 @@ function runCallbacks(): void {
     // register their own setTimeouts.
     scheduleRealCallback();
 
-    for (let i = 0; i < callbacksToRun.length; i++) {
-        cb = callbacksToRun[i];
+    for (const cb of callbacksToRun) {
         try {
             cb.func.apply(global, cb.params);
         } catch (e) {

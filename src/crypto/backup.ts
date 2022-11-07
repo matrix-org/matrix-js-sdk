@@ -680,8 +680,7 @@ export class Curve25519 implements BackupAlgorithm {
             const backupPubKey = decryption.init_with_private_key(privKey);
 
             if (backupPubKey !== this.authData.public_key) {
-                // eslint-disable-next-line no-throw-literal
-                throw { errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY };
+                throw new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY });
             }
 
             const keys: IMegolmSessionData[] = [];

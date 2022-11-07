@@ -2379,9 +2379,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async getOlmSessionsForUser(userId: string): Promise<Record<string, IUserOlmSession>> {
         const devices = this.getStoredDevicesForUser(userId) || [];
-        const result = {};
-        for (let j = 0; j < devices.length; ++j) {
-            const device = devices[j];
+        const result: { [deviceId: string]: IUserOlmSession } = {};
+        for (const device of devices) {
             const deviceKey = device.getIdentityKey();
             const sessions = await this.olmDevice.getSessionInfoForDevice(deviceKey);
 
@@ -2682,14 +2681,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
         const devicesByUser: Record<string, DeviceInfo[]> = {};
 
-        for (let i = 0; i < users.length; ++i) {
-            const userId = users[i];
+        for (const userId of users) {
             devicesByUser[userId] = [];
 
             const devices = this.getStoredDevicesForUser(userId) || [];
-            for (let j = 0; j < devices.length; ++j) {
-                const deviceInfo = devices[j];
-
+            for (const deviceInfo of devices) {
                 const key = deviceInfo.getIdentityKey();
                 if (key == this.olmDevice.deviceCurve25519Key) {
                     // don't bother setting up session to ourself
