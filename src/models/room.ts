@@ -933,7 +933,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // with refreshing the timeline before which left them in a blank
         // timeline from `resetLiveTimeline`.
         if (!mostRecentEventIdInTimeline) {
-            newTimeline = await this.client.getLatestLiveTimeline(timelineSet);
+            newTimeline = await this.client.fetchLatestLiveTimeline(timelineSet);
         } else {
             // Empty out all of `this.timelineSets`. But we also need to keep the
             // same `timelineSet` references around so the React code updates

@@ -780,7 +780,135 @@ describe("MatrixClient event timelines", function() {
         });
     });
 
-    describe("getLatestLiveTimeline", function() {
+    describe("getLatestTimeline", function() {
+        it("timeline support must be enabled to work", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: false },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+            await startClient(httpBackend, client);
+
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0]!;
+            await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
+        });
+
+        it("timeline support works when enabled", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+
+            return startClient(httpBackend, client).then(() => {
+                const room = client.getRoom(roomId)!;
+                const timelineSet = room.getTimelineSets()[0];
+                expect(client.getLatestTimeline(timelineSet)).rejects.toBeFalsy();
+            });
+        });
+
+        it("only works with room timelines", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+            await startClient(httpBackend, client);
+
+            const timelineSet = new EventTimelineSet(undefined);
+            await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
+        });
+
+        it("should create a new timeline for new events", function() {
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0];
+
+            const latestMessageId = 'event1:bar';
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, function() {
+                    return {
+                        chunk: [{
+                            event_id: latestMessageId,
+                        }],
+                    };
+                });
+
+            httpBackend.when("GET", `/rooms/!foo%3Abar/context/${encodeURIComponent(latestMessageId)}`)
+                .respond(200, function() {
+                    return {
+                        start: "start_token",
+                        events_before: [EVENTS[1], EVENTS[0]],
+                        event: EVENTS[2],
+                        events_after: [EVENTS[3]],
+                        state: [
+                            ROOM_NAME_EVENT,
+                            USER_MEMBERSHIP_EVENT,
+                        ],
+                        end: "end_token",
+                    };
+                });
+
+            return Promise.all([
+                client.getLatestTimeline(timelineSet).then(function(tl) {
+                    // Instead of this assertion logic, we could just add a spy
+                    // for `getEventTimeline` and make sure it's called with the
+                    // correct parameters. This doesn't feel too bad to make sure
+                    // `getLatestTimeline` is doing the right thing though.
+                    expect(tl!.getEvents().length).toEqual(4);
+                    for (let i = 0; i < 4; i++) {
+                        expect(tl!.getEvents()[i].event).toEqual(EVENTS[i]);
+                        expect(tl!.getEvents()[i]?.sender?.name).toEqual(userName);
+                    }
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
+                        .toEqual("start_token");
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS))
+                        .toEqual("end_token");
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should throw error when /messages does not return a message", () => {
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, () => {
+                    return {
+                        chunk: [
+                            // No messages to return
+                        ],
+                    };
+                });
+
+            return Promise.all([
+                expect(client.getLatestTimeline(timelineSet)).rejects.toThrow(),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    describe("fetchLatestLiveTimeline", function() {
         beforeEach(() => {
             // @ts-ignore
             client.clientOpts.experimentalThreadSupport = true;
@@ -802,7 +930,7 @@ describe("MatrixClient event timelines", function() {
 
             const room = client.getRoom(roomId)!;
             const timelineSet = room.getTimelineSets()[0]!;
-            await expect(client.getLatestLiveTimeline(timelineSet)).rejects.toBeTruthy();
+            await expect(client.fetchLatestLiveTimeline(timelineSet)).rejects.toBeTruthy();
         });
 
         it("timeline support works when enabled", async function() {
@@ -821,7 +949,7 @@ describe("MatrixClient event timelines", function() {
             return startClient(httpBackend, client).then(() => {
                 const room = client.getRoom(roomId)!;
                 const timelineSet = room.getTimelineSets()[0];
-                expect(client.getLatestLiveTimeline(timelineSet)).rejects.toBeFalsy();
+                expect(client.fetchLatestLiveTimeline(timelineSet)).rejects.toBeFalsy();
             });
         });
 
@@ -840,7 +968,7 @@ describe("MatrixClient event timelines", function() {
             await startClient(httpBackend, client);
 
             const timelineSet = new EventTimelineSet(undefined);
-            await expect(client.getLatestLiveTimeline(timelineSet)).rejects.toBeTruthy();
+            await expect(client.fetchLatestLiveTimeline(timelineSet)).rejects.toBeTruthy();
         });
 
         it("should create a new timeline for new events", function() {
@@ -874,11 +1002,11 @@ describe("MatrixClient event timelines", function() {
                 });
 
             return Promise.all([
-                client.getLatestLiveTimeline(timelineSet).then(function(tl) {
+                client.fetchLatestLiveTimeline(timelineSet).then(function(tl) {
                     // Instead of this assertion logic, we could just add a spy
                     // for `getEventTimeline` and make sure it's called with the
                     // correct parameters. This doesn't feel too bad to make sure
-                    // `getLatestLiveTimeline` is doing the right thing though.
+                    // `fetchLatestLiveTimeline` is doing the right thing though.
                     expect(tl!.getEvents().length).toEqual(4);
                     for (let i = 0; i < 4; i++) {
                         expect(tl!.getEvents()[i].event).toEqual(EVENTS[i]);
@@ -934,7 +1062,7 @@ describe("MatrixClient event timelines", function() {
                 };
             };
             return Promise.all([
-                client.getLatestLiveTimeline(timelineSet).then(function(tl) {
+                client.fetchLatestLiveTimeline(timelineSet).then(function(tl) {
                     const events = tl!.getEvents();
                     const expectedEvents = [EVENTS[0], THREAD_ROOT];
                     expect(events.map(event => eventPropertiesToCompare(event)))
@@ -965,7 +1093,7 @@ describe("MatrixClient event timelines", function() {
                 });
 
             return Promise.all([
-                expect(client.getLatestLiveTimeline(timelineSet)).rejects.toThrow(),
+                expect(client.fetchLatestLiveTimeline(timelineSet)).rejects.toThrow(),
                 httpBackend.flushAllExpected(),
             ]);
         });
@@ -1185,7 +1313,7 @@ describe("MatrixClient event timelines", function() {
                 respondToContext();
                 await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
                 respondToThreads();
-                const timeline = await flushHttp(client.getLatestLiveTimeline(timelineSet));
+                const timeline = await flushHttp(client.getLatestTimeline(timelineSet));
                 expect(timeline).not.toBeNull();
 
                 respondToThreads();
@@ -1241,7 +1369,7 @@ describe("MatrixClient event timelines", function() {
                 await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
 
                 respondToMessagesRequest();
-                const timeline = await flushHttp(client.getLatestLiveTimeline(timelineSet));
+                const timeline = await flushHttp(client.getLatestTimeline(timelineSet));
                 expect(timeline).not.toBeNull();
 
                 respondToMessagesRequest();

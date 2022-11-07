@@ -5503,14 +5503,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Get an EventTimeline for the latest events in the room. This will just
      * call `/messages` to get the latest message in the room, then use
      * `client.getEventTimeline(...)` to construct a new timeline from it.
-     * Always returns timeline in the given `timelineSet`.
      *
      * @param {EventTimelineSet} timelineSet  The timelineSet to find or add the timeline to
      *
      * @return {Promise} Resolves:
      *    {@link module:models/event-timeline~EventTimeline} timeline with the latest events in the room
      */
-    public async getLatestLiveTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
+    public async getLatestTimeline(timelineSet: EventTimelineSet): Promise<Optional<EventTimeline>> {
         // don't allow any timeline support unless it's been enabled.
         if (!this.timelineSupport) {
             throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
@@ -5518,11 +5517,77 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (!timelineSet.room) {
-            throw new Error("getLatestLiveTimeline only supports room timelines");
+            throw new Error("getLatestTimeline only supports room timelines");
+        }
+
+        let event;
+        if (timelineSet.threadListType !== null) {
+            const res = await this.createThreadListMessagesRequest(
+                timelineSet.room.roomId,
+                null,
+                1,
+                Direction.Backward,
+                timelineSet.threadListType,
+                timelineSet.getFilter(),
+            );
+            event = res.chunk?.[0];
+        } else if (timelineSet.thread && Thread.hasServerSideSupport) {
+            const res = await this.fetchRelations(
+                timelineSet.room.roomId,
+                timelineSet.thread.id,
+                THREAD_RELATION_TYPE.name,
+                null,
+                { dir: Direction.Backward, limit: 1 },
+            );
+            event = res.chunk?.[0];
+        } else {
+            const messagesPath = utils.encodeUri(
+                "/rooms/$roomId/messages", {
+                    $roomId: timelineSet.room.roomId,
+                },
+            );
+
+            const params: Record<string, string | string[]> = {
+                dir: 'b',
+            };
+            if (this.clientOpts?.lazyLoadMembers) {
+                params.filter = JSON.stringify(Filter.LAZY_LOADING_MESSAGES_FILTER);
+            }
+
+            const res = await this.http.authedRequest<IMessagesResponse>(Method.Get, messagesPath, params);
+            event = res.chunk?.[0];
+        }
+        if (!event) {
+            throw new Error("No message returned when trying to construct getLatestTimeline");
+        }
+
+        return this.getEventTimeline(timelineSet, event.event_id);
+    }
+
+    /**
+     * Get an EventTimeline for the latest events in the room. This will just
+     * call `/messages` to get the latest message in the room, then use
+     * `client.getEventTimeline(...)` to construct a new timeline from it.
+     * Always returns timeline in the given `timelineSet`.
+     *
+     * @param {EventTimelineSet} timelineSet  The timelineSet to find or add the timeline to
+     *
+     * @return {Promise} Resolves:
+     *    {@link module:models/event-timeline~EventTimeline} timeline with the latest events in the room
+     */
+    public async fetchLatestLiveTimeline(timelineSet: EventTimelineSet): Promise<EventTimeline> {
+        // don't allow any timeline support unless it's been enabled.
+        if (!this.timelineSupport) {
+            throw new Error("timeline support is disabled. Set the 'timelineSupport'" +
+                " parameter to true when creating MatrixClient to enable it.");
+        }
+
+        if (!timelineSet.room) {
+            throw new Error("fetchLatestLiveTimeline only supports room timelines");
         }
 
         if (timelineSet.threadListType !== null || timelineSet.thread && Thread.hasServerSideSupport) {
-            throw new Error("getLatestLiveTimeline only supports live timelines");
+            throw new Error("fetchLatestLiveTimeline only supports live timelines");
         }
 
         const messagesPath = utils.encodeUri(
@@ -5547,7 +5612,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const latestEventInTimeline = messagesRes.chunk?.[0];
         const latestEventIdInTimeline = latestEventInTimeline?.event_id;
         if (!latestEventIdInTimeline) {
-            throw new Error("No message returned when trying to construct getLatestLiveTimeline");
+            throw new Error("No message returned when trying to construct fetchLatestLiveTimeline");
         }
 
         const contextPath = utils.encodeUri(
@@ -5567,7 +5632,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         );
         if (!contextRes.event || contextRes.event.event_id !== latestEventIdInTimeline) {
             throw new Error(
-                `getLatestLiveTimeline: \`/context\` response did not include latestEventIdInTimeline=` +
+                `fetchLatestLiveTimeline: \`/context\` response did not include latestEventIdInTimeline=` +
                 `${latestEventIdInTimeline} which we were asking about. This is probably a bug in the ` +
                 `homeserver since we just saw the event with the other request above and now the server ` +
                 `claims it does not exist.`,
