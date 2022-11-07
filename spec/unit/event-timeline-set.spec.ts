@@ -205,7 +205,7 @@ describe('EventTimelineSet', () => {
         });
 
         describe('non-room timeline', () => {
-            fit('Adds event to timeline', () => {
+            it('Adds event to timeline', () => {
                 const nonRoomEventTimelineSet = new EventTimelineSet(
                     // This is what we're specifically testing against, a timeline
                     // without a `room` defined
