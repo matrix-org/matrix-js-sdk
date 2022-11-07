@@ -6,6 +6,7 @@ module.exports = {
     extends: [
         "plugin:matrix-org/babel",
         "plugin:import/typescript",
+        "plugin:jest/recommended",
     ],
     env: {
         browser: true,
