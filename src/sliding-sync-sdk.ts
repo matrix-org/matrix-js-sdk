@@ -33,8 +33,11 @@ import {
     SlidingSyncEvent,
     SlidingSyncState,
 } from "./sliding-sync";
-import { EventType, IPushRules } from "./matrix";
+import { EventType } from "./@types/event";
+import { IPushRules } from "./@types/PushRules";
 import { PushProcessor } from "./pushprocessor";
+import { RoomStateEvent } from "./models/room-state";
+import { RoomMemberEvent } from "./models/room-member";
 
 // Number of consecutive failed syncs that will lead to a syncState of ERROR as opposed
 // to RECONNECTING. This is needed to inform the client of server issues when the
@@ -389,6 +392,60 @@ export class SlidingSyncSdk {
         return this.syncStateData ?? null;
     }
 
+    // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts
+
+    public createRoom(roomId: string): Room { // XXX cargoculted from sync.ts
+        const { timelineSupport } = this.client;
+        const room = new Room(roomId, this.client, this.client.getUserId()!, {
+            lazyLoadMembers: this.opts.lazyLoadMembers,
+            pendingEventOrdering: this.opts.pendingEventOrdering,
+            timelineSupport,
+        });
+        this.client.reEmitter.reEmit(room, [
+            RoomEvent.Name,
+            RoomEvent.Redaction,
+            RoomEvent.RedactionCancelled,
+            RoomEvent.Receipt,
+            RoomEvent.Tags,
+            RoomEvent.LocalEchoUpdated,
+            RoomEvent.AccountData,
+            RoomEvent.MyMembership,
+            RoomEvent.Timeline,
+            RoomEvent.TimelineReset,
+        ]);
+        this.registerStateListeners(room);
+        return room;
+    }
+
+    private registerStateListeners(room: Room): void { // XXX cargoculted from sync.ts
+        // we need to also re-emit room state and room member events, so hook it up
+        // to the client now. We need to add a listener for RoomState.members in
+        // order to hook them correctly.
+        this.client.reEmitter.reEmit(room.currentState, [
+            RoomStateEvent.Events,
+            RoomStateEvent.Members,
+            RoomStateEvent.NewMember,
+            RoomStateEvent.Update,
+        ]);
+        room.currentState.on(RoomStateEvent.NewMember, (event, state, member) => {
+            member.user = this.client.getUser(member.userId) ?? undefined;
+            this.client.reEmitter.reEmit(member, [
+                RoomMemberEvent.Name,
+                RoomMemberEvent.Typing,
+                RoomMemberEvent.PowerLevel,
+                RoomMemberEvent.Membership,
+            ]);
+        });
+    }
+
+    /*
+    private deregisterStateListeners(room: Room): void { // XXX cargoculted from sync.ts
+        // could do with a better way of achieving this.
+        room.currentState.removeAllListeners(RoomStateEvent.Events);
+        room.currentState.removeAllListeners(RoomStateEvent.Members);
+        room.currentState.removeAllListeners(RoomStateEvent.NewMember);
+    } */
+
     private shouldAbortSync(error: MatrixError): boolean {
         if (error.errcode === "M_UNKNOWN_TOKEN") {
             // The logout already happened, we just need to stop.
@@ -484,7 +541,7 @@ export class SlidingSyncSdk {
 
         if (roomData.invite_state) {
             const inviteStateEvents = mapEvents(this.client, room.roomId, roomData.invite_state);
-            this.processRoomEvents(room, inviteStateEvents);
+            this.injectRoomEvents(room, inviteStateEvents);
             if (roomData.initial) {
                 room.recalculate();
                 this.client.store.storeRoom(room);
@@ -552,10 +609,11 @@ export class SlidingSyncSdk {
                 // reason to stop incrementally tracking notifications and
                 // reset the timeline.
                 this.client.resetNotifTimelineSet();
+                this.registerStateListeners(room);
             }
         } */
 
-        this.processRoomEvents(room, stateEvents, timelineEvents, false);
+        this.injectRoomEvents(room, stateEvents, timelineEvents, false);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -594,6 +652,7 @@ export class SlidingSyncSdk {
     }
 
     /**
+     * Injects events into a room's model.
      * @param {Room} room
      * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
@@ -601,7 +660,7 @@ export class SlidingSyncSdk {
      * @param {boolean} fromCache whether the sync response came from cache
      * is earlier in time. Higher index is later.
      */
-    private processRoomEvents(
+    public injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
@@ -822,7 +881,6 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
 
 // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
 // just outside the class.
-
 function mapEvents(client: MatrixClient, roomId: string | undefined, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });
     return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {

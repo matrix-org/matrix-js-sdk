@@ -334,7 +334,7 @@ export class SyncApi {
             // events so that clients can start back-paginating.
             room.getLiveTimeline().setPaginationToken(leaveObj.timeline.prev_batch, EventTimeline.BACKWARDS);
 
-            await this.processRoomEvents(room, stateEvents, events);
+            await this.injectRoomEvents(room, stateEvents, events);
 
             room.recalculate();
             client.store.storeRoom(room);
@@ -367,7 +367,7 @@ export class SyncApi {
             response.messages.chunk = response.messages.chunk || [];
             response.state = response.state || [];
 
-            // FIXME: Mostly duplicated from processRoomEvents but not entirely
+            // FIXME: Mostly duplicated from injectRoomEvents but not entirely
             // because "state" in this API is at the BEGINNING of the chunk
             const oldStateEvents = utils.deepCopy(response.state)
                 .map(client.getEventMapper());
@@ -1207,7 +1207,7 @@ export class SyncApi {
             const room = inviteObj.room;
             const stateEvents = this.mapSyncEventsFormat(inviteObj.invite_state, room);
 
-            await this.processRoomEvents(room, stateEvents);
+            await this.injectRoomEvents(room, stateEvents);
 
             const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId()!)?.getSender();
 
@@ -1363,7 +1363,7 @@ export class SyncApi {
             }
 
             try {
-                await this.processRoomEvents(room, stateEvents, events, syncEventData.fromCache);
+                await this.injectRoomEvents(room, stateEvents, events, syncEventData.fromCache);
             } catch (e) {
                 logger.error(`Failed to process events on room ${room.roomId}:`, e);
             }
@@ -1418,7 +1418,7 @@ export class SyncApi {
             const events = this.mapSyncEventsFormat(leaveObj.timeline, room);
             const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 
-            await this.processRoomEvents(room, stateEvents, events);
+            await this.injectRoomEvents(room, stateEvents, events);
             room.addAccountData(accountDataEvents);
 
             room.recalculate();
@@ -1656,14 +1656,15 @@ export class SyncApi {
     }
 
     /**
+     * Injects events into a room's model.
      * @param {Room} room
      * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
      * @param {MatrixEvent[]} [timelineEventList] A list of timeline events, including threaded. Lower index
-     * @param {boolean} fromCache whether the sync response came from cache
      * is earlier in time. Higher index is later.
+     * @param {boolean} fromCache whether the sync response came from cache
      */
-    private async processRoomEvents(
+    public async injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],

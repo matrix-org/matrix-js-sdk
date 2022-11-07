@@ -1,5 +1,5 @@
 /*
-Copyright 2015-2021 The Matrix.org Foundation C.I.C.
+Copyright 2015-2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,14 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { WidgetApi } from "matrix-widget-api";
+
 import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store";
 import { MemoryStore } from "./store/memory";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient, ICreateClientOpts } from "./client";
-import { DeviceTrustLevel } from "./crypto/CrossSigning";
-import { ISecretStorageKeyInfo } from "./crypto/api";
+import { RoomWidgetClient, ICapabilities } from "./embedded";
 
 export * from "./client";
+export * from "./embedded";
 export * from "./http-api";
 export * from "./autodiscovery";
 export * from "./sync-accumulator";
@@ -51,9 +53,16 @@ export * from './@types/requests';
 export * from './@types/search';
 export * from './models/room-summary';
 export * as ContentHelpers from "./content-helpers";
+export type { ICryptoCallbacks } from "./crypto"; // used to be located here
+export { createNewMatrixCall } from "./webrtc/call";
+export type { MatrixCall } from "./webrtc/call";
 export {
-    createNewMatrixCall,
-} from "./webrtc/call";
+    GroupCallEvent,
+    GroupCallIntent,
+    GroupCallState,
+    GroupCallType,
+} from "./webrtc/groupCall";
+export type { GroupCall } from "./webrtc/groupCall";
 
 let cryptoStoreFactory = () => new MemoryCryptoStore;
 
@@ -67,34 +76,20 @@ export function setCryptoStoreFactory(fac) {
     cryptoStoreFactory = fac;
 }
 
-export interface ICryptoCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
-    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
-    shouldUpgradeDeviceVerifications?: (
-        users: Record<string, any>
-    ) => Promise<string[]>;
-    getSecretStorageKey?: (
-        keys: {keys: Record<string, ISecretStorageKeyInfo>}, name: string
-    ) => Promise<[string, Uint8Array] | null>;
-    cacheSecretStorageKey?: (
-        keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array
-    ) => void;
-    onSecretRequested?: (
-        userId: string, deviceId: string,
-        requestId: string, secretName: string, deviceTrust: DeviceTrustLevel
-    ) => Promise<string>;
-    getDehydrationKey?: (
-        keyInfo: ISecretStorageKeyInfo,
-        checkFunc: (key: Uint8Array) => void,
-    ) => Promise<Uint8Array>;
-    getBackupKey?: () => Promise<Uint8Array>;
+function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
+    opts.store = opts.store ?? new MemoryStore({
+        localStorage: global.localStorage,
+    });
+    opts.scheduler = opts.scheduler ?? new MatrixScheduler();
+    opts.cryptoStore = opts.cryptoStore ?? cryptoStoreFactory();
+
+    return opts;
 }
 
 /**
  * Construct a Matrix Client. Similar to {@link module:client.MatrixClient}
  * except that the 'request', 'store' and 'scheduler' dependencies are satisfied.
- * @param {(Object)} opts The configuration options for this client. If
- * this is a string, it is assumed to be the base URL. These configuration
+ * @param {Object} opts The configuration options for this client. These configuration
  * options will be passed directly to {@link module:client.MatrixClient}.
  * @param {Object} opts.store If not set, defaults to
  * {@link module:store/memory.MemoryStore}.
@@ -111,33 +106,15 @@ export interface ICryptoCallbacks {
  * @see {@link module:client.MatrixClient} for the full list of options for
  * <code>opts</code>.
  */
-export function createClient(opts: ICreateClientOpts) {
-    opts.store = opts.store || new MemoryStore({
-        localStorage: global.localStorage,
-    });
-    opts.scheduler = opts.scheduler || new MatrixScheduler();
-    opts.cryptoStore = opts.cryptoStore || cryptoStoreFactory();
-    return new MatrixClient(opts);
+export function createClient(opts: ICreateClientOpts): MatrixClient {
+    return new MatrixClient(amendClientOpts(opts));
 }
 
-/**
- * A wrapper for the request function interface.
- * @callback requestWrapperFunction
- * @param {requestFunction} origRequest The underlying request function being
- * wrapped
- * @param {Object} opts The options for this HTTP request, given in the same
- * form as {@link requestFunction}.
- * @param {requestCallback} callback The request callback.
- */
-
-/**
-  * The request callback interface for performing HTTP requests. This matches the
-  * API for the {@link https://github.com/request/request#requestoptions-callback|
-  * request NPM module}. The SDK will implement a callback which meets this
-  * interface in order to handle the HTTP response.
-  * @callback requestCallback
-  * @param {Error} err The error if one occurred, else falsey.
-  * @param {Object} response The HTTP response which consists of
-  * <code>{statusCode: {Number}, headers: {Object}}</code>
-  * @param {Object} body The parsed HTTP response body.
-  */
+export function createRoomWidgetClient(
+    widgetApi: WidgetApi,
+    capabilities: ICapabilities,
+    roomId: string,
+    opts: ICreateClientOpts,
+): MatrixClient {
+    return new RoomWidgetClient(widgetApi, capabilities, roomId, amendClientOpts(opts));
+}
