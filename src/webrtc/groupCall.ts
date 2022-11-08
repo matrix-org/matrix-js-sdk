@@ -183,6 +183,9 @@ export class GroupCall extends TypedEventEmitter<
     private transmitTimer: ReturnType<typeof setTimeout> | null = null;
     private memberStateExpirationTimers: Map<string, ReturnType<typeof setTimeout>> = new Map();
     private resendMemberStateTimer: ReturnType<typeof setInterval> | null = null;
+    private initWithAudioMuted = false;
+    private initWithVideoMuted = false;
+    private sfu: ISfuInfo | null;
 
     constructor(
         private client: MatrixClient,
@@ -1110,6 +1113,16 @@ export class GroupCall extends TypedEventEmitter<
 
         // Find removed feeds
         [...this.userMediaFeeds, ...this.screenshareFeeds].filter((gf) => gf.disposed).forEach((feed) => {
+            // Only remove the feed if the other feed array doesn't have a feed
+            // from the given user
+            if (
+                !(feed.purpose === SDPStreamMetadataPurpose.Usermedia
+                    ? this.screenshareFeeds
+                    : this.userMediaFeeds).some((f) => f.userId === feed.getMember().userId)
+            ) {
+                this.removeParticipant(feed.getMember());
+            }
+
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
             else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.removeScreenshareFeed(feed);
         });
@@ -1118,6 +1131,8 @@ export class GroupCall extends TypedEventEmitter<
         call.getRemoteFeeds().filter((cf) => {
             return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
         }).forEach((feed) => {
+            this.addParticipant(feed.getMember());
+
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
             else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.addScreenshareFeed(feed);
         });
