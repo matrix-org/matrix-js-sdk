@@ -22,6 +22,8 @@ import { MatrixClient } from "../../src/client";
 import { ToDeviceBatch } from '../../src/models/ToDeviceMessage';
 import { logger } from '../../src/logger';
 import { IStore } from '../../src/store';
+import { flushPromises } from '../test-utils/flushPromises';
+import { removeElement } from "../../src/utils";
 
 const FAKE_USER = "@alice:example.org";
 const FAKE_DEVICE_ID = "AAAAAAAA";
@@ -47,19 +49,6 @@ enum StoreType {
     IndexedDB = 'IndexedDB',
 }
 
-// Jest now uses @sinonjs/fake-timers which exposes tickAsync() and a number of
-// other async methods which break the event loop, letting scheduled promise
-// callbacks run. Unfortunately, Jest doesn't expose these, so we have to do
-// it manually (this is what sinon does under the hood). We do both in a loop
-// until the thing we expect happens: hopefully this is the least flakey way
-// and avoids assuming anything about the app's behaviour.
-const realSetTimeout = setTimeout;
-function flushPromises() {
-    return new Promise(r => {
-        realSetTimeout(r, 1);
-    });
-}
-
 async function flushAndRunTimersUntil(cond: () => boolean) {
     while (!cond()) {
         await flushPromises();
@@ -75,6 +64,8 @@ describe.each([
     let client: MatrixClient;
 
     beforeEach(async function() {
+        jest.runOnlyPendingTimers();
+        jest.useRealTimers();
         httpBackend = new MockHttpBackend();
 
         let store: IStore;
@@ -300,7 +291,7 @@ describe.each([
             ],
         });
 
-        expect(await httpBackend.flush(undefined, 1, 1)).toEqual(1);
+        expect(await httpBackend.flush(undefined, 1, 20)).toEqual(1);
         await flushPromises();
 
         const dummyEvent = new MatrixEvent({
@@ -328,12 +319,12 @@ describe.each([
             });
         }
 
+        const expectedCounts = [20, 1];
         httpBackend.when(
             "PUT", "/sendToDevice/org.example.foo/",
         ).check((request) => {
-            expect(Object.keys(request.data.messages).length).toEqual(20);
+            expect(removeElement(expectedCounts, c => c === Object.keys(request.data.messages).length)).toBeTruthy();
         }).respond(200, {});
-
         httpBackend.when(
             "PUT", "/sendToDevice/org.example.foo/",
         ).check((request) => {

@@ -35,6 +35,7 @@ import { StubStore } from "./store/stub";
 import { CallEvent, CallEventHandlerMap, createNewMatrixCall, MatrixCall, supportsMatrixCall } from "./webrtc/call";
 import { Filter, IFilterDefinition, IRoomEventFilter } from "./filter";
 import { CallEventHandlerEvent, CallEventHandler, CallEventHandlerEventHandlerMap } from './webrtc/callEventHandler';
+import { GroupCallEventHandlerEvent, GroupCallEventHandlerEventHandlerMap } from './webrtc/groupCallEventHandler';
 import * as utils from './utils';
 import { replaceParam, QueryDict, sleep } from './utils';
 import { Direction, EventTimeline } from "./models/event-timeline";
@@ -64,12 +65,14 @@ import {
     FileType,
     UploadResponse,
     HTTPError,
+    IRequestOpts,
 } from "./http-api";
 import {
     Crypto,
     CryptoEvent,
     CryptoEventHandlerMap,
     fixBackupKey,
+    ICryptoCallbacks,
     IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
     IMegolmSessionData,
@@ -99,29 +102,9 @@ import {
 } from "./crypto/keybackup";
 import { IIdentityServerProvider } from "./@types/IIdentityServerProvider";
 import { MatrixScheduler } from "./scheduler";
-import {
-    IAuthData,
-    ICryptoCallbacks,
-    IMinimalEvent,
-    IRoomEvent,
-    IStateEvent,
-    NotificationCountType,
-    BeaconEvent,
-    BeaconEventHandlerMap,
-    RoomEvent,
-    RoomEventHandlerMap,
-    RoomMemberEvent,
-    RoomMemberEventHandlerMap,
-    RoomStateEvent,
-    RoomStateEventHandlerMap,
-    INotificationsResponse,
-    IFilterResponse,
-    ITagsResponse,
-    IStatusResponse,
-    IPushRule,
-    PushRuleActionName,
-    IAuthDict,
-} from "./matrix";
+import { BeaconEvent, BeaconEventHandlerMap } from "./models/beacon";
+import { IAuthData, IAuthDict } from "./interactive-auth";
+import { IMinimalEvent, IRoomEvent, IStateEvent } from "./sync-accumulator";
 import {
     CrossSigningKey,
     IAddSecretStorageKeyOpts,
@@ -136,7 +119,9 @@ import { VerificationRequest } from "./crypto/verification/request/VerificationR
 import { VerificationBase as Verification } from "./crypto/verification/Base";
 import * as ContentHelpers from "./content-helpers";
 import { CrossSigningInfo, DeviceTrustLevel, ICacheCallbacks, UserTrustLevel } from "./crypto/CrossSigning";
-import { Room, RoomNameState } from "./models/room";
+import { Room, NotificationCountType, RoomEvent, RoomEventHandlerMap, RoomNameState } from "./models/room";
+import { RoomMemberEvent, RoomMemberEventHandlerMap } from "./models/room-member";
+import { RoomStateEvent, RoomStateEventHandlerMap } from "./models/room-state";
 import {
     IAddThreePidOnlyBody,
     IBindThreePidBody,
@@ -153,6 +138,10 @@ import {
     IRoomDirectoryOptions,
     ISearchOpts,
     ISendEventResponse,
+    INotificationsResponse,
+    IFilterResponse,
+    ITagsResponse,
+    IStatusResponse,
 } from "./@types/requests";
 import {
     EventType,
@@ -184,10 +173,26 @@ import {
 } from "./@types/search";
 import { ISynapseAdminDeactivateResponse, ISynapseAdminWhoisResponse } from "./@types/synapse";
 import { IHierarchyRoom } from "./@types/spaces";
-import { IPusher, IPusherRequest, IPushRules, PushRuleAction, PushRuleKind, RuleId } from "./@types/PushRules";
+import {
+    IPusher,
+    IPusherRequest,
+    IPushRule,
+    IPushRules,
+    PushRuleAction,
+    PushRuleActionName,
+    PushRuleKind,
+    RuleId,
+} from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
 import { CryptoStore } from "./crypto/store/base";
+import {
+    GroupCall,
+    IGroupCallDataChannelOptions,
+    GroupCallIntent,
+    GroupCallType,
+} from "./webrtc/groupCall";
 import { MediaHandler } from "./webrtc/mediaHandler";
+import { GroupCallEventHandler } from "./webrtc/groupCallEventHandler";
 import { LoginTokenPostResponse, ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { ReceiptType } from "./@types/read_receipts";
@@ -359,6 +364,12 @@ export interface ICreateClientOpts {
      */
     fallbackICEServerAllowed?: boolean;
 
+    /**
+     * If true, to-device signalling for group calls will be encrypted
+     * with Olm. Default: true.
+     */
+    useE2eForGroupCall?: boolean;
+
     cryptoCallbacks?: ICryptoCallbacks;
 
     /**
@@ -507,7 +518,7 @@ export interface IUploadKeySignaturesResponse {
 }
 
 export interface IPreviewUrlResponse {
-    [key: string]: string | number;
+    [key: string]: undefined | string | number;
     "og:title": string;
     "og:type": string;
     "og:url": string;
@@ -705,8 +716,9 @@ export interface IMyDevice {
     display_name?: string;
     last_seen_ip?: string;
     last_seen_ts?: number;
-    [UNSTABLE_MSC3852_LAST_SEEN_UA.stable]?: string;
-    [UNSTABLE_MSC3852_LAST_SEEN_UA.unstable]?: string;
+    // UNSTABLE_MSC3852_LAST_SEEN_UA
+    last_seen_user_agent?: string;
+    "org.matrix.msc3852.last_seen_user_agent"?: string;
 }
 
 export interface Keys {
@@ -824,6 +836,7 @@ export enum ClientEvent {
     DeleteRoom = "deleteRoom",
     SyncUnexpectedError = "sync.unexpectedError",
     ClientWellKnown = "WellKnown.client",
+    ReceivedVoipEvent = "received_voip_event",
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
 }
@@ -883,6 +896,9 @@ export type EmittedEvents = ClientEvent
     | UserEvents
     | CallEvent // re-emitted by call.ts using Object.values
     | CallEventHandlerEvent.Incoming
+    | GroupCallEventHandlerEvent.Incoming
+    | GroupCallEventHandlerEvent.Ended
+    | GroupCallEventHandlerEvent.Participants
     | HttpApiEvent.SessionLoggedOut
     | HttpApiEvent.NoConsent
     | BeaconEvent;
@@ -896,6 +912,7 @@ export type ClientEventHandlerMap = {
     [ClientEvent.DeleteRoom]: (roomId: string) => void;
     [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
     [ClientEvent.ClientWellKnown]: (data: IClientWellKnown) => void;
+    [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
 } & RoomEventHandlerMap
@@ -905,6 +922,7 @@ export type ClientEventHandlerMap = {
     & RoomMemberEventHandlerMap
     & UserEventHandlerMap
     & CallEventHandlerEventHandlerMap
+    & GroupCallEventHandlerEventHandlerMap
     & CallEventHandlerMap
     & HttpApiEventHandlerMap
     & BeaconEventHandlerMap;
@@ -935,6 +953,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public crypto?: Crypto; // XXX: Intended private, used in code.
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
+    public groupCallEventHandler?: GroupCallEventHandler;
     public supportsCallTransfer = false; // XXX: Intended private, used in code.
     public forceTURN = false; // XXX: Intended private, used in code.
     public iceCandidatePoolSize = 0; // XXX: Intended private, used in code.
@@ -983,8 +1002,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected exportedOlmDeviceToImport?: IExportedOlmDevice;
     protected txnCtr = 0;
     protected mediaHandler = new MediaHandler(this);
+    protected sessionId: string;
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
+    private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
 
     // A manager for determining which invites should be ignored.
@@ -1003,6 +1024,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.usingExternalCrypto = opts.usingExternalCrypto ?? false;
         this.store = opts.store || new StubStore();
         this.deviceId = opts.deviceId || null;
+        this.sessionId = randomString(10);
 
         const userId = opts.userId || null;
         this.credentials = { userId };
@@ -1061,6 +1083,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (supportsMatrixCall()) {
             this.callEventHandler = new CallEventHandler(this);
+            this.groupCallEventHandler = new GroupCallEventHandler(this);
             this.canSupportVoip = true;
             // Start listening for calls after the initial sync is done
             // We do not need to backfill the call event buffer
@@ -1078,6 +1101,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.iceCandidatePoolSize = opts.iceCandidatePoolSize === undefined ? 0 : opts.iceCandidatePoolSize;
         this.supportsCallTransfer = opts.supportsCallTransfer || false;
         this.fallbackICEServerAllowed = opts.fallbackICEServerAllowed || false;
+
+        if (opts.useE2eForGroupCall !== undefined) this.useE2eForGroupCall = opts.useE2eForGroupCall;
 
         // List of which rooms have encryption enabled: separate from crypto because
         // we still want to know which rooms are encrypted even if crypto is disabled:
@@ -1251,7 +1276,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.peekSync?.stopPeeking();
 
         this.callEventHandler?.stop();
+        this.groupCallEventHandler?.stop();
         this.callEventHandler = undefined;
+        this.groupCallEventHandler = undefined;
 
         global.clearInterval(this.checkTurnServersIntervalID);
         this.checkTurnServersIntervalID = undefined;
@@ -1483,6 +1510,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Get the session ID of this client
+     * @return {string} session ID
+     */
+    public getSessionId(): string {
+        return this.sessionId;
+    }
+
+    /**
      * Check if the runtime environment supports VoIP calling.
      * @return {boolean} True if VoIP is supported.
      */
@@ -1516,6 +1551,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Returns true if to-device signalling for group calls will be encrypted with Olm.
+     * If false, it will be sent unencrypted.
+     * @returns boolean Whether group call signalling will be encrypted
+     */
+    public getUseE2eForGroupCall(): boolean {
+        return this.useE2eForGroupCall;
+    }
+
+    /**
      * Creates a new call.
      * The place*Call methods on the returned call can be used to actually place a call
      *
@@ -1524,6 +1568,67 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public createCall(roomId: string): MatrixCall | null {
         return createNewMatrixCall(this, roomId);
+    }
+
+    /**
+     * Creates a new group call and sends the associated state event
+     * to alert other members that the room now has a group call.
+     *
+     * @param {string} roomId The room the call is to be placed in.
+     * @return {GroupCall}
+     */
+    public async createGroupCall(
+        roomId: string,
+        type: GroupCallType,
+        isPtt: boolean,
+        intent: GroupCallIntent,
+        dataChannelsEnabled?: boolean,
+        dataChannelOptions?: IGroupCallDataChannelOptions,
+    ): Promise<GroupCall> {
+        if (this.getGroupCallForRoom(roomId)) {
+            throw new Error(`${roomId} already has an existing group call`);
+        }
+
+        const room = this.getRoom(roomId);
+
+        if (!room) {
+            throw new Error(`Cannot find room ${roomId}`);
+        }
+
+        return new GroupCall(
+            this,
+            room,
+            type,
+            isPtt,
+            intent,
+            undefined,
+            dataChannelsEnabled,
+            dataChannelOptions,
+        ).create();
+    }
+
+    /**
+     * Wait until an initial state for the given room has been processed by the
+     * client and the client is aware of any ongoing group calls. Awaiting on
+     * the promise returned by this method before calling getGroupCallForRoom()
+     * avoids races where getGroupCallForRoom is called before the state for that
+     * room has been processed. It does not, however, fix other races, eg. two
+     * clients both creating a group call at the same time.
+     * @param roomId The room ID to wait for
+     * @returns A promise that resolves once existing group calls in the room
+     *          have been processed.
+     */
+    public waitUntilRoomReadyForGroupCalls(roomId: string): Promise<void> {
+        return this.groupCallEventHandler!.waitUntilRoomReadyForGroupCalls(roomId);
+    }
+
+    /**
+     * Get an existing group call for the provided room.
+     * @param roomId
+     * @returns {GroupCall} The group call or null if it doesn't already exist.
+     */
+    public getGroupCallForRoom(roomId: string): GroupCall | null {
+        return this.groupCallEventHandler!.groupCalls.get(roomId) || null;
     }
 
     /**
@@ -2929,7 +3034,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
-        const path = this.makeKeyBackupPath(roomId!, sessionId!, version!);
+        const path = this.makeKeyBackupPath(roomId!, sessionId!, version);
         await this.http.authedRequest(
             Method.Put, path.path, path.queryData, data,
             { prefix: ClientPrefix.V3 },
@@ -3121,7 +3226,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         opts: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = decodeRecoveryKey(recoveryKey);
-        return this.restoreKeyBackup(privKey, targetRoomId, targetSessionId, backupInfo, opts);
+        return this.restoreKeyBackup(privKey, targetRoomId!, targetSessionId!, backupInfo, opts);
     }
 
     public async restoreKeyBackupWithCache(
@@ -3283,7 +3388,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("End-to-end encryption disabled");
         }
 
-        const path = this.makeKeyBackupPath(roomId, sessionId, version);
+        const path = this.makeKeyBackupPath(roomId!, sessionId!, version);
         await this.http.authedRequest(
             Method.Delete, path.path, path.queryData, undefined,
             { prefix: ClientPrefix.V3 },
@@ -3775,7 +3880,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         threadId: string | null,
         eventType: string | IContent,
-        content: IContent | string,
+        content?: IContent | string,
         txnId?: string,
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
@@ -3787,10 +3892,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // If we expect that an event is part of a thread but is missing the relation
         // we need to add it manually, as well as the reply fallback
-        if (threadId && !content["m.relates_to"]?.rel_type) {
-            const isReply = !!content["m.relates_to"]?.["m.in_reply_to"];
-            content["m.relates_to"] = {
-                ...content["m.relates_to"],
+        if (threadId && !content!["m.relates_to"]?.rel_type) {
+            const isReply = !!content!["m.relates_to"]?.["m.in_reply_to"];
+            content!["m.relates_to"] = {
+                ...content!["m.relates_to"],
                 "rel_type": THREAD_RELATION_TYPE.name,
                 "event_id": threadId,
                 // Set is_falling_back to true unless this is actually intended to be a reply
@@ -3798,7 +3903,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             };
             const thread = this.getRoom(roomId)?.getThread(threadId);
             if (thread && !isReply) {
-                content["m.relates_to"]["m.in_reply_to"] = {
+                content!["m.relates_to"]["m.in_reply_to"] = {
                     "event_id": thread.lastReply((ev: MatrixEvent) => {
                         return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
                     })?.getId() ?? threadId,
@@ -3888,9 +3993,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param room
      * @param event
      * @returns {Promise} returns a promise which resolves with the result of the send request
-     * @private
      */
-    private encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
+    protected encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
         let cancelled = false;
         // Add an extra Promise.resolve() to turn synchronous exceptions into promise rejections,
         // so that we can handle synchronous and asynchronous exceptions with the
@@ -4018,7 +4122,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.isRoomEncrypted(roomId) ? EventType.RoomMessageEncrypted : eventType;
     }
 
-    private updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus) {
+    protected updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus) {
         if (room) {
             room.updatePendingEvent(event, newStatus);
         } else {
@@ -4097,7 +4201,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!eventId?.startsWith(EVENT_ID_PREFIX)) {
             opts = txnId as IRedactOpts;
             txnId = eventId;
-            eventId = threadId;
+            eventId = threadId!;
             threadId = null;
         }
         const reason = opts?.reason;
@@ -4130,7 +4234,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendMessage(
         roomId: string,
         threadId: string | null | IContent,
-        content: IContent | string,
+        content?: IContent | string,
         txnId?: string,
     ): Promise<ISendEventResponse> {
         if (typeof threadId !== "string" && threadId !== null) {
@@ -4180,7 +4284,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         return this.sendEvent(
             roomId,
-            threadId as (string | null),
+            threadId as string | null,
             eventType,
             sendContent,
             txnId,
@@ -4314,7 +4418,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendImageMessage(
         roomId: string,
         threadId: string | null,
-        url: string | IImageInfo,
+        url?: string | IImageInfo,
         info?: IImageInfo | string,
         text = "Image",
     ): Promise<ISendEventResponse> {
@@ -4358,7 +4462,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public sendStickerMessage(
         roomId: string,
         threadId: string | null,
-        url: string | IImageInfo,
+        url?: string | IImageInfo,
         info?: IImageInfo | string,
         text = "Sticker",
     ): Promise<ISendEventResponse> {
@@ -5224,13 +5328,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         ];
 
         // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
-        let timeline = timelineSet.getTimelineForEvent(events[0].getId()!);
+        let timeline = timelineSet.getTimelineForEvent(events[0].getId());
         if (timeline) {
-            timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+            timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
         } else {
             timeline = timelineSet.addTimeline();
             timeline.initialiseState(res.state.map(mapper));
-            timeline.getState(EventTimeline.FORWARDS).paginationToken = res.end;
+            timeline.getState(EventTimeline.FORWARDS)!.paginationToken = res.end;
         }
 
         const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
@@ -5319,7 +5423,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread summaries.
                 let timeline = timelineSet.getTimelineForEvent(event.getId());
                 if (timeline) {
-                    timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+                    timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
                 } else {
                     timeline = timelineSet.addTimeline();
                     timeline.initialiseState(res.state.map(mapper));
@@ -5380,7 +5484,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // Here we handle non-thread timelines only, but still process any thread events to populate thread
                 // summaries.
                 const timeline = timelineSet.getLiveTimeline();
-                timeline.getState(EventTimeline.BACKWARDS).setUnknownStateEvents(res.state.map(mapper));
+                timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(res.state.map(mapper));
 
                 timelineSet.addEventsToTimeline(events, true, timeline, null);
                 if (!resOlder.next_batch) {
@@ -5683,7 +5787,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.getFilter(),
             ).then((res) => {
                 if (res.state) {
-                    const roomState = eventTimeline.getState(dir);
+                    const roomState = eventTimeline.getState(dir)!;
                     const stateEvents = res.state.map(this.getEventMapper());
                     roomState.setUnknownStateEvents(stateEvents);
                 }
@@ -5758,7 +5862,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 eventTimeline.getFilter(),
             ).then((res) => {
                 if (res.state) {
-                    const roomState = eventTimeline.getState(dir);
+                    const roomState = eventTimeline.getState(dir)!;
                     const stateEvents = res.state.map(this.getEventMapper());
                     roomState.setUnknownStateEvents(stateEvents);
                 }
@@ -6114,15 +6218,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // There can be only room-kind push rule per room
         // and its id is the room id.
         if (this.pushRules) {
-            if (!this.pushRules[scope] || !this.pushRules[scope].room) {
-                return;
-            }
-            for (let i = 0; i < this.pushRules[scope].room.length; i++) {
-                const rule = this.pushRules[scope].room[i];
-                if (rule.rule_id === roomId) {
-                    return rule;
-                }
-            }
+            return this.pushRules[scope]?.room?.find(rule => rule.rule_id === roomId);
         } else {
             throw new Error(
                 "SyncApi.sync() must be done before accessing to push rules.",
@@ -6472,8 +6568,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // create a new filter
         const createdFilter = await this.createFilter(filter.getDefinition());
 
-        // debuglog("Created new filter ID %s: %s", createdFilter.filterId,
-        //          JSON.stringify(createdFilter.getDefinition()));
         this.store.setFilterIdByName(filterName, createdFilter.filterId);
         return createdFilter.filterId!;
     }
@@ -6495,7 +6589,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private startCallEventHandler = (): void => {
         if (this.isInitialSyncComplete()) {
-            this.callEventHandler?.start();
+            this.callEventHandler!.start();
+            this.groupCallEventHandler!.start();
             this.off(ClientEvent.Sync, this.startCallEventHandler);
         }
     };
@@ -7640,6 +7735,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} eventType
      * @param {Object} content
      * @param {string} stateKey
+     * @param {IRequestOpts} opts Options for the request function.
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -7648,6 +7744,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         eventType: string,
         content: any,
         stateKey = "",
+        opts: IRequestOpts = {},
     ): Promise<ISendEventResponse> {
         const pathParams = {
             $roomId: roomId,
@@ -7658,7 +7755,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(Method.Put, path, undefined, content);
+        return this.http.authedRequest(Method.Put, path, undefined, content, opts);
     }
 
     /**
@@ -8433,9 +8530,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             keyAlgorithm = "signed_curve25519";
         }
 
-        for (let i = 0; i < devices.length; ++i) {
-            const userId = devices[i][0];
-            const deviceId = devices[i][1];
+        for (const [userId, deviceId] of devices) {
             const query = queries[userId] || {};
             queries[userId] = query;
             query[deviceId] = keyAlgorithm;

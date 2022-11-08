@@ -150,8 +150,7 @@ export class FilterComponent {
             },
         };
 
-        for (let n = 0; n < Object.keys(literalKeys).length; n++) {
-            const name = Object.keys(literalKeys)[n];
+        for (const name in literalKeys) {
             const matchFunc = literalKeys[name];
             const notName = "not_" + name;
             const disallowedValues: string[] = this.filterJson[notName];

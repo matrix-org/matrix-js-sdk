@@ -87,6 +87,10 @@ export enum EventType {
     RoomKeyRequest = "m.room_key_request",
     ForwardedRoomKey = "m.forwarded_room_key",
     Dummy = "m.dummy",
+
+    // Group call events
+    GroupCallPrefix = "org.matrix.msc3401.call",
+    GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 }
 
 export enum RelationType {

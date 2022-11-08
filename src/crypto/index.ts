@@ -127,6 +127,29 @@ export interface IBootstrapCrossSigningOpts {
     authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
+export interface ICryptoCallbacks {
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
+    saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
+    shouldUpgradeDeviceVerifications?: (
+        users: Record<string, any>
+    ) => Promise<string[]>;
+    getSecretStorageKey?: (
+        keys: {keys: Record<string, ISecretStorageKeyInfo>}, name: string
+    ) => Promise<[string, Uint8Array] | null>;
+    cacheSecretStorageKey?: (
+        keyId: string, keyInfo: ISecretStorageKeyInfo, key: Uint8Array
+    ) => void;
+    onSecretRequested?: (
+        userId: string, deviceId: string,
+        requestId: string, secretName: string, deviceTrust: DeviceTrustLevel
+    ) => Promise<string>;
+    getDehydrationKey?: (
+        keyInfo: ISecretStorageKeyInfo,
+        checkFunc: (key: Uint8Array) => void,
+    ) => Promise<Uint8Array>;
+    getBackupKey?: () => Promise<Uint8Array>;
+}
+
 /* eslint-disable camelcase */
 interface IRoomKey {
     room_id: string;
@@ -2379,9 +2402,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async getOlmSessionsForUser(userId: string): Promise<Record<string, IUserOlmSession>> {
         const devices = this.getStoredDevicesForUser(userId) || [];
-        const result = {};
-        for (let j = 0; j < devices.length; ++j) {
-            const device = devices[j];
+        const result: { [deviceId: string]: IUserOlmSession } = {};
+        for (const device of devices) {
             const deviceKey = device.getIdentityKey();
             const sessions = await this.olmDevice.getSessionInfoForDevice(deviceKey);
 
@@ -2682,14 +2704,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
         const devicesByUser: Record<string, DeviceInfo[]> = {};
 
-        for (let i = 0; i < users.length; ++i) {
-            const userId = users[i];
+        for (const userId of users) {
             devicesByUser[userId] = [];
 
             const devices = this.getStoredDevicesForUser(userId) || [];
-            for (let j = 0; j < devices.length; ++j) {
-                const deviceInfo = devices[j];
-
+            for (const deviceInfo of devices) {
                 const key = deviceInfo.getIdentityKey();
                 if (key == this.olmDevice.deviceCurve25519Key) {
                     // don't bother setting up session to ourself

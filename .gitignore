@@ -1,5 +1,6 @@
 /.jsdocbuild
 /.jsdoc
+.DS_Store
 
 node_modules
 /.npmrc
