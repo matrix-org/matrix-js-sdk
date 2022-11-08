@@ -1027,6 +1027,9 @@ describe("MatrixClient event timelines", function() {
             expect(timelineSet.thread).toBeUndefined();
 
             const latestMessageId = THREAD_REPLY.event_id;
+            if (!latestMessageId) {
+                throw new Error('Expected THREAD_REPLY to have an event_id to reference in the test');
+            }
 
             httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
                 .respond(200, function() {
