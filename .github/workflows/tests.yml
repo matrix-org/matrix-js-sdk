@@ -8,25 +8,40 @@ concurrency:
   cancel-in-progress: true
 jobs:
   jest:
-    name: Jest
+    name: 'Jest [${{ matrix.specs }}] (Node ${{ matrix.node }})'
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      matrix:
+        specs: [browserify, integ, unit]
+        node: [16, 18, latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Yarn cache
+      - name: Setup Node
         uses: actions/setup-node@v3
         with:
           cache: 'yarn'
+          node-version: ${{ matrix.node }}
 
       - name: Install dependencies
         run: "yarn install"
 
       - name: Build
+        if: matrix.specs == 'browserify'
         run: "yarn build"
 
+      - name: Get number of CPU cores
+        id: cpu-cores
+        uses: SimenB/github-actions-cpu-cores@v1
+
       - name: Run tests with coverage
-        run: "yarn coverage --ci --reporters github-actions"
+        run: |
+          yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}
+          mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
+        env:
+          JEST_SONAR_UNIQUE_OUTPUT_NAME: true
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v3
