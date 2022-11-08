@@ -913,7 +913,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const backwardPaginationToken = liveTimelineBefore.getPaginationToken(EventTimeline.BACKWARDS);
         const eventsBefore = liveTimelineBefore.getEvents();
         const mostRecentEventInTimeline = eventsBefore[eventsBefore.length - 1];
-        const mostRecentEventIdInTimeline = mostRecentEventInTimeline.getId();
+        const mostRecentEventIdInTimeline = mostRecentEventInTimeline?.getId();
         logger.log(
             `[refreshLiveTimeline for ${this.roomId}] at ` +
             `mostRecentEventIdInTimeline=${mostRecentEventIdInTimeline} ` +
