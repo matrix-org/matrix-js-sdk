@@ -230,7 +230,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
             }, delay);
         }
 
-        return savePromise!;
+        return savePromise;
     }
 
     /**
@@ -252,7 +252,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      *
      * @param {string} st The sync token
      */
-    public setSyncToken(st: string): void {
+    public setSyncToken(st: string | null): void {
         this.syncToken = st;
     }
 

@@ -1,1 +1,4 @@
-* @matrix-org/element-call-reviewers
+* @matrix-org/element-web
+
+/src/webrtc @matrix-org/element-call-reviewers
+/spec/*/webrtc @matrix-org/element-call-reviewers

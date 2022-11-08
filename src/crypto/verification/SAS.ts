@@ -217,7 +217,7 @@ const MAC_SET = new Set(MAC_LIST);
 const SAS_SET = new Set(SAS_LIST);
 
 function intersection<T>(anArray: T[], aSet: Set<T>): T[] {
-    return anArray instanceof Array ? anArray.filter(x => aSet.has(x)) : [];
+    return Array.isArray(anArray) ? anArray.filter(x => aSet.has(x)) : [];
 }
 
 export enum SasEvent {
@@ -233,10 +233,10 @@ type EventHandlerMap = {
  * @extends {module:crypto/verification/Base}
  */
 export class SAS extends Base<SasEvent, EventHandlerMap> {
-    private waitingForAccept: boolean;
-    public ourSASPubKey: string;
-    public theirSASPubKey: string;
-    public sasEvent: ISasEvent;
+    private waitingForAccept?: boolean;
+    public ourSASPubKey?: string;
+    public theirSASPubKey?: string;
+    public sasEvent?: ISasEvent;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static get NAME(): string {
@@ -279,7 +279,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             return false;
         }
         const content = event.getContent();
-        return content && content.method === SAS.NAME && this.waitingForAccept;
+        return content?.method === SAS.NAME && !!this.waitingForAccept;
     }
 
     private async sendStart(): Promise<Record<string, any>> {
@@ -400,7 +400,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
     private async doRespondVerification(): Promise<void> {
         // as m.related_to is not included in the encrypted content in e2e rooms,
         // we need to make sure it is added
-        let content = this.channel.completedContentFromEvent(this.startEvent);
+        let content = this.channel.completedContentFromEvent(this.startEvent!);
 
         // Note: we intersect using our pre-made lists, rather than the sets,
         // so that the result will be in our order of preference.  Then

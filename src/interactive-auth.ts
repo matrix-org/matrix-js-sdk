@@ -21,6 +21,7 @@ limitations under the License.
 import { logger } from './logger';
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
+import { MatrixError } from "./http-api";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -111,7 +112,7 @@ interface IOpts {
     sessionId?: string;
     clientSecret?: string;
     emailSid?: string;
-    doRequest(auth: IAuthData, background: boolean): Promise<IAuthData>;
+    doRequest(auth: IAuthData | null, background: boolean): Promise<IAuthData>;
     stateUpdated(nextStage: AuthType, status: IStageStatus): void;
     requestEmailToken(email: string, secret: string, attempt: number, session: string): Promise<{ sid: string }>;
     busyChanged?(busy: boolean): void;
@@ -207,15 +208,15 @@ export class InteractiveAuth {
     private data: IAuthData;
     private emailSid?: string;
     private requestingEmailToken = false;
-    private attemptAuthDeferred: IDeferred<IAuthData> = null;
-    private chosenFlow: IFlow = null;
-    private currentStage: string = null;
+    private attemptAuthDeferred: IDeferred<IAuthData> | null = null;
+    private chosenFlow: IFlow | null = null;
+    private currentStage: string | null = null;
 
     private emailAttempt = 1;
 
     // if we are currently trying to submit an auth dict (which includes polling)
     // the promise the will resolve/reject when it completes
-    private submitPromise: Promise<void> = null;
+    private submitPromise: Promise<void> | null = null;
 
     constructor(opts: IOpts) {
         this.matrixClient = opts.matrixClient;
@@ -229,7 +230,7 @@ export class InteractiveAuth {
 
         if (opts.sessionId) this.data.session = opts.sessionId;
         this.clientSecret = opts.clientSecret || this.matrixClient.generateClientSecret();
-        this.emailSid = opts.emailSid ?? null;
+        this.emailSid = opts.emailSid;
     }
 
     /**
@@ -286,7 +287,7 @@ export class InteractiveAuth {
                     client_secret: this.clientSecret,
                 };
                 if (await this.matrixClient.doesServerRequireIdServerParam()) {
-                    const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl());
+                    const idServerParsedUrl = new URL(this.matrixClient.getIdentityServerUrl()!);
                     creds.id_server = idServerParsedUrl.host;
                 }
                 authDict = {
@@ -308,7 +309,7 @@ export class InteractiveAuth {
      *
      * @return {string} session id
      */
-    public getSessionId(): string {
+    public getSessionId(): string | undefined {
         return this.data?.session;
     }
 
@@ -328,11 +329,11 @@ export class InteractiveAuth {
      * @param {string} loginType login type for the stage
      * @return {object?} any parameters from the server for this stage
      */
-    public getStageParams(loginType: string): Record<string, any> {
+    public getStageParams(loginType: string): Record<string, any> | undefined {
         return this.data.params?.[loginType];
     }
 
-    public getChosenFlow(): IFlow {
+    public getChosenFlow(): IFlow | null {
         return this.chosenFlow;
     }
 
@@ -399,7 +400,7 @@ export class InteractiveAuth {
      *
      * @returns {string} The sid of the email auth session
      */
-    public getEmailSid(): string {
+    public getEmailSid(): string | undefined {
         return this.emailSid;
     }
 
@@ -428,10 +429,10 @@ export class InteractiveAuth {
             this.requestingEmailToken = true;
             try {
                 const requestTokenResult = await this.requestEmailTokenCallback(
-                    this.inputs.emailAddress,
+                    this.inputs.emailAddress!,
                     this.clientSecret,
                     this.emailAttempt++,
-                    this.data.session,
+                    this.data.session!,
                 );
                 this.emailSid = requestTokenResult.sid;
                 logger.trace("Email token request succeeded");
@@ -454,16 +455,16 @@ export class InteractiveAuth {
      *    This can be set to true for requests that just poll to see if auth has
      *    been completed elsewhere.
      */
-    private async doRequest(auth: IAuthData, background = false): Promise<void> {
+    private async doRequest(auth: IAuthData | null, background = false): Promise<void> {
         try {
             const result = await this.requestCallback(auth, background);
-            this.attemptAuthDeferred.resolve(result);
+            this.attemptAuthDeferred!.resolve(result);
             this.attemptAuthDeferred = null;
         } catch (error) {
             // sometimes UI auth errors don't come with flows
-            const errorFlows = error.data?.flows ?? null;
+            const errorFlows = (<MatrixError>error).data?.flows ?? null;
             const haveFlows = this.data.flows || Boolean(errorFlows);
-            if (error.httpStatus !== 401 || !error.data || !haveFlows) {
+            if ((<MatrixError>error).httpStatus !== 401 || !(<MatrixError>error).data || !haveFlows) {
                 // doesn't look like an interactive-auth failure.
                 if (!background) {
                     this.attemptAuthDeferred?.reject(error);
@@ -474,29 +475,32 @@ export class InteractiveAuth {
                     logger.log("Background poll request failed doing UI auth: ignoring", error);
                 }
             }
-            if (!error.data) {
-                error.data = {};
+            if (!(<MatrixError>error).data) {
+                (<MatrixError>error).data = {};
             }
             // if the error didn't come with flows, completed flows or session ID,
             // copy over the ones we have. Synapse sometimes sends responses without
             // any UI auth data (eg. when polling for email validation, if the email
             // has not yet been validated). This appears to be a Synapse bug, which
             // we workaround here.
-            if (!error.data.flows && !error.data.completed && !error.data.session) {
-                error.data.flows = this.data.flows;
-                error.data.completed = this.data.completed;
-                error.data.session = this.data.session;
+            if (!(<MatrixError>error).data.flows &&
+                !(<MatrixError>error).data.completed &&
+                !(<MatrixError>error).data.session
+            ) {
+                (<MatrixError>error).data.flows = this.data.flows;
+                (<MatrixError>error).data.completed = this.data.completed;
+                (<MatrixError>error).data.session = this.data.session;
             }
-            this.data = error.data;
+            this.data = (<MatrixError>error).data;
             try {
                 this.startNextAuthStage();
             } catch (e) {
-                this.attemptAuthDeferred.reject(e);
+                this.attemptAuthDeferred!.reject(e);
                 this.attemptAuthDeferred = null;
                 return;
             }
 
-            if (!this.emailSid && this.chosenFlow.stages.includes(AuthType.Email)) {
+            if (!this.emailSid && this.chosenFlow?.stages.includes(AuthType.Email)) {
                 try {
                     await this.requestEmailToken();
                     // NB. promise is not resolved here - at some point, doRequest
@@ -512,7 +516,7 @@ export class InteractiveAuth {
                     // to do) or it could be a network failure. Either way, pass
                     // the failure up as the user can't complete auth if we can't
                     // send the email, for whatever reason.
-                    this.attemptAuthDeferred.reject(e);
+                    this.attemptAuthDeferred!.reject(e);
                     this.attemptAuthDeferred = null;
                 }
             }
@@ -559,7 +563,7 @@ export class InteractiveAuth {
      * @return {string?} login type
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
-    private chooseStage(): AuthType {
+    private chooseStage(): AuthType | undefined {
         if (this.chosenFlow === null) {
             this.chosenFlow = this.chooseFlow();
         }
@@ -625,13 +629,8 @@ export class InteractiveAuth {
      * @param {object} flow
      * @return {string} login type
      */
-    private firstUncompletedStage(flow: IFlow): AuthType {
+    private firstUncompletedStage(flow: IFlow): AuthType | undefined {
         const completed = this.data.completed || [];
-        for (let i = 0; i < flow.stages.length; ++i) {
-            const stageType = flow.stages[i];
-            if (completed.indexOf(stageType) === -1) {
-                return stageType;
-            }
-        }
+        return flow.stages.find(stageType => !completed.includes(stageType));
     }
 }

@@ -536,6 +536,7 @@ describe("MegolmDecryption", function() {
             "@bob:example.com", BOB_DEVICES,
         );
         aliceClient.crypto!.deviceList.downloadKeys = async function(userIds) {
+            // @ts-ignore short-circuiting private method
             return this.getDevicesFromStore(userIds);
         };
 

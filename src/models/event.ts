@@ -71,7 +71,7 @@ export interface IEvent {
     type: string;
     content: IContent;
     sender: string;
-    room_id: string;
+    room_id?: string;
     origin_server_ts: number;
     txn_id?: string;
     state_key?: string;
@@ -107,7 +107,7 @@ export interface IEventRelation {
     event_id?: string;
     is_falling_back?: boolean;
     "m.in_reply_to"?: {
-        event_id: string;
+        event_id?: string;
     };
     key?: string;
 }
@@ -392,7 +392,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @return {string} The event ID, e.g. <code>$143350589368169JsLZx:localhost
      * </code>
      */
-    public getId(): string {
+    public getId(): string | undefined {
         return this.event.event_id;
     }
 
@@ -400,7 +400,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the user_id for this event.
      * @return {string} The user ID, e.g. <code>@alice:matrix.org</code>
      */
-    public getSender(): string {
+    public getSender(): string | undefined {
         return this.event.sender || this.event.user_id; // v2 / v1
     }
 
@@ -413,7 +413,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (this.clearEvent) {
             return this.clearEvent.type;
         }
-        return this.event.type;
+        return this.event.type!;
     }
 
     /**
@@ -423,7 +423,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @return {string} The event type.
      */
     public getWireType(): EventType | string {
-        return this.event.type;
+        return this.event.type!;
     }
 
     /**
@@ -441,7 +441,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @return {Number} The event timestamp, e.g. <code>1433502692297</code>
      */
     public getTs(): number {
-        return this.event.origin_server_ts;
+        return this.event.origin_server_ts!;
     }
 
     /**
@@ -521,7 +521,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return !!threadDetails || (this.getThread()?.id === this.getId());
     }
 
-    public get replyEventId(): string {
+    public get replyEventId(): string | undefined {
         // We're prefer ev.getContent() over ev.getWireContent() to make sure
         // we grab the latest edit with potentially new relations. But we also
         // can't just rely on ev.getContent() by itself because historically we
@@ -625,8 +625,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     ): void {
         // keep the plain-text data for 'view source'
         this.clearEvent = {
-            type: this.event.type,
-            content: this.event.content,
+            type: this.event.type!,
+            content: this.event.content!,
         };
         this.event.type = cryptoType;
         this.event.content = cryptoContent;
@@ -730,7 +730,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const wireContent = this.getWireContent();
         return crypto.requestRoomKey({
             algorithm: wireContent.algorithm,
-            room_id: this.getRoomId(),
+            room_id: this.getRoomId()!,
             session_id: wireContent.session_id,
             sender_key: wireContent.sender_key,
         }, this.getKeyRequestRecipients(userId), true);
@@ -748,12 +748,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // original sending device if it wasn't us.
         const wireContent = this.getWireContent();
         const recipients = [{
-            userId, deviceId: '*',
+            userId,
+            deviceId: '*',
         }];
         const sender = this.getSender();
         if (sender !== userId) {
             recipients.push({
-                userId: sender, deviceId: wireContent.device_id,
+                userId: sender!,
+                deviceId: wireContent.device_id,
             });
         }
         return recipients;
@@ -788,10 +790,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     const re = options.isRetry ? 're' : '';
                     // For find results: this can produce "Error decrypting event (id=$ev)" and
                     // "Error redecrypting event (id=$ev)".
-                    logger.error(
-                        `Error ${re}decrypting event ` +
-                        `(id=${this.getId()}): ${e.stack || e}`,
-                    );
+                    logger.error(`Error ${re}decrypting event (id=${this.getId()})`, e);
                     this.decryptionPromise = null;
                     this.retryDecryption = false;
                     return;
@@ -1005,7 +1004,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const value = this._localRedactionEvent;
         this._localRedactionEvent = null;
         if (this.event.unsigned) {
-            this.event.unsigned.redacted_because = null;
+            this.event.unsigned.redacted_because = undefined;
         }
         return !!value;
     }
@@ -1192,8 +1191,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (!this.isRedacted()) return null;
 
         if (this.clearEvent?.unsigned) {
-            return this.clearEvent?.unsigned.redacted_because;
-        } else if (this.event.unsigned.redacted_because) {
+            return this.clearEvent?.unsigned.redacted_because ?? null;
+        } else if (this.event.unsigned?.redacted_because) {
             return this.event.unsigned.redacted_because;
         } else {
             return {};
@@ -1244,7 +1243,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             this.emit(MatrixEventEvent.LocalEventIdReplaced, this);
         }
 
-        this.localTimestamp = Date.now() - this.getAge();
+        this.localTimestamp = Date.now() - this.getAge()!;
     }
 
     /**
@@ -1288,7 +1287,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             // State events cannot be m.replace relations
             return false;
         }
-        return relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true);
+        return !!(relation?.rel_type && relation.event_id && (relType ? relation.rel_type === relType : true));
     }
 
     /**
@@ -1300,7 +1299,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (!this.isRelation()) {
             return null;
         }
-        return this.getWireContent()["m.relates_to"];
+        return this.getWireContent()["m.relates_to"] ?? null;
     }
 
     /**
@@ -1387,7 +1386,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 return new Date(ts);
             }
         } else if (this._replacingEvent) {
-            return this._replacingEvent.getDate();
+            return this._replacingEvent.getDate() ?? undefined;
         }
     }
 
@@ -1540,10 +1539,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * @experimental
      */
-    public setThread(thread: Thread): void {
+    public setThread(thread?: Thread): void {
+        if (this.thread) {
+            this.reEmitter.stopReEmitting(this.thread, [ThreadEvent.Update]);
+        }
         this.thread = thread;
-        this.setThreadId(thread.id);
-        this.reEmitter.reEmit(thread, [ThreadEvent.Update]);
+        this.setThreadId(thread?.id);
+        if (thread) {
+            this.reEmitter.reEmit(thread, [ThreadEvent.Update]);
+        }
     }
 
     /**
@@ -1553,7 +1557,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.thread;
     }
 
-    public setThreadId(threadId: string): void {
+    public setThreadId(threadId?: string): void {
         this.threadId = threadId;
     }
 }

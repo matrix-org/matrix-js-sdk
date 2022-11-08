@@ -27,7 +27,7 @@ import { RoomState } from "./room-state";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { RelationsContainer } from "./relations-container";
 import { MatrixClient } from "../client";
-import { Thread } from "./thread";
+import { Thread, ThreadFilterType } from "./thread";
 
 const DEBUG = true;
 
@@ -140,7 +140,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         opts: IOpts = {},
         client?: MatrixClient,
         public readonly thread?: Thread,
-        public readonly isThreadTimeline: boolean = false,
+        public readonly threadListType: ThreadFilterType | null = null,
     ) {
         super();
 
@@ -297,8 +297,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @return {?module:models/event-timeline~EventTimeline} timeline containing
      * the given event, or null if unknown
      */
-    public getTimelineForEvent(eventId: string | null): EventTimeline | null {
-        if (eventId === null) { return null; }
+    public getTimelineForEvent(eventId?: string): EventTimeline | null {
+        if (eventId === null || eventId === undefined) { return null; }
         const res = this._eventIdToTimeline.get(eventId);
         return (res === undefined) ? null : res;
     }
@@ -359,7 +359,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         events: MatrixEvent[],
         toStartOfTimeline: boolean,
         timeline: EventTimeline,
-        paginationToken?: string,
+        paginationToken?: string | null,
     ): void {
         if (!timeline) {
             throw new Error(
@@ -457,9 +457,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         let didUpdate = false;
         let lastEventWasNew = false;
-        for (let i = 0; i < events.length; i++) {
-            const event = events[i];
-            const eventId = event.getId();
+        for (const event of events) {
+            const eventId = event.getId()!;
 
             const existingTimeline = this._eventIdToTimeline.get(eventId);
 
@@ -612,7 +611,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             }
         }
 
-        const timeline = this._eventIdToTimeline.get(event.getId());
+        const timeline = this._eventIdToTimeline.get(event.getId()!);
         if (timeline) {
             if (duplicateStrategy === DuplicateStrategy.Replace) {
                 debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " + event.getId());
@@ -625,7 +624,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                         }
                         EventTimeline.setEventMetadata(
                             event,
-                            roomState,
+                            roomState!,
                             false,
                         );
                         tlEvents[j] = event;
@@ -702,7 +701,29 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
         }
 
-        const eventId = event.getId();
+        if (timeline.getTimelineSet() !== this) {
+            throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " + 
+                "in timelineSet(threadId=${this.thread?.id})`);
+        }
+
+        // Make sure events don't get mixed in timelines they shouldn't be in (e.g. a
+        // threaded message should not be in the main timeline).
+        //
+        // We can only run this check for timelines with a `room` because `canContain`
+        // requires it
+        if (this.room && !this.canContain(event)) {
+            let eventDebugString = `event=${event.getId()}`;
+            if (event.threadRootId) {
+                eventDebugString += `(belongs to thread=${event.threadRootId})`;
+            }
+            logger.warn(
+                `EventTimelineSet.addEventToTimeline: Ignoring ${eventDebugString} that does not belong ` +
+                `in timeline=${timeline.toString()} timelineSet(threadId=${this.thread?.id})`,
+            );
+            return;
+        }
+
+        const eventId = event.getId()!;
         timeline.addEvent(event, {
             toStartOfTimeline,
             roomState,

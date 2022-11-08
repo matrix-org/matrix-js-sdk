@@ -135,8 +135,7 @@ export class PushProcessor {
      */
     public static actionListToActionsObject(actionList: PushRuleAction[]): IActionsObject {
         const actionObj: IActionsObject = { notify: false, tweaks: {} };
-        for (let i = 0; i < actionList.length; ++i) {
-            const action = actionList[i];
+        for (const action of actionList) {
             if (action === PushRuleActionName.Notify) {
                 actionObj.notify = true;
             } else if (typeof action === 'object') {
@@ -190,15 +189,13 @@ export class PushProcessor {
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
 
     private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule | null {
-        for (let ruleKindIndex = 0; ruleKindIndex < RULEKINDS_IN_ORDER.length; ++ruleKindIndex) {
-            const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
+        for (const kind of RULEKINDS_IN_ORDER) {
             const ruleset = kindset[kind];
             if (!ruleset) {
                 continue;
             }
 
-            for (let ruleIndex = 0; ruleIndex < ruleset.length; ++ruleIndex) {
-                const rule = ruleset[ruleIndex];
+            for (const rule of ruleset) {
                 if (!rule.enabled) {
                     continue;
                 }
@@ -219,8 +216,11 @@ export class PushProcessor {
         return null;
     }
 
-    private templateRuleToRaw(kind: PushRuleKind, tprule: any): any {
-        const rawrule = {
+    private templateRuleToRaw(
+        kind: PushRuleKind,
+        tprule: IPushRule,
+    ): Pick<IPushRule, "rule_id" | "actions" | "conditions"> | null {
+        const rawrule: Pick<IPushRule, "rule_id" | "actions" | "conditions"> = {
             'rule_id': tprule.rule_id,
             'actions': tprule.actions,
             'conditions': [],
@@ -234,7 +234,7 @@ export class PushProcessor {
                 if (!tprule.rule_id) {
                     return null;
                 }
-                rawrule.conditions.push({
+                rawrule.conditions!.push({
                     'kind': ConditionKind.EventMatch,
                     'key': 'room_id',
                     'value': tprule.rule_id,
@@ -244,7 +244,7 @@ export class PushProcessor {
                 if (!tprule.rule_id) {
                     return null;
                 }
-                rawrule.conditions.push({
+                rawrule.conditions!.push({
                     'kind': ConditionKind.EventMatch,
                     'key': 'user_id',
                     'value': tprule.rule_id,
@@ -254,7 +254,7 @@ export class PushProcessor {
                 if (!tprule.pattern) {
                     return null;
                 }
-                rawrule.conditions.push({
+                rawrule.conditions!.push({
                     'kind': ConditionKind.EventMatch,
                     'key': 'content.body',
                     'pattern': tprule.pattern,
@@ -302,7 +302,7 @@ export class PushProcessor {
         // Note that this should not be the current state of the room but the state at
         // the point the event is in the DAG. Unfortunately the js-sdk does not store
         // this.
-        return room.currentState.mayTriggerNotifOfType(notifLevelKey, ev.getSender());
+        return room.currentState.mayTriggerNotifOfType(notifLevelKey, ev.getSender()!);
     }
 
     private eventFulfillsRoomMemberCountCondition(cond: IRoomMemberCountCondition, ev: MatrixEvent): boolean {
@@ -474,17 +474,8 @@ export class PushProcessor {
         return actionObj;
     }
 
-    public ruleMatchesEvent(rule: IPushRule, ev: MatrixEvent): boolean {
-        if (!rule.conditions?.length) return true;
-
-        let ret = true;
-        for (let i = 0; i < rule.conditions.length; ++i) {
-            const cond = rule.conditions[i];
-            // @ts-ignore
-            ret &= this.eventFulfillsCondition(cond, ev);
-        }
-        //console.log("Rule "+rule.rule_id+(ret ? " matches" : " doesn't match"));
-        return ret;
+    public ruleMatchesEvent(rule: Partial<IPushRule> & Pick<IPushRule, "conditions">, ev: MatrixEvent): boolean {
+        return !rule.conditions?.some(cond => !this.eventFulfillsCondition(cond, ev));
     }
 
     /**

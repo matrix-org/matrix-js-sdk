@@ -128,7 +128,7 @@ export interface IBootstrapCrossSigningOpts {
 }
 
 export interface ICryptoCallbacks {
-    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array>;
+    getCrossSigningKey?: (keyType: string, pubKey: string) => Promise<Uint8Array | null>;
     saveCrossSigningKeys?: (keys: Record<string, Uint8Array>) => void;
     shouldUpgradeDeviceVerifications?: (
         users: Record<string, any>
@@ -222,8 +222,8 @@ export interface IEventDecryptionResult {
 }
 
 export interface IRequestsMap {
-    getRequest(event: MatrixEvent): VerificationRequest;
-    getRequestByChannel(channel: IVerificationChannel): VerificationRequest;
+    getRequest(event: MatrixEvent): VerificationRequest | undefined;
+    getRequestByChannel(channel: IVerificationChannel): VerificationRequest | undefined;
     setRequest(event: MatrixEvent, request: VerificationRequest): void;
     setRequestByChannel(channel: IVerificationChannel, request: VerificationRequest): void;
 }
@@ -325,7 +325,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     // track if an initial tracking of all the room members
     // has happened for a given room. This is delayed
     // to avoid loading room members as long as possible.
-    private roomDeviceTrackingState: Record<string, Promise<void>> = {}; // roomId: Promise<void
+    private roomDeviceTrackingState: { [roomId: string]: Promise<void> } = {};
 
     // The timestamp of the last time we forced establishment
     // of a new session for each device, in milliseconds.
@@ -611,7 +611,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 privateKey,
             };
         } finally {
-            if (decryption) decryption.free();
+            decryption?.free();
         }
     }
 
@@ -787,7 +787,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         ) {
             const secretStorage = new SecretStorage(
                 builder.accountDataClientAdapter,
-                builder.ssssCryptoCallbacks);
+                builder.ssssCryptoCallbacks,
+                undefined,
+            );
             if (await secretStorage.hasKey()) {
                 logger.log("Storing new cross-signing private keys in secret storage");
                 // This is writing to in-memory account data in
@@ -859,6 +861,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const secretStorage = new SecretStorage(
             builder.accountDataClientAdapter,
             builder.ssssCryptoCallbacks,
+            undefined,
         );
 
         // the ID of the new SSSS key, if we create one
@@ -2247,7 +2250,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             logger.info("Own device " + deviceId + " marked verified: signing");
 
             // Signing only needed if other device not already signed
-            let device: ISignedKey;
+            let device: ISignedKey | undefined;
             const deviceTrust = this.checkDeviceTrust(userId, deviceId);
             if (deviceTrust.isCrossSigningVerified()) {
                 logger.log(`Own device ${deviceId} already cross-signing verified`);
@@ -2262,7 +2265,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     logger.info("Uploading signature for " + deviceId);
                     const response = await this.baseApis.uploadKeySignatures({
                         [userId]: {
-                            [deviceId]: device,
+                            [deviceId]: device!,
                         },
                     });
                     const { failures } = response || {};
@@ -2288,7 +2291,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         return deviceObj;
     }
 
-    public findVerificationRequestDMInProgress(roomId: string): VerificationRequest {
+    public findVerificationRequestDMInProgress(roomId: string): VerificationRequest | undefined {
         return this.inRoomVerificationRequests.findRequestInProgress(roomId);
     }
 
@@ -2344,9 +2347,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         method: string,
         userId: string,
         deviceId: string,
-        transactionId: string = null,
+        transactionId: string | null = null,
     ): VerificationBase<any, any> {
-        let request: Request;
+        let request: Request | undefined;
         if (transactionId) {
             request = this.toDeviceVerificationRequests.getRequestBySenderAndTxnId(userId, transactionId);
             if (!request) {
@@ -2399,9 +2402,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async getOlmSessionsForUser(userId: string): Promise<Record<string, IUserOlmSession>> {
         const devices = this.getStoredDevicesForUser(userId) || [];
-        const result = {};
-        for (let j = 0; j < devices.length; ++j) {
-            const device = devices[j];
+        const result: { [deviceId: string]: IUserOlmSession } = {};
+        for (const device of devices) {
             const deviceKey = device.getIdentityKey();
             const sessions = await this.olmDevice.getSessionInfoForDevice(deviceKey);
 
@@ -2490,7 +2492,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
         const ret: Partial<IEncryptedEventInfo> = {};
 
-        ret.senderKey = event.getSenderKey();
+        ret.senderKey = event.getSenderKey() ?? undefined;
         ret.algorithm = event.getWireContent().algorithm;
 
         if (!ret.senderKey || !ret.algorithm) {
@@ -2511,7 +2513,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // was sent from. In the case of Megolm, it's actually the Curve25519
         // identity key of the device which set up the Megolm session.
 
-        ret.sender = this.deviceList.getDeviceByIdentityKey(ret.algorithm, ret.senderKey);
+        ret.sender = this.deviceList.getDeviceByIdentityKey(ret.algorithm, ret.senderKey) ?? undefined;
 
         // so far so good, but now we need to check that the sender of this event
         // hadn't advertised someone else's Curve25519 key as their own. We do that
@@ -2678,7 +2680,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         if (!promise) {
             promise = trackMembers();
             this.roomDeviceTrackingState[roomId] = promise.catch(err => {
-                this.roomDeviceTrackingState[roomId] = null;
+                delete this.roomDeviceTrackingState[roomId];
                 throw err;
             });
         }
@@ -2702,14 +2704,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     ): Promise<Record<string, Record<string, olmlib.IOlmSessionResult>>> {
         const devicesByUser: Record<string, DeviceInfo[]> = {};
 
-        for (let i = 0; i < users.length; ++i) {
-            const userId = users[i];
+        for (const userId of users) {
             devicesByUser[userId] = [];
 
             const devices = this.getStoredDevicesForUser(userId) || [];
-            for (let j = 0; j < devices.length; ++j) {
-                const deviceInfo = devices[j];
-
+            for (const deviceInfo of devices) {
                 const key = deviceInfo.getIdentityKey();
                 if (key == this.olmDevice.deviceCurve25519Key) {
                     // don't bother setting up session to ourself
@@ -2739,9 +2738,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 this.cryptoStore.getAllEndToEndInboundGroupSessions(txn, (s) => {
                     if (s === null) return;
 
-                    const sess = this.olmDevice.exportInboundGroupSession(
-                        s.senderKey, s.sessionId, s.sessionData,
-                    );
+                    const sess = this.olmDevice.exportInboundGroupSession(s.senderKey, s.sessionId, s.sessionData!);
                     delete sess.first_known_index;
                     sess.algorithm = olmlib.MEGOLM_ALGORITHM;
                     exportedSessions.push(sess);
@@ -2826,7 +2823,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             throw new Error("Cannot send encrypted messages in unknown rooms");
         }
 
-        const roomId = event.getRoomId();
+        const roomId = event.getRoomId()!;
 
         const alg = this.roomEncryptors.get(roomId);
         if (!alg) {
@@ -2908,7 +2905,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             };
         } else {
             const content = event.getWireContent();
-            const alg = this.getRoomDecryptor(event.getRoomId(), content.algorithm);
+            const alg = this.getRoomDecryptor(event.getRoomId()!, content.algorithm);
             return alg.decryptEvent(event);
         }
     }
@@ -2993,7 +2990,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param {module:models/event.MatrixEvent} event encryption event
      */
     public async onCryptoEvent(event: MatrixEvent): Promise<void> {
-        const roomId = event.getRoomId();
+        const roomId = event.getRoomId()!;
         const content = event.getContent<IRoomEncryption>();
 
         try {
@@ -3001,8 +2998,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // finished processing the sync, in onSyncCompleted.
             await this.setRoomEncryption(roomId, content, true);
         } catch (e) {
-            logger.error("Error configuring encryption in room " + roomId +
-                ":", e);
+            logger.error(`Error configuring encryption in room ${roomId}`, e);
         }
     }
 
@@ -3036,7 +3032,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param {Object} syncData  the data from the 'MatrixClient.sync' event
      */
     public async onSyncCompleted(syncData: ISyncStateData): Promise<void> {
-        this.deviceList.setSyncToken(syncData.nextSyncToken);
+        this.deviceList.setSyncToken(syncData.nextSyncToken ?? null);
         this.deviceList.saveIfDirty();
 
         // we always track our own device list (for key backups etc)
@@ -3098,7 +3094,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns {string[]} List of user IDs
      */
     private async getTrackedE2eUsers(): Promise<string[]> {
-        const e2eUserIds = [];
+        const e2eUserIds: string[] = [];
         for (const room of this.getTrackedE2eRooms()) {
             const members = await room.getEncryptionTargetMembers();
             for (const member of members) {
@@ -3318,7 +3314,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         if (!ToDeviceChannel.validateEvent(event, this.baseApis)) {
             return;
         }
-        const createRequest = (event: MatrixEvent) => {
+        const createRequest = (event: MatrixEvent): VerificationRequest | undefined => {
             if (!ToDeviceChannel.canCreateRequest(ToDeviceChannel.getEventType(event))) {
                 return;
             }
@@ -3327,7 +3323,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             if (!deviceId) {
                 return;
             }
-            const userId = event.getSender();
+            const userId = event.getSender()!;
             const channel = new ToDeviceChannel(
                 this.baseApis,
                 userId,
@@ -3360,10 +3356,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return;
         }
         const createRequest = (event: MatrixEvent) => {
-            const channel = new InRoomChannel(
-                this.baseApis,
-                event.getRoomId(),
-            );
+            const channel = new InRoomChannel(this.baseApis, event.getRoomId()!);
             return new VerificationRequest(
                 channel, this.verificationMethods, this.baseApis);
         };
@@ -3373,15 +3366,15 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     private async handleVerificationEvent(
         event: MatrixEvent,
         requestsMap: IRequestsMap,
-        createRequest: (event: MatrixEvent) => VerificationRequest,
+        createRequest: (event: MatrixEvent) => VerificationRequest | undefined,
         isLiveEvent = true,
     ): Promise<void> {
         // Wait for event to get its final ID with pendingEventOrdering: "chronological", since DM channels depend on it.
         if (event.isSending() && event.status != EventStatus.SENT) {
-            let eventIdListener;
-            let statusListener;
+            let eventIdListener: () => void;
+            let statusListener: () => void;
             try {
-                await new Promise((resolve, reject) => {
+                await new Promise<void>((resolve, reject) => {
                     eventIdListener = resolve;
                     statusListener = () => {
                         if (event.status == EventStatus.CANCELLED) {
@@ -3395,11 +3388,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 logger.error("error while waiting for the verification event to be sent: ", err);
                 return;
             } finally {
-                event.removeListener(MatrixEventEvent.LocalEventIdReplaced, eventIdListener);
-                event.removeListener(MatrixEventEvent.Status, statusListener);
+                event.removeListener(MatrixEventEvent.LocalEventIdReplaced, eventIdListener!);
+                event.removeListener(MatrixEventEvent.Status, statusListener!);
             }
         }
-        let request = requestsMap.getRequest(event);
+        let request: VerificationRequest | undefined = requestsMap.getRequest(event);
         let isNewRequest = false;
         if (!request) {
             request = createRequest(event);
@@ -3562,13 +3555,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // this way we don't start device queries after sync on behalf of this room which we won't use
         // the result of anyway, as we'll need to do a query again once all the members are fetched
         // by calling _trackRoomDevices
-        if (this.roomDeviceTrackingState[roomId]) {
+        if (roomId in this.roomDeviceTrackingState) {
             if (member.membership == 'join') {
                 logger.log('Join event for ' + member.userId + ' in ' + roomId);
                 // make sure we are tracking the deviceList for this user
                 this.deviceList.startTrackingDeviceList(member.userId);
             } else if (member.membership == 'invite' &&
-                this.clientStore.getRoom(roomId).shouldEncryptForInvitedMembers()) {
+                this.clientStore.getRoom(roomId)?.shouldEncryptForInvitedMembers()
+            ) {
                 logger.log('Invite event for ' + member.userId + ' in ' + roomId);
                 this.deviceList.startTrackingDeviceList(member.userId);
             }
@@ -3658,7 +3652,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 logger.debug(`room key request for unencrypted room ${roomId}`);
                 return;
             }
-            const encryptor = this.roomEncryptors.get(roomId);
+            const encryptor = this.roomEncryptors.get(roomId)!;
             const device = this.deviceList.getStoredDevice(userId, deviceId);
             if (!device) {
                 logger.debug(`Ignoring keyshare for unknown device ${userId}:${deviceId}`);
@@ -3666,7 +3660,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             }
 
             try {
-                await encryptor.reshareKeyWithDevice(body.sender_key, body.session_id, userId, device);
+                await encryptor.reshareKeyWithDevice!(body.sender_key, body.session_id, userId, device);
             } catch (e) {
                 logger.warn(
                     "Failed to re-share keys for session " + body.session_id +
@@ -3699,7 +3693,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             return;
         }
 
-        const decryptor = this.roomDecryptors.get(roomId).get(alg);
+        const decryptor = this.roomDecryptors.get(roomId)!.get(alg);
         if (!decryptor) {
             logger.log(`room key request for unknown alg ${alg} in room ${roomId}`);
             return;
@@ -3764,11 +3758,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @raises {module:crypto.algorithms.DecryptionError} if the algorithm is
      * unknown
      */
-    public getRoomDecryptor(roomId: string, algorithm: string): DecryptionAlgorithm {
+    public getRoomDecryptor(roomId: string | null, algorithm: string): DecryptionAlgorithm {
         let decryptors: Map<string, DecryptionAlgorithm> | undefined;
         let alg: DecryptionAlgorithm | undefined;
 
-        roomId = roomId || null;
         if (roomId) {
             decryptors = this.roomDecryptors.get(roomId);
             if (!decryptors) {
@@ -3794,7 +3787,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             crypto: this,
             olmDevice: this.olmDevice,
             baseApis: this.baseApis,
-            roomId: roomId,
+            roomId: roomId ?? undefined,
         });
 
         if (decryptors) {
@@ -3888,7 +3881,7 @@ export class IncomingRoomKeyRequest {
     constructor(event: MatrixEvent) {
         const content = event.getContent();
 
-        this.userId = event.getSender();
+        this.userId = event.getSender()!;
         this.deviceId = content.requesting_device_id;
         this.requestId = content.request_id;
         this.requestBody = content.body || {};
@@ -3913,7 +3906,7 @@ class IncomingRoomKeyRequestCancellation {
     constructor(event: MatrixEvent) {
         const content = event.getContent();
 
-        this.userId = event.getSender();
+        this.userId = event.getSender()!;
         this.deviceId = content.requesting_device_id;
         this.requestId = content.request_id;
     }

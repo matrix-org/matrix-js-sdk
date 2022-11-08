@@ -91,7 +91,7 @@ export class GroupCallEventHandler {
     }
 
     private getRoomDeferred(roomId: string): RoomDeferred {
-        let deferred: RoomDeferred = this.roomDeferreds.get(roomId);
+        let deferred = this.roomDeferreds.get(roomId);
         if (deferred === undefined) {
             let resolveFunc: () => void;
             deferred = {
@@ -99,7 +99,7 @@ export class GroupCallEventHandler {
                     resolveFunc = resolve;
                 }),
             };
-            deferred.resolve = resolveFunc;
+            deferred.resolve = resolveFunc!;
             this.roomDeferreds.set(roomId, deferred);
         }
 
@@ -110,7 +110,7 @@ export class GroupCallEventHandler {
         return this.getRoomDeferred(roomId).prom;
     }
 
-    public getGroupCallById(groupCallId: string): GroupCall {
+    public getGroupCallById(groupCallId: string): GroupCall | undefined {
         return [...this.groupCalls.values()].find((groupCall) => groupCall.groupCallId === groupCallId);
     }
 
@@ -135,7 +135,7 @@ export class GroupCallEventHandler {
         }
 
         logger.info("Group call event handler processed room", room.roomId);
-        this.getRoomDeferred(room.roomId).resolve();
+        this.getRoomDeferred(room.roomId).resolve!();
     }
 
     private createGroupCallFromRoomStateEvent(event: MatrixEvent): GroupCall | undefined {

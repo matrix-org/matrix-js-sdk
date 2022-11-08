@@ -46,8 +46,8 @@ export class ToDeviceChannel implements IVerificationChannel {
         private readonly client: MatrixClient,
         public readonly userId: string,
         private readonly devices: string[],
-        public transactionId: string = null,
-        public deviceId: string = null,
+        public transactionId?: string,
+        public deviceId?: string,
     ) {}
 
     public isToDevices(devices: string[]): boolean {
@@ -173,13 +173,11 @@ export class ToDeviceChannel implements IVerificationChannel {
                 return this.sendToDevices(CANCEL_TYPE, cancelContent, [deviceId]);
             }
         }
-        const wasStarted = request.phase === PHASE_STARTED ||
-                           request.phase === PHASE_READY;
+        const wasStarted = request.phase === PHASE_STARTED || request.phase === PHASE_READY;
 
         await request.handleEvent(event.getType(), event, isLiveEvent, false, false);
 
-        const isStarted = request.phase === PHASE_STARTED ||
-                          request.phase === PHASE_READY;
+        const isStarted = request.phase === PHASE_STARTED || request.phase === PHASE_READY;
 
         const isAcceptingEvent = type === START_TYPE || type === READY_TYPE;
         // the request has picked a ready or start event, tell the other devices about it
@@ -256,16 +254,16 @@ export class ToDeviceChannel implements IVerificationChannel {
         if (type === REQUEST_TYPE || (type === CANCEL_TYPE && !this.deviceId)) {
             result = await this.sendToDevices(type, content, this.devices);
         } else {
-            result = await this.sendToDevices(type, content, [this.deviceId]);
+            result = await this.sendToDevices(type, content, [this.deviceId!]);
         }
         // the VerificationRequest state machine requires remote echos of the event
         // the client sends itself, so we fake this for to_device messages
         const remoteEchoEvent = new MatrixEvent({
-            sender: this.client.getUserId(),
+            sender: this.client.getUserId()!,
             content,
             type,
         });
-        await this.request.handleEvent(
+        await this.request!.handleEvent(
             type,
             remoteEchoEvent,
             /*isLiveEvent=*/true,
@@ -298,18 +296,18 @@ export class ToDeviceChannel implements IVerificationChannel {
 export class ToDeviceRequests implements IRequestsMap {
     private requestsByUserId = new Map<string, Map<string, Request>>();
 
-    public getRequest(event: MatrixEvent): Request {
+    public getRequest(event: MatrixEvent): Request | undefined {
         return this.getRequestBySenderAndTxnId(
-            event.getSender(),
+            event.getSender()!,
             ToDeviceChannel.getTransactionId(event),
         );
     }
 
-    public getRequestByChannel(channel: ToDeviceChannel): Request {
-        return this.getRequestBySenderAndTxnId(channel.userId, channel.transactionId);
+    public getRequestByChannel(channel: ToDeviceChannel): Request | undefined {
+        return this.getRequestBySenderAndTxnId(channel.userId, channel.transactionId!);
     }
 
-    public getRequestBySenderAndTxnId(sender: string, txnId: string): Request {
+    public getRequestBySenderAndTxnId(sender: string, txnId: string): Request | undefined {
         const requestsByTxnId = this.requestsByUserId.get(sender);
         if (requestsByTxnId) {
             return requestsByTxnId.get(txnId);
@@ -317,11 +315,11 @@ export class ToDeviceRequests implements IRequestsMap {
     }
 
     public setRequest(event: MatrixEvent, request: Request): void {
-        this.setRequestBySenderAndTxnId(event.getSender(), ToDeviceChannel.getTransactionId(event), request);
+        this.setRequestBySenderAndTxnId(event.getSender()!, ToDeviceChannel.getTransactionId(event), request);
     }
 
     public setRequestByChannel(channel: ToDeviceChannel, request: Request): void {
-        this.setRequestBySenderAndTxnId(channel.userId, channel.transactionId, request);
+        this.setRequestBySenderAndTxnId(channel.userId, channel.transactionId!, request);
     }
 
     public setRequestBySenderAndTxnId(sender: string, txnId: string, request: Request): void {
@@ -334,7 +332,7 @@ export class ToDeviceRequests implements IRequestsMap {
     }
 
     public removeRequest(event: MatrixEvent): void {
-        const userId = event.getSender();
+        const userId = event.getSender()!;
         const requestsByTxnId = this.requestsByUserId.get(userId);
         if (requestsByTxnId) {
             requestsByTxnId.delete(ToDeviceChannel.getTransactionId(event));
@@ -344,7 +342,7 @@ export class ToDeviceRequests implements IRequestsMap {
         }
     }
 
-    public findRequestInProgress(userId: string, devices: string[]): Request {
+    public findRequestInProgress(userId: string, devices: string[]): Request | undefined {
         const requestsByTxnId = this.requestsByUserId.get(userId);
         if (requestsByTxnId) {
             for (const request of requestsByTxnId.values()) {

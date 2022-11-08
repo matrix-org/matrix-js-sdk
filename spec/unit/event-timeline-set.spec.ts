@@ -45,7 +45,7 @@ describe('EventTimelineSet', () => {
         it('should return the related events', () => {
             eventTimelineSet.relations.aggregateChildEvent(messageEvent);
             const relations = eventTimelineSet.relations.getChildEventsForEvent(
-                messageEvent.getId(),
+                messageEvent.getId()!,
                 "m.in_reply_to",
                 EventType.RoomMessage,
             );
@@ -54,6 +54,23 @@ describe('EventTimelineSet', () => {
             expect(relations!.getRelations()[0].getId()).toBe(replyEvent.getId());
         });
     };
+
+    const mkThreadResponse = (root: MatrixEvent) => utils.mkEvent({
+        event: true,
+        type: EventType.RoomMessage,
+        user: userA,
+        room: roomId,
+        content: {
+            "body": "Thread response :: " + Math.random(),
+            "m.relates_to": {
+                "event_id": root.getId(),
+                "m.in_reply_to": {
+                    "event_id": root.getId(),
+                },
+                "rel_type": "m.thread",
+            },
+        },
+    }, room.client);
 
     beforeEach(() => {
         client = utils.mock(MatrixClient, 'MatrixClient');
@@ -117,6 +134,13 @@ describe('EventTimelineSet', () => {
     });
 
     describe('addEventToTimeline', () => {
+        let thread: Thread;
+
+        beforeEach(() => {
+            (client.supportsExperimentalThreads as jest.Mock).mockReturnValue(true);
+            thread = new Thread("!thread_id:server", messageEvent, { room, client });
+        });
+
         it("Adds event to timeline", () => {
             const liveTimeline = eventTimelineSet.getLiveTimeline();
             expect(liveTimeline.getEvents().length).toStrictEqual(0);
@@ -143,6 +167,58 @@ describe('EventTimelineSet', () => {
                     false,
                 );
             }).not.toThrow();
+        });
+
+        it("should not add an event to a timeline that does not belong to the timelineSet", () => {
+            const eventTimelineSet2 = new EventTimelineSet(room);
+            const liveTimeline2 = eventTimelineSet2.getLiveTimeline();
+            expect(liveTimeline2.getEvents().length).toStrictEqual(0);
+
+            expect(() => {
+                eventTimelineSet.addEventToTimeline(messageEvent, liveTimeline2, {
+                    toStartOfTimeline: true,
+                });
+            }).toThrowError();
+        });
+
+        it("should not add a threaded reply to the main room timeline", () => {
+            const liveTimeline = eventTimelineSet.getLiveTimeline();
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+
+            const threadedReplyEvent = mkThreadResponse(messageEvent);
+
+            eventTimelineSet.addEventToTimeline(threadedReplyEvent, liveTimeline, {
+                toStartOfTimeline: true,
+            });
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+        });
+
+        it("should not add a normal message to the timelineSet representing a thread", () => {
+            const eventTimelineSetForThread = new EventTimelineSet(room, {}, client, thread);
+            const liveTimeline = eventTimelineSetForThread.getLiveTimeline();
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+
+            eventTimelineSetForThread.addEventToTimeline(messageEvent, liveTimeline, {
+                toStartOfTimeline: true,
+            });
+            expect(liveTimeline.getEvents().length).toStrictEqual(0);
+        });
+
+        describe('non-room timeline', () => {
+            it('Adds event to timeline', () => {
+                const nonRoomEventTimelineSet = new EventTimelineSet(
+                    // This is what we're specifically testing against, a timeline
+                    // without a `room` defined
+                    undefined,
+                );
+                const nonRoomEventTimeline = new EventTimeline(nonRoomEventTimelineSet);
+
+                expect(nonRoomEventTimeline.getEvents().length).toStrictEqual(0);
+                nonRoomEventTimelineSet.addEventToTimeline(messageEvent, nonRoomEventTimeline, {
+                    toStartOfTimeline: true,
+                });
+                expect(nonRoomEventTimeline.getEvents().length).toStrictEqual(1);
+            });
         });
     });
 
@@ -193,7 +269,7 @@ describe('EventTimelineSet', () => {
             it('should not return the related events', () => {
                 eventTimelineSet.relations.aggregateChildEvent(messageEvent);
                 const relations = eventTimelineSet.relations.getChildEventsForEvent(
-                    messageEvent.getId(),
+                    messageEvent.getId()!,
                     "m.in_reply_to",
                     EventType.RoomMessage,
                 );
@@ -236,7 +312,7 @@ describe('EventTimelineSet', () => {
                 "m.relates_to": {
                     "event_id": root.getId(),
                     "m.in_reply_to": {
-                        "event_id": root.getId(),
+                        "event_id": root.getId()!,
                     },
                     "rel_type": "m.thread",
                 },
@@ -278,14 +354,14 @@ describe('EventTimelineSet', () => {
         });
 
         it("should return true if the timeline set is for a thread and the event is its thread root", () => {
-            const thread = new Thread(messageEvent.getId(), messageEvent, { room, client });
+            const thread = new Thread(messageEvent.getId()!, messageEvent, { room, client });
             const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
             messageEvent.setThread(thread);
             expect(eventTimelineSet.canContain(messageEvent)).toBeTruthy();
         });
 
         it("should return true if the timeline set is for a thread and the event is a response to it", () => {
-            const thread = new Thread(messageEvent.getId(), messageEvent, { room, client });
+            const thread = new Thread(messageEvent.getId()!, messageEvent, { room, client });
             const eventTimelineSet = new EventTimelineSet(room, {}, client, thread);
             messageEvent.setThread(thread);
             const event = mkThreadResponse(messageEvent);
@@ -310,7 +386,7 @@ describe('EventTimelineSet', () => {
                 content: { body: "test" },
                 event_id: "!test1:server",
             });
-            eventTimelineSet.handleRemoteEcho(roomMessageEvent, "~!local-event-id:server", roomMessageEvent.getId());
+            eventTimelineSet.handleRemoteEcho(roomMessageEvent, "~!local-event-id:server", roomMessageEvent.getId()!);
             expect(eventTimelineSet.getLiveTimeline().getEvents()).toContain(roomMessageEvent);
 
             const roomFilteredEvent = new MatrixEvent({
@@ -318,7 +394,7 @@ describe('EventTimelineSet', () => {
                 content: { body: "test" },
                 event_id: "!test2:server",
             });
-            eventTimelineSet.handleRemoteEcho(roomFilteredEvent, "~!local-event-id:server", roomFilteredEvent.getId());
+            eventTimelineSet.handleRemoteEcho(roomFilteredEvent, "~!local-event-id:server", roomFilteredEvent.getId()!);
             expect(eventTimelineSet.getLiveTimeline().getEvents()).not.toContain(roomFilteredEvent);
         });
     });

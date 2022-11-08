@@ -87,7 +87,7 @@ export class DeviceInfo {
         BLOCKED: DeviceVerification.Blocked,
     };
 
-    public algorithms: string[];
+    public algorithms: string[] = [];
     public keys: Record<string, string> = {};
     public verified = DeviceVerification.Unverified;
     public known = false;

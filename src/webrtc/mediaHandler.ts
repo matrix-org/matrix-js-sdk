@@ -106,7 +106,7 @@ export class MediaHandler extends TypedEventEmitter<
         if (this.userMediaStreams.length === 0) return;
 
         const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
-        for (const call of this.client.callEventHandler.calls.values()) {
+        for (const call of this.client.callEventHandler!.calls.values()) {
             callMediaStreamParams.set(call.callId, {
                 audio: call.hasLocalUserMediaAudioTrack,
                 video: call.hasLocalUserMediaVideoTrack,
@@ -123,7 +123,7 @@ export class MediaHandler extends TypedEventEmitter<
         this.userMediaStreams = [];
         this.localUserMediaStream = undefined;
 
-        for (const call of this.client.callEventHandler.calls.values()) {
+        for (const call of this.client.callEventHandler!.calls.values()) {
             if (call.callHasEnded() || !callMediaStreamParams.has(call.callId)) {
                 continue;
             }
@@ -140,7 +140,7 @@ export class MediaHandler extends TypedEventEmitter<
             await call.updateLocalUsermediaStream(stream);
         }
 
-        for (const groupCall of this.client.groupCallEventHandler.groupCalls.values()) {
+        for (const groupCall of this.client.groupCallEventHandler!.groupCalls.values()) {
             if (!groupCall.localCallFeed) {
                 continue;
             }
@@ -228,8 +228,8 @@ export class MediaHandler extends TypedEventEmitter<
                 this.localUserMediaStream = stream;
             }
         } else {
-            stream = this.localUserMediaStream.clone();
-            logger.log(`mediaHandler clone userMediaStream ${this.localUserMediaStream.id} new stream ${
+            stream = this.localUserMediaStream!.clone();
+            logger.log(`mediaHandler clone userMediaStream ${this.localUserMediaStream?.id} new stream ${
                 stream.id} shouldRequestAudio ${shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`);
 
             if (!shouldRequestAudio) {
@@ -282,12 +282,11 @@ export class MediaHandler extends TypedEventEmitter<
      * @param reusable is allowed to be reused by the MediaHandler
      * @returns {MediaStream} based on passed parameters
      */
-    public async getScreensharingStream(opts: IScreensharingOpts = {}, reusable = true): Promise<MediaStream | null> {
+    public async getScreensharingStream(opts: IScreensharingOpts = {}, reusable = true): Promise<MediaStream> {
         let stream: MediaStream;
 
         if (this.screensharingStreams.length === 0) {
             const screenshareConstraints = this.getScreenshareContraints(opts);
-            if (!screenshareConstraints) return null;
 
             if (opts.desktopCapturerSourceId) {
                 // We are using Electron
@@ -385,7 +384,7 @@ export class MediaHandler extends TypedEventEmitter<
         if (desktopCapturerSourceId) {
             logger.debug("Using desktop capturer source", desktopCapturerSourceId);
             return {
-                audio,
+                audio: audio ?? false,
                 video: {
                     mandatory: {
                         chromeMediaSource: "desktop",
@@ -396,7 +395,7 @@ export class MediaHandler extends TypedEventEmitter<
         } else {
             logger.debug("Not using desktop capturer source");
             return {
-                audio,
+                audio: audio ?? false,
                 video: true,
             };
         }

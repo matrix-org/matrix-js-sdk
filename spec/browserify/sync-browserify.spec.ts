@@ -16,26 +16,13 @@ limitations under the License.
 
 import HttpBackend from "matrix-mock-request";
 
-import "./setupTests";
-import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import type { MatrixClient, ClientEvent } from "../../src";
+import "./setupTests";// uses browser-matrix instead of the src
+import type { MatrixClient } from "../../src";
 
 const USER_ID = "@user:test.server";
 const DEVICE_ID = "device_id";
 const ACCESS_TOKEN = "access_token";
 const ROOM_ID = "!room_id:server.test";
-
-declare global {
-    // eslint-disable-next-line @typescript-eslint/no-namespace
-    namespace NodeJS {
-        interface Global {
-            matrixcs: {
-                MatrixClient: typeof MatrixClient;
-                ClientEvent: typeof ClientEvent;
-            };
-        }
-    }
-}
 
 describe("Browserify Test", function() {
     let client: MatrixClient;

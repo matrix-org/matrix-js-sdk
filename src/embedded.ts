@@ -96,9 +96,9 @@ export interface ICapabilities {
  * @experimental This class is considered unstable!
  */
 export class RoomWidgetClient extends MatrixClient {
-    private room: Room;
+    private room?: Room;
     private widgetApiReady = new Promise<void>(resolve => this.widgetApi.once("ready", resolve));
-    private lifecycle: AbortController;
+    private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
 
     constructor(
@@ -197,7 +197,7 @@ export class RoomWidgetClient extends MatrixClient {
                 const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey, [this.roomId]);
                 const events = rawEvents.map(rawEvent => new MatrixEvent(rawEvent as Partial<IEvent>));
 
-                await this.syncApi.injectRoomEvents(this.room, [], events);
+                await this.syncApi!.injectRoomEvents(this.room!, [], events);
                 events.forEach(event => {
                     this.emit(ClientEvent.Event, event);
                     logger.info(`Backfilled event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
@@ -216,11 +216,11 @@ export class RoomWidgetClient extends MatrixClient {
         this.widgetApi.off(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
 
         super.stopClient();
-        this.lifecycle.abort(); // Signal to other async tasks that the client has stopped
+        this.lifecycle!.abort(); // Signal to other async tasks that the client has stopped
     }
 
     public async joinRoom(roomIdOrAlias: string): Promise<Room> {
-        if (roomIdOrAlias === this.roomId) return this.room;
+        if (roomIdOrAlias === this.roomId) return this.room!;
         throw new Error(`Unknown room: ${roomIdOrAlias}`);
     }
 
@@ -284,7 +284,7 @@ export class RoomWidgetClient extends MatrixClient {
     }
 
     // Overridden since we 'sync' manually without the sync API
-    public getSyncState(): SyncState {
+    public getSyncState(): SyncState | null {
         return this.syncState;
     }
 
@@ -305,7 +305,7 @@ export class RoomWidgetClient extends MatrixClient {
         // send us events from other rooms if this widget is always on screen
         if (ev.detail.data.room_id === this.roomId) {
             const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
-            await this.syncApi.injectRoomEvents(this.room, [], [event]);
+            await this.syncApi!.injectRoomEvents(this.room!, [], [event]);
             this.emit(ClientEvent.Event, event);
             this.setSyncState(SyncState.Syncing);
             logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
@@ -336,7 +336,7 @@ export class RoomWidgetClient extends MatrixClient {
     private async watchTurnServers() {
         const servers = this.widgetApi.getTurnServers();
         const onClientStopped = () => servers.return(undefined);
-        this.lifecycle.signal.addEventListener("abort", onClientStopped);
+        this.lifecycle!.signal.addEventListener("abort", onClientStopped);
 
         try {
             for await (const server of servers) {
@@ -351,7 +351,7 @@ export class RoomWidgetClient extends MatrixClient {
         } catch (e) {
             logger.warn("Error watching TURN servers", e);
         } finally {
-            this.lifecycle.signal.removeEventListener("abort", onClientStopped);
+            this.lifecycle!.signal.removeEventListener("abort", onClientStopped);
         }
     }
 }

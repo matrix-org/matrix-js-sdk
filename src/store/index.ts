@@ -24,6 +24,7 @@ import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator";
 import { IStartClientOpts } from "../client";
 import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
+import { EventEmitterEvents } from "../models/typed-event-emitter";
 
 export interface ISavedSync {
     nextBatch: string;
@@ -39,7 +40,7 @@ export interface IStore {
 
     // XXX: The indexeddb store exposes a non-standard emitter for the "degraded" event
     // for when it falls back to being a memory store due to errors.
-    on?: (event: string, handler: (...args: any[]) => void) => void;
+    on?: (event: EventEmitterEvents | "degraded", handler: (...args: any[]) => void) => void;
 
     /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;
@@ -231,7 +232,7 @@ export interface IStore {
 
     clearOutOfBandMembers(roomId: string): Promise<void>;
 
-    getClientOptions(): Promise<IStartClientOpts>;
+    getClientOptions(): Promise<IStartClientOpts | undefined>;
 
     storeClientOptions(options: IStartClientOpts): Promise<void>;
 

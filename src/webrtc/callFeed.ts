@@ -27,7 +27,7 @@ const SPEAKING_SAMPLE_COUNT = 8; // samples
 
 export interface ICallFeedOpts {
     client: MatrixClient;
-    roomId: string;
+    roomId?: string;
     userId: string;
     stream: MediaStream;
     purpose: SDPStreamMetadataPurpose;
@@ -67,7 +67,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public speakingVolumeSamples: number[];
 
     private client: MatrixClient;
-    private roomId: string;
+    private roomId?: string;
     private audioMuted: boolean;
     private videoMuted: boolean;
     private localVolume = 1;
@@ -239,9 +239,9 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.analyser.getFloatFrequencyData(this.frequencyBinCount!);
 
         let maxVolume = -Infinity;
-        for (let i = 0; i < this.frequencyBinCount!.length; i++) {
-            if (this.frequencyBinCount![i] > maxVolume) {
-                maxVolume = this.frequencyBinCount![i];
+        for (const volume of this.frequencyBinCount!) {
+            if (volume > maxVolume) {
+                maxVolume = volume;
             }
         }
 
@@ -252,9 +252,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         let newSpeaking = false;
 
-        for (let i = 0; i < this.speakingVolumeSamples.length; i++) {
-            const volume = this.speakingVolumeSamples[i];
-
+        for (const volume of this.speakingVolumeSamples) {
             if (volume > this.speakingThreshold) {
                 newSpeaking = true;
                 break;
@@ -295,8 +293,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         clearTimeout(this.volumeLooperTimeout);
         this.stream?.removeEventListener("addtrack", this.onAddTrack);
         if (this.audioContext) {
-            this.audioContext = null;
-            this.analyser = null;
+            this.audioContext = undefined;
+            this.analyser = undefined;
             releaseContext();
         }
         this._disposed = true;

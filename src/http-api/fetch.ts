@@ -143,18 +143,20 @@ export class FetchHttpApi<O extends IHttpOpts> {
     ): Promise<ResponseType<T, O>> {
         if (!queryParams) queryParams = {};
 
-        if (this.opts.useAuthorizationHeader) {
-            if (!opts.headers) {
-                opts.headers = {};
+        if (this.opts.accessToken) {
+            if (this.opts.useAuthorizationHeader) {
+                if (!opts.headers) {
+                    opts.headers = {};
+                }
+                if (!opts.headers.Authorization) {
+                    opts.headers.Authorization = "Bearer " + this.opts.accessToken;
+                }
+                if (queryParams.access_token) {
+                    delete queryParams.access_token;
+                }
+            } else if (!queryParams.access_token) {
+                queryParams.access_token = this.opts.accessToken;
             }
-            if (!opts.headers.Authorization) {
-                opts.headers.Authorization = "Bearer " + this.opts.accessToken;
-            }
-            if (queryParams.access_token) {
-                delete queryParams.access_token;
-            }
-        } else if (!queryParams.access_token) {
-            queryParams.access_token = this.opts.accessToken;
         }
 
         const requestPromise = this.request<T>(method, path, queryParams, body, opts);
@@ -234,7 +236,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         method: Method,
         url: URL | string,
         body?: Body,
-        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "abortSignal"> = {},
+        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal"> = {},
     ): Promise<ResponseType<T, O>> {
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
@@ -252,6 +254,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         const timeout = opts.localTimeoutMs ?? this.opts.localTimeoutMs;
+        const keepAlive = opts.keepAlive ?? false;
         const signals = [
             this.abortController.signal,
         ];
@@ -284,6 +287,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 referrerPolicy: "no-referrer",
                 cache: "no-cache",
                 credentials: "omit", // we send credentials via headers
+                keepalive: keepAlive,
             });
         } catch (e) {
             if ((<Error>e).name === "AbortError") {

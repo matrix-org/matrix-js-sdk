@@ -821,7 +821,6 @@ export class SyncApi {
 
             let data: ISyncResponse;
             try {
-                //debuglog('Starting sync since=' + syncToken);
                 if (!this.currentSyncRequest) {
                     this.currentSyncRequest = this.doSyncRequest(syncOptions, syncToken);
                 }
@@ -833,8 +832,6 @@ export class SyncApi {
             } finally {
                 this.currentSyncRequest = undefined;
             }
-
-            //debuglog('Completed sync, next_batch=' + data.next_batch);
 
             // set the sync token NOW *before* processing the events. We do this so
             // if something barfs on an event we can skip it rather than constantly
@@ -1081,11 +1078,11 @@ export class SyncApi {
         if (Array.isArray(data.presence?.events)) {
             data.presence!.events.map(client.getEventMapper()).forEach(
                 function(presenceEvent) {
-                    let user = client.store.getUser(presenceEvent.getSender());
+                    let user = client.store.getUser(presenceEvent.getSender()!);
                     if (user) {
                         user.setPresenceEvent(presenceEvent);
                     } else {
-                        user = createNewUser(client, presenceEvent.getSender());
+                        user = createNewUser(client, presenceEvent.getSender()!);
                         user.setPresenceEvent(presenceEvent);
                         client.store.storeUser(user);
                     }
@@ -1097,7 +1094,7 @@ export class SyncApi {
         if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.map(client.getEventMapper());
             const prevEventsMap = events.reduce((m, c) => {
-                m[c.getType()] = client.store.getAccountData(c.getType());
+                m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
             }, {});
             client.store.storeAccountDataEvents(events);
@@ -1111,7 +1108,7 @@ export class SyncApi {
                         const rules = accountDataEvent.getContent<IPushRules>();
                         client.pushRules = PushProcessor.rewriteDefaultRules(rules);
                     }
-                    const prevEvent = prevEventsMap[accountDataEvent.getType()];
+                    const prevEvent = prevEventsMap[accountDataEvent.getType()!];
                     client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                     return accountDataEvent;
                 },
@@ -1330,10 +1327,9 @@ export class SyncApi {
                 // will stop us linking the empty timeline into the chain).
                 //
                 for (let i = events.length - 1; i >= 0; i--) {
-                    const eventId = events[i].getId();
+                    const eventId = events[i].getId()!;
                     if (room.getTimelineForEvent(eventId)) {
-                        debuglog("Already have event " + eventId + " in limited " +
-                            "sync - not resetting");
+                        debuglog(`Already have event ${eventId} in limited sync - not resetting`);
                         limited = false;
 
                         // we might still be missing some of the events before i;
@@ -1483,7 +1479,7 @@ export class SyncApi {
             const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.opts.crypto.setNeedsNewFallback(
-                unusedFallbackKeys instanceof Array &&
+                Array.isArray(unusedFallbackKeys) &&
                 !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
@@ -1540,6 +1536,7 @@ export class SyncApi {
             {
                 prefix: '',
                 localTimeoutMs: 15 * 1000,
+                abortSignal: this.abortController?.signal,
             },
         ).then(() => {
             success();
@@ -1749,11 +1746,10 @@ export class SyncApi {
     private processEventsForNotifs(room: Room, timelineEventList: MatrixEvent[]): void {
         // gather our notifications into this.notifEvents
         if (this.client.getNotifTimelineSet()) {
-            for (let i = 0; i < timelineEventList.length; i++) {
-                const pushActions = this.client.getPushActionsForEvent(timelineEventList[i]);
-                if (pushActions && pushActions.notify &&
-                    pushActions.tweaks && pushActions.tweaks.highlight) {
-                    this.notifEvents.push(timelineEventList[i]);
+            for (const event of timelineEventList) {
+                const pushActions = this.client.getPushActionsForEvent(event);
+                if (pushActions?.notify && pushActions.tweaks?.highlight) {
+                    this.notifEvents.push(event);
                 }
             }
         }

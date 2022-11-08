@@ -201,7 +201,7 @@ export class Backend implements CryptoStore {
         let stateIndex = 0;
         let result: OutgoingRoomKeyRequest;
 
-        function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
+        function onsuccess(this: IDBRequest<IDBCursorWithValue | null>) {
             const cursor = this.result;
             if (cursor) {
                 // got a match
@@ -256,7 +256,7 @@ export class Backend implements CryptoStore {
         let stateIndex = 0;
         const results: OutgoingRoomKeyRequest[] = [];
 
-        function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
+        function onsuccess(this: IDBRequest<IDBCursorWithValue | null>) {
             const cursor = this.result;
             if (cursor) {
                 const keyReq = cursor.value;
@@ -309,7 +309,7 @@ export class Backend implements CryptoStore {
     ): Promise<OutgoingRoomKeyRequest | null> {
         let result: OutgoingRoomKeyRequest | null = null;
 
-        function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
+        function onsuccess(this: IDBRequest<IDBCursorWithValue | null>) {
             const cursor = this.result;
             if (!cursor) {
                 return;
@@ -678,7 +678,7 @@ export class Backend implements CryptoStore {
             senderCurve25519Key, sessionId, session: sessionData,
         });
         addReq.onerror = (ev) => {
-            if (addReq.error.name === 'ConstraintError') {
+            if (addReq.error?.name === 'ConstraintError') {
                 // This stops the error from triggering the txn's onerror
                 ev.stopPropagation();
                 // ...and this stops it from aborting the transaction

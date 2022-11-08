@@ -73,7 +73,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     }
 
     public get beaconInfoId(): string {
-        return this.rootEvent.getId();
+        return this.rootEvent.getId()!;
     }
 
     public get beaconInfoOwner(): string {
@@ -132,19 +132,19 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         this.checkLiveness();
         if (!this.beaconInfo) return;
         if (this.isLive) {
-            const expiryInMs = (this.beaconInfo.timestamp + this.beaconInfo.timeout) - Date.now();
+            const expiryInMs = (this.beaconInfo.timestamp! + this.beaconInfo.timeout) - Date.now();
             if (expiryInMs > 1) {
                 this.livenessWatchTimeout = setTimeout(
                     () => { this.monitorLiveness(); },
                     expiryInMs,
                 );
             }
-        } else if (this.beaconInfo.timestamp > Date.now()) {
+        } else if (this.beaconInfo.timestamp! > Date.now()) {
             // beacon start timestamp is in the future
             // check liveness again then
             this.livenessWatchTimeout = setTimeout(
                 () => { this.monitorLiveness(); },
-                this.beaconInfo.timestamp - Date.now(),
+                this.beaconInfo.timestamp! - Date.now(),
             );
         }
     }
@@ -165,6 +165,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
             if (!parsed.uri || !parsed.timestamp) return false; // we won't be able to process these
             const { timestamp } = parsed;
             return (
+                this._beaconInfo!.timestamp &&
                 // only include positions that were taken inside the beacon's live period
                 isTimestampInDuration(this._beaconInfo!.timestamp, this._beaconInfo!.timeout, timestamp) &&
                 // ignore positions older than our current latest location
@@ -197,10 +198,10 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         // may have a start timestamp in the future from Bob's POV
         // handle this by adding 6min of leniency to the start timestamp when it is in the future
         if (!this.beaconInfo) return;
-        const startTimestamp = this.beaconInfo.timestamp > Date.now() ?
-            this.beaconInfo.timestamp - 360000 /* 6min */ :
+        const startTimestamp = this.beaconInfo.timestamp! > Date.now() ?
+            this.beaconInfo.timestamp! - 360000 /* 6min */ :
             this.beaconInfo.timestamp;
-        this._isLive = !!this._beaconInfo?.live &&
+        this._isLive = !!this._beaconInfo?.live && !!startTimestamp &&
             isTimestampInDuration(startTimestamp, this._beaconInfo?.timeout, Date.now());
 
         if (prevLiveness !== this.isLive) {

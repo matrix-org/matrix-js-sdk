@@ -50,8 +50,8 @@ describe("CallEventHandler", () => {
     });
 
     afterEach(() => {
-        client.callEventHandler.stop();
-        client.groupCallEventHandler.stop();
+        client.callEventHandler!.stop();
+        client.groupCallEventHandler!.stop();
     });
 
     const sync = async () => {
@@ -63,7 +63,7 @@ describe("CallEventHandler", () => {
     };
 
     it("should enforce inbound toDevice message ordering", async () => {
-        const callEventHandler = client.callEventHandler;
+        const callEventHandler = client.callEventHandler!;
         const event1 = new MatrixEvent({
             type: EventType.CallInvite,
             content: {
@@ -99,7 +99,7 @@ describe("CallEventHandler", () => {
 
         expect(callEventHandler.callEventBuffer.length).toBe(2);
         expect(callEventHandler.nextSeqByCall.get("123")).toBe(2);
-        expect(callEventHandler.toDeviceEventBuffers.get("123").length).toBe(1);
+        expect(callEventHandler.toDeviceEventBuffers.get("123")?.length).toBe(1);
 
         const event4 = new MatrixEvent({
             type: EventType.CallCandidates,
@@ -112,7 +112,7 @@ describe("CallEventHandler", () => {
 
         expect(callEventHandler.callEventBuffer.length).toBe(2);
         expect(callEventHandler.nextSeqByCall.get("123")).toBe(2);
-        expect(callEventHandler.toDeviceEventBuffers.get("123").length).toBe(2);
+        expect(callEventHandler.toDeviceEventBuffers.get("123")?.length).toBe(2);
 
         const event5 = new MatrixEvent({
             type: EventType.CallCandidates,
@@ -125,7 +125,7 @@ describe("CallEventHandler", () => {
 
         expect(callEventHandler.callEventBuffer.length).toBe(5);
         expect(callEventHandler.nextSeqByCall.get("123")).toBe(5);
-        expect(callEventHandler.toDeviceEventBuffers.get("123").length).toBe(0);
+        expect(callEventHandler.toDeviceEventBuffers.get("123")?.length).toBe(0);
     });
 
     it("should ignore a call if invite & hangup come within a single sync", () => {
@@ -161,7 +161,7 @@ describe("CallEventHandler", () => {
     it("should ignore non-call events", async () => {
         // @ts-ignore Mock handleCallEvent is private
         jest.spyOn(client.callEventHandler, "handleCallEvent");
-        jest.spyOn(client, "checkTurnServers").mockReturnValue(undefined);
+        jest.spyOn(client, "checkTurnServers").mockReturnValue(Promise.resolve(true));
 
         const room = new Room("!room:id", client, "@user:id");
         const timelineData: IRoomTimelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
@@ -186,10 +186,10 @@ describe("CallEventHandler", () => {
         let room: Room;
 
         beforeEach(() => {
-            room = new Room("!room:id", client, client.getUserId());
+            room = new Room("!room:id", client, client.getUserId()!);
             timelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
 
-            jest.spyOn(client, "checkTurnServers").mockReturnValue(undefined);
+            jest.spyOn(client, "checkTurnServers").mockReturnValue(Promise.resolve(true));
             jest.spyOn(client, "getRoom").mockReturnValue(room);
             jest.spyOn(room, "getMember").mockReturnValue({ user_id: client.getUserId() } as unknown as RoomMember);
 
@@ -227,7 +227,7 @@ describe("CallEventHandler", () => {
             const DEVICE_ID = "device_id";
 
             incomingCallListener.mockImplementation((c) => call = c);
-            jest.spyOn(client.groupCallEventHandler, "getGroupCallById").mockReturnValue(groupCall);
+            jest.spyOn(client.groupCallEventHandler!, "getGroupCallById").mockReturnValue(groupCall);
             // @ts-ignore Mock onIncomingCall is private
             jest.spyOn(groupCall, "onIncomingCall");
 
@@ -246,10 +246,10 @@ describe("CallEventHandler", () => {
             await sync();
 
             expect(incomingCallListener).toHaveBeenCalled();
-            expect(call.groupCallId).toBe(GROUP_CALL_ID);
+            expect(call!.groupCallId).toBe(GROUP_CALL_ID);
             // @ts-ignore Mock opponentDeviceId is private
             expect(call.opponentDeviceId).toBe(DEVICE_ID);
-            expect(call.getOpponentSessionId()).toBe(SESSION_ID);
+            expect(call!.getOpponentSessionId()).toBe(SESSION_ID);
             // @ts-ignore Mock onIncomingCall is private
             expect(groupCall.onIncomingCall).toHaveBeenCalledWith(call);
 

@@ -16,14 +16,13 @@ limitations under the License.
 
 import { UnstableValue } from "matrix-events-sdk";
 
-import { RendezvousChannel } from ".";
+import { RendezvousChannel, RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
 import { MatrixClient } from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
 import { DeviceInfo } from "../crypto/deviceinfo";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "../feature";
 import { logger } from "../logger";
 import { sleep } from "../utils";
-import { RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
 
 enum PayloadType {
     Start = 'm.login.start',
@@ -208,7 +207,7 @@ export class MSC3906Rendezvous {
         await this.send({
             type: PayloadType.Finish,
             outcome: Outcome.Verified,
-            verifying_device_id: this.client.getDeviceId(),
+            verifying_device_id: this.client.getDeviceId()!,
             verifying_device_key: this.client.getDeviceEd25519Key()!,
             master_key: masterPublicKey,
         });

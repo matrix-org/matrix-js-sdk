@@ -88,7 +88,7 @@ export class FilterComponent {
         // as sending a whole list of participants could be proven problematic in terms
         // of performance
         // This should be improved when bundled relationships solve that problem
-        const relationSenders = [];
+        const relationSenders: string[] = [];
         if (this.userId && bundledRelationships?.[THREAD_RELATION_TYPE.name]?.current_user_participated) {
             relationSenders.push(this.userId);
         }
@@ -131,8 +131,8 @@ export class FilterComponent {
      * @return {boolean} true if the event fields match the filter
      */
     private checkFields(
-        roomId: string,
-        sender: string,
+        roomId: string | undefined,
+        sender: string | undefined,
         eventType: string,
         containsUrl: boolean,
         relationTypes: Array<RelationType | string>,
@@ -150,8 +150,7 @@ export class FilterComponent {
             },
         };
 
-        for (let n = 0; n < Object.keys(literalKeys).length; n++) {
-            const name = Object.keys(literalKeys)[n];
+        for (const name in literalKeys) {
             const matchFunc = literalKeys[name];
             const notName = "not_" + name;
             const disallowedValues: string[] = this.filterJson[notName];

@@ -49,7 +49,7 @@ export class HTTPError extends Error {
  */
 export class MatrixError extends HTTPError {
     public readonly errcode?: string;
-    public readonly data: IErrorJson;
+    public data: IErrorJson;
 
     constructor(
         errorJson: IErrorJson = {},

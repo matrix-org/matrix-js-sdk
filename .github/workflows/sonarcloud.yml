@@ -5,6 +5,11 @@ on:
     secrets:
       SONAR_TOKEN:
         required: true
+    inputs:
+      extra_args:
+        type: string
+        required: false
+        description: "Extra args to pass to SonarCloud"
 jobs:
   sonarqube:
     runs-on: ubuntu-latest
@@ -22,7 +27,7 @@ jobs:
 
       - name: "🩻 SonarCloud Scan"
         id: sonarcloud
-        uses: matrix-org/sonarcloud-workflow-action@v2.2
+        uses: matrix-org/sonarcloud-workflow-action@v2.3
         with:
           repository: ${{ github.event.workflow_run.head_repository.full_name }}
           is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
@@ -33,8 +38,8 @@ jobs:
           coverage_run_id: ${{ github.event.workflow_run.id }}
           coverage_workflow_name: tests.yml
           coverage_extract_path: coverage
-          
-      
+          extra_args: ${{ inputs.extra_args }}
+
       - uses: Sibz/github-status-action@v1
         if: always()
         with:

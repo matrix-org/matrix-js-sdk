@@ -18,7 +18,7 @@ import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../syn
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
 import { logger } from '../logger';
-import { IStartClientOpts, IStateEventWithRoomId } from "../matrix";
+import { IStateEventWithRoomId, IStoredClientOpts } from "../matrix";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
@@ -454,8 +454,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         return utils.promiseTry<void>(() => {
             const txn = this.db!.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
-            for (let i = 0; i < accountData.length; i++) {
-                store.put(accountData[i]); // put == UPSERT
+            for (const event of accountData) {
+                store.put(event); // put == UPSERT
             }
             return txnAsPromise(txn).then();
         });
@@ -538,7 +538,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         });
     }
 
-    public getClientOptions(): Promise<IStartClientOpts> {
+    public getClientOptions(): Promise<IStoredClientOpts | undefined> {
         return Promise.resolve().then(() => {
             const txn = this.db!.transaction(["client_options"], "readonly");
             const store = txn.objectStore("client_options");
@@ -548,7 +548,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         });
     }
 
-    public async storeClientOptions(options: IStartClientOpts): Promise<void> {
+    public async storeClientOptions(options: IStoredClientOpts): Promise<void> {
         const txn = this.db!.transaction(["client_options"], "readwrite");
         const store = txn.objectStore("client_options");
         store.put({

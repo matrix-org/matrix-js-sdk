@@ -680,7 +680,7 @@ export class OlmDevice {
     public async getSessionIdsForDevice(theirDeviceIdentityKey: string): Promise<string[]> {
         const log = logger.withPrefix("[getSessionIdsForDevice]");
 
-        if (this.sessionsInProgress[theirDeviceIdentityKey]) {
+        if (theirDeviceIdentityKey in this.sessionsInProgress) {
             log.debug(`Waiting for Olm session for ${theirDeviceIdentityKey} to be created`);
             try {
                 await this.sessionsInProgress[theirDeviceIdentityKey];
@@ -770,7 +770,7 @@ export class OlmDevice {
     ): Promise<{ sessionId: string, lastReceivedMessageTs: number, hasReceivedMessage: boolean }[]> {
         log = log.withPrefix("[getSessionInfoForDevice]");
 
-        if (this.sessionsInProgress[deviceIdentityKey] && !nowait) {
+        if (deviceIdentityKey in this.sessionsInProgress && !nowait) {
             log.debug(`Waiting for Olm session for ${deviceIdentityKey} to be created`);
             try {
                 await this.sessionsInProgress[deviceIdentityKey];
@@ -804,7 +804,7 @@ export class OlmDevice {
             log,
         );
 
-        return info!;
+        return info;
     }
 
     /**

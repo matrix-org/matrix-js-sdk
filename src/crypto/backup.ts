@@ -201,7 +201,7 @@ export class BackupManager {
         }
 
         const [privateKey, authData] = await Algorithm.prepare(key);
-        const recoveryKey = encodeRecoveryKey(privateKey);
+        const recoveryKey = encodeRecoveryKey(privateKey)!;
         return {
             algorithm: Algorithm.algorithmName,
             auth_data: authData,
@@ -298,11 +298,11 @@ export class BackupManager {
 
         const now = new Date().getTime();
         if (
-            !this.sessionLastCheckAttemptedTime[targetSessionId]
-                || now - this.sessionLastCheckAttemptedTime[targetSessionId] > KEY_BACKUP_CHECK_RATE_LIMIT
+            !this.sessionLastCheckAttemptedTime[targetSessionId!]
+                || now - this.sessionLastCheckAttemptedTime[targetSessionId!] > KEY_BACKUP_CHECK_RATE_LIMIT
         ) {
-            this.sessionLastCheckAttemptedTime[targetSessionId] = now;
-            await this.baseApis.restoreKeyBackupWithCache(targetRoomId, targetSessionId, this.backupInfo, {});
+            this.sessionLastCheckAttemptedTime[targetSessionId!] = now;
+            await this.baseApis.restoreKeyBackupWithCache(targetRoomId!, targetSessionId!, this.backupInfo, {});
         }
     }
 
@@ -680,8 +680,7 @@ export class Curve25519 implements BackupAlgorithm {
             const backupPubKey = decryption.init_with_private_key(privKey);
 
             if (backupPubKey !== this.authData.public_key) {
-                // eslint-disable-next-line no-throw-literal
-                throw { errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY };
+                throw new MatrixError({ errcode: MatrixClient.RESTORE_BACKUP_ERROR_BAD_KEY });
             }
 
             const keys: IMegolmSessionData[] = [];

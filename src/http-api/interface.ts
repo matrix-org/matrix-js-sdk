@@ -38,6 +38,7 @@ export interface IRequestOpts {
     headers?: Record<string, string>;
     abortSignal?: AbortSignal;
     localTimeoutMs?: number;
+    keepAlive?: boolean; // defaults to false
     json?: boolean; // defaults to true
 
     // Set to true to prevent the request function from emitting a Session.logged_out event.

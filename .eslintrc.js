@@ -20,13 +20,13 @@ module.exports = {
     // NOTE: These rules are frozen and new rules should not be added here.
     // New changes belong in https://github.com/matrix-org/eslint-plugin-matrix-org/
     rules: {
-        "no-var": ["warn"],
-        "prefer-rest-params": ["warn"],
-        "prefer-spread": ["warn"],
-        "one-var": ["warn"],
-        "padded-blocks": ["warn"],
-        "no-extend-native": ["warn"],
-        "camelcase": ["warn"],
+        "no-var": ["error"],
+        "prefer-rest-params": ["error"],
+        "prefer-spread": ["error"],
+        "one-var": ["error"],
+        "padded-blocks": ["error"],
+        "no-extend-native": ["error"],
+        "camelcase": ["error"],
         "no-multi-spaces": ["error", { "ignoreEOLComments": true }],
         "space-before-function-paren": ["error", {
             "anonymous": "never",

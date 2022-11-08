@@ -118,12 +118,12 @@ export function makeEmoteMessage(body: string) {
 /** Location content helpers */
 
 export const getTextForLocationEvent = (
-    uri: string,
+    uri: string | undefined,
     assetType: LocationAssetType,
-    timestamp: number,
-    description?: string,
+    timestamp?: number,
+    description?: string | null,
 ): string => {
-    const date = `at ${new Date(timestamp).toISOString()}`;
+    const date = `at ${new Date(timestamp!).toISOString()}`;
     const assetName = assetType === LocationAssetType.Self ? 'User' : undefined;
     const quotedDescription = description ? `"${description}"` : undefined;
 
@@ -139,8 +139,7 @@ export const getTextForLocationEvent = (
 /**
  * Generates the content for a Location event
  * @param uri a geo:// uri for the location
- * @param timestamp the timestamp when the location was correct (milliseconds since
- *           the UNIX epoch)
+ * @param timestamp the timestamp when the location was correct (milliseconds since the UNIX epoch)
  * @param description the (optional) label for this location on the map
  * @param assetType the (optional) asset type of this location e.g. "m.self"
  * @param text optional. A text for the location
@@ -148,10 +147,10 @@ export const getTextForLocationEvent = (
 export const makeLocationContent = (
     // this is first but optional
     // to avoid a breaking change
-    text: string | undefined,
-    uri: string,
+    text?: string,
+    uri?: string,
     timestamp?: number,
-    description?: string,
+    description?: string | null,
     assetType?: LocationAssetType,
 ): LegacyLocationEventContent & MLocationEventContent => {
     const defaultedText = text ??
@@ -188,7 +187,7 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
     const assetType = asset?.type ?? LocationAssetType.Self;
     const fallbackText = text ?? wireEventContent.body;
 
-    return makeLocationContent(fallbackText, geoUri, timestamp, description, assetType);
+    return makeLocationContent(fallbackText, geoUri, timestamp ?? undefined, description, assetType);
 };
 
 /**
@@ -202,7 +201,7 @@ export type MakeTopicContent = (
 export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
     const renderings = [{ body: topic, mimetype: "text/plain" }];
     if (isProvided(htmlTopic)) {
-        renderings.push({ body: htmlTopic, mimetype: "text/html" });
+        renderings.push({ body: htmlTopic!, mimetype: "text/html" });
     }
     return { topic, [M_TOPIC.name]: renderings };
 };
@@ -248,14 +247,14 @@ export const makeBeaconInfoContent: MakeBeaconInfoContent = (
 
 export type BeaconInfoState = MBeaconInfoContent & {
     assetType?: LocationAssetType;
-    timestamp: number;
+    timestamp?: number;
 };
 /**
  * Flatten beacon info event content
  */
 export const parseBeaconInfoContent = (content: MBeaconInfoEventContent): BeaconInfoState => {
     const { description, timeout, live } = content;
-    const timestamp = M_TIMESTAMP.findIn<number>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content) ?? undefined;
     const asset = M_ASSET.findIn<MAssetContent>(content);
 
     return {
@@ -291,14 +290,14 @@ export const makeBeaconContent: MakeBeaconContent = (
     },
 });
 
-export type BeaconLocationState = MLocationContent & {
+export type BeaconLocationState = Omit<MLocationContent, "uri"> & {
     uri?: string; // override from MLocationContent to allow optionals
     timestamp?: number;
 };
 
 export const parseBeaconContent = (content: MBeaconEventContent): BeaconLocationState => {
     const location = M_LOCATION.findIn<MLocationContent>(content);
-    const timestamp = M_TIMESTAMP.findIn<number>(content);
+    const timestamp = M_TIMESTAMP.findIn<number>(content) ?? undefined;
 
     return {
         description: location?.description,

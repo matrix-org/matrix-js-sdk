@@ -15,8 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import nodeCrypto from "crypto";
-
 import { TestClient } from '../../../TestClient';
 import { MatrixEvent } from "../../../../src/models/event";
 import { IRoomTimelineData } from "../../../../src/models/event-timeline-set";
@@ -117,17 +115,4 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
     };
 
     return [clients, destroy];
-}
-
-export function setupWebcrypto() {
-    global.crypto = {
-        getRandomValues: (buf) => {
-            return nodeCrypto.randomFillSync(buf as any);
-        },
-    } as unknown as Crypto;
-}
-
-export function teardownWebcrypto() {
-    // @ts-ignore undefined != Crypto
-    global.crypto = undefined;
 }

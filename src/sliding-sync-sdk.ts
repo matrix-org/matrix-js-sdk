@@ -85,7 +85,7 @@ class ExtensionE2EE implements Extension {
             const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.crypto.setNeedsNewFallback(
-                unusedFallbackKeys instanceof Array &&
+                Array.isArray(unusedFallbackKeys) &&
                 !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
@@ -396,7 +396,7 @@ export class SlidingSyncSdk {
 
     public createRoom(roomId: string): Room { // XXX cargoculted from sync.ts
         const { timelineSupport } = this.client;
-        const room = new Room(roomId, this.client, this.client.getUserId(), {
+        const room = new Room(roomId, this.client, this.client.getUserId()!, {
             lazyLoadMembers: this.opts.lazyLoadMembers,
             pendingEventOrdering: this.opts.pendingEventOrdering,
             timelineSupport,
@@ -428,7 +428,7 @@ export class SlidingSyncSdk {
             RoomStateEvent.Update,
         ]);
         room.currentState.on(RoomStateEvent.NewMember, (event, state, member) => {
-            member.user = this.client.getUser(member.userId);
+            member.user = this.client.getUser(member.userId) ?? undefined;
             this.client.reEmitter.reEmit(member, [
                 RoomMemberEvent.Name,
                 RoomMemberEvent.Typing,
@@ -475,7 +475,7 @@ export class SlidingSyncSdk {
             // this room, then timeline_limit: 50).
             const knownEvents = new Set<string>();
             room.getLiveTimeline().getEvents().forEach((e) => {
-                knownEvents.add(e.getId());
+                knownEvents.add(e.getId()!);
             });
             // all unknown events BEFORE a known event must be scrollback e.g:
             //       D E   <-- what we know
@@ -490,7 +490,7 @@ export class SlidingSyncSdk {
             let seenKnownEvent = false;
             for (let i = timelineEvents.length-1; i >= 0; i--) {
                 const recvEvent = timelineEvents[i];
-                if (knownEvents.has(recvEvent.getId())) {
+                if (knownEvents.has(recvEvent.getId()!)) {
                     seenKnownEvent = true;
                     continue; // don't include this event, it's a dupe
                 }

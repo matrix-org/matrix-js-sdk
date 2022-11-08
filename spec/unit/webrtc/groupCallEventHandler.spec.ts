@@ -74,7 +74,7 @@ describe('Group Call Event Handler', function() {
                 { roomId: FAKE_ROOM_ID } as unknown as RoomState,
             );
 
-            const groupCall = groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID);
+            const groupCall = groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID)!;
 
             expect(groupCall.state).toBe(GroupCallState.LocalCallFeedUninitialized);
 

@@ -84,31 +84,31 @@ export const USERMEDIA_STREAM_ID = "mock_stream_from_media_handler";
 export const SCREENSHARE_STREAM_ID = "mock_screen_stream_from_media_handler";
 
 class MockMediaStreamAudioSourceNode {
-    connect() {}
+    public connect() {}
 }
 
 class MockAnalyser {
-    getFloatFrequencyData() { return 0.0; }
+    public getFloatFrequencyData() { return 0.0; }
 }
 
 export class MockAudioContext {
     constructor() {}
-    createAnalyser() { return new MockAnalyser(); }
-    createMediaStreamSource() { return new MockMediaStreamAudioSourceNode(); }
-    close() {}
+    public createAnalyser() { return new MockAnalyser(); }
+    public createMediaStreamSource() { return new MockMediaStreamAudioSourceNode(); }
+    public close() {}
 }
 
 export class MockRTCPeerConnection {
     private static instances: MockRTCPeerConnection[] = [];
 
-    private negotiationNeededListener: () => void;
+    private negotiationNeededListener?: () => void;
     public iceCandidateListener?: (e: RTCPeerConnectionIceEvent) => void;
     public onTrackListener?: (e: RTCTrackEvent) => void;
     public needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
-    private onReadyToNegotiate: () => void;
-    localDescription: RTCSessionDescription;
-    signalingState: RTCSignalingState = "stable";
+    private onReadyToNegotiate?: () => void;
+    public localDescription: RTCSessionDescription;
+    public signalingState: RTCSignalingState = "stable";
     public transceivers: MockRTCRtpTransceiver[] = [];
 
     public static triggerAllNegotiations(): void {
@@ -139,7 +139,7 @@ export class MockRTCPeerConnection {
         MockRTCPeerConnection.instances.push(this);
     }
 
-    addEventListener(type: string, listener: () => void) {
+    public addEventListener(type: string, listener: () => void) {
         if (type === 'negotiationneeded') {
             this.negotiationNeededListener = listener;
         } else if (type == 'icecandidate') {
@@ -148,30 +148,30 @@ export class MockRTCPeerConnection {
             this.onTrackListener = listener;
         }
     }
-    createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
-    createOffer() {
+    public createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
+    public createOffer() {
         return Promise.resolve({
             type: 'offer',
             sdp: DUMMY_SDP,
         });
     }
-    createAnswer() {
+    public createAnswer() {
         return Promise.resolve({
             type: 'answer',
             sdp: DUMMY_SDP,
         });
     }
-    setRemoteDescription() {
+    public setRemoteDescription() {
         return Promise.resolve();
     }
-    setLocalDescription() {
+    public setLocalDescription() {
         return Promise.resolve();
     }
-    close() { }
-    getStats() { return []; }
-    addTransceiver(track: MockMediaStreamTrack): MockRTCRtpTransceiver {
+    public close() { }
+    public getStats() { return []; }
+    public addTransceiver(track: MockMediaStreamTrack): MockRTCRtpTransceiver {
         this.needsNegotiation = true;
-        this.onReadyToNegotiate();
+        if (this.onReadyToNegotiate) this.onReadyToNegotiate();
 
         const newSender = new MockRTCRtpSender(track);
         const newReceiver = new MockRTCRtpReceiver(track);
@@ -184,19 +184,21 @@ export class MockRTCPeerConnection {
 
         return newTransceiver;
     }
-    addTrack(track: MockMediaStreamTrack): MockRTCRtpSender {
+    public addTrack(track: MockMediaStreamTrack): MockRTCRtpSender {
         return this.addTransceiver(track).sender as unknown as MockRTCRtpSender;
     }
 
-    removeTrack() {
+    public removeTrack() {
         this.needsNegotiation = true;
-        this.onReadyToNegotiate();
+        if (this.onReadyToNegotiate) this.onReadyToNegotiate();
     }
 
-    getTransceivers(): MockRTCRtpTransceiver[] { return this.transceivers; }
-    getSenders(): MockRTCRtpSender[] { return this.transceivers.map(t => t.sender as unknown as MockRTCRtpSender); }
+    public getTransceivers(): MockRTCRtpTransceiver[] { return this.transceivers; }
+    public getSenders(): MockRTCRtpSender[] {
+        return this.transceivers.map(t => t.sender as unknown as MockRTCRtpSender);
+    }
 
-    doNegotiation() {
+    public doNegotiation() {
         if (this.needsNegotiation && this.negotiationNeededListener) {
             this.needsNegotiation = false;
             this.negotiationNeededListener();
@@ -207,7 +209,7 @@ export class MockRTCPeerConnection {
 export class MockRTCRtpSender {
     constructor(public track: MockMediaStreamTrack) { }
 
-    replaceTrack(track: MockMediaStreamTrack) { this.track = track; }
+    public replaceTrack(track: MockMediaStreamTrack) { this.track = track; }
 }
 
 export class MockRTCRtpReceiver {
@@ -217,45 +219,45 @@ export class MockRTCRtpReceiver {
 export class MockRTCRtpTransceiver {
     constructor(private peerConn: MockRTCPeerConnection) {}
 
-    public sender: RTCRtpSender;
-    public receiver: RTCRtpReceiver;
+    public sender?: RTCRtpSender;
+    public receiver?: RTCRtpReceiver;
 
     public set direction(_: string) {
         this.peerConn.needsNegotiation = true;
     }
 
-    setCodecPreferences = jest.fn<void, RTCRtpCodecCapability[]>();
+    public setCodecPreferences = jest.fn<void, RTCRtpCodecCapability[]>();
 }
 
 export class MockMediaStreamTrack {
     constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) { }
 
-    stop = jest.fn<void, []>();
+    public stop = jest.fn<void, []>();
 
-    listeners: [string, (...args: any[]) => any][] = [];
+    public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
-    public settings: MediaTrackSettings;
+    public settings?: MediaTrackSettings;
 
-    getSettings(): MediaTrackSettings { return this.settings; }
+    public getSettings(): MediaTrackSettings { return this.settings!; }
 
     // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
     // implementation
-    dispatchEvent(eventType: string) {
+    public dispatchEvent(eventType: string) {
         this.listeners.forEach(([t, c]) => {
             if (t !== eventType) return;
             c();
         });
     }
-    addEventListener(eventType: string, callback: (...args: any[]) => any) {
+    public addEventListener(eventType: string, callback: (...args: any[]) => any) {
         this.listeners.push([eventType, callback]);
     }
-    removeEventListener(eventType: string, callback: (...args: any[]) => any) {
+    public removeEventListener(eventType: string, callback: (...args: any[]) => any) {
         this.listeners.filter(([t, c]) => {
             return t !== eventType || c !== callback;
         });
     }
 
-    typed(): MediaStreamTrack { return this as unknown as MediaStreamTrack; }
+    public typed(): MediaStreamTrack { return this as unknown as MediaStreamTrack; }
 }
 
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
@@ -266,42 +268,42 @@ export class MockMediaStream {
         private tracks: MockMediaStreamTrack[] = [],
     ) {}
 
-    listeners: [string, (...args: any[]) => any][] = [];
+    public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
 
-    dispatchEvent(eventType: string) {
+    public dispatchEvent(eventType: string) {
         this.listeners.forEach(([t, c]) => {
             if (t !== eventType) return;
             c();
         });
     }
-    getTracks() { return this.tracks; }
-    getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
-    getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
-    addEventListener(eventType: string, callback: (...args: any[]) => any) {
+    public getTracks() { return this.tracks; }
+    public getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
+    public getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
+    public addEventListener(eventType: string, callback: (...args: any[]) => any) {
         this.listeners.push([eventType, callback]);
     }
-    removeEventListener(eventType: string, callback: (...args: any[]) => any) {
+    public removeEventListener(eventType: string, callback: (...args: any[]) => any) {
         this.listeners.filter(([t, c]) => {
             return t !== eventType || c !== callback;
         });
     }
-    addTrack(track: MockMediaStreamTrack) {
+    public addTrack(track: MockMediaStreamTrack) {
         this.tracks.push(track);
         this.dispatchEvent("addtrack");
     }
-    removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
+    public removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
 
-    clone(): MediaStream {
+    public clone(): MediaStream {
         return new MockMediaStream(this.id + ".clone", this.tracks).typed();
     }
 
-    isCloneOf(stream: MediaStream) {
+    public isCloneOf(stream: MediaStream) {
         return this.id === stream.id + ".clone";
     }
 
     // syntactic sugar for typing
-    typed(): MediaStream {
+    public typed(): MediaStream {
         return this as unknown as MediaStream;
     }
 }
@@ -311,14 +313,14 @@ export class MockMediaDeviceInfo {
         public kind: "audioinput" | "videoinput" | "audiooutput",
     ) { }
 
-    typed(): MediaDeviceInfo { return this as unknown as MediaDeviceInfo; }
+    public typed(): MediaDeviceInfo { return this as unknown as MediaDeviceInfo; }
 }
 
 export class MockMediaHandler {
     public userMediaStreams: MockMediaStream[] = [];
     public screensharingStreams: MockMediaStream[] = [];
 
-    getUserMediaStream(audio: boolean, video: boolean) {
+    public getUserMediaStream(audio: boolean, video: boolean) {
         const tracks: MockMediaStreamTrack[] = [];
         if (audio) tracks.push(new MockMediaStreamTrack("usermedia_audio_track", "audio"));
         if (video) tracks.push(new MockMediaStreamTrack("usermedia_video_track", "video"));
@@ -327,10 +329,10 @@ export class MockMediaHandler {
         this.userMediaStreams.push(stream);
         return stream;
     }
-    stopUserMediaStream(stream: MockMediaStream) {
+    public stopUserMediaStream(stream: MockMediaStream) {
         stream.isStopped = true;
     }
-    getScreensharingStream = jest.fn((opts?: IScreensharingOpts) => {
+    public getScreensharingStream = jest.fn((opts?: IScreensharingOpts) => {
         const tracks = [new MockMediaStreamTrack("screenshare_video_track", "video")];
         if (opts?.audio) tracks.push(new MockMediaStreamTrack("screenshare_audio_track", "audio"));
 
@@ -338,31 +340,31 @@ export class MockMediaHandler {
         this.screensharingStreams.push(stream);
         return stream;
     });
-    stopScreensharingStream(stream: MockMediaStream) {
+    public stopScreensharingStream(stream: MockMediaStream) {
         stream.isStopped = true;
     }
-    hasAudioDevice() { return true; }
-    hasVideoDevice() { return true; }
-    stopAllStreams() {}
+    public hasAudioDevice() { return true; }
+    public hasVideoDevice() { return true; }
+    public stopAllStreams() {}
 
-    typed(): MediaHandler { return this as unknown as MediaHandler; }
+    public typed(): MediaHandler { return this as unknown as MediaHandler; }
 }
 
 export class MockMediaDevices {
-    enumerateDevices = jest.fn<Promise<MediaDeviceInfo[]>, []>().mockResolvedValue([
+    public enumerateDevices = jest.fn<Promise<MediaDeviceInfo[]>, []>().mockResolvedValue([
         new MockMediaDeviceInfo("audioinput").typed(),
         new MockMediaDeviceInfo("videoinput").typed(),
     ]);
 
-    getUserMedia = jest.fn<Promise<MediaStream>, [MediaStreamConstraints]>().mockReturnValue(
+    public getUserMedia = jest.fn<Promise<MediaStream>, [MediaStreamConstraints]>().mockReturnValue(
         Promise.resolve(new MockMediaStream("local_stream").typed()),
     );
 
-    getDisplayMedia = jest.fn<Promise<MediaStream>, [DisplayMediaStreamConstraints]>().mockReturnValue(
+    public getDisplayMedia = jest.fn<Promise<MediaStream>, [DisplayMediaStreamConstraints]>().mockReturnValue(
         Promise.resolve(new MockMediaStream("local_display_stream").typed()),
     );
 
-    typed(): MediaDevices { return this as unknown as MediaDevices; }
+    public typed(): MediaDevices { return this as unknown as MediaDevices; }
 }
 
 type EmittedEvents = CallEventHandlerEvent | CallEvent | ClientEvent | RoomStateEvent | GroupCallEventHandlerEvent;
@@ -379,44 +381,44 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
         super();
     }
 
-    groupCallEventHandler = {
+    public groupCallEventHandler = {
         groupCalls: new Map<string, GroupCall>(),
     };
 
-    callEventHandler = {
+    public callEventHandler = {
         calls: new Map<string, MatrixCall>(),
     };
 
-    sendStateEvent = jest.fn<Promise<ISendEventResponse>, [
+    public sendStateEvent = jest.fn<Promise<ISendEventResponse>, [
         roomId: string, eventType: EventType, content: any, statekey: string,
     ]>();
-    sendToDevice = jest.fn<Promise<{}>, [
+    public sendToDevice = jest.fn<Promise<{}>, [
         eventType: string,
         contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
         txnId?: string,
     ]>();
 
-    getMediaHandler(): MediaHandler { return this.mediaHandler.typed(); }
+    public getMediaHandler(): MediaHandler { return this.mediaHandler.typed(); }
 
-    getUserId(): string { return this.userId; }
+    public getUserId(): string { return this.userId; }
 
-    getDeviceId(): string { return this.deviceId; }
-    getSessionId(): string { return this.sessionId; }
+    public getDeviceId(): string { return this.deviceId; }
+    public getSessionId(): string { return this.sessionId; }
 
-    getTurnServers = () => [];
-    isFallbackICEServerAllowed = () => false;
-    reEmitter = new ReEmitter(new TypedEventEmitter());
-    getUseE2eForGroupCall = () => false;
-    checkTurnServers = () => null;
+    public getTurnServers = () => [];
+    public isFallbackICEServerAllowed = () => false;
+    public reEmitter = new ReEmitter(new TypedEventEmitter());
+    public getUseE2eForGroupCall = () => false;
+    public checkTurnServers = () => null;
 
-    getSyncState = jest.fn<SyncState, []>().mockReturnValue(SyncState.Syncing);
+    public getSyncState = jest.fn<SyncState | null, []>().mockReturnValue(SyncState.Syncing);
 
-    getRooms = jest.fn<Room[], []>().mockReturnValue([]);
-    getRoom = jest.fn();
+    public getRooms = jest.fn<Room[], []>().mockReturnValue([]);
+    public getRoom = jest.fn();
 
-    typed(): MatrixClient { return this as unknown as MatrixClient; }
+    public typed(): MatrixClient { return this as unknown as MatrixClient; }
 
-    emitRoomState(event: MatrixEvent, state: RoomState): void {
+    public emitRoomState(event: MatrixEvent, state: RoomState): void {
         this.emit(
             RoomStateEvent.Events,
             event,
@@ -432,10 +434,10 @@ export class MockCallFeed {
         public stream: MockMediaStream,
     ) {}
 
-    measureVolumeActivity(val: boolean) {}
-    dispose() {}
+    public measureVolumeActivity(val: boolean) {}
+    public dispose() {}
 
-    typed(): CallFeed {
+    public typed(): CallFeed {
         return this as unknown as CallFeed;
     }
 }
