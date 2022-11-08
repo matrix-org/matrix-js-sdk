@@ -29,10 +29,10 @@ describe("eventMapperFor", function() {
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
-            request: function() {} as any, // NOP
+            fetchFn: function() {} as any, // NOP
             store: {
                 getRoom(roomId: string): Room | null {
-                    return rooms.find(r => r.roomId === roomId);
+                    return rooms.find(r => r.roomId === roomId) ?? null;
                 },
             } as IStore,
             scheduler: {

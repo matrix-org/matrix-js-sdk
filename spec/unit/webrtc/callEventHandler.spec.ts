@@ -20,30 +20,47 @@ import {
     EventTimeline,
     EventTimelineSet,
     EventType,
+    GroupCallIntent,
+    GroupCallType,
     IRoomTimelineData,
+    MatrixCall,
     MatrixEvent,
     Room,
     RoomEvent,
+    RoomMember,
 } from "../../../src";
 import { MatrixClient } from "../../../src/client";
 import { CallEventHandler, CallEventHandlerEvent } from "../../../src/webrtc/callEventHandler";
 import { GroupCallEventHandler } from "../../../src/webrtc/groupCallEventHandler";
 import { SyncState } from "../../../src/sync";
+import { installWebRTCMocks, MockRTCPeerConnection } from "../../test-utils/webrtc";
+import { sleep } from "../../../src/utils";
 
 describe("CallEventHandler", () => {
     let client: MatrixClient;
     beforeEach(() => {
+        installWebRTCMocks();
+
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {}).client;
         client.callEventHandler = new CallEventHandler(client);
         client.callEventHandler.start();
         client.groupCallEventHandler = new GroupCallEventHandler(client);
         client.groupCallEventHandler.start();
+        client.sendStateEvent = jest.fn().mockResolvedValue({});
     });
 
     afterEach(() => {
         client.callEventHandler.stop();
         client.groupCallEventHandler.stop();
     });
+
+    const sync = async () => {
+        client.getSyncState = jest.fn().mockReturnValue(SyncState.Syncing);
+        client.emit(ClientEvent.Sync, SyncState.Syncing, SyncState.Prepared);
+
+        // We can't await the event processing
+        await sleep(10);
+    };
 
     it("should enforce inbound toDevice message ordering", async () => {
         const callEventHandler = client.callEventHandler;
@@ -136,8 +153,121 @@ describe("CallEventHandler", () => {
         client.on(CallEventHandlerEvent.Incoming, incomingCallEmitted);
 
         client.getSyncState = jest.fn().mockReturnValue(SyncState.Syncing);
-        client.emit(ClientEvent.Sync, SyncState.Syncing);
+        client.emit(ClientEvent.Sync, SyncState.Syncing, null);
 
         expect(incomingCallEmitted).not.toHaveBeenCalled();
+    });
+
+    it("should ignore non-call events", async () => {
+        // @ts-ignore Mock handleCallEvent is private
+        jest.spyOn(client.callEventHandler, "handleCallEvent");
+        jest.spyOn(client, "checkTurnServers").mockReturnValue(undefined);
+
+        const room = new Room("!room:id", client, "@user:id");
+        const timelineData: IRoomTimelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
+
+        client.emit(RoomEvent.Timeline, new MatrixEvent({
+            type: EventType.RoomMessage,
+            room_id: "!room:id",
+            content: {
+                text: "hello",
+
+            },
+        }), room, false, false, timelineData);
+        await sync();
+
+        // @ts-ignore Mock handleCallEvent is private
+        expect(client.callEventHandler.handleCallEvent).not.toHaveBeenCalled();
+    });
+
+    describe("handleCallEvent()", () => {
+        const incomingCallListener = jest.fn();
+        let timelineData: IRoomTimelineData;
+        let room: Room;
+
+        beforeEach(() => {
+            room = new Room("!room:id", client, client.getUserId());
+            timelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
+
+            jest.spyOn(client, "checkTurnServers").mockReturnValue(undefined);
+            jest.spyOn(client, "getRoom").mockReturnValue(room);
+            jest.spyOn(room, "getMember").mockReturnValue({ user_id: client.getUserId() } as unknown as RoomMember);
+
+            client.on(CallEventHandlerEvent.Incoming, incomingCallListener);
+        });
+
+        afterEach(() => {
+            MockRTCPeerConnection.resetInstances();
+            jest.resetAllMocks();
+        });
+
+        it("should create a call when receiving an invite", async () => {
+            client.emit(RoomEvent.Timeline, new MatrixEvent({
+                type: EventType.CallInvite,
+                room_id: "!room:id",
+                content: {
+                    call_id: "123",
+                },
+            }), room, false, false, timelineData);
+            await sync();
+
+            expect(incomingCallListener).toHaveBeenCalled();
+        });
+
+        it("should handle group call event", async () => {
+            let call: MatrixCall;
+            const groupCall = await client.createGroupCall(
+                room.roomId,
+                GroupCallType.Voice,
+                false,
+                GroupCallIntent.Ring,
+            );
+            const SESSION_ID = "sender_session_id";
+            const GROUP_CALL_ID = "group_call_id";
+            const DEVICE_ID = "device_id";
+
+            incomingCallListener.mockImplementation((c) => call = c);
+            jest.spyOn(client.groupCallEventHandler, "getGroupCallById").mockReturnValue(groupCall);
+            // @ts-ignore Mock onIncomingCall is private
+            jest.spyOn(groupCall, "onIncomingCall");
+
+            await groupCall.enter();
+            client.emit(RoomEvent.Timeline, new MatrixEvent({
+                type: EventType.CallInvite,
+                room_id: "!room:id",
+                content: {
+                    call_id: "123",
+                    conf_id: GROUP_CALL_ID,
+                    device_id: DEVICE_ID,
+                    sender_session_id: SESSION_ID,
+                    dest_session_id: client.getSessionId(),
+                },
+            }), room, false, false, timelineData);
+            await sync();
+
+            expect(incomingCallListener).toHaveBeenCalled();
+            expect(call.groupCallId).toBe(GROUP_CALL_ID);
+            // @ts-ignore Mock opponentDeviceId is private
+            expect(call.opponentDeviceId).toBe(DEVICE_ID);
+            expect(call.getOpponentSessionId()).toBe(SESSION_ID);
+            // @ts-ignore Mock onIncomingCall is private
+            expect(groupCall.onIncomingCall).toHaveBeenCalledWith(call);
+
+            groupCall.terminate(false);
+        });
+
+        it("ignores a call with a different invitee than us", async () => {
+            client.emit(RoomEvent.Timeline, new MatrixEvent({
+                type: EventType.CallInvite,
+                room_id: "!room:id",
+                content: {
+                    call_id: "123",
+                    invitee: "@bob:bar",
+                },
+            }), room, false, false, timelineData);
+            await sync();
+
+            expect(incomingCallListener).not.toHaveBeenCalled();
+        });
     });
 });

@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    IndexedDBCryptoStore,
-} from '../../../src/crypto/store/indexeddb-crypto-store';
+import { CryptoStore } from '../../../src/crypto/store/base';
+import { IndexedDBCryptoStore } from '../../../src/crypto/store/indexeddb-crypto-store';
+import { LocalStorageCryptoStore } from '../../../src/crypto/store/localStorage-crypto-store';
 import { MemoryCryptoStore } from '../../../src/crypto/store/memory-crypto-store';
 import { RoomKeyRequestState } from '../../../src/crypto/OutgoingRoomKeyRequestManager';
 
@@ -26,36 +26,39 @@ import 'jest-localstorage-mock';
 const requests = [
     {
         requestId: "A",
-        requestBody: { session_id: "A", room_id: "A" },
+        requestBody: { session_id: "A", room_id: "A", sender_key: "A", algorithm: "m.megolm.v1.aes-sha2" },
         state: RoomKeyRequestState.Sent,
+        recipients: [
+            { userId: "@alice:example.com", deviceId: "*" },
+            { userId: "@becca:example.com", deviceId: "foobarbaz" },
+        ],
     },
     {
         requestId: "B",
-        requestBody: { session_id: "B", room_id: "B" },
+        requestBody: { session_id: "B", room_id: "B", sender_key: "B", algorithm: "m.megolm.v1.aes-sha2" },
         state: RoomKeyRequestState.Sent,
+        recipients: [
+            { userId: "@alice:example.com", deviceId: "*" },
+            { userId: "@carrie:example.com", deviceId: "barbazquux" },
+        ],
     },
     {
         requestId: "C",
-        requestBody: { session_id: "C", room_id: "C" },
+        requestBody: { session_id: "C", room_id: "C", sender_key: "B", algorithm: "m.megolm.v1.aes-sha2" },
         state: RoomKeyRequestState.Unsent,
+        recipients: [
+            { userId: "@becca:example.com", deviceId: "foobarbaz" },
+        ],
     },
 ];
 
 describe.each([
     ["IndexedDBCryptoStore",
         () => new IndexedDBCryptoStore(global.indexedDB, "tests")],
-    ["LocalStorageCryptoStore",
-        () => new IndexedDBCryptoStore(undefined, "tests")],
-    ["MemoryCryptoStore", () => {
-        const store = new IndexedDBCryptoStore(undefined, "tests");
-        // @ts-ignore set private properties
-        store.backend = new MemoryCryptoStore();
-        // @ts-ignore
-        store.backendPromise = Promise.resolve(store.backend);
-        return store;
-    }],
+    ["LocalStorageCryptoStore", () => new LocalStorageCryptoStore(localStorage)],
+    ["MemoryCryptoStore", () => new MemoryCryptoStore()],
 ])("Outgoing room key requests [%s]", function(name, dbFactory) {
-    let store;
+    let store: CryptoStore;
 
     beforeAll(async () => {
         store = dbFactory();
@@ -75,13 +78,22 @@ describe.each([
             });
         });
 
+    it("getOutgoingRoomKeyRequestsByTarget retrieves all entries with a given target",
+        async () => {
+            const r = await store.getOutgoingRoomKeyRequestsByTarget(
+                "@becca:example.com", "foobarbaz", [RoomKeyRequestState.Sent],
+            );
+            expect(r).toHaveLength(1);
+            expect(r[0]).toEqual(requests[0]);
+        });
+
     test("getOutgoingRoomKeyRequestByState retrieves any entry in a given state",
         async () => {
             const r =
             await store.getOutgoingRoomKeyRequestByState([RoomKeyRequestState.Sent]);
             expect(r).not.toBeNull();
             expect(r).not.toBeUndefined();
-            expect(r.state).toEqual(RoomKeyRequestState.Sent);
+            expect(r!.state).toEqual(RoomKeyRequestState.Sent);
             expect(requests).toContainEqual(r);
         });
 });

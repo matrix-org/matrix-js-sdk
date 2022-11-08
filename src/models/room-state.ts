@@ -68,7 +68,7 @@ export type RoomStateEventHandlerMap = {
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
-    [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions: IMarkerFoundOptions) => void;
+    [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions?: IMarkerFoundOptions) => void;
     [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
 };
 
@@ -79,25 +79,25 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public readonly reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
-    private displayNameToUserIds: Record<string, string[]> = {};
+    private displayNameToUserIds = new Map<string, string[]>();
     private userIdsToDisplayNames: Record<string, string> = {};
     private tokenToInvite: Record<string, MatrixEvent> = {}; // 3pid invite state_key to m.room.member invite
-    private joinedMemberCount: number = null; // cache of the number of joined members
+    private joinedMemberCount: number | null = null; // cache of the number of joined members
     // joined members count from summary api
     // once set, we know the server supports the summary api
     // and we should only trust that
     // we could also only trust that before OOB members
     // are loaded but doesn't seem worth the hassle atm
-    private summaryJoinedMemberCount: number = null;
+    private summaryJoinedMemberCount: number |null = null;
     // same for invited member count
-    private invitedMemberCount: number = null;
-    private summaryInvitedMemberCount: number = null;
-    private modified: number;
+    private invitedMemberCount: number | null = null;
+    private summaryInvitedMemberCount: number | null = null;
+    private modified = -1;
 
     // XXX: Should be read-only
     public members: Record<string, RoomMember> = {}; // userId: RoomMember
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
-    public paginationToken: string = null;
+    public paginationToken: string | null = null;
 
     public readonly beacons = new Map<BeaconIdentifier, Beacon>();
     private _liveBeaconIds: BeaconIdentifier[] = [];
@@ -232,7 +232,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (sentinel === undefined) {
             sentinel = new RoomMember(this.roomId, userId);
             const member = this.members[userId];
-            if (member) {
+            if (member?.events.member) {
                 sentinel.setMembershipEvent(member.events.member, this);
             }
             this.sentinels[userId] = sentinel;
@@ -257,9 +257,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return stateKey === undefined ? [] : null;
         }
         if (stateKey === undefined) { // return all values
-            return Array.from(this.events.get(eventType).values());
+            return Array.from(this.events.get(eventType)!.values());
         }
-        const event = this.events.get(eventType).get(stateKey);
+        const event = this.events.get(eventType)!.get(stateKey);
         return event ? event : null;
     }
 
@@ -306,8 +306,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // copy markOutOfBand flags
             this.getMembers().forEach((member) => {
                 if (member.isOutOfBand()) {
-                    const copyMember = copy.getMember(member.userId);
-                    copyMember.markOutOfBand();
+                    copy.getMember(member.userId)?.markOutOfBand();
                 }
             });
         }
@@ -324,8 +323,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public setUnknownStateEvents(events: MatrixEvent[]): void {
         const unknownStateEvents = events.filter((event) => {
-            return !this.events.has(event.getType()) ||
-                !this.events.get(event.getType()).has(event.getStateKey());
+            return !this.events.has(event.getType()) || !this.events.get(event.getType())!.has(event.getStateKey()!);
         });
 
         this.setStateEvents(unknownStateEvents);
@@ -349,12 +347,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         // update the core event dict
         stateEvents.forEach((event) => {
-            if (event.getRoomId() !== this.roomId) {
-                return;
-            }
-            if (!event.isState()) {
-                return;
-            }
+            if (event.getRoomId() !== this.roomId || !event.isState()) return;
 
             if (M_BEACON_INFO.matches(event.getType())) {
                 this.setBeacon(event);
@@ -363,7 +356,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const lastStateEvent = this.getStateEventMatching(event);
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
-                this.updateDisplayNameCache(event.getStateKey(), event.getContent().displayname);
+                this.updateDisplayNameCache(event.getStateKey()!, event.getContent().displayname ?? "");
                 this.updateThirdPartyTokenCache(event);
             }
             this.emit(RoomStateEvent.Events, event, this, lastStateEvent);
@@ -375,15 +368,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         // the given array (e.g. disambiguating display names in one go to do both
         // clashing names rather than progressively which only catches 1 of them).
         stateEvents.forEach((event) => {
-            if (event.getRoomId() !== this.roomId) {
-                return;
-            }
-            if (!event.isState()) {
-                return;
-            }
+            if (event.getRoomId() !== this.roomId || !event.isState()) return;
 
             if (event.getType() === EventType.RoomMember) {
-                const userId = event.getStateKey();
+                const userId = event.getStateKey()!;
 
                 // leave events apparently elide the displayname or avatar_url,
                 // so let's fake one up so that we don't leak user ids
@@ -456,11 +444,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         events.forEach((event: MatrixEvent) => {
             const relatedToEventId = event.getRelation()?.event_id;
-            // not related to a beacon we know about
-            // discard
-            if (!beaconByEventIdDict[relatedToEventId]) {
-                return;
-            }
+            // not related to a beacon we know about; discard
+            if (!relatedToEventId || !beaconByEventIdDict[relatedToEventId]) return;
 
             matrixClient.decryptEventIfNeeded(event);
 
@@ -501,7 +486,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (!this.events.has(event.getType())) {
             this.events.set(event.getType(), new Map());
         }
-        this.events.get(event.getType()).set(event.getStateKey(), event);
+        this.events.get(event.getType())!.set(event.getStateKey()!, event);
     }
 
     /**
@@ -511,7 +496,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const beaconIdentifier = getBeaconInfoIdentifier(event);
 
         if (this.beacons.has(beaconIdentifier)) {
-            const beacon = this.beacons.get(beaconIdentifier);
+            const beacon = this.beacons.get(beaconIdentifier)!;
 
             if (event.isRedacted()) {
                 if (beacon.beaconInfoId === event.getRedactionEvent()?.['redacts']) {
@@ -558,7 +543,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     private getStateEventMatching(event: MatrixEvent): MatrixEvent | null {
-        return this.events.get(event.getType())?.get(event.getStateKey()) ?? null;
+        return this.events.get(event.getType())?.get(event.getStateKey()!) ?? null;
     }
 
     private updateMember(member: RoomMember): void {
@@ -646,7 +631,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (stateEvent.getType() !== EventType.RoomMember) {
             return;
         }
-        const userId = stateEvent.getStateKey();
+        const userId = stateEvent.getStateKey()!;
         const existingMember = this.getMember(userId);
         // never replace members received as part of the sync
         if (existingMember && !existingMember.isOutOfBand()) {
@@ -709,7 +694,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @return {string[]} An array of user IDs or an empty array.
      */
     public getUserIdsWithDisplayName(displayName: string): string[] {
-        return this.displayNameToUserIds[utils.removeHiddenChars(displayName)] || [];
+        return this.displayNameToUserIds.get(utils.removeHiddenChars(displayName)) ?? [];
     }
 
     /**
@@ -788,7 +773,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
       *                        according to the room's state.
       */
     public mayClientSendStateEvent(stateEventType: EventType | string, cli: MatrixClient): boolean {
-        if (cli.isGuest()) {
+        if (cli.isGuest() || !cli.credentials.userId) {
             return false;
         }
         return this.maySendStateEvent(stateEventType, cli.credentials.userId);
@@ -941,11 +926,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // the lot.
             const strippedOldName = utils.removeHiddenChars(oldName);
 
-            const existingUserIds = this.displayNameToUserIds[strippedOldName];
+            const existingUserIds = this.displayNameToUserIds.get(strippedOldName);
             if (existingUserIds) {
                 // remove this user ID from this array
                 const filteredUserIDs = existingUserIds.filter((id) => id !== userId);
-                this.displayNameToUserIds[strippedOldName] = filteredUserIDs;
+                this.displayNameToUserIds.set(strippedOldName, filteredUserIDs);
             }
         }
 
@@ -954,10 +939,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const strippedDisplayname = displayName && utils.removeHiddenChars(displayName);
         // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
         if (strippedDisplayname) {
-            if (!this.displayNameToUserIds[strippedDisplayname]) {
-                this.displayNameToUserIds[strippedDisplayname] = [];
-            }
-            this.displayNameToUserIds[strippedDisplayname].push(userId);
+            const arr = this.displayNameToUserIds.get(strippedDisplayname) ?? [];
+            arr.push(userId);
+            this.displayNameToUserIds.set(strippedDisplayname, arr);
         }
     }
 }

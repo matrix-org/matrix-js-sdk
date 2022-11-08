@@ -17,10 +17,9 @@ limitations under the License.
 
 /** @module auto-discovery */
 
-import { ServerResponse } from "http";
-
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from './logger';
+import { MatrixError, Method, timeoutSignal } from "./http-api";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -348,7 +347,7 @@ export class AutoDiscovery {
      * @returns {Promise<object>} Resolves to the domain's client config. Can
      * be an empty object.
      */
-    public static async getRawClientConfig(domain: string): Promise<IClientWellKnown> {
+    public static async getRawClientConfig(domain?: string): Promise<IClientWellKnown> {
         if (!domain || typeof(domain) !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
@@ -395,6 +394,19 @@ export class AutoDiscovery {
         }
     }
 
+    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+        if (this.fetchFn) {
+            return this.fetchFn(resource, options);
+        }
+        return global.fetch(resource, options);
+    }
+
+    private static fetchFn?: typeof global.fetch;
+
+    public static setFetchFn(fetchFn: typeof global.fetch): void {
+        AutoDiscovery.fetchFn = fetchFn;
+    }
+
     /**
      * Fetches a JSON object from a given URL, as expected by all .well-known
      * related lookups. If the server gives a 404 then the `action` will be
@@ -411,45 +423,55 @@ export class AutoDiscovery {
      * @return {Promise<object>} Resolves to the returned state.
      * @private
      */
-    private static fetchWellKnownObject(uri: string): Promise<IWellKnownConfig> {
-        return new Promise((resolve) => {
-            // eslint-disable-next-line
-            const request = require("./matrix").getRequest();
-            if (!request) throw new Error("No request library available");
-            request(
-                { method: "GET", uri, timeout: 5000 },
-                (error: Error, response: ServerResponse, body: string) => {
-                    if (error || response?.statusCode < 200 || response?.statusCode >= 300) {
-                        const result = { error, raw: {} };
-                        return resolve(response?.statusCode === 404
-                            ? {
-                                ...result,
-                                action: AutoDiscoveryAction.IGNORE,
-                                reason: AutoDiscovery.ERROR_MISSING_WELLKNOWN,
-                            } : {
-                                ...result,
-                                action: AutoDiscoveryAction.FAIL_PROMPT,
-                                reason: error?.message || "General failure",
-                            });
-                    }
+    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
+        let response: Response;
 
-                    try {
-                        return resolve({
-                            raw: JSON.parse(body),
-                            action: AutoDiscoveryAction.SUCCESS,
-                        });
-                    } catch (err) {
-                        return resolve({
-                            error: err,
-                            raw: {},
-                            action: AutoDiscoveryAction.FAIL_PROMPT,
-                            reason: err?.name === "SyntaxError"
-                                ? AutoDiscovery.ERROR_INVALID_JSON
-                                : AutoDiscovery.ERROR_INVALID,
-                        });
-                    }
-                },
-            );
-        });
+        try {
+            response = await AutoDiscovery.fetch(url, {
+                method: Method.Get,
+                signal: timeoutSignal(5000),
+            });
+
+            if (response.status === 404) {
+                return {
+                    raw: {},
+                    action: AutoDiscoveryAction.IGNORE,
+                    reason: AutoDiscovery.ERROR_MISSING_WELLKNOWN,
+                };
+            }
+
+            if (!response.ok) {
+                return {
+                    raw: {},
+                    action: AutoDiscoveryAction.FAIL_PROMPT,
+                    reason: "General failure",
+                };
+            }
+        } catch (err) {
+            const error = err as Error | string | undefined;
+            return {
+                error,
+                raw: {},
+                action: AutoDiscoveryAction.FAIL_PROMPT,
+                reason: (<Error>error)?.message || "General failure",
+            };
+        }
+
+        try {
+            return {
+                raw: await response.json(),
+                action: AutoDiscoveryAction.SUCCESS,
+            };
+        } catch (err) {
+            const error = err as Error | string | undefined;
+            return {
+                error,
+                raw: {},
+                action: AutoDiscoveryAction.FAIL_PROMPT,
+                reason: (error as MatrixError)?.name === "SyntaxError"
+                    ? AutoDiscovery.ERROR_INVALID_JSON
+                    : AutoDiscovery.ERROR_INVALID,
+            };
+        }
     }
 }

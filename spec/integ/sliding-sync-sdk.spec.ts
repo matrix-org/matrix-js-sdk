@@ -23,18 +23,19 @@ import { TestClient } from "../TestClient";
 import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
 import {
     MatrixClient, MatrixEvent, NotificationCountType, JoinRule, MatrixError,
-    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent,
+    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent, RoomMemberEvent,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
 import { IStoredClientOpts } from "../../src/client";
 import { logger } from "../../src/logger";
+import { emitPromise } from "../test-utils/test-utils";
 
 describe("SlidingSyncSdk", () => {
-    let client: MatrixClient = null;
-    let httpBackend: MockHttpBackend = null;
-    let sdk: SlidingSyncSdk = null;
-    let mockSlidingSync: SlidingSync = null;
+    let client: MatrixClient | undefined;
+    let httpBackend: MockHttpBackend | undefined;
+    let sdk: SlidingSyncSdk | undefined;
+    let mockSlidingSync: SlidingSync | undefined;
     const selfUserId = "@alice:localhost";
     const selfAccessToken = "aseukfgwef";
 
@@ -66,7 +67,7 @@ describe("SlidingSyncSdk", () => {
             event_id: "$" + eventIdCounter,
         };
     };
-    const mkOwnStateEvent = (evType: string, content: object, stateKey?: string): IStateEvent => {
+    const mkOwnStateEvent = (evType: string, content: object, stateKey = ''): IStateEvent => {
         eventIdCounter++;
         return {
             type: evType,
@@ -103,24 +104,24 @@ describe("SlidingSyncSdk", () => {
         client = testClient.client;
         mockSlidingSync = mockifySlidingSync(new SlidingSync("", [], {}, client, 0));
         if (testOpts.withCrypto) {
-            httpBackend.when("GET", "/room_keys/version").respond(404, {});
-            await client.initCrypto();
-            testOpts.crypto = client.crypto;
+            httpBackend!.when("GET", "/room_keys/version").respond(404, {});
+            await client!.initCrypto();
+            testOpts.crypto = client!.crypto;
         }
-        httpBackend.when("GET", "/_matrix/client/r0/pushrules").respond(200, {});
+        httpBackend!.when("GET", "/_matrix/client/r0/pushrules").respond(200, {});
         sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts);
     };
 
     // tear down client/httpBackend globals
     const teardownClient = () => {
-        client.stopClient();
-        return httpBackend.stop();
+        client!.stopClient();
+        return httpBackend!.stop();
     };
 
     // find an extension on a SlidingSyncSdk instance
     const findExtension = (name: string): Extension => {
-        expect(mockSlidingSync.registerExtension).toHaveBeenCalled();
-        const mockFn = mockSlidingSync.registerExtension as jest.Mock;
+        expect(mockSlidingSync!.registerExtension).toHaveBeenCalled();
+        const mockFn = mockSlidingSync!.registerExtension as jest.Mock;
         // find the extension
         for (let i = 0; i < mockFn.mock.calls.length; i++) {
             const calledExtension = mockFn.mock.calls[i][0] as Extension;
@@ -137,14 +138,14 @@ describe("SlidingSyncSdk", () => {
         });
         afterAll(teardownClient);
         it("can sync()", async () => {
-            const hasSynced = sdk.sync();
-            await httpBackend.flushAllExpected();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
             await hasSynced;
-            expect(mockSlidingSync.start).toBeCalled();
+            expect(mockSlidingSync!.start).toBeCalled();
         });
         it("can stop()", async () => {
-            sdk.stop();
-            expect(mockSlidingSync.stop).toBeCalled();
+            sdk!.stop();
+            expect(mockSlidingSync!.stop).toBeCalled();
         });
     });
 
@@ -156,8 +157,8 @@ describe("SlidingSyncSdk", () => {
 
         describe("initial", () => {
             beforeAll(async () => {
-                const hasSynced = sdk.sync();
-                await httpBackend.flushAllExpected();
+                const hasSynced = sdk!.sync();
+                await httpBackend!.flushAllExpected();
                 await hasSynced;
             });
             // inject some rooms with different fields set.
@@ -168,6 +169,7 @@ describe("SlidingSyncSdk", () => {
             const roomD = "!d_with_notif_count:localhost";
             const roomE = "!e_with_invite:localhost";
             const roomF = "!f_calc_room_name:localhost";
+            const roomG = "!g_join_invite_counts:localhost";
             const data: Record<string, MSC3575RoomData> = {
                 [roomA]: {
                     name: "A",
@@ -261,56 +263,83 @@ describe("SlidingSyncSdk", () => {
                     ],
                     initial: true,
                 },
+                [roomG]: {
+                    name: "G",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    ],
+                    joined_count: 5,
+                    invited_count: 2,
+                    initial: true,
+                },
             };
 
             it("can be created with required_state and timeline", () => {
-                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, data[roomA]);
-                const gotRoom = client.getRoom(roomA);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomA, data[roomA]);
+                const gotRoom = client!.getRoom(roomA);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(gotRoom.name).toEqual(data[roomA].name);
                 expect(gotRoom.getMyMembership()).toEqual("join");
                 assertTimelineEvents(gotRoom.getLiveTimeline().getEvents().slice(-2), data[roomA].timeline);
             });
 
             it("can be created with timeline only", () => {
-                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomB, data[roomB]);
-                const gotRoom = client.getRoom(roomB);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomB, data[roomB]);
+                const gotRoom = client!.getRoom(roomB);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(gotRoom.name).toEqual(data[roomB].name);
                 expect(gotRoom.getMyMembership()).toEqual("join");
                 assertTimelineEvents(gotRoom.getLiveTimeline().getEvents().slice(-5), data[roomB].timeline);
             });
 
             it("can be created with a highlight_count", () => {
-                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomC, data[roomC]);
-                const gotRoom = client.getRoom(roomC);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomC, data[roomC]);
+                const gotRoom = client!.getRoom(roomC);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(
                     gotRoom.getUnreadNotificationCount(NotificationCountType.Highlight),
                 ).toEqual(data[roomC].highlight_count);
             });
 
             it("can be created with a notification_count", () => {
-                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomD, data[roomD]);
-                const gotRoom = client.getRoom(roomD);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomD, data[roomD]);
+                const gotRoom = client!.getRoom(roomD);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(
                     gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
                 ).toEqual(data[roomD].notification_count);
             });
 
-            it("can be created with invite_state", () => {
-                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomE, data[roomE]);
-                const gotRoom = client.getRoom(roomE);
+            it("can be created with an invited/joined_count", () => {
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomG, data[roomG]);
+                const gotRoom = client!.getRoom(roomG);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
+                expect(gotRoom.getInvitedMemberCount()).toEqual(data[roomG].invited_count);
+                expect(gotRoom.getJoinedMemberCount()).toEqual(data[roomG].joined_count);
+            });
+
+            it("can be created with invite_state", () => {
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomE, data[roomE]);
+                const gotRoom = client!.getRoom(roomE);
+                expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(gotRoom.getMyMembership()).toEqual("invite");
                 expect(gotRoom.currentState.getJoinRule()).toEqual(JoinRule.Invite);
             });
 
             it("uses the 'name' field to caluclate the room name", () => {
-                mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomF, data[roomF]);
-                const gotRoom = client.getRoom(roomF);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomF, data[roomF]);
+                const gotRoom = client!.getRoom(roomF);
                 expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
                 expect(
                     gotRoom.name,
                 ).toEqual(data[roomF].name);
@@ -319,59 +348,78 @@ describe("SlidingSyncSdk", () => {
             describe("updating", () => {
                 it("can update with a new timeline event", async () => {
                     const newEvent = mkOwnEvent(EventType.RoomMessage, { body: "new event A" });
-                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, {
+                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomA, {
                         timeline: [newEvent],
                         required_state: [],
                         name: data[roomA].name,
                     });
-                    const gotRoom = client.getRoom(roomA);
+                    const gotRoom = client!.getRoom(roomA);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     const newTimeline = data[roomA].timeline;
                     newTimeline.push(newEvent);
                     assertTimelineEvents(gotRoom.getLiveTimeline().getEvents().slice(-3), newTimeline);
                 });
 
                 it("can update with a new required_state event", async () => {
-                    let gotRoom = client.getRoom(roomB);
+                    let gotRoom = client!.getRoom(roomB);
+                    expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(gotRoom.getJoinRule()).toEqual(JoinRule.Invite); // default
-                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomB, {
+                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomB, {
                         required_state: [
                             mkOwnStateEvent("m.room.join_rules", { join_rule: "restricted" }, ""),
                         ],
                         timeline: [],
                         name: data[roomB].name,
                     });
-                    gotRoom = client.getRoom(roomB);
+                    gotRoom = client!.getRoom(roomB);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(gotRoom.getJoinRule()).toEqual(JoinRule.Restricted);
                 });
 
                 it("can update with a new highlight_count", async () => {
-                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomC, {
+                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomC, {
                         name: data[roomC].name,
                         required_state: [],
                         timeline: [],
                         highlight_count: 1,
                     });
-                    const gotRoom = client.getRoom(roomC);
+                    const gotRoom = client!.getRoom(roomC);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(
                         gotRoom.getUnreadNotificationCount(NotificationCountType.Highlight),
                     ).toEqual(1);
                 });
 
                 it("can update with a new notification_count", async () => {
-                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomD, {
+                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomD, {
                         name: data[roomD].name,
                         required_state: [],
                         timeline: [],
                         notification_count: 1,
                     });
-                    const gotRoom = client.getRoom(roomD);
+                    const gotRoom = client!.getRoom(roomD);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
                     expect(
                         gotRoom.getUnreadNotificationCount(NotificationCountType.Total),
                     ).toEqual(1);
+                });
+
+                it("can update with a new joined_count", () => {
+                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomG, {
+                        name: data[roomD].name,
+                        required_state: [],
+                        timeline: [],
+                        joined_count: 1,
+                    });
+                    const gotRoom = client!.getRoom(roomG);
+                    expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
+                    expect(gotRoom.getJoinedMemberCount()).toEqual(1);
                 });
 
                 // Regression test for a bug which caused the timeline entries to be out-of-order
@@ -386,14 +434,15 @@ describe("SlidingSyncSdk", () => {
                         mkOwnEvent(EventType.RoomMessage, { body: "old event C" }),
                         ...timeline,
                     ];
-                    mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomA, {
+                    mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomA, {
                         timeline: oldTimeline,
                         required_state: [],
                         name: data[roomA].name,
                         initial: true, // e.g requested via room subscription
                     });
-                    const gotRoom = client.getRoom(roomA);
+                    const gotRoom = client!.getRoom(roomA);
                     expect(gotRoom).toBeDefined();
+                    if (gotRoom == null) { return; }
 
                     logger.log("want:", oldTimeline.map((e) => (e.type + " : " + (e.content || {}).body)));
                     logger.log("got:", gotRoom.getLiveTimeline().getEvents().map(
@@ -410,50 +459,49 @@ describe("SlidingSyncSdk", () => {
     describe("lifecycle", () => {
         beforeAll(async () => {
             await setupClient();
-            const hasSynced = sdk.sync();
-            await httpBackend.flushAllExpected();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
             await hasSynced;
         });
         const FAILED_SYNC_ERROR_THRESHOLD = 3; // would be nice to export the const in the actual class...
 
         it("emits SyncState.Reconnecting when < FAILED_SYNC_ERROR_THRESHOLD & SyncState.Error when over", async () => {
-            mockSlidingSync.emit(
+            mockSlidingSync!.emit(
                 SlidingSyncEvent.Lifecycle, SlidingSyncState.Complete,
-                { pos: "h", lists: [], rooms: {}, extensions: {} }, null,
+                { pos: "h", lists: [], rooms: {}, extensions: {} },
             );
-            expect(sdk.getSyncState()).toEqual(SyncState.Syncing);
+            expect(sdk!.getSyncState()).toEqual(SyncState.Syncing);
 
-            mockSlidingSync.emit(
+            mockSlidingSync!.emit(
                 SlidingSyncEvent.Lifecycle, SlidingSyncState.RequestFinished, null, new Error("generic"),
             );
-            expect(sdk.getSyncState()).toEqual(SyncState.Reconnecting);
+            expect(sdk!.getSyncState()).toEqual(SyncState.Reconnecting);
 
             for (let i = 0; i < FAILED_SYNC_ERROR_THRESHOLD; i++) {
-                mockSlidingSync.emit(
+                mockSlidingSync!.emit(
                     SlidingSyncEvent.Lifecycle, SlidingSyncState.RequestFinished, null, new Error("generic"),
                 );
             }
-            expect(sdk.getSyncState()).toEqual(SyncState.Error);
+            expect(sdk!.getSyncState()).toEqual(SyncState.Error);
         });
 
         it("emits SyncState.Syncing after a previous SyncState.Error", async () => {
-            mockSlidingSync.emit(
+            mockSlidingSync!.emit(
                 SlidingSyncEvent.Lifecycle,
                 SlidingSyncState.Complete,
                 { pos: "i", lists: [], rooms: {}, extensions: {} },
-                null,
             );
-            expect(sdk.getSyncState()).toEqual(SyncState.Syncing);
+            expect(sdk!.getSyncState()).toEqual(SyncState.Syncing);
         });
 
         it("emits SyncState.Error immediately when receiving M_UNKNOWN_TOKEN and stops syncing", async () => {
-            expect(mockSlidingSync.stop).not.toBeCalled();
-            mockSlidingSync.emit(SlidingSyncEvent.Lifecycle, SlidingSyncState.RequestFinished, null, new MatrixError({
+            expect(mockSlidingSync!.stop).not.toBeCalled();
+            mockSlidingSync!.emit(SlidingSyncEvent.Lifecycle, SlidingSyncState.RequestFinished, null, new MatrixError({
                 errcode: "M_UNKNOWN_TOKEN",
                 message: "Oh no your access token is no longer valid",
             }));
-            expect(sdk.getSyncState()).toEqual(SyncState.Error);
-            expect(mockSlidingSync.stop).toBeCalled();
+            expect(sdk!.getSyncState()).toEqual(SyncState.Error);
+            expect(mockSlidingSync!.stop).toBeCalled();
         });
     });
 
@@ -469,8 +517,8 @@ describe("SlidingSyncSdk", () => {
                 avatar_url: "mxc://foobar",
                 displayname: "The Invitee",
             };
-            httpBackend.when("GET", "/profile").respond(200, inviteeProfile);
-            mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomId, {
+            httpBackend!.when("GET", "/profile").respond(200, inviteeProfile);
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
                 initial: true,
                 name: "Room with Invite",
                 required_state: [],
@@ -481,10 +529,11 @@ describe("SlidingSyncSdk", () => {
                     mkOwnStateEvent(EventType.RoomMember, { membership: "invite" }, invitee),
                 ],
             });
-            await httpBackend.flush("/profile", 1, 1000);
-            const room = client.getRoom(roomId);
+            await httpBackend!.flush("/profile", 1, 1000);
+            await emitPromise(client!, RoomMemberEvent.Name);
+            const room = client!.getRoom(roomId)!;
             expect(room).toBeDefined();
-            const inviteeMember = room.getMember(invitee);
+            const inviteeMember = room.getMember(invitee)!;
             expect(inviteeMember).toBeDefined();
             expect(inviteeMember.getMxcAvatarUrl()).toEqual(inviteeProfile.avatar_url);
             expect(inviteeMember.name).toEqual(inviteeProfile.displayname);
@@ -497,8 +546,8 @@ describe("SlidingSyncSdk", () => {
             await setupClient({
                 withCrypto: true,
             });
-            const hasSynced = sdk.sync();
-            await httpBackend.flushAllExpected();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
             await hasSynced;
             ext = findExtension("e2ee");
         });
@@ -506,7 +555,7 @@ describe("SlidingSyncSdk", () => {
             // needed else we do some async operations in the background which can cause Jest to whine:
             // "Cannot log after tests are done. Did you forget to wait for something async in your test?"
             // Attempted to log "Saving device tracking data null"."
-            client.crypto.stop();
+            client!.crypto!.stop();
         });
         it("gets enabled on the initial request only", () => {
             expect(ext.onRequest(true)).toEqual({
@@ -524,38 +573,38 @@ describe("SlidingSyncSdk", () => {
             // TODO: more assertions?
         });
         it("can update OTK counts", () => {
-            client.crypto.updateOneTimeKeyCount = jest.fn();
+            client!.crypto!.updateOneTimeKeyCount = jest.fn();
             ext.onResponse({
                 device_one_time_keys_count: {
                     signed_curve25519: 42,
                 },
             });
-            expect(client.crypto.updateOneTimeKeyCount).toHaveBeenCalledWith(42);
+            expect(client!.crypto!.updateOneTimeKeyCount).toHaveBeenCalledWith(42);
             ext.onResponse({
                 device_one_time_keys_count: {
                     not_signed_curve25519: 42,
                     // missing field -> default to 0
                 },
             });
-            expect(client.crypto.updateOneTimeKeyCount).toHaveBeenCalledWith(0);
+            expect(client!.crypto!.updateOneTimeKeyCount).toHaveBeenCalledWith(0);
         });
         it("can update fallback keys", () => {
             ext.onResponse({
                 device_unused_fallback_key_types: ["signed_curve25519"],
             });
-            expect(client.crypto.getNeedsNewFallback()).toEqual(false);
+            expect(client!.crypto!.getNeedsNewFallback()).toEqual(false);
             ext.onResponse({
                 device_unused_fallback_key_types: ["not_signed_curve25519"],
             });
-            expect(client.crypto.getNeedsNewFallback()).toEqual(true);
+            expect(client!.crypto!.getNeedsNewFallback()).toEqual(true);
         });
     });
     describe("ExtensionAccountData", () => {
         let ext: Extension;
         beforeAll(async () => {
             await setupClient();
-            const hasSynced = sdk.sync();
-            await httpBackend.flushAllExpected();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
             await hasSynced;
             ext = findExtension("account_data");
         });
@@ -570,7 +619,7 @@ describe("SlidingSyncSdk", () => {
             const globalContent = {
                 info: "here",
             };
-            let globalData = client.getAccountData(globalType);
+            let globalData = client!.getAccountData(globalType);
             expect(globalData).toBeUndefined();
             ext.onResponse({
                 global: [
@@ -580,13 +629,13 @@ describe("SlidingSyncSdk", () => {
                     },
                 ],
             });
-            globalData = client.getAccountData(globalType);
+            globalData = client!.getAccountData(globalType)!;
             expect(globalData).toBeDefined();
             expect(globalData.getContent()).toEqual(globalContent);
         });
         it("processes rooms account data", async () => {
             const roomId = "!room:id";
-            mockSlidingSync.emit(SlidingSyncEvent.RoomData, roomId, {
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
                 name: "Room with account data",
                 required_state: [],
                 timeline: [
@@ -612,9 +661,9 @@ describe("SlidingSyncSdk", () => {
                     ],
                 },
             });
-            const room = client.getRoom(roomId);
+            const room = client!.getRoom(roomId)!;
             expect(room).toBeDefined();
-            const event = room.getAccountData(roomType);
+            const event = room.getAccountData(roomType)!;
             expect(event).toBeDefined();
             expect(event.getContent()).toEqual(roomContent);
         });
@@ -633,9 +682,9 @@ describe("SlidingSyncSdk", () => {
                     ],
                 },
             });
-            const room = client.getRoom(unknownRoomId);
+            const room = client!.getRoom(unknownRoomId);
             expect(room).toBeNull();
-            expect(client.getAccountData(roomType)).toBeUndefined();
+            expect(client!.getAccountData(roomType)).toBeUndefined();
         });
         it("can update push rules via account data", async () => {
             const roomId = "!foo:bar";
@@ -655,7 +704,7 @@ describe("SlidingSyncSdk", () => {
                     }],
                 },
             };
-            let pushRule = client.getRoomPushRule("global", roomId);
+            let pushRule = client!.getRoomPushRule("global", roomId);
             expect(pushRule).toBeUndefined();
             ext.onResponse({
                 global: [
@@ -665,16 +714,16 @@ describe("SlidingSyncSdk", () => {
                     },
                 ],
             });
-            pushRule = client.getRoomPushRule("global", roomId);
-            expect(pushRule).toEqual(pushRulesContent.global[PushRuleKind.RoomSpecific][0]);
+            pushRule = client!.getRoomPushRule("global", roomId)!;
+            expect(pushRule).toEqual(pushRulesContent.global[PushRuleKind.RoomSpecific]![0]);
         });
     });
     describe("ExtensionToDevice", () => {
         let ext: Extension;
         beforeAll(async () => {
             await setupClient();
-            const hasSynced = sdk.sync();
-            await httpBackend.flushAllExpected();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
             await hasSynced;
             ext = findExtension("to_device");
         });
@@ -705,7 +754,7 @@ describe("SlidingSyncSdk", () => {
                 foo: "bar",
             };
             let called = false;
-            client.once(ClientEvent.ToDeviceEvent, (ev) => {
+            client!.once(ClientEvent.ToDeviceEvent, (ev) => {
                 expect(ev.getContent()).toEqual(toDeviceContent);
                 expect(ev.getType()).toEqual(toDeviceType);
                 called = true;
@@ -723,7 +772,7 @@ describe("SlidingSyncSdk", () => {
         });
         it("can cancel key verification requests", async () => {
             const seen: Record<string, boolean> = {};
-            client.on(ClientEvent.ToDeviceEvent, (ev) => {
+            client!.on(ClientEvent.ToDeviceEvent, (ev) => {
                 const evType = ev.getType();
                 expect(seen[evType]).toBeFalsy();
                 seen[evType] = true;

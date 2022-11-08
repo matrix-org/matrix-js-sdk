@@ -36,14 +36,16 @@ let count = 0;
 // the key for our callback with the real global.setTimeout
 let realCallbackKey: NodeJS.Timeout | number;
 
-// a sorted list of the callbacks to be run.
-// each is an object with keys [runAt, func, params, key].
-const callbackList: {
+type Callback = {
     runAt: number;
     func: (...params: any[]) => void;
     params: any[];
     key: number;
-}[] = [];
+};
+
+// a sorted list of the callbacks to be run.
+// each is an object with keys [runAt, func, params, key].
+const callbackList: Callback[] = [];
 
 // var debuglog = logger.log.bind(logger);
 const debuglog = function(...params: any[]) {};
@@ -135,19 +137,19 @@ function scheduleRealCallback(): void {
 }
 
 function runCallbacks(): void {
-    let cb;
+    let cb: Callback;
     const timestamp = Date.now();
     debuglog("runCallbacks: now:", timestamp);
 
     // get the list of things to call
-    const callbacksToRun = [];
+    const callbacksToRun: Callback[] = [];
     // eslint-disable-next-line
     while (true) {
         const first = callbackList[0];
         if (!first || first.runAt > timestamp) {
             break;
         }
-        cb = callbackList.shift();
+        cb = callbackList.shift()!;
         debuglog("runCallbacks: popping", cb.key);
         callbacksToRun.push(cb);
     }
@@ -162,8 +164,7 @@ function runCallbacks(): void {
         try {
             cb.func.apply(global, cb.params);
         } catch (e) {
-            logger.error("Uncaught exception in callback function",
-                e.stack || e);
+            logger.error("Uncaught exception in callback function", e);
         }
     }
 }

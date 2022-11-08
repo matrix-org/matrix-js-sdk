@@ -23,14 +23,8 @@ import { Room } from "./room";
 
 export class RelationsContainer {
     // A tree of objects to access a set of related children for an event, as in:
-    // this.relations[parentEventId][relationType][relationEventType]
-    private relations: {
-        [parentEventId: string]: {
-            [relationType: RelationType | string]: {
-                [eventType: EventType | string]: Relations;
-            };
-        };
-    } = {};
+    // this.relations.get(parentEventId).get(relationType).get(relationEventType)
+    private relations = new Map<string, Map<RelationType | string, Map<EventType | string, Relations>>>();
 
     constructor(private readonly client: MatrixClient, private readonly room?: Room) {
     }
@@ -57,14 +51,15 @@ export class RelationsContainer {
         relationType: RelationType | string,
         eventType: EventType | string,
     ): Relations | undefined {
-        return this.relations[eventId]?.[relationType]?.[eventType];
+        return this.relations.get(eventId)?.get(relationType)?.get(eventType);
     }
 
     public getAllChildEventsForEvent(parentEventId: string): MatrixEvent[] {
-        const relationsForEvent = this.relations[parentEventId] ?? {};
+        const relationsForEvent = this.relations.get(parentEventId)
+            ?? new Map<RelationType | string, Map<EventType | string, Relations>>();
         const events: MatrixEvent[] = [];
-        for (const relationsRecord of Object.values(relationsForEvent)) {
-            for (const relations of Object.values(relationsRecord)) {
+        for (const relationsRecord of relationsForEvent.values()) {
+            for (const relations of relationsRecord.values()) {
                 events.push(...relations.getRelations());
             }
         }
@@ -79,11 +74,11 @@ export class RelationsContainer {
      * @param {MatrixEvent} event The event to check as relation target.
      */
     public aggregateParentEvent(event: MatrixEvent): void {
-        const relationsForEvent = this.relations[event.getId()];
+        const relationsForEvent = this.relations.get(event.getId());
         if (!relationsForEvent) return;
 
-        for (const relationsWithRelType of Object.values(relationsForEvent)) {
-            for (const relationsWithEventType of Object.values(relationsWithRelType)) {
+        for (const relationsWithRelType of relationsForEvent.values()) {
+            for (const relationsWithEventType of relationsWithRelType.values()) {
                 relationsWithEventType.setTargetEvent(event);
             }
         }
@@ -123,28 +118,31 @@ export class RelationsContainer {
         const { event_id: relatesToEventId, rel_type: relationType } = relation;
         const eventType = event.getType();
 
-        let relationsForEvent = this.relations[relatesToEventId];
+        let relationsForEvent = this.relations.get(relatesToEventId!);
         if (!relationsForEvent) {
-            relationsForEvent = this.relations[relatesToEventId] = {};
+            relationsForEvent = new Map<RelationType | string, Map<EventType | string, Relations>>();
+            this.relations.set(relatesToEventId!, relationsForEvent);
         }
 
-        let relationsWithRelType = relationsForEvent[relationType];
+        let relationsWithRelType = relationsForEvent.get(relationType!);
         if (!relationsWithRelType) {
-            relationsWithRelType = relationsForEvent[relationType] = {};
+            relationsWithRelType = new Map<EventType | string, Relations>();
+            relationsForEvent.set(relationType!, relationsWithRelType);
         }
 
-        let relationsWithEventType = relationsWithRelType[eventType];
+        let relationsWithEventType = relationsWithRelType.get(eventType);
         if (!relationsWithEventType) {
-            relationsWithEventType = relationsWithRelType[eventType] = new Relations(
-                relationType,
+            relationsWithEventType = new Relations(
+                relationType!,
                 eventType,
                 this.client,
             );
+            relationsWithRelType.set(eventType, relationsWithEventType);
 
             const room = this.room ?? timelineSet?.room;
-            const relatesToEvent = timelineSet?.findEventById(relatesToEventId)
-                ?? room?.findEventById(relatesToEventId)
-                ?? room?.getPendingEvent(relatesToEventId);
+            const relatesToEvent = timelineSet?.findEventById(relatesToEventId!)
+                ?? room?.findEventById(relatesToEventId!)
+                ?? room?.getPendingEvent(relatesToEventId!);
             if (relatesToEvent) {
                 relationsWithEventType.setTargetEvent(relatesToEvent);
             }

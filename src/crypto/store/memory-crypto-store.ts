@@ -25,13 +25,13 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
+    ParkedSharedHistory, SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. in-memory storage for e2e.
@@ -44,9 +44,9 @@ import { IEncryptedPayload } from "../aes";
  */
 export class MemoryCryptoStore implements CryptoStore {
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
-    private account: string = null;
-    private crossSigningKeys: Record<string, ICrossSigningKey> = null;
-    private privateKeys: Record<string, IEncryptedPayload> = {};
+    private account: string | null = null;
+    private crossSigningKeys: Record<string, ICrossSigningKey> | null = null;
+    private privateKeys: Partial<SecretStorePrivateKeys> = {};
 
     private sessions: { [deviceKey: string]: { [sessionId: string]: ISessionInfo } } = {};
     private sessionProblems: { [deviceKey: string]: IProblem[] } = {};
@@ -54,10 +54,11 @@ export class MemoryCryptoStore implements CryptoStore {
     private inboundGroupSessions: { [sessionKey: string]: InboundGroupSessionData } = {};
     private inboundGroupSessionsWithheld: Record<string, IWithheld> = {};
     // Opaque device data object
-    private deviceData: IDeviceData = null;
+    private deviceData: IDeviceData | null = null;
     private rooms: { [roomId: string]: IRoomEncryption } = {};
     private sessionsNeedingBackup: { [sessionKey: string]: boolean } = {};
     private sharedHistoryInboundGroupSessions: { [roomId: string]: [senderKey: string, sessionId: string][] } = {};
+    private parkedSharedHistory = new Map<string, ParkedSharedHistory[]>(); // keyed by room ID
 
     /**
      * Ensure the database exists and is up-to-date.
@@ -191,11 +192,13 @@ export class MemoryCryptoStore implements CryptoStore {
         deviceId: string,
         wantedStates: number[],
     ): Promise<OutgoingRoomKeyRequest[]> {
-        const results = [];
+        const results: OutgoingRoomKeyRequest[] = [];
 
         for (const req of this.outgoingRoomKeyRequests) {
             for (const state of wantedStates) {
-                if (req.state === state && req.recipients.includes({ userId, deviceId })) {
+                if (req.state === state && req.recipients.some(
+                    (recipient) => recipient.userId === userId && recipient.deviceId === deviceId,
+                )) {
                     results.push(req);
                 }
             }
@@ -276,7 +279,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     // Olm Account
 
-    public getAccount(txn: unknown, func: (accountPickle: string) => void) {
+    public getAccount(txn: unknown, func: (accountPickle: string | null) => void) {
         func(this.account);
     }
 
@@ -284,12 +287,16 @@ export class MemoryCryptoStore implements CryptoStore {
         this.account = accountPickle;
     }
 
-    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void {
         func(this.crossSigningKeys);
     }
 
-    public getSecretStorePrivateKey(txn: unknown, func: (key: IEncryptedPayload | null) => void, type: string): void {
-        const result = this.privateKeys[type];
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
+    ): void {
+        const result = this.privateKeys[type] as SecretStorePrivateKeys[K] | undefined;
         func(result || null);
     }
 
@@ -297,7 +304,11 @@ export class MemoryCryptoStore implements CryptoStore {
         this.crossSigningKeys = keys;
     }
 
-    public storeSecretStorePrivateKey(txn: unknown, type: string, key: IEncryptedPayload): void {
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
         this.privateKeys[type] = key;
     }
 
@@ -522,6 +533,18 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public getSharedHistoryInboundGroupSessions(roomId: string): Promise<[senderKey: string, sessionId: string][]> {
         return Promise.resolve(this.sharedHistoryInboundGroupSessions[roomId] || []);
+    }
+
+    public addParkedSharedHistory(roomId: string, parkedData: ParkedSharedHistory): void {
+        const parked = this.parkedSharedHistory.get(roomId) ?? [];
+        parked.push(parkedData);
+        this.parkedSharedHistory.set(roomId, parked);
+    }
+
+    public takeParkedSharedHistory(roomId: string): Promise<ParkedSharedHistory[]> {
+        const parked = this.parkedSharedHistory.get(roomId) ?? [];
+        this.parkedSharedHistory.delete(roomId);
+        return Promise.resolve(parked);
     }
 
     // Session key backups

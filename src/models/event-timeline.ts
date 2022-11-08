@@ -77,7 +77,7 @@ export class EventTimeline {
             event.sender = stateContext.getSentinelMember(event.getSender());
         }
         if (!event.target?.events?.member && event.getType() === EventType.RoomMember) {
-            event.target = stateContext.getSentinelMember(event.getStateKey());
+            event.target = stateContext.getSentinelMember(event.getStateKey()!);
         }
 
         if (event.isState()) {
@@ -97,9 +97,9 @@ export class EventTimeline {
     private baseIndex = 0;
     private startState: RoomState;
     private endState: RoomState;
-    private prevTimeline?: EventTimeline;
-    private nextTimeline?: EventTimeline;
-    public paginationRequests: Record<Direction, Promise<boolean>> = {
+    private prevTimeline: EventTimeline | null = null;
+    private nextTimeline: EventTimeline | null = null;
+    public paginationRequests: Record<Direction, Promise<boolean> | null> = {
         [Direction.Backward]: null,
         [Direction.Forward]: null,
     };
@@ -130,9 +130,6 @@ export class EventTimeline {
         this.startState.paginationToken = null;
         this.endState = new RoomState(this.roomId);
         this.endState.paginationToken = null;
-
-        this.prevTimeline = null;
-        this.nextTimeline = null;
 
         // this is used by client.js
         this.paginationRequests = { 'b': null, 'f': null };
@@ -226,7 +223,7 @@ export class EventTimeline {
      * Get the ID of the room for this timeline
      * @return {string} room ID
      */
-    public getRoomId(): string {
+    public getRoomId(): string | null {
         return this.roomId;
     }
 
@@ -234,7 +231,7 @@ export class EventTimeline {
      * Get the filter for this timeline's timelineSet (if any)
      * @return {Filter} filter
      */
-    public getFilter(): Filter {
+    public getFilter(): Filter | undefined {
         return this.eventTimelineSet.getFilter();
     }
 
@@ -307,11 +304,11 @@ export class EventTimeline {
      *
      * @param {?string} token       pagination token
      *
-     * @param {string} direction    EventTimeline.BACKWARDS to set the pagination
+     * @param {string} direction    EventTimeline.BACKWARDS to set the paginatio
      *   token for going backwards in time; EventTimeline.FORWARDS to set the
      *   pagination token for going forwards in time.
      */
-    public setPaginationToken(token: string, direction: Direction): void {
+    public setPaginationToken(token: string | null, direction: Direction): void {
         this.getState(direction).paginationToken = token;
     }
 
@@ -324,7 +321,7 @@ export class EventTimeline {
      * @return {?EventTimeline} previous or following timeline, if they have been
      * joined up.
      */
-    public getNeighbouringTimeline(direction: Direction): EventTimeline {
+    public getNeighbouringTimeline(direction: Direction): EventTimeline | null {
         if (direction == EventTimeline.BACKWARDS) {
             return this.prevTimeline;
         } else if (direction == EventTimeline.FORWARDS) {
@@ -391,7 +388,7 @@ export class EventTimeline {
         roomState?: RoomState,
     ): void {
         let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty: boolean | undefined;
         if (typeof (toStartOfTimelineOrOpts) === 'object') {
             ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
         } else if (toStartOfTimelineOrOpts !== undefined) {

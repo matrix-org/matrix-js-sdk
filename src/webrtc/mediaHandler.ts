@@ -33,13 +33,18 @@ export type MediaHandlerEventHandlerMap = {
 export interface IScreensharingOpts {
     desktopCapturerSourceId?: string;
     audio?: boolean;
+    // For electron screen capture, there are very few options for detecting electron
+    // apart from inspecting the user agent or just trying getDisplayMedia() and
+    // catching the failure, so we do the latter - this flag tells the function to just
+    // throw an error so we can catch it in this case, rather than logging and emitting.
+    throwOnFail?: boolean;
 }
 
 export class MediaHandler extends TypedEventEmitter<
     MediaHandlerEvent.LocalStreamsChanged, MediaHandlerEventHandlerMap
 > {
-    private audioInput: string;
-    private videoInput: string;
+    private audioInput?: string;
+    private videoInput?: string;
     private localUserMediaStream?: MediaStream;
     public userMediaStreams: MediaStream[] = [];
     public screensharingStreams: MediaStream[] = [];
@@ -123,7 +128,7 @@ export class MediaHandler extends TypedEventEmitter<
                 continue;
             }
 
-            const { audio, video } = callMediaStreamParams.get(call.callId);
+            const { audio, video } = callMediaStreamParams.get(call.callId)!;
 
             logger.log(`mediaHandler updateLocalUsermediaStreams getUserMediaStream call ${call.callId}`);
             const stream = await this.getUserMediaStream(audio, video);
@@ -179,13 +184,31 @@ export class MediaHandler extends TypedEventEmitter<
 
         let stream: MediaStream;
 
-        if (
-            !this.localUserMediaStream ||
-            (this.localUserMediaStream.getAudioTracks().length === 0 && shouldRequestAudio) ||
-            (this.localUserMediaStream.getVideoTracks().length === 0 && shouldRequestVideo) ||
-            (this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput) ||
-            (this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput)
-        ) {
+        let canReuseStream = true;
+        if (this.localUserMediaStream) {
+            // This code checks that the device ID is the same as the localUserMediaStream stream, but we update
+            // the localUserMediaStream whenever the device ID changes (apart from when restoring) so it's not
+            // clear why this would ever be different, unless there's a race.
+            if (shouldRequestAudio) {
+                if (
+                    this.localUserMediaStream.getAudioTracks().length === 0 ||
+                    this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput
+                ) {
+                    canReuseStream = false;
+                }
+            }
+            if (shouldRequestVideo) {
+                if (
+                    this.localUserMediaStream.getVideoTracks().length === 0 ||
+                    this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput) {
+                    canReuseStream = false;
+                }
+            }
+        } else {
+            canReuseStream = false;
+        }
+
+        if (!canReuseStream) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
             logger.log(`mediaHandler getUserMediaStream streamId ${stream.id} shouldRequestAudio ${
@@ -195,9 +218,9 @@ export class MediaHandler extends TypedEventEmitter<
                 const settings = track.getSettings();
 
                 if (track.kind === "audio") {
-                    this.audioInput = settings.deviceId;
+                    this.audioInput = settings.deviceId!;
                 } else if (track.kind === "video") {
-                    this.videoInput = settings.deviceId;
+                    this.videoInput = settings.deviceId!;
                 }
             }
 

@@ -16,14 +16,15 @@ limitations under the License.
 
 import * as utils from "../test-utils/test-utils";
 import {
+    DuplicateStrategy,
     EventTimeline,
     EventTimelineSet,
     EventType,
+    Filter,
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
     Room,
-    DuplicateStrategy,
 } from '../../src';
 import { Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
@@ -49,8 +50,8 @@ describe('EventTimelineSet', () => {
                 EventType.RoomMessage,
             );
             expect(relations).toBeDefined();
-            expect(relations.getRelations().length).toBe(1);
-            expect(relations.getRelations()[0].getId()).toBe(replyEvent.getId());
+            expect(relations!.getRelations().length).toBe(1);
+            expect(relations!.getRelations()[0].getId()).toBe(replyEvent.getId());
         });
     };
 
@@ -289,6 +290,36 @@ describe('EventTimelineSet', () => {
             messageEvent.setThread(thread);
             const event = mkThreadResponse(messageEvent);
             expect(eventTimelineSet.canContain(event)).toBeTruthy();
+        });
+    });
+
+    describe("handleRemoteEcho", () => {
+        it("should add to liveTimeline only if the event matches the filter", () => {
+            const filter = new Filter(client.getUserId()!, "test_filter");
+            filter.setDefinition({
+                room: {
+                    timeline: {
+                        types: [EventType.RoomMessage],
+                    },
+                },
+            });
+            const eventTimelineSet = new EventTimelineSet(room, { filter }, client);
+
+            const roomMessageEvent = new MatrixEvent({
+                type: EventType.RoomMessage,
+                content: { body: "test" },
+                event_id: "!test1:server",
+            });
+            eventTimelineSet.handleRemoteEcho(roomMessageEvent, "~!local-event-id:server", roomMessageEvent.getId());
+            expect(eventTimelineSet.getLiveTimeline().getEvents()).toContain(roomMessageEvent);
+
+            const roomFilteredEvent = new MatrixEvent({
+                type: "other_event_type",
+                content: { body: "test" },
+                event_id: "!test2:server",
+            });
+            eventTimelineSet.handleRemoteEcho(roomFilteredEvent, "~!local-event-id:server", roomFilteredEvent.getId());
+            expect(eventTimelineSet.getLiveTimeline().getEvents()).not.toContain(roomFilteredEvent);
         });
     });
 });

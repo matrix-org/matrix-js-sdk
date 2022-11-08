@@ -21,6 +21,7 @@ limitations under the License.
  */
 
 import { MatrixEvent } from '../../models/event';
+import { EventType } from '../../@types/event';
 import { logger } from '../../logger';
 import { DeviceInfo } from '../deviceinfo';
 import { newTimeoutError } from "./Error";
@@ -54,14 +55,14 @@ export class VerificationBase<
 > extends TypedEventEmitter<Events | VerificationEvent, Arguments, VerificationEventHandlerMap> {
     private cancelled = false;
     private _done = false;
-    private promise: Promise<void> = null;
-    private transactionTimeoutTimer: ReturnType<typeof setTimeout> = null;
-    protected expectedEvent: string;
-    private resolve: () => void;
-    private reject: (e: Error | MatrixEvent) => void;
-    private resolveEvent: (e: MatrixEvent) => void;
-    private rejectEvent: (e: Error) => void;
-    private started: boolean;
+    private promise: Promise<void> | null = null;
+    private transactionTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+    protected expectedEvent?: string;
+    private resolve?: () => void;
+    private reject?: (e: Error | MatrixEvent) => void;
+    private resolveEvent?: (e: MatrixEvent) => void;
+    private rejectEvent?: (e: Error) => void;
+    private started?: boolean;
 
     /**
      * Base class for verification methods.
@@ -182,13 +183,13 @@ export class VerificationBase<
         } else if (e.getType() === this.expectedEvent) {
             // if we receive an expected m.key.verification.done, then just
             // ignore it, since we don't need to do anything about it
-            if (this.expectedEvent !== "m.key.verification.done") {
+            if (this.expectedEvent !== EventType.KeyVerificationDone) {
                 this.expectedEvent = undefined;
                 this.rejectEvent = undefined;
                 this.resetTimer();
-                this.resolveEvent(e);
+                this.resolveEvent?.(e);
             }
-        } else if (e.getType() === "m.key.verification.cancel") {
+        } else if (e.getType() === EventType.KeyVerificationCancel) {
             const reject = this.reject;
             this.reject = undefined;
             // there is only promise to reject if verify has been called
@@ -217,11 +218,11 @@ export class VerificationBase<
         }
     }
 
-    public done(): Promise<KeysDuringVerification | void> {
+    public async done(): Promise<KeysDuringVerification | void> {
         this.endTimer(); // always kill the activity timer
         if (!this._done) {
             this.request.onVerifierFinished();
-            this.resolve();
+            this.resolve?.();
             return requestKeysDuringVerification(this.baseApis, this.userId, this.deviceId);
         }
     }
@@ -241,20 +242,20 @@ export class VerificationBase<
                     const sender = e.getSender();
                     if (sender !== this.userId) {
                         const content = e.getContent();
-                        if (e.getType() === "m.key.verification.cancel") {
+                        if (e.getType() === EventType.KeyVerificationCancel) {
                             content.code = content.code || "m.unknown";
                             content.reason = content.reason || content.body
                                 || "Unknown reason";
-                            this.send("m.key.verification.cancel", content);
+                            this.send(EventType.KeyVerificationCancel, content);
                         } else {
-                            this.send("m.key.verification.cancel", {
+                            this.send(EventType.KeyVerificationCancel, {
                                 code: "m.unknown",
                                 reason: content.body || "Unknown reason",
                             });
                         }
                     }
                 } else {
-                    this.send("m.key.verification.cancel", {
+                    this.send(EventType.KeyVerificationCancel, {
                         code: "m.unknown",
                         reason: e.toString(),
                     });
@@ -290,7 +291,7 @@ export class VerificationBase<
                 this.endTimer();
                 resolve(...args);
             };
-            this.reject = (e: Error) => {
+            this.reject = (e: Error | MatrixEvent) => {
                 this._done = true;
                 this.endTimer();
                 reject(e);
@@ -299,7 +300,13 @@ export class VerificationBase<
         if (this.doVerification && !this.started) {
             this.started = true;
             this.resetTimer(); // restart the timeout
-            Promise.resolve(this.doVerification()).then(this.done.bind(this), this.cancel.bind(this));
+            new Promise<void>((resolve, reject) => {
+                const crossSignId = this.baseApis.crypto!.deviceList.getStoredCrossSigningForUser(this.userId)?.getId();
+                if (crossSignId === this.deviceId) {
+                    reject(new Error("Device ID is the same as the cross-signing ID"));
+                }
+                resolve();
+            }).then(() => this.doVerification!()).then(this.done.bind(this), this.cancel.bind(this));
         }
         return this.promise;
     }
@@ -310,23 +317,23 @@ export class VerificationBase<
         // we try to verify all the keys that we're told about, but we might
         // not know about all of them, so keep track of the keys that we know
         // about, and ignore the rest
-        const verifiedDevices = [];
+        const verifiedDevices: [string, string, string][] = [];
 
         for (const [keyId, keyInfo] of Object.entries(keys)) {
             const deviceId = keyId.split(':', 2)[1];
             const device = this.baseApis.getStoredDevice(userId, deviceId);
             if (device) {
                 verifier(keyId, device, keyInfo);
-                verifiedDevices.push(deviceId);
+                verifiedDevices.push([deviceId, keyId, device.keys[keyId]]);
             } else {
-                const crossSigningInfo = this.baseApis.crypto.deviceList.getStoredCrossSigningForUser(userId);
+                const crossSigningInfo = this.baseApis.crypto!.deviceList.getStoredCrossSigningForUser(userId);
                 if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
                     verifier(keyId, DeviceInfo.fromStorage({
                         keys: {
                             [keyId]: deviceId,
                         },
                     }, deviceId), keyInfo);
-                    verifiedDevices.push(deviceId);
+                    verifiedDevices.push([deviceId, keyId, deviceId]);
                 } else {
                     logger.warn(
                         `verification: Could not find device ${deviceId} to verify`,
@@ -348,8 +355,15 @@ export class VerificationBase<
         // TODO: There should probably be a batch version of this, otherwise it's going
         // to upload each signature in a separate API call which is silly because the
         // API supports as many signatures as you like.
-        for (const deviceId of verifiedDevices) {
-            await this.baseApis.setDeviceVerified(userId, deviceId);
+        for (const [deviceId, keyId, key] of verifiedDevices) {
+            await this.baseApis.crypto!.setDeviceVerification(userId, deviceId, true, null, null, { [keyId]: key });
+        }
+
+        // if one of the user's own devices is being marked as verified / unverified,
+        // check the key backup status, since whether or not we use this depends on
+        // whether it has a signature from a verified device
+        if (userId == this.baseApis.credentials.userId) {
+            await this.baseApis.checkKeyBackup();
         }
     }
 

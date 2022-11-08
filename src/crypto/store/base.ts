@@ -24,6 +24,8 @@ import { IDevice } from "../deviceinfo";
 import { ICrossSigningInfo } from "../CrossSigning";
 import { PrefixedLogger } from "../../logger";
 import { InboundGroupSessionData } from "../OlmDevice";
+import { MatrixEvent } from "../../models/event";
+import { DehydrationManager } from "../dehydration";
 import { IEncryptedPayload } from "../aes";
 
 /**
@@ -31,6 +33,16 @@ import { IEncryptedPayload } from "../aes";
  *
  * @module
  */
+
+export interface SecretStorePrivateKeys {
+    dehydration: {
+        keyInfo: DehydrationManager["keyInfo"];
+        key: IEncryptedPayload;
+        deviceDisplayName: string;
+        time: number;
+    } | null;
+    "m.megolm_backup.v1": IEncryptedPayload;
+}
 
 /**
  * Abstraction of things that can store data required for end-to-end encryption
@@ -57,12 +69,20 @@ export interface CryptoStore {
     deleteOutgoingRoomKeyRequest(requestId: string, expectedState: number): Promise<OutgoingRoomKeyRequest | null>;
 
     // Olm Account
-    getAccount(txn: unknown, func: (accountPickle: string) => void);
+    getAccount(txn: unknown, func: (accountPickle: string | null) => void);
     storeAccount(txn: unknown, accountPickle: string): void;
-    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey>) => void): void;
-    getSecretStorePrivateKey(txn: unknown, func: (key: IEncryptedPayload | null) => void, type: string): void;
+    getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void;
+    getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
+    ): void;
     storeCrossSigningKeys(txn: unknown, keys: Record<string, ICrossSigningKey>): void;
-    storeSecretStorePrivateKey(txn: unknown, type: string, key: IEncryptedPayload): void;
+    storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: unknown,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void;
 
     // Olm Sessions
     countEndToEndSessions(txn: unknown, func: (count: number) => void): void;
@@ -70,14 +90,14 @@ export interface CryptoStore {
         deviceKey: string,
         sessionId: string,
         txn: unknown,
-        func: (session: ISessionInfo) => void,
+        func: (session: ISessionInfo | null) => void,
     ): void;
     getEndToEndSessions(
         deviceKey: string,
         txn: unknown,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void;
-    getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo) => void): void;
+    getAllEndToEndSessions(txn: unknown, func: (session: ISessionInfo | null) => void): void;
     storeEndToEndSession(deviceKey: string, sessionId: string, sessionInfo: ISessionInfo, txn: unknown): void;
     storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void>;
     getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null>;
@@ -127,6 +147,8 @@ export interface CryptoStore {
         roomId: string,
         txn?: unknown,
     ): Promise<[senderKey: string, sessionId: string][]>;
+    addParkedSharedHistory(roomId: string, data: ParkedSharedHistory, txn?: unknown): void;
+    takeParkedSharedHistory(roomId: string, txn?: unknown): Promise<ParkedSharedHistory[]>;
 
     // Session key backups
     doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T, log?: PrefixedLogger): Promise<T>;
@@ -202,4 +224,13 @@ export interface OutgoingRoomKeyRequest {
     recipients: IRoomKeyRequestRecipient[];
     requestBody: IRoomKeyRequestBody;
     state: RoomKeyRequestState;
+}
+
+export interface ParkedSharedHistory {
+    senderId: string;
+    senderKey: string;
+    sessionId: string;
+    sessionKey: string;
+    keysClaimed: ReturnType<MatrixEvent["getKeysClaimed"]>; // XXX: Less type dependence on MatrixEvent
+    forwardingCurve25519KeyChain: string[];
 }

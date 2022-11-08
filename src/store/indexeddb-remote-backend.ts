@@ -18,18 +18,18 @@ import { logger } from "../logger";
 import { defer, IDeferred } from "../utils";
 import { ISavedSync } from "./index";
 import { IStartClientOpts } from "../client";
-import { IStateEventWithRoomId, ISyncResponse } from "..";
+import { IStateEventWithRoomId, ISyncResponse } from "../matrix";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
 export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
-    private worker: Worker;
+    private worker?: Worker;
     private nextSeq = 0;
     // The currently in-flight requests to the actual backend
     private inFlight: Record<number, IDeferred<any>> = {}; // seq: promise
     // Once we start connecting, we keep the promise and re-use it
     // if we try to connect again
-    private startPromise: Promise<void> = null;
+    private startPromise?: Promise<void>;
 
     /**
      * An IndexedDB store backend where the actual backend sits in a web
@@ -44,7 +44,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     constructor(
         private readonly workerFactory: () => Worker,
-        private readonly dbName: string,
+        private readonly dbName?: string,
     ) {}
 
     /**
@@ -138,7 +138,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         return this.doCmd('saveToDeviceBatches', [batches]);
     }
 
-    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch> {
+    public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
         return this.doCmd('getOldestToDeviceBatch');
     }
 
@@ -147,12 +147,12 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     private ensureStarted(): Promise<void> {
-        if (this.startPromise === null) {
+        if (!this.startPromise) {
             this.worker = this.workerFactory();
             this.worker.onmessage = this.onWorkerMessage;
 
             // tell the worker the db name.
-            this.startPromise = this.doCmd('_setupWorker', [this.dbName]).then(() => {
+            this.startPromise = this.doCmd('setupWorker', [this.dbName]).then(() => {
                 logger.log("IndexedDB worker is ready");
             });
         }
@@ -168,7 +168,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
 
             this.inFlight[seq] = def;
 
-            this.worker.postMessage({ command, seq, args });
+            this.worker?.postMessage({ command, seq, args });
 
             return def.promise;
         });

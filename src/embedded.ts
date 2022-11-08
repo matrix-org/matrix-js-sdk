@@ -22,8 +22,10 @@ import {
     IWidgetApiAcknowledgeResponseData,
     ISendEventToWidgetActionRequest,
     ISendToDeviceToWidgetActionRequest,
+    ISendEventFromWidgetResponseData,
 } from "matrix-widget-api";
 
+import { IEvent, IContent, EventStatus } from "./models/event";
 import { ISendEventResponse } from "./@types/requests";
 import { EventType } from "./@types/event";
 import { logger } from "./logger";
@@ -43,17 +45,56 @@ interface IStateEventRequest {
 }
 
 export interface ICapabilities {
-    // TODO: Add fields for messages and other non-state events
+    /**
+     * Event types that this client expects to send.
+     */
+    sendEvent?: string[];
+    /**
+     * Event types that this client expects to receive.
+     */
+    receiveEvent?: string[];
 
+    /**
+     * Message types that this client expects to send, or true for all message
+     * types.
+     */
+    sendMessage?: string[] | true;
+    /**
+     * Message types that this client expects to receive, or true for all
+     * message types.
+     */
+    receiveMessage?: string[] | true;
+
+    /**
+     * Types of state events that this client expects to send.
+     */
     sendState?: IStateEventRequest[];
+    /**
+     * Types of state events that this client expects to receive.
+     */
     receiveState?: IStateEventRequest[];
 
+    /**
+     * To-device event types that this client expects to send.
+     */
     sendToDevice?: string[];
+    /**
+     * To-device event types that this client expects to receive.
+     */
     receiveToDevice?: string[];
 
+    /**
+     * Whether this client needs access to TURN servers.
+     * @default false
+     */
     turnServers?: boolean;
 }
 
+/**
+ * A MatrixClient that routes its requests through the widget API instead of the
+ * real CS API.
+ * @experimental This class is considered unstable!
+ */
 export class RoomWidgetClient extends MatrixClient {
     private room: Room;
     private widgetApiReady = new Promise<void>(resolve => this.widgetApi.once("ready", resolve));
@@ -69,27 +110,59 @@ export class RoomWidgetClient extends MatrixClient {
         super(opts);
 
         // Request capabilities for the functionality this client needs to support
-        this.capabilities.sendState?.forEach(({ eventType, stateKey }) =>
-            this.widgetApi.requestCapabilityToSendState(eventType, stateKey),
+        if (
+            capabilities.sendEvent?.length
+            || capabilities.receiveEvent?.length
+            || capabilities.sendMessage === true
+            || (Array.isArray(capabilities.sendMessage) && capabilities.sendMessage.length)
+            || capabilities.receiveMessage === true
+            || (Array.isArray(capabilities.receiveMessage) && capabilities.receiveMessage.length)
+            || capabilities.sendState?.length
+            || capabilities.receiveState?.length
+        ) {
+            widgetApi.requestCapabilityForRoomTimeline(roomId);
+        }
+        capabilities.sendEvent?.forEach(eventType =>
+            widgetApi.requestCapabilityToSendEvent(eventType),
         );
-        this.capabilities.receiveState?.forEach(({ eventType, stateKey }) =>
-            this.widgetApi.requestCapabilityToReceiveState(eventType, stateKey),
+        capabilities.receiveEvent?.forEach(eventType =>
+            widgetApi.requestCapabilityToReceiveEvent(eventType),
         );
-        this.capabilities.sendToDevice?.forEach(eventType =>
-            this.widgetApi.requestCapabilityToSendToDevice(eventType),
+        if (capabilities.sendMessage === true) {
+            widgetApi.requestCapabilityToSendMessage();
+        } else if (Array.isArray(capabilities.sendMessage)) {
+            capabilities.sendMessage.forEach(msgType =>
+                widgetApi.requestCapabilityToSendMessage(msgType),
+            );
+        }
+        if (capabilities.receiveMessage === true) {
+            widgetApi.requestCapabilityToReceiveMessage();
+        } else if (Array.isArray(capabilities.receiveMessage)) {
+            capabilities.receiveMessage.forEach(msgType =>
+                widgetApi.requestCapabilityToReceiveMessage(msgType),
+            );
+        }
+        capabilities.sendState?.forEach(({ eventType, stateKey }) =>
+            widgetApi.requestCapabilityToSendState(eventType, stateKey),
         );
-        this.capabilities.receiveToDevice?.forEach(eventType =>
-            this.widgetApi.requestCapabilityToReceiveToDevice(eventType),
+        capabilities.receiveState?.forEach(({ eventType, stateKey }) =>
+            widgetApi.requestCapabilityToReceiveState(eventType, stateKey),
         );
-        if (this.capabilities.turnServers) {
-            this.widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
+        capabilities.sendToDevice?.forEach(eventType =>
+            widgetApi.requestCapabilityToSendToDevice(eventType),
+        );
+        capabilities.receiveToDevice?.forEach(eventType =>
+            widgetApi.requestCapabilityToReceiveToDevice(eventType),
+        );
+        if (capabilities.turnServers) {
+            widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
         }
 
-        this.widgetApi.on(`action:${WidgetApiToWidgetAction.SendEvent}`, this.onEvent);
-        this.widgetApi.on(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
+        widgetApi.on(`action:${WidgetApiToWidgetAction.SendEvent}`, this.onEvent);
+        widgetApi.on(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
 
         // Open communication with the host
-        this.widgetApi.start();
+        widgetApi.start();
     }
 
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {
@@ -121,8 +194,8 @@ export class RoomWidgetClient extends MatrixClient {
         // so it doesn't really matter what order we inject them in
         await Promise.all(
             this.capabilities.receiveState?.map(async ({ eventType, stateKey }) => {
-                const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey);
-                const events = rawEvents.map(rawEvent => new MatrixEvent(rawEvent));
+                const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey, [this.roomId]);
+                const events = rawEvents.map(rawEvent => new MatrixEvent(rawEvent as Partial<IEvent>));
 
                 await this.syncApi.injectRoomEvents(this.room, [], events);
                 events.forEach(event => {
@@ -131,7 +204,7 @@ export class RoomWidgetClient extends MatrixClient {
                 });
             }) ?? [],
         );
-        this.setSyncState(SyncState.Prepared);
+        this.setSyncState(SyncState.Syncing);
         logger.info("Finished backfilling events");
 
         // Watch for TURN servers, if requested
@@ -146,14 +219,31 @@ export class RoomWidgetClient extends MatrixClient {
         this.lifecycle.abort(); // Signal to other async tasks that the client has stopped
     }
 
+    public async joinRoom(roomIdOrAlias: string): Promise<Room> {
+        if (roomIdOrAlias === this.roomId) return this.room;
+        throw new Error(`Unknown room: ${roomIdOrAlias}`);
+    }
+
+    protected async encryptAndSendEvent(room: Room, event: MatrixEvent): Promise<ISendEventResponse> {
+        let response: ISendEventFromWidgetResponseData;
+        try {
+            response = await this.widgetApi.sendRoomEvent(event.getType(), event.getContent(), room.roomId);
+        } catch (e) {
+            this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
+            throw e;
+        }
+
+        room.updatePendingEvent(event, EventStatus.SENT, response.event_id);
+        return { event_id: response.event_id };
+    }
+
     public async sendStateEvent(
         roomId: string,
         eventType: string,
         content: any,
         stateKey = "",
     ): Promise<ISendEventResponse> {
-        if (roomId !== this.roomId) throw new Error(`Can't send events to ${roomId}`);
-        return await this.widgetApi.sendStateEvent(eventType, stateKey, content);
+        return await this.widgetApi.sendStateEvent(eventType, stateKey, content, roomId);
     }
 
     public async sendToDevice(
@@ -210,11 +300,20 @@ export class RoomWidgetClient extends MatrixClient {
 
     private onEvent = async (ev: CustomEvent<ISendEventToWidgetActionRequest>) => {
         ev.preventDefault();
-        const event = new MatrixEvent(ev.detail.data);
-        await this.syncApi.injectRoomEvents(this.room, [], [event]);
-        this.emit(ClientEvent.Event, event);
-        this.setSyncState(SyncState.Syncing);
-        logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
+
+        // Verify the room ID matches, since it's possible for the client to
+        // send us events from other rooms if this widget is always on screen
+        if (ev.detail.data.room_id === this.roomId) {
+            const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
+            await this.syncApi.injectRoomEvents(this.room, [], [event]);
+            this.emit(ClientEvent.Event, event);
+            this.setSyncState(SyncState.Syncing);
+            logger.info(`Received event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
+        } else {
+            const { event_id: eventId, room_id: roomId } = ev.detail.data;
+            logger.info(`Received event ${eventId} for a different room ${roomId}; discarding`);
+        }
+
         await this.ack(ev);
     };
 
@@ -224,7 +323,7 @@ export class RoomWidgetClient extends MatrixClient {
         const event = new MatrixEvent({
             type: ev.detail.data.type,
             sender: ev.detail.data.sender,
-            content: ev.detail.data.content,
+            content: ev.detail.data.content as IContent,
         });
         // Mark the event as encrypted if it was, using fake contents and keys since those are unknown to us
         if (ev.detail.data.encrypted) event.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");

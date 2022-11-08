@@ -21,19 +21,11 @@ import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from '../../TestClient';
 import { makeTestClients } from './verification/util';
 import { encryptAES } from "../../../src/crypto/aes";
-import { resetCrossSigningKeys, createSecretStorageKey } from "./crypto-utils";
+import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from '../../../src/logger';
-import * as utils from "../../../src/utils";
-import { ICreateClientOpts } from '../../../src/client';
+import { ClientEvent, ICreateClientOpts } from '../../../src/client';
 import { ISecretStorageKeyInfo } from '../../../src/crypto/api';
-
-try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const crypto = require('crypto');
-    utils.setCrypto(crypto);
-} catch (err) {
-    logger.log('nodejs was compiled without crypto support');
-}
+import { DeviceInfo } from '../../../src/crypto/deviceinfo';
 
 async function makeTestClient(userInfo: { userId: string, deviceId: string}, options: Partial<ICreateClientOpts> = {}) {
     const client = (new TestClient(
@@ -49,7 +41,7 @@ async function makeTestClient(userInfo: { userId: string, deviceId: string}, opt
     await client.initCrypto();
 
     // No need to download keys for these tests
-    jest.spyOn(client.crypto, 'downloadKeys').mockResolvedValue({});
+    jest.spyOn(client.crypto!, 'downloadKeys').mockResolvedValue({});
 
     return client;
 }
@@ -101,30 +93,27 @@ describe("Secrets", function() {
                 },
             },
         );
-        alice.crypto.crossSigningInfo.setKeys({
+        alice.crypto!.crossSigningInfo.setKeys({
             master: signingkeyInfo,
         });
 
-        const secretStorage = alice.crypto.secretStorage;
+        const secretStorage = alice.crypto!.secretStorage;
 
         jest.spyOn(alice, 'setAccountData').mockImplementation(
-            async function(eventType, contents, callback) {
+            async function(eventType, contents) {
                 alice.store.storeAccountDataEvents([
                     new MatrixEvent({
                         type: eventType,
                         content: contents,
                     }),
                 ]);
-                if (callback) {
-                    callback(undefined, undefined);
-                }
                 return {};
             });
 
         const keyAccountData = {
             algorithm: SECRET_STORAGE_ALGORITHM_V1_AES,
         };
-        await alice.crypto.crossSigningInfo.signObject(keyAccountData, 'master');
+        await alice.crypto!.crossSigningInfo.signObject(keyAccountData, 'master');
 
         alice.store.storeAccountDataEvents([
             new MatrixEvent({
@@ -191,7 +180,7 @@ describe("Secrets", function() {
                 },
             },
         );
-        alice.setAccountData = async function(eventType, contents, callback) {
+        alice.setAccountData = async function(eventType, contents) {
             alice.store.storeAccountDataEvents([
                 new MatrixEvent({
                     type: eventType,
@@ -211,7 +200,7 @@ describe("Secrets", function() {
         await alice.storeSecret("foo", "bar");
 
         const accountData = alice.getAccountData('foo');
-        expect(accountData.getContent().encrypted).toBeTruthy();
+        expect(accountData!.getContent().encrypted).toBeTruthy();
         alice.stopClient();
     });
 
@@ -244,29 +233,29 @@ describe("Secrets", function() {
             },
         );
 
-        const vaxDevice = vax.client.crypto.olmDevice;
-        const osborne2Device = osborne2.client.crypto.olmDevice;
-        const secretStorage = osborne2.client.crypto.secretStorage;
+        const vaxDevice = vax.client.crypto!.olmDevice;
+        const osborne2Device = osborne2.client.crypto!.olmDevice;
+        const secretStorage = osborne2.client.crypto!.secretStorage;
 
-        osborne2.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
+        osborne2.client.crypto!.deviceList.storeDevicesForUser("@alice:example.com", {
             "VAX": {
-                user_id: "@alice:example.com",
-                device_id: "VAX",
+                known: false,
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                 keys: {
-                    "ed25519:VAX": vaxDevice.deviceEd25519Key,
-                    "curve25519:VAX": vaxDevice.deviceCurve25519Key,
+                    "ed25519:VAX": vaxDevice.deviceEd25519Key!,
+                    "curve25519:VAX": vaxDevice.deviceCurve25519Key!,
                 },
+                verified: DeviceInfo.DeviceVerification.VERIFIED,
             },
         });
-        vax.client.crypto.deviceList.storeDevicesForUser("@alice:example.com", {
+        vax.client.crypto!.deviceList.storeDevicesForUser("@alice:example.com", {
             "Osborne2": {
-                user_id: "@alice:example.com",
-                device_id: "Osborne2",
                 algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
+                verified: 0,
+                known: false,
                 keys: {
-                    "ed25519:Osborne2": osborne2Device.deviceEd25519Key,
-                    "curve25519:Osborne2": osborne2Device.deviceCurve25519Key,
+                    "ed25519:Osborne2": osborne2Device.deviceEd25519Key!,
+                    "curve25519:Osborne2": osborne2Device.deviceCurve25519Key!,
                 },
             },
         });
@@ -275,15 +264,17 @@ describe("Secrets", function() {
         const otks = (await osborne2Device.getOneTimeKeys()).curve25519;
         await osborne2Device.markKeysAsPublished();
 
-        await vax.client.crypto.olmDevice.createOutboundSession(
-            osborne2Device.deviceCurve25519Key,
+        await vax.client.crypto!.olmDevice.createOutboundSession(
+            osborne2Device.deviceCurve25519Key!,
             Object.values(otks)[0],
         );
 
-        const request = await secretStorage.request("foo", ["VAX"]);
-        const secret = await request.promise;
+        osborne2.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        osborne2.client.crypto!.deviceList.getUserByIdentityKey = () => "@alice:example.com";
 
-        expect(secret).toBe("bar");
+        const request = await secretStorage.request("foo", ["VAX"]);
+        await request.promise; // return value not used
+
         osborne2.stop();
         vax.stop();
         clearTestClientTimeouts();
@@ -329,7 +320,7 @@ describe("Secrets", function() {
             );
             bob.uploadDeviceSigningKeys = async () => ({});
             bob.uploadKeySignatures = jest.fn().mockResolvedValue(undefined);
-            bob.setAccountData = async function(eventType, contents, callback) {
+            bob.setAccountData = async function(eventType, contents) {
                 const event = new MatrixEvent({
                     type: eventType,
                     content: contents,
@@ -337,7 +328,7 @@ describe("Secrets", function() {
                 this.store.storeAccountDataEvents([
                     event,
                 ]);
-                this.emit("accountData", event);
+                this.emit(ClientEvent.AccountData, event);
                 return {};
             };
 
@@ -348,8 +339,8 @@ describe("Secrets", function() {
                 createSecretStorageKey,
             });
 
-            const crossSigning = bob.crypto.crossSigningInfo;
-            const secretStorage = bob.crypto.secretStorage;
+            const crossSigning = bob.crypto!.crossSigningInfo;
+            const secretStorage = bob.crypto!.secretStorage;
 
             expect(crossSigning.getId()).toBeTruthy();
             expect(await crossSigning.isStoredInSecretStorage(secretStorage))
@@ -495,7 +486,7 @@ describe("Secrets", function() {
                     },
                 }),
             ]);
-            alice.crypto.deviceList.storeCrossSigningForUser("@alice:example.com", {
+            alice.crypto!.deviceList.storeCrossSigningForUser("@alice:example.com", {
                 firstUse: false,
                 crossSigningVerifiedBefore: false,
                 keys: {
@@ -537,16 +528,15 @@ describe("Secrets", function() {
                     content: data,
                 });
                 alice.store.storeAccountDataEvents([event]);
-                this.emit("accountData", event);
+                this.emit(ClientEvent.AccountData, event);
                 return {};
             };
 
             await alice.bootstrapSecretStorage({});
 
-            expect(alice.getAccountData("m.secret_storage.default_key").getContent())
+            expect(alice.getAccountData("m.secret_storage.default_key")!.getContent())
                 .toEqual({ key: "key_id" });
-            const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")
-                .getContent() as ISecretStorageKeyInfo;
+            const keyInfo = alice.getAccountData("m.secret_storage.key.key_id")!.getContent<ISecretStorageKeyInfo>();
             expect(keyInfo.algorithm)
                 .toEqual("m.secret_storage.v1.aes-hmac-sha2");
             expect(keyInfo.passphrase).toEqual({
@@ -639,7 +629,7 @@ describe("Secrets", function() {
                     },
                 }),
             ]);
-            alice.crypto.deviceList.storeCrossSigningForUser("@alice:example.com", {
+            alice.crypto!.deviceList.storeCrossSigningForUser("@alice:example.com", {
                 firstUse: false,
                 crossSigningVerifiedBefore: false,
                 keys: {
@@ -681,14 +671,13 @@ describe("Secrets", function() {
                     content: data,
                 });
                 alice.store.storeAccountDataEvents([event]);
-                this.emit("accountData", event);
+                this.emit(ClientEvent.AccountData, event);
                 return {};
             };
 
             await alice.bootstrapSecretStorage({});
 
-            const backupKey = alice.getAccountData("m.megolm_backup.v1")
-                .getContent();
+            const backupKey = alice.getAccountData("m.megolm_backup.v1")!.getContent();
             expect(backupKey.encrypted).toHaveProperty("key_id");
             expect(await alice.getSecret("m.megolm_backup.v1"))
                 .toEqual("ey0GB1kB6jhOWgwiBUMIWg==");

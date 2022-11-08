@@ -15,14 +15,14 @@ limitations under the License.
 */
 
 import { Account, InboundGroupSession, OutboundGroupSession, Session, Utility } from "@matrix-org/olm";
-import { Logger } from "loglevel";
 
-import { logger } from '../logger';
+import { logger, PrefixedLogger } from '../logger';
 import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
 import * as algorithms from './algorithms';
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
 import { IMegolmSessionData } from "./index";
+import { OlmGroupSessionExtraData } from "../@types/crypto";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
@@ -120,8 +120,9 @@ interface IInboundGroupSessionKey {
     chain_index: number;
     key: string;
     forwarding_curve25519_key_chain: string[];
-    sender_claimed_ed25519_key: string;
+    sender_claimed_ed25519_key: string | null;
     shared_history: boolean;
+    untrusted?: boolean;
 }
 /* eslint-enable camelcase */
 
@@ -143,9 +144,9 @@ export class OlmDevice {
     public pickleKey = "DEFAULT_KEY"; // set by consumers
 
     // don't know these until we load the account from storage in init()
-    public deviceCurve25519Key: string = null;
-    public deviceEd25519Key: string = null;
-    private maxOneTimeKeys: number = null;
+    public deviceCurve25519Key: string | null = null;
+    public deviceEd25519Key: string | null = null;
+    private maxOneTimeKeys: number | null = null;
 
     // we don't bother stashing outboundgroupsessions in the cryptoStore -
     // instead we keep them here.
@@ -264,8 +265,8 @@ export class OlmDevice {
                         lastReceivedMessageTs: session.lastReceivedMessageTs,
                     };
                     this.cryptoStore.storeEndToEndSession(
-                        deviceKey,
-                        sessionId,
+                        deviceKey!,
+                        sessionId!,
                         sessionInfo,
                         txn,
                     );
@@ -306,10 +307,10 @@ export class OlmDevice {
      * @private
      */
     private getAccount(txn: unknown, func: (account: Account) => void): void {
-        this.cryptoStore.getAccount(txn, (pickledAccount: string) => {
+        this.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
             const account = new global.Olm.Account();
             try {
-                account.unpickle(this.pickleKey, pickledAccount);
+                account.unpickle(this.pickleKey, pickledAccount!);
                 func(account);
             } finally {
                 account.free();
@@ -348,15 +349,15 @@ export class OlmDevice {
                 IndexedDBCryptoStore.STORE_SESSIONS,
             ],
             (txn) => {
-                this.cryptoStore.getAccount(txn, (pickledAccount: string) => {
-                    result.pickledAccount = pickledAccount;
+                this.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
+                    result.pickledAccount = pickledAccount!;
                 });
                 result.sessions = [];
                 // Note that the pickledSession object we get in the callback
                 // is not exactly the same thing you get in method _getSession
                 // see documentation of IndexedDBCryptoStore.getAllEndToEndSessions
                 this.cryptoStore.getAllEndToEndSessions(txn, (pickledSession) => {
-                    result.sessions.push(pickledSession);
+                    result.sessions!.push(pickledSession!);
                 });
             },
         );
@@ -382,8 +383,8 @@ export class OlmDevice {
         func: (unpickledSessionInfo: IUnpickledSessionInfo) => void,
     ): void {
         this.cryptoStore.getEndToEndSession(
-            deviceKey, sessionId, txn, (sessionInfo: ISessionInfo) => {
-                this.unpickleSession(sessionInfo, func);
+            deviceKey, sessionId, txn, (sessionInfo: ISessionInfo | null) => {
+                this.unpickleSession(sessionInfo!, func);
             },
         );
     }
@@ -403,7 +404,7 @@ export class OlmDevice {
     ): void {
         const session = new global.Olm.Session();
         try {
-            session.unpickle(this.pickleKey, sessionInfo.session);
+            session.unpickle(this.pickleKey, sessionInfo.session!);
             const unpickledSessInfo: IUnpickledSessionInfo = Object.assign({}, sessionInfo, { session });
 
             func(unpickledSessInfo);
@@ -489,7 +490,7 @@ export class OlmDevice {
      * @return {number} number of keys
      */
     public maxNumberOfOneTimeKeys(): number {
-        return this.maxOneTimeKeys;
+        return this.maxOneTimeKeys ?? -1;
     }
 
     /**
@@ -552,7 +553,7 @@ export class OlmDevice {
                 });
             },
         );
-        return result;
+        return result!;
     }
 
     public async forgetOldFallbackKey(): Promise<void> {
@@ -605,7 +606,7 @@ export class OlmDevice {
             },
             logger.withPrefix("[createOutboundSession]"),
         );
-        return newSessionId;
+        return newSessionId!;
     }
 
     /**
@@ -666,7 +667,7 @@ export class OlmDevice {
             logger.withPrefix("[createInboundSession]"),
         );
 
-        return result;
+        return result!;
     }
 
     /**
@@ -701,7 +702,7 @@ export class OlmDevice {
             log,
         );
 
-        return sessionIds;
+        return sessionIds!;
     }
 
     /**
@@ -712,13 +713,13 @@ export class OlmDevice {
      * @param {boolean} nowait Don't wait for an in-progress session to complete.
      *     This should only be set to true of the calling function is the function
      *     that marked the session as being in-progress.
-     * @param {Logger} [log] A possibly customised log
+     * @param {PrefixedLogger} [log] A possibly customised log
      * @return {Promise<?string>}  session id, or null if no established session
      */
     public async getSessionIdForDevice(
         theirDeviceIdentityKey: string,
         nowait = false,
-        log?: Logger,
+        log?: PrefixedLogger,
     ): Promise<string | null> {
         const sessionInfos = await this.getSessionInfoForDevice(theirDeviceIdentityKey, nowait, log);
 
@@ -778,7 +779,11 @@ export class OlmDevice {
                 // return an empty result
             }
         }
-        const info = [];
+        const info: {
+            lastReceivedMessageTs: number;
+            hasReceivedMessage: boolean;
+            sessionId: string;
+        }[] = [];
 
         await this.cryptoStore.doTxn(
             'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
@@ -788,9 +793,9 @@ export class OlmDevice {
                     for (const sessionId of sessionIds) {
                         this.unpickleSession(sessions[sessionId], (sessInfo: IUnpickledSessionInfo) => {
                             info.push({
-                                lastReceivedMessageTs: sessInfo.lastReceivedMessageTs,
+                                lastReceivedMessageTs: sessInfo.lastReceivedMessageTs!,
                                 hasReceivedMessage: sessInfo.session.has_received_message(),
-                                sessionId: sessionId,
+                                sessionId,
                             });
                         });
                     }
@@ -799,7 +804,7 @@ export class OlmDevice {
             log,
         );
 
-        return info;
+        return info!;
     }
 
     /**
@@ -914,7 +919,7 @@ export class OlmDevice {
         await this.cryptoStore.storeEndToEndSessionProblem(deviceKey, type, fixed);
     }
 
-    public sessionMayHaveProblems(deviceKey: string, timestamp: number): Promise<IProblem> {
+    public sessionMayHaveProblems(deviceKey: string, timestamp: number): Promise<IProblem | null> {
         return this.cryptoStore.getEndToEndSessionProblem(deviceKey, timestamp);
     }
 
@@ -1054,10 +1059,14 @@ export class OlmDevice {
         senderKey: string,
         sessionId: string,
         txn: unknown,
-        func: (session: InboundGroupSession, data: InboundGroupSessionData, withheld?: IWithheld) => void,
+        func: (
+            session: InboundGroupSession | null,
+            data: InboundGroupSessionData | null,
+            withheld: IWithheld | null,
+        ) => void,
     ): void {
         this.cryptoStore.getEndToEndInboundGroupSession(
-            senderKey, sessionId, txn, (sessionData: InboundGroupSessionData, withheld: IWithheld | null) => {
+            senderKey, sessionId, txn, (sessionData: InboundGroupSessionData | null, withheld: IWithheld | null) => {
                 if (sessionData === null) {
                     func(null, null, withheld);
                     return;
@@ -1101,7 +1110,7 @@ export class OlmDevice {
         sessionKey: string,
         keysClaimed: Record<string, string>,
         exportFormat: boolean,
-        extraSessionData: Record<string, any> = {},
+        extraSessionData: OlmGroupSessionExtraData = {},
     ): Promise<void> {
         await this.cryptoStore.doTxn(
             'readwrite', [
@@ -1110,69 +1119,94 @@ export class OlmDevice {
                 IndexedDBCryptoStore.STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS,
             ], (txn) => {
                 /* if we already have this session, consider updating it */
-                this.getInboundGroupSession(
-                    roomId, senderKey, sessionId, txn,
-                    (existingSession: InboundGroupSession, existingSessionData: InboundGroupSessionData) => {
-                        // new session.
-                        const session = new global.Olm.InboundGroupSession();
-                        try {
-                            if (exportFormat) {
-                                session.import_session(sessionKey);
-                            } else {
-                                session.create(sessionKey);
-                            }
-                            if (sessionId != session.session_id()) {
-                                throw new Error(
-                                    "Mismatched group session ID from senderKey: " +
-                                    senderKey,
-                                );
-                            }
+                this.getInboundGroupSession(roomId, senderKey, sessionId, txn, (
+                    existingSession: InboundGroupSession | null,
+                    existingSessionData: InboundGroupSessionData | null,
+                ) => {
+                    // new session.
+                    const session = new global.Olm.InboundGroupSession();
+                    try {
+                        if (exportFormat) {
+                            session.import_session(sessionKey);
+                        } else {
+                            session.create(sessionKey);
+                        }
+                        if (sessionId != session.session_id()) {
+                            throw new Error(
+                                "Mismatched group session ID from senderKey: " +
+                                senderKey,
+                            );
+                        }
 
-                            if (existingSession) {
-                                logger.log(
-                                    "Update for megolm session "
-                                    + senderKey + "/" + sessionId,
-                                );
-                                if (existingSession.first_known_index()
-                                    <= session.first_known_index()
-                                    && !(existingSession.first_known_index() == session.first_known_index()
-                                        && !extraSessionData.untrusted
-                                        && existingSessionData.untrusted)) {
-                                    // existing session has lower index (i.e. can
-                                    // decrypt more), or they have the same index and
-                                    // the new sessions trust does not win over the old
-                                    // sessions trust, so keep it
+                        if (existingSession) {
+                            logger.log(
+                                "Update for megolm session "
+                                + senderKey + "/" + sessionId,
+                            );
+                            if (existingSession.first_known_index() <= session.first_known_index()) {
+                                if (!existingSessionData!.untrusted || extraSessionData.untrusted) {
+                                    // existing session has less-than-or-equal index
+                                    // (i.e. can decrypt at least as much), and the
+                                    // new session's trust does not win over the old
+                                    // session's trust, so keep it
                                     logger.log(`Keeping existing megolm session ${sessionId}`);
                                     return;
                                 }
+                                if (existingSession.first_known_index() < session.first_known_index()) {
+                                    // We want to upgrade the existing session's trust,
+                                    // but we can't just use the new session because we'll
+                                    // lose the lower index. Check that the sessions connect
+                                    // properly, and then manually set the existing session
+                                    // as trusted.
+                                    if (
+                                        existingSession.export_session(session.first_known_index())
+                                        === session.export_session(session.first_known_index())
+                                    ) {
+                                        logger.info(
+                                            "Upgrading trust of existing megolm session " +
+                                            sessionId + " based on newly-received trusted session",
+                                        );
+                                        existingSessionData!.untrusted = false;
+                                        this.cryptoStore.storeEndToEndInboundGroupSession(
+                                            senderKey, sessionId, existingSessionData!, txn,
+                                        );
+                                    } else {
+                                        logger.warn(
+                                            "Newly-received megolm session " + sessionId +
+                                            " does not match existing session! Keeping existing session",
+                                        );
+                                    }
+                                    return;
+                                }
+                                // If the sessions have the same index, go ahead and store the new trusted one.
                             }
-
-                            logger.info(
-                                "Storing megolm session " + senderKey + "/" + sessionId +
-                                " with first index " + session.first_known_index(),
-                            );
-
-                            const sessionData = Object.assign({}, extraSessionData, {
-                                room_id: roomId,
-                                session: session.pickle(this.pickleKey),
-                                keysClaimed: keysClaimed,
-                                forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
-                            });
-
-                            this.cryptoStore.storeEndToEndInboundGroupSession(
-                                senderKey, sessionId, sessionData, txn,
-                            );
-
-                            if (!existingSession && extraSessionData.sharedHistory) {
-                                this.cryptoStore.addSharedHistoryInboundGroupSession(
-                                    roomId, senderKey, sessionId, txn,
-                                );
-                            }
-                        } finally {
-                            session.free();
                         }
-                    },
-                );
+
+                        logger.info(
+                            "Storing megolm session " + senderKey + "/" + sessionId +
+                            " with first index " + session.first_known_index(),
+                        );
+
+                        const sessionData = Object.assign({}, extraSessionData, {
+                            room_id: roomId,
+                            session: session.pickle(this.pickleKey),
+                            keysClaimed: keysClaimed,
+                            forwardingCurve25519KeyChain: forwardingCurve25519KeyChain,
+                        });
+
+                        this.cryptoStore.storeEndToEndInboundGroupSession(
+                            senderKey, sessionId, sessionData, txn,
+                        );
+
+                        if (!existingSession && extraSessionData.sharedHistory) {
+                            this.cryptoStore.addSharedHistoryInboundGroupSession(
+                                roomId, senderKey, sessionId, txn,
+                            );
+                        }
+                    } finally {
+                        session.free();
+                    }
+                });
             },
             logger.withPrefix("[addInboundGroupSession]"),
         );
@@ -1234,7 +1268,7 @@ export class OlmDevice {
         eventId: string,
         timestamp: number,
     ): Promise<IDecryptedGroupMessage | null> {
-        let result: IDecryptedGroupMessage;
+        let result: IDecryptedGroupMessage | null = null;
         // when the localstorage crypto store is used as an indexeddb backend,
         // exceptions thrown from within the inner function are not passed through
         // to the top level, so we store exceptions in a variable and raise them at
@@ -1248,7 +1282,7 @@ export class OlmDevice {
             ], (txn) => {
                 this.getInboundGroupSession(
                     roomId, senderKey, sessionId, txn, (session, sessionData, withheld) => {
-                        if (session === null) {
+                        if (session === null || sessionData === null) {
                             if (withheld) {
                                 error = new algorithms.DecryptionError(
                                     "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
@@ -1265,7 +1299,7 @@ export class OlmDevice {
                         try {
                             res = session.decrypt(body);
                         } catch (e) {
-                            if (e && e.message === 'OLM.UNKNOWN_MESSAGE_INDEX' && withheld) {
+                            if ((<Error>e)?.message === 'OLM.UNKNOWN_MESSAGE_INDEX' && withheld) {
                                 error = new algorithms.DecryptionError(
                                     "MEGOLM_UNKNOWN_INBOUND_SESSION_ID",
                                     calculateWithheldMessage(withheld),
@@ -1274,7 +1308,7 @@ export class OlmDevice {
                                     },
                                 );
                             } else {
-                                error = e;
+                                error = <Error>e;
                             }
                             return;
                         }
@@ -1323,7 +1357,7 @@ export class OlmDevice {
                             forwardingCurve25519KeyChain: (
                                 sessionData.forwardingCurve25519KeyChain || []
                             ),
-                            untrusted: sessionData.untrusted,
+                            untrusted: !!sessionData.untrusted,
                         };
                     },
                 );
@@ -1331,10 +1365,10 @@ export class OlmDevice {
             logger.withPrefix("[decryptGroupMessage]"),
         );
 
-        if (error) {
+        if (error!) {
             throw error;
         }
-        return result;
+        return result!;
     }
 
     /**
@@ -1377,7 +1411,7 @@ export class OlmDevice {
             logger.withPrefix("[hasInboundSessionKeys]"),
         );
 
-        return result;
+        return result!;
     }
 
     /**
@@ -1404,8 +1438,8 @@ export class OlmDevice {
         senderKey: string,
         sessionId: string,
         chainIndex?: number,
-    ): Promise<IInboundGroupSessionKey> {
-        let result: IInboundGroupSessionKey;
+    ): Promise<IInboundGroupSessionKey | null> {
+        let result: IInboundGroupSessionKey | null = null;
         await this.cryptoStore.doTxn(
             'readonly', [
                 IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
@@ -1413,7 +1447,7 @@ export class OlmDevice {
             ], (txn) => {
                 this.getInboundGroupSession(
                     roomId, senderKey, sessionId, txn, (session, sessionData) => {
-                        if (session === null) {
+                        if (session === null || sessionData === null) {
                             result = null;
                             return;
                         }
@@ -1427,13 +1461,23 @@ export class OlmDevice {
                         const claimedKeys = sessionData.keysClaimed || {};
                         const senderEd25519Key = claimedKeys.ed25519 || null;
 
+                        const forwardingKeyChain = sessionData.forwardingCurve25519KeyChain || [];
+                        // older forwarded keys didn't set the "untrusted"
+                        // property, but can be identified by having a
+                        // non-empty forwarding key chain.  These keys should
+                        // be marked as untrusted since we don't know that they
+                        // can be trusted
+                        const untrusted = "untrusted" in sessionData
+                            ? sessionData.untrusted
+                            : forwardingKeyChain.length > 0;
+
                         result = {
                             "chain_index": chainIndex,
                             "key": exportedSession,
-                            "forwarding_curve25519_key_chain":
-                                sessionData.forwardingCurve25519KeyChain || [],
+                            "forwarding_curve25519_key_chain": forwardingKeyChain,
                             "sender_claimed_ed25519_key": senderEd25519Key,
                             "shared_history": sessionData.sharedHistory || false,
+                            "untrusted": untrusted,
                         };
                     },
                 );
@@ -1483,7 +1527,7 @@ export class OlmDevice {
             },
             logger.withPrefix("[getSharedHistoryInboundGroupSessionsForRoom]"),
         );
-        return result;
+        return result!;
     }
 
     // Utilities

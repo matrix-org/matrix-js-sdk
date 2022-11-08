@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { logger } from "./logger";
-import { MatrixClient } from "./client";
+import { MatrixError, MatrixClient } from "./matrix";
 import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage";
 import { MatrixScheduler } from "./scheduler";
 
@@ -28,7 +28,7 @@ const MAX_BATCH_SIZE = 20;
 export class ToDeviceMessageQueue {
     private sending = false;
     private running = true;
-    private retryTimeout: number = null;
+    private retryTimeout: ReturnType<typeof setTimeout> | null = null;
     private retryAttempts = 0;
 
     constructor(private client: MatrixClient) {
@@ -48,14 +48,18 @@ export class ToDeviceMessageQueue {
     public async queueBatch(batch: ToDeviceBatch): Promise<void> {
         const batches: ToDeviceBatchWithTxnId[] = [];
         for (let i = 0; i < batch.batch.length; i += MAX_BATCH_SIZE) {
-            batches.push({
+            const batchWithTxnId = {
                 eventType: batch.eventType,
                 batch: batch.batch.slice(i, i + MAX_BATCH_SIZE),
                 txnId: this.client.makeTxnId(),
-            });
+            };
+            batches.push(batchWithTxnId);
+            const recips = batchWithTxnId.batch.map((msg) => `${msg.userId}:${msg.deviceId}`);
+            logger.info(`Created batch of to-device messages with txn id ${batchWithTxnId.txnId} for ${recips}`);
         }
 
         await this.client.store.saveToDeviceBatches(batches);
+        logger.info(`Enqueued to-device messages with txn ids ${batches.map((batch) => batch.txnId)}`);
         this.sendQueue();
     }
 
@@ -68,7 +72,7 @@ export class ToDeviceMessageQueue {
         logger.debug("Attempting to send queued to-device messages");
 
         this.sending = true;
-        let headBatch;
+        let headBatch: IndexedToDeviceBatch | null;
         try {
             while (this.running) {
                 headBatch = await this.client.store.getOldestToDeviceBatch();
@@ -86,13 +90,13 @@ export class ToDeviceMessageQueue {
             ++this.retryAttempts;
             // eslint-disable-next-line @typescript-eslint/naming-convention
             // eslint-disable-next-line new-cap
-            const retryDelay = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(null, this.retryAttempts, e);
+            const retryDelay = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(null, this.retryAttempts, <MatrixError>e);
             if (retryDelay === -1) {
                 // the scheduler function doesn't differentiate between fatal errors and just getting
                 // bored and giving up for now
-                if (Math.floor(e.httpStatus / 100) === 4) {
+                if (Math.floor((<MatrixError>e).httpStatus! / 100) === 4) {
                     logger.error("Fatal error when sending to-device message - dropping to-device batch!", e);
-                    await this.client.store.removeToDeviceBatch(headBatch.id);
+                    await this.client.store.removeToDeviceBatch(headBatch!.id);
                 } else {
                     logger.info("Automatic retry limit reached for to-device messages.");
                 }
@@ -118,7 +122,9 @@ export class ToDeviceMessageQueue {
             contentMap[item.userId][item.deviceId] = item.payload;
         }
 
-        logger.info(`Sending batch of ${batch.batch.length} to-device messages with ID ${batch.id}`);
+        logger.info(
+            `Sending batch of ${batch.batch.length} to-device messages with ID ${batch.id} and txnId ${batch.txnId}`,
+        );
 
         await this.client.sendToDevice(batch.eventType, contentMap, batch.txnId);
     }

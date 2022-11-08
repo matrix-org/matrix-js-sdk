@@ -14,13 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
+import { deepCompare, escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils";
 import { logger } from './logger';
 import { MatrixClient } from "./client";
 import { MatrixEvent } from "./models/event";
 import {
     ConditionKind,
     IAnnotatedPushRule,
+    ICallStartedCondition,
+    ICallStartedPrefixCondition,
     IContainsDisplayNameCondition,
     IEventMatchCondition,
     IPushRule,
@@ -90,6 +92,23 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             },
         ],
         actions: [],
+    },
+    {
+        // For homeservers which don't support MSC3914 yet
+        rule_id: ".org.matrix.msc3914.rule.room.call",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: ConditionKind.EventMatch,
+                key: "type",
+                pattern: "org.matrix.msc3401.call",
+            },
+            {
+                kind: ConditionKind.CallStarted,
+            },
+        ],
+        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Sound, value: "default" }],
     },
 ];
 
@@ -170,7 +189,7 @@ export class PushProcessor {
 
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
 
-    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule {
+    private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule | null {
         for (let ruleKindIndex = 0; ruleKindIndex < RULEKINDS_IN_ORDER.length; ++ruleKindIndex) {
             const kind = RULEKINDS_IN_ORDER[ruleKindIndex];
             const ruleset = kindset[kind];
@@ -255,6 +274,9 @@ export class PushProcessor {
                 return this.eventFulfillsRoomMemberCountCondition(cond, ev);
             case ConditionKind.SenderNotificationPermission:
                 return this.eventFulfillsSenderNotifPermCondition(cond, ev);
+            case ConditionKind.CallStarted:
+            case ConditionKind.CallStartedPrefix:
+                return this.eventFulfillsCallStartedCondition(cond, ev);
         }
 
         // unknown conditions: we previously matched all unknown conditions,
@@ -324,19 +346,19 @@ export class PushProcessor {
     private eventFulfillsDisplayNameCondition(cond: IContainsDisplayNameCondition, ev: MatrixEvent): boolean {
         let content = ev.getContent();
         if (ev.isEncrypted() && ev.getClearContent()) {
-            content = ev.getClearContent();
+            content = ev.getClearContent()!;
         }
         if (!content || !content.body || typeof content.body != 'string') {
             return false;
         }
 
         const room = this.client.getRoom(ev.getRoomId());
-        if (!room || !room.currentState || !room.currentState.members ||
-            !room.currentState.getMember(this.client.credentials.userId)) {
+        const member = room?.currentState?.getMember(this.client.credentials.userId!);
+        if (!member) {
             return false;
         }
 
-        const displayName = room.currentState.getMember(this.client.credentials.userId).name;
+        const displayName = member.name;
 
         // N.B. we can't use \b as it chokes on unicode. however \W seems to be okay
         // as shorthand for [^0-9A-Za-z_].
@@ -369,6 +391,22 @@ export class PushProcessor {
         return !!val.match(regex);
     }
 
+    private eventFulfillsCallStartedCondition(
+        _cond: ICallStartedCondition | ICallStartedPrefixCondition,
+        ev: MatrixEvent,
+    ): boolean {
+        // Since servers don't support properly sending push notification
+        // about MSC3401 call events, we do the handling ourselves
+        return (
+            ["m.ring", "m.prompt"].includes(ev.getContent()["m.intent"])
+            && !("m.terminated" in ev.getContent())
+            && (
+                (ev.getPrevContent()["m.terminated"] !== ev.getContent()["m.terminated"])
+                || deepCompare(ev.getPrevContent(), {})
+            )
+        );
+    }
+
     private createCachedRegex(prefix: string, glob: string, suffix: string): RegExp {
         if (PushProcessor.cachedGlobToRegex[glob]) {
             return PushProcessor.cachedGlobToRegex[glob];
@@ -382,7 +420,7 @@ export class PushProcessor {
 
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
         const parts = key.split('.');
-        let val;
+        let val: any;
 
         // special-case the first component to deal with encrypted messages
         const firstPart = parts[0];
@@ -398,7 +436,7 @@ export class PushProcessor {
         }
 
         while (parts.length > 0) {
-            const thisPart = parts.shift();
+            const thisPart = parts.shift()!;
             if (isNullOrUndefined(val[thisPart])) {
                 return null;
             }
@@ -407,7 +445,7 @@ export class PushProcessor {
         return val;
     }
 
-    private matchingRuleForEventWithRulesets(ev: MatrixEvent, rulesets): IAnnotatedPushRule {
+    private matchingRuleForEventWithRulesets(ev: MatrixEvent, rulesets?: IPushRules): IAnnotatedPushRule | null {
         if (!rulesets) {
             return null;
         }
@@ -418,7 +456,7 @@ export class PushProcessor {
         return this.matchingRuleFromKindSet(ev, rulesets.global);
     }
 
-    private pushActionsForEventAndRulesets(ev: MatrixEvent, rulesets): IActionsObject {
+    private pushActionsForEventAndRulesets(ev: MatrixEvent, rulesets?: IPushRules): IActionsObject {
         const rule = this.matchingRuleForEventWithRulesets(ev, rulesets);
         if (!rule) {
             return {} as IActionsObject;
@@ -466,9 +504,9 @@ export class PushProcessor {
      * @param {string} ruleId The ID of the rule to search for
      * @return {object} The push rule, or null if no such rule was found
      */
-    public getPushRuleById(ruleId: string): IPushRule {
+    public getPushRuleById(ruleId: string): IPushRule | null {
         for (const scope of ['global']) {
-            if (this.client.pushRules[scope] === undefined) continue;
+            if (this.client.pushRules?.[scope] === undefined) continue;
 
             for (const kind of RULEKINDS_IN_ORDER) {
                 if (this.client.pushRules[scope][kind] === undefined) continue;

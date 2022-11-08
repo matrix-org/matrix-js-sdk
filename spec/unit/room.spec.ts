@@ -27,18 +27,21 @@ import {
     EventType,
     JoinRule,
     MatrixEvent,
+    MatrixEventEvent,
     PendingEventOrdering,
     RelationType,
     RoomEvent,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
-import { IWrappedReceipt, Room } from "../../src/models/room";
+import { NotificationCountType, Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType } from "../../src/@types/read_receipts";
-import { Thread, ThreadEvent } from "../../src/models/thread";
+import { FeatureSupport, Thread, ThreadEvent } from "../../src/models/thread";
+import { WrappedReceipt } from "../../src/models/read-receipt";
+import { Crypto } from "../../src/crypto";
 
 describe("Room", function() {
     const roomId = "!foo:bar";
@@ -288,11 +291,11 @@ describe("Room", function() {
                 room.addLiveEvents(events);
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[0]],
-                    { timelineWasEmpty: undefined },
+                    { timelineWasEmpty: false },
                 );
                 expect(room.currentState.setStateEvents).toHaveBeenCalledWith(
                     [events[1]],
-                    { timelineWasEmpty: undefined },
+                    { timelineWasEmpty: false },
                 );
                 expect(events[0].forwardLooking).toBe(true);
                 expect(events[1].forwardLooking).toBe(true);
@@ -336,12 +339,12 @@ describe("Room", function() {
                             expect(event.getId()).toEqual(localEventId);
                             expect(event.status).toEqual(EventStatus.SENDING);
                             expect(emitRoom).toEqual(room);
-                            expect(oldEventId).toBe(null);
-                            expect(oldStatus).toBe(null);
+                            expect(oldEventId).toBeUndefined();
+                            expect(oldStatus).toBeUndefined();
                             break;
                         case 1:
                             expect(event.getId()).toEqual(remoteEventId);
-                            expect(event.status).toBe(null);
+                            expect(event.status).toBeNull();
                             expect(emitRoom).toEqual(room);
                             expect(oldEventId).toEqual(localEventId);
                             expect(oldStatus).toBe(EventStatus.SENDING);
@@ -370,7 +373,7 @@ describe("Room", function() {
             delete eventJson["event_id"];
             const localEvent = new MatrixEvent(Object.assign({ event_id: "$temp" }, eventJson));
             localEvent.status = EventStatus.SENDING;
-            expect(localEvent.getTxnId()).toBeNull();
+            expect(localEvent.getTxnId()).toBeUndefined();
             expect(room.timeline.length).toEqual(0);
 
             // first add the local echo. This is done before the /send request is even sent.
@@ -385,7 +388,7 @@ describe("Room", function() {
 
             // then /sync returns the remoteEvent, it should de-dupe based on the event ID.
             const remoteEvent = new MatrixEvent(Object.assign({ event_id: realEventId }, eventJson));
-            expect(remoteEvent.getTxnId()).toBeNull();
+            expect(remoteEvent.getTxnId()).toBeUndefined();
             room.addLiveEvents([remoteEvent]);
             // the duplicate strategy code should ensure we don't add a 2nd event to the live timeline
             expect(room.timeline.length).toEqual(1);
@@ -425,6 +428,17 @@ describe("Room", function() {
             expect(room.timeline.length).toEqual(1);
             // but without the event ID matching we will still have the local event in pending events
             expect(room.getEventForTxnId(txnId)).toBeUndefined();
+        });
+
+        it("should correctly handle remote echoes from other devices", () => {
+            const remoteEvent = utils.mkMessage({
+                room: roomId, user: userA, event: true,
+            });
+            remoteEvent.event.unsigned = { transaction_id: "TXN_ID" };
+
+            // add the remoteEvent
+            room.addLiveEvents([remoteEvent]);
+            expect(room.timeline.length).toEqual(1);
         });
     });
 
@@ -587,7 +601,7 @@ describe("Room", function() {
     });
 
     const resetTimelineTests = function(timelineSupport) {
-        let events = null;
+        let events: MatrixEvent[];
 
         beforeEach(function() {
             room = new Room(roomId, new TestClient(userA).client, userA, { timelineSupport: timelineSupport });
@@ -1419,6 +1433,19 @@ describe("Room", function() {
                 expect(room.getUsersReadUpTo(eventToAck)).toEqual([userB]);
             });
         });
+
+        describe("hasUserReadUpTo", function() {
+            it("should acknowledge if an event has been read", function() {
+                const ts = 13787898424;
+                room.addReceipt(mkReceipt(roomId, [
+                    mkRecord(eventToAck.getId(), "m.read", userB, ts),
+                ]));
+                expect(room.hasUserReadEvent(userB, eventToAck.getId())).toEqual(true);
+            });
+            it("return false for an unknown event", function() {
+                expect(room.hasUserReadEvent(userB, "unknown_event")).toEqual(false);
+            });
+        });
     });
 
     describe("tags", function() {
@@ -1509,6 +1536,36 @@ describe("Room", function() {
             expect(room.timeline).toEqual(
                 [eventA, eventB, eventC],
             );
+        });
+
+        it("should apply redactions eagerly in the pending event list", () => {
+            const client = (new TestClient("@alice:example.com", "alicedevice")).client;
+            const room = new Room(roomId, client, userA, {
+                pendingEventOrdering: PendingEventOrdering.Detached,
+            });
+
+            const eventA = utils.mkMessage({
+                room: roomId,
+                user: userA,
+                msg: "remote 1",
+                event: true,
+            });
+            eventA.status = EventStatus.SENDING;
+            const redactA = utils.mkEvent({
+                room: roomId,
+                user: userA,
+                type: EventType.RoomRedaction,
+                content: {},
+                redacts: eventA.getId(),
+                event: true,
+            });
+            redactA.status = EventStatus.SENDING;
+
+            room.addPendingEvent(eventA, "TXN1");
+            expect(room.getPendingEvents()).toEqual([eventA]);
+            room.addPendingEvent(redactA, "TXN2");
+            expect(room.getPendingEvents()).toEqual([eventA, redactA]);
+            expect(eventA.isRedacted()).toBeTruthy();
         });
     });
 
@@ -1675,7 +1732,7 @@ describe("Room", function() {
 
             client.members.mockReturnValue({ chunk: [memberEvent] });
             await room.loadMembersIfNeeded();
-            const memberA = room.getMember("@user_a:bar");
+            const memberA = room.getMember("@user_a:bar")!;
             expect(memberA.name).toEqual("User A");
         });
     });
@@ -1696,7 +1753,7 @@ describe("Room", function() {
                 });
                 room.updateMyMembership(JoinRule.Invite);
                 expect(room.getMyMembership()).toEqual(JoinRule.Invite);
-                expect(events[0]).toEqual({ membership: "invite", oldMembership: null });
+                expect(events[0]).toEqual({ membership: "invite", oldMembership: undefined });
                 events.splice(0);   //clear
                 room.updateMyMembership(JoinRule.Invite);
                 expect(events.length).toEqual(0);
@@ -2383,7 +2440,7 @@ describe("Room", function() {
         });
 
         it("should aggregate relations in thread event timeline set", () => {
-            Thread.setServerSideSupport(true, true);
+            Thread.setServerSideSupport(FeatureSupport.Stable);
             const threadRoot = mkMessage();
             const rootReaction = mkReaction(threadRoot);
             const threadResponse = mkThreadResponse(threadRoot);
@@ -2398,28 +2455,28 @@ describe("Room", function() {
 
             room.addLiveEvents(events);
 
-            const thread = threadRoot.getThread();
+            const thread = threadRoot.getThread()!;
             expect(thread.rootEvent).toBe(threadRoot);
 
             const rootRelations = thread.timelineSet.relations.getChildEventsForEvent(
                 threadRoot.getId(),
                 RelationType.Annotation,
                 EventType.Reaction,
-            ).getSortedAnnotationsByKey();
+            )!.getSortedAnnotationsByKey();
             expect(rootRelations).toHaveLength(1);
-            expect(rootRelations[0][0]).toEqual(rootReaction.getRelation().key);
-            expect(rootRelations[0][1].size).toEqual(1);
-            expect(rootRelations[0][1].has(rootReaction)).toBeTruthy();
+            expect(rootRelations![0][0]).toEqual(rootReaction.getRelation()!.key);
+            expect(rootRelations![0][1].size).toEqual(1);
+            expect(rootRelations![0][1].has(rootReaction)).toBeTruthy();
 
             const responseRelations = thread.timelineSet.relations.getChildEventsForEvent(
                 threadResponse.getId(),
                 RelationType.Annotation,
                 EventType.Reaction,
-            ).getSortedAnnotationsByKey();
+            )!.getSortedAnnotationsByKey();
             expect(responseRelations).toHaveLength(1);
-            expect(responseRelations[0][0]).toEqual(threadReaction.getRelation().key);
-            expect(responseRelations[0][1].size).toEqual(1);
-            expect(responseRelations[0][1].has(threadReaction)).toBeTruthy();
+            expect(responseRelations![0][0]).toEqual(threadReaction.getRelation()!.key);
+            expect(responseRelations![0][1].size).toEqual(1);
+            expect(responseRelations![0][1].has(threadReaction)).toBeTruthy();
         });
     });
 
@@ -2428,8 +2485,8 @@ describe("Room", function() {
         const room = new Room(roomId, client, userA);
 
         it("handles missing receipt type", () => {
-            room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
-                return receiptType === ReceiptType.ReadPrivate ? { eventId: "eventId" } as IWrappedReceipt : null;
+            room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
+                return receiptType === ReceiptType.ReadPrivate ? { eventId: "eventId" } as WrappedReceipt : null;
             };
 
             expect(room.getEventReadUpTo(userA)).toEqual("eventId");
@@ -2437,19 +2494,17 @@ describe("Room", function() {
 
         describe("prefers newer receipt", () => {
             it("should compare correctly using timelines", () => {
-                room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                     if (receiptType === ReceiptType.ReadPrivate) {
-                        return { eventId: "eventId1" } as IWrappedReceipt;
-                    }
-                    if (receiptType === ReceiptType.UnstableReadPrivate) {
-                        return { eventId: "eventId2" } as IWrappedReceipt;
+                        return { eventId: "eventId1" } as WrappedReceipt;
                     }
                     if (receiptType === ReceiptType.Read) {
-                        return { eventId: "eventId3" } as IWrappedReceipt;
+                        return { eventId: "eventId2" } as WrappedReceipt;
                     }
+                    return null;
                 };
 
-                for (let i = 1; i <= 3; i++) {
+                for (let i = 1; i <= 2; i++) {
                     room.getUnfilteredTimelineSet = () => ({ compareEventOrdering: (event1, event2) => {
                         return (event1 === `eventId${i}`) ? 1 : -1;
                     } } as EventTimelineSet);
@@ -2460,20 +2515,18 @@ describe("Room", function() {
 
             describe("correctly compares by timestamp", () => {
                 it("should correctly compare, if we have all receipts", () => {
-                    for (let i = 1; i <= 3; i++) {
+                    for (let i = 1; i <= 2; i++) {
                         room.getUnfilteredTimelineSet = () => ({
                             compareEventOrdering: (_1, _2) => null,
                         } as EventTimelineSet);
-                        room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                        room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                             if (receiptType === ReceiptType.ReadPrivate) {
-                                return { eventId: "eventId1", data: { ts: i === 1 ? 1 : 0 } } as IWrappedReceipt;
-                            }
-                            if (receiptType === ReceiptType.UnstableReadPrivate) {
-                                return { eventId: "eventId2", data: { ts: i === 2 ? 1 : 0 } } as IWrappedReceipt;
+                                return { eventId: "eventId1", data: { ts: i === 1 ? 2 : 1 } } as WrappedReceipt;
                             }
                             if (receiptType === ReceiptType.Read) {
-                                return { eventId: "eventId3", data: { ts: i === 3 ? 1 : 0 } } as IWrappedReceipt;
+                                return { eventId: "eventId2", data: { ts: i === 2 ? 2 : 1 } } as WrappedReceipt;
                             }
+                            return null;
                         };
 
                         expect(room.getEventReadUpTo(userA)).toEqual(`eventId${i}`);
@@ -2484,13 +2537,11 @@ describe("Room", function() {
                     room.getUnfilteredTimelineSet = () => ({
                         compareEventOrdering: (_1, _2) => null,
                     } as EventTimelineSet);
-                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
-                        if (receiptType === ReceiptType.UnstableReadPrivate) {
-                            return { eventId: "eventId1", data: { ts: 0 } } as IWrappedReceipt;
-                        }
+                    room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                         if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId2", data: { ts: 1 } } as IWrappedReceipt;
+                            return { eventId: "eventId2", data: { ts: 1 } } as WrappedReceipt;
                         }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
@@ -2505,39 +2556,25 @@ describe("Room", function() {
                 });
 
                 it("should give precedence to m.read.private", () => {
-                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                    room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                         if (receiptType === ReceiptType.ReadPrivate) {
-                            return { eventId: "eventId1" } as IWrappedReceipt;
-                        }
-                        if (receiptType === ReceiptType.UnstableReadPrivate) {
-                            return { eventId: "eventId2" } as IWrappedReceipt;
+                            return { eventId: "eventId1" } as WrappedReceipt;
                         }
                         if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId3" } as IWrappedReceipt;
+                            return { eventId: "eventId2" } as WrappedReceipt;
                         }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId1`);
                 });
 
-                it("should give precedence to org.matrix.msc2285.read.private", () => {
-                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
-                        if (receiptType === ReceiptType.UnstableReadPrivate) {
-                            return { eventId: "eventId2" } as IWrappedReceipt;
-                        }
-                        if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId2" } as IWrappedReceipt;
-                        }
-                    };
-
-                    expect(room.getEventReadUpTo(userA)).toEqual(`eventId2`);
-                });
-
                 it("should give precedence to m.read", () => {
-                    room.getReadReceiptForUserId = (userId, ignore, receiptType) => {
+                    room.getReadReceiptForUserId = (userId, ignore, receiptType): WrappedReceipt | null => {
                         if (receiptType === ReceiptType.Read) {
-                            return { eventId: "eventId3" } as IWrappedReceipt;
+                            return { eventId: "eventId3" } as WrappedReceipt;
                         }
+                        return null;
                     };
 
                     expect(room.getEventReadUpTo(userA)).toEqual(`eventId3`);
@@ -2556,5 +2593,158 @@ describe("Room", function() {
             room.recalculate();
             expect(client.roomNameGenerator).toHaveBeenCalled();
         });
+    });
+
+    describe("thread notifications", () => {
+        let room;
+
+        beforeEach(() => {
+            const client = new TestClient(userA).client;
+            room = new Room(roomId, client, userA);
+        });
+
+        it("defaults to undefined", () => {
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(0);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(0);
+        });
+
+        it("lets you set values", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 1);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(1);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(0);
+
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 10);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(1);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(10);
+        });
+
+        it("lets you reset threads notifications", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 123);
+
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+
+            room.resetThreadUnreadNotificationCount();
+
+            expect(room.threadsAggregateNotificationType).toBe(null);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(0);
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Highlight)).toBe(0);
+        });
+
+        it("sets the room threads notification type", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 123);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 333);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+        });
+
+        it("partially resets room notifications", () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 666);
+            room.setThreadUnreadNotificationCount("456", NotificationCountType.Highlight, 123);
+
+            room.resetThreadUnreadNotificationCount(["123"]);
+
+            expect(room.getThreadUnreadNotificationCount("123", NotificationCountType.Total)).toBe(666);
+            expect(room.getThreadUnreadNotificationCount("456", NotificationCountType.Highlight)).toBe(0);
+        });
+    });
+
+    describe("hasThreadUnreadNotification", () => {
+        it('has no notifications by default', () => {
+            expect(room.hasThreadUnreadNotification()).toBe(false);
+        });
+
+        it('main timeline notification does not affect this', () => {
+            room.setUnreadNotificationCount(NotificationCountType.Highlight, 1);
+            expect(room.hasThreadUnreadNotification()).toBe(false);
+            room.setUnreadNotificationCount(NotificationCountType.Total, 1);
+            expect(room.hasThreadUnreadNotification()).toBe(false);
+
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Total, 1);
+            expect(room.hasThreadUnreadNotification()).toBe(true);
+        });
+
+        it('lets you reset', () => {
+            room.setThreadUnreadNotificationCount("123", NotificationCountType.Highlight, 1);
+            expect(room.hasThreadUnreadNotification()).toBe(true);
+
+            room.resetThreadUnreadNotificationCount();
+
+            expect(room.hasThreadUnreadNotification()).toBe(false);
+        });
+    });
+
+    describe("threadsAggregateNotificationType", () => {
+        it("defaults to null", () => {
+            expect(room.threadsAggregateNotificationType).toBeNull();
+        });
+
+        it("counts multiple threads", () => {
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 0);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Total);
+        });
+
+        it("allows reset", () => {
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Total, 1);
+            room.setThreadUnreadNotificationCount("$456", NotificationCountType.Total, 1);
+            room.setThreadUnreadNotificationCount("$123", NotificationCountType.Highlight, 1);
+            expect(room.threadsAggregateNotificationType).toBe(NotificationCountType.Highlight);
+
+            room.resetThreadUnreadNotificationCount();
+
+            expect(room.threadsAggregateNotificationType).toBeNull();
+        });
+    });
+
+    it("should load pending events from from the store and decrypt if needed", async () => {
+        const client = new TestClient(userA).client;
+        client.crypto = {
+            decryptEvent: jest.fn().mockResolvedValue({ clearEvent: { body: "enc" } }),
+        } as unknown as Crypto;
+        client.store.getPendingEvents = jest.fn(async roomId => [{
+            event_id: "$1:server",
+            type: "m.room.message",
+            content: { body: "1" },
+            sender: "@1:server",
+            room_id: roomId,
+            origin_server_ts: 1,
+            txn_id: "txn1",
+        }, {
+            event_id: "$2:server",
+            type: "m.room.encrypted",
+            content: { body: "2" },
+            sender: "@2:server",
+            room_id: roomId,
+            origin_server_ts: 2,
+            txn_id: "txn2",
+        }]);
+        const room = new Room(roomId, client, userA, {
+            pendingEventOrdering: PendingEventOrdering.Detached,
+        });
+        await emitPromise(room, RoomEvent.LocalEchoUpdated);
+        await emitPromise(client, MatrixEventEvent.Decrypted);
+        await emitPromise(room, RoomEvent.LocalEchoUpdated);
+        const pendingEvents = room.getPendingEvents();
+        expect(pendingEvents).toHaveLength(2);
+        expect(pendingEvents[1].isDecryptionFailure()).toBeFalsy();
+        expect(pendingEvents[1].isBeingDecrypted()).toBeFalsy();
+        expect(pendingEvents[1].isEncrypted()).toBeTruthy();
+        for (const ev of pendingEvents) {
+            expect(room.getPendingEvent(ev.getId())).toBe(ev);
+        }
     });
 });

@@ -24,10 +24,10 @@ import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./eve
 import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
 import { Room, RoomEvent } from './room';
-import { TypedEventEmitter } from "./typed-event-emitter";
 import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
+import { ReadReceipt } from "./read-receipt";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -52,11 +52,28 @@ interface IThreadOpts {
     client: MatrixClient;
 }
 
+export enum FeatureSupport {
+    None = 0,
+    Experimental = 1,
+    Stable = 2
+}
+
+export function determineFeatureSupport(stable: boolean, unstable: boolean): FeatureSupport {
+    if (stable) {
+        return FeatureSupport.Stable;
+    } else if (unstable) {
+        return FeatureSupport.Experimental;
+    } else {
+        return FeatureSupport.None;
+    }
+}
+
 /**
  * @experimental
  */
-export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
-    public static hasServerSideSupport: boolean;
+export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
+    public static hasServerSideSupport = FeatureSupport.None;
+    public static hasServerSideListSupport = FeatureSupport.None;
 
     /**
      * A reference to all the events ID at the bottom of the threads
@@ -67,7 +84,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
     private reEmitter: TypedReEmitter<EmittedEvents, EventHandlerMap>;
 
-    private lastEvent: MatrixEvent;
+    private lastEvent!: MatrixEvent;
     private replyCount = 0;
 
     public readonly room: Room;
@@ -135,13 +152,21 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.emit(ThreadEvent.Update, this);
     }
 
-    public static setServerSideSupport(hasServerSideSupport: boolean, useStable: boolean): void {
-        Thread.hasServerSideSupport = hasServerSideSupport;
-        if (!useStable) {
+    public static setServerSideSupport(
+        status: FeatureSupport,
+    ): void {
+        Thread.hasServerSideSupport = status;
+        if (status !== FeatureSupport.Stable) {
             FILTER_RELATED_BY_SENDERS.setPreferUnstable(true);
             FILTER_RELATED_BY_REL_TYPES.setPreferUnstable(true);
             THREAD_RELATION_TYPE.setPreferUnstable(true);
         }
+    }
+
+    public static setServerSideListSupport(
+        status: FeatureSupport,
+    ): void {
+        Thread.hasServerSideListSupport = status;
     }
 
     private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent) => {
@@ -161,7 +186,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         this.lastEvent = events.find(e => (
             !e.isRedacted() &&
             e.isRelation(THREAD_RELATION_TYPE.name)
-        )) ?? this.rootEvent;
+        )) ?? this.rootEvent!;
         this.emit(ThreadEvent.Update, this);
     };
 
@@ -243,7 +268,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             this.client.decryptEventIfNeeded(event, {});
         } else if (!toStartOfTimeline &&
             this.initialEventsFetched &&
-            event.localTimestamp > this.lastReply()?.localTimestamp
+            event.localTimestamp > this.lastReply()!.localTimestamp
         ) {
             this.fetchEditsWhereNeeded(event);
             this.addEventToTimeline(event, false);
@@ -265,7 +290,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         }
     }
 
-    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship {
+    private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
@@ -278,7 +303,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
-            this._currentUserParticipated = bundledRelationship.current_user_participated;
+            this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
             const event = new MatrixEvent({
                 room_id: this.rootEvent.getRoomId(),
@@ -336,7 +361,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     /**
      * Return last reply to the thread, if known.
      */
-    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): Optional<MatrixEvent> {
+    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): MatrixEvent | null {
         for (let i = this.events.length - 1; i >= 0; i--) {
             const event = this.events[i];
             if (matches(event)) {
@@ -382,10 +407,10 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
         return this.timelineSet.getLiveTimeline();
     }
 
-    public async fetchEvents(opts: IRelationsRequestOpts = { limit: 20, direction: Direction.Backward }): Promise<{
-        originalEvent: MatrixEvent;
+    public async fetchEvents(opts: IRelationsRequestOpts = { limit: 20, dir: Direction.Backward }): Promise<{
+        originalEvent?: MatrixEvent;
         events: MatrixEvent[];
-        nextBatch?: string;
+        nextBatch?: string | null;
         prevBatch?: string;
     }> {
         let {
@@ -403,7 +428,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
 
         // When there's no nextBatch returned with a `from` request we have reached
         // the end of the thread, and therefore want to return an empty one
-        if (!opts.to && !nextBatch) {
+        if (!opts.to && !nextBatch && originalEvent) {
             events = [...events, originalEvent];
         }
 
@@ -414,7 +439,7 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             return this.client.decryptEventIfNeeded(event);
         }));
 
-        const prependEvents = (opts.direction ?? Direction.Backward) === Direction.Backward;
+        const prependEvents = (opts.dir ?? Direction.Backward) === Direction.Backward;
 
         this.timelineSet.addEventsToTimeline(
             events,
@@ -429,6 +454,18 @@ export class Thread extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
             prevBatch,
             nextBatch,
         };
+    }
+
+    public getUnfilteredTimelineSet(): EventTimelineSet {
+        return this.timelineSet;
+    }
+
+    public get timeline(): MatrixEvent[] {
+        return this.events;
+    }
+
+    public addReceipt(event: MatrixEvent, synthetic: boolean): void {
+        throw new Error("Unsupported function on the thread model");
     }
 }
 

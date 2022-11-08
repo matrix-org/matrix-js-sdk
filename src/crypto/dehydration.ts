@@ -58,9 +58,9 @@ const oneweek = 7 * 24 * 60 * 60 * 1000;
 export class DehydrationManager {
     private inProgress = false;
     private timeoutId: any;
-    private key: Uint8Array;
-    private keyInfo: {[props: string]: any};
-    private deviceDisplayName: string;
+    private key?: Uint8Array;
+    private keyInfo?: {[props: string]: any};
+    private deviceDisplayName?: string;
 
     constructor(private readonly crypto: Crypto) {
         this.getDehydrationKeyFromCache();
@@ -97,7 +97,7 @@ export class DehydrationManager {
     /** set the key, and queue periodic dehydration to the server in the background */
     public async setKeyAndQueueDehydration(
         key: Uint8Array, keyInfo: {[props: string]: any} = {},
-        deviceDisplayName: string = undefined,
+        deviceDisplayName?: string,
     ): Promise<void> {
         const matches = await this.setKey(key, keyInfo, deviceDisplayName);
         if (!matches) {
@@ -108,8 +108,8 @@ export class DehydrationManager {
 
     public async setKey(
         key: Uint8Array, keyInfo: {[props: string]: any} = {},
-        deviceDisplayName: string = undefined,
-    ): Promise<boolean> {
+        deviceDisplayName?: string,
+    ): Promise<boolean | undefined> {
         if (!key) {
             // unsetting the key -- cancel any pending dehydration task
             if (this.timeoutId) {
@@ -135,9 +135,9 @@ export class DehydrationManager {
         // dehydrate a new device.  If it's the same, we can keep the same
         // device.  (Assume that keyInfo and deviceDisplayName will be the
         // same if the key is the same.)
-        let matches: boolean = this.key && key.length == this.key.length;
+        let matches: boolean = !!this.key && key.length == this.key.length;
         for (let i = 0; matches && i < key.length; i++) {
-            if (key[i] != this.key[i]) {
+            if (key[i] != this.key![i]) {
                 matches = false;
             }
         }
@@ -150,7 +150,7 @@ export class DehydrationManager {
     }
 
     /** returns the device id of the newly created dehydrated device */
-    public async dehydrateDevice(): Promise<string> {
+    public async dehydrateDevice(): Promise<string | undefined> {
         if (this.inProgress) {
             logger.log("Dehydration already in progress -- not starting new dehydration");
             return;
@@ -164,7 +164,7 @@ export class DehydrationManager {
             const pickleKey = Buffer.from(this.crypto.olmDevice.pickleKey);
 
             // update the crypto store with the timestamp
-            const key = await encryptAES(encodeBase64(this.key), pickleKey, DEHYDRATION_ALGORITHM);
+            const key = await encryptAES(encodeBase64(this.key!), pickleKey, DEHYDRATION_ALGORITHM);
             await this.crypto.cryptoStore.doTxn(
                 'readwrite',
                 [IndexedDBCryptoStore.STORE_ACCOUNT],
@@ -174,7 +174,7 @@ export class DehydrationManager {
                         {
                             keyInfo: this.keyInfo,
                             key,
-                            deviceDisplayName: this.deviceDisplayName,
+                            deviceDisplayName: this.deviceDisplayName!,
                             time: Date.now(),
                         },
                     );
@@ -197,20 +197,19 @@ export class DehydrationManager {
             account.mark_keys_as_published();
 
             // dehydrate the account and store it on the server
-            const pickledAccount = account.pickle(new Uint8Array(this.key));
+            const pickledAccount = account.pickle(new Uint8Array(this.key!));
 
             const deviceData: {[props: string]: any} = {
                 algorithm: DEHYDRATION_ALGORITHM,
                 account: pickledAccount,
             };
-            if (this.keyInfo.passphrase) {
-                deviceData.passphrase = this.keyInfo.passphrase;
+            if (this.keyInfo!.passphrase) {
+                deviceData.passphrase = this.keyInfo!.passphrase;
             }
 
             logger.log("Uploading account to server");
             // eslint-disable-next-line camelcase
             const dehydrateResult = await this.crypto.baseApis.http.authedRequest<{ device_id: string }>(
-                undefined,
                 Method.Put,
                 "/dehydrated_device",
                 undefined,
@@ -273,7 +272,6 @@ export class DehydrationManager {
 
             logger.log("Uploading keys to server");
             await this.crypto.baseApis.http.authedRequest(
-                undefined,
                 Method.Post,
                 "/keys/upload/" + encodeURI(deviceId),
                 undefined,

@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { MatrixEvent } from '../models/event';
-import { RoomStateEvent } from '../models/room-state';
 import { MatrixClient, ClientEvent } from '../client';
 import {
     GroupCall,
@@ -24,10 +23,11 @@ import {
     IGroupCallDataChannelOptions,
 } from "./groupCall";
 import { Room } from "../models/room";
-import { RoomState } from "../models/room-state";
+import { RoomState, RoomStateEvent } from "../models/room-state";
 import { RoomMember } from "../models/room-member";
 import { logger } from '../logger';
 import { EventType } from "../@types/event";
+import { SyncState } from '../sync';
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
@@ -41,12 +41,41 @@ export type GroupCallEventHandlerEventHandlerMap = {
     [GroupCallEventHandlerEvent.Participants]: (participants: RoomMember[], call: GroupCall) => void;
 };
 
+interface RoomDeferred {
+    prom: Promise<void>;
+    resolve?: () => void;
+}
+
 export class GroupCallEventHandler {
     public groupCalls = new Map<string, GroupCall>(); // roomId -> GroupCall
 
+    // All rooms we know about and whether we've seen a 'Room' event
+    // for them. The promise will be fulfilled once we've processed that
+    // event which means we're "up to date" on what calls are in a room
+    // and get
+    private roomDeferreds = new Map<string, RoomDeferred>();
+
     constructor(private client: MatrixClient) { }
 
-    public start(): void {
+    public async start(): Promise<void> {
+        // We wait until the client has started syncing for real.
+        // This is because we only support one call at a time, and want
+        // the latest. We therefore want the latest state of the room before
+        // we create a group call for the room so we can be fairly sure that
+        // the group call we create is really the latest one.
+        if (this.client.getSyncState() !== SyncState.Syncing) {
+            logger.debug("Waiting for client to start syncing...");
+            await new Promise<void>(resolve => {
+                const onSync = () => {
+                    if (this.client.getSyncState() === SyncState.Syncing) {
+                        this.client.off(ClientEvent.Sync, onSync);
+                        return resolve();
+                    }
+                };
+                this.client.on(ClientEvent.Sync, onSync);
+            });
+        }
+
         const rooms = this.client.getRooms();
 
         for (const room of rooms) {
@@ -61,11 +90,31 @@ export class GroupCallEventHandler {
         this.client.removeListener(RoomStateEvent.Events, this.onRoomStateChanged);
     }
 
+    private getRoomDeferred(roomId: string): RoomDeferred {
+        let deferred: RoomDeferred = this.roomDeferreds.get(roomId);
+        if (deferred === undefined) {
+            let resolveFunc: () => void;
+            deferred = {
+                prom: new Promise<void>(resolve => {
+                    resolveFunc = resolve;
+                }),
+            };
+            deferred.resolve = resolveFunc;
+            this.roomDeferreds.set(roomId, deferred);
+        }
+
+        return deferred;
+    }
+
+    public waitUntilRoomReadyForGroupCalls(roomId: string): Promise<void> {
+        return this.getRoomDeferred(roomId).prom;
+    }
+
     public getGroupCallById(groupCallId: string): GroupCall {
         return [...this.groupCalls.values()].find((groupCall) => groupCall.groupCallId === groupCallId);
     }
 
-    private createGroupCallForRoom(room: Room): GroupCall | undefined {
+    private createGroupCallForRoom(room: Room): void {
         const callEvents = room.currentState.getStateEvents(EventType.GroupCallPrefix);
         const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
 
@@ -76,8 +125,17 @@ export class GroupCallEventHandler {
                 continue;
             }
 
-            return this.createGroupCallFromRoomStateEvent(callEvent);
+            logger.debug(
+                `Choosing group call ${callEvent.getStateKey()} with TS ` +
+                `${callEvent.getTs()} for room ${room.roomId} from ${callEvents.length} possible calls.`,
+            );
+
+            this.createGroupCallFromRoomStateEvent(callEvent);
+            break;
         }
+
+        logger.info("Group call event handler processed room", room.roomId);
+        this.getRoomDeferred(room.roomId).resolve();
     }
 
     private createGroupCallFromRoomStateEvent(event: MatrixEvent): GroupCall | undefined {

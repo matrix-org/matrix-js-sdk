@@ -18,41 +18,36 @@ import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../syn
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
 import { logger } from '../logger';
-import { IStartClientOpts, IStateEventWithRoomId } from "..";
+import { IStartClientOpts, IStateEventWithRoomId } from "../matrix";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
-const VERSION = 4;
+type DbMigration = (db: IDBDatabase) => void;
+const DB_MIGRATIONS: DbMigration[] = [
+    (db) => {
+        // Make user store, clobber based on user ID. (userId property of User objects)
+        db.createObjectStore("users", { keyPath: ["userId"] });
 
-function createDatabase(db: IDBDatabase): void {
-    // Make user store, clobber based on user ID. (userId property of User objects)
-    db.createObjectStore("users", { keyPath: ["userId"] });
+        // Make account data store, clobber based on event type.
+        // (event.type property of MatrixEvent objects)
+        db.createObjectStore("accountData", { keyPath: ["type"] });
 
-    // Make account data store, clobber based on event type.
-    // (event.type property of MatrixEvent objects)
-    db.createObjectStore("accountData", { keyPath: ["type"] });
-
-    // Make /sync store (sync tokens, room data, etc), always clobber (const key).
-    db.createObjectStore("sync", { keyPath: ["clobber"] });
-}
-
-function upgradeSchemaV2(db: IDBDatabase): void {
-    const oobMembersStore = db.createObjectStore(
-        "oob_membership_events", {
-            keyPath: ["room_id", "state_key"],
-        });
-    oobMembersStore.createIndex("room", "room_id");
-}
-
-function upgradeSchemaV3(db: IDBDatabase): void {
-    db.createObjectStore("client_options",
-        { keyPath: ["clobber"] });
-}
-
-function upgradeSchemaV4(db: IDBDatabase): void {
-    db.createObjectStore("to_device_queue", { autoIncrement: true });
-}
+        // Make /sync store (sync tokens, room data, etc), always clobber (const key).
+        db.createObjectStore("sync", { keyPath: ["clobber"] });
+    },
+    (db) => {
+        const oobMembersStore = db.createObjectStore(
+            "oob_membership_events", {
+                keyPath: ["room_id", "state_key"],
+            });
+        oobMembersStore.createIndex("room", "room_id");
+    },
+    (db) => { db.createObjectStore("client_options", { keyPath: ["clobber"] }); },
+    (db) => { db.createObjectStore("to_device_queue", { autoIncrement: true }); },
+    // Expand as needed.
+];
+const VERSION = DB_MIGRATIONS.length;
 
 /**
  * Helper method to collect results from a Cursor and promiseify it.
@@ -129,7 +124,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
     private readonly dbName: string;
     private readonly syncAccumulator: SyncAccumulator;
-    private db: IDBDatabase = null;
+    private db?: IDBDatabase;
     private disconnected = true;
     private _isNewlyCreated = false;
     private isPersisting = false;
@@ -146,8 +141,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @param {string=} dbName Optional database name. The same name must be used
      * to open the same database.
      */
-    constructor(private readonly indexedDB: IDBFactory, dbName: string) {
-        this.dbName = "matrix-js-sdk:" + (dbName || "default");
+    constructor(private readonly indexedDB: IDBFactory, dbName = "default") {
+        this.dbName = "matrix-js-sdk:" + dbName;
         this.syncAccumulator = new SyncAccumulator();
     }
 
@@ -172,20 +167,13 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             logger.log(
                 `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
             );
-            if (oldVersion < 1) { // The database did not previously exist.
+            if (oldVersion < 1) {
+                // The database did not previously exist
                 this._isNewlyCreated = true;
-                createDatabase(db);
             }
-            if (oldVersion < 2) {
-                upgradeSchemaV2(db);
-            }
-            if (oldVersion < 3) {
-                upgradeSchemaV3(db);
-            }
-            if (oldVersion < 4) {
-                upgradeSchemaV4(db);
-            }
-            // Expand as needed.
+            DB_MIGRATIONS.forEach((migration, index) => {
+                if (oldVersion <= index) migration(db);
+            });
         };
 
         req.onblocked = () => {
@@ -200,7 +188,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             // add a poorly-named listener for when deleteDatabase is called
             // so we can close our db connections.
             this.db.onversionchange = () => {
-                this.db.close();
+                this.db?.close();
             };
 
             return this.init();
@@ -241,7 +229,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     public getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null> {
         return new Promise<IStateEventWithRoomId[] | null>((resolve, reject) => {
-            const tx = this.db.transaction(["oob_membership_events"], "readonly");
+            const tx = this.db!.transaction(["oob_membership_events"], "readonly");
             const store = tx.objectStore("oob_membership_events");
             const roomIndex = store.index("room");
             const range = IDBKeyRange.only(roomId);
@@ -291,7 +279,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     public async setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
         logger.log(`LL: backend about to store ${membershipEvents.length}` +
             ` members for ${roomId}`);
-        const tx = this.db.transaction(["oob_membership_events"], "readwrite");
+        const tx = this.db!.transaction(["oob_membership_events"], "readwrite");
         const store = tx.objectStore("oob_membership_events");
         membershipEvents.forEach((e) => {
             store.put(e);
@@ -318,7 +306,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         // keys in the store.
         // this should be way faster than deleting every member
         // individually for a large room.
-        const readTx = this.db.transaction(
+        const readTx = this.db!.transaction(
             ["oob_membership_events"],
             "readonly");
         const store = readTx.objectStore("oob_membership_events");
@@ -334,7 +322,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         const [minStateKey, maxStateKey] = await Promise.all(
             [minStateKeyProm, maxStateKeyProm]);
 
-        const writeTx = this.db.transaction(
+        const writeTx = this.db!.transaction(
             ["oob_membership_events"],
             "readwrite");
         const writeStore = writeTx.objectStore("oob_membership_events");
@@ -386,7 +374,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync(copy = true): Promise<ISavedSync> {
+    public getSavedSync(copy = true): Promise<ISavedSync | null> {
         const data = this.syncAccumulator.getJSON();
         if (!data.nextBatch) return Promise.resolve(null);
         if (copy) {
@@ -443,7 +431,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     ): Promise<void> {
         logger.log("Persisting sync data up to", nextBatch);
         return utils.promiseTry<void>(() => {
-            const txn = this.db.transaction(["sync"], "readwrite");
+            const txn = this.db!.transaction(["sync"], "readwrite");
             const store = txn.objectStore("sync");
             store.put({
                 clobber: "-", // constant key so will always clobber
@@ -464,7 +452,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     private persistAccountData(accountData: IMinimalEvent[]): Promise<void> {
         return utils.promiseTry<void>(() => {
-            const txn = this.db.transaction(["accountData"], "readwrite");
+            const txn = this.db!.transaction(["accountData"], "readwrite");
             const store = txn.objectStore("accountData");
             for (let i = 0; i < accountData.length; i++) {
                 store.put(accountData[i]); // put == UPSERT
@@ -483,7 +471,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     private persistUserPresenceEvents(tuples: UserTuple[]): Promise<void> {
         return utils.promiseTry<void>(() => {
-            const txn = this.db.transaction(["users"], "readwrite");
+            const txn = this.db!.transaction(["users"], "readwrite");
             const store = txn.objectStore("users");
             for (const tuple of tuples) {
                 store.put({
@@ -503,7 +491,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     public getUserPresenceEvents(): Promise<UserTuple[]> {
         return utils.promiseTry<UserTuple[]>(() => {
-            const txn = this.db.transaction(["users"], "readonly");
+            const txn = this.db!.transaction(["users"], "readonly");
             const store = txn.objectStore("users");
             return selectQuery(store, undefined, (cursor) => {
                 return [cursor.value.userId, cursor.value.event];
@@ -518,7 +506,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     private loadAccountData(): Promise<IMinimalEvent[]> {
         logger.log(`LocalIndexedDBStoreBackend: loading account data...`);
         return utils.promiseTry<IMinimalEvent[]>(() => {
-            const txn = this.db.transaction(["accountData"], "readonly");
+            const txn = this.db!.transaction(["accountData"], "readonly");
             const store = txn.objectStore("accountData");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
@@ -536,7 +524,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     private loadSyncData(): Promise<ISyncData> {
         logger.log(`LocalIndexedDBStoreBackend: loading sync data...`);
         return utils.promiseTry<ISyncData>(() => {
-            const txn = this.db.transaction(["sync"], "readonly");
+            const txn = this.db!.transaction(["sync"], "readonly");
             const store = txn.objectStore("sync");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value;
@@ -552,7 +540,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
     public getClientOptions(): Promise<IStartClientOpts> {
         return Promise.resolve().then(() => {
-            const txn = this.db.transaction(["client_options"], "readonly");
+            const txn = this.db!.transaction(["client_options"], "readonly");
             const store = txn.objectStore("client_options");
             return selectQuery(store, undefined, (cursor) => {
                 return cursor.value?.options;
@@ -561,7 +549,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async storeClientOptions(options: IStartClientOpts): Promise<void> {
-        const txn = this.db.transaction(["client_options"], "readwrite");
+        const txn = this.db!.transaction(["client_options"], "readwrite");
         const store = txn.objectStore("client_options");
         store.put({
             clobber: "-", // constant key so will always clobber
@@ -571,7 +559,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void> {
-        const txn = this.db.transaction(["to_device_queue"], "readwrite");
+        const txn = this.db!.transaction(["to_device_queue"], "readwrite");
         const store = txn.objectStore("to_device_queue");
         for (const batch of batches) {
             store.add(batch);
@@ -580,7 +568,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
-        const txn = this.db.transaction(["to_device_queue"], "readonly");
+        const txn = this.db!.transaction(["to_device_queue"], "readonly");
         const store = txn.objectStore("to_device_queue");
         const cursor = await reqAsCursorPromise(store.openCursor());
         if (!cursor) return null;
@@ -596,7 +584,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async removeToDeviceBatch(id: number): Promise<void> {
-        const txn = this.db.transaction(["to_device_queue"], "readwrite");
+        const txn = this.db!.transaction(["to_device_queue"], "readwrite");
         const store = txn.objectStore("to_device_queue");
         store.delete(id);
         await txnAsPromise(txn);

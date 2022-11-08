@@ -150,7 +150,7 @@ export interface IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    setFilterIdByName(filterName: string, filterId: string): void;
+    setFilterIdByName(filterName: string, filterId?: string): void;
 
     /**
      * Store user-scoped account data events
@@ -162,7 +162,7 @@ export interface IStore {
      * Get account data event by event type
      * @param {string} eventType The event type being queried
      */
-    getAccountData(eventType: EventType | string): MatrixEvent;
+    getAccountData(eventType: EventType | string): MatrixEvent | undefined;
 
     /**
      * setSyncData does nothing as there is no backing data store.
@@ -195,7 +195,7 @@ export interface IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync(): Promise<ISavedSync>;
+    getSavedSync(): Promise<ISavedSync | null>;
 
     /**
      * @return {Promise} If there is a saved sync, the nextBatch token
@@ -247,7 +247,7 @@ export interface IStore {
      /**
       * Fetches the oldest batch of to-device messages in the queue
       */
-     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch>;
+     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
 
      /**
       * Removes a specific batch of to-device messages from the queue

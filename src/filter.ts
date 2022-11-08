@@ -22,6 +22,7 @@ import {
     EventType,
     RelationType,
 } from "./@types/event";
+import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
@@ -57,6 +58,8 @@ export interface IRoomEventFilter extends IFilterComponent {
     types?: Array<EventType | string>;
     related_by_senders?: Array<RelationType | string>;
     related_by_rel_types?: string[];
+    unread_thread_notifications?: boolean;
+    "org.matrix.msc3773.unread_thread_notifications"?: boolean;
 
     // Unstable values
     "io.element.relation_senders"?: Array<RelationType | string>;
@@ -97,23 +100,23 @@ export class Filter {
      * @param {Object} jsonObj
      * @return {Filter}
      */
-    public static fromJson(userId: string, filterId: string, jsonObj: IFilterDefinition): Filter {
+    public static fromJson(userId: string | undefined | null, filterId: string, jsonObj: IFilterDefinition): Filter {
         const filter = new Filter(userId, filterId);
         filter.setDefinition(jsonObj);
         return filter;
     }
 
     private definition: IFilterDefinition = {};
-    private roomFilter: FilterComponent;
-    private roomTimelineFilter: FilterComponent;
+    private roomFilter?: FilterComponent;
+    private roomTimelineFilter?: FilterComponent;
 
-    constructor(public readonly userId: string, public filterId?: string) {}
+    constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
 
     /**
      * Get the ID of this filter on your homeserver (if known)
      * @return {?string} The filter ID
      */
-    getFilterId(): string | null {
+    public getFilterId(): string | undefined {
         return this.filterId;
     }
 
@@ -121,7 +124,7 @@ export class Filter {
      * Get the JSON body of the filter.
      * @return {Object} The filter definition
      */
-    getDefinition(): IFilterDefinition {
+    public getDefinition(): IFilterDefinition {
         return this.definition;
     }
 
@@ -129,7 +132,7 @@ export class Filter {
      * Set the JSON body of the filter
      * @param {Object} definition The filter definition
      */
-    setDefinition(definition: IFilterDefinition) {
+    public setDefinition(definition: IFilterDefinition) {
         this.definition = definition;
 
         // This is all ported from synapse's FilterCollection()
@@ -198,7 +201,7 @@ export class Filter {
      * Get the room.timeline filter component of the filter
      * @return {FilterComponent} room timeline filter component
      */
-    getRoomTimelineFilterComponent(): FilterComponent {
+    public getRoomTimelineFilterComponent(): FilterComponent | undefined {
         return this.roomTimelineFilter;
     }
 
@@ -208,20 +211,43 @@ export class Filter {
      * @param {MatrixEvent[]} events  the list of events being filtered
      * @return {MatrixEvent[]} the list of events which match the filter
      */
-    filterRoomTimeline(events: MatrixEvent[]): MatrixEvent[] {
-        return this.roomTimelineFilter.filter(this.roomFilter.filter(events));
+    public filterRoomTimeline(events: MatrixEvent[]): MatrixEvent[] {
+        if (this.roomFilter) {
+            events = this.roomFilter.filter(events);
+        }
+        if (this.roomTimelineFilter) {
+            events = this.roomTimelineFilter.filter(events);
+        }
+        return events;
     }
 
     /**
      * Set the max number of events to return for each room's timeline.
      * @param {Number} limit The max number of events to return for each room.
      */
-    setTimelineLimit(limit: number) {
+    public setTimelineLimit(limit: number) {
         setProp(this.definition, "room.timeline.limit", limit);
     }
 
-    setLazyLoadMembers(enabled: boolean) {
-        setProp(this.definition, "room.state.lazy_load_members", !!enabled);
+    /**
+     * Enable threads unread notification
+     * @param {boolean} enabled
+     */
+    public setUnreadThreadNotifications(enabled: boolean): void {
+        this.definition = {
+            ...this.definition,
+            room: {
+                ...this.definition?.room,
+                timeline: {
+                    ...this.definition?.room?.timeline,
+                    [UNREAD_THREAD_NOTIFICATIONS.name]: enabled,
+                },
+            },
+        };
+    }
+
+    public setLazyLoadMembers(enabled: boolean): void {
+        setProp(this.definition, "room.state.lazy_load_members", enabled);
     }
 
     /**
@@ -229,7 +255,7 @@ export class Filter {
      * @param {boolean} includeLeave True to make rooms the user has left appear
      * in responses.
      */
-    setIncludeLeaveRooms(includeLeave: boolean) {
+    public setIncludeLeaveRooms(includeLeave: boolean) {
         setProp(this.definition, "room.include_leave", includeLeave);
     }
 }

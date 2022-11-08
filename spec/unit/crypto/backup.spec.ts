@@ -30,11 +30,11 @@ import { Crypto } from "../../../src/crypto";
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { BackupManager } from "../../../src/crypto/backup";
 import { StubStore } from "../../../src/store/stub";
-import { IAbortablePromise, MatrixScheduler } from '../../../src';
+import { MatrixScheduler } from '../../../src';
 
 const Olm = global.Olm;
 
-const MegolmDecryption = algorithms.DECRYPTION_CLASSES['m.megolm.v1.aes-sha2'];
+const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2')!;
 
 const ROOM_ID = '!ROOM:ID';
 
@@ -131,7 +131,7 @@ function makeTestClient(cryptoStore) {
         baseUrl: "https://my.home.server",
         idBaseUrl: "https://identity.server",
         accessToken: "my.access.token",
-        request: jest.fn(), // NOP
+        fetchFn: jest.fn(), // NOP
         store: store,
         scheduler: scheduler,
         userId: "@alice:bar",
@@ -197,7 +197,7 @@ describe("MegolmBackup", function() {
             // to tick the clock between the first try and the retry.
             const realSetTimeout = global.setTimeout;
             jest.spyOn(global, 'setTimeout').mockImplementation(function(f, n) {
-                return realSetTimeout(f, n/100);
+                return realSetTimeout(f!, n!/100);
             });
         });
 
@@ -214,6 +214,12 @@ describe("MegolmBackup", function() {
             const event = new MatrixEvent({
                 type: 'm.room.encrypted',
             });
+            event.getWireType = () => "m.room.encrypted";
+            event.getWireContent = () => {
+                return {
+                    algorithm: "m.olm.v1.curve25519-aes-sha2",
+                };
+            };
             const decryptedData = {
                 clearEvent: {
                     type: 'm.room_key',
@@ -292,27 +298,27 @@ describe("MegolmBackup", function() {
                     });
                     let numCalls = 0;
                     return new Promise<void>((resolve, reject) => {
-                        client.http.authedRequest = function(
-                            callback, method, path, queryParams, data, opts,
-                        ) {
+                        client.http.authedRequest = function<T>(
+                            method, path, queryParams, data, opts,
+                        ): Promise<T> {
                             ++numCalls;
                             expect(numCalls).toBeLessThanOrEqual(1);
                             if (numCalls >= 2) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
-                                return Promise.resolve({}) as IAbortablePromise<any>;
+                                return Promise.resolve({} as T);
                             }
                             expect(method).toBe("PUT");
                             expect(path).toBe("/room_keys/keys");
                             expect(queryParams.version).toBe('1');
-                            expect(data.rooms[ROOM_ID].sessions).toBeDefined();
-                            expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
+                            expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toBeDefined();
+                            expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toHaveProperty(
                                 groupSession.session_id(),
                             );
                             resolve();
-                            return Promise.resolve({}) as IAbortablePromise<any>;
+                            return Promise.resolve({} as T);
                         };
-                        client.crypto.backupManager.backupGroupSession(
+                        client.crypto!.backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                             groupSession.session_id(),
                         );
@@ -343,7 +349,7 @@ describe("MegolmBackup", function() {
 
             return client.initCrypto()
                 .then(() => {
-                    return client.crypto.storeSessionBackupPrivateKey(new Uint8Array(32));
+                    return client.crypto!.storeSessionBackupPrivateKey(new Uint8Array(32));
                 })
                 .then(() => {
                     return cryptoStore.doTxn(
@@ -375,27 +381,27 @@ describe("MegolmBackup", function() {
                     });
                     let numCalls = 0;
                     return new Promise<void>((resolve, reject) => {
-                        client.http.authedRequest = function(
-                            callback, method, path, queryParams, data, opts,
-                        ) {
+                        client.http.authedRequest = function<T>(
+                            method, path, queryParams, data, opts,
+                        ): Promise<T> {
                             ++numCalls;
                             expect(numCalls).toBeLessThanOrEqual(1);
                             if (numCalls >= 2) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
-                                return Promise.resolve({}) as IAbortablePromise<any>;
+                                return Promise.resolve({} as T);
                             }
                             expect(method).toBe("PUT");
                             expect(path).toBe("/room_keys/keys");
                             expect(queryParams.version).toBe('1');
-                            expect(data.rooms[ROOM_ID].sessions).toBeDefined();
-                            expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
+                            expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toBeDefined();
+                            expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toHaveProperty(
                                 groupSession.session_id(),
                             );
                             resolve();
-                            return Promise.resolve({}) as IAbortablePromise<any>;
+                            return Promise.resolve({} as T);
                         };
-                        client.crypto.backupManager.backupGroupSession(
+                        client.crypto!.backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                             groupSession.session_id(),
                         );
@@ -433,7 +439,7 @@ describe("MegolmBackup", function() {
                 new Promise<void>((resolve, reject) => {
                     let backupInfo;
                     client.http.authedRequest = function(
-                        callback, method, path, queryParams, data, opts,
+                        method, path, queryParams, data, opts,
                     ) {
                         ++numCalls;
                         expect(numCalls).toBeLessThanOrEqual(2);
@@ -443,23 +449,23 @@ describe("MegolmBackup", function() {
                             try {
                                 // make sure auth_data is signed by the master key
                                 olmlib.pkVerify(
-                                    data.auth_data, client.getCrossSigningId(), "@alice:bar",
+                                    (data as Record<string, any>).auth_data, client.getCrossSigningId()!, "@alice:bar",
                                 );
                             } catch (e) {
                                 reject(e);
-                                return Promise.resolve({}) as IAbortablePromise<any>;
+                                return Promise.resolve({});
                             }
                             backupInfo = data;
-                            return Promise.resolve({}) as IAbortablePromise<any>;
+                            return Promise.resolve({});
                         } else if (numCalls === 2) {
                             expect(method).toBe("GET");
                             expect(path).toBe("/room_keys/version");
                             resolve();
-                            return Promise.resolve(backupInfo) as IAbortablePromise<any>;
+                            return Promise.resolve(backupInfo);
                         } else {
                             // exit out of retry loop if there's something wrong
                             reject(new Error("authedRequest called too many times"));
-                            return Promise.resolve({}) as IAbortablePromise<any>;
+                            return Promise.resolve({});
                         }
                     };
                 }),
@@ -489,7 +495,7 @@ describe("MegolmBackup", function() {
                 baseUrl: "https://my.home.server",
                 idBaseUrl: "https://identity.server",
                 accessToken: "my.access.token",
-                request: jest.fn(), // NOP
+                fetchFn: jest.fn(), // NOP
                 store: store,
                 scheduler: scheduler,
                 userId: "@alice:bar",
@@ -536,33 +542,33 @@ describe("MegolmBackup", function() {
             let numCalls = 0;
 
             await new Promise<void>((resolve, reject) => {
-                client.http.authedRequest = function(
-                    callback, method, path, queryParams, data, opts,
-                ) {
+                client.http.authedRequest = function<T>(
+                    method, path, queryParams, data, opts,
+                ): Promise<T> {
                     ++numCalls;
                     expect(numCalls).toBeLessThanOrEqual(2);
                     if (numCalls >= 3) {
                         // exit out of retry loop if there's something wrong
                         reject(new Error("authedRequest called too many timmes"));
-                        return Promise.resolve({}) as IAbortablePromise<any>;
+                        return Promise.resolve({} as T);
                     }
                     expect(method).toBe("PUT");
                     expect(path).toBe("/room_keys/keys");
                     expect(queryParams.version).toBe('1');
-                    expect(data.rooms[ROOM_ID].sessions).toBeDefined();
-                    expect(data.rooms[ROOM_ID].sessions).toHaveProperty(
+                    expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toBeDefined();
+                    expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toHaveProperty(
                         groupSession.session_id(),
                     );
                     if (numCalls > 1) {
                         resolve();
-                        return Promise.resolve({}) as IAbortablePromise<any>;
+                        return Promise.resolve({} as T);
                     } else {
                         return Promise.reject(
                             new Error("this is an expected failure"),
-                        ) as IAbortablePromise<any>;
+                        );
                     }
                 };
-                return client.crypto.backupManager.backupGroupSession(
+                return client.crypto!.backupManager.backupGroupSession(
                     "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                     groupSession.session_id(),
                 );
@@ -691,6 +697,32 @@ describe("MegolmBackup", function() {
                 SESSION_ID,
                 BAD_BACKUP_INFO,
             )).rejects.toThrow();
+        });
+    });
+
+    describe("flagAllGroupSessionsForBackup", () => {
+        it("should return number of sesions needing backup", async () => {
+            const scheduler = [
+                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
+                "setProcessFunction",
+            ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {}) as MockedObject<MatrixScheduler>;
+            const store = new StubStore();
+            const client = new MatrixClient({
+                baseUrl: "https://my.home.server",
+                idBaseUrl: "https://identity.server",
+                accessToken: "my.access.token",
+                fetchFn: jest.fn(), // NOP
+                store,
+                scheduler,
+                userId: "@alice:bar",
+                deviceId: "device",
+                cryptoStore,
+            });
+            await client.initCrypto();
+
+            cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);
+            await expect(client.flagAllGroupSessionsForBackup()).resolves.toBe(6);
+            client.stopClient();
         });
     });
 });

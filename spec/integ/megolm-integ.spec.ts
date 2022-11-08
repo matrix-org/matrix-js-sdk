@@ -29,8 +29,11 @@ import {
     IDownloadKeyResult,
     MatrixEvent,
     MatrixEventEvent,
+    IndexedDBCryptoStore,
+    Room,
 } from "../../src/matrix";
 import { IDeviceKeys } from "../../src/crypto/dehydration";
+import { DeviceInfo } from "../../src/crypto/deviceinfo";
 
 const ROOM_ID = "!room:id";
 
@@ -204,9 +207,11 @@ describe("megolm", () => {
     }
     const Olm = global.Olm;
 
-    let testOlmAccount: Olm.Account;
-    let testSenderKey: string;
-    let aliceTestClient: TestClient;
+    let testOlmAccount = {} as unknown as Olm.Account;
+    let testSenderKey = '';
+    let aliceTestClient = new TestClient(
+        "@alice:localhost", "device2", "access_token2",
+    );
 
     /**
      * Get the device keys for testOlmAccount in a format suitable for a
@@ -280,9 +285,12 @@ describe("megolm", () => {
 
     it("Alice receives a megolm message", async () => {
         await aliceTestClient.start();
+        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
+
+        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
@@ -316,7 +324,7 @@ describe("megolm", () => {
         aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
         await aliceTestClient.flushSync();
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.isEncrypted()).toBe(true);
         const decryptedEvent = await testUtils.awaitDecryption(event);
@@ -326,9 +334,12 @@ describe("megolm", () => {
     it("Alice receives a megolm message before the session keys", async () => {
         // https://github.com/vector-im/element-web/issues/2273
         await aliceTestClient.start();
+        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
+
+        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         // make the room_key event, but don't send it yet
         const roomKeyEncrypted = encryptGroupSessionKey({
@@ -353,7 +364,7 @@ describe("megolm", () => {
         });
         await aliceTestClient.flushSync();
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         expect(room.getLiveTimeline().getEvents()[0].getContent().msgtype).toEqual('m.bad.encrypted');
 
         // now she gets the room_key event
@@ -383,9 +394,12 @@ describe("megolm", () => {
 
     it("Alice gets a second room_key message", async () => {
         await aliceTestClient.start();
+        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
+
+        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         // make the room_key event
         const roomKeyEncrypted1 = encryptGroupSessionKey({
@@ -439,7 +453,7 @@ describe("megolm", () => {
         await aliceTestClient.flushSync();
         await aliceTestClient.flushSync();
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         await room.decryptCriticalEvents();
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.getContent().body).toEqual('42');
@@ -468,6 +482,9 @@ describe("megolm", () => {
         aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
             200, getTestKeysQueryResponse('@bob:xyz'),
         );
+        aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+            200, getTestKeysQueryResponse('@bob:xyz'),
+        );
 
         await Promise.all([
             aliceTestClient.client.sendTextMessage(ROOM_ID, 'test').then(() => {
@@ -484,7 +501,7 @@ describe("megolm", () => {
         let inboundGroupSession: Olm.InboundGroupSession;
         aliceTestClient.httpBackend.when(
             'PUT', '/sendToDevice/m.room.encrypted/',
-        ).respond(200, function(_path, content) {
+        ).respond(200, function(_path, content: any) {
             const m = content.messages['@bob:xyz'].DEVICE_ID;
             const ct = m.ciphertext[testSenderKey];
             const decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
@@ -510,7 +527,7 @@ describe("megolm", () => {
             return { event_id: '$event_id' };
         });
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const pendingMsg = room.getPendingEvents()[0];
 
         await Promise.all([
@@ -544,10 +561,13 @@ describe("megolm", () => {
         aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
             200, getTestKeysQueryResponse('@bob:xyz'),
         );
+        aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+            200, getTestKeysQueryResponse('@bob:xyz'),
+        );
 
         await Promise.all([
             aliceTestClient.client.downloadKeys(['@bob:xyz']),
-            aliceTestClient.httpBackend.flush('/keys/query', 1),
+            aliceTestClient.httpBackend.flush('/keys/query', 2),
         ]);
 
         logger.log('Telling alice to block our device');
@@ -595,6 +615,9 @@ describe("megolm", () => {
         aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
             200, getTestKeysQueryResponse('@bob:xyz'),
         );
+        aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+            200, getTestKeysQueryResponse('@bob:xyz'),
+        );
 
         await Promise.all([
             aliceTestClient.client.downloadKeys(['@bob:xyz']),
@@ -607,7 +630,7 @@ describe("megolm", () => {
         let megolmSessionId: string;
         aliceTestClient.httpBackend.when(
             'PUT', '/sendToDevice/m.room.encrypted/',
-        ).respond(200, function(_path, content) {
+        ).respond(200, function(_path, content: any) {
             logger.log('sendToDevice: ', content);
             const m = content.messages['@bob:xyz'].DEVICE_ID;
             const ct = m.ciphertext[testSenderKey];
@@ -685,7 +708,7 @@ describe("megolm", () => {
         // invalidate the device cache for all members in e2e rooms (ie,
         // herself), and do a key query.
         aliceTestClient.expectKeyQuery(
-            getTestKeysQueryResponse(aliceTestClient.userId),
+            getTestKeysQueryResponse(aliceTestClient.userId!),
         );
 
         await aliceTestClient.httpBackend.flushAllExpected();
@@ -695,28 +718,30 @@ describe("megolm", () => {
             await aliceTestClient.client.sendTextMessage(ROOM_ID, 'test');
             throw new Error("sendTextMessage succeeded on an unknown device");
         } catch (e) {
-            expect(e.name).toEqual("UnknownDeviceError");
-            expect(Object.keys(e.devices)).toEqual([aliceTestClient.userId]);
-            expect(Object.keys(e.devices[aliceTestClient.userId])).
+            expect((e as any).name).toEqual("UnknownDeviceError");
+            expect(Object.keys((e as any).devices)).toEqual([aliceTestClient.userId!]);
+            expect(Object.keys((e as any)?.devices[aliceTestClient.userId!])).
                 toEqual(['DEVICE_ID']);
         }
 
         // mark the device as known, and resend.
-        aliceTestClient.client.setDeviceKnown(aliceTestClient.userId, 'DEVICE_ID');
+        aliceTestClient.client.setDeviceKnown(aliceTestClient.userId!, 'DEVICE_ID');
         aliceTestClient.httpBackend.when('POST', '/keys/claim').respond(
-            200, function(_path, content) {
-                expect(content.one_time_keys[aliceTestClient.userId].DEVICE_ID)
+            200, function(_path, content: IClaimOTKsResult) {
+                expect(content.one_time_keys[aliceTestClient.userId!].DEVICE_ID)
                     .toEqual("signed_curve25519");
-                return getTestKeysClaimResponse(aliceTestClient.userId);
+                return getTestKeysClaimResponse(aliceTestClient.userId!);
             });
 
         let p2pSession: Olm.Session;
         let inboundGroupSession: Olm.InboundGroupSession;
         aliceTestClient.httpBackend.when(
             'PUT', '/sendToDevice/m.room.encrypted/',
-        ).respond(200, function(_path, content) {
+        ).respond(200, function(_path, content: {
+            messages: { [userId: string]: { [deviceId: string]: Record<string, any> }};
+        }) {
             logger.log("sendToDevice: ", content);
-            const m = content.messages[aliceTestClient.userId].DEVICE_ID;
+            const m = content.messages[aliceTestClient.userId!].DEVICE_ID;
             const ct = m.ciphertext[testSenderKey];
             expect(ct.type).toEqual(0); // pre-key message
 
@@ -730,7 +755,7 @@ describe("megolm", () => {
             return {};
         });
 
-        let decrypted: IEvent;
+        let decrypted: Partial<IEvent> = {};
         aliceTestClient.httpBackend.when(
             'PUT', '/send/',
         ).respond(200, function(_path, content: IContent) {
@@ -745,7 +770,7 @@ describe("megolm", () => {
         });
 
         // Grab the event that we'll need to resend
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const pendingEvents = room.getPendingEvents();
         expect(pendingEvents.length).toEqual(1);
         const unsentEvent = pendingEvents[0];
@@ -760,7 +785,7 @@ describe("megolm", () => {
         ]);
 
         expect(decrypted.type).toEqual('m.room.message');
-        expect(decrypted.content.body).toEqual('test');
+        expect(decrypted.content?.body).toEqual('test');
     });
 
     it('Alice should wait for device list to complete when sending a megolm message', async () => {
@@ -786,6 +811,10 @@ describe("megolm", () => {
         logger.log('Forcing alice to download our device keys');
         const downloadPromise = aliceTestClient.client.downloadKeys(['@bob:xyz']);
 
+        aliceTestClient.httpBackend.when('POST', '/keys/query').respond(
+            200, getTestKeysQueryResponse('@bob:xyz'),
+        );
+
         // so will this.
         const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, 'test')
             .then(() => {
@@ -805,8 +834,11 @@ describe("megolm", () => {
     it("Alice exports megolm keys and imports them to a new device", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} }, failures: {} });
         await aliceTestClient.start();
+        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         // establish an olm session with alice
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+
+        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
@@ -839,7 +871,7 @@ describe("megolm", () => {
         });
         await aliceTestClient.flushSync();
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         await room.decryptCriticalEvents();
         expect(room.getLiveTimeline().getEvents()[0].getContent().body).toEqual('42');
 
@@ -854,6 +886,8 @@ describe("megolm", () => {
         await aliceTestClient.client.initCrypto();
         await aliceTestClient.client.importRoomKeys(exported);
         await aliceTestClient.start();
+
+        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         const syncResponse = {
             next_batch: 1,
@@ -897,7 +931,7 @@ describe("megolm", () => {
             ...rawEvent,
             room: ROOM_ID,
         });
-        await event1.attemptDecryption(testClient.client.crypto, { isRetry: true });
+        await event1.attemptDecryption(testClient.client.crypto!, { isRetry: true });
         expect(event1.isKeySourceUntrusted()).toBeTruthy();
 
         const event2 = testUtils.mkEvent({
@@ -913,23 +947,26 @@ describe("megolm", () => {
         // @ts-ignore - private
         event2.senderCurve25519Key = testSenderKey;
         // @ts-ignore - private
-        testClient.client.crypto.onRoomKeyEvent(event2);
+        testClient.client.crypto!.onRoomKeyEvent(event2);
 
         const event3 = testUtils.mkEvent({
             event: true,
             ...rawEvent,
             room: ROOM_ID,
         });
-        await event3.attemptDecryption(testClient.client.crypto, { isRetry: true });
+        await event3.attemptDecryption(testClient.client.crypto!, { isRetry: true });
         expect(event3.isKeySourceUntrusted()).toBeFalsy();
         testClient.stop();
     });
 
     it("Alice can decrypt a message with falsey content", async () => {
         await aliceTestClient.start();
+        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
+
+        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
@@ -972,7 +1009,7 @@ describe("megolm", () => {
         aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
         await aliceTestClient.flushSync();
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.isEncrypted()).toBe(true);
         const decryptedEvent = await testUtils.awaitDecryption(event);
@@ -985,9 +1022,12 @@ describe("megolm", () => {
         "should successfully decrypt bundled redaction events that don't include a room_id in their /sync data",
         async () => {
             await aliceTestClient.start();
+            aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
             const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
             const groupSession = new Olm.OutboundGroupSession();
             groupSession.create();
+
+            aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
             // make the room_key event
             const roomKeyEncrypted = encryptGroupSessionKey({
@@ -1036,13 +1076,292 @@ describe("megolm", () => {
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
             await aliceTestClient.flushSync();
 
-            const room = aliceTestClient.client.getRoom(ROOM_ID);
+            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.isEncrypted()).toBe(true);
-            await event.attemptDecryption(aliceTestClient.client.crypto);
+            await event.attemptDecryption(aliceTestClient.client.crypto!);
             expect(event.getContent()).toEqual({});
             const redactionEvent: any = event.getRedactionEvent();
             expect(redactionEvent.content.reason).toEqual("redaction test");
         },
     );
+
+    it("Alice receives shared history before being invited to a room by the sharer", async () => {
+        const beccaTestClient = new TestClient(
+            "@becca:localhost", "foobar", "bazquux",
+        );
+        await beccaTestClient.client.initCrypto();
+
+        await aliceTestClient.start();
+        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+        await beccaTestClient.start();
+
+        const beccaRoom = new Room(ROOM_ID, beccaTestClient.client, "@becca:localhost", {});
+        beccaTestClient.client.store.storeRoom(beccaRoom);
+        await beccaTestClient.client.setRoomEncryption(ROOM_ID, { "algorithm": "m.megolm.v1.aes-sha2" });
+
+        const event = new MatrixEvent({
+            type: "m.room.message",
+            sender: "@becca:localhost",
+            room_id: ROOM_ID,
+            event_id: "$1",
+            content: {
+                msgtype: "m.text",
+                body: "test message",
+            },
+        });
+
+        await beccaTestClient.client.crypto!.encryptEvent(event, beccaRoom);
+        // remove keys from the event
+        // @ts-ignore private properties
+        event.clearEvent = undefined;
+        // @ts-ignore private properties
+        event.senderCurve25519Key = null;
+        // @ts-ignore private properties
+        event.claimedEd25519Key = null;
+
+        const device = new DeviceInfo(beccaTestClient.client.deviceId!);
+        aliceTestClient.client.crypto!.deviceList.getDeviceByIdentityKey = () => device;
+        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
+
+        // Create an olm session for Becca and Alice's devices
+        const aliceOtks = await aliceTestClient.awaitOneTimeKeyUpload();
+        const aliceOtkId = Object.keys(aliceOtks)[0];
+        const aliceOtk = aliceOtks[aliceOtkId];
+        const p2pSession = new global.Olm.Session();
+        await beccaTestClient.client.crypto!.cryptoStore.doTxn(
+            'readonly',
+            [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
+                    const account = new global.Olm.Account();
+                    try {
+                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
+                        p2pSession.create_outbound(account, aliceTestClient.getDeviceKey(), aliceOtk.key);
+                    } finally {
+                        account.free();
+                    }
+                });
+            },
+        );
+
+        const content = event.getWireContent();
+        const groupSessionKey = await beccaTestClient.client.crypto!.olmDevice.getInboundGroupSessionKey(
+            ROOM_ID,
+            content.sender_key,
+            content.session_id,
+        );
+        const encryptedForwardedKey = encryptOlmEvent({
+            sender: "@becca:localhost",
+            senderKey: beccaTestClient.getDeviceKey(),
+            recipient: aliceTestClient,
+            p2pSession: p2pSession,
+            plaincontent: {
+                "algorithm": 'm.megolm.v1.aes-sha2',
+                "room_id": ROOM_ID,
+                "sender_key": content.sender_key,
+                "sender_claimed_ed25519_key": groupSessionKey!.sender_claimed_ed25519_key,
+                "session_id": content.session_id,
+                "session_key": groupSessionKey!.key,
+                "chain_index": groupSessionKey!.chain_index,
+                "forwarding_curve25519_key_chain": groupSessionKey!.forwarding_curve25519_key_chain,
+                "org.matrix.msc3061.shared_history": true,
+            },
+            plaintype: 'm.forwarded_room_key',
+        });
+
+        // Alice receives shared history
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: 1,
+            to_device: { events: [encryptedForwardedKey] },
+        });
+        await aliceTestClient.flushSync();
+
+        // Alice is invited to the room by Becca
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: 2,
+            rooms: { invite: { [ROOM_ID]: { invite_state: { events: [
+                {
+                    sender: '@becca:localhost',
+                    type: 'm.room.encryption',
+                    state_key: '',
+                    content: {
+                        algorithm: 'm.megolm.v1.aes-sha2',
+                    },
+                },
+                {
+                    sender: '@becca:localhost',
+                    type: 'm.room.member',
+                    state_key: '@alice:localhost',
+                    content: {
+                        membership: 'invite',
+                    },
+                },
+            ] } } } },
+        });
+        await aliceTestClient.flushSync();
+
+        // Alice has joined the room
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(
+            200, getSyncResponse(["@alice:localhost", "@becca:localhost"]),
+        );
+        await aliceTestClient.flushSync();
+
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: 4,
+            rooms: {
+                join: {
+                    [ROOM_ID]: { timeline: { events: [event.event] } },
+                },
+            },
+        });
+        await aliceTestClient.flushSync();
+
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const roomEvent = room.getLiveTimeline().getEvents()[0];
+        expect(roomEvent.isEncrypted()).toBe(true);
+        const decryptedEvent = await testUtils.awaitDecryption(roomEvent);
+        expect(decryptedEvent.getContent().body).toEqual('test message');
+
+        await beccaTestClient.stop();
+    });
+
+    it("Alice receives shared history before being invited to a room by someone else", async () => {
+        const beccaTestClient = new TestClient(
+            "@becca:localhost", "foobar", "bazquux",
+        );
+        await beccaTestClient.client.initCrypto();
+
+        await aliceTestClient.start();
+        await beccaTestClient.start();
+
+        const beccaRoom = new Room(ROOM_ID, beccaTestClient.client, "@becca:localhost", {});
+        beccaTestClient.client.store.storeRoom(beccaRoom);
+        await beccaTestClient.client.setRoomEncryption(ROOM_ID, { "algorithm": "m.megolm.v1.aes-sha2" });
+
+        const event = new MatrixEvent({
+            type: "m.room.message",
+            sender: "@becca:localhost",
+            room_id: ROOM_ID,
+            event_id: "$1",
+            content: {
+                msgtype: "m.text",
+                body: "test message",
+            },
+        });
+
+        await beccaTestClient.client.crypto!.encryptEvent(event, beccaRoom);
+        // remove keys from the event
+        // @ts-ignore private properties
+        event.clearEvent = undefined;
+        // @ts-ignore private properties
+        event.senderCurve25519Key = null;
+        // @ts-ignore private properties
+        event.claimedEd25519Key = null;
+
+        const device = new DeviceInfo(beccaTestClient.client.deviceId!);
+        aliceTestClient.client.crypto!.deviceList.getDeviceByIdentityKey = () => device;
+
+        // Create an olm session for Becca and Alice's devices
+        const aliceOtks = await aliceTestClient.awaitOneTimeKeyUpload();
+        const aliceOtkId = Object.keys(aliceOtks)[0];
+        const aliceOtk = aliceOtks[aliceOtkId];
+        const p2pSession = new global.Olm.Session();
+        await beccaTestClient.client.crypto!.cryptoStore.doTxn(
+            'readonly',
+            [IndexedDBCryptoStore.STORE_ACCOUNT],
+            (txn) => {
+                beccaTestClient.client.crypto!.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
+                    const account = new global.Olm.Account();
+                    try {
+                        account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
+                        p2pSession.create_outbound(account, aliceTestClient.getDeviceKey(), aliceOtk.key);
+                    } finally {
+                        account.free();
+                    }
+                });
+            },
+        );
+
+        const content = event.getWireContent();
+        const groupSessionKey = await beccaTestClient.client.crypto!.olmDevice.getInboundGroupSessionKey(
+            ROOM_ID,
+            content.sender_key,
+            content.session_id,
+        );
+        const encryptedForwardedKey = encryptOlmEvent({
+            sender: "@becca:localhost",
+            senderKey: beccaTestClient.getDeviceKey(),
+            recipient: aliceTestClient,
+            p2pSession: p2pSession,
+            plaincontent: {
+                "algorithm": 'm.megolm.v1.aes-sha2',
+                "room_id": ROOM_ID,
+                "sender_key": content.sender_key,
+                "sender_claimed_ed25519_key": groupSessionKey!.sender_claimed_ed25519_key,
+                "session_id": content.session_id,
+                "session_key": groupSessionKey!.key,
+                "chain_index": groupSessionKey!.chain_index,
+                "forwarding_curve25519_key_chain": groupSessionKey!.forwarding_curve25519_key_chain,
+                "org.matrix.msc3061.shared_history": true,
+            },
+            plaintype: 'm.forwarded_room_key',
+        });
+
+        // Alice receives forwarded history from Becca
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: 1,
+            to_device: { events: [encryptedForwardedKey] },
+        });
+        await aliceTestClient.flushSync();
+
+        // Alice is invited to the room by Charlie
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: 2,
+            rooms: { invite: { [ROOM_ID]: { invite_state: { events: [
+                {
+                    sender: '@becca:localhost',
+                    type: 'm.room.encryption',
+                    state_key: '',
+                    content: {
+                        algorithm: 'm.megolm.v1.aes-sha2',
+                    },
+                },
+                {
+                    sender: '@charlie:localhost',
+                    type: 'm.room.member',
+                    state_key: '@alice:localhost',
+                    content: {
+                        membership: 'invite',
+                    },
+                },
+            ] } } } },
+        });
+        await aliceTestClient.flushSync();
+
+        // Alice has joined the room
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(
+            200, getSyncResponse(["@alice:localhost", "@becca:localhost", "@charlie:localhost"]),
+        );
+        await aliceTestClient.flushSync();
+
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            next_batch: 4,
+            rooms: {
+                join: {
+                    [ROOM_ID]: { timeline: { events: [event.event] } },
+                },
+            },
+        });
+        await aliceTestClient.flushSync();
+
+        // Decryption should fail, because Alice hasn't received any keys she can trust
+        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const roomEvent = room.getLiveTimeline().getEvents()[0];
+        expect(roomEvent.isEncrypted()).toBe(true);
+        const decryptedEvent = await testUtils.awaitDecryption(roomEvent);
+        expect(decryptedEvent.isDecryptionFailure()).toBe(true);
+
+        await beccaTestClient.stop();
+    });
 });

@@ -32,7 +32,7 @@ import { ISyncResponse } from "../sync-accumulator";
 import { IStateEventWithRoomId } from "../@types/search";
 import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
 
-function isValidFilterId(filterId: string): boolean {
+function isValidFilterId(filterId?: string | number | null): boolean {
     const isValidStr = typeof filterId === "string" &&
         !!filterId &&
         filterId !== "undefined" && // exclude these as we've serialized undefined in localStorage before
@@ -55,13 +55,13 @@ export interface IOpts {
 export class MemoryStore implements IStore {
     private rooms: Record<string, Room> = {}; // roomId: Room
     private users: Record<string, User> = {}; // userId: User
-    private syncToken: string = null;
+    private syncToken: string | null = null;
     // userId: {
     //    filterId: Filter
     // }
     private filters: Record<string, Record<string, Filter>> = {};
     public accountData: Record<string, MatrixEvent> = {}; // type : content
-    protected readonly localStorage: Storage;
+    protected readonly localStorage?: Storage;
     private oobMembers: Record<string, IStateEventWithRoomId[]> = {}; // roomId: [member events]
     private pendingEvents: { [roomId: string]: Partial<IEvent>[] } = {};
     private clientOptions = {};
@@ -115,7 +115,7 @@ export class MemoryStore implements IStore {
      * @param {RoomState} state
      * @param {RoomMember} member
      */
-    private onRoomMember = (event: MatrixEvent, state: RoomState, member: RoomMember) => {
+    private onRoomMember = (event: MatrixEvent | null, state: RoomState, member: RoomMember) => {
         if (member.membership === "invite") {
             // We do NOT add invited members because people love to typo user IDs
             // which would then show up in these lists (!)
@@ -126,9 +126,7 @@ export class MemoryStore implements IStore {
         if (member.name) {
             user.setDisplayName(member.name);
             if (member.events.member) {
-                user.setRawDisplayName(
-                    member.events.member.getDirectionalContent().displayname,
-                );
+                user.setRawDisplayName(member.events.member.getDirectionalContent().displayname);
             }
         }
         if (member.events.member && member.events.member.getContent().avatar_url) {
@@ -227,9 +225,7 @@ export class MemoryStore implements IStore {
      * @param {Filter} filter
      */
     public storeFilter(filter: Filter): void {
-        if (!filter) {
-            return;
-        }
+        if (!filter?.userId || !filter?.filterId) return;
         if (!this.filters[filter.userId]) {
             this.filters[filter.userId] = {};
         }
@@ -278,14 +274,14 @@ export class MemoryStore implements IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    public setFilterIdByName(filterName: string, filterId: string) {
+    public setFilterIdByName(filterName: string, filterId?: string) {
         if (!this.localStorage) {
             return;
         }
         const key = "mxjssdk_memory_filter_" + filterName;
         try {
             if (isValidFilterId(filterId)) {
-                this.localStorage.setItem(key, filterId);
+                this.localStorage.setItem(key, filterId!);
             } else {
                 this.localStorage.removeItem(key);
             }
@@ -352,7 +348,7 @@ export class MemoryStore implements IStore {
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    public getSavedSync(): Promise<ISavedSync> {
+    public getSavedSync(): Promise<ISavedSync | null> {
         return Promise.resolve(null);
     }
 

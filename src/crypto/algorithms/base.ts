@@ -23,7 +23,7 @@ limitations under the License.
 import { MatrixClient } from "../../client";
 import { Room } from "../../models/room";
 import { OlmDevice } from "../OlmDevice";
-import { MatrixEvent, RoomMember } from "../..";
+import { MatrixEvent, RoomMember } from "../../matrix";
 import { Crypto, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "..";
 import { DeviceInfo } from "../deviceinfo";
 import { IRoomEncryption } from "../RoomList";
@@ -34,7 +34,7 @@ import { IRoomEncryption } from "../RoomList";
  *
  * @type {Object.<string, function(new: module:crypto/algorithms/base.EncryptionAlgorithm)>}
  */
-export const ENCRYPTION_CLASSES: Record<string, new (params: IParams) => EncryptionAlgorithm> = {};
+export const ENCRYPTION_CLASSES = new Map<string, new (params: IParams) => EncryptionAlgorithm>();
 
 type DecryptionClassParams = Omit<IParams, "deviceId" | "config">;
 
@@ -44,7 +44,7 @@ type DecryptionClassParams = Omit<IParams, "deviceId" | "config">;
  *
  * @type {Object.<string, function(new: module:crypto/algorithms/base.DecryptionAlgorithm)>}
  */
-export const DECRYPTION_CLASSES: Record<string, new (params: DecryptionClassParams) => DecryptionAlgorithm> = {};
+export const DECRYPTION_CLASSES = new Map<string, new (params: DecryptionClassParams) => DecryptionAlgorithm>();
 
 export interface IParams {
     userId: string;
@@ -242,7 +242,7 @@ export abstract class DecryptionAlgorithm {
 export class DecryptionError extends Error {
     public readonly detailedString: string;
 
-    constructor(public readonly code: string, msg: string, details?: Record<string, string>) {
+    constructor(public readonly code: string, msg: string, details?: Record<string, string | Error>) {
         super(msg);
         this.code = code;
         this.name = 'DecryptionError';
@@ -250,7 +250,7 @@ export class DecryptionError extends Error {
     }
 }
 
-function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string>): string {
+function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string | Error>): string {
     let result = err.name + '[msg: ' + err.message;
 
     if (details) {
@@ -272,7 +272,11 @@ function detailedStringForDecryptionError(err: DecryptionError, details?: Record
  * @extends Error
  */
 export class UnknownDeviceError extends Error {
-    constructor(msg: string, public readonly devices: Record<string, Record<string, object>>) {
+    constructor(
+        msg: string,
+        public readonly devices: Record<string, Record<string, object>>,
+        public event?: MatrixEvent,
+    ) {
         super(msg);
         this.name = "UnknownDeviceError";
         this.devices = devices;
@@ -295,8 +299,8 @@ export class UnknownDeviceError extends Error {
 export function registerAlgorithm(
     algorithm: string,
     encryptor: new (params: IParams) => EncryptionAlgorithm,
-    decryptor: new (params: Omit<IParams, "deviceId">) => DecryptionAlgorithm,
+    decryptor: new (params: DecryptionClassParams) => DecryptionAlgorithm,
 ): void {
-    ENCRYPTION_CLASSES[algorithm] = encryptor;
-    DECRYPTION_CLASSES[algorithm] = decryptor;
+    ENCRYPTION_CLASSES.set(algorithm, encryptor);
+    DECRYPTION_CLASSES.set(algorithm, decryptor);
 }

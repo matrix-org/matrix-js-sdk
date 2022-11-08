@@ -17,13 +17,12 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
-import { request } from "../../src/matrix";
 import { AutoDiscovery } from "../../src/autodiscovery";
 
 describe("AutoDiscovery", function() {
     const getHttpBackend = (): MockHttpBackend => {
         const httpBackend = new MockHttpBackend();
-        request(httpBackend.requestFn);
+        AutoDiscovery.setFetchFn(httpBackend.fetchFn as typeof global.fetch);
         return httpBackend;
     };
 
@@ -176,8 +175,7 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_PROMPT when .well-known does not have a base_url for " +
-        "m.homeserver (empty string)", function() {
+    it("should return FAIL_PROMPT when .well-known does not have a base_url for m.homeserver (empty string)", () => {
         const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -205,8 +203,7 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_PROMPT when .well-known does not have a base_url for " +
-        "m.homeserver (no property)", function() {
+    it("should return FAIL_PROMPT when .well-known does not have a base_url for m.homeserver (no property)", () => {
         const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {},
@@ -232,8 +229,7 @@ describe("AutoDiscovery", function() {
         ]);
     });
 
-    it("should return FAIL_ERROR when .well-known has an invalid base_url for " +
-        "m.homeserver (disallowed scheme)", function() {
+    it("should return FAIL_ERROR when .well-known has an invalid base_url for m.homeserver (disallowed scheme)", () => {
         const httpBackend = getHttpBackend();
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
             "m.homeserver": {
@@ -672,6 +668,78 @@ describe("AutoDiscovery", function() {
                     },
                     "org.example.custom.property": {
                         cupcakes: "yes",
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
+    it("should return FAIL_PROMPT for connection errors", () => {
+        const httpBackend = getHttpBackend();
+        httpBackend.when("GET", "/.well-known/matrix/client").fail(0, undefined!);
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "FAIL_PROMPT",
+                        error: AutoDiscovery.ERROR_INVALID,
+                        base_url: null,
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
+    it("should return FAIL_PROMPT for fetch errors", () => {
+        const httpBackend = getHttpBackend();
+        httpBackend.when("GET", "/.well-known/matrix/client").fail(0, new Error("CORS or something"));
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "FAIL_PROMPT",
+                        error: AutoDiscovery.ERROR_INVALID,
+                        base_url: null,
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
+                    },
+                };
+
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
+
+    it("should return FAIL_PROMPT for invalid JSON", () => {
+        const httpBackend = getHttpBackend();
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, "<html>", true);
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "FAIL_PROMPT",
+                        error: AutoDiscovery.ERROR_INVALID,
+                        base_url: null,
+                    },
+                    "m.identity_server": {
+                        state: "PROMPT",
+                        error: null,
+                        base_url: null,
                     },
                 };
 

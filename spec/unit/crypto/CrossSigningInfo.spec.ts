@@ -247,14 +247,14 @@ describe.each([
         const olmDevice = new OlmDevice(store);
         const { getCrossSigningKeyCache, storeCrossSigningKeyCache } =
               createCryptoStoreCacheCallbacks(store, olmDevice);
-        await storeCrossSigningKeyCache("self_signing", testKey);
+        await storeCrossSigningKeyCache!("self_signing", testKey);
 
         // If we've not saved anything, don't expect anything
         // Definitely don't accidentally return the wrong key for the type
-        const nokey = await getCrossSigningKeyCache("self", "");
+        const nokey = await getCrossSigningKeyCache!("self", "");
         expect(nokey).toBeNull();
 
-        const key = await getCrossSigningKeyCache("self_signing", "");
+        const key = await getCrossSigningKeyCache!("self_signing", "");
         expect(new Uint8Array(key)).toEqual(testKey);
     });
 });

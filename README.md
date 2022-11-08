@@ -33,10 +33,8 @@ In Node.js
 ----------
 
 Ensure you have the latest LTS version of Node.js installed.
-
-This SDK targets Node 12 for compatibility, which translates to ES6. If you're using
-a bundler like webpack you'll likely have to transpile dependencies, including this
-SDK, to match your target browsers.
+This library relies on `fetch` which is available in Node from v18.0.0 - it should work fine also with polyfills.
+If you wish to use a ponyfill or adapter of some sort then pass it as `fetchFn` to the MatrixClient constructor options.
 
 Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
 if you do not have it already.
@@ -303,7 +301,7 @@ host the API reference from the source files like this:
 ```
   $ yarn gendoc
   $ cd .jsdoc
-  $ python -m SimpleHTTPServer 8005
+  $ python -m http.server 8005
 ```
 
 Then visit ``http://localhost:8005`` to see the API docs.

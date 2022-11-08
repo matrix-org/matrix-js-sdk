@@ -30,7 +30,6 @@ import { MockStorageApi } from "./MockStorageApi";
 import { encodeUri } from "../src/utils";
 import { IDeviceKeys, IOneTimeKey } from "../src/crypto/dehydration";
 import { IKeyBackupSession } from "../src/crypto/keybackup";
-import { IHttpOpts } from "../src/http-api";
 import { IKeysUploadResponse, IUploadKeysRequest } from '../src/client';
 
 /**
@@ -39,8 +38,8 @@ import { IKeysUploadResponse, IUploadKeysRequest } from '../src/client';
 export class TestClient {
     public readonly httpBackend: MockHttpBackend;
     public readonly client: MatrixClient;
-    public deviceKeys: IDeviceKeys;
-    public oneTimeKeys: Record<string, IOneTimeKey>;
+    public deviceKeys?: IDeviceKeys | null;
+    public oneTimeKeys?: Record<string, IOneTimeKey>;
 
     constructor(
         public readonly userId?: string,
@@ -50,17 +49,17 @@ export class TestClient {
         options?: Partial<ICreateClientOpts>,
     ) {
         if (sessionStoreBackend === undefined) {
-            sessionStoreBackend = new MockStorageApi();
+            sessionStoreBackend = new MockStorageApi() as unknown as Storage;
         }
 
         this.httpBackend = new MockHttpBackend();
 
         const fullOptions: ICreateClientOpts = {
-            baseUrl: "http://" + userId + ".test.server",
+            baseUrl: "http://" + userId?.slice(1).replace(":", ".") + ".test.server",
             userId: userId,
             accessToken: accessToken,
             deviceId: deviceId,
-            request: this.httpBackend.requestFn as IHttpOpts["request"],
+            fetchFn: this.httpBackend.fetchFn as typeof global.fetch,
             ...options,
         };
         if (!fullOptions.cryptoStore) {
@@ -124,7 +123,7 @@ export class TestClient {
 
                 logger.log(this + ': received device keys');
                 // we expect this to happen before any one-time keys are uploaded.
-                expect(Object.keys(this.oneTimeKeys).length).toEqual(0);
+                expect(Object.keys(this.oneTimeKeys!).length).toEqual(0);
 
                 this.deviceKeys = content.device_keys;
                 return { one_time_key_counts: { signed_curve25519: 0 } };
@@ -139,9 +138,9 @@ export class TestClient {
      * @returns {Promise} for the one-time keys
      */
     public awaitOneTimeKeyUpload(): Promise<Record<string, IOneTimeKey>> {
-        if (Object.keys(this.oneTimeKeys).length != 0) {
+        if (Object.keys(this.oneTimeKeys!).length != 0) {
             // already got one-time keys
-            return Promise.resolve(this.oneTimeKeys);
+            return Promise.resolve(this.oneTimeKeys!);
         }
 
         this.httpBackend.when("POST", "/keys/upload")
@@ -149,7 +148,7 @@ export class TestClient {
                 expect(content.device_keys).toBe(undefined);
                 expect(content.one_time_keys).toBe(undefined);
                 return { one_time_key_counts: {
-                    signed_curve25519: Object.keys(this.oneTimeKeys).length,
+                    signed_curve25519: Object.keys(this.oneTimeKeys!).length,
                 } };
             });
 
@@ -159,17 +158,17 @@ export class TestClient {
                 expect(content.one_time_keys).toBeTruthy();
                 expect(content.one_time_keys).not.toEqual({});
                 logger.log('%s: received %i one-time keys', this,
-                    Object.keys(content.one_time_keys).length);
+                    Object.keys(content.one_time_keys!).length);
                 this.oneTimeKeys = content.one_time_keys;
                 return { one_time_key_counts: {
-                    signed_curve25519: Object.keys(this.oneTimeKeys).length,
+                    signed_curve25519: Object.keys(this.oneTimeKeys!).length,
                 } };
             });
 
         // this can take ages
         return this.httpBackend.flush('/keys/upload', 2, 1000).then((flushed) => {
             expect(flushed).toEqual(2);
-            return this.oneTimeKeys;
+            return this.oneTimeKeys!;
         });
     }
 
@@ -184,7 +183,7 @@ export class TestClient {
         this.httpBackend.when('POST', '/keys/query').respond<IDownloadKeyResult>(
             200, (_path, content) => {
                 Object.keys(response.device_keys).forEach((userId) => {
-                    expect(content.device_keys[userId]).toEqual([]);
+                    expect(content.device_keys![userId]).toEqual([]);
                 });
                 return response;
             });
@@ -207,7 +206,7 @@ export class TestClient {
      */
     public getDeviceKey(): string {
         const keyId = 'curve25519:' + this.deviceId;
-        return this.deviceKeys.keys[keyId];
+        return this.deviceKeys!.keys[keyId];
     }
 
     /**
@@ -217,7 +216,7 @@ export class TestClient {
      */
     public getSigningKey(): string {
         const keyId = 'ed25519:' + this.deviceId;
-        return this.deviceKeys.keys[keyId];
+        return this.deviceKeys!.keys[keyId];
     }
 
     /**
@@ -238,6 +237,6 @@ export class TestClient {
     }
 
     public getUserId(): string {
-        return this.userId;
+        return this.userId!;
     }
 }

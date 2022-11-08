@@ -24,7 +24,7 @@ import { logger } from './logger';
 import { MatrixEvent } from "./models/event";
 import { EventType } from "./@types/event";
 import { IDeferred } from "./utils";
-import { MatrixError } from "./http-api";
+import { ConnectionError, MatrixError } from "./http-api";
 import { ISendEventResponse } from "./@types/requests";
 
 const DEBUG = false;  // set true to enable console logging.
@@ -63,14 +63,12 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * @see module:scheduler~retryAlgorithm
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    public static RETRY_BACKOFF_RATELIMIT(event: MatrixEvent, attempts: number, err: MatrixError): number {
+    public static RETRY_BACKOFF_RATELIMIT(event: MatrixEvent | null, attempts: number, err: MatrixError): number {
         if (err.httpStatus === 400 || err.httpStatus === 403 || err.httpStatus === 401) {
             // client error; no amount of retrying with save you now.
             return -1;
         }
-        // we ship with browser-request which returns { cors: rejected } when trying
-        // with no connection, so if we match that, give up since they have no conn.
-        if (err["cors"] === "rejected") {
+        if (err instanceof ConnectionError) {
             return -1;
         }
 
@@ -116,7 +114,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     // }, ...]
     private readonly queues: Record<string, IQueueEntry<T>[]> = {};
     private activeQueues: string[] = [];
-    private procFn: ProcessFunction<T> = null;
+    private procFn: ProcessFunction<T> | null = null;
 
     constructor(
         public readonly retryAlgorithm = MatrixScheduler.RETRY_BACKOFF_RATELIMIT,
@@ -132,7 +130,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * this array <i>will</i> modify the underlying event in the queue.
      * @see MatrixScheduler.removeEventFromQueue To remove an event from the queue.
      */
-    public getQueueForEvent(event: MatrixEvent): MatrixEvent[] {
+    public getQueueForEvent(event: MatrixEvent): MatrixEvent[] | null {
         const name = this.queueAlgorithm(event);
         if (!name || !this.queues[name]) {
             return null;
@@ -161,6 +159,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
                 removed = true;
                 return true;
             }
+            return false;
         });
         return removed;
     }
@@ -241,7 +240,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         // This way enqueued relations/redactions to enqueued events can receive
         // the remove id of their target before being sent.
         Promise.resolve().then(() => {
-            return this.procFn(obj.event);
+            return this.procFn!(obj.event);
         }).then((res) => {
             // remove this from the queue
             this.removeNextEvent(queueName);
@@ -267,18 +266,18 @@ export class MatrixScheduler<T = ISendEventResponse> {
         });
     };
 
-    private peekNextEvent(queueName: string): IQueueEntry<T> {
+    private peekNextEvent(queueName: string): IQueueEntry<T> | undefined {
         const queue = this.queues[queueName];
         if (!Array.isArray(queue)) {
-            return null;
+            return undefined;
         }
         return queue[0];
     }
 
-    private removeNextEvent(queueName: string): IQueueEntry<T> {
+    private removeNextEvent(queueName: string): IQueueEntry<T> | undefined {
         const queue = this.queues[queueName];
         if (!Array.isArray(queue)) {
-            return null;
+            return undefined;
         }
         return queue.shift();
     }

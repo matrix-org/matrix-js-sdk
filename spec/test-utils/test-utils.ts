@@ -6,7 +6,7 @@ import '../olm-loader';
 
 import { logger } from '../../src/logger';
 import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
-import { ClientEvent, EventType, MatrixClient, MsgType } from "../../src";
+import { ClientEvent, EventType, IPusher, MatrixClient, MsgType } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
 
@@ -74,6 +74,7 @@ interface IEventOpts {
     sender?: string;
     skey?: string;
     content: IContent;
+    prev_content?: IContent;
     user?: string;
     unsigned?: IUnsigned;
     redacts?: string;
@@ -103,6 +104,7 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
+        prev_content: opts.prev_content,
         unsigned: opts.unsigned || {},
         event_id: "$" + testEventIndex++ + "-" + Math.random() + "-" + Math.random(),
         txn_id: "~" + Math.random(),
@@ -147,9 +149,9 @@ export function mkEventCustom<T>(base: T): T & GeneratedMetadata {
 interface IPresenceOpts {
     user?: string;
     sender?: string;
-    url: string;
-    name: string;
-    ago: number;
+    url?: string;
+    name?: string;
+    ago?: number;
     presence?: string;
     event?: boolean;
 }
@@ -371,3 +373,14 @@ export async function awaitDecryption(event: MatrixEvent): Promise<MatrixEvent> 
 }
 
 export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise(r => e.once(k, r));
+
+export const mkPusher = (extra: Partial<IPusher> = {}): IPusher => ({
+    app_display_name: "app",
+    app_id: "123",
+    data: {},
+    device_display_name: "name",
+    kind: "http",
+    lang: "en",
+    pushkey: "pushpush",
+    ...extra,
+});

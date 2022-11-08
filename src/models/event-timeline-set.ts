@@ -75,18 +75,27 @@ export interface IAddLiveEventOptions
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;
 
 export type EventTimelineSetHandlerMap = {
-    [RoomEvent.Timeline]:
-        (event: MatrixEvent, room: Room, toStartOfTimeline: boolean, removed: boolean, data: IRoomTimelineData) => void;
-    [RoomEvent.TimelineReset]: (room: Room, eventTimelineSet: EventTimelineSet, resetAllTimelines: boolean) => void;
+    [RoomEvent.Timeline]: (
+        event: MatrixEvent,
+        room: Room | undefined,
+        toStartOfTimeline: boolean | undefined,
+        removed: boolean,
+        data: IRoomTimelineData,
+    ) => void;
+    [RoomEvent.TimelineReset]: (
+        room: Room | undefined,
+        eventTimelineSet: EventTimelineSet,
+        resetAllTimelines: boolean,
+    ) => void;
 };
 
 export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTimelineSetHandlerMap> {
-    public readonly relations?: RelationsContainer;
+    public readonly relations: RelationsContainer;
     private readonly timelineSupport: boolean;
     private readonly displayPendingEvents: boolean;
     private liveTimeline: EventTimeline;
     private timelines: EventTimeline[];
-    private _eventIdToTimeline: Record<string, EventTimeline>;
+    private _eventIdToTimeline = new Map<string, EventTimeline>();
     private filter?: Filter;
 
     /**
@@ -123,12 +132,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {MatrixClient=} client the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
      * @param {Thread=} thread the thread to which this timeline set relates.
+     * @param {boolean} isThreadTimeline Whether this timeline set relates to a thread list timeline
+     * (e.g., All threads or My threads)
      */
     constructor(
         public readonly room: Room | undefined,
         opts: IOpts = {},
         client?: MatrixClient,
         public readonly thread?: Thread,
+        public readonly isThreadTimeline: boolean = false,
     ) {
         super();
 
@@ -138,11 +150,11 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         // just a list - *not* ordered.
         this.timelines = [this.liveTimeline];
-        this._eventIdToTimeline = {};
+        this._eventIdToTimeline = new Map<string, EventTimeline>();
 
         this.filter = opts.filter;
 
-        this.relations = this.room?.relations ?? new RelationsContainer(room?.client ?? client);
+        this.relations = this.room?.relations ?? new RelationsContainer(room?.client ?? client!);
     }
 
     /**
@@ -209,8 +221,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {String} eventId the eventId being sought
      * @return {module:models/event-timeline~EventTimeline} timeline
      */
-    public eventIdToTimeline(eventId: string): EventTimeline {
-        return this._eventIdToTimeline[eventId];
+    public eventIdToTimeline(eventId: string): EventTimeline | undefined {
+        return this._eventIdToTimeline.get(eventId);
     }
 
     /**
@@ -220,10 +232,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {String} newEventId  event ID of the replacement event
      */
     public replaceEventId(oldEventId: string, newEventId: string): void {
-        const existingTimeline = this._eventIdToTimeline[oldEventId];
+        const existingTimeline = this._eventIdToTimeline.get(oldEventId);
         if (existingTimeline) {
-            delete this._eventIdToTimeline[oldEventId];
-            this._eventIdToTimeline[newEventId] = existingTimeline;
+            this._eventIdToTimeline.delete(oldEventId);
+            this._eventIdToTimeline.set(newEventId, existingTimeline);
         }
     }
 
@@ -257,7 +269,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         if (resetAllTimelines) {
             this.timelines = [newTimeline];
-            this._eventIdToTimeline = {};
+            this._eventIdToTimeline = new Map<string, EventTimeline>();
         } else {
             this.timelines.push(newTimeline);
         }
@@ -265,15 +277,13 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         if (forwardPaginationToken) {
             // Now set the forward pagination token on the old live timeline
             // so it can be forward-paginated.
-            oldTimeline.setPaginationToken(
-                forwardPaginationToken, EventTimeline.FORWARDS,
-            );
+            oldTimeline.setPaginationToken(forwardPaginationToken, EventTimeline.FORWARDS);
         }
 
         // make sure we set the pagination token before firing timelineReset,
         // otherwise clients which start back-paginating will fail, and then get
         // stuck without realising that they *can* back-paginate.
-        newTimeline.setPaginationToken(backPaginationToken, EventTimeline.BACKWARDS);
+        newTimeline.setPaginationToken(backPaginationToken ?? null, EventTimeline.BACKWARDS);
 
         // Now we can swap the live timeline to the new one.
         this.liveTimeline = newTimeline;
@@ -287,8 +297,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @return {?module:models/event-timeline~EventTimeline} timeline containing
      * the given event, or null if unknown
      */
-    public getTimelineForEvent(eventId: string): EventTimeline | null {
-        const res = this._eventIdToTimeline[eventId];
+    public getTimelineForEvent(eventId: string | null): EventTimeline | null {
+        if (eventId === null) { return null; }
+        const res = this._eventIdToTimeline.get(eventId);
         return (res === undefined) ? null : res;
     }
 
@@ -348,7 +359,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         events: MatrixEvent[],
         toStartOfTimeline: boolean,
         timeline: EventTimeline,
-        paginationToken: string,
+        paginationToken?: string,
     ): void {
         if (!timeline) {
             throw new Error(
@@ -450,7 +461,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             const event = events[i];
             const eventId = event.getId();
 
-            const existingTimeline = this._eventIdToTimeline[eventId];
+            const existingTimeline = this._eventIdToTimeline.get(eventId);
 
             if (!existingTimeline) {
                 // we don't know about this event yet. Just add it to the timeline.
@@ -540,7 +551,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 );
                 return;
             }
-            timeline.setPaginationToken(paginationToken, direction);
+            timeline.setPaginationToken(paginationToken ?? null, direction);
         }
     }
 
@@ -575,7 +586,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         roomState?: RoomState,
     ): void {
         let duplicateStrategy = duplicateStrategyOrOpts as DuplicateStrategy || DuplicateStrategy.Ignore;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty: boolean | undefined;
         if (typeof (duplicateStrategyOrOpts) === 'object') {
             ({
                 duplicateStrategy = DuplicateStrategy.Ignore,
@@ -601,7 +612,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             }
         }
 
-        const timeline = this._eventIdToTimeline[event.getId()];
+        const timeline = this._eventIdToTimeline.get(event.getId());
         if (timeline) {
             if (duplicateStrategy === DuplicateStrategy.Replace) {
                 debuglog("EventTimelineSet.addLiveEvent: replacing duplicate event " + event.getId());
@@ -677,7 +688,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         roomState?: RoomState,
     ): void {
         let toStartOfTimeline = !!toStartOfTimelineOrOpts;
-        let timelineWasEmpty: boolean;
+        let timelineWasEmpty: boolean | undefined;
         if (typeof (toStartOfTimelineOrOpts) === 'object') {
             ({ toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
         } else if (toStartOfTimelineOrOpts !== undefined) {
@@ -697,7 +708,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             roomState,
             timelineWasEmpty,
         });
-        this._eventIdToTimeline[eventId] = timeline;
+        this._eventIdToTimeline.set(eventId, timeline);
 
         this.relations.aggregateParentEvent(event);
         this.relations.aggregateChildEvent(event, this);
@@ -725,22 +736,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         newEventId: string,
     ): void {
         // XXX: why don't we infer newEventId from localEvent?
-        const existingTimeline = this._eventIdToTimeline[oldEventId];
+        const existingTimeline = this._eventIdToTimeline.get(oldEventId);
         if (existingTimeline) {
-            delete this._eventIdToTimeline[oldEventId];
-            this._eventIdToTimeline[newEventId] = existingTimeline;
-        } else {
-            if (this.filter) {
-                if (this.filter.filterRoomTimeline([localEvent]).length) {
-                    this.addEventToTimeline(localEvent, this.liveTimeline, {
-                        toStartOfTimeline: false,
-                    });
-                }
-            } else {
-                this.addEventToTimeline(localEvent, this.liveTimeline, {
-                    toStartOfTimeline: false,
-                });
-            }
+            this._eventIdToTimeline.delete(oldEventId);
+            this._eventIdToTimeline.set(newEventId, existingTimeline);
+        } else if (!this.filter || this.filter.filterRoomTimeline([localEvent]).length) {
+            this.addEventToTimeline(localEvent, this.liveTimeline, {
+                toStartOfTimeline: false,
+            });
         }
     }
 
@@ -753,14 +756,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * in this room.
      */
     public removeEvent(eventId: string): MatrixEvent | null {
-        const timeline = this._eventIdToTimeline[eventId];
+        const timeline = this._eventIdToTimeline.get(eventId);
         if (!timeline) {
             return null;
         }
 
         const removed = timeline.removeEvent(eventId);
         if (removed) {
-            delete this._eventIdToTimeline[eventId];
+            this._eventIdToTimeline.delete(eventId);
             const data = {
                 timeline: timeline,
             };
@@ -787,8 +790,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             return 0;
         }
 
-        const timeline1 = this._eventIdToTimeline[eventId1];
-        const timeline2 = this._eventIdToTimeline[eventId2];
+        const timeline1 = this._eventIdToTimeline.get(eventId1);
+        const timeline2 = this._eventIdToTimeline.get(eventId2);
 
         if (timeline1 === undefined) {
             return null;
@@ -798,10 +801,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         }
 
         if (timeline1 === timeline2) {
-            // both events are in the same timeline - figure out their
-            // relative indices
-            let idx1: number;
-            let idx2: number;
+            // both events are in the same timeline - figure out their relative indices
+            let idx1: number | undefined = undefined;
+            let idx2: number | undefined = undefined;
             const events = timeline1.getEvents();
             for (let idx = 0; idx < events.length &&
             (idx1 === undefined || idx2 === undefined); idx++) {
@@ -813,14 +815,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                     idx2 = idx;
                 }
             }
-            return idx1 - idx2;
+            return idx1! - idx2!;
         }
 
         // the events are in different timelines. Iterate through the
         // linkedlist to see which comes first.
 
         // first work forwards from timeline1
-        let tl = timeline1;
+        let tl: EventTimeline | null = timeline1;
         while (tl) {
             if (tl === timeline2) {
                 // timeline1 is before timeline2

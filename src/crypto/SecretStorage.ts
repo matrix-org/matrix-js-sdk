@@ -183,7 +183,7 @@ export class SecretStorage {
      *     the form [keyId, keyInfo].  Otherwise, null is returned.
      *     XXX: why is this an array when addKey returns an object?
      */
-    public async getKey(keyId: string): Promise<SecretStorageKeyTuple | null> {
+    public async getKey(keyId?: string | null): Promise<SecretStorageKeyTuple | null> {
         if (!keyId) {
             keyId = await this.getDefaultKeyId();
         }
@@ -238,7 +238,7 @@ export class SecretStorage {
      * @param {Array} keys The IDs of the keys to use to encrypt the secret
      *     or null/undefined to use the default key.
      */
-    public async store(name: string, secret: string, keys?: string[]): Promise<void> {
+    public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
         const encrypted: Record<string, IEncryptedPayload> = {};
 
         if (!keys) {
@@ -285,7 +285,7 @@ export class SecretStorage {
      *
      * @return {string} the contents of the secret
      */
-    public async get(name: string): Promise<string> {
+    public async get(name: string): Promise<string | undefined> {
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo) {
             return;
@@ -540,7 +540,23 @@ export class SecretStorage {
             // because someone could be trying to send us bogus data
             return;
         }
+
+        if (!olmlib.isOlmEncrypted(event)) {
+            logger.error("secret event not properly encrypted");
+            return;
+        }
+
         const content = event.getContent();
+
+        const senderKeyUser = this.baseApis.crypto.deviceList.getUserByIdentityKey(
+            olmlib.OLM_ALGORITHM,
+            event.getSenderKey() || "",
+        );
+        if (senderKeyUser !== event.getSender()) {
+            logger.error("sending device does not belong to the user it claims to be from");
+            return;
+        }
+
         logger.log("got secret share for request", content.request_id);
         const requestControl = this.requests.get(content.request_id);
         if (requestControl) {
@@ -558,6 +574,14 @@ export class SecretStorage {
             }
             if (!requestControl.devices.includes(deviceInfo.deviceId)) {
                 logger.log("unsolicited secret share from device", deviceInfo.deviceId);
+                return;
+            }
+            // unsure that the sender is trusted.  In theory, this check is
+            // unnecessary since we only accept secret shares from devices that
+            // we requested from, but it doesn't hurt.
+            const deviceTrust = this.baseApis.crypto.checkDeviceInfoTrust(event.getSender(), deviceInfo);
+            if (!deviceTrust.isVerified()) {
+                logger.log("secret share from unverified device");
                 return;
             }
 

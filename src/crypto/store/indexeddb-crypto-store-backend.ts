@@ -25,15 +25,14 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
+    ParkedSharedHistory, SecretStorePrivateKeys,
 } from "./base";
-import { IRoomKeyRequestBody } from "../index";
+import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
 import { IOlmDevice } from "../algorithms/megolm";
 import { IRoomEncryption } from "../RoomList";
 import { InboundGroupSessionData } from "../OlmDevice";
-import { IEncryptedPayload } from "../aes";
 
-export const VERSION = 10;
 const PROFILE_TRANSACTIONS = false;
 
 /**
@@ -261,7 +260,9 @@ export class Backend implements CryptoStore {
             const cursor = this.result;
             if (cursor) {
                 const keyReq = cursor.value;
-                if (keyReq.recipients.includes({ userId, deviceId })) {
+                if (keyReq.recipients.some((recipient: IRoomKeyRequestRecipient) =>
+                    recipient.userId === userId && recipient.deviceId === deviceId,
+                )) {
                     results.push(keyReq);
                 }
                 cursor.continue();
@@ -306,7 +307,7 @@ export class Backend implements CryptoStore {
         expectedState: number,
         updates: Partial<OutgoingRoomKeyRequest>,
     ): Promise<OutgoingRoomKeyRequest | null> {
-        let result: OutgoingRoomKeyRequest = null;
+        let result: OutgoingRoomKeyRequest | null = null;
 
         function onsuccess(this: IDBRequest<IDBCursorWithValue>) {
             const cursor = this.result;
@@ -367,14 +368,14 @@ export class Backend implements CryptoStore {
 
     // Olm Account
 
-    public getAccount(txn: IDBTransaction, func: (accountPickle: string) => void): void {
+    public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("-");
         getReq.onsuccess = function() {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -384,22 +385,25 @@ export class Backend implements CryptoStore {
         objectStore.put(accountPickle, "-");
     }
 
-    public getCrossSigningKeys(txn: IDBTransaction, func: (keys: Record<string, ICrossSigningKey>) => void): void {
+    public getCrossSigningKeys(
+        txn: IDBTransaction,
+        func: (keys: Record<string, ICrossSigningKey> | null) => void,
+    ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("crossSigningKeys");
         getReq.onsuccess = function() {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
 
-    public getSecretStorePrivateKey(
+    public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: IDBTransaction,
-        func: (key: IEncryptedPayload | null) => void,
-        type: string,
+        func: (key: SecretStorePrivateKeys[K] | null) => void,
+        type: K,
     ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get(`ssss_cache:${type}`);
@@ -407,7 +411,7 @@ export class Backend implements CryptoStore {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -417,7 +421,11 @@ export class Backend implements CryptoStore {
         objectStore.put(keys, "crossSigningKeys");
     }
 
-    public storeSecretStorePrivateKey(txn: IDBTransaction, type: string, key: IEncryptedPayload): void {
+    public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
+        txn: IDBTransaction,
+        type: K,
+        key: SecretStorePrivateKeys[K],
+    ): void {
         const objectStore = txn.objectStore("account");
         objectStore.put(key, `ssss_cache:${type}`);
     }
@@ -431,7 +439,7 @@ export class Backend implements CryptoStore {
             try {
                 func(countReq.result);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -457,7 +465,7 @@ export class Backend implements CryptoStore {
                 try {
                     func(results);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -467,7 +475,7 @@ export class Backend implements CryptoStore {
         deviceKey: string,
         sessionId: string,
         txn: IDBTransaction,
-        func: (sessions: { [ sessionId: string ]: ISessionInfo }) => void,
+        func: (session: ISessionInfo | null) => void,
     ): void {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.get([deviceKey, sessionId]);
@@ -482,12 +490,12 @@ export class Backend implements CryptoStore {
                     func(null);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
 
-    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo) => void): void {
+    public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo | null) => void): void {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.openCursor();
         getReq.onsuccess = function() {
@@ -500,7 +508,7 @@ export class Backend implements CryptoStore {
                     func(null);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -529,11 +537,11 @@ export class Backend implements CryptoStore {
             fixed,
             time: Date.now(),
         });
-        return promiseifyTxn(txn);
+        await promiseifyTxn(txn);
     }
 
     public async getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null> {
-        let result;
+        let result: IProblem | null = null;
         const txn = this.db.transaction("session_problems", "readwrite");
         const objectStore = txn.objectStore("session_problems");
         const index = objectStore.index("deviceKey");
@@ -596,8 +604,8 @@ export class Backend implements CryptoStore {
         txn: IDBTransaction,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        let session: InboundGroupSessionData | boolean = false;
-        let withheld: IWithheld | boolean = false;
+        let session: InboundGroupSessionData | null | boolean = false;
+        let withheld: IWithheld | null | boolean = false;
         const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.get([senderCurve25519Key, sessionId]);
         getReq.onsuccess = function() {
@@ -611,7 +619,7 @@ export class Backend implements CryptoStore {
                     func(session as InboundGroupSessionData, withheld as IWithheld);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
 
@@ -628,7 +636,7 @@ export class Backend implements CryptoStore {
                     func(session as InboundGroupSessionData, withheld as IWithheld);
                 }
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -646,14 +654,14 @@ export class Backend implements CryptoStore {
                         sessionData: cursor.value.session,
                     });
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
                 cursor.continue();
             } else {
                 try {
                     func(null);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -718,7 +726,7 @@ export class Backend implements CryptoStore {
             try {
                 func(getReq.result || null);
             } catch (e) {
-                abortWithException(txn, e);
+                abortWithException(txn, <Error>e);
             }
         };
     }
@@ -746,7 +754,7 @@ export class Backend implements CryptoStore {
                 try {
                     func(rooms);
                 } catch (e) {
-                    abortWithException(txn, e);
+                    abortWithException(txn, <Error>e);
                 }
             }
         };
@@ -871,6 +879,50 @@ export class Backend implements CryptoStore {
         });
     }
 
+    public addParkedSharedHistory(
+        roomId: string,
+        parkedData: ParkedSharedHistory,
+        txn?: IDBTransaction,
+    ): void {
+        if (!txn) {
+            txn = this.db.transaction(
+                "parked_shared_history", "readwrite",
+            );
+        }
+        const objectStore = txn.objectStore("parked_shared_history");
+        const req = objectStore.get([roomId]);
+        req.onsuccess = () => {
+            const { parked } = req.result || { parked: [] };
+            parked.push(parkedData);
+            objectStore.put({ roomId, parked });
+        };
+    }
+
+    public takeParkedSharedHistory(
+        roomId: string,
+        txn?: IDBTransaction,
+    ): Promise<ParkedSharedHistory[]> {
+        if (!txn) {
+            txn = this.db.transaction(
+                "parked_shared_history", "readwrite",
+            );
+        }
+        const cursorReq = txn.objectStore("parked_shared_history").openCursor(roomId);
+        return new Promise((resolve, reject) => {
+            cursorReq.onsuccess = () => {
+                const cursor = cursorReq.result;
+                if (!cursor) {
+                    resolve([]);
+                    return;
+                }
+                const data = cursor.value;
+                cursor.delete();
+                resolve(data);
+            };
+            cursorReq.onerror = reject;
+        });
+    }
+
     public doTxn<T>(
         mode: Mode,
         stores: string | string[],
@@ -903,45 +955,34 @@ export class Backend implements CryptoStore {
     }
 }
 
-export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
-    logger.log(
-        `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
-            + ` to ${VERSION}`,
-    );
-    if (oldVersion < 1) { // The database did not previously exist.
-        createDatabase(db);
-    }
-    if (oldVersion < 2) {
-        db.createObjectStore("account");
-    }
-    if (oldVersion < 3) {
+type DbMigration = (db: IDBDatabase) => void;
+const DB_MIGRATIONS: DbMigration[] = [
+    (db) => { createDatabase(db); },
+    (db) => { db.createObjectStore("account"); },
+    (db) => {
         const sessionsStore = db.createObjectStore("sessions", {
             keyPath: ["deviceKey", "sessionId"],
         });
         sessionsStore.createIndex("deviceKey", "deviceKey");
-    }
-    if (oldVersion < 4) {
+    },
+    (db) => {
         db.createObjectStore("inbound_group_sessions", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
-    }
-    if (oldVersion < 5) {
-        db.createObjectStore("device_data");
-    }
-    if (oldVersion < 6) {
-        db.createObjectStore("rooms");
-    }
-    if (oldVersion < 7) {
+    },
+    (db) => { db.createObjectStore("device_data"); },
+    (db) => { db.createObjectStore("rooms"); },
+    (db) => {
         db.createObjectStore("sessions_needing_backup", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
-    }
-    if (oldVersion < 8) {
+    },
+    (db) => {
         db.createObjectStore("inbound_group_sessions_withheld", {
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
-    }
-    if (oldVersion < 9) {
+    },
+    (db) => {
         const problemsStore = db.createObjectStore("session_problems", {
             keyPath: ["deviceKey", "time"],
         });
@@ -950,13 +991,29 @@ export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
         db.createObjectStore("notified_error_devices", {
             keyPath: ["userId", "deviceId"],
         });
-    }
-    if (oldVersion < 10) {
+    },
+    (db) => {
         db.createObjectStore("shared_history_inbound_group_sessions", {
             keyPath: ["roomId"],
         });
-    }
+    },
+    (db) => {
+        db.createObjectStore("parked_shared_history", {
+            keyPath: ["roomId"],
+        });
+    },
     // Expand as needed.
+];
+export const VERSION = DB_MIGRATIONS.length;
+
+export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
+    logger.log(
+        `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
+            + ` to ${VERSION}`,
+    );
+    DB_MIGRATIONS.forEach((migration, index) => {
+        if (oldVersion <= index) migration(db);
+    });
 }
 
 function createDatabase(db: IDBDatabase): void {
@@ -993,7 +1050,7 @@ function abortWithException(txn: IDBTransaction, e: Error) {
     }
 }
 
-function promiseifyTxn<T>(txn: IDBTransaction): Promise<T> {
+function promiseifyTxn<T>(txn: IDBTransaction): Promise<T | null> {
     return new Promise((resolve, reject) => {
         txn.oncomplete = () => {
             if ((txn as IWrappedIDBTransaction)._mx_abortexception !== undefined) {

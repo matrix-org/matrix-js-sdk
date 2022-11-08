@@ -14,129 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { BinaryLike } from "crypto";
-import { getCrypto } from '../utils';
 import { decodeBase64, encodeBase64 } from './olmlib';
-
-const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
-    (window.crypto.subtle || window.crypto.webkitSubtle) : null;
+import { subtleCrypto, crypto, TextEncoder } from "./crypto";
 
 // salt for HKDF, with 8 bytes of zeros
 const zeroSalt = new Uint8Array(8);
 
 export interface IEncryptedPayload {
     [key: string]: any; // extensible
-    iv?: string;
-    ciphertext?: string;
-    mac?: string;
+    iv: string;
+    ciphertext: string;
+    mac: string;
 }
 
 /**
- * encrypt a string in Node.js
+ * encrypt a string
  *
  * @param {string} data the plaintext to encrypt
  * @param {Uint8Array} key the encryption key to use
  * @param {string} name the name of the secret
  * @param {string} ivStr the initialization vector to use
  */
-async function encryptNode(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
-    const crypto = getCrypto();
-    if (!crypto) {
-        throw new Error("No usable crypto implementation");
-    }
-
-    let iv;
-    if (ivStr) {
-        iv = decodeBase64(ivStr);
-    } else {
-        iv = crypto.randomBytes(16);
-
-        // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
-        // (which would mean we wouldn't be able to decrypt on Android). The loss
-        // of a single bit of iv is a price we have to pay.
-        iv[8] &= 0x7f;
-    }
-
-    const [aesKey, hmacKey] = deriveKeysNode(key, name);
-
-    const cipher = crypto.createCipheriv("aes-256-ctr", aesKey, iv);
-    const ciphertext = Buffer.concat([
-        cipher.update(data, "utf8"),
-        cipher.final(),
-    ]);
-
-    const hmac = crypto.createHmac("sha256", hmacKey)
-        .update(ciphertext).digest("base64");
-
-    return {
-        iv: encodeBase64(iv),
-        ciphertext: ciphertext.toString("base64"),
-        mac: hmac,
-    };
-}
-
-/**
- * decrypt a string in Node.js
- *
- * @param {object} data the encrypted data
- * @param {string} data.ciphertext the ciphertext in base64
- * @param {string} data.iv the initialization vector in base64
- * @param {string} data.mac the HMAC in base64
- * @param {Uint8Array} key the encryption key to use
- * @param {string} name the name of the secret
- */
-async function decryptNode(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
-    const crypto = getCrypto();
-    if (!crypto) {
-        throw new Error("No usable crypto implementation");
-    }
-
-    const [aesKey, hmacKey] = deriveKeysNode(key, name);
-
-    const hmac = crypto.createHmac("sha256", hmacKey)
-        .update(Buffer.from(data.ciphertext, "base64"))
-        .digest("base64").replace(/=+$/g, '');
-
-    if (hmac !== data.mac.replace(/=+$/g, '')) {
-        throw new Error(`Error decrypting secret ${name}: bad MAC`);
-    }
-
-    const decipher = crypto.createDecipheriv(
-        "aes-256-ctr", aesKey, decodeBase64(data.iv),
-    );
-    return decipher.update(data.ciphertext, "base64", "utf8")
-          + decipher.final("utf8");
-}
-
-function deriveKeysNode(key: BinaryLike, name: string): [Buffer, Buffer] {
-    const crypto = getCrypto();
-    const prk = crypto.createHmac("sha256", zeroSalt).update(key).digest();
-
-    const b = Buffer.alloc(1, 1);
-    const aesKey = crypto.createHmac("sha256", prk)
-        .update(name, "utf8").update(b).digest();
-    b[0] = 2;
-    const hmacKey = crypto.createHmac("sha256", prk)
-        .update(aesKey).update(name, "utf8").update(b).digest();
-
-    return [aesKey, hmacKey];
-}
-
-/**
- * encrypt a string in Node.js
- *
- * @param {string} data the plaintext to encrypt
- * @param {Uint8Array} key the encryption key to use
- * @param {string} name the name of the secret
- * @param {string} ivStr the initialization vector to use
- */
-async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
-    let iv;
+export async function encryptAES(
+    data: string,
+    key: Uint8Array,
+    name: string,
+    ivStr?: string,
+): Promise<IEncryptedPayload> {
+    let iv: Uint8Array;
     if (ivStr) {
         iv = decodeBase64(ivStr);
     } else {
         iv = new Uint8Array(16);
-        window.crypto.getRandomValues(iv);
+        crypto.getRandomValues(iv);
 
         // clear bit 63 of the IV to stop us hitting the 64-bit counter boundary
         // (which would mean we wouldn't be able to decrypt on Android). The loss
@@ -144,7 +54,7 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
         iv[8] &= 0x7f;
     }
 
-    const [aesKey, hmacKey] = await deriveKeysBrowser(key, name);
+    const [aesKey, hmacKey] = await deriveKeys(key, name);
     const encodedData = new TextEncoder().encode(data);
 
     const ciphertext = await subtleCrypto.encrypt(
@@ -171,7 +81,7 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
 }
 
 /**
- * decrypt a string in the browser
+ * decrypt a string
  *
  * @param {object} data the encrypted data
  * @param {string} data.ciphertext the ciphertext in base64
@@ -180,8 +90,8 @@ async function encryptBrowser(data: string, key: Uint8Array, name: string, ivStr
  * @param {Uint8Array} key the encryption key to use
  * @param {string} name the name of the secret
  */
-async function decryptBrowser(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
-    const [aesKey, hmacKey] = await deriveKeysBrowser(key, name);
+export async function decryptAES(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
+    const [aesKey, hmacKey] = await deriveKeys(key, name);
 
     const ciphertext = decodeBase64(data.ciphertext);
 
@@ -207,7 +117,7 @@ async function decryptBrowser(data: IEncryptedPayload, key: Uint8Array, name: st
     return new TextDecoder().decode(new Uint8Array(plaintext));
 }
 
-async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[CryptoKey, CryptoKey]> {
+async function deriveKeys(key: Uint8Array, name: string): Promise<[CryptoKey, CryptoKey]> {
     const hkdfkey = await subtleCrypto.importKey(
         'raw',
         key,
@@ -251,14 +161,6 @@ async function deriveKeysBrowser(key: Uint8Array, name: string): Promise<[Crypto
     );
 
     return Promise.all([aesProm, hmacProm]);
-}
-
-export function encryptAES(data: string, key: Uint8Array, name: string, ivStr?: string): Promise<IEncryptedPayload> {
-    return subtleCrypto ? encryptBrowser(data, key, name, ivStr) : encryptNode(data, key, name, ivStr);
-}
-
-export function decryptAES(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
-    return subtleCrypto ? decryptBrowser(data, key, name) : decryptNode(data, key, name);
 }
 
 // string of zeroes, for calculating the key check

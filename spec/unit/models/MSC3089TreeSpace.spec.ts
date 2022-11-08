@@ -565,7 +565,7 @@ describe("MSC3089TreeSpace", () => {
             rooms = {};
             rooms[tree.roomId] = parentRoom;
             (<any>tree).room = parentRoom; // override readonly
-            client.getRoom = (r) => rooms[r];
+            client.getRoom = (r) => rooms[r ?? ""];
 
             clientSendStateFn = jest.fn()
                 .mockImplementation((roomId: string, eventType: EventType, content: any, stateKey: string) => {
@@ -890,9 +890,8 @@ describe("MSC3089TreeSpace", () => {
             expect(contents.length).toEqual(fileContents.length);
             expect(opts).toMatchObject({
                 includeFilename: false,
-                onlyContentUri: true, // because the tests rely on this - we shouldn't really be testing  for this.
             });
-            return Promise.resolve(mxc);
+            return Promise.resolve({ content_uri: mxc });
         });
         client.uploadContent = uploadFn;
 
@@ -950,9 +949,8 @@ describe("MSC3089TreeSpace", () => {
             expect(contents.length).toEqual(fileContents.length);
             expect(opts).toMatchObject({
                 includeFilename: false,
-                onlyContentUri: true, // because the tests rely on this - we shouldn't really be testing  for this.
             });
-            return Promise.resolve(mxc);
+            return Promise.resolve({ content_uri: mxc });
         });
         client.uploadContent = uploadFn;
 

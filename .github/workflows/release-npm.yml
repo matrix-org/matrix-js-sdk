@@ -1,0 +1,41 @@
+# Must only be called from `release#published` triggers
+name: Publish to npm
+on:
+  workflow_call:
+    secrets:
+      NPM_TOKEN:
+        required: true
+jobs:
+  npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🧮 Checkout code
+        uses: actions/checkout@v3
+
+      - name: 🔧 Yarn cache
+        uses: actions/setup-node@v3
+        with:
+          cache: "yarn"
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: 🔨 Install dependencies
+        run: "yarn install --pure-lockfile"
+
+      - name: 🚀 Publish to npm
+        id: npm-publish
+        uses: JS-DevTools/npm-publish@v1
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: public
+          tag: next
+
+      - name: 🎖️ Add `latest` dist-tag to final releases
+        if: github.event.release.prerelease == false
+        run: |
+          package=$(cat package.json | jq -er .name)
+          npm dist-tag add "$package@$release" latest
+        env:
+          # JS-DevTools/npm-publish overrides `NODE_AUTH_TOKEN` with `INPUT_TOKEN` in .npmrc
+          INPUT_TOKEN: ${{ secrets.NPM_TOKEN }}
+          release: ${{ steps.npm-publish.outputs.version }}

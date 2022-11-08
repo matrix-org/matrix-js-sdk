@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 import { logger } from './logger';
-import { IAbortablePromise } from "./@types/partials";
 import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
-import { TypedEventEmitter } from "./models//typed-event-emitter";
+import { TypedEventEmitter } from "./models/typed-event-emitter";
 import { sleep, IDeferred, defer } from "./utils";
+import { HTTPError } from "./http-api";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -47,6 +47,8 @@ export interface MSC3575Filter {
     room_types?: string[];
     not_room_types?: string[];
     spaces?: string[];
+    tags?: string[];
+    not_tags?: string[];
 }
 
 /**
@@ -82,6 +84,8 @@ export interface MSC3575RoomData {
     timeline: (IRoomEvent | IStateEvent)[];
     notification_count?: number;
     highlight_count?: number;
+    joined_count?: number;
+    invited_count?: number;
     invite_state?: IStateEvent[];
     initial?: boolean;
     limited?: boolean;
@@ -150,12 +154,12 @@ export enum SlidingSyncState {
  * multiple sliding windows, and maintains the index->room_id mapping.
  */
 class SlidingList {
-    private list: MSC3575List;
-    private isModified: boolean;
+    private list!: MSC3575List;
+    private isModified?: boolean;
 
     // returned data
-    public roomIndexToRoomId: Record<number, string>;
-    public joinedCount: number;
+    public roomIndexToRoomId: Record<number, string> = {};
+    public joinedCount = 0;
 
     /**
      * Construct a new sliding list.
@@ -268,7 +272,7 @@ export interface Extension {
      * @param isInitial True when this is part of the initial request (send sticky params)
      * @returns The request JSON to send.
      */
-    onRequest(isInitial: boolean): object;
+    onRequest(isInitial: boolean): object | undefined;
     /**
      * A function which is called when there is response JSON under this extension.
      * @param data The response JSON under the extension name.
@@ -318,7 +322,9 @@ export enum SlidingSyncEvent {
 
 export type SlidingSyncEventHandlerMap = {
     [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
-    [SlidingSyncEvent.Lifecycle]: (state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err: Error) => void;
+    [SlidingSyncEvent.Lifecycle]: (
+        state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error,
+    ) => void;
     [SlidingSyncEvent.List]: (
         listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number, string>,
     ) => void;
@@ -337,7 +343,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     // flag set when resend() is called because we cannot rely on detecting AbortError in JS SDK :(
     private needsResend = false;
     // the txn_id to send with the next request.
-    private txnId?: string = null;
+    private txnId: string | null = null;
     // a list (in chronological order of when they were sent) of objects containing the txn ID and
     // a defer to resolve/reject depending on whether they were successfully sent or not.
     private txnIdDefers: (IDeferred<string> & { txnId: string})[] = [];
@@ -347,7 +353,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private desiredRoomSubscriptions = new Set<string>(); // the *desired* room subscriptions
     private confirmedRoomSubscriptions = new Set<string>();
 
-    private pendingReq?: IAbortablePromise<MSC3575SlidingSyncResponse>;
+    private pendingReq?: Promise<MSC3575SlidingSyncResponse>;
+    private abortController?: AbortController;
 
     /**
      * Create a new sliding sync instance
@@ -381,7 +388,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The list index
      * @returns The list data which contains the rooms in this list
      */
-    public getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} {
+    public getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} | null {
         if (!this.lists[index]) {
             return null;
         }
@@ -397,7 +404,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index The list index to get the list for.
      * @returns A copy of the list or undefined.
      */
-    public getList(index: number): MSC3575List {
+    public getList(index: number): MSC3575List | null {
         if (!this.lists[index]) {
             return null;
         }
@@ -526,8 +533,71 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param {object} resp The raw sync response JSON
      * @param {Error?} err Any error that occurred when making the request e.g. network errors.
      */
-    private invokeLifecycleListeners(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse, err?: Error): void {
+    private invokeLifecycleListeners(
+        state: SlidingSyncState,
+        resp: MSC3575SlidingSyncResponse | null,
+        err?: Error,
+    ): void {
         this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
+    }
+
+    private shiftRight(listIndex: number, hi: number, low: number) {
+        //     l   h
+        // 0,1,2,3,4 <- before
+        // 0,1,2,2,3 <- after, hi is deleted and low is duplicated
+        for (let i = hi; i > low; i--) {
+            if (this.lists[listIndex].isIndexInRange(i)) {
+                this.lists[listIndex].roomIndexToRoomId[i] =
+                    this.lists[listIndex].roomIndexToRoomId[
+                        i - 1
+                    ];
+            }
+        }
+    }
+
+    private shiftLeft(listIndex: number, hi: number, low: number) {
+        //     l   h
+        // 0,1,2,3,4 <- before
+        // 0,1,3,4,4 <- after, low is deleted and hi is duplicated
+        for (let i = low; i < hi; i++) {
+            if (this.lists[listIndex].isIndexInRange(i)) {
+                this.lists[listIndex].roomIndexToRoomId[i] =
+                    this.lists[listIndex].roomIndexToRoomId[
+                        i + 1
+                    ];
+            }
+        }
+    }
+
+    private removeEntry(listIndex: number, index: number) {
+        // work out the max index
+        let max = -1;
+        for (const n in this.lists[listIndex].roomIndexToRoomId) {
+            if (Number(n) > max) {
+                max = Number(n);
+            }
+        }
+        if (max < 0 || index > max) {
+            return;
+        }
+        // Everything higher than the gap needs to be shifted left.
+        this.shiftLeft(listIndex, max, index);
+        delete this.lists[listIndex].roomIndexToRoomId[max];
+    }
+
+    private addEntry(listIndex: number, index: number) {
+        // work out the max index
+        let max = -1;
+        for (const n in this.lists[listIndex].roomIndexToRoomId) {
+            if (Number(n) > max) {
+                max = Number(n);
+            }
+        }
+        if (max < 0 || index > max) {
+            return;
+        }
+        // Everything higher than the gap needs to be shifted right, +1 so we don't delete the highest element
+        this.shiftRight(listIndex, max+1, index);
     }
 
     private processListOps(list: ListResponse, listIndex: number): void {
@@ -537,6 +607,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 case "DELETE": {
                     logger.debug("DELETE", listIndex, op.index, ";");
                     delete this.lists[listIndex].roomIndexToRoomId[op.index];
+                    if (gapIndex !== -1) {
+                        // we already have a DELETE operation to process, so process it.
+                        this.removeEntry(listIndex, gapIndex);
+                    }
                     gapIndex = op.index;
                     break;
                 }
@@ -551,20 +625,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     if (this.lists[listIndex].roomIndexToRoomId[op.index]) {
                         // something is in this space, shift items out of the way
                         if (gapIndex < 0) {
-                            logger.debug(
-                                "cannot work out where gap is, INSERT without previous DELETE! List: ",
-                                listIndex,
-                            );
-                            return;
-                        }
-                        //  0,1,2,3  index
-                        // [A,B,C,D]
-                        //   DEL 3
-                        // [A,B,C,_]
-                        //   INSERT E 0
-                        // [E,A,B,C]
-                        // gapIndex=3, op.index=0
-                        if (gapIndex > op.index) {
+                            // we haven't been told where to shift from, so make way for a new room entry.
+                            this.addEntry(listIndex, op.index);
+                        } else if (gapIndex > op.index) {
                             // the gap is further down the list, shift every element to the right
                             // starting at the gap so we can just shift each element in turn:
                             // [A,B,C,_] gapIndex=3, op.index=0
@@ -572,26 +635,13 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                             // [A,B,B,C] i=2
                             // [A,A,B,C] i=1
                             // Terminate. We'll assign into op.index next.
-                            for (let i = gapIndex; i > op.index; i--) {
-                                if (this.lists[listIndex].isIndexInRange(i)) {
-                                    this.lists[listIndex].roomIndexToRoomId[i] =
-                                        this.lists[listIndex].roomIndexToRoomId[
-                                            i - 1
-                                        ];
-                                }
-                            }
+                            this.shiftRight(listIndex, gapIndex, op.index);
                         } else if (gapIndex < op.index) {
                             // the gap is further up the list, shift every element to the left
                             // starting at the gap so we can just shift each element in turn
-                            for (let i = gapIndex; i < op.index; i++) {
-                                if (this.lists[listIndex].isIndexInRange(i)) {
-                                    this.lists[listIndex].roomIndexToRoomId[i] =
-                                        this.lists[listIndex].roomIndexToRoomId[
-                                            i + 1
-                                        ];
-                                }
-                            }
+                            this.shiftLeft(listIndex, op.index, gapIndex);
                         }
+                        gapIndex = -1; // forget the gap, we don't need it anymore.
                     }
                     this.lists[listIndex].roomIndexToRoomId[op.index] = op.room_id;
                     break;
@@ -631,6 +681,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 }
             }
         });
+        if (gapIndex !== -1) {
+            // we already have a DELETE operation to process, so process it
+            // Everything higher than the gap needs to be shifted left.
+            this.removeEntry(listIndex, gapIndex);
+        }
     }
 
     /**
@@ -650,7 +705,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             ...d,
             txnId: this.txnId,
         });
-        this.pendingReq?.abort();
+        this.abortController?.abort();
+        this.abortController = new AbortController();
         return d.promise;
     }
 
@@ -678,7 +734,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             this.txnIdDefers[i].reject(this.txnIdDefers[i].txnId);
         }
         this.txnIdDefers[txnIndex].resolve(txnId);
-        // clear out settled promises, incuding the one we resolved.
+        // clear out settled promises, including the one we resolved.
         this.txnIdDefers = this.txnIdDefers.slice(txnIndex+1);
     }
 
@@ -687,7 +743,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      */
     public stop(): void {
         this.terminated = true;
-        this.pendingReq?.abort();
+        this.abortController?.abort();
         // remove all listeners so things can be GC'd
         this.removeAllListeners(SlidingSyncEvent.Lifecycle);
         this.removeAllListeners(SlidingSyncEvent.List);
@@ -695,14 +751,37 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     /**
+     * Re-setup this connection e.g in the event of an expired session.
+     */
+    private resetup(): void {
+        logger.warn("SlidingSync: resetting connection info");
+        // any pending txn ID defers will be forgotten already by the server, so clear them out
+        this.txnIdDefers.forEach((d) => {
+            d.reject(d.txnId);
+        });
+        this.txnIdDefers = [];
+        // resend sticky params and de-confirm all subscriptions
+        this.lists.forEach((l) => {
+            l.setModified(true);
+        });
+        this.confirmedRoomSubscriptions = new Set<string>(); // leave desired ones alone though!
+        // reset the connection as we might be wedged
+        this.needsResend = true;
+        this.abortController?.abort();
+        this.abortController = new AbortController();
+    }
+
+    /**
      * Start syncing with the server. Blocks until stopped.
      */
     public async start() {
-        let currentPos: string;
+        this.abortController = new AbortController();
+
+        let currentPos: string | undefined;
         while (!this.terminated) {
             this.needsResend = false;
             let doNotUpdateList = false;
-            let resp: MSC3575SlidingSyncResponse;
+            let resp: MSC3575SlidingSyncResponse | undefined;
             try {
                 const listModifiedCount = this.listModifiedCount;
                 const reqBody: MSC3575SlidingSyncRequest = {
@@ -730,9 +809,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     reqBody.txn_id = this.txnId;
                     this.txnId = null;
                 }
-                this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl);
+                this.pendingReq = this.client.slidingSync(reqBody, this.proxyBaseUrl, this.abortController.signal);
                 resp = await this.pendingReq;
-                logger.debug(resp);
                 currentPos = resp.pos;
                 // update what we think we're subscribed to.
                 for (const roomId of newSubscriptions) {
@@ -764,22 +842,25 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     resp,
                 );
             } catch (err) {
-                if (err.httpStatus) {
+                if ((<HTTPError>err).httpStatus) {
                     this.invokeLifecycleListeners(
                         SlidingSyncState.RequestFinished,
                         null,
-                        err,
+                        <Error>err,
                     );
-                    await sleep(3000);
-                } else if (this.needsResend || err === "aborted") {
-                    // don't sleep as we caused this error by abort()ing the request.
-                    // we check for 'aborted' because that's the error Jest returns and without it
-                    // we get warnings about not exiting fast enough.
-                    continue;
-                } else {
-                    logger.error(err);
-                    await sleep(3000);
+                    if ((<HTTPError>err).httpStatus === 400) {
+                        // session probably expired TODO: assign an errcode
+                        // so drop state and re-request
+                        this.resetup();
+                        currentPos = undefined;
+                        await sleep(50); // in case the 400 was for something else; don't tightloop
+                        continue;
+                    } // else fallthrough to generic error handling
+                } else if (this.needsResend || (<Error>err).name === "AbortError") {
+                    continue; // don't sleep as we caused this error by abort()ing the request.
                 }
+                logger.error(err);
+                await sleep(5000);
             }
             if (!resp) {
                 continue;
@@ -789,7 +870,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             Object.keys(resp.rooms).forEach((roomId) => {
                 this.invokeRoomDataListeners(
                     roomId,
-                    resp.rooms[roomId],
+                    resp!.rooms[roomId],
                 );
             });
 

@@ -23,11 +23,33 @@ limitations under the License.
 import unhomoglyph from "unhomoglyph";
 import promiseRetry from "p-retry";
 
-import type * as NodeCrypto from "crypto";
 import { MatrixEvent } from "./models/event";
-import { MatrixClient } from ".";
 import { M_TIMESTAMP } from "./@types/location";
 import { ReceiptType } from "./@types/read_receipts";
+
+const interns = new Map<string, string>();
+
+/**
+ * Internalises a string, reusing a known pointer or storing the pointer
+ * if needed for future strings.
+ * @param str The string to internalise.
+ * @returns The internalised string.
+ */
+export function internaliseString(str: string): string {
+    // Unwrap strings before entering the map, if we somehow got a wrapped
+    // string as our input. This should only happen from tests.
+    if ((str as unknown) instanceof String) {
+        str = str.toString();
+    }
+
+    // Check the map to see if we can store the value
+    if (!interns.has(str)) {
+        interns.set(str, str);
+    }
+
+    // Return any cached string reference
+    return interns.get(str)!;
+}
 
 /**
  * Encode a dictionary of query parameters.
@@ -36,17 +58,23 @@ import { ReceiptType } from "./@types/read_receipts";
  * {"foo": "bar", "baz": "taz"}
  * @return {string} The encoded string e.g. foo=bar&baz=taz
  */
-export function encodeParams(params: Record<string, string | number | boolean>): string {
-    const searchParams = new URLSearchParams();
+export function encodeParams(params: QueryDict, urlSearchParams?: URLSearchParams): URLSearchParams {
+    const searchParams = urlSearchParams ?? new URLSearchParams();
     for (const [key, val] of Object.entries(params)) {
         if (val !== undefined && val !== null) {
-            searchParams.set(key, String(val));
+            if (Array.isArray(val)) {
+                val.forEach(v => {
+                    searchParams.append(key, String(v));
+                });
+            } else {
+                searchParams.append(key, String(val));
+            }
         }
     }
-    return searchParams.toString();
+    return searchParams;
 }
 
-export type QueryDict = Record<string, string | string[]>;
+export type QueryDict = Record<string, string[] | string | number | boolean | undefined>;
 
 /**
  * Decode a query string in `application/x-www-form-urlencoded` format.
@@ -57,8 +85,8 @@ export type QueryDict = Record<string, string | string[]>;
  * This behaviour matches Node's qs.parse but is built on URLSearchParams
  * for native web compatibility
  */
-export function decodeParams(query: string): QueryDict {
-    const o: QueryDict = {};
+export function decodeParams(query: string): Record<string, string | string[]> {
+    const o: Record<string, string | string[]> = {};
     const params = new URLSearchParams(query);
     for (const key of params.keys()) {
         const val = params.getAll(key);
@@ -75,8 +103,7 @@ export function decodeParams(query: string): QueryDict {
  * variables with. E.g. { "$bar": "baz" }.
  * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
  */
-export function encodeUri(pathTemplate: string,
-    variables: Record<string, string>): string {
+export function encodeUri(pathTemplate: string, variables: Record<string, string>): string {
     for (const key in variables) {
         if (!variables.hasOwnProperty(key)) {
             continue;
@@ -216,33 +243,24 @@ export function deepCompare(x: any, y: any): boolean {
             }
         }
     } else {
-        // disable jshint "The body of a for in should be wrapped in an if
-        // statement"
-        /* jshint -W089 */
-
         // check that all of y's direct keys are in x
-        let p;
-        for (p in y) {
+        for (const p in y) {
             if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
                 return false;
             }
         }
 
         // finally, compare each of x's keys with y
-        for (p in y) { // eslint-disable-line guard-for-in
-            if (y.hasOwnProperty(p) !== x.hasOwnProperty(p)) {
-                return false;
-            }
-            if (!deepCompare(x[p], y[p])) {
+        for (const p in x) {
+            if (y.hasOwnProperty(p) !== x.hasOwnProperty(p) || !deepCompare(x[p], y[p])) {
                 return false;
             }
         }
     }
-    /* jshint +W089 */
     return true;
 }
 
-// Dev note: This returns a tuple, but jsdoc doesn't like that. https://github.com/jsdoc/jsdoc/issues/1703
+// Dev note: This returns an array of tuples, but jsdoc doesn't like that. https://github.com/jsdoc/jsdoc/issues/1703
 /**
  * Creates an array of object properties/values (entries) then
  * sorts the result by key, recursively. The input object must
@@ -321,14 +339,15 @@ export function normalize(str: string): string {
 // Arabic Letter RTL mark U+061C
 // Combining characters U+0300 - U+036F
 // Zero width no-break space (BOM) U+FEFF
+// Blank/invisible characters (U2800, U2062-U2063)
 // eslint-disable-next-line no-misleading-character-class
-const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036F\uFEFF\u061C\s]/g;
+const removeHiddenCharsRegex = /[\u2000-\u200F\u202A-\u202F\u0300-\u036F\uFEFF\u061C\u2800\u2062-\u2063\s]/g;
 
 export function escapeRegExp(string: string): string {
     return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-export function globToRegexp(glob: string, extended?: any): string {
+export function globToRegexp(glob: string, extended = false): string {
     // From
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
     // Because micromatch is about 130KB with dependencies,
@@ -336,7 +355,7 @@ export function globToRegexp(glob: string, extended?: any): string {
     const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
         [/\\\*/g, '.*'],
         [/\?/g, '.'],
-        extended !== false && [
+        !extended && [
             /\\\[(!|)(.*)\\]/g,
             (_match: string, neg: string, pat: string) => [
                 '[',
@@ -393,7 +412,7 @@ export function defer<T = void>(): IDeferred<T> {
 
 export async function promiseMapSeries<T>(
     promises: Array<T | Promise<T>>,
-    fn: (t: T) => Promise<unknown> | void, // if async/promise we don't care about the type as we only await resolution
+    fn: (t: T) => Promise<unknown> | undefined, // if async we don't care about the type as we only await resolution
 ): Promise<void> {
     for (const o of promises) {
         await fn(await o);
@@ -431,20 +450,6 @@ export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<
         minTimeout: 3000, // ms
         maxTimeout: 15000, // ms
     });
-}
-
-// We need to be able to access the Node.js crypto library from within the
-// Matrix SDK without needing to `require("crypto")`, which will fail in
-// browsers.  So `index.ts` will call `setCrypto` to store it, and when we need
-// it, we can call `getCrypto`.
-let crypto: typeof NodeCrypto;
-
-export function setCrypto(c: typeof NodeCrypto) {
-    crypto = c;
-}
-
-export function getCrypto(): typeof NodeCrypto {
-    return crypto;
 }
 
 // String averaging inspired by https://stackoverflow.com/a/2510816
@@ -657,17 +662,6 @@ export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: Mat
     return getContentTimestampWithFallback(right) - getContentTimestampWithFallback(left);
 }
 
-export async function getPrivateReadReceiptField(client: MatrixClient): Promise<ReceiptType | null> {
-    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285.stable")) return ReceiptType.ReadPrivate;
-    if (await client.doesServerSupportUnstableFeature("org.matrix.msc2285")) return ReceiptType.UnstableReadPrivate;
-    return null;
-}
-
 export function isSupportedReceiptType(receiptType: string): boolean {
-    return [
-        ReceiptType.Read,
-        ReceiptType.ReadPrivate,
-        ReceiptType.UnstableReadPrivate,
-    ].includes(receiptType as ReceiptType);
+    return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receiptType as ReceiptType);
 }
-

@@ -30,6 +30,12 @@ const RES_WITH_AGE = {
                 account_data: { events: [] },
                 ephemeral: { events: [] },
                 unread_notifications: {},
+                unread_thread_notifications: {
+                    "$143273582443PhrSn:example.org": {
+                        highlight_count: 0,
+                        notification_count: 1,
+                    },
+                },
                 timeline: {
                     events: [
                         Object.freeze({
@@ -302,9 +308,6 @@ describe("SyncAccumulator", function() {
                     [ReceiptType.ReadPrivate]: {
                         "@dan:localhost": { ts: 4 },
                     },
-                    [ReceiptType.UnstableReadPrivate]: {
-                        "@matthew:localhost": { ts: 5 },
-                    },
                     "some.other.receipt.type": {
                         "@should_be_ignored:localhost": { key: "val" },
                     },
@@ -349,9 +352,6 @@ describe("SyncAccumulator", function() {
                     },
                     [ReceiptType.ReadPrivate]: {
                         "@dan:localhost": { ts: 4 },
-                    },
-                    [ReceiptType.UnstableReadPrivate]: {
-                        "@matthew:localhost": { ts: 5 },
                     },
                 },
                 "$event2:localhost": {
@@ -444,6 +444,13 @@ describe("SyncAccumulator", function() {
             expect(Object.keys(output.roomsData.join["!foo:bar"].timeline.events[0])).toEqual(
                 Object.keys(RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0]),
             );
+        });
+
+        it("should retrieve unread thread notifications", () => {
+            sa.accumulate(RES_WITH_AGE);
+            const output = sa.getJSON();
+            expect(output.roomsData.join["!foo:bar"]
+                .unread_thread_notifications["$143273582443PhrSn:example.org"]).not.toBeUndefined();
         });
     });
 });
