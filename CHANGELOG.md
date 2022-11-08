@@ -1,5 +1,5 @@
-Changes in [21.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.1.0-rc.1) (2022-11-01)
-============================================================================================================
+Changes in [21.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.1.0) (2022-11-08)
+==================================================================================================
 
 ## ✨ Features
  * Loading threads with server-side assistance ([\#2735](https://github.com/matrix-org/matrix-js-sdk/pull/2735)). Contributed by @justjanne.
