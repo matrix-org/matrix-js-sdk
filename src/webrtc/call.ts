@@ -411,7 +411,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.invitee = opts.invitee;
         this.client = opts.client;
 
-        if (!this.client.deviceId) throw new Error("Client must have a device ID to start calls");
+        if (!this.client.getDeviceId()) throw new Error("Client must have a device ID to start calls");
 
         this.forceTURN = opts.forceTURN ?? false;
         this.ourPartyId = this.client.deviceId;
