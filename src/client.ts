@@ -5660,7 +5660,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // thread events to populate thread summaries.
         let timeline = timelineSet.getTimelineForEvent(events[0].getId()!);
         if (timeline) {
-            timeline.getState(EventTimeline.BACKWARDS)!.setUnknownStateEvents(contextRes.state.map(mapper));
+            const backwardsState = timeline.getState(EventTimeline.BACKWARDS);
+            if (backwardsState) {
+                backwardsState.setUnknownStateEvents(contextRes.state.map(mapper));
+            } else {
+                throw new Error(
+                    `fetchLatestLiveTimeline: While updating backwards state of the existing ` +
+                    ` timeline=${timeline.toString()}, it unexpectedly did not have any backwards ` +
+                    `state. Something probably broke with the timeline earlier for this to happen.`,
+                );
+            }
         } else {
             // If the `latestEventIdInTimeline` does not belong to this `timelineSet`
             // then it will be ignored and not added to the `timelineSet`. We'll instead
@@ -5668,7 +5677,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // pagination tokens setup to continue paginating.
             timeline = timelineSet.addTimeline();
             timeline.initialiseState(contextRes.state.map(mapper));
-            timeline.getState(EventTimeline.FORWARDS)!.paginationToken = contextRes.end;
+            const forwardsState = timeline.getState(EventTimeline.FORWARDS);
+            if (forwardsState) {
+                forwardsState.paginationToken = contextRes.end;
+            } else {
+                throw new Error(
+                    `fetchLatestLiveTimeline: While updating forwards state of the new ` +
+                    ` timeline=${timeline.toString()}, it unexpectedly did not have any forwards ` +
+                    `state. Something probably broke while creating the timeline for this to happen.`,
+                );
+            }
         }
 
         const [timelineEvents, threadedEvents] = timelineSet.room.partitionThreadedEvents(events);
