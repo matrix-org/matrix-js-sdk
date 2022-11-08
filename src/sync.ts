@@ -1536,6 +1536,7 @@ export class SyncApi {
             {
                 prefix: '',
                 localTimeoutMs: 15 * 1000,
+                abortSignal: this.abortController?.signal,
             },
         ).then(() => {
             success();
