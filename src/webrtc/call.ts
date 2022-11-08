@@ -414,7 +414,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!this.client.getDeviceId()) throw new Error("Client must have a device ID to start calls");
 
         this.forceTURN = opts.forceTURN ?? false;
-        this.ourPartyId = this.client.deviceId;
+        this.ourPartyId = this.client.deviceId!;
+        if (!this.ourPartyId) {
+            logger.warn('MatrixCall: ourPartyId is null which may have unintended consequences');
+        }
         this.opponentDeviceId = opts.opponentDeviceId;
         this.opponentSessionId = opts.opponentSessionId;
         this.groupCallId = opts.groupCallId;
