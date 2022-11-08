@@ -5185,9 +5185,9 @@ marked@^4.0.10:
   resolved "https://registry.yarnpkg.com/marked/-/marked-4.1.1.tgz#2f709a4462abf65a283f2453dc1c42ab177d302e"
   integrity sha512-0cNMnTcUJPxbA6uWmCmjWz4NJRe/0Xfk2NhXCUHjew9qJzFN20krFnsUe7QynwqOwa5m1fZ4UDg0ycKFVC0ccw==
 
-"matrix-events-sdk@github:t3chguy/matrix-events-sdk#b33f44cefcd72b8a9e443454431031fee012fe52":
+"matrix-events-sdk@github:robintown/matrix-events-sdk#2fab6c9f566e35f2e4b0f5e7cb1167ec475328bd":
   version "0.0.1-beta.7"
-  resolved "https://codeload.github.com/t3chguy/matrix-events-sdk/tar.gz/b33f44cefcd72b8a9e443454431031fee012fe52"
+  resolved "https://codeload.github.com/robintown/matrix-events-sdk/tar.gz/2fab6c9f566e35f2e4b0f5e7cb1167ec475328bd"
 
 matrix-mock-request@^2.5.0:
   version "2.6.0"

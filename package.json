@@ -59,7 +59,7 @@
     "bs58": "^5.0.0",
     "content-type": "^1.0.4",
     "loglevel": "^1.7.1",
-    "matrix-events-sdk": "github:t3chguy/matrix-events-sdk#b33f44cefcd72b8a9e443454431031fee012fe52",
+    "matrix-events-sdk": "github:robintown/matrix-events-sdk#2fab6c9f566e35f2e4b0f5e7cb1167ec475328bd",
     "matrix-widget-api": "^1.0.0",
     "p-retry": "4",
     "qs": "^6.9.6",
