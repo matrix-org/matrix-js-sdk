@@ -1076,7 +1076,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public hangup(reason: CallErrorCode, suppressEvent: boolean): void {
         if (this.callHasEnded()) return;
 
-        logger.debug("Ending call " + this.callId);
+        logger.debug(`Ending call ${this.callId} with reason ${reason}`);
         this.terminate(CallParty.Local, reason, !suppressEvent);
         // We don't want to send hangup here if we didn't even get to sending an invite
         if (this.state === CallState.WaitLocalMedia) return;
@@ -2096,10 +2096,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.candidatesEnded = false;
                 this.peerConn!.restartIce();
             } else {
+                logger.info(`Hanging up call ${this.callId} (ICE failed and no ICE restart method)`);
                 this.hangup(CallErrorCode.IceFailed, false);
             }
         } else if (this.peerConn?.iceConnectionState == 'disconnected') {
             this.iceDisconnectedTimeout = setTimeout(() => {
+                logger.info(`Hanging up call ${this.callId} (ICE disconnected for too long)`);
                 this.hangup(CallErrorCode.IceFailed, false);
             }, 30 * 1000);
         }
