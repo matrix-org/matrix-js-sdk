@@ -40,10 +40,17 @@ export interface IScreensharingOpts {
     throwOnFail?: boolean;
 }
 
+export interface AudioSettings {
+    autoGainControl: boolean;
+    echoCancellation: boolean;
+    noiseSuppression: boolean;
+}
+
 export class MediaHandler extends TypedEventEmitter<
     MediaHandlerEvent.LocalStreamsChanged, MediaHandlerEventHandlerMap
 > {
     private audioInput?: string;
+    private audioSettings?: AudioSettings;
     private videoInput?: string;
     private localUserMediaStream?: MediaStream;
     public userMediaStreams: MediaStream[] = [];
@@ -64,11 +71,22 @@ export class MediaHandler extends TypedEventEmitter<
      * undefined treated as unset
      */
     public async setAudioInput(deviceId: string): Promise<void> {
-        logger.info("LOG setting audio input to", deviceId);
+        logger.info("Setting audio input to", deviceId);
 
         if (this.audioInput === deviceId) return;
 
         this.audioInput = deviceId;
+        await this.updateLocalUsermediaStreams();
+    }
+
+    /**
+     * Set audio settings for MatrixCalls
+     * @param {AudioSettings} opts audio options to set
+     */
+    public async setAudioSettings(opts: AudioSettings): Promise<void> {
+        logger.info("Setting audio settings to", opts);
+
+        this.audioSettings = Object.assign({}, opts) as AudioSettings;
         await this.updateLocalUsermediaStreams();
     }
 
@@ -78,7 +96,7 @@ export class MediaHandler extends TypedEventEmitter<
      * undefined treated as unset
      */
     public async setVideoInput(deviceId: string): Promise<void> {
-        logger.info("LOG setting video input to", deviceId);
+        logger.info("Setting video input to", deviceId);
 
         if (this.videoInput === deviceId) return;
 
@@ -362,6 +380,9 @@ export class MediaHandler extends TypedEventEmitter<
             audio: audio
                 ? {
                     deviceId: this.audioInput ? { ideal: this.audioInput } : undefined,
+                    autoGainControl: this.audioSettings ? { ideal: this.audioSettings.autoGainControl } : undefined,
+                    echoCancellation: this.audioSettings ? { ideal: this.audioSettings.echoCancellation } : undefined,
+                    noiseSuppression: this.audioSettings ? { ideal: this.audioSettings.noiseSuppression } : undefined,
                 }
                 : false,
             video: video

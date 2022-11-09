@@ -1,3 +1,17 @@
+Changes in [21.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.1.0) (2022-11-08)
+==================================================================================================
+
+## ✨ Features
+ * Loading threads with server-side assistance ([\#2735](https://github.com/matrix-org/matrix-js-sdk/pull/2735)). Contributed by @justjanne.
+ * Support sign in + E2EE set up using QR code implementing MSC3886, MSC3903 and MSC3906 ([\#2747](https://github.com/matrix-org/matrix-js-sdk/pull/2747)). Contributed by @hughns.
+
+## 🐛 Bug Fixes
+ * Replace `instanceof Array` with `Array.isArray` ([\#2812](https://github.com/matrix-org/matrix-js-sdk/pull/2812)). Fixes #2811.
+ * Emit UnreadNotification event on notifications reset ([\#2804](https://github.com/matrix-org/matrix-js-sdk/pull/2804)). Fixes vector-im/element-web#23590.
+ * Fix incorrect prevEv being sent in ClientEvent.AccountData events ([\#2794](https://github.com/matrix-org/matrix-js-sdk/pull/2794)).
+ * Fix build error caused by wrong ts-strict improvements ([\#2783](https://github.com/matrix-org/matrix-js-sdk/pull/2783)). Contributed by @justjanne.
+ * Encryption should not hinder verification ([\#2734](https://github.com/matrix-org/matrix-js-sdk/pull/2734)).
+
 Changes in [21.0.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.0.1) (2022-11-01)
 ==================================================================================================
 
