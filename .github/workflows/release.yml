@@ -24,10 +24,7 @@ jobs:
 
       - name: 📋 Copy to temp
         run: |
-          tag="${{ github.ref_name }}"
-          version="${tag#v}"
-          echo "VERSION=$version" >> $GITHUB_ENV
-          cp -a "./.jsdoc/matrix-js-sdk/$version" $RUNNER_TEMP
+          cp -a "./_docs" "$RUNNER_TEMP/"
 
       - name: 🧮 Checkout gh-pages
         uses: actions/checkout@v3
@@ -36,7 +33,10 @@ jobs:
 
       - name: 🔪 Prepare
         run: |
-          cp -a "$RUNNER_TEMP/$VERSION" .
+          tag="${{ github.ref_name }}"
+          VERSION="${tag#v}"
+          [ ! -e "$VERSION" ] || rm -r $VERSION
+          cp -r $RUNNER_TEMP/docs/ $VERSION
 
           # Add the new directory to the index if it isn't there already
           if ! grep -q ">Version $VERSION</a>" index.html; then
