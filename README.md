@@ -295,12 +295,12 @@ API Reference
 A hosted reference can be found at
 http://matrix-org.github.io/matrix-js-sdk/index.html
 
-This SDK uses JSDoc3 style comments. You can manually build and
+This SDK uses [Typedoc](https://typedoc.org/guides/doccomments) doc comments. You can manually build and
 host the API reference from the source files like this:
 
 ```
   $ yarn gendoc
-  $ cd .jsdoc
+  $ cd _docs
   $ python -m http.server 8005
 ```
 
