@@ -22,11 +22,12 @@ import { RelationType } from "../@types/event";
 import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
-import { Room, RoomEvent } from './room';
+import { NotificationCountType, Room, RoomEvent } from './room';
 import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
+import { ReceiptType } from "../@types/read_receipts";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -416,6 +417,24 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public addReceipt(event: MatrixEvent, synthetic: boolean): void {
         throw new Error("Unsupported function on the thread model");
+    }
+
+    public hasUserReadEvent(userId: string, eventId: string): boolean {
+        if (userId === this.client.getUserId()) {
+            const publicReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.Read);
+            const privateReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.ReadPrivate);
+            const hasUnreads = this.room.getThreadUnreadNotificationCount(this.id, NotificationCountType.Total) > 0;
+
+            if (!publicReadReceipt && !privateReadReceipt && !hasUnreads) {
+                // Consider an event read if it's part of a thread that has no
+                // read receipts and has no notifications. It is likely that it is
+                // part of a thread that was created before read receipts for threads
+                // were supported (via MSC3771)
+                return true;
+            }
+        }
+
+        return super.hasUserReadEvent(userId, eventId);
     }
 }
 
