@@ -1363,6 +1363,13 @@ describe("MatrixClient", function() {
             expect(resp.token).toBe("tt");
         });
     });
+
+    describe("uploadKeys", () => {
+        // uploadKeys() is a no-op nowadays, so there's not much to test here.
+        it("should complete successfully", async () => {
+            await client!.uploadKeys();
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
