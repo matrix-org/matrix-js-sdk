@@ -127,7 +127,7 @@ function makeTestClient(cryptoStore) {
     ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {}) as MockedObject<MatrixScheduler>;
     const store = new StubStore();
 
-    return new MatrixClient({
+    const client = new MatrixClient({
         baseUrl: "https://my.home.server",
         idBaseUrl: "https://identity.server",
         accessToken: "my.access.token",
@@ -139,6 +139,10 @@ function makeTestClient(cryptoStore) {
         cryptoStore: cryptoStore,
         cryptoCallbacks: { getCrossSigningKey, saveCrossSigningKeys },
     });
+
+    // initialising the crypto library will trigger a key upload request, which we can stub out
+    client.uploadKeysRequest = jest.fn();
+    return client;
 }
 
 describe("MegolmBackup", function() {
@@ -502,6 +506,8 @@ describe("MegolmBackup", function() {
                 deviceId: "device",
                 cryptoStore: cryptoStore,
             });
+            // initialising the crypto library will trigger a key upload request, which we can stub out
+            client.uploadKeysRequest = jest.fn();
 
             megolmDecryption = new MegolmDecryption({
                 userId: '@user:id',
@@ -718,6 +724,9 @@ describe("MegolmBackup", function() {
                 deviceId: "device",
                 cryptoStore,
             });
+            // initialising the crypto library will trigger a key upload request, which we can stub out
+            client.uploadKeysRequest = jest.fn();
+
             await client.initCrypto();
 
             cryptoStore.countSessionsNeedingBackup = jest.fn().mockReturnValue(6);

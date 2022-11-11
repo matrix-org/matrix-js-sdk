@@ -1199,10 +1199,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.store.storeUser(new User(userId));
         }
 
-        if (this.crypto) {
-            this.crypto.uploadDeviceKeys();
-        }
-
         // periodically poll for turn servers if we support voip
         if (this.canSupportVoip) {
             this.checkTurnServersIntervalID = setInterval(() => {
@@ -1851,6 +1847,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // if crypto initialisation was successful, tell it to attach its event handlers.
         crypto.registerEventHandlers(this as Parameters<Crypto["registerEventHandlers"]>[0]);
         this.crypto = crypto;
+
+        // upload our keys in the background
+        this.crypto.uploadDeviceKeys().catch((e) => {
+            // TODO: throwing away this error is a really bad idea.
+            logger.error("Error uploading device keys", e);
+        });
     }
 
     /**
@@ -1882,15 +1884,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Upload the device keys to the homeserver.
-     * @return {Promise<void>} A promise that will resolve when the keys are uploaded.
+     * @deprecated Does nothing.
      */
     public async uploadKeys(): Promise<void> {
-        if (!this.crypto) {
-            throw new Error("End-to-end encryption disabled");
-        }
-
-        await this.crypto.uploadDeviceKeys();
+        logger.warn("MatrixClient.uploadKeys is deprecated");
     }
 
     /**

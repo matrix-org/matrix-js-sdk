@@ -55,10 +55,7 @@ interface OlmPayload {
 
 async function bobUploadsDeviceKeys(): Promise<void> {
     bobTestClient.expectDeviceKeyUpload();
-    await Promise.all([
-        bobTestClient.client.uploadKeys(),
-        bobTestClient.httpBackend.flushAllExpected(),
-    ]);
+    await bobTestClient.httpBackend.flushAllExpected();
     expect(Object.keys(bobTestClient.deviceKeys!).length).not.toEqual(0);
 }
 
