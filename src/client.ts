@@ -1851,7 +1851,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.crypto.uploadDeviceKeys().catch((e) => {
             // TODO: throwing away this error is a really bad idea.
             logger.error("Error uploading device keys", e);
-        })
+        });
     }
 
     /**
