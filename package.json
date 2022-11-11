@@ -16,7 +16,7 @@
     "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
     "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig-build.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
     "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
-    "gendoc": "jsdoc -c jsdoc.json -P package.json",
+    "gendoc": "typedoc",
     "lint": "yarn lint:types && yarn lint:js",
     "lint:js": "eslint --max-warnings 0 src spec",
     "lint:js-fix": "eslint --fix src spec",
@@ -107,11 +107,12 @@
     "jest-environment-jsdom": "^28.1.3",
     "jest-localstorage-mock": "^2.4.6",
     "jest-mock": "^29.0.0",
-    "jsdoc": "^3.6.6",
     "matrix-mock-request": "^2.5.0",
     "rimraf": "^3.0.2",
     "terser": "^5.5.1",
     "tsify": "^5.0.2",
+    "typedoc": "^0.23.20",
+    "typedoc-plugin-missing-exports": "^1.0.0",
     "typescript": "^4.5.3"
   },
   "jest": {

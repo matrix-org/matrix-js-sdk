@@ -63,7 +63,7 @@ jobs:
         run: "yarn install"
 
       - name: Generate Docs
-        run: "yarn run gendoc -d _docs"
+        run: "yarn run gendoc"
         
       - name: Upload Artifact
         uses: actions/upload-artifact@v2
