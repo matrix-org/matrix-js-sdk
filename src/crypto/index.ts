@@ -1775,11 +1775,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         eventEmitter.on(MatrixEventEvent.Decrypted, this.onTimelineEvent);
     }
 
-    /** Start background processes related to crypto */
-    public start(): void {
-        this.outgoingRoomKeyRequestManager.start();
-    }
-
     /** Stop background processes related to crypto */
     public stop(): void {
         this.outgoingRoomKeyRequestManager.stop();
