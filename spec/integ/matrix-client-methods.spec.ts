@@ -509,7 +509,12 @@ describe("MatrixClient", function() {
         }
 
         beforeEach(function() {
-            return client!.initCrypto();
+            // running initCrypto should trigger a key upload
+            httpBackend.when("POST", "/keys/upload").respond(200, {});
+            return Promise.all([
+                client!.initCrypto(),
+                httpBackend.flush("/keys/upload", 1),
+            ]);
         });
 
         afterEach(() => {
