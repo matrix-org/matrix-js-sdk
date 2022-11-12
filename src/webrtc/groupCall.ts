@@ -186,7 +186,7 @@ export class GroupCall extends TypedEventEmitter<
     private resendMemberStateTimer: ReturnType<typeof setInterval> | null = null;
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
-    private sfu: ISfuInfo | null;
+    private sfu: ISfuInfo | null = null;
 
     constructor(
         private client: MatrixClient,
@@ -367,6 +367,17 @@ export class GroupCall extends TypedEventEmitter<
                 "feeds": [],
             };
 
+            const onError = (e?): void => {
+                logger.warn(`Failed to place call to ${this.sfu!.user_id}!`, e);
+                this.emit(
+                    GroupCallEvent.Error,
+                    new GroupCallError(
+                        GroupCallErrorCode.PlaceCallFailed,
+                        `Failed to place call to ${this.sfu!.user_id}.`,
+                    ),
+                );
+            };
+
             const sfuCall = createNewMatrixCall(
                 this.client,
                 this.room.roomId,
@@ -378,21 +389,17 @@ export class GroupCall extends TypedEventEmitter<
                     isSfu: true,
                 },
             );
-
-            sfuCall.isPtt = this.isPtt;
+            if (!sfuCall) {
+                onError();
+                return;
+            }
 
             try {
+                sfuCall.isPtt = this.isPtt;
                 await sfuCall.placeCallWithCallFeeds(this.getLocalFeeds());
                 sfuCall.createDataChannel("datachannel", this.dataChannelOptions);
             } catch (e) {
-                logger.warn(`Failed to place call to ${this.sfu.user_id}!`, e);
-                this.emit(
-                    GroupCallEvent.Error,
-                    new GroupCallError(
-                        GroupCallErrorCode.PlaceCallFailed,
-                        `Failed to place call to ${this.sfu.user_id}.`,
-                    ),
-                );
+                onError(e);
                 return;
             }
 
@@ -656,7 +663,7 @@ export class GroupCall extends TypedEventEmitter<
 
                 // TODO: handle errors
                 await Promise.all(this.calls.map(call => call.pushLocalFeed(call.isSfu
-                    ? this.localScreenshareFeed
+                    ? this.localScreenshareFeed!
                     : this.localScreenshareFeed!.clone(),
                 )));
 
@@ -1146,9 +1153,9 @@ export class GroupCall extends TypedEventEmitter<
             if (
                 !(feed.purpose === SDPStreamMetadataPurpose.Usermedia
                     ? this.screenshareFeeds
-                    : this.userMediaFeeds).some((f) => f.userId === feed.getMember().userId)
+                    : this.userMediaFeeds).some((f) => f.userId === feed.getMember()!.userId)
             ) {
-                this.removeParticipant(feed.getMember());
+                this.removeParticipant(feed.getMember()!);
             }
 
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
@@ -1159,7 +1166,7 @@ export class GroupCall extends TypedEventEmitter<
         call.getRemoteFeeds().filter((cf) => {
             return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
         }).forEach((feed) => {
-            this.addParticipant(feed.getMember());
+            this.addParticipant(feed.getMember()!);
 
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
             else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.addScreenshareFeed(feed);
