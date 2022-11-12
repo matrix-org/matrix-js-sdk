@@ -375,7 +375,7 @@ export interface ICreateClientOpts {
     /**
      * The user ID for the local SFU to use for group calling, if any
      */
-    localSfu?: string;
+    localSfuUserId?: string;
 
     /**
      * The device ID for the local SFU to use for group calling, if any
@@ -1021,8 +1021,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected sessionId: string;
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
-    private localSfu: string;
-    private localSfuDeviceId: string;
+    private localSfuUserId?: string;
+    private localSfuDeviceId?: string;
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
 
@@ -1099,7 +1099,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         }
 
-        this.localSfu = opts.localSfu;
+        this.localSfuUserId = opts.localSfuUserId;
         this.localSfuDeviceId = opts.localSfuDeviceId;
 
         if (supportsMatrixCall()) {
@@ -1583,10 +1583,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public getSfu(): ISfuInfo | null {
-        if (!this.localSfu || !this.localSfuDeviceId) return null;
+        if (!this.localSfuUserId || !this.localSfuDeviceId) return null;
 
         return {
-            user_id: this.localSfu,
+            user_id: this.localSfuUserId,
             device_id: this.localSfuDeviceId,
         };
     }

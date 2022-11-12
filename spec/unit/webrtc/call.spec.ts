@@ -820,9 +820,12 @@ describe('Call', function() {
             const setupCall = (audio: boolean, video: boolean): SDPStreamMetadata => {
                 const metadata = {
                     stream: {
+                        user_id: "user",
+                        device_id: "device",
                         purpose: SDPStreamMetadataPurpose.Usermedia,
                         audio_muted: audio,
                         video_muted: video,
+                        tracks: {},
                     },
                 };
                 (call as any).pushRemoteFeed(new MockMediaStream("stream", [
