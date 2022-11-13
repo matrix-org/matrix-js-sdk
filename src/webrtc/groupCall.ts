@@ -109,6 +109,15 @@ export interface IGroupCallRoomMemberFeed {
     purpose: SDPStreamMetadataPurpose;
 }
 
+export interface IGroupCallRoomState {
+    "m.intent": GroupCallIntent;
+    "m.type": GroupCallType;
+    "io.element.ptt"?: boolean;
+    // TODO: Specify data-channels
+    "dataChannelsEnabled"?: boolean;
+    "dataChannelOptions"?: IGroupCallDataChannelOptions;
+}
+
 export interface IGroupCallRoomMemberDevice {
     "device_id": string;
     "session_id": string;
@@ -195,7 +204,7 @@ export class GroupCall extends TypedEventEmitter<
         public isPtt: boolean,
         public intent: GroupCallIntent,
         groupCallId?: string,
-        private dataChannelsEnabled?: boolean,
+        private dataChannelsEnabled = false,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
     ) {
         super();
@@ -210,17 +219,19 @@ export class GroupCall extends TypedEventEmitter<
     public async create() {
         this.client.groupCallEventHandler!.groupCalls.set(this.room.roomId, this);
 
+        const groupCallState: IGroupCallRoomState = {
+            "m.intent": this.intent,
+            "m.type": this.type,
+            "io.element.ptt": this.isPtt,
+            // TODO: Specify data-channels better
+            "dataChannelsEnabled": this.dataChannelsEnabled,
+            "dataChannelOptions": this.dataChannelsEnabled ? this.dataChannelOptions : undefined,
+        };
+
         await this.client.sendStateEvent(
             this.room.roomId,
             EventType.GroupCallPrefix,
-            {
-                "m.intent": this.intent,
-                "m.type": this.type,
-                "io.element.ptt": this.isPtt,
-                // TODO: Specify datachannels
-                "dataChannelsEnabled": this.dataChannelsEnabled,
-                "dataChannelOptions": this.dataChannelOptions,
-            },
+            groupCallState,
             this.groupCallId,
         );
 
