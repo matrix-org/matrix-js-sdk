@@ -436,10 +436,14 @@ export class GroupCall extends TypedEventEmitter<
         // Try to find a focus of another user to use
         let focusOfAnotherMember: IFocusInfo | undefined;
         for (const event of this.getMemberStateEvents()) {
-            focusOfAnotherMember = event.getContent<IGroupCallRoomMemberState>()
+            const focus = event.getContent<IGroupCallRoomMemberState>()
                 ?.["m.calls"] ?.[0]
                 ?.["m.devices"]?.[0]
                 ?.["m.foci.active"]?.[0];
+            if (focus) {
+                focusOfAnotherMember = focus;
+                break;
+            }
         }
 
         this.foci = [focusOfAnotherMember ?? this.client.getFoci()[0]];
