@@ -8749,11 +8749,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         clientSecret: string,
         msisdnToken: string,
     ): Promise<any> { // TODO: Types
-        const u = new URL(url);
-        u.searchParams.set("sid", sid);
-        u.searchParams.set("client_secret", clientSecret);
-        u.searchParams.set("token", msisdnToken);
-        return this.http.requestOtherUrl(Method.Post, u);
+        const params = {
+            sid: sid,
+            client_secret: clientSecret,
+            token: msisdnToken,
+        };
+        return this.http.requestOtherUrl(Method.Post, url, params);
     }
 
     /**
