@@ -1,6 +1,6 @@
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
-import { ISfuInfo, MatrixClient } from "../client";
+import { IFocusInfo, MatrixClient } from "../client";
 import {
     CallErrorCode,
     CallEvent,
@@ -122,11 +122,12 @@ export interface IGroupCallRoomMemberDevice {
     "device_id": string;
     "session_id": string;
     "feeds": IGroupCallRoomMemberFeed[];
+    "m.foci.active"?: IFocusInfo[];
+    "m.foci.preferred"?: IFocusInfo[];
 }
 
 export interface IGroupCallRoomMemberCallState {
     "m.call_id": string;
-    "m.foci"?: string[];
     "m.devices": IGroupCallRoomMemberDevice[];
 }
 
@@ -195,7 +196,7 @@ export class GroupCall extends TypedEventEmitter<
     private resendMemberStateTimer: ReturnType<typeof setInterval> | null = null;
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
-    private sfu: ISfuInfo | null = null;
+    private foci: IFocusInfo[] = [];
 
     constructor(
         private client: MatrixClient,
@@ -242,6 +243,15 @@ export class GroupCall extends TypedEventEmitter<
         const oldState = this.state;
         this.state = newState;
         this.emit(GroupCallEvent.GroupCallStateChanged, newState, oldState);
+    }
+
+    private getPreferredFoci(): IFocusInfo[] {
+        const preferredFoci = this.client.getFoci();
+        const isUsingPreferredFocus = Boolean(preferredFoci.find(pf => (
+            this.foci.find(f => pf.user_id === f.user_id && pf.device_id === pf.device_id)
+        )));
+
+        return isUsingPreferredFocus ? [] : preferredFoci;
     }
 
     public getLocalFeeds(): CallFeed[] {
@@ -339,14 +349,16 @@ export class GroupCall extends TypedEventEmitter<
 
         this.addParticipant(this.room.getMember(this.client.getUserId()!)!);
 
-        await this.sendMemberStateEvent();
-
-        this.activeSpeaker = undefined;
+        // TODO: Call preferred foci
 
         // This needs to be done before we set the state to entered. With the
         // state set to entered, we'll start calling other participants full-mesh
-        // which we don't want, if we have an SFU
-        this.sfu = this.client.getSfu();
+        // which we don't want, if we have a focus
+        this.chooseFocus();
+
+        await this.sendMemberStateEvent();
+
+        this.activeSpeaker = undefined;
 
         this.setState(GroupCallState.Entered);
 
@@ -370,21 +382,21 @@ export class GroupCall extends TypedEventEmitter<
 
         this.onActiveSpeakerLoop();
 
-        if (this.sfu) {
+        if (this.foci[0]) {
             const opponentDevice = {
-                "device_id": this.sfu.device_id,
+                "device_id": this.foci[0].device_id,
                 // XXX: What if an SFU gets restarted?
                 "session_id": "sfu",
                 "feeds": [],
             };
 
             const onError = (e?): void => {
-                logger.warn(`Failed to place call to ${this.sfu!.user_id}!`, e);
+                logger.warn(`Failed to place call to ${this.foci[0].user_id}!`, e);
                 this.emit(
                     GroupCallEvent.Error,
                     new GroupCallError(
                         GroupCallErrorCode.PlaceCallFailed,
-                        `Failed to place call to ${this.sfu!.user_id}.`,
+                        `Failed to place call to ${this.foci[0].user_id}.`,
                     ),
                 );
             };
@@ -393,11 +405,11 @@ export class GroupCall extends TypedEventEmitter<
                 this.client,
                 this.room.roomId,
                 {
-                    invitee: this.sfu.user_id,
+                    invitee: this.foci[0].user_id,
                     opponentDeviceId: opponentDevice.device_id,
                     opponentSessionId: opponentDevice.session_id,
                     groupCallId: this.groupCallId,
-                    isSfu: true,
+                    isFocus: true,
                 },
             );
             if (!sfuCall) {
@@ -416,6 +428,21 @@ export class GroupCall extends TypedEventEmitter<
 
             this.addCall(sfuCall);
         }
+    }
+
+    private chooseFocus(): void {
+        // TODO: Go through all state and find best focus and try to use that
+
+        // Try to find a focus of another user to use
+        let focusOfAnotherMember: IFocusInfo | undefined;
+        for (const event of this.getMemberStateEvents()) {
+            focusOfAnotherMember = event.getContent<IGroupCallRoomMemberState>()
+                ?.["m.calls"] ?.[0]
+                ?.["m.devices"]?.[0]
+                ?.["m.foci.active"]?.[0];
+        }
+
+        this.foci = [focusOfAnotherMember ?? this.client.getFoci()[0]];
     }
 
     private dispose() {
@@ -673,7 +700,7 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 // TODO: handle errors
-                await Promise.all(this.calls.map(call => call.pushLocalFeed(call.isSfu
+                await Promise.all(this.calls.map(call => call.pushLocalFeed(call.isFocus
                     ? this.localScreenshareFeed!
                     : this.localScreenshareFeed!.clone(),
                 )));
@@ -697,7 +724,7 @@ export class GroupCall extends TypedEventEmitter<
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed!.stream);
             // We have to remove the feed manually as MatrixCall has its clone,
             // so it won't be removed automatically
-            if (!this.sfu) {
+            if (!this.foci[0]) {
                 this.removeScreenshareFeed(this.localScreenshareFeed!);
             }
             this.localScreenshareFeed = undefined;
@@ -786,6 +813,8 @@ export class GroupCall extends TypedEventEmitter<
                     "feeds": this.getLocalFeeds().map((feed) => ({
                         purpose: feed.purpose,
                     })),
+                    "m.foci.active": this.foci,
+                    "m.foci.preferred": this.getPreferredFoci(),
                     // TODO: Add data channels
                 },
             ],
@@ -849,7 +878,10 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public onMemberStateChanged = async (event: MatrixEvent) => {
-        if (this.sfu) return;
+        if (this.foci[0]) {
+            // TODO: Check if someone switched to one of our preferred foci
+            return;
+        }
 
         // If we haven't entered the call yet, we don't care
         if (this.state !== GroupCallState.Entered) {
@@ -1207,7 +1239,7 @@ export class GroupCall extends TypedEventEmitter<
             this.retryCallCounts.delete(getCallUserId(call)!);
 
             // if we're calling an SFU, subscribe to its feeds
-            if (call.isSfu) {
+            if (call.isFocus) {
                 call.subscribeToSFU();
             }
         }
