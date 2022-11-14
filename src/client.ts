@@ -4588,6 +4588,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {ReceiptType} receiptType The kind of receipt e.g. "m.read". Other than
      * ReceiptType.Read are experimental!
      * @param {object} body Additional content to send alongside the receipt.
+     * @param {boolean} unthreaded An unthreaded receipt will clear room+thread notifications
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -4595,6 +4596,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         event: MatrixEvent,
         receiptType: ReceiptType,
         body: any,
+        unthreaded = false,
     ): Promise<{}> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send receipts so don't bother.
@@ -4606,12 +4608,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        // TODO: Add a check for which spec version this will be released in
-        if (await this.doesServerSupportUnstableFeature("org.matrix.msc3771")) {
+        const supportsThreadRR = this.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported;
+        if (supportsThreadRR && !unthreaded) {
             const isThread = !!event.threadRootId;
-            body.thread_id = isThread
-                ? event.threadRootId
-                : MAIN_ROOM_TIMELINE;
+            body = {
+                ...body,
+                thread_id: isThread
+                    ? event.threadRootId
+                    : MAIN_ROOM_TIMELINE,
+            };
         }
 
         const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, body || {});
@@ -4633,6 +4638,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async sendReadReceipt(
         event: MatrixEvent | null,
         receiptType = ReceiptType.Read,
+        unthreaded = false,
     ): Promise<{} | undefined> {
         if (!event) return;
         const eventId = event.getId()!;
@@ -4641,7 +4647,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error(`Cannot set read receipt to a pending event (${eventId})`);
         }
 
-        return this.sendReceipt(event, receiptType, {});
+        return this.sendReceipt(event, receiptType, {}, unthreaded);
     }
 
     /**

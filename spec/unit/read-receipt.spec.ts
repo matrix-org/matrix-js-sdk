@@ -18,6 +18,7 @@ import MockHttpBackend from 'matrix-mock-request';
 
 import { ReceiptType } from '../../src/@types/read_receipts';
 import { MatrixClient } from "../../src/client";
+import { Feature, ServerSupport } from '../../src/feature';
 import { EventType } from '../../src/matrix';
 import { MAIN_ROOM_TIMELINE } from '../../src/models/read-receipt';
 import { encodeUri } from '../../src/utils';
@@ -69,15 +70,8 @@ const roomEvent = utils.mkEvent({
     },
 });
 
-function mockServerSideSupport(client, hasServerSideSupport) {
-    const doesServerSupportUnstableFeature = client.doesServerSupportUnstableFeature;
-    client.doesServerSupportUnstableFeature = (unstableFeature) => {
-        if (unstableFeature === "org.matrix.msc3771") {
-            return Promise.resolve(hasServerSideSupport);
-        } else {
-            return doesServerSupportUnstableFeature(unstableFeature);
-        }
-    };
+function mockServerSideSupport(client, serverSideSupport: ServerSupport) {
+    client.canSupport.set(Feature.ThreadUnreadNotifications, serverSideSupport);
 }
 
 describe("Read receipt", () => {
@@ -103,8 +97,26 @@ describe("Read receipt", () => {
                 expect(request.data.thread_id).toEqual(THREAD_ID);
             }).respond(200, {});
 
-            mockServerSideSupport(client, true);
+            mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReceipt(threadEvent, ReceiptType.Read, {});
+
+            await httpBackend.flushAllExpected();
+            await flushPromises();
+        });
+
+        it("sends an unthreaded receipt", async () => {
+            httpBackend.when(
+                "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                    $roomId: ROOM_ID,
+                    $receiptType: ReceiptType.Read,
+                    $eventId: threadEvent.getId()!,
+                }),
+            ).check((request) => {
+                expect(request.data.thread_id).toBeUndefined();
+            }).respond(200, {});
+
+            mockServerSideSupport(client, ServerSupport.Stable);
+            client.sendReadReceipt(threadEvent, ReceiptType.Read, true);
 
             await httpBackend.flushAllExpected();
             await flushPromises();
@@ -121,7 +133,7 @@ describe("Read receipt", () => {
                 expect(request.data.thread_id).toEqual(MAIN_ROOM_TIMELINE);
             }).respond(200, {});
 
-            mockServerSideSupport(client, true);
+            mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReceipt(roomEvent, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
@@ -139,7 +151,7 @@ describe("Read receipt", () => {
                 expect(request.data.thread_id).toBeUndefined();
             }).respond(200, {});
 
-            mockServerSideSupport(client, false);
+            mockServerSideSupport(client, ServerSupport.Unsupported);
             client.sendReceipt(threadEvent, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
@@ -157,7 +169,7 @@ describe("Read receipt", () => {
                 expect(request.data).toEqual({});
             }).respond(200, {});
 
-            mockServerSideSupport(client, false);
+            mockServerSideSupport(client, ServerSupport.Unsupported);
             client.sendReceipt(threadEvent, ReceiptType.Read, undefined);
 
             await httpBackend.flushAllExpected();
