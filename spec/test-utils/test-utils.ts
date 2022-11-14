@@ -5,7 +5,7 @@ import EventEmitter from "events";
 import '../olm-loader';
 
 import { logger } from '../../src/logger';
-import { IContent, IEvent, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
+import { IContent, IEvent, IEventRelation, IUnsigned, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { ClientEvent, EventType, IPusher, MatrixClient, MsgType } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
@@ -78,6 +78,7 @@ interface IEventOpts {
     user?: string;
     unsigned?: IUnsigned;
     redacts?: string;
+    ts?: number;
 }
 
 let testEventIndex = 1; // counter for events, easier for comparison of randomly generated events
@@ -109,6 +110,7 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
         event_id: "$" + testEventIndex++ + "-" + Math.random() + "-" + Math.random(),
         txn_id: "~" + Math.random(),
         redacts: opts.redacts,
+        origin_server_ts: opts.ts ?? 0,
     };
     if (opts.skey !== undefined) {
         event.state_key = opts.skey;
@@ -237,11 +239,13 @@ export function mkMembershipCustom<T>(
     });
 }
 
-interface IMessageOpts {
+export interface IMessageOpts {
     room?: string;
     user: string;
     msg?: string;
     event?: boolean;
+    relatesTo?: IEventRelation;
+    ts?: number;
 }
 
 /**
@@ -268,6 +272,10 @@ export function mkMessage(
             body: opts.msg,
         },
     };
+
+    if (opts.relatesTo) {
+        eventOpts.content["m.relates_to"] = opts.relatesTo;
+    }
 
     if (!eventOpts.content.body) {
         eventOpts.content.body = "Random->" + Math.random();

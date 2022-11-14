@@ -14,6 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
+import type { MatrixClient, ClientEvent } from "../../src";
+
+declare global {
+    // eslint-disable-next-line @typescript-eslint/no-namespace
+    namespace NodeJS {
+        interface Global {
+            matrixcs: {
+                MatrixClient: typeof MatrixClient;
+                ClientEvent: typeof ClientEvent;
+            };
+        }
+    }
+}
+
 // stub for browser-matrix browserify tests
 // @ts-ignore
 global.XMLHttpRequest = jest.fn();
@@ -23,3 +38,9 @@ afterAll(() => {
     // @ts-ignore
     global.XMLHttpRequest = undefined;
 });
+
+// Akin to spec/setupTests.ts - but that won't affect the browser-matrix bundle
+global.matrixcs = {
+    ...global.matrixcs,
+    timeoutSignal: () => new AbortController().signal,
+};

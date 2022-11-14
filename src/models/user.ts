@@ -134,8 +134,8 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
 
         this.updateModifiedTime();
 
-        for (let i = 0; i < eventsToFire.length; i++) {
-            this.emit(eventsToFire[i], event, this);
+        for (const eventToFire of eventsToFire) {
+            this.emit(eventToFire, event, this);
         }
     }
 

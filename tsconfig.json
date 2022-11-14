@@ -8,10 +8,16 @@
     "noImplicitAny": false,
     "noUnusedLocals": true,
     "noEmit": true,
-    "declaration": true
+    "declaration": true,
+    "strict": true
   },
   "include": [
     "./src/**/*.ts",
     "./spec/**/*.ts"
-  ]
+  ],
+  "typedocOptions": {
+    "entryPoints": ["src/index.ts"],
+    "excludeExternals": true,
+    "out": "_docs"
+  }
 }

@@ -236,7 +236,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         method: Method,
         url: URL | string,
         body?: Body,
-        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "abortSignal"> = {},
+        opts: Pick<IRequestOpts, "headers" | "json" | "localTimeoutMs" | "keepAlive" | "abortSignal"> = {},
     ): Promise<ResponseType<T, O>> {
         const headers = Object.assign({}, opts.headers || {});
         const json = opts.json ?? true;
@@ -254,6 +254,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
 
         const timeout = opts.localTimeoutMs ?? this.opts.localTimeoutMs;
+        const keepAlive = opts.keepAlive ?? false;
         const signals = [
             this.abortController.signal,
         ];
@@ -286,6 +287,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 referrerPolicy: "no-referrer",
                 cache: "no-cache",
                 credentials: "omit", // we send credentials via headers
+                keepalive: keepAlive,
             });
         } catch (e) {
             if ((<Error>e).name === "AbortError") {

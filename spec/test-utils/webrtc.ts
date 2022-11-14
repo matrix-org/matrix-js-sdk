@@ -14,6 +14,32 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import {
+    ClientEvent,
+    ClientEventHandlerMap,
+    EventType,
+    GroupCall,
+    GroupCallIntent,
+    GroupCallType,
+    IContent,
+    ISendEventResponse,
+    MatrixClient,
+    MatrixEvent,
+    Room,
+    RoomState,
+    RoomStateEvent,
+    RoomStateEventHandlerMap,
+} from "../../src";
+import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
+import { ReEmitter } from "../../src/ReEmitter";
+import { SyncState } from "../../src/sync";
+import { CallEvent, CallEventHandlerMap, MatrixCall } from "../../src/webrtc/call";
+import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "../../src/webrtc/callEventHandler";
+import { CallFeed } from "../../src/webrtc/callFeed";
+import { GroupCallEventHandlerMap } from "../../src/webrtc/groupCall";
+import { GroupCallEventHandlerEvent } from "../../src/webrtc/groupCallEventHandler";
+import { IScreensharingOpts, MediaHandler } from "../../src/webrtc/mediaHandler";
+
 export const DUMMY_SDP = (
     "v=0\r\n" +
     "o=- 5022425983810148698 2 IN IP4 127.0.0.1\r\n" +
@@ -54,8 +80,50 @@ export const DUMMY_SDP = (
     "a=ssrc:3619738545 cname:2RWtmqhXLdoF4sOi\r\n"
 );
 
+export const USERMEDIA_STREAM_ID = "mock_stream_from_media_handler";
+export const SCREENSHARE_STREAM_ID = "mock_screen_stream_from_media_handler";
+
+class MockMediaStreamAudioSourceNode {
+    public connect() {}
+}
+
+class MockAnalyser {
+    public getFloatFrequencyData() { return 0.0; }
+}
+
+export class MockAudioContext {
+    constructor() {}
+    public createAnalyser() { return new MockAnalyser(); }
+    public createMediaStreamSource() { return new MockMediaStreamAudioSourceNode(); }
+    public close() {}
+}
+
 export class MockRTCPeerConnection {
-    localDescription: RTCSessionDescription;
+    private static instances: MockRTCPeerConnection[] = [];
+
+    private negotiationNeededListener?: () => void;
+    public iceCandidateListener?: (e: RTCPeerConnectionIceEvent) => void;
+    public onTrackListener?: (e: RTCTrackEvent) => void;
+    public needsNegotiation = false;
+    public readyToNegotiate: Promise<void>;
+    private onReadyToNegotiate?: () => void;
+    public localDescription: RTCSessionDescription;
+    public signalingState: RTCSignalingState = "stable";
+    public transceivers: MockRTCRtpTransceiver[] = [];
+
+    public static triggerAllNegotiations(): void {
+        for (const inst of this.instances) {
+            inst.doNegotiation();
+        }
+    }
+
+    public static hasAnyPendingNegotiations(): boolean {
+        return this.instances.some(i => i.needsNegotiation);
+    }
+
+    public static resetInstances() {
+        this.instances = [];
+    }
 
     constructor() {
         this.localDescription = {
@@ -63,34 +131,133 @@ export class MockRTCPeerConnection {
             type: 'offer',
             toJSON: function() { },
         };
+
+        this.readyToNegotiate = new Promise<void>(resolve => {
+            this.onReadyToNegotiate = resolve;
+        });
+
+        MockRTCPeerConnection.instances.push(this);
     }
 
-    addEventListener() { }
-    createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
-    createOffer() {
-        return Promise.resolve({});
+    public addEventListener(type: string, listener: () => void) {
+        if (type === 'negotiationneeded') {
+            this.negotiationNeededListener = listener;
+        } else if (type == 'icecandidate') {
+            this.iceCandidateListener = listener;
+        } else if (type == 'track') {
+            this.onTrackListener = listener;
+        }
     }
-    setRemoteDescription() {
+    public createDataChannel(label: string, opts: RTCDataChannelInit) { return { label, ...opts }; }
+    public createOffer() {
+        return Promise.resolve({
+            type: 'offer',
+            sdp: DUMMY_SDP,
+        });
+    }
+    public createAnswer() {
+        return Promise.resolve({
+            type: 'answer',
+            sdp: DUMMY_SDP,
+        });
+    }
+    public setRemoteDescription() {
         return Promise.resolve();
     }
-    setLocalDescription() {
+    public setLocalDescription() {
         return Promise.resolve();
     }
-    close() { }
-    getStats() { return []; }
-    addTrack(track: MockMediaStreamTrack) { return new MockRTCRtpSender(track); }
+    public close() { }
+    public getStats() { return []; }
+    public addTransceiver(track: MockMediaStreamTrack): MockRTCRtpTransceiver {
+        this.needsNegotiation = true;
+        if (this.onReadyToNegotiate) this.onReadyToNegotiate();
+
+        const newSender = new MockRTCRtpSender(track);
+        const newReceiver = new MockRTCRtpReceiver(track);
+
+        const newTransceiver = new MockRTCRtpTransceiver(this);
+        newTransceiver.sender = newSender as unknown as RTCRtpSender;
+        newTransceiver.receiver = newReceiver as unknown as RTCRtpReceiver;
+
+        this.transceivers.push(newTransceiver);
+
+        return newTransceiver;
+    }
+    public addTrack(track: MockMediaStreamTrack): MockRTCRtpSender {
+        return this.addTransceiver(track).sender as unknown as MockRTCRtpSender;
+    }
+
+    public removeTrack() {
+        this.needsNegotiation = true;
+        if (this.onReadyToNegotiate) this.onReadyToNegotiate();
+    }
+
+    public getTransceivers(): MockRTCRtpTransceiver[] { return this.transceivers; }
+    public getSenders(): MockRTCRtpSender[] {
+        return this.transceivers.map(t => t.sender as unknown as MockRTCRtpSender);
+    }
+
+    public doNegotiation() {
+        if (this.needsNegotiation && this.negotiationNeededListener) {
+            this.needsNegotiation = false;
+            this.negotiationNeededListener();
+        }
+    }
 }
 
 export class MockRTCRtpSender {
     constructor(public track: MockMediaStreamTrack) { }
 
-    replaceTrack(track: MockMediaStreamTrack) { this.track = track; }
+    public replaceTrack(track: MockMediaStreamTrack) { this.track = track; }
+}
+
+export class MockRTCRtpReceiver {
+    constructor(public track: MockMediaStreamTrack) { }
+}
+
+export class MockRTCRtpTransceiver {
+    constructor(private peerConn: MockRTCPeerConnection) {}
+
+    public sender?: RTCRtpSender;
+    public receiver?: RTCRtpReceiver;
+
+    public set direction(_: string) {
+        this.peerConn.needsNegotiation = true;
+    }
+
+    public setCodecPreferences = jest.fn<void, RTCRtpCodecCapability[]>();
 }
 
 export class MockMediaStreamTrack {
     constructor(public readonly id: string, public readonly kind: "audio" | "video", public enabled = true) { }
 
-    stop() { }
+    public stop = jest.fn<void, []>();
+
+    public listeners: [string, (...args: any[]) => any][] = [];
+    public isStopped = false;
+    public settings?: MediaTrackSettings;
+
+    public getSettings(): MediaTrackSettings { return this.settings!; }
+
+    // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
+    // implementation
+    public dispatchEvent(eventType: string) {
+        this.listeners.forEach(([t, c]) => {
+            if (t !== eventType) return;
+            c();
+        });
+    }
+    public addEventListener(eventType: string, callback: (...args: any[]) => any) {
+        this.listeners.push([eventType, callback]);
+    }
+    public removeEventListener(eventType: string, callback: (...args: any[]) => any) {
+        this.listeners.filter(([t, c]) => {
+            return t !== eventType || c !== callback;
+        });
+    }
+
+    public typed(): MediaStreamTrack { return this as unknown as MediaStreamTrack; }
 }
 
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
@@ -101,46 +268,236 @@ export class MockMediaStream {
         private tracks: MockMediaStreamTrack[] = [],
     ) {}
 
-    listeners: [string, (...args: any[]) => any][] = [];
+    public listeners: [string, (...args: any[]) => any][] = [];
+    public isStopped = false;
 
-    dispatchEvent(eventType: string) {
+    public dispatchEvent(eventType: string) {
         this.listeners.forEach(([t, c]) => {
             if (t !== eventType) return;
             c();
         });
     }
-    getTracks() { return this.tracks; }
-    getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
-    getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
-    addEventListener(eventType: string, callback: (...args: any[]) => any) {
+    public getTracks() { return this.tracks; }
+    public getAudioTracks() { return this.tracks.filter((track) => track.kind === "audio"); }
+    public getVideoTracks() { return this.tracks.filter((track) => track.kind === "video"); }
+    public addEventListener(eventType: string, callback: (...args: any[]) => any) {
         this.listeners.push([eventType, callback]);
     }
-    removeEventListener(eventType: string, callback: (...args: any[]) => any) {
+    public removeEventListener(eventType: string, callback: (...args: any[]) => any) {
         this.listeners.filter(([t, c]) => {
             return t !== eventType || c !== callback;
         });
     }
-    addTrack(track: MockMediaStreamTrack) {
+    public addTrack(track: MockMediaStreamTrack) {
         this.tracks.push(track);
         this.dispatchEvent("addtrack");
     }
-    removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
+    public removeTrack(track: MockMediaStreamTrack) { this.tracks.splice(this.tracks.indexOf(track), 1); }
+
+    public clone(): MediaStream {
+        return new MockMediaStream(this.id + ".clone", this.tracks).typed();
+    }
+
+    public isCloneOf(stream: MediaStream) {
+        return this.id === stream.id + ".clone";
+    }
+
+    // syntactic sugar for typing
+    public typed(): MediaStream {
+        return this as unknown as MediaStream;
+    }
 }
 
 export class MockMediaDeviceInfo {
     constructor(
-        public kind: "audio" | "video",
+        public kind: "audioinput" | "videoinput" | "audiooutput",
     ) { }
+
+    public typed(): MediaDeviceInfo { return this as unknown as MediaDeviceInfo; }
 }
 
 export class MockMediaHandler {
-    getUserMediaStream(audio: boolean, video: boolean) {
-        const tracks: MockMediaStreamTrack[] = [];
-        if (audio) tracks.push(new MockMediaStreamTrack("audio_track", "audio"));
-        if (video) tracks.push(new MockMediaStreamTrack("video_track", "video"));
+    public userMediaStreams: MockMediaStream[] = [];
+    public screensharingStreams: MockMediaStream[] = [];
 
-        return new MockMediaStream("mock_stream_from_media_handler", tracks);
+    public getUserMediaStream(audio: boolean, video: boolean) {
+        const tracks: MockMediaStreamTrack[] = [];
+        if (audio) tracks.push(new MockMediaStreamTrack("usermedia_audio_track", "audio"));
+        if (video) tracks.push(new MockMediaStreamTrack("usermedia_video_track", "video"));
+
+        const stream = new MockMediaStream(USERMEDIA_STREAM_ID, tracks);
+        this.userMediaStreams.push(stream);
+        return stream;
     }
-    stopUserMediaStream() { }
-    hasAudioDevice() { return true; }
+    public stopUserMediaStream(stream: MockMediaStream) {
+        stream.isStopped = true;
+    }
+    public getScreensharingStream = jest.fn((opts?: IScreensharingOpts) => {
+        const tracks = [new MockMediaStreamTrack("screenshare_video_track", "video")];
+        if (opts?.audio) tracks.push(new MockMediaStreamTrack("screenshare_audio_track", "audio"));
+
+        const stream = new MockMediaStream(SCREENSHARE_STREAM_ID, tracks);
+        this.screensharingStreams.push(stream);
+        return stream;
+    });
+    public stopScreensharingStream(stream: MockMediaStream) {
+        stream.isStopped = true;
+    }
+    public hasAudioDevice() { return true; }
+    public hasVideoDevice() { return true; }
+    public stopAllStreams() {}
+
+    public typed(): MediaHandler { return this as unknown as MediaHandler; }
+}
+
+export class MockMediaDevices {
+    public enumerateDevices = jest.fn<Promise<MediaDeviceInfo[]>, []>().mockResolvedValue([
+        new MockMediaDeviceInfo("audioinput").typed(),
+        new MockMediaDeviceInfo("videoinput").typed(),
+    ]);
+
+    public getUserMedia = jest.fn<Promise<MediaStream>, [MediaStreamConstraints]>().mockReturnValue(
+        Promise.resolve(new MockMediaStream("local_stream").typed()),
+    );
+
+    public getDisplayMedia = jest.fn<Promise<MediaStream>, [DisplayMediaStreamConstraints]>().mockReturnValue(
+        Promise.resolve(new MockMediaStream("local_display_stream").typed()),
+    );
+
+    public typed(): MediaDevices { return this as unknown as MediaDevices; }
+}
+
+type EmittedEvents = CallEventHandlerEvent | CallEvent | ClientEvent | RoomStateEvent | GroupCallEventHandlerEvent;
+type EmittedEventMap = CallEventHandlerEventHandlerMap &
+    CallEventHandlerMap &
+    ClientEventHandlerMap &
+    RoomStateEventHandlerMap &
+    GroupCallEventHandlerMap;
+
+export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, EmittedEventMap> {
+    public mediaHandler = new MockMediaHandler();
+
+    constructor(public userId: string, public deviceId: string, public sessionId: string) {
+        super();
+    }
+
+    public groupCallEventHandler = {
+        groupCalls: new Map<string, GroupCall>(),
+    };
+
+    public callEventHandler = {
+        calls: new Map<string, MatrixCall>(),
+    };
+
+    public sendStateEvent = jest.fn<Promise<ISendEventResponse>, [
+        roomId: string, eventType: EventType, content: any, statekey: string,
+    ]>();
+    public sendToDevice = jest.fn<Promise<{}>, [
+        eventType: string,
+        contentMap: { [userId: string]: { [deviceId: string]: Record<string, any> } },
+        txnId?: string,
+    ]>();
+
+    public getMediaHandler(): MediaHandler { return this.mediaHandler.typed(); }
+
+    public getUserId(): string { return this.userId; }
+
+    public getDeviceId(): string { return this.deviceId; }
+    public getSessionId(): string { return this.sessionId; }
+
+    public getTurnServers = () => [];
+    public isFallbackICEServerAllowed = () => false;
+    public reEmitter = new ReEmitter(new TypedEventEmitter());
+    public getUseE2eForGroupCall = () => false;
+    public checkTurnServers = () => null;
+
+    public getSyncState = jest.fn<SyncState | null, []>().mockReturnValue(SyncState.Syncing);
+
+    public getRooms = jest.fn<Room[], []>().mockReturnValue([]);
+    public getRoom = jest.fn();
+
+    public typed(): MatrixClient { return this as unknown as MatrixClient; }
+
+    public emitRoomState(event: MatrixEvent, state: RoomState): void {
+        this.emit(
+            RoomStateEvent.Events,
+            event,
+            state,
+            null,
+        );
+    }
+}
+
+export class MockCallFeed {
+    constructor(
+        public userId: string,
+        public stream: MockMediaStream,
+    ) {}
+
+    public measureVolumeActivity(val: boolean) {}
+    public dispose() {}
+
+    public typed(): CallFeed {
+        return this as unknown as CallFeed;
+    }
+}
+
+export function installWebRTCMocks() {
+    global.navigator = {
+        mediaDevices: new MockMediaDevices().typed(),
+    } as unknown as Navigator;
+
+    global.window = {
+        // @ts-ignore Mock
+        RTCPeerConnection: MockRTCPeerConnection,
+        // @ts-ignore Mock
+        RTCSessionDescription: {},
+        // @ts-ignore Mock
+        RTCIceCandidate: {},
+        getUserMedia: () => new MockMediaStream("local_stream"),
+    };
+    // @ts-ignore Mock
+    global.document = {};
+
+    // @ts-ignore Mock
+    global.AudioContext = MockAudioContext;
+
+    // @ts-ignore Mock
+    global.RTCRtpReceiver = {
+        getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
+            codecs: [],
+            headerExtensions: [],
+        }),
+    };
+
+    // @ts-ignore Mock
+    global.RTCRtpSender = {
+        getCapabilities: jest.fn<RTCRtpCapabilities, [string]>().mockReturnValue({
+            codecs: [],
+            headerExtensions: [],
+        }),
+    };
+}
+
+export function makeMockGroupCallStateEvent(roomId: string, groupCallId: string, content: IContent = {
+    "m.type": GroupCallType.Video,
+    "m.intent": GroupCallIntent.Prompt,
+}): MatrixEvent {
+    return {
+        getType: jest.fn().mockReturnValue(EventType.GroupCallPrefix),
+        getRoomId: jest.fn().mockReturnValue(roomId),
+        getTs: jest.fn().mockReturnValue(0),
+        getContent: jest.fn().mockReturnValue(content),
+        getStateKey: jest.fn().mockReturnValue(groupCallId),
+    } as unknown as MatrixEvent;
+}
+
+export function makeMockGroupCallMemberStateEvent(roomId: string, groupCallId: string): MatrixEvent {
+    return {
+        getType: jest.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+        getRoomId: jest.fn().mockReturnValue(roomId),
+        getTs: jest.fn().mockReturnValue(0),
+        getContent: jest.fn().mockReturnValue({}),
+        getStateKey: jest.fn().mockReturnValue(groupCallId),
+    } as unknown as MatrixEvent;
 }

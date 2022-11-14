@@ -804,7 +804,7 @@ export class OlmDevice {
             log,
         );
 
-        return info!;
+        return info;
     }
 
     /**

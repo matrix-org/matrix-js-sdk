@@ -12,9 +12,11 @@ limitations under the License.
 */
 
 import { ReceiptType } from "../@types/read_receipts";
-import { EventTimelineSet, EventType, MatrixEvent } from "../matrix";
 import { ListenerMap, TypedEventEmitter } from "./typed-event-emitter";
 import * as utils from "../utils";
+import { MatrixEvent } from "./event";
+import { EventType } from "../@types/event";
+import { EventTimelineSet } from "./event-timeline-set";
 
 export const MAIN_ROOM_TIMELINE = "main";
 

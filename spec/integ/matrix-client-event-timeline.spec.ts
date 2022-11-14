@@ -18,12 +18,14 @@ import * as utils from "../test-utils/test-utils";
 import {
     ClientEvent,
     Direction,
+    EventStatus,
     EventTimeline,
     EventTimelineSet,
     Filter,
     IEvent,
     MatrixClient,
     MatrixEvent,
+    PendingEventOrdering,
     Room,
 } from "../../src/matrix";
 import { logger } from "../../src/logger";
@@ -1161,6 +1163,25 @@ describe("MatrixClient event timelines", function() {
                 respondToThreads();
                 httpBackend.when("GET", "/sync").respond(200, INITIAL_SYNC_DATA);
                 await flushHttp(room.fetchRoomThreads());
+            });
+
+            it("should prevent displaying pending events", async function() {
+                const room = new Room("room123", client, "john", {
+                    pendingEventOrdering: PendingEventOrdering.Detached,
+                });
+                const timelineSets = await room!.createThreadsTimelineSets();
+                expect(timelineSets).not.toBeNull();
+
+                const event = utils.mkMessage({
+                    room: roomId, user: userId, msg: "a body", event: true,
+                });
+                event.status = EventStatus.SENDING;
+                room.addPendingEvent(event, "txn");
+
+                const [allThreads, myThreads] = timelineSets!;
+                expect(allThreads.getPendingEvents()).toHaveLength(0);
+                expect(myThreads.getPendingEvents()).toHaveLength(0);
+                expect(room.getPendingEvents()).toHaveLength(1);
             });
         });
 

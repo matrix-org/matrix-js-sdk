@@ -1008,8 +1008,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Removing just the old live timeline whilst preserving previous ones is not supported.
      */
     public resetLiveTimeline(backPaginationToken?: string | null, forwardPaginationToken?: string | null): void {
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].resetLiveTimeline(
+        for (const timelineSet of this.timelineSets) {
+            timelineSet.resetLiveTimeline(
                 backPaginationToken ?? undefined,
                 forwardPaginationToken ?? undefined,
             );
@@ -1032,10 +1032,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // state at the start and end of that timeline. These are more
         // for backwards-compatibility than anything else.
         this.timeline = this.getLiveTimeline().getEvents();
-        this.oldState = this.getLiveTimeline()
-            .getState(EventTimeline.BACKWARDS);
-        this.currentState = this.getLiveTimeline()
-            .getState(EventTimeline.FORWARDS);
+        this.oldState = this.getLiveTimeline().getState(EventTimeline.BACKWARDS)!;
+        this.currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
 
         // Let people know to register new listeners for the new state
         // references. The reference won't necessarily change every time so only
@@ -1564,8 +1562,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             pendingEvents = true,
         }: ICreateFilterOpts = {},
     ): EventTimelineSet {
-        if (this.filteredTimelineSets[filter.filterId]) {
-            return this.filteredTimelineSets[filter.filterId];
+        if (this.filteredTimelineSets[filter.filterId!]) {
+            return this.filteredTimelineSets[filter.filterId!];
         }
         const opts = Object.assign({ filter, pendingEvents }, this.opts);
         const timelineSet = new EventTimelineSet(this, opts);
@@ -1574,7 +1572,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             RoomEvent.TimelineReset,
         ]);
         if (useSyncEvents) {
-            this.filteredTimelineSets[filter.filterId] = timelineSet;
+            this.filteredTimelineSets[filter.filterId!] = timelineSet;
             this.timelineSets.push(timelineSet);
         }
 
@@ -1623,7 +1621,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private async getThreadListFilter(filterType = ThreadFilterType.All): Promise<Filter> {
-        const myUserId = this.client.getUserId();
+        const myUserId = this.client.getUserId()!;
         const filter = new Filter(myUserId);
 
         const definition: IFilterDefinition = {
@@ -1635,7 +1633,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         };
 
         if (filterType === ThreadFilterType.My) {
-            definition.room.timeline[FILTER_RELATED_BY_SENDERS.name] = [myUserId];
+            definition!.room!.timeline![FILTER_RELATED_BY_SENDERS.name] = [myUserId];
         }
 
         filter.setDefinition(definition);
@@ -1653,7 +1651,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let timelineSet: EventTimelineSet;
         if (Thread.hasServerSideListSupport) {
             timelineSet =
-                new EventTimelineSet(this, this.opts, undefined, undefined, filterType ?? ThreadFilterType.All);
+                new EventTimelineSet(this, {
+                    ...this.opts,
+                    pendingEvents: false,
+                }, undefined, undefined, filterType ?? ThreadFilterType.All);
             this.reEmitter.reEmit(timelineSet, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
@@ -1681,7 +1682,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         return event.getSender() === this.client.getUserId();
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
-                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent, {
+                        timelineSet.getLiveTimeline().addEvent(thread.rootEvent!, {
                             toStartOfTimeline: false,
                         });
                     }
@@ -1851,8 +1852,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {Filter} filter the filter whose timelineSet is to be forgotten
      */
     public removeFilteredTimelineSet(filter: Filter): void {
-        const timelineSet = this.filteredTimelineSets[filter.filterId];
-        delete this.filteredTimelineSets[filter.filterId];
+        const timelineSet = this.filteredTimelineSets[filter.filterId!];
+        delete this.filteredTimelineSets[filter.filterId!];
         const i = this.timelineSets.indexOf(timelineSet);
         if (i > -1) {
             this.timelineSets.splice(i, 1);
@@ -1864,7 +1865,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (!this.client.supportsExperimentalThreads()) {
+        if (!this.client?.supportsExperimentalThreads()) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2130,8 +2131,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const { duplicateStrategy, timelineWasEmpty, fromCache } = addLiveEventOptions;
 
         // add to our timeline sets
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            this.timelineSets[i].addLiveEvent(event, {
+        for (const timelineSet of this.timelineSets) {
+            timelineSet.addLiveEvent(event, {
                 duplicateStrategy,
                 fromCache,
                 timelineWasEmpty,
@@ -2187,7 +2188,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // call setEventMetadata to set up event.sender etc
         // as event is shared over all timelineSets, we set up its metadata based
         // on the unfiltered timelineSet.
-        EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS), false);
+        EventTimeline.setEventMetadata(event, this.getLiveTimeline().getState(EventTimeline.FORWARDS)!, false);
 
         this.txnToEvent[txnId] = event;
         if (this.pendingEventList) {
@@ -2216,8 +2217,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 }
             }
         } else {
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
+            for (const timelineSet of this.timelineSets) {
                 if (timelineSet.getFilter()) {
                     if (timelineSet.getFilter()!.filterRoomTimeline([event]).length) {
                         timelineSet.addEventToTimeline(event,
@@ -2324,9 +2324,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
         if (shouldLiveInRoom) {
-            for (let i = 0; i < this.timelineSets.length; i++) {
-                const timelineSet = this.timelineSets[i];
-
+            for (const timelineSet of this.timelineSets) {
                 // if it's already in the timeline, update the timeline map. If it's not, add it.
                 timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
             }
@@ -2409,8 +2407,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 // if the event was already in the timeline (which will be the case if
                 // opts.pendingEventOrdering==chronological), we need to update the
                 // timeline map.
-                for (let i = 0; i < this.timelineSets.length; i++) {
-                    this.timelineSets[i].replaceEventId(oldEventId, newEventId!);
+                for (const timelineSet of this.timelineSets) {
+                    timelineSet.replaceEventId(oldEventId, newEventId!);
                 }
             }
         } else if (newStatus == EventStatus.CANCELLED) {
@@ -2645,8 +2643,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {String[]} eventIds A list of eventIds to remove.
      */
     public removeEvents(eventIds: string[]): void {
-        for (let i = 0; i < eventIds.length; ++i) {
-            this.removeEvent(eventIds[i]);
+        for (const eventId of eventIds) {
+            this.removeEvent(eventId);
         }
     }
 
@@ -2659,8 +2657,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public removeEvent(eventId: string): boolean {
         let removedAny = false;
-        for (let i = 0; i < this.timelineSets.length; i++) {
-            const removed = this.timelineSets[i].removeEvent(eventId);
+        for (const timelineSet of this.timelineSets) {
+            const removed = timelineSet.removeEvent(eventId);
             if (removed) {
                 if (removed.isRedaction()) {
                     this.revertRedactionLocalEcho(removed);
@@ -2742,8 +2740,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {Array<MatrixEvent>} events an array of account_data events to add
      */
     public addAccountData(events: MatrixEvent[]): void {
-        for (let i = 0; i < events.length; i++) {
-            const event = events[i];
+        for (const event of events) {
             if (event.getType() === "m.tag") {
                 this.addTags(event);
             }

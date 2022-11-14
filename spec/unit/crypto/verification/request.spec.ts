@@ -18,7 +18,7 @@ import "../../../olm-loader";
 import { CryptoEvent, verificationMethods } from "../../../../src/crypto";
 import { logger } from "../../../../src/logger";
 import { SAS } from "../../../../src/crypto/verification/SAS";
-import { makeTestClients, setupWebcrypto, teardownWebcrypto } from './util';
+import { makeTestClients } from './util';
 
 const Olm = global.Olm;
 
@@ -31,12 +31,7 @@ describe("verification request integration tests with crypto layer", function() 
     }
 
     beforeAll(function() {
-        setupWebcrypto();
         return Olm.init();
-    });
-
-    afterAll(() => {
-        teardownWebcrypto();
     });
 
     it("should request and accept a verification", async function() {
