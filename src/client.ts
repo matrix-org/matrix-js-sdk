@@ -1200,7 +1200,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (this.crypto) {
             this.crypto.uploadDeviceKeys();
-            this.crypto.start();
         }
 
         // periodically poll for turn servers if we support voip

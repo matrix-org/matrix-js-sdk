@@ -1775,9 +1775,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         eventEmitter.on(MatrixEventEvent.Decrypted, this.onTimelineEvent);
     }
 
-    /** Start background processes related to crypto */
+    /**
+     * @deprecated this does nothing and will be removed in a future version
+     */
     public start(): void {
-        this.outgoingRoomKeyRequestManager.start();
+        logger.warn("MatrixClient.crypto.start() is deprecated");
     }
 
     /** Stop background processes related to crypto */

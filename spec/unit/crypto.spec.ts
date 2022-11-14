@@ -1122,4 +1122,22 @@ describe("Crypto", function() {
             expect(free).toHaveBeenCalled();
         });
     });
+
+    describe("start", () => {
+        let client: TestClient;
+
+        beforeEach(async () => {
+            client = new TestClient("@alice:example.org", "aliceweb");
+            await client.client.initCrypto();
+        });
+
+        afterEach(async function() {
+            await client!.stop();
+        });
+
+        // start() is a no-op nowadays, so there's not much to test here.
+        it("should complete successfully", async () => {
+            await client!.client.crypto!.start();
+        });
+    });
 });
