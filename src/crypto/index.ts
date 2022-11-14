@@ -308,8 +308,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     private deviceKeys: Record<string, string> = {}; // type: key
 
-    private globalBlacklistUnverifiedDevices = false;
-    private globalErrorOnUnknownDevices = true;
+    public globalBlacklistUnverifiedDevices = false;
+    public globalErrorOnUnknownDevices = true;
 
     // list of IncomingRoomKeyRequests/IncomingRoomKeyRequestCancellations
     // we received in the current sync.
@@ -1813,6 +1813,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * do not specify a value.
      *
      * @param {boolean} value whether to blacklist all unverified devices by default
+     *
+     * @deprecated For external code, use {@link MatrixClient#setGlobalBlacklistUnverifiedDevices}. For
+     *   internal code, set {@link #globalBlacklistUnverifiedDevices} directly.
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): void {
         this.globalBlacklistUnverifiedDevices = value;
@@ -1820,32 +1823,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     /**
      * @return {boolean} whether to blacklist all unverified devices by default
+     *
+     * @deprecated For external code, use {@link MatrixClient#getGlobalBlacklistUnverifiedDevices}. For
+     *   internal code, reference {@link #globalBlacklistUnverifiedDevices} directly.
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
         return this.globalBlacklistUnverifiedDevices;
-    }
-
-    /**
-     * Set whether sendMessage in a room with unknown and unverified devices
-     * should throw an error and not send them message. This has 'Global' for
-     * symmetry with setGlobalBlacklistUnverifiedDevices but there is currently
-     * no room-level equivalent for this setting.
-     *
-     * This API is currently UNSTABLE and may change or be removed without notice.
-     *
-     * @param {boolean} value whether error on unknown devices
-     */
-    public setGlobalErrorOnUnknownDevices(value: boolean): void {
-        this.globalErrorOnUnknownDevices = value;
-    }
-
-    /**
-     * @return {boolean} whether to error on unknown devices
-     *
-     * This API is currently UNSTABLE and may change or be removed without notice.
-     */
-    public getGlobalErrorOnUnknownDevices(): boolean {
-        return this.globalErrorOnUnknownDevices;
     }
 
     /**

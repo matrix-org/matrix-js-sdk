@@ -975,7 +975,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                     logger.debug(`Getting devices in ${this.roomId}`);
                     const [devicesInRoom, blocked] = await this.getDevicesInRoom(room);
 
-                    if (this.crypto.getGlobalErrorOnUnknownDevices()) {
+                    if (this.crypto.globalErrorOnUnknownDevices) {
                         // Drop unknown devices for now.  When the message gets sent, we'll
                         // throw an error, but we'll still be prepared to send to the known
                         // devices.
@@ -1028,7 +1028,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         // check if any of these devices are not yet known to the user.
         // if so, warn the user so they can verify or ignore.
-        if (this.crypto.getGlobalErrorOnUnknownDevices()) {
+        if (this.crypto.globalErrorOnUnknownDevices) {
             this.checkForUnknownDevices(devicesInRoom);
         }
 
@@ -1163,7 +1163,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         });
 
         // The global value is treated as a default for when rooms don't specify a value.
-        let isBlacklisting = this.crypto.getGlobalBlacklistUnverifiedDevices();
+        let isBlacklisting = this.crypto.globalBlacklistUnverifiedDevices;
         const isRoomBlacklisting = room.getBlacklistUnverifiedDevices();
         if (typeof isRoomBlacklisting === 'boolean') {
             isBlacklisting = isRoomBlacklisting;
