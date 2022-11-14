@@ -6389,7 +6389,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             next_batch: searchResults.next_batch,
         };
 
-        const promise = this.search(searchOpts)
+        const promise = this.search(searchOpts, searchResults.abortSignal)
             .then(res => this.processRoomEventsSearch(searchResults, res))
             .finally(() => {
                 searchResults.pendingRequest = undefined;
@@ -8439,17 +8439,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {Object} opts
      * @param {string} opts.next_batch the batch token to pass in the query string
      * @param {Object} opts.body the JSON object to pass to the request body.
+     * @param {AbortSignal=} abortSignal optional signal used to cancel the http request.
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public search(
         opts: { body: ISearchRequestBody, next_batch?: string }, // eslint-disable-line camelcase
+        abortSignal?: AbortSignal,
     ): Promise<ISearchResponse> {
         const queryParams: any = {};
         if (opts.next_batch) {
             queryParams.next_batch = opts.next_batch;
         }
-        return this.http.authedRequest(Method.Post, "/search", queryParams, opts.body);
+        return this.http.authedRequest(Method.Post, "/search", queryParams, opts.body, { abortSignal });
     }
 
     /**
