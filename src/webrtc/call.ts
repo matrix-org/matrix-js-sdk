@@ -2104,6 +2104,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.info(`Hanging up call ${this.callId} (ICE disconnected for too long)`);
                 this.hangup(CallErrorCode.IceFailed, false);
             }, 30 * 1000);
+            this.setState(CallState.Connecting);
         }
 
         // In PTT mode, override feed status to muted when we lose connection to
