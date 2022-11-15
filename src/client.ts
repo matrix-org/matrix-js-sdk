@@ -1200,7 +1200,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (this.crypto) {
             this.crypto.uploadDeviceKeys();
-            this.crypto.start();
         }
 
         // periodically poll for turn servers if we support voip
@@ -2108,11 +2107,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {boolean} value whether to blacklist all unverified devices by default
      */
-    public setGlobalBlacklistUnverifiedDevices(value: boolean) {
+    public setGlobalBlacklistUnverifiedDevices(value: boolean): boolean {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.setGlobalBlacklistUnverifiedDevices(value);
+        this.crypto.globalBlacklistUnverifiedDevices = value;
+        return value;
     }
 
     /**
@@ -2122,7 +2122,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getGlobalBlacklistUnverifiedDevices();
+        return this.crypto.globalBlacklistUnverifiedDevices;
     }
 
     /**
@@ -2135,11 +2135,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {boolean} value whether error on unknown devices
      */
-    public setGlobalErrorOnUnknownDevices(value: boolean) {
+    public setGlobalErrorOnUnknownDevices(value: boolean): void {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.setGlobalErrorOnUnknownDevices(value);
+        this.crypto.globalErrorOnUnknownDevices = value;
     }
 
     /**
@@ -2151,7 +2151,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getGlobalErrorOnUnknownDevices();
+        return this.crypto.globalErrorOnUnknownDevices;
     }
 
     /**
@@ -4588,6 +4588,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {ReceiptType} receiptType The kind of receipt e.g. "m.read". Other than
      * ReceiptType.Read are experimental!
      * @param {object} body Additional content to send alongside the receipt.
+     * @param {boolean} unthreaded An unthreaded receipt will clear room+thread notifications
      * @return {Promise} Resolves: to an empty object {}
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
@@ -4595,6 +4596,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         event: MatrixEvent,
         receiptType: ReceiptType,
         body: any,
+        unthreaded = false,
     ): Promise<{}> {
         if (this.isGuest()) {
             return Promise.resolve({}); // guests cannot send receipts so don't bother.
@@ -4606,12 +4608,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        // TODO: Add a check for which spec version this will be released in
-        if (await this.doesServerSupportUnstableFeature("org.matrix.msc3771")) {
+        const supportsThreadRR = this.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported;
+        if (supportsThreadRR && !unthreaded) {
             const isThread = !!event.threadRootId;
-            body.thread_id = isThread
-                ? event.threadRootId
-                : MAIN_ROOM_TIMELINE;
+            body = {
+                ...body,
+                thread_id: isThread
+                    ? event.threadRootId
+                    : MAIN_ROOM_TIMELINE,
+            };
         }
 
         const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, body || {});
@@ -4633,6 +4638,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async sendReadReceipt(
         event: MatrixEvent | null,
         receiptType = ReceiptType.Read,
+        unthreaded = false,
     ): Promise<{} | undefined> {
         if (!event) return;
         const eventId = event.getId()!;
@@ -4641,7 +4647,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error(`Cannot set read receipt to a pending event (${eventId})`);
         }
 
-        return this.sendReceipt(event, receiptType, {});
+        return this.sendReceipt(event, receiptType, {}, unthreaded);
     }
 
     /**
@@ -6389,7 +6395,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             next_batch: searchResults.next_batch,
         };
 
-        const promise = this.search(searchOpts)
+        const promise = this.search(searchOpts, searchResults.abortSignal)
             .then(res => this.processRoomEventsSearch(searchResults, res))
             .finally(() => {
                 searchResults.pendingRequest = undefined;
@@ -8439,17 +8445,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {Object} opts
      * @param {string} opts.next_batch the batch token to pass in the query string
      * @param {Object} opts.body the JSON object to pass to the request body.
+     * @param {AbortSignal=} abortSignal optional signal used to cancel the http request.
      * @return {Promise} Resolves: TODO
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public search(
         opts: { body: ISearchRequestBody, next_batch?: string }, // eslint-disable-line camelcase
+        abortSignal?: AbortSignal,
     ): Promise<ISearchResponse> {
         const queryParams: any = {};
         if (opts.next_batch) {
             queryParams.next_batch = opts.next_batch;
         }
-        return this.http.authedRequest(Method.Post, "/search", queryParams, opts.body);
+        return this.http.authedRequest(Method.Post, "/search", queryParams, opts.body, { abortSignal });
     }
 
     /**

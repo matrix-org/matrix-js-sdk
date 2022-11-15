@@ -1112,6 +1112,156 @@ describe("SlidingSync", () => {
         });
     });
 
+    describe("custom room subscriptions", () => {
+        beforeAll(setupClient);
+        afterAll(teardownClient);
+
+        const roomA = "!a";
+        const roomB = "!b";
+        const roomC = "!c";
+        const roomD = "!d";
+
+        const defaultSub = {
+            timeline_limit: 1,
+            required_state: [["m.room.create", ""]],
+        };
+
+        const customSubName1 = "sub1";
+        const customSub1 = {
+            timeline_limit: 2,
+            required_state: [["*", "*"]],
+        };
+
+        const customSubName2 = "sub2";
+        const customSub2 = {
+            timeline_limit: 3,
+            required_state: [["*", "*"]],
+        };
+
+        it("should be possible to use custom subscriptions on startup", async () => {
+            const slidingSync = new SlidingSync(proxyBaseUrl, [], defaultSub, client!, 1);
+            // the intention is for clients to set this up at startup
+            slidingSync.addCustomSubscription(customSubName1, customSub1);
+            slidingSync.addCustomSubscription(customSubName2, customSub2);
+            // then call these depending on the kind of room / context
+            slidingSync.useCustomSubscription(roomA, customSubName1);
+            slidingSync.useCustomSubscription(roomB, customSubName1);
+            slidingSync.useCustomSubscription(roomC, customSubName2);
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomA, roomB, roomC, roomD]));
+
+            httpBackend!.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.log("custom subs", body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomA]).toEqual(customSub1);
+                expect(body.room_subscriptions[roomB]).toEqual(customSub1);
+                expect(body.room_subscriptions[roomC]).toEqual(customSub2);
+                expect(body.room_subscriptions[roomD]).toEqual(defaultSub);
+            }).respond(200, {
+                pos: "b",
+                lists: [],
+                extensions: {},
+                rooms: {},
+            });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+            slidingSync.stop();
+        });
+
+        it("should be possible to use custom subscriptions mid-connection", async () => {
+            const slidingSync = new SlidingSync(proxyBaseUrl, [], defaultSub, client!, 1);
+            // the intention is for clients to set this up at startup
+            slidingSync.addCustomSubscription(customSubName1, customSub1);
+            slidingSync.addCustomSubscription(customSubName2, customSub2);
+            // initially no subs
+            httpBackend!.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.log("custom subs", body);
+                expect(body.room_subscriptions).toBeFalsy();
+            }).respond(200, {
+                pos: "b",
+                lists: [],
+                extensions: {},
+                rooms: {},
+            });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+
+            // now the user clicks on a room which uses the default sub
+            httpBackend!.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.log("custom subs", body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomA]).toEqual(defaultSub);
+            }).respond(200, {
+                pos: "b",
+                lists: [],
+                extensions: {},
+                rooms: {},
+            });
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomA]));
+            await httpBackend!.flushAllExpected();
+
+            // now the user clicks on a room which uses a custom sub
+            httpBackend!.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.log("custom subs", body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomB]).toEqual(customSub1);
+                expect(body.unsubscribe_rooms).toEqual([roomA]);
+            }).respond(200, {
+                pos: "b",
+                lists: [],
+                extensions: {},
+                rooms: {},
+            });
+            slidingSync.useCustomSubscription(roomB, customSubName1);
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomB]));
+            await httpBackend!.flushAllExpected();
+
+            // now the user uses a different sub for the same room: we don't unsub but just resend
+            httpBackend!.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.log("custom subs", body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomB]).toEqual(customSub2);
+                expect(body.unsubscribe_rooms).toBeFalsy();
+            }).respond(200, {
+                pos: "b",
+                lists: [],
+                extensions: {},
+                rooms: {},
+            });
+            slidingSync.useCustomSubscription(roomB, customSubName2);
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomB]));
+            await httpBackend!.flushAllExpected();
+
+            slidingSync.stop();
+        });
+
+        it("uses the default subscription for unknown subscription names", async () => {
+            const slidingSync = new SlidingSync(proxyBaseUrl, [], defaultSub, client!, 1);
+            slidingSync.addCustomSubscription(customSubName1, customSub1);
+            slidingSync.useCustomSubscription(roomA, "unknown name");
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomA]));
+
+            httpBackend!.when("POST", syncUrl).check(function(req) {
+                const body = req.data;
+                logger.log("custom subs", body);
+                expect(body.room_subscriptions).toBeTruthy();
+                expect(body.room_subscriptions[roomA]).toEqual(defaultSub);
+            }).respond(200, {
+                pos: "b",
+                lists: [],
+                extensions: {},
+                rooms: {},
+            });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+            slidingSync.stop();
+        });
+    });
+
     describe("extensions", () => {
         beforeAll(setupClient);
         afterAll(teardownClient);
