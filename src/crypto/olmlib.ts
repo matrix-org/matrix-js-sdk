@@ -88,12 +88,16 @@ export async function encryptMessageForDevice(
     if (sessionId === null) {
         // If we don't have a session for a device then
         // we can't encrypt a message for it.
+        logger.log(
+            `[olmlib.encryptMessageForDevice] Unable to find Olm session for device ` +
+            `${recipientUserId}:${recipientDevice.deviceId}`
+        );
         return;
     }
 
     logger.log(
-        "Using sessionid " + sessionId + " for device " +
-            recipientUserId + ":" + recipientDevice.deviceId,
+        `[olmlib.encryptMessageForDevice] Using Olm session ${sessionId} for device ` +
+        `${recipientUserId}:${recipientDevice.deviceId}`
     );
 
     const payload = {
