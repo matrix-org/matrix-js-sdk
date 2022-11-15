@@ -834,7 +834,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(`Error decrypting event (${this.getDetails()}), but retrying: ${(<DecryptionError>e).detailedString}`);
+                    logger.log(
+                        `Error decrypting event (${this.getDetails()}), but retrying: ` +
+                        (<DecryptionError>e).detailedString,
+                    );
                     continue;
                 }
 
@@ -843,7 +846,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 // the detailedString already includes the name and message of the error, and the stack isn't much use,
                 // so we don't bother to log `e` separately.
-                logger.warn(`Error decrypting event (${this.getDetails()}): ${(<DecryptionError>e).detailedString}`);
+                logger.warn(
+                    `Error decrypting event (${this.getDetails()}): ` +
+                    (<DecryptionError>e).detailedString,
+                );
 
                 res = this.badEncryptedMessage((<DecryptionError>e).message);
             }

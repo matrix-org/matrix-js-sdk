@@ -90,14 +90,14 @@ export async function encryptMessageForDevice(
         // we can't encrypt a message for it.
         logger.log(
             `[olmlib.encryptMessageForDevice] Unable to find Olm session for device ` +
-            `${recipientUserId}:${recipientDevice.deviceId}`
+            `${recipientUserId}:${recipientDevice.deviceId}`,
         );
         return;
     }
 
     logger.log(
         `[olmlib.encryptMessageForDevice] Using Olm session ${sessionId} for device ` +
-        `${recipientUserId}:${recipientDevice.deviceId}`
+        `${recipientUserId}:${recipientDevice.deviceId}`,
     );
 
     const payload = {
