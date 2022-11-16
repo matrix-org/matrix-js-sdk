@@ -1905,7 +1905,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
         logger.log(
             `Sharing history in ${this.roomId} with users ${Object.keys(devicesByUser)}`,
             sharedHistorySessions.map(([senderKey, sessionId]) => `${senderKey}|${sessionId}`),
-        )
+        );
         for (const [senderKey, sessionId] of sharedHistorySessions) {
             const payload = await this.buildKeyForwardingMessage(this.roomId, senderKey, sessionId);
 
