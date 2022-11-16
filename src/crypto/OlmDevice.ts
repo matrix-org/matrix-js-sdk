@@ -916,6 +916,7 @@ export class OlmDevice {
     }
 
     public async recordSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
+        logger.info(`Recording problem on olm session with ${deviceKey} of type ${type}. Recreating: ${fixed}`);
         await this.cryptoStore.storeEndToEndSessionProblem(deviceKey, type, fixed);
     }
 
