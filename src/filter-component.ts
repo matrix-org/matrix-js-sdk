@@ -51,6 +51,7 @@ export interface IFilterComponent {
     senders?: string[];
     not_senders?: string[];
     contains_url?: boolean;
+    message_with_url?: boolean;
     limit?: number;
     related_by_senders?: Array<RelationType | string>;
     related_by_rel_types?: string[];
@@ -93,11 +94,16 @@ export class FilterComponent {
             relationSenders.push(this.userId);
         }
 
+        // check if a message contains an url by way of regex
+        const urlCheck = new RegExp("([a-zA-Z0-9]+://)?([a-zA-Z0-9_]+:[a-zA-Z0-9_]+@)?"
+            + "([a-zA-Z0-9.-]+\\.[A-Za-z]{2,4})(:[0-9]+)?(/.*)?");
+
         return this.checkFields(
             event.getRoomId(),
             event.getSender(),
             event.getType(),
             event.getContent() ? event.getContent().url !== undefined : false,
+            event.getContent() ? urlCheck.test(event.getContent().body) : false,
             relations,
             relationSenders,
         );
@@ -115,6 +121,7 @@ export class FilterComponent {
             "senders": this.filterJson.senders || null,
             "not_senders": this.filterJson.not_senders || [],
             "contains_url": this.filterJson.contains_url || null,
+            "message_with_url": this.filterJson.message_with_url || null,
             [FILTER_RELATED_BY_SENDERS.name]: this.filterJson[FILTER_RELATED_BY_SENDERS.name] || [],
             [FILTER_RELATED_BY_REL_TYPES.name]: this.filterJson[FILTER_RELATED_BY_REL_TYPES.name] || [],
         };
@@ -126,6 +133,7 @@ export class FilterComponent {
      * @param {String} sender        the sender of the event being checked
      * @param {String} eventType     the type of the event being checked
      * @param {boolean} containsUrl  whether the event contains a content.url field
+     * @param {boolean} messageWithUrl  whether the event contains a content.url field
      * @param {boolean} relationTypes  whether has aggregated relation of the given type
      * @param {boolean} relationSenders whether one of the relation is sent by the user listed
      * @return {boolean} true if the event fields match the filter
@@ -135,6 +143,7 @@ export class FilterComponent {
         sender: string,
         eventType: string,
         containsUrl: boolean,
+        messageWithUrl: boolean,
         relationTypes: Array<RelationType | string>,
         relationSenders: string[],
     ): boolean {
@@ -167,6 +176,11 @@ export class FilterComponent {
 
         const containsUrlFilter = this.filterJson.contains_url;
         if (containsUrlFilter !== undefined && containsUrlFilter !== containsUrl) {
+            return false;
+        }
+
+        const messageWithUrlFilter = this.filterJson.message_with_url;
+        if (messageWithUrlFilter !== undefined && messageWithUrlFilter !== messageWithUrl) {
             return false;
         }
 
