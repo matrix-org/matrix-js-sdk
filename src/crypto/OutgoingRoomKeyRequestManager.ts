@@ -100,20 +100,13 @@ export class OutgoingRoomKeyRequestManager {
     // of sendOutgoingRoomKeyRequests
     private sendOutgoingRoomKeyRequestsRunning = false;
 
-    private clientRunning = false;
+    private clientRunning = true;
 
     constructor(
         private readonly baseApis: MatrixClient,
         private readonly deviceId: string,
         private readonly cryptoStore: CryptoStore,
     ) {}
-
-    /**
-     * Called when the client is started. Sets background processes running.
-     */
-    public start(): void {
-        this.clientRunning = true;
-    }
 
     /**
      * Called when the client is stopped. Stops any running background processes.

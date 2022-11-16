@@ -64,3 +64,11 @@ jobs:
 
       - name: Generate Docs
         run: "yarn run gendoc"
+        
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: docs
+          path: _docs
+          # We'll only use this in a workflow_run, then we're done with it
+          retention-days: 1

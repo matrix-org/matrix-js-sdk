@@ -745,7 +745,7 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        logger.log(`GroupCall: incoming call from: ${opponentMemberId}`);
+        logger.log(`GroupCall: incoming call from: ${opponentMemberId} with ID ${newCall.callId}`);
 
         // we are handlng this call as a PTT call, so enable PTT semantics
         newCall.isPtt = this.isPtt;
