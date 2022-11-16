@@ -1311,6 +1311,10 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 content.sender_key, event.getTs() - 120000,
             );
             if (problem) {
+                logger.info(
+                    `When handling UISI from ${event.getSender()} (sender key ${content.sender_key}): ` +
+                    `recent session problem with that sender: ${problem}`
+                );
                 let problemDescription = PROBLEM_DESCRIPTIONS[problem.type as "no_olm"] || PROBLEM_DESCRIPTIONS.unknown;
                 if (problem.fixed) {
                     problemDescription +=
