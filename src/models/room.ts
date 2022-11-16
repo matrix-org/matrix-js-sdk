@@ -54,14 +54,11 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { ReceiptType } from "../@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import {
-    MAIN_ROOM_TIMELINE,
     ReadReceipt,
-    Receipt,
-    ReceiptContent,
     synthesizeReceipt,
 } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
