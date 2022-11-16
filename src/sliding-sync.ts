@@ -27,6 +27,10 @@ import { HTTPError } from "./http-api";
 // to determine the max time we're willing to wait.
 const BUFFER_PERIOD_MS = 10 * 1000;
 
+export const MSC3575_WILDCARD = "*";
+export const MSC3575_STATE_KEY_ME = "$ME";
+export const MSC3575_STATE_KEY_LAZY = "$LAZY";
+
 /**
  * Represents a subscription to a room or set of rooms. Controls which events are returned.
  */
