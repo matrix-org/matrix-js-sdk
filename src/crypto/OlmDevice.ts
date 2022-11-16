@@ -1139,17 +1139,14 @@ export class OlmDevice {
                         }
 
                         if (existingSession) {
-                            logger.log(
-                                "Update for megolm session "
-                                + senderKey + "/" + sessionId,
-                            );
+                            logger.log(`Update for megolm session ${senderKey}|${sessionId}`);
                             if (existingSession.first_known_index() <= session.first_known_index()) {
                                 if (!existingSessionData!.untrusted || extraSessionData.untrusted) {
                                     // existing session has less-than-or-equal index
                                     // (i.e. can decrypt at least as much), and the
                                     // new session's trust does not win over the old
                                     // session's trust, so keep it
-                                    logger.log(`Keeping existing megolm session ${sessionId}`);
+                                    logger.log(`Keeping existing megolm session ${senderKey}|${sessionId}`);
                                     return;
                                 }
                                 if (existingSession.first_known_index() < session.first_known_index()) {
@@ -1164,7 +1161,7 @@ export class OlmDevice {
                                     ) {
                                         logger.info(
                                             "Upgrading trust of existing megolm session " +
-                                            sessionId + " based on newly-received trusted session",
+                                            `${senderKey}|${sessionId} based on newly-received trusted session`,
                                         );
                                         existingSessionData!.untrusted = false;
                                         this.cryptoStore.storeEndToEndInboundGroupSession(
@@ -1172,7 +1169,7 @@ export class OlmDevice {
                                         );
                                     } else {
                                         logger.warn(
-                                            "Newly-received megolm session " + sessionId +
+                                            `Newly-received megolm session ${senderKey}|$sessionId}` +
                                             " does not match existing session! Keeping existing session",
                                         );
                                     }
@@ -1183,8 +1180,8 @@ export class OlmDevice {
                         }
 
                         logger.info(
-                            "Storing megolm session " + senderKey + "/" + sessionId +
-                            " with first index " + session.first_known_index(),
+                            `Storing megolm session ${senderKey}|${sessionId} with first index `+
+                            session.first_known_index(),
                         );
 
                         const sessionData = Object.assign({}, extraSessionData, {
