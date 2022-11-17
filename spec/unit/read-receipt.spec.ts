@@ -16,11 +16,10 @@ limitations under the License.
 
 import MockHttpBackend from 'matrix-mock-request';
 
-import { ReceiptType } from '../../src/@types/read_receipts';
+import { MAIN_ROOM_TIMELINE, ReceiptType } from '../../src/@types/read_receipts';
 import { MatrixClient } from "../../src/client";
 import { Feature, ServerSupport } from '../../src/feature';
 import { EventType } from '../../src/matrix';
-import { MAIN_ROOM_TIMELINE } from '../../src/models/read-receipt';
 import { encodeUri } from '../../src/utils';
 import * as utils from "../test-utils/test-utils";
 

@@ -696,28 +696,27 @@ class MegolmEncryption extends EncryptionAlgorithm {
     ): Promise<void> {
         const obSessionInfo = this.outboundSessions[sessionId];
         if (!obSessionInfo) {
-            logger.debug(`megolm session ${sessionId} not found: not re-sharing keys`);
+            logger.debug(`megolm session ${senderKey}|${sessionId} not found: not re-sharing keys`);
             return;
         }
 
         // The chain index of the key we previously sent this device
         if (obSessionInfo.sharedWithDevices[userId] === undefined) {
-            logger.debug(`megolm session ${sessionId} never shared with user ${userId}`);
+            logger.debug(`megolm session ${senderKey}|${sessionId} never shared with user ${userId}`);
             return;
         }
         const sessionSharedData = obSessionInfo.sharedWithDevices[userId][device.deviceId];
         if (sessionSharedData === undefined) {
             logger.debug(
-                "megolm session ID " + sessionId + " never shared with device " +
-                userId + ":" + device.deviceId,
+                `megolm session ${senderKey}|${sessionId} never shared with device ${userId}:${device.deviceId}`,
             );
             return;
         }
 
         if (sessionSharedData.deviceKey !== device.getIdentityKey()) {
             logger.warn(
-                `Session has been shared with device ${device.deviceId} but with identity ` +
-                `key ${sessionSharedData.deviceKey}. Key is now ${device.getIdentityKey()}!`,
+                `Megolm session ${senderKey}|${sessionId} has been shared with device ${device.deviceId} but ` +
+                `with identity key ${sessionSharedData.deviceKey}. Key is now ${device.getIdentityKey()}!`,
             );
             return;
         }
@@ -730,7 +729,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         if (!key) {
             logger.warn(
-                `No inbound session key found for megolm ${sessionId}: not re-sharing keys`,
+                `No inbound session key found for megolm session ${senderKey}|${sessionId}: not re-sharing keys`,
             );
             return;
         }
@@ -776,7 +775,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 [device.deviceId]: encryptedContent,
             },
         });
-        logger.debug(`Re-shared key for megolm session ${sessionId} with ${userId}:${device.deviceId}`);
+        logger.debug(`Re-shared key for megolm session ${senderKey}|${sessionId} with ${userId}:${device.deviceId}`);
     }
 
     /**
@@ -1312,6 +1311,10 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 content.sender_key, event.getTs() - 120000,
             );
             if (problem) {
+                logger.info(
+                    `When handling UISI from ${event.getSender()} (sender key ${content.sender_key}): ` +
+                    `recent session problem with that sender: ${problem}`,
+                );
                 let problemDescription = PROBLEM_DESCRIPTIONS[problem.type as "no_olm"] || PROBLEM_DESCRIPTIONS.unknown;
                 if (problem.fixed) {
                     problemDescription +=
@@ -1902,10 +1905,11 @@ class MegolmDecryption extends DecryptionAlgorithm {
     public async sendSharedHistoryInboundSessions(devicesByUser: Record<string, DeviceInfo[]>): Promise<void> {
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser);
 
-        logger.log("sendSharedHistoryInboundSessions to users", Object.keys(devicesByUser));
-
         const sharedHistorySessions = await this.olmDevice.getSharedHistoryInboundGroupSessions(this.roomId);
-        logger.log("shared-history sessions", sharedHistorySessions);
+        logger.log(
+            `Sharing history in ${this.roomId} with users ${Object.keys(devicesByUser)}`,
+            sharedHistorySessions.map(([senderKey, sessionId]) => `${senderKey}|${sessionId}`),
+        );
         for (const [senderKey, sessionId] of sharedHistorySessions) {
             const payload = await this.buildKeyForwardingMessage(this.roomId, senderKey, sessionId);
 

@@ -195,7 +195,7 @@ import { MediaHandler } from "./webrtc/mediaHandler";
 import { GroupCallEventHandler } from "./webrtc/groupCallEventHandler";
 import { LoginTokenPostResponse, ILoginFlowsResponse, IRefreshTokenResponse, SSOAction } from "./@types/auth";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
-import { ReceiptType } from "./@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, ReceiptType } from "./@types/read_receipts";
 import { MSC3575SlidingSyncRequest, MSC3575SlidingSyncResponse, SlidingSync } from "./sliding-sync";
 import { SlidingSyncSdk } from "./sliding-sync-sdk";
 import {
@@ -210,7 +210,6 @@ import { MBeaconInfoEventContent, M_BEACON_INFO } from "./@types/beacon";
 import { UnstableValue } from "./NamespacedValue";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue";
 import { ToDeviceBatch } from "./models/ToDeviceMessage";
-import { MAIN_ROOM_TIMELINE } from "./models/read-receipt";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
