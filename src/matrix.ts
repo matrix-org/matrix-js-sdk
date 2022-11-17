@@ -21,6 +21,7 @@ import { MemoryStore } from "./store/memory";
 import { MatrixScheduler } from "./scheduler";
 import { MatrixClient, ICreateClientOpts } from "./client";
 import { RoomWidgetClient, ICapabilities } from "./embedded";
+import { CryptoStore } from "./crypto/store/base";
 
 export * from "./client";
 export * from "./embedded";
@@ -64,7 +65,7 @@ export {
 } from "./webrtc/groupCall";
 export type { GroupCall } from "./webrtc/groupCall";
 
-let cryptoStoreFactory = () => new MemoryCryptoStore;
+let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore;
 
 /**
  * Configure a different factory to be used for creating crypto stores
@@ -72,7 +73,7 @@ let cryptoStoreFactory = () => new MemoryCryptoStore;
  * @param {Function} fac  a function which will return a new
  *    {@link module:crypto.store.base~CryptoStore}.
  */
-export function setCryptoStoreFactory(fac) {
+export function setCryptoStoreFactory(fac: () => CryptoStore): void {
     cryptoStoreFactory = fac;
 }
 

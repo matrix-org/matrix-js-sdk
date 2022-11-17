@@ -172,7 +172,7 @@ export class MSC3089TreeSpace {
         const currentPls = this.room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
-        const pls = currentPls.getContent() || {};
+        const pls = currentPls?.getContent() || {};
         const viewLevel = pls['users_default'] || 0;
         const editLevel = pls['events_default'] || 50;
         const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;
@@ -207,7 +207,7 @@ export class MSC3089TreeSpace {
         const currentPls = this.room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
-        const pls = currentPls.getContent() || {};
+        const pls = currentPls?.getContent() || {};
         const viewLevel = pls['users_default'] || 0;
         const editLevel = pls['events_default'] || 50;
         const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;

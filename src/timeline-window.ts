@@ -32,7 +32,7 @@ const DEBUG = false;
 /**
  * @private
  */
-const debuglog = DEBUG ? logger.log.bind(logger) : function() {};
+const debuglog = DEBUG ? logger.log.bind(logger) : function(): void {};
 
 /**
  * the number of times we ask the server for more events before giving up
@@ -84,7 +84,7 @@ export class TimelineWindow {
      *
      * @constructor
      */
-    constructor(
+    public constructor(
         private readonly client: MatrixClient,
         private readonly timelineSet: EventTimelineSet,
         opts: IOpts = {},
@@ -104,7 +104,7 @@ export class TimelineWindow {
     public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
         // fields so that the event in question is in the middle of the window.
-        const initFields = (timeline: Optional<EventTimeline>) => {
+        const initFields = (timeline: Optional<EventTimeline>): void => {
             if (!timeline) {
                 throw new Error("No timeline given to initFields");
             }
@@ -430,7 +430,7 @@ export class TimelineIndex {
     public pendingPaginate?: Promise<boolean>;
 
     // index: the indexes are relative to BaseIndex, so could well be negative.
-    constructor(public timeline: EventTimeline, public index: number) {}
+    public constructor(public timeline: EventTimeline, public index: number) {}
 
     /**
      * @return {number} the minimum possible value for the index in the current

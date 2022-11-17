@@ -202,7 +202,7 @@ export class SyncAccumulator {
      * never be more. This cannot be 0 or else it makes it impossible to scroll
      * back in a room. Default: 50.
      */
-    constructor(private readonly opts: IOpts = {}) {
+    public constructor(private readonly opts: IOpts = {}) {
         this.opts.maxTimelineEntries = this.opts.maxTimelineEntries || 50;
     }
 

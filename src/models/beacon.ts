@@ -56,7 +56,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
     private livenessWatchTimeout?: ReturnType<typeof setTimeout>;
     private _latestLocationEvent?: MatrixEvent;
 
-    constructor(
+    public constructor(
         private rootEvent: MatrixEvent,
     ) {
         super();
@@ -180,7 +180,7 @@ export class Beacon extends TypedEventEmitter<Exclude<BeaconEvent, BeaconEvent.N
         }
     }
 
-    private clearLatestLocation = () => {
+    private clearLatestLocation = (): void => {
         this._latestLocationEvent = undefined;
         this.emit(BeaconEvent.LocationUpdate, this.latestLocationState!);
     };

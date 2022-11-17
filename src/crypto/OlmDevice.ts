@@ -177,13 +177,13 @@ export class OlmDevice {
     // Used by olm to serialise prekey message decryptions
     public olmPrekeyPromise: Promise<any> = Promise.resolve(); // set by consumers
 
-    constructor(private readonly cryptoStore: CryptoStore) {
+    public constructor(private readonly cryptoStore: CryptoStore) {
     }
 
     /**
      * @return {array} The version of Olm.
      */
-    static getOlmVersion(): [number, number, number] {
+    public static getOlmVersion(): [number, number, number] {
         return global.Olm.get_library_version();
     }
 
@@ -1517,7 +1517,9 @@ export class OlmDevice {
         });
     }
 
-    async getSharedHistoryInboundGroupSessions(roomId: string): Promise<[senderKey: string, sessionId: string][]> {
+    public async getSharedHistoryInboundGroupSessions(
+        roomId: string,
+    ): Promise<[senderKey: string, sessionId: string][]> {
         let result: Promise<[senderKey: string, sessionId: string][]>;
         await this.cryptoStore.doTxn(
             'readonly', [

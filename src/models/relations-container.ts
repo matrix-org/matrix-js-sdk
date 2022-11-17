@@ -26,7 +26,7 @@ export class RelationsContainer {
     // this.relations.get(parentEventId).get(relationType).get(relationEventType)
     private relations = new Map<string, Map<RelationType | string, Map<EventType | string, Relations>>>();
 
-    constructor(private readonly client: MatrixClient, private readonly room?: Room) {
+    public constructor(private readonly client: MatrixClient, private readonly room?: Room) {
     }
 
     /**
@@ -98,7 +98,7 @@ export class RelationsContainer {
         const relation = event.getRelation();
         if (!relation) return;
 
-        const onEventDecrypted = () => {
+        const onEventDecrypted = (): void => {
             if (event.isDecryptionFailure()) {
                 // This could for example happen if the encryption keys are not yet available.
                 // The event may still be decrypted later. Register the listener again.

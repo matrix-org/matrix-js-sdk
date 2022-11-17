@@ -152,7 +152,7 @@ describe("RoomState", function() {
         it("should return a single MatrixEvent if a state_key was specified",
             function() {
                 const event = state.getStateEvents("m.room.member", userA);
-                expect(event.getContent()).toMatchObject({
+                expect(event?.getContent()).toMatchObject({
                     membership: "join",
                 });
             });

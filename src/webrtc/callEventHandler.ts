@@ -46,7 +46,7 @@ export class CallEventHandler {
     private candidateEventsByCall: Map<string, Array<MatrixEvent>>;
     private eventBufferPromiseChain?: Promise<void>;
 
-    constructor(client: MatrixClient) {
+    public constructor(client: MatrixClient) {
         this.client = client;
         this.calls = new Map<string, MatrixCall>();
         // The sync code always emits one event at a time, so it will patiently
@@ -61,13 +61,13 @@ export class CallEventHandler {
         this.candidateEventsByCall = new Map<string, Array<MatrixEvent>>();
     }
 
-    public start() {
+    public start(): void {
         this.client.on(ClientEvent.Sync, this.onSync);
         this.client.on(RoomEvent.Timeline, this.onRoomTimeline);
         this.client.on(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
     }
 
-    public stop() {
+    public stop(): void {
         this.client.removeListener(ClientEvent.Sync, this.onSync);
         this.client.removeListener(RoomEvent.Timeline, this.onRoomTimeline);
         this.client.removeListener(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
@@ -87,7 +87,7 @@ export class CallEventHandler {
         }
     };
 
-    private async evaluateEventBuffer(eventBuffer: MatrixEvent[]) {
+    private async evaluateEventBuffer(eventBuffer: MatrixEvent[]): Promise<void> {
         await Promise.all(eventBuffer.map((event) => this.client.decryptEventIfNeeded(event)));
 
         const callEvents = eventBuffer.filter((event) => {
@@ -125,7 +125,7 @@ export class CallEventHandler {
         }
     }
 
-    private onRoomTimeline = (event: MatrixEvent) => {
+    private onRoomTimeline = (event: MatrixEvent): void => {
         this.callEventBuffer.push(event);
     };
 
@@ -178,7 +178,7 @@ export class CallEventHandler {
         }
     };
 
-    private async handleCallEvent(event: MatrixEvent) {
+    private async handleCallEvent(event: MatrixEvent): Promise<void> {
         this.client.emit(ClientEvent.ReceivedVoipEvent, event);
 
         const content = event.getContent();

@@ -62,7 +62,7 @@ export class DehydrationManager {
     private keyInfo?: {[props: string]: any};
     private deviceDisplayName?: string;
 
-    constructor(private readonly crypto: Crypto) {
+    public constructor(private readonly crypto: Crypto) {
         this.getDehydrationKeyFromCache();
     }
 
@@ -294,7 +294,7 @@ export class DehydrationManager {
         }
     }
 
-    public stop() {
+    public stop(): void {
         if (this.timeoutId) {
             global.clearTimeout(this.timeoutId);
             this.timeoutId = undefined;

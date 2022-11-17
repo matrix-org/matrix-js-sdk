@@ -170,10 +170,12 @@ const macMethods = {
     "hmac-sha256": "calculate_mac_long_kdf",
 };
 
-function calculateMAC(olmSAS: OlmSAS, method: string) {
-    return function(...args) {
+type Method = keyof typeof macMethods;
+
+function calculateMAC(olmSAS: OlmSAS, method: Method) {
+    return function(...args): string {
         const macFunction = olmSAS[macMethods[method]];
-        const mac = macFunction.apply(olmSAS, args);
+        const mac: string = macFunction.apply(olmSAS, args);
         logger.log("SAS calculateMAC:", method, args, mac);
         return mac;
     };
@@ -208,7 +210,7 @@ const calculateKeyAgreement = {
  */
 const KEY_AGREEMENT_LIST = ["curve25519-hkdf-sha256", "curve25519"];
 const HASHES_LIST = ["sha256"];
-const MAC_LIST = ["org.matrix.msc3783.hkdf-hmac-sha256", "hkdf-hmac-sha256", "hmac-sha256"];
+const MAC_LIST: Method[] = ["org.matrix.msc3783.hkdf-hmac-sha256", "hkdf-hmac-sha256", "hmac-sha256"];
 const SAS_LIST = Object.keys(sasGenerators);
 
 const KEY_AGREEMENT_SET = new Set(KEY_AGREEMENT_LIST);
@@ -300,13 +302,13 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         keyAgreement: string,
         sasMethods: string[],
         olmSAS: OlmSAS,
-        macMethod: string,
+        macMethod: Method,
     ): Promise<void> {
         const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
         const verifySAS = new Promise<void>((resolve, reject) => {
             this.sasEvent = {
                 sas: generateSas(sasBytes, sasMethods),
-                confirm: async () => {
+                confirm: async (): Promise<void> => {
                     try {
                         await this.sendMAC(olmSAS, macMethod);
                         resolve();
@@ -443,7 +445,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         }
     }
 
-    private sendMAC(olmSAS: OlmSAS, method: string): Promise<void> {
+    private sendMAC(olmSAS: OlmSAS, method: Method): Promise<void> {
         const mac = {};
         const keyList: string[] = [];
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
@@ -475,7 +477,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         return this.send(EventType.KeyVerificationMac, { mac, keys });
     }
 
-    private async checkMAC(olmSAS: OlmSAS, content: IContent, method: string): Promise<void> {
+    private async checkMAC(olmSAS: OlmSAS, content: IContent, method: Method): Promise<void> {
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this.userId + this.deviceId
               + this.baseApis.getUserId() + this.baseApis.deviceId

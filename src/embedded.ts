@@ -101,7 +101,7 @@ export class RoomWidgetClient extends MatrixClient {
     private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
 
-    constructor(
+    public constructor(
         private readonly widgetApi: WidgetApi,
         private readonly capabilities: ICapabilities,
         private readonly roomId: string,
@@ -211,7 +211,7 @@ export class RoomWidgetClient extends MatrixClient {
         if (this.capabilities.turnServers) this.watchTurnServers();
     }
 
-    public stopClient() {
+    public stopClient(): void {
         this.widgetApi.off(`action:${WidgetApiToWidgetAction.SendEvent}`, this.onEvent);
         this.widgetApi.off(`action:${WidgetApiToWidgetAction.SendToDevice}`, this.onToDevice);
 
@@ -288,7 +288,7 @@ export class RoomWidgetClient extends MatrixClient {
         return this.syncState;
     }
 
-    private setSyncState(state: SyncState) {
+    private setSyncState(state: SyncState): void {
         const oldState = this.syncState;
         this.syncState = state;
         this.emit(ClientEvent.Sync, state, oldState);
@@ -298,7 +298,7 @@ export class RoomWidgetClient extends MatrixClient {
         await this.widgetApi.transport.reply<IWidgetApiAcknowledgeResponseData>(ev.detail, {});
     }
 
-    private onEvent = async (ev: CustomEvent<ISendEventToWidgetActionRequest>) => {
+    private onEvent = async (ev: CustomEvent<ISendEventToWidgetActionRequest>): Promise<void> => {
         ev.preventDefault();
 
         // Verify the room ID matches, since it's possible for the client to
@@ -317,7 +317,7 @@ export class RoomWidgetClient extends MatrixClient {
         await this.ack(ev);
     };
 
-    private onToDevice = async (ev: CustomEvent<ISendToDeviceToWidgetActionRequest>) => {
+    private onToDevice = async (ev: CustomEvent<ISendToDeviceToWidgetActionRequest>): Promise<void> => {
         ev.preventDefault();
 
         const event = new MatrixEvent({
@@ -333,9 +333,11 @@ export class RoomWidgetClient extends MatrixClient {
         await this.ack(ev);
     };
 
-    private async watchTurnServers() {
+    private async watchTurnServers(): Promise<void> {
         const servers = this.widgetApi.getTurnServers();
-        const onClientStopped = () => servers.return(undefined);
+        const onClientStopped = (): void => {
+            servers.return(undefined);
+        };
         this.lifecycle!.signal.addEventListener("abort", onClientStopped);
 
         try {

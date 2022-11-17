@@ -1011,7 +1011,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // A manager for determining which invites should be ignored.
     public readonly ignoredInvites: IgnoredInvites;
 
-    constructor(opts: IMatrixClientCreateOpts) {
+    public constructor(opts: IMatrixClientCreateOpts) {
         super();
 
         opts.baseUrl = utils.ensureNoTrailingSlash(opts.baseUrl);
@@ -1233,7 +1233,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // shallow-copy the opts dict before modifying and storing it
         this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
         this.clientOpts.crypto = this.crypto;
-        this.clientOpts.canResetEntireTimeline = (roomId) => {
+        this.clientOpts.canResetEntireTimeline = (roomId): boolean => {
             if (!this.canResetTimelineCallback) {
                 return false;
             }
@@ -1260,7 +1260,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * High level helper method to stop the client from polling and allow a
      * clean shutdown.
      */
-    public stopClient() {
+    public stopClient(): void {
         this.crypto?.stop(); // crypto might have been initialised even if the client wasn't fully started
 
         if (!this.clientRunning) return; // already stopped
@@ -1537,7 +1537,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * when creating the client.
      * @param {boolean} force True to force use of TURN servers
      */
-    public setForceTURN(force: boolean) {
+    public setForceTURN(force: boolean): void {
         this.forceTURN = force;
     }
 
@@ -1545,7 +1545,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set whether to advertise transfer support to other parties on Matrix calls.
      * @param {boolean} support True to advertise the 'm.call.transferee' capability
      */
-    public setSupportsCallTransfer(support: boolean) {
+    public setSupportsCallTransfer(support: boolean): void {
         this.supportsCallTransfer = support;
     }
 
@@ -1679,7 +1679,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * and may change without warning.</b>
      * @param {boolean} guest True if this is a guest account.
      */
-    public setGuest(guest: boolean) {
+    public setGuest(guest: boolean): void {
         // EXPERIMENTAL:
         // If the token is a macaroon, it should be encoded in it that it is a 'guest'
         // access token, which means that the SDK can determine this entirely without
@@ -1722,7 +1722,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {EventTimelineSet} set
      */
-    public setNotifTimelineSet(set: EventTimelineSet) {
+    public setNotifTimelineSet(set: EventTimelineSet): void {
         this.notifTimelineSet = set;
     }
 
@@ -2280,11 +2280,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * send, in order to speed up sending of the message.
      * @param {module:models/room} room the room the event is in
      */
-    public prepareToEncrypt(room: Room) {
+    public prepareToEncrypt(room: Room): void {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.prepareToEncrypt(room);
+        this.crypto.prepareToEncrypt(room);
     }
 
     /**
@@ -2325,7 +2325,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     auth data as an object. Can be called multiple times, first with an empty
      *     authDict, to obtain the flows.
      */
-    public bootstrapCrossSigning(opts: IBootstrapCrossSigningOpts) {
+    public bootstrapCrossSigning(opts: IBootstrapCrossSigningOpts): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2353,11 +2353,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {boolean} val True to trust cross-signed devices
      */
-    public setCryptoTrustCrossSignedDevices(val: boolean) {
+    public setCryptoTrustCrossSignedDevices(val: boolean): void {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.setCryptoTrustCrossSignedDevices(val);
+        this.crypto.setCryptoTrustCrossSignedDevices(val);
     }
 
     /**
@@ -2498,7 +2498,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {Array} keys The IDs of the keys to use to encrypt the secret or null/undefined
      *     to use the default (will throw if no default key is set).
      */
-    public storeSecret(name: string, secret: string, keys?: string[]) {
+    public storeSecret(name: string, secret: string, keys?: string[]): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2576,7 +2576,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {string} keyId The new default key ID
      */
-    public setDefaultSecretStorageKeyId(keyId: string) {
+    public setDefaultSecretStorageKeyId(keyId: string): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -2717,7 +2717,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * This should not normally be necessary.
      */
-    public forceDiscardSession(roomId: string) {
+    public forceDiscardSession(roomId: string): void {
         if (!this.crypto) {
             throw new Error("End-to-End encryption disabled");
         }
@@ -2841,7 +2841,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Disable backing up of keys.
      */
-    public disableKeyBackup() {
+    public disableKeyBackup(): void {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3045,7 +3045,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Marks all group sessions as needing to be backed up and schedules them to
      * upload in the background as soon as possible.
      */
-    public async scheduleAllGroupSessionsForBackup() {
+    public async scheduleAllGroupSessionsForBackup(): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3402,7 +3402,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {array} userIds a list of users to share with.  The keys will be sent to
      *     all of the user's current devices.
      */
-    public async sendSharedHistoryKeys(roomId: string, userIds: string[]) {
+    public async sendSharedHistoryKeys(roomId: string, userIds: string[]): Promise<void> {
         if (!this.crypto) {
             throw new Error("End-to-end encryption disabled");
         }
@@ -3686,7 +3686,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {MatrixEvent} event   Event to cancel
      * @throws Error if the event is not in QUEUED, NOT_SENT or ENCRYPTING state
      */
-    public cancelPendingEvent(event: MatrixEvent) {
+    public cancelPendingEvent(event: MatrixEvent): void {
         if (![EventStatus.QUEUED, EventStatus.NOT_SENT, EventStatus.ENCRYPTING].includes(event.status!)) {
             throw new Error("cannot cancel an event with status " + event.status);
         }
@@ -3835,7 +3835,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async unstable_createLiveBeacon(
         roomId: Room["roomId"],
         beaconInfoContent: MBeaconInfoEventContent,
-    ) {
+    ): Promise<ISendEventResponse> {
         return this.unstable_setLiveBeacon(roomId, beaconInfoContent);
     }
 
@@ -3850,7 +3850,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async unstable_setLiveBeacon(
         roomId: string,
         beaconInfoContent: MBeaconInfoEventContent,
-    ) {
+    ): Promise<ISendEventResponse> {
         return this.sendStateEvent(roomId, M_BEACON_INFO.name, beaconInfoContent, this.getUserId()!);
     }
 
@@ -4122,7 +4122,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.isRoomEncrypted(roomId) ? EventType.RoomMessageEncrypted : eventType;
     }
 
-    protected updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus) {
+    protected updatePendingEventStatus(room: Room | null, event: MatrixEvent, newStatus: EventStatus): void {
         if (room) {
             room.updatePendingEvent(event, newStatus);
         } else {
@@ -4945,12 +4945,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const populationResults: { [roomId: string]: Error } = {};
         const promises: Promise<any>[] = [];
 
-        const doLeave = (roomId: string) => {
+        const doLeave = (roomId: string): Promise<void> => {
             return this.leave(roomId).then(() => {
                 delete populationResults[roomId];
             }).catch((err) => {
+                // suppress error
                 populationResults[roomId] = err;
-                return null; // suppress error
             });
         };
 
@@ -5905,7 +5905,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Reset the notifTimelineSet entirely, paginating in some historical notifs as
      * a starting point for subsequent pagination.
      */
-    public resetNotifTimelineSet() {
+    public resetNotifTimelineSet(): void {
         if (!this.notifTimelineSet) {
             return;
         }
@@ -5950,7 +5950,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Stop any ongoing room peeking.
      */
-    public stopPeeking() {
+    public stopPeeking(): void {
         if (this.peekSync) {
             this.peekSync.stopPeeking();
             this.peekSync = null;
@@ -6684,7 +6684,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param {boolean} allow
      */
-    public setFallbackICEServerAllowed(allow: boolean) {
+    public setFallbackICEServerAllowed(allow: boolean): void {
         this.fallbackICEServerAllowed = allow;
     }
 
@@ -7025,7 +7025,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Default: returns false.
      * @param {Function} cb The callback which will be invoked.
      */
-    public setCanResetTimelineCallback(cb: ResetTimelineCallback) {
+    public setCanResetTimelineCallback(cb: ResetTimelineCallback): void {
         this.canResetTimelineCallback = cb;
     }
 
@@ -7165,7 +7165,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set the identity server URL of this client
      * @param {string} url New identity server URL
      */
-    public setIdentityServerUrl(url: string) {
+    public setIdentityServerUrl(url: string): void {
         this.idBaseUrl = utils.ensureNoTrailingSlash(url);
         this.http.setIdBaseUrl(this.idBaseUrl);
     }
@@ -7182,7 +7182,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set the access token associated with this account.
      * @param {string} token The new access token.
      */
-    public setAccessToken(token: string) {
+    public setAccessToken(token: string): void {
         this.http.opts.accessToken = token;
     }
 

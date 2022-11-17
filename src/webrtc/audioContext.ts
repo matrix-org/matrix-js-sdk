@@ -35,7 +35,7 @@ export const acquireContext = (): AudioContext => {
  * released, allowing the context and associated hardware resources to be
  * cleaned up if nothing else is using it.
  */
-export const releaseContext = () => {
+export const releaseContext = (): void => {
     refCount--;
     if (refCount === 0) {
         audioContext?.close();

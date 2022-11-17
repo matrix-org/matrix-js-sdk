@@ -78,7 +78,7 @@ export abstract class EncryptionAlgorithm {
     protected readonly baseApis: MatrixClient;
     protected readonly roomId?: string;
 
-    constructor(params: IParams) {
+    public constructor(params: IParams) {
         this.userId = params.userId;
         this.deviceId = params.deviceId;
         this.crypto = params.crypto;
@@ -150,7 +150,7 @@ export abstract class DecryptionAlgorithm {
     protected readonly baseApis: MatrixClient;
     protected readonly roomId?: string;
 
-    constructor(params: DecryptionClassParams) {
+    public constructor(params: DecryptionClassParams) {
         this.userId = params.userId;
         this.crypto = params.crypto;
         this.olmDevice = params.olmDevice;
@@ -242,7 +242,7 @@ export abstract class DecryptionAlgorithm {
 export class DecryptionError extends Error {
     public readonly detailedString: string;
 
-    constructor(public readonly code: string, msg: string, details?: Record<string, string | Error>) {
+    public constructor(public readonly code: string, msg: string, details?: Record<string, string | Error>) {
         super(msg);
         this.code = code;
         this.name = 'DecryptionError';
@@ -272,7 +272,7 @@ function detailedStringForDecryptionError(err: DecryptionError, details?: Record
  * @extends Error
  */
 export class UnknownDeviceError extends Error {
-    constructor(
+    public constructor(
         msg: string,
         public readonly devices: Record<string, Record<string, object>>,
         public event?: MatrixEvent,
