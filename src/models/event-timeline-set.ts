@@ -36,7 +36,7 @@ if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
     debuglog = logger.log.bind(logger);
 } else {
-    debuglog = function() {};
+    debuglog = function(): void {};
 }
 
 interface IOpts {
@@ -135,7 +135,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param {boolean} isThreadTimeline Whether this timeline set relates to a thread list timeline
      * (e.g., All threads or My threads)
      */
-    constructor(
+    public constructor(
         public readonly room: Room | undefined,
         opts: IOpts = {},
         client?: MatrixClient,
@@ -702,7 +702,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         }
 
         if (timeline.getTimelineSet() !== this) {
-            throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " + 
+            throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " +
                 "in timelineSet(threadId=${this.thread?.id})`);
         }
 

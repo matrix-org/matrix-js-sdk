@@ -80,7 +80,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private volumeLooperTimeout?: ReturnType<typeof setTimeout>;
     private _disposed = false;
 
-    constructor(opts: ICallFeedOpts) {
+    public constructor(opts: ICallFeedOpts) {
         super();
 
         this.client = opts.client;
@@ -227,11 +227,11 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         }
     }
 
-    public setSpeakingThreshold(threshold: number) {
+    public setSpeakingThreshold(threshold: number): void {
         this.speakingThreshold = threshold;
     }
 
-    private volumeLooper = () => {
+    private volumeLooper = (): void => {
         if (!this.analyser) return;
 
         if (!this.measuringVolumeActivity) return;

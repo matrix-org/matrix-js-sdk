@@ -56,11 +56,11 @@ export class MediaHandler extends TypedEventEmitter<
     public userMediaStreams: MediaStream[] = [];
     public screensharingStreams: MediaStream[] = [];
 
-    constructor(private client: MatrixClient) {
+    public constructor(private client: MatrixClient) {
         super();
     }
 
-    public restoreMediaSettings(audioInput: string, videoInput: string) {
+    public restoreMediaSettings(audioInput: string, videoInput: string): void {
         this.audioInput = audioInput;
         this.videoInput = videoInput;
     }
@@ -275,7 +275,7 @@ export class MediaHandler extends TypedEventEmitter<
     /**
      * Stops all tracks on the provided usermedia stream
      */
-    public stopUserMediaStream(mediaStream: MediaStream) {
+    public stopUserMediaStream(mediaStream: MediaStream): void {
         logger.log(`mediaHandler stopUserMediaStream stopping stream ${mediaStream.id}`);
         for (const track of mediaStream.getTracks()) {
             track.stop();
@@ -333,7 +333,7 @@ export class MediaHandler extends TypedEventEmitter<
     /**
      * Stops all tracks on the provided screensharing stream
      */
-    public stopScreensharingStream(mediaStream: MediaStream) {
+    public stopScreensharingStream(mediaStream: MediaStream): void {
         logger.debug("Stopping screensharing stream", mediaStream.id);
         for (const track of mediaStream.getTracks()) {
             track.stop();
@@ -352,7 +352,7 @@ export class MediaHandler extends TypedEventEmitter<
     /**
      * Stops all local media tracks
      */
-    public stopAllStreams() {
+    public stopAllStreams(): void {
         for (const stream of this.userMediaStreams) {
             logger.log(`mediaHandler stopAllStreams stopping stream ${stream.id}`);
             for (const track of stream.getTracks()) {

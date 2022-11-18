@@ -116,7 +116,7 @@ export class VerificationRequest<
     public _cancellingUserId?: string; // Used in tests only
     private _verifier?: VerificationBase<any, any>;
 
-    constructor(
+    public constructor(
         public readonly channel: C,
         private readonly verificationMethods: Map<VerificationMethod, typeof VerificationBase>,
         private readonly client: MatrixClient,
@@ -498,7 +498,7 @@ export class VerificationRequest<
      */
     public waitFor(fn: (request: VerificationRequest) => boolean): Promise<VerificationRequest> {
         return new Promise((resolve, reject) => {
-            const check = () => {
+            const check = (): boolean => {
                 let handled = false;
                 if (fn(this)) {
                     resolve(this);
@@ -539,7 +539,7 @@ export class VerificationRequest<
 
     private calculatePhaseTransitions(): ITransition[] {
         const transitions: ITransition[] = [{ phase: PHASE_UNSENT }];
-        const phase = () => transitions[transitions.length - 1].phase;
+        const phase = (): Phase => transitions[transitions.length - 1].phase;
 
         // always pass by .request first to be sure channel.userId has been set
         const hasRequestByThem = this.eventsByThem.has(REQUEST_TYPE);
@@ -816,7 +816,7 @@ export class VerificationRequest<
         }
     }
 
-    private cancelOnTimeout = async () => {
+    private cancelOnTimeout = async (): Promise<void> => {
         try {
             if (this.initiatedByMe) {
                 await this.cancel({

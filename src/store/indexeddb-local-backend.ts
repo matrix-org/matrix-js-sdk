@@ -25,7 +25,7 @@ import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDevice
 
 type DbMigration = (db: IDBDatabase) => void;
 const DB_MIGRATIONS: DbMigration[] = [
-    (db) => {
+    (db): void => {
         // Make user store, clobber based on user ID. (userId property of User objects)
         db.createObjectStore("users", { keyPath: ["userId"] });
 
@@ -36,15 +36,15 @@ const DB_MIGRATIONS: DbMigration[] = [
         // Make /sync store (sync tokens, room data, etc), always clobber (const key).
         db.createObjectStore("sync", { keyPath: ["clobber"] });
     },
-    (db) => {
+    (db): void => {
         const oobMembersStore = db.createObjectStore(
             "oob_membership_events", {
                 keyPath: ["room_id", "state_key"],
             });
         oobMembersStore.createIndex("room", "room_id");
     },
-    (db) => { db.createObjectStore("client_options", { keyPath: ["clobber"] }); },
-    (db) => { db.createObjectStore("to_device_queue", { autoIncrement: true }); },
+    (db): void => { db.createObjectStore("client_options", { keyPath: ["clobber"] }); },
+    (db): void => { db.createObjectStore("to_device_queue", { autoIncrement: true }); },
     // Expand as needed.
 ];
 const VERSION = DB_MIGRATIONS.length;
@@ -67,11 +67,11 @@ function selectQuery<T>(
     const query = store.openCursor(keyRange);
     return new Promise((resolve, reject) => {
         const results: T[] = [];
-        query.onerror = () => {
+        query.onerror = (): void => {
             reject(new Error("Query failed: " + query.error));
         };
         // collect results
-        query.onsuccess = () => {
+        query.onsuccess = (): void => {
             const cursor = query.result;
             if (!cursor) {
                 resolve(results);
@@ -85,10 +85,10 @@ function selectQuery<T>(
 
 function txnAsPromise(txn: IDBTransaction): Promise<Event> {
     return new Promise((resolve, reject) => {
-        txn.oncomplete = function(event) {
+        txn.oncomplete = function(event): void {
             resolve(event);
         };
-        txn.onerror = function() {
+        txn.onerror = function(): void {
             reject(txn.error);
         };
     });
@@ -96,10 +96,10 @@ function txnAsPromise(txn: IDBTransaction): Promise<Event> {
 
 function reqAsEventPromise(req: IDBRequest): Promise<Event> {
     return new Promise((resolve, reject) => {
-        req.onsuccess = function(event) {
+        req.onsuccess = function(event): void {
             resolve(event);
         };
-        req.onerror = function() {
+        req.onerror = function(): void {
             reject(req.error);
         };
     });
@@ -107,8 +107,8 @@ function reqAsEventPromise(req: IDBRequest): Promise<Event> {
 
 function reqAsPromise(req: IDBRequest): Promise<IDBRequest> {
     return new Promise((resolve, reject) => {
-        req.onsuccess = () => resolve(req);
-        req.onerror = (err) => reject(err);
+        req.onsuccess = (): void => resolve(req);
+        req.onerror = (err): void => reject(err);
     });
 }
 
@@ -141,7 +141,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @param {string=} dbName Optional database name. The same name must be used
      * to open the same database.
      */
-    constructor(private readonly indexedDB: IDBFactory, dbName = "default") {
+    public constructor(private readonly indexedDB: IDBFactory, dbName = "default") {
         this.dbName = "matrix-js-sdk:" + dbName;
         this.syncAccumulator = new SyncAccumulator();
     }
@@ -161,7 +161,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
         logger.log(`LocalIndexedDBStoreBackend.connect: connecting...`);
         const req = this.indexedDB.open(this.dbName, VERSION);
-        req.onupgradeneeded = (ev) => {
+        req.onupgradeneeded = (ev): void => {
             const db = req.result;
             const oldVersion = ev.oldVersion;
             logger.log(
@@ -176,22 +176,22 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             });
         };
 
-        req.onblocked = () => {
+        req.onblocked = (): void => {
             logger.log(`can't yet open LocalIndexedDBStoreBackend because it is open elsewhere`);
         };
 
         logger.log(`LocalIndexedDBStoreBackend.connect: awaiting connection...`);
-        return reqAsEventPromise(req).then(() => {
+        return reqAsEventPromise(req).then(async () => {
             logger.log(`LocalIndexedDBStoreBackend.connect: connected`);
             this.db = req.result;
 
             // add a poorly-named listener for when deleteDatabase is called
             // so we can close our db connections.
-            this.db.onversionchange = () => {
+            this.db.onversionchange = (): void => {
                 this.db?.close();
             };
 
-            return this.init();
+            await this.init();
         });
     }
 
@@ -204,7 +204,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Having connected, load initial data from the database and prepare for use
      * @return {Promise} Resolves on success
      */
-    private init() {
+    private init(): Promise<unknown> {
         return Promise.all([
             this.loadAccountData(),
             this.loadSyncData(),
@@ -243,7 +243,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             // were all known already
             let oobWritten = false;
 
-            request.onsuccess = () => {
+            request.onsuccess = (): void => {
                 const cursor = request.result;
                 if (!cursor) {
                     // Unknown room
@@ -260,7 +260,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 }
                 cursor.continue();
             };
-            request.onerror = (err) => {
+            request.onerror = (err): void => {
                 reject(err);
             };
         }).then((events) => {
@@ -346,11 +346,11 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             logger.log(`Removing indexeddb instance: ${this.dbName}`);
             const req = this.indexedDB.deleteDatabase(this.dbName);
 
-            req.onblocked = () => {
+            req.onblocked = (): void => {
                 logger.log(`can't yet delete indexeddb ${this.dbName} because it is open elsewhere`);
             };
 
-            req.onerror = () => {
+            req.onerror = (): void => {
                 // in firefox, with indexedDB disabled, this fails with a
                 // DOMError. We treat this as non-fatal, so that we can still
                 // use the app.
@@ -358,7 +358,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 resolve();
             };
 
-            req.onsuccess = () => {
+            req.onsuccess = (): void => {
                 logger.log(`Removed indexeddb instance: ${this.dbName}`);
                 resolve();
             };

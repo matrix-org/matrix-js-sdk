@@ -94,7 +94,7 @@ export class DeviceInfo {
     public unsigned: Record<string, any> = {};
     public signatures: ISignatures = {};
 
-    constructor(public readonly deviceId: string) {}
+    public constructor(public readonly deviceId: string) {}
 
     /**
      * Prepare a DeviceInfo for JSON serialisation in the session store

@@ -29,11 +29,11 @@ export class RelatedRelations {
         return this.relations.reduce<MatrixEvent[]>((c, p) => [...c, ...p.getRelations()], []);
     }
 
-    public on<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>) {
+    public on<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>): void {
         this.relations.forEach(r => r.on(ev, fn));
     }
 
-    public off<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>) {
+    public off<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>): void {
         this.relations.forEach(r => r.off(ev, fn));
     }
 }

@@ -22,7 +22,7 @@ import { EventEmitter } from "events";
 import { ListenerMap, TypedEventEmitter } from "./models/typed-event-emitter";
 
 export class ReEmitter {
-    constructor(private readonly target: EventEmitter) {}
+    public constructor(private readonly target: EventEmitter) {}
 
     // Map from emitter to event name to re-emitter
     private reEmitters = new Map<EventEmitter, Map<string, (...args: any[]) => void>>();
@@ -38,7 +38,7 @@ export class ReEmitter {
             // We include the source as the last argument for event handlers which may need it,
             // such as read receipt listeners on the client class which won't have the context
             // of the room.
-            const forSource = (...args: any[]) => {
+            const forSource = (...args: any[]): void => {
                 // EventEmitter special cases 'error' to make the emit function throw if no
                 // handler is attached, which sort of makes sense for making sure that something
                 // handles an error, but for re-emitting, there could be a listener on the original
@@ -74,7 +74,7 @@ export class TypedReEmitter<
     Events extends string,
     Arguments extends ListenerMap<Events>,
 > extends ReEmitter {
-    constructor(target: TypedEventEmitter<Events, Arguments>) {
+    public constructor(target: TypedEventEmitter<Events, Arguments>) {
         super(target);
     }
 

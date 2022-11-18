@@ -46,6 +46,6 @@ interface IInfo {
  * @param {Number} info.timestamp The timestamp for this room.
  */
 export class RoomSummary {
-    constructor(public readonly roomId: string, info?: IInfo) {}
+    public constructor(public readonly roomId: string, info?: IInfo) {}
 }
 

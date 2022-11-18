@@ -60,5 +60,5 @@ export class SearchResult {
      *
      * @constructor
      */
-    constructor(public readonly rank: number, public readonly context: EventContext) {}
+    public constructor(public readonly rank: number, public readonly context: EventContext) {}
 }
