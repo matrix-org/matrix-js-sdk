@@ -809,4 +809,106 @@ describe("SlidingSyncSdk", () => {
             });
         });
     });
+    describe("ExtensionRoomEphemeral", () => {
+        let ext: Extension;
+        beforeAll(async () => {
+            await setupClient();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("room_ephemeral");
+        });
+        it("gets enabled on the initial request only", () => {
+            expect(ext.onRequest(true)).toEqual({
+                enabled: true,
+            });
+            expect(ext.onRequest(false)).toEqual(undefined);
+        });
+        it("processes typing notifications", async () => {
+            const roomId = "!room:id";
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with typing",
+                required_state: [],
+                timeline: [
+                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
+                ],
+                initial: true,
+            });
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeDefined();
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+            ext.onResponse({
+                rooms: {
+                    [roomId]: [
+                        {
+                            type: EventType.Typing,
+                            content: {
+                                user_ids: [selfUserId],
+                            },
+                        },
+                    ],
+                },
+            });
+            expect(room.getMember(selfUserId)?.typing).toEqual(true);
+            ext.onResponse({
+                rooms: {
+                    [roomId]: [
+                        {
+                            type: EventType.Typing,
+                            content: {
+                                user_ids: [],
+                            },
+                        },
+                    ],
+                },
+            });
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+        });
+        it("gracefully handles missing rooms and members when typing", async () => {
+            const roomId = "!room:id";
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with typing",
+                required_state: [],
+                timeline: [
+                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
+                ],
+                initial: true,
+            });
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeDefined();
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+            ext.onResponse({
+                rooms: {
+                    [roomId]: [
+                        {
+                            type: EventType.Typing,
+                            content: {
+                                user_ids: ["@someone:else"],
+                            },
+                        },
+                    ],
+                },
+            });
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+            ext.onResponse({
+                rooms: {
+                    "!something:else": [
+                        {
+                            type: EventType.Typing,
+                            content: {
+                                user_ids: [selfUserId],
+                            },
+                        },
+                    ],
+                },
+            });
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+        });
+    });
 });
