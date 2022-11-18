@@ -233,6 +233,46 @@ class ExtensionAccountData implements Extension {
     }
 }
 
+class ExtensionRoomEphemeral implements Extension {
+    public constructor(private readonly client: MatrixClient) {}
+
+    public name(): string {
+        return "room_ephemeral";
+    }
+
+    public when(): ExtensionState {
+        return ExtensionState.PostProcess;
+    }
+
+    public onRequest(isInitial: boolean): object | undefined {
+        if (!isInitial) {
+            return undefined;
+        }
+        return {
+            enabled: true,
+        };
+    }
+
+    public onResponse(data: {rooms: Record<string, Event[]>}): void {
+        if (!data || !data.rooms) {
+            return;
+        }
+
+        for (const roomId in data.rooms) {
+            const ephemeralEvents = mapEvents(this.client, roomId, data.rooms[roomId]);
+            const room = this.client.getRoom(roomId);
+            if (!room) {
+                logger.warn("got ephemeral events for room but room doesn't exist on client:", roomId);
+                continue;
+            }
+            room.addEphemeralEvents(ephemeralEvents);
+            ephemeralEvents.forEach((e) => {
+                this.client.emit(ClientEvent.Event, e);
+            });
+        }
+    }
+}
+
 /**
  * A copy of SyncApi such that it can be used as a drop-in replacement for sync v2. For the actual
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
@@ -273,6 +313,7 @@ export class SlidingSyncSdk {
         const extensions: Extension[] = [
             new ExtensionToDevice(this.client),
             new ExtensionAccountData(this.client),
+            new ExtensionRoomEphemeral(this.client),
         ];
         if (this.opts.crypto) {
             extensions.push(
