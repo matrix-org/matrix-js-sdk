@@ -1079,7 +1079,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         logger.debug(`Ending call ${this.callId} with reason ${reason}`);
         this.terminate(CallParty.Local, reason, !suppressEvent);
         // We don't want to send hangup here if we didn't even get to sending an invite
-        if (this.state === CallState.WaitLocalMedia) return;
+        if ([CallState.Fledgling, CallState.WaitLocalMedia].includes(this.state)) return;
         const content = {};
         // Don't send UserHangup reason to older clients
         if ((this.opponentVersion && this.opponentVersion !== 0) || reason !== CallErrorCode.UserHangup) {

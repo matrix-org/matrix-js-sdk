@@ -1072,7 +1072,7 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        if (call.state !== CallState.Ended && call.state !== CallState.Fledgling) {
+        if (call.state !== CallState.Ended) {
             call.hangup(hangupReason, false);
         }
 
