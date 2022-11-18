@@ -38,7 +38,11 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}
+          if [[ ${{ github.ref }} == refs/heads/develop ]]; then
+            yarn coverage --ci --reporters github-actions '--reporters=<rootDir>/spec/slowReporter.js' --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}
+          else
+            yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}
+          fi
           mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
         env:
           JEST_SONAR_UNIQUE_OUTPUT_NAME: true
