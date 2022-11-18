@@ -316,7 +316,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
         }
 
         let keyId: string;
-        let decryption;
+        let decryption: IDecryptors | undefined;
         try {
             // fetch private key from app
             [keyId, decryption] = await this.getSecretStorageKey(keys, name);

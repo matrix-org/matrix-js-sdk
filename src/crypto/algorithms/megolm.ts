@@ -36,7 +36,7 @@ import { Room } from '../../models/room';
 import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
-import { MatrixEvent } from "../../models/event";
+import { IContent, MatrixEvent } from "../../models/event";
 import { EventType, MsgType } from '../../@types/event';
 import { IEncryptedContent, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
 import { RoomKeyRequestState } from '../OutgoingRoomKeyRequestManager';
@@ -1057,7 +1057,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         return encryptedContent;
     }
 
-    private isVerificationEvent(eventType: string, content: object): boolean {
+    private isVerificationEvent(eventType: string, content: IContent): boolean {
         switch (eventType) {
             case EventType.KeyVerificationCancel:
             case EventType.KeyVerificationDone:

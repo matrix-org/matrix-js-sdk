@@ -17,7 +17,7 @@ limitations under the License.
 import { UnstableValue } from "matrix-events-sdk";
 
 import { MatrixClient } from "../client";
-import { MatrixEvent } from "./event";
+import { IContent, MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { Preset } from "../@types/partials";
 import { globToRegexp } from "../utils";
@@ -262,7 +262,7 @@ export class IgnoredInvites {
      */
     public async getOrCreateSourceRooms(): Promise<Room[]> {
         const ignoreInvitesPolicies = this.getIgnoreInvitesPolicies();
-        let sources = ignoreInvitesPolicies.sources;
+        let sources: string[] = ignoreInvitesPolicies.sources;
 
         // Validate `sources`. If it is invalid, trash out the current `sources`
         // and create a new list of sources from `target`.
@@ -327,7 +327,7 @@ export class IgnoredInvites {
      */
     private getPoliciesAndIgnoreInvitesPolicies():
         {policies: {[key: string]: any}, ignoreInvitesPolicies: {[key: string]: any}} {
-        let policies = {};
+        let policies: IContent = {};
         for (const key of [POLICIES_ACCOUNT_EVENT_TYPE.name, POLICIES_ACCOUNT_EVENT_TYPE.altName]) {
             if (!key) {
                 continue;

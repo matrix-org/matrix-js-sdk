@@ -20,11 +20,14 @@ limitations under the License.
  */
 
 import * as utils from "../test-utils/test-utils";
+import { emitPromise } from "../test-utils/test-utils";
 import {
+    Direction,
     DuplicateStrategy,
     EventStatus,
     EventTimelineSet,
-    EventType, IStateEventWithRoomId,
+    EventType,
+    IStateEventWithRoomId,
     JoinRule,
     MatrixEvent,
     MatrixEventEvent,
@@ -37,9 +40,8 @@ import { NotificationCountType, Room } from "../../src/models/room";
 import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
-import { emitPromise } from "../test-utils/test-utils";
 import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
-import { FeatureSupport, Thread, ThreadEvent, THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { Crypto } from "../../src/crypto";
 
 describe("Room", function() {
@@ -48,7 +50,7 @@ describe("Room", function() {
     const userB = "@bertha:bar";
     const userC = "@clarissa:bar";
     const userD = "@dorothy:bar";
-    let room;
+    let room: Room;
 
     const mkMessage = () => utils.mkMessage({
         event: true,
@@ -734,17 +736,15 @@ describe("Room", function() {
 
         it("should handle events in adjacent timelines", function() {
             const oldTimeline = room.addTimeline();
-            oldTimeline.setNeighbouringTimeline(room.getLiveTimeline(), 'f');
-            room.getLiveTimeline().setNeighbouringTimeline(oldTimeline, 'b');
+            oldTimeline.setNeighbouringTimeline(room.getLiveTimeline(), Direction.Forward);
+            room.getLiveTimeline().setNeighbouringTimeline(oldTimeline, Direction.Backward);
 
             room.addEventsToTimeline([events[0]], false, oldTimeline);
             room.addLiveEvents([events[1]]);
 
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId()!,
-                events[1].getId()))
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[0].getId()!, events[1].getId()!))
                 .toBeLessThan(0);
-            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId()!,
-                events[0].getId()))
+            expect(room.getUnfilteredTimelineSet().compareEventOrdering(events[1].getId()!, events[0].getId()!))
                 .toBeGreaterThan(0);
         });
 

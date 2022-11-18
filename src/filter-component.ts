@@ -148,7 +148,7 @@ export class FilterComponent {
             "types": function(v: string): boolean {
                 return matchesWildcard(eventType, v);
             },
-        };
+        } as const;
 
         for (const name in literalKeys) {
             const matchFunc = literalKeys[name];

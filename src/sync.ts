@@ -106,7 +106,7 @@ function getFilterName(userId: string, suffix?: string): string {
     return `FILTER_SYNC_${userId}` + (suffix ? "_" + suffix : "");
 }
 
-function debuglog(...params): void {
+function debuglog(...params: any[]): void {
     if (!DEBUG) return;
     logger.log(...params);
 }
@@ -1096,7 +1096,7 @@ export class SyncApi {
             const prevEventsMap = events.reduce((m, c) => {
                 m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
-            }, {});
+            }, {} as Record<string, MatrixEvent | undefined>);
             client.store.storeAccountDataEvents(events);
             events.forEach(
                 function(accountDataEvent) {
@@ -1389,7 +1389,7 @@ export class SyncApi {
 
             this.processEventsForNotifs(room, events);
 
-            const processRoomEvent = async (e): Promise<void> => {
+            const processRoomEvent = async (e: MatrixEvent): Promise<void> => {
                 client.emit(ClientEvent.Event, e);
                 if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
                     await this.opts.crypto.onCryptoEvent(e);
@@ -1471,12 +1471,12 @@ export class SyncApi {
             this.opts.crypto.updateOneTimeKeyCount(currentCount);
         }
         if (this.opts.crypto &&
-            (data["device_unused_fallback_key_types"] ||
+            (data.device_unused_fallback_key_types ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"])) {
             // The presence of device_unused_fallback_key_types indicates that the
             // server supports fallback keys. If there's no unused
             // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
+            const unusedFallbackKeys = data.device_unused_fallback_key_types ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.opts.crypto.setNeedsNewFallback(
                 Array.isArray(unusedFallbackKeys) &&

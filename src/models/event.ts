@@ -318,19 +318,19 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // 'membership' at the event level (rather than the content level) is a legacy
         // field that Element never otherwise looks at, but it will still take up a lot
         // of space if we don't intern it.
-        ["state_key", "type", "sender", "room_id", "membership"].forEach((prop) => {
+        (["state_key", "type", "sender", "room_id", "membership"] as const).forEach((prop) => {
             if (typeof event[prop] !== "string") return;
-            event[prop] = internaliseString(event[prop]);
+            event[prop] = internaliseString(event[prop]!);
         });
 
-        ["membership", "avatar_url", "displayname"].forEach((prop) => {
+        (["membership", "avatar_url", "displayname"] as const).forEach((prop) => {
             if (typeof event.content?.[prop] !== "string") return;
-            event.content[prop] = internaliseString(event.content[prop]);
+            event.content[prop] = internaliseString(event.content[prop]!);
         });
 
-        ["rel_type"].forEach((prop) => {
+        (["rel_type"] as const).forEach((prop) => {
             if (typeof event.content?.["m.relates_to"]?.[prop] !== "string") return;
-            event.content["m.relates_to"][prop] = internaliseString(event.content["m.relates_to"][prop]);
+            event.content["m.relates_to"][prop] = internaliseString(event.content["m.relates_to"][prop]!);
         });
 
         this.txnId = event.txn_id;
@@ -1129,7 +1129,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             this.clearEvent = undefined;
         }
 
-        const keeps = REDACT_KEEP_CONTENT_MAP[this.getType()] || {};
+        const keeps = this.getType() in REDACT_KEEP_CONTENT_MAP
+            ? REDACT_KEEP_CONTENT_MAP[this.getType() as keyof typeof REDACT_KEEP_CONTENT_MAP]
+            : {};
         const content = this.getContent();
         for (const key in content) {
             if (content.hasOwnProperty(key) && !keeps[key]) {
@@ -1212,7 +1214,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @returns {object} The redaction event JSON, or an empty object
      */
-    public getRedactionEvent(): object | null {
+    public getRedactionEvent(): IEvent | {} | null {
         if (!this.isRedacted()) return null;
 
         if (this.clearEvent?.unsigned) {
@@ -1611,7 +1613,7 @@ const REDACT_KEEP_CONTENT_MAP = {
         'kick': 1, 'redact': 1, 'state_default': 1,
         'users': 1, 'users_default': 1,
     },
-};
+} as const;
 
 /**
  * Fires when an event is decrypted

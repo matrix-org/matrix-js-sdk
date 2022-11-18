@@ -428,8 +428,8 @@ export interface IDeferred<T> {
 
 // Returns a Deferred
 export function defer<T = void>(): IDeferred<T> {
-    let resolve;
-    let reject;
+    let resolve!: IDeferred<T>["resolve"];
+    let reject!: IDeferred<T>["reject"];
 
     const promise = new Promise<T>((_resolve, _reject) => {
         resolve = _resolve;
@@ -665,7 +665,11 @@ export function compare(a: string, b: string): number {
  * @param {Object} source
  * @returns the target object
  */
-export function recursivelyAssign(target: Object, source: Object, ignoreNullish = false): any {
+export function recursivelyAssign<T1 extends Record<string, any>, T2 extends Record<string, any>>(
+    target: T1,
+    source: T2,
+    ignoreNullish = false,
+): T1 & T2 {
     for (const [sourceKey, sourceValue] of Object.entries(source)) {
         if (target[sourceKey] instanceof Object && sourceValue) {
             recursivelyAssign(target[sourceKey], sourceValue);
@@ -676,7 +680,7 @@ export function recursivelyAssign(target: Object, source: Object, ignoreNullish 
             continue;
         }
     }
-    return target;
+    return target as T1 & T2;
 }
 
 function getContentTimestampWithFallback(event: MatrixEvent): number {

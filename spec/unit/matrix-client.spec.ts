@@ -17,7 +17,7 @@ limitations under the License.
 import { mocked } from "jest-mock";
 
 import { logger } from "../../src/logger";
-import { MatrixClient, ClientEvent } from "../../src/client";
+import { MatrixClient, ClientEvent, Store } from "../../src/client";
 import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
@@ -36,7 +36,7 @@ import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
-import { ContentHelpers, EventTimeline, MatrixError, Room } from "../../src";
+import { ContentHelpers, EventTimeline, MatrixError, MatrixScheduler, Room } from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import {
@@ -56,9 +56,9 @@ describe("MatrixClient", function() {
     const userId = "@alice:bar";
     const identityServerUrl = "https://identity.server";
     const identityServerDomain = "identity.server";
-    let client;
-    let store;
-    let scheduler;
+    let client: MatrixClient;
+    let store: Store;
+    let scheduler: MatrixScheduler;
 
     const KEEP_ALIVE_PATH = "/_matrix/client/versions";
 
@@ -104,7 +104,7 @@ describe("MatrixClient", function() {
         method: string;
         path: string;
     } | null = null;
-    function httpReq(method, path, qp, data, prefix) {
+    function httpReq(method: string, path: string, qp: object, data: object, prefix: string) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
                 unstable_features: {
