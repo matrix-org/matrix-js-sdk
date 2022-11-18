@@ -3795,9 +3795,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Set a user's power level.
+     * Set a power level to one or multiple users.
      * @param {string} roomId
-     * @param {string} userId
+     * @param {string|string[]} userId
      * @param {Number} powerLevel
      * @param {MatrixEvent} event
      * @return {Promise} Resolves: to an ISendEventResponse object
@@ -3805,19 +3805,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setPowerLevel(
         roomId: string,
-        userId: string,
+        userId: string | string[],
         powerLevel: number,
         event: MatrixEvent,
     ): Promise<ISendEventResponse> {
         let content = {
             users: {},
         };
-        if (event?.getType() === EventType.RoomPowerLevels) {
+        if (event.getType() === EventType.RoomPowerLevels) {
             // take a copy of the content to ensure we don't corrupt
             // existing client state with a failed power level change
             content = utils.deepCopy(event.getContent());
         }
-        content.users[userId] = powerLevel;
+        if (Array.isArray(userId)) {
+            for (const user of userId) {
+                content.users[user] = powerLevel;
+            }
+        } else {
+            content.users[userId] = powerLevel;
+        }
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
             $roomId: roomId,
         });
