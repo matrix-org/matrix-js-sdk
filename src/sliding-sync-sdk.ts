@@ -45,7 +45,7 @@ import { RoomMemberEvent } from "./models/room-member";
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
 
 class ExtensionE2EE implements Extension {
-    constructor(private readonly crypto: Crypto) {}
+    public constructor(private readonly crypto: Crypto) {}
 
     public name(): string {
         return "e2ee";
@@ -95,7 +95,7 @@ class ExtensionE2EE implements Extension {
 class ExtensionToDevice implements Extension {
     private nextBatch: string | null = null;
 
-    constructor(private readonly client: MatrixClient) {}
+    public constructor(private readonly client: MatrixClient) {}
 
     public name(): string {
         return "to_device";
@@ -170,7 +170,7 @@ class ExtensionToDevice implements Extension {
 }
 
 class ExtensionAccountData implements Extension {
-    constructor(private readonly client: MatrixClient) {}
+    public constructor(private readonly client: MatrixClient) {}
 
     public name(): string {
         return "account_data";
@@ -244,7 +244,7 @@ export class SlidingSyncSdk {
     private failCount = 0;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
 
-    constructor(
+    public constructor(
         private readonly slidingSync: SlidingSync,
         private readonly client: MatrixClient,
         private readonly opts: Partial<IStoredClientOpts> = {},
@@ -256,7 +256,7 @@ export class SlidingSyncSdk {
         this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
         if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (_roomId: string) => {
+            opts.canResetEntireTimeline = (_roomId: string): boolean => {
                 return false;
             };
         }
@@ -348,7 +348,7 @@ export class SlidingSyncSdk {
      * Sync rooms the user has left.
      * @return {Promise} Resolved when they've been added to the store.
      */
-    public async syncLeftRooms() {
+    public async syncLeftRooms(): Promise<Room[]> {
         return []; // TODO
     }
 
@@ -457,7 +457,7 @@ export class SlidingSyncSdk {
         return false;
     }
 
-    private async processRoomData(client: MatrixClient, room: Room, roomData: MSC3575RoomData) {
+    private async processRoomData(client: MatrixClient, room: Room, roomData: MSC3575RoomData): Promise<void> {
         roomData = ensureNameEvent(client, room.roomId, roomData);
         const stateEvents = mapEvents(this.client, room.roomId, roomData.required_state);
         // Prevent events from being decrypted ahead of time
@@ -632,7 +632,7 @@ export class SlidingSyncSdk {
         // we'll purge this once we've fully processed the sync response
         this.addNotifications(timelineEvents);
 
-        const processRoomEvent = async (e: MatrixEvent) => {
+        const processRoomEvent = async (e: MatrixEvent): Promise<void> => {
             client.emit(ClientEvent.Event, e);
             if (e.isState() && e.getType() == EventType.RoomEncryption && this.opts.crypto) {
                 await this.opts.crypto.onCryptoEvent(e);
@@ -767,7 +767,7 @@ export class SlidingSyncSdk {
     /**
      * Main entry point. Blocks until stop() is called.
      */
-    public async sync() {
+    public async sync(): Promise<void> {
         logger.debug("Sliding sync init loop");
 
         //   1) We need to get push rules so we can check if events should bing as we get

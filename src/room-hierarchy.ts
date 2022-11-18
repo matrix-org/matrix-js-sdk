@@ -47,7 +47,7 @@ export class RoomHierarchy {
      * @param {boolean} suggestedOnly whether to only return rooms with suggested=true.
      * @constructor
      */
-    constructor(
+    public constructor(
         public readonly root: Room,
         private readonly pageSize?: number,
         private readonly maxDepth?: number,

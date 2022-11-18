@@ -73,7 +73,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {IDBFactory} indexedDB  global indexedDB instance
      * @param {string} dbName   name of db to connect to
      */
-    constructor(private readonly indexedDB: IDBFactory, private readonly dbName: string) {}
+    public constructor(private readonly indexedDB: IDBFactory, private readonly dbName: string) {}
 
     /**
      * Ensure the database exists and is up-to-date, or fall back to
@@ -99,24 +99,24 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
             const req = this.indexedDB.open(this.dbName, IndexedDBCryptoStoreBackend.VERSION);
 
-            req.onupgradeneeded = (ev) => {
+            req.onupgradeneeded = (ev): void => {
                 const db = req.result;
                 const oldVersion = ev.oldVersion;
                 IndexedDBCryptoStoreBackend.upgradeDatabase(db, oldVersion);
             };
 
-            req.onblocked = () => {
+            req.onblocked = (): void => {
                 logger.log(
                     `can't yet open IndexedDBCryptoStore because it is open elsewhere`,
                 );
             };
 
-            req.onerror = (ev) => {
+            req.onerror = (ev): void => {
                 logger.log("Error connecting to indexeddb", ev);
                 reject(req.error);
             };
 
-            req.onsuccess = () => {
+            req.onsuccess = (): void => {
                 const db = req.result;
 
                 logger.log(`connected to indexeddb ${this.dbName}`);
@@ -179,18 +179,18 @@ export class IndexedDBCryptoStore implements CryptoStore {
             logger.log(`Removing indexeddb instance: ${this.dbName}`);
             const req = this.indexedDB.deleteDatabase(this.dbName);
 
-            req.onblocked = () => {
+            req.onblocked = (): void => {
                 logger.log(
                     `can't yet delete IndexedDBCryptoStore because it is open elsewhere`,
                 );
             };
 
-            req.onerror = (ev) => {
+            req.onerror = (ev): void => {
                 logger.log("Error deleting data from indexeddb", ev);
                 reject(req.error);
             };
 
-            req.onsuccess = () => {
+            req.onsuccess = (): void => {
                 logger.log(`Removed indexeddb instance: ${this.dbName}`);
                 resolve();
             };
@@ -322,7 +322,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param {*} txn An active transaction. See doTxn().
      * @param {function(string)} func Called with the account pickle
      */
-    public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void) {
+    public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void): void {
         this.backend!.getAccount(txn, func);
     }
 

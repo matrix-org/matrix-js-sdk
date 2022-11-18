@@ -126,7 +126,7 @@ export class PushProcessor {
      * @constructor
      * @param {Object} client The Matrix client object to use
      */
-    constructor(private readonly client: MatrixClient) {}
+    public constructor(private readonly client: MatrixClient) {}
 
     /**
      * Convert a list of actions into a object with the actions as keys and their values

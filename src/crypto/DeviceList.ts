@@ -102,7 +102,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
 
     private readonly serialiser: DeviceListUpdateSerialiser;
 
-    constructor(
+    public constructor(
         baseApis: MatrixClient,
         private readonly cryptoStore: CryptoStore,
         olmDevice: OlmDevice,
@@ -117,7 +117,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Load the device tracking state from storage
      */
-    public async load() {
+    public async load(): Promise<void> {
         await this.cryptoStore.doTxn(
             'readonly', [IndexedDBCryptoStore.STORE_DEVICE_DATA], (txn) => {
                 this.cryptoStore.getEndToEndDeviceData(txn, (deviceData) => {
@@ -150,7 +150,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
         }
     }
 
-    public stop() {
+    public stop(): void {
         if (this.saveTimer !== null) {
             clearTimeout(this.saveTimer);
         }
@@ -693,7 +693,7 @@ class DeviceListUpdateSerialiser {
      * @param {object} olmDevice The Olm Device
      * @param {object} deviceList The device list object, the device list to be updated
      */
-    constructor(
+    public constructor(
         private readonly baseApis: MatrixClient,
         private readonly olmDevice: OlmDevice,
         private readonly deviceList: DeviceList,

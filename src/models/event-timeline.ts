@@ -67,7 +67,7 @@ export class EventTimeline {
      * @param {RoomState} stateContext  the room state to be queried
      * @param {boolean} toStartOfTimeline  if true the event's forwardLooking flag is set false
      */
-    static setEventMetadata(event: MatrixEvent, stateContext: RoomState, toStartOfTimeline: boolean): void {
+    public static setEventMetadata(event: MatrixEvent, stateContext: RoomState, toStartOfTimeline: boolean): void {
         // When we try to generate a sentinel member before we have that member
         // in the members object, we still generate a sentinel but it doesn't
         // have a membership event, so test to see if events.member is set. We
@@ -130,7 +130,7 @@ export class EventTimeline {
      * @param {EventTimelineSet} eventTimelineSet the set of timelines this is part of
      * @constructor
      */
-    constructor(private readonly eventTimelineSet: EventTimelineSet) {
+    public constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
         if (this.roomId) {
             this.startState = new RoomState(this.roomId);

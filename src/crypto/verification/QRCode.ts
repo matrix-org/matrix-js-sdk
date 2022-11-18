@@ -154,7 +154,7 @@ interface IQrData {
 }
 
 export class QRCodeData {
-    constructor(
+    public constructor(
         public readonly mode: Mode,
         private readonly sharedSecret: string,
         // only set when mode is MODE_VERIFY_OTHER_USER, master key of other party at time of generating QR code
@@ -283,21 +283,21 @@ export class QRCodeData {
     private static generateBuffer(qrData: IQrData): Buffer {
         let buf = Buffer.alloc(0); // we'll concat our way through life
 
-        const appendByte = (b) => {
+        const appendByte = (b): void => {
             const tmpBuf = Buffer.from([b]);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendInt = (i) => {
+        const appendInt = (i): void => {
             const tmpBuf = Buffer.alloc(2);
             tmpBuf.writeInt16BE(i, 0);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendStr = (s, enc, withLengthPrefix = true) => {
+        const appendStr = (s, enc, withLengthPrefix = true): void => {
             const tmpBuf = Buffer.from(s, enc);
             if (withLengthPrefix) appendInt(tmpBuf.byteLength);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendEncBase64 = (b64) => {
+        const appendEncBase64 = (b64): void => {
             const b = decodeBase64(b64);
             const tmpBuf = Buffer.from(b);
             buf = Buffer.concat([buf, tmpBuf]);

@@ -83,7 +83,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @prop {MatrixEvent} events.member The m.room.member event for this RoomMember.
      * @prop {boolean} disambiguate True if the member's name is disambiguated.
      */
-    constructor(public readonly roomId: string, public readonly userId: string) {
+    public constructor(public readonly roomId: string, public readonly userId: string) {
         super();
 
         this.name = userId;
@@ -232,7 +232,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update the last modified time to the current time.
      */
-    private updateModifiedTime() {
+    private updateModifiedTime(): void {
         this.modified = Date.now();
     }
 

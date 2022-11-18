@@ -55,7 +55,7 @@ export class GroupCallEventHandler {
     // and get
     private roomDeferreds = new Map<string, RoomDeferred>();
 
-    constructor(private client: MatrixClient) { }
+    public constructor(private client: MatrixClient) { }
 
     public async start(): Promise<void> {
         // We wait until the client has started syncing for real.
@@ -66,7 +66,7 @@ export class GroupCallEventHandler {
         if (this.client.getSyncState() !== SyncState.Syncing) {
             logger.debug("Waiting for client to start syncing...");
             await new Promise<void>(resolve => {
-                const onSync = () => {
+                const onSync = (): void => {
                     if (this.client.getSyncState() === SyncState.Syncing) {
                         this.client.off(ClientEvent.Sync, onSync);
                         return resolve();
@@ -192,7 +192,7 @@ export class GroupCallEventHandler {
         return groupCall;
     }
 
-    private onRoomsChanged = (room: Room) => {
+    private onRoomsChanged = (room: Room): void => {
         this.createGroupCallForRoom(room);
     };
 

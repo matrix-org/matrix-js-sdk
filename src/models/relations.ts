@@ -60,7 +60,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param {MatrixClient|Room} client
      * The client which created this instance. For backwards compatibility also accepts a Room.
      */
-    constructor(
+    public constructor(
         public readonly relationType: RelationType | string,
         public readonly eventType: string,
         client: MatrixClient | Room,
@@ -75,7 +75,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param {MatrixEvent} event
      * The new relation event to be added.
      */
-    public async addEvent(event: MatrixEvent) {
+    public async addEvent(event: MatrixEvent): Promise<void> {
         if (this.relationEventIds.has(event.getId()!)) {
             return;
         }
@@ -123,7 +123,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param {MatrixEvent} event
      * The relation event to remove.
      */
-    private async removeEvent(event: MatrixEvent) {
+    private async removeEvent(event: MatrixEvent): Promise<void> {
         if (!this.relations.has(event)) {
             return;
         }
@@ -160,7 +160,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param {MatrixEvent} event The event whose status has changed
      * @param {EventStatus} status The new status
      */
-    private onEventStatus = (event: MatrixEvent, status: EventStatus | null) => {
+    private onEventStatus = (event: MatrixEvent, status: EventStatus | null): void => {
         if (!event.isSending()) {
             // Sending is done, so we don't need to listen anymore
             event.removeListener(MatrixEventEvent.Status, this.onEventStatus);
@@ -356,7 +356,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     /*
      * @param {MatrixEvent} targetEvent the event the relations are related to.
      */
-    public async setTargetEvent(event: MatrixEvent) {
+    public async setTargetEvent(event: MatrixEvent): Promise<void> {
         if (this.targetEvent) {
             return;
         }
@@ -374,7 +374,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         this.maybeEmitCreated();
     }
 
-    private maybeEmitCreated() {
+    private maybeEmitCreated(): void {
         if (this.creationEmitted) {
             return;
         }

@@ -29,7 +29,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
     let preventReEmit = Boolean(options.preventReEmit);
     const decrypt = options.decrypt !== false;
 
-    function mapper(plainOldJsObject: Partial<IEvent>) {
+    function mapper(plainOldJsObject: Partial<IEvent>): MatrixEvent {
         if (options.toDevice) {
             delete plainOldJsObject.room_id;
         }

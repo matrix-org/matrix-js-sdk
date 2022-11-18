@@ -76,7 +76,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         return false;
     }
 
-    constructor(private readonly store: Storage) {
+    public constructor(private readonly store: Storage) {
         super();
     }
 
@@ -154,7 +154,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         setJsonItem(this.store, key, problems);
     }
 
-    async getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null> {
+    public async getEndToEndSessionProblem(deviceKey: string, timestamp: number): Promise<IProblem | null> {
         const key = keyEndToEndSessionProblems(deviceKey);
         const problems = getJsonItem<IProblem[]>(this.store, key) || [];
         if (!problems.length) {
@@ -408,7 +408,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
         setJsonItem(this.store, E2E_PREFIX + `ssss_cache.${type}`, key);
     }
 
-    doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T): Promise<T> {
+    public doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: unknown) => T): Promise<T> {
         return Promise.resolve(func(null));
     }
 }

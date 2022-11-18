@@ -136,7 +136,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * events dictionary, keyed on the event type and then the state_key value.
      * @prop {string} paginationToken The pagination token for this state.
      */
-    constructor(public readonly roomId: string, private oobMemberFlags = { status: OobStatus.NotStarted }) {
+    public constructor(public readonly roomId: string, private oobMemberFlags = { status: OobStatus.NotStarted }) {
         super();
         this.updateModifiedTime();
     }
@@ -250,8 +250,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * <code>undefined</code>, else a single event (or null if no match found).
      */
     public getStateEvents(eventType: EventType | string): MatrixEvent[];
-    public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent;
-    public getStateEvents(eventType: EventType | string, stateKey?: string) {
+    public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent | null;
+    public getStateEvents(eventType: EventType | string, stateKey?: string): MatrixEvent[] | MatrixEvent | null {
         if (!this.events.has(eventType)) {
             // no match
             return stateKey === undefined ? [] : null;
@@ -342,7 +342,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @fires module:client~MatrixClient#event:"RoomState.events"
      * @fires module:client~MatrixClient#event:"RoomStateEvent.Marker"
      */
-    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions) {
+    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions): void {
         this.updateModifiedTime();
 
         // update the core event dict

@@ -106,7 +106,7 @@ function getFilterName(userId: string, suffix?: string): string {
     return `FILTER_SYNC_${userId}` + (suffix ? "_" + suffix : "");
 }
 
-function debuglog(...params) {
+function debuglog(...params): void {
     if (!DEBUG) return;
     logger.log(...params);
 }
@@ -175,7 +175,7 @@ export class SyncApi {
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
 
-    constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
+    public constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
         this.opts.pollTimeout = this.opts.pollTimeout || (30 * 1000);
@@ -183,7 +183,7 @@ export class SyncApi {
         this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
         if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (roomId: string) => {
+            opts.canResetEntireTimeline = (roomId: string): boolean => {
                 return false;
             };
         }
@@ -554,7 +554,7 @@ export class SyncApi {
         return false;
     }
 
-    private getPushRules = async () => {
+    private getPushRules = async (): Promise<void> => {
         try {
             debuglog("Getting push rules...");
             const result = await this.client.getPushRules();
@@ -572,7 +572,7 @@ export class SyncApi {
         }
     };
 
-    private buildDefaultFilter = () => {
+    private buildDefaultFilter = (): Filter => {
         const filter = new Filter(this.client.credentials.userId);
         if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
             filter.setUnreadThreadNotifications(true);
@@ -580,7 +580,7 @@ export class SyncApi {
         return filter;
     };
 
-    private checkLazyLoadStatus = async () => {
+    private checkLazyLoadStatus = async (): Promise<void> => {
         debuglog("Checking lazy load status...");
         if (this.opts.lazyLoadMembers && this.client.isGuest()) {
             this.opts.lazyLoadMembers = false;
@@ -1389,7 +1389,7 @@ export class SyncApi {
 
             this.processEventsForNotifs(room, events);
 
-            const processRoomEvent = async (e) => {
+            const processRoomEvent = async (e): Promise<void> => {
                 client.emit(ClientEvent.Event, e);
                 if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
                     await this.opts.crypto.onCryptoEvent(e);
@@ -1521,7 +1521,7 @@ export class SyncApi {
      * @param {boolean} connDidFail True if a connectivity failure has been detected. Optional.
      */
     private pokeKeepAlive(connDidFail = false): void {
-        const success = () => {
+        const success = (): void => {
             clearTimeout(this.keepAliveTimer);
             if (this.connectionReturnedDefer) {
                 this.connectionReturnedDefer.resolve(connDidFail);
