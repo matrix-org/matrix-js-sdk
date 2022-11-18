@@ -233,11 +233,11 @@ class ExtensionAccountData implements Extension {
     }
 }
 
-class ExtensionRoomEphemeral implements Extension {
+class ExtensionTyping implements Extension {
     public constructor(private readonly client: MatrixClient) {}
 
     public name(): string {
-        return "room_ephemeral";
+        return "typing";
     }
 
     public when(): ExtensionState {
@@ -262,7 +262,7 @@ class ExtensionRoomEphemeral implements Extension {
             const ephemeralEvents = mapEvents(this.client, roomId, data.rooms[roomId]);
             const room = this.client.getRoom(roomId);
             if (!room) {
-                logger.warn("got ephemeral events for room but room doesn't exist on client:", roomId);
+                logger.warn("got typing events for room but room doesn't exist on client:", roomId);
                 continue;
             }
             room.addEphemeralEvents(ephemeralEvents);
@@ -313,7 +313,7 @@ export class SlidingSyncSdk {
         const extensions: Extension[] = [
             new ExtensionToDevice(this.client),
             new ExtensionAccountData(this.client),
-            new ExtensionRoomEphemeral(this.client),
+            new ExtensionTyping(this.client),
         ];
         if (this.opts.crypto) {
             extensions.push(

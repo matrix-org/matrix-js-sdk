@@ -809,14 +809,14 @@ describe("SlidingSyncSdk", () => {
             });
         });
     });
-    describe("ExtensionRoomEphemeral", () => {
+    describe("ExtensionTyping", () => {
         let ext: Extension;
         beforeAll(async () => {
             await setupClient();
             const hasSynced = sdk!.sync();
             await httpBackend!.flushAllExpected();
             await hasSynced;
-            ext = findExtension("room_ephemeral");
+            ext = findExtension("typing");
         });
         it("gets enabled on the initial request only", () => {
             expect(ext.onRequest(true)).toEqual({
