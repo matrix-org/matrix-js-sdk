@@ -220,14 +220,6 @@ export class GroupCallEventHandler {
                 logger.warn(`Multiple group calls detected for room: ${
                     state.roomId}. Multiple group calls are currently unsupported.`);
             }
-        } else if (eventType === EventType.GroupCallMemberPrefix) {
-            const groupCall = this.groupCalls.get(state.roomId);
-
-            if (!groupCall) {
-                return;
-            }
-
-            groupCall.onMemberStateChanged(event);
         }
     };
 }
