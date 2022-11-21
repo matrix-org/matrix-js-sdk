@@ -281,21 +281,32 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
-    public async initialiseThread(): Promise<void> {
-        let bundledRelationship = this.getRootEventBundledRelationship();
-        if (Thread.hasServerSideSupport) {
-            await this.fetchRootEvent();
-            bundledRelationship = this.getRootEventBundledRelationship();
-        }
-
+    private async processRootEvent(): Promise<void> {
+        const bundledRelationship = this.getRootEventBundledRelationship();
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
             const mapper = this.client.getEventMapper();
-            this.lastEvent = mapper(bundledRelationship.latest_event);
+            // re-insert roomId
+            this.lastEvent = mapper({
+                ...bundledRelationship.latest_event,
+                room_id: this.roomId,
+            });
             await this.processEvent(this.lastEvent);
         }
+    }
+
+    public async initialiseThread(): Promise<void> {
+        if (Thread.hasServerSideSupport) {
+            // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
+            // don't want the thread preview to be empty if we can avoid it
+            if (!this.initialEventsFetched) {
+                await this.processRootEvent();
+            }
+            await this.fetchRootEvent();
+        }
+        await this.processRootEvent();
 
         if (!this.initialEventsFetched) {
             this.initialEventsFetched = true;
