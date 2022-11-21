@@ -3269,9 +3269,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         logger.info(
-            `Got room key withheld event from ${event.getSender()} (${content.sender_key}) `
-            + `for ${content.algorithm}/${content.room_id}/${content.session_id} `
-            + `with reason ${content.code} (${content.reason})`,
+            `Got room key withheld event from ${event.getSender()}q `
+            + `for ${content.algorithm} session ${content.sender_key}|${content.session_id} `
+            + `in room ${content.room_id} with code ${content.code} (${content.reason})`,
         );
 
         const alg = this.getRoomDecryptor(content.room_id, content.algorithm);
