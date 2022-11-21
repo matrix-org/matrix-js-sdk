@@ -3269,7 +3269,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         }
 
         logger.info(
-            `Got room key withheld event from ${event.getSender()}q `
+            `Got room key withheld event from ${event.getSender()} `
             + `for ${content.algorithm} session ${content.sender_key}|${content.session_id} `
             + `in room ${content.room_id} with code ${content.code} (${content.reason})`,
         );
