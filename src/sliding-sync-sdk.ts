@@ -259,7 +259,7 @@ class ExtensionTyping implements Extension {
         }
 
         for (const roomId in data.rooms) {
-            const ephemeralEvents = mapEvents(this.client, roomId, data.rooms[roomId]);
+            const ephemeralEvents = mapEvents(this.client, roomId, [data.rooms[roomId]]);
             const room = this.client.getRoom(roomId);
             if (!room) {
                 logger.warn("got typing events for room but room doesn't exist on client:", roomId);

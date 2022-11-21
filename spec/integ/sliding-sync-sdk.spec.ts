@@ -866,27 +866,23 @@ describe("SlidingSyncSdk", () => {
             expect(room.getMember(selfUserId)?.typing).toEqual(false);
             ext.onResponse({
                 rooms: {
-                    [roomId]: [
-                        {
-                            type: EventType.Typing,
-                            content: {
-                                user_ids: [selfUserId],
-                            },
+                    [roomId]: {
+                        type: EventType.Typing,
+                        content: {
+                            user_ids: [selfUserId],
                         },
-                    ],
+                    },
                 },
             });
             expect(room.getMember(selfUserId)?.typing).toEqual(true);
             ext.onResponse({
                 rooms: {
-                    [roomId]: [
-                        {
-                            type: EventType.Typing,
-                            content: {
-                                user_ids: [],
-                            },
+                    [roomId]: {
+                        type: EventType.Typing,
+                        content: {
+                            user_ids: [],
                         },
-                    ],
+                    },
                 },
             });
             expect(room.getMember(selfUserId)?.typing).toEqual(false);
@@ -910,27 +906,23 @@ describe("SlidingSyncSdk", () => {
             expect(room.getMember(selfUserId)?.typing).toEqual(false);
             ext.onResponse({
                 rooms: {
-                    [roomId]: [
-                        {
-                            type: EventType.Typing,
-                            content: {
-                                user_ids: ["@someone:else"],
-                            },
+                    [roomId]: {
+                        type: EventType.Typing,
+                        content: {
+                            user_ids: ["@someone:else"],
                         },
-                    ],
+                    },
                 },
             });
             expect(room.getMember(selfUserId)?.typing).toEqual(false);
             ext.onResponse({
                 rooms: {
-                    "!something:else": [
-                        {
-                            type: EventType.Typing,
-                            content: {
-                                user_ids: [selfUserId],
-                            },
+                    "!something:else": {
+                        type: EventType.Typing,
+                        content: {
+                            user_ids: [selfUserId],
                         },
-                    ],
+                    },
                 },
             });
             expect(room.getMember(selfUserId)?.typing).toEqual(false);
