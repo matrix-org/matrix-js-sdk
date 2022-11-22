@@ -1,5 +1,5 @@
-Changes in [21.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.2.0-rc.1) (2022-11-15)
-============================================================================================================
+Changes in [21.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.2.0) (2022-11-22)
+==================================================================================================
 
 ## ✨ Features
  * Make calls go back to 'connecting' state when media lost ([\#2880](https://github.com/matrix-org/matrix-js-sdk/pull/2880)).
