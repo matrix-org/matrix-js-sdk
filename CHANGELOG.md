@@ -1,3 +1,62 @@
+Changes in [21.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.2.0) (2022-11-22)
+==================================================================================================
+
+## ✨ Features
+ * Make calls go back to 'connecting' state when media lost ([\#2880](https://github.com/matrix-org/matrix-js-sdk/pull/2880)).
+ * Add ability to send unthreaded receipt ([\#2878](https://github.com/matrix-org/matrix-js-sdk/pull/2878)).
+ * Add way to abort search requests ([\#2877](https://github.com/matrix-org/matrix-js-sdk/pull/2877)).
+ * sliding sync: add custom room subscriptions support ([\#2834](https://github.com/matrix-org/matrix-js-sdk/pull/2834)).
+ * webrtc: add advanced audio settings ([\#2434](https://github.com/matrix-org/matrix-js-sdk/pull/2434)). Contributed by @MrAnno.
+ * Add support for group calls using MSC3401 ([\#2553](https://github.com/matrix-org/matrix-js-sdk/pull/2553)).
+ * Make the js-sdk conform to tsc --strict ([\#2835](https://github.com/matrix-org/matrix-js-sdk/pull/2835)). Fixes #2112 #2116 and #2124.
+ * Let leave requests outlive the window ([\#2815](https://github.com/matrix-org/matrix-js-sdk/pull/2815)). Fixes vector-im/element-call#639.
+ * Add event and message capabilities to RoomWidgetClient ([\#2797](https://github.com/matrix-org/matrix-js-sdk/pull/2797)).
+ * Misc fixes for group call widgets ([\#2657](https://github.com/matrix-org/matrix-js-sdk/pull/2657)).
+ * Support nested Matrix clients via the widget API ([\#2473](https://github.com/matrix-org/matrix-js-sdk/pull/2473)).
+ * Set max average bitrate on PTT calls ([\#2499](https://github.com/matrix-org/matrix-js-sdk/pull/2499)). Fixes vector-im/element-call#440.
+ * Add config option for e2e group call signalling ([\#2492](https://github.com/matrix-org/matrix-js-sdk/pull/2492)).
+ * Enable DTX on audio tracks in calls ([\#2482](https://github.com/matrix-org/matrix-js-sdk/pull/2482)).
+ * Don't ignore call member events with a distant future expiration date ([\#2466](https://github.com/matrix-org/matrix-js-sdk/pull/2466)).
+ * Expire call member state events after 1 hour ([\#2446](https://github.com/matrix-org/matrix-js-sdk/pull/2446)).
+ * Emit unknown device errors for group call participants without e2e ([\#2447](https://github.com/matrix-org/matrix-js-sdk/pull/2447)).
+ * Mute disconnected peers in PTT mode ([\#2421](https://github.com/matrix-org/matrix-js-sdk/pull/2421)).
+ * Add support for sending encrypted to-device events with OLM ([\#2322](https://github.com/matrix-org/matrix-js-sdk/pull/2322)). Contributed by @robertlong.
+ * Support for PTT group call mode ([\#2338](https://github.com/matrix-org/matrix-js-sdk/pull/2338)).
+
+## 🐛 Bug Fixes
+ * Fix registration add phone number not working ([\#2876](https://github.com/matrix-org/matrix-js-sdk/pull/2876)). Contributed by @bagvand.
+ * Use an underride rule for Element Call notifications ([\#2873](https://github.com/matrix-org/matrix-js-sdk/pull/2873)). Fixes vector-im/element-web#23691.
+ * Fixes unwanted highlight notifications with encrypted threads ([\#2862](https://github.com/matrix-org/matrix-js-sdk/pull/2862)).
+ * Extra insurance that we don't mix events in the wrong timelines - v2 ([\#2856](https://github.com/matrix-org/matrix-js-sdk/pull/2856)). Contributed by @MadLittleMods.
+ * Hide pending events in thread timelines ([\#2843](https://github.com/matrix-org/matrix-js-sdk/pull/2843)). Fixes vector-im/element-web#23684.
+ * Fix pagination token tracking for mixed room timelines ([\#2855](https://github.com/matrix-org/matrix-js-sdk/pull/2855)). Fixes vector-im/element-web#23695.
+ * Extra insurance that we don't mix events in the wrong timelines ([\#2848](https://github.com/matrix-org/matrix-js-sdk/pull/2848)). Contributed by @MadLittleMods.
+ * Do not freeze state in `initialiseState()` ([\#2846](https://github.com/matrix-org/matrix-js-sdk/pull/2846)).
+ * Don't remove our own member for a split second when entering a call ([\#2844](https://github.com/matrix-org/matrix-js-sdk/pull/2844)).
+ * Resolve races between `initLocalCallFeed` and `leave` ([\#2826](https://github.com/matrix-org/matrix-js-sdk/pull/2826)).
+ * Add throwOnFail to groupCall.setScreensharingEnabled ([\#2787](https://github.com/matrix-org/matrix-js-sdk/pull/2787)).
+ * Fix connectivity regressions ([\#2780](https://github.com/matrix-org/matrix-js-sdk/pull/2780)).
+ * Fix screenshare failing after several attempts ([\#2771](https://github.com/matrix-org/matrix-js-sdk/pull/2771)). Fixes vector-im/element-call#625.
+ * Don't block muting/unmuting on network requests ([\#2754](https://github.com/matrix-org/matrix-js-sdk/pull/2754)). Fixes vector-im/element-call#592.
+ * Fix ICE restarts ([\#2702](https://github.com/matrix-org/matrix-js-sdk/pull/2702)).
+ * Target widget actions at a specific room ([\#2670](https://github.com/matrix-org/matrix-js-sdk/pull/2670)).
+ * Add tests for ice candidate sending ([\#2674](https://github.com/matrix-org/matrix-js-sdk/pull/2674)).
+ * Prevent exception when muting ([\#2667](https://github.com/matrix-org/matrix-js-sdk/pull/2667)). Fixes vector-im/element-call#578.
+ * Fix race in creating calls ([\#2662](https://github.com/matrix-org/matrix-js-sdk/pull/2662)).
+ * Add client.waitUntilRoomReadyForGroupCalls() ([\#2641](https://github.com/matrix-org/matrix-js-sdk/pull/2641)).
+ * Wait for client to start syncing before making group calls ([\#2632](https://github.com/matrix-org/matrix-js-sdk/pull/2632)). Fixes #2589.
+ * Add GroupCallEventHandlerEvent.Room ([\#2631](https://github.com/matrix-org/matrix-js-sdk/pull/2631)).
+ * Add missing events from reemitter to GroupCall ([\#2527](https://github.com/matrix-org/matrix-js-sdk/pull/2527)). Contributed by @toger5.
+ * Prevent double mute status changed events ([\#2502](https://github.com/matrix-org/matrix-js-sdk/pull/2502)).
+ * Don't mute the remote side immediately in PTT calls ([\#2487](https://github.com/matrix-org/matrix-js-sdk/pull/2487)). Fixes vector-im/element-call#425.
+ * Fix some MatrixCall leaks and use a shared AudioContext ([\#2484](https://github.com/matrix-org/matrix-js-sdk/pull/2484)). Fixes vector-im/element-call#412.
+ * Don't block muting on determining whether the device exists ([\#2461](https://github.com/matrix-org/matrix-js-sdk/pull/2461)).
+ * Only clone streams on Safari ([\#2450](https://github.com/matrix-org/matrix-js-sdk/pull/2450)). Fixes vector-im/element-call#267.
+ * Set PTT mode on call correctly ([\#2445](https://github.com/matrix-org/matrix-js-sdk/pull/2445)). Fixes vector-im/element-call#382.
+ * Wait for mute event to send in PTT mode ([\#2401](https://github.com/matrix-org/matrix-js-sdk/pull/2401)).
+ * Handle other members having no e2e keys ([\#2383](https://github.com/matrix-org/matrix-js-sdk/pull/2383)). Fixes vector-im/element-call#338.
+ * Fix races when muting/unmuting ([\#2370](https://github.com/matrix-org/matrix-js-sdk/pull/2370)).
+
 Changes in [21.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.1.0) (2022-11-08)
 ==================================================================================================
 
