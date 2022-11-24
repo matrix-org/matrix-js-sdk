@@ -256,6 +256,21 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      * @param singleOlmCreationPhase - Only perform one round of olm
      *     session creation
      *
+     * This method updates the setupPromise field of the class by chaining a new
+     * call on top of the existing promise, and then catching and discarding any
+     * errors that might happen while setting up the outbound group session. This
+     * is done to ensure that `setupPromise` always resolves to `null` or the
+     * `OutboundSessionInfo`.
+     *
+     * Using `>>=` to represent the promise chaining operation, it does the
+     * following:
+     *
+     * setupPromise = previousSetupPromise >>= setup >>= discardErrors
+     *
+     * The initial value for the `setupPromise` is a promise that resolves to
+     * `null`. The forceDiscardSession() resets setupPromise to this initial
+     * promise.
+     *
      * @returns Promise which resolves to the
      *    OutboundSessionInfo when setup is complete.
      */
@@ -286,18 +301,20 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         };
 
         // first wait for the previous share to complete
-        const prom = this.setupPromise.then(setup);
+        const fallible = this.setupPromise.then(setup);
 
-        // Ensure any failures are logged for debugging
-        prom.catch(e => {
+        // Ensure any failures are logged for debugging and make sure that the
+        // promise chain remains unbroken
+        //
+        // setupPromise resolves to `null` or the `OutboundSessionInfo` whether
+        // or not the share succeeds
+        this.setupPromise = fallible.catch(e => {
             logger.error(`Failed to setup outbound session in ${this.roomId}`, e);
+            return null;
         });
 
-        // setupPromise resolves to `session` whether or not the share succeeds
-        this.setupPromise = prom;
-
         // but we return a promise which only resolves if the share was successful.
-        return prom;
+        return fallible;
     }
 
     private async prepareSession(
