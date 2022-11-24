@@ -36,13 +36,18 @@ jobs:
         id: cpu-cores
         uses: SimenB/github-actions-cpu-cores@v1
 
-      - name: Run tests with coverage
+      - name: Run tests with coverage and metrics
+        if: github.ref == 'refs/heads/develop'
         run: |
-          if [[ ${{ github.ref }} == refs/heads/develop ]]; then
-            yarn coverage --ci --reporters github-actions '--reporters=<rootDir>/spec/slowReporter.js' --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}
-          else
-            yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}
-          fi
+          yarn coverage --ci --reporters github-actions '--reporters=<rootDir>/spec/slowReporter.js' --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}
+          mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
+        env:
+          JEST_SONAR_UNIQUE_OUTPUT_NAME: true
+
+      - name: Run tests with coverage
+        if: github.ref != 'refs/heads/develop'
+        run: |
+          yarn coverage --ci --reporters github-actions --max-workers ${{ steps.cpu-cores.outputs.count }} ./spec/${{ matrix.specs }}
           mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
         env:
           JEST_SONAR_UNIQUE_OUTPUT_NAME: true
