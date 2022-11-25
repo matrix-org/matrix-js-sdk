@@ -611,7 +611,12 @@ describe("MatrixClient event timelines", function() {
                     return THREAD_ROOT;
                 });
 
-            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+
+            httpBackend.when("GET", "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
                 encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&limit=1")
                 .respond(200, function() {
@@ -1504,7 +1509,22 @@ describe("MatrixClient event timelines", function() {
                     state: [],
                     end: "end_token",
                 });
-            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            httpBackend.when("GET", "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
                 encodeURIComponent(THREAD_RELATION_TYPE.name) + buildParams(Direction.Backward, "start_token"))
                 .respond(200, function() {
@@ -1513,7 +1533,7 @@ describe("MatrixClient event timelines", function() {
                         chunk: [],
                     };
                 });
-            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            httpBackend.when("GET", "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
                 encodeURIComponent(THREAD_RELATION_TYPE.name) + buildParams(Direction.Forward, "end_token"))
                 .respond(200, function() {
