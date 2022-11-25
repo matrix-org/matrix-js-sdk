@@ -21,16 +21,19 @@ import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
 import {
-    IContent,
-    IEvent,
     IClaimOTKsResult,
-    IJoinedRoom,
-    ISyncResponse,
+    IContent,
     IDownloadKeyResult,
+    IEvent,
+    IJoinedRoom,
+    IndexedDBCryptoStore,
+    ISyncResponse,
+    IUploadKeysRequest,
     MatrixEvent,
     MatrixEventEvent,
-    IndexedDBCryptoStore,
     Room,
+    RoomMember,
+    RoomStateEvent,
 } from "../../src/matrix";
 import { IDeviceKeys } from "../../src/crypto/dehydration";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
@@ -327,7 +330,9 @@ describe("megolm", () => {
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.isEncrypted()).toBe(true);
-        const decryptedEvent = await testUtils.awaitDecryption(event);
+
+        // it probably won't be decrypted yet, because it takes a while to process the olm keys
+        const decryptedEvent = await testUtils.awaitDecryption(event, { waitOnDecryptionFailure: true });
         expect(decryptedEvent.getContent().body).toEqual('42');
     });
 
@@ -873,7 +878,12 @@ describe("megolm", () => {
 
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         await room.decryptCriticalEvents();
-        expect(room.getLiveTimeline().getEvents()[0].getContent().body).toEqual('42');
+
+        // it probably won't be decrypted yet, because it takes a while to process the olm keys
+        const decryptedEvent = await testUtils.awaitDecryption(
+            room.getLiveTimeline().getEvents()[0], { waitOnDecryptionFailure: true },
+        );
+        expect(decryptedEvent.getContent().body).toEqual('42');
 
         const exported = await aliceTestClient.client.exportRoomKeys();
 
@@ -1012,7 +1022,9 @@ describe("megolm", () => {
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.isEncrypted()).toBe(true);
-        const decryptedEvent = await testUtils.awaitDecryption(event);
+
+        // it probably won't be decrypted yet, because it takes a while to process the olm keys
+        const decryptedEvent = await testUtils.awaitDecryption(event, { waitOnDecryptionFailure: true });
         expect(decryptedEvent.getRoomId()).toEqual(ROOM_ID);
         expect(decryptedEvent.getContent()).toEqual({});
         expect(decryptedEvent.getClearContent()).toBeUndefined();
