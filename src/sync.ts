@@ -207,6 +207,7 @@ export class SyncApi {
             this.onMarkerStateEvent(room, markerEvent, markerFoundOptions);
         });
 
+        this.client.store.storeRoom(room);
         return room;
     }
 
@@ -337,7 +338,6 @@ export class SyncApi {
             await this.injectRoomEvents(room, stateEvents, events);
 
             room.recalculate();
-            client.store.storeRoom(room);
             client.emit(ClientEvent.Room, room);
 
             this.processEventsForNotifs(room, events);
@@ -1231,7 +1231,6 @@ export class SyncApi {
 
             if (inviteObj.isBrandNewRoom) {
                 room.recalculate();
-                client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
             } else {
                 // Update room state for invite->reject->invite cycles
@@ -1383,7 +1382,6 @@ export class SyncApi {
 
             room.recalculate();
             if (joinObj.isBrandNewRoom) {
-                client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
             }
 
@@ -1423,7 +1421,6 @@ export class SyncApi {
 
             room.recalculate();
             if (leaveObj.isBrandNewRoom) {
-                client.store.storeRoom(room);
                 client.emit(ClientEvent.Room, room);
             }
 
