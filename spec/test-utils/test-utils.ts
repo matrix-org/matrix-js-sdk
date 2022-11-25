@@ -362,22 +362,28 @@ export class MockStorageApi {
  * @param {MatrixEvent} event
  * @returns {Promise} promise which resolves (to `event`) when the event has been decrypted
  */
-export async function awaitDecryption(event: MatrixEvent): Promise<MatrixEvent> {
+export async function awaitDecryption(
+    event: MatrixEvent, { waitOnDecryptionFailure = false } = {},
+): Promise<MatrixEvent> {
     // An event is not always decrypted ahead of time
     // getClearContent is a good signal to know whether an event has been decrypted
     // already
     if (event.getClearContent() !== null) {
-        return event;
+        if (waitOnDecryptionFailure && event.isDecryptionFailure()) {
+            logger.log(`${Date.now()} event ${event.getId()} got decryption error; waiting`);
+        } else {
+            return event;
+        }
     } else {
-        logger.log(`${Date.now()} event ${event.getId()} is being decrypted; waiting`);
-
-        return new Promise((resolve) => {
-            event.once(MatrixEventEvent.Decrypted, (ev) => {
-                logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
-                resolve(ev);
-            });
-        });
+        logger.log(`${Date.now()} event ${event.getId()} is not yet decrypted; waiting`);
     }
+
+    return new Promise((resolve) => {
+        event.once(MatrixEventEvent.Decrypted, (ev) => {
+            logger.log(`${Date.now()} event ${event.getId()} now decrypted`);
+            resolve(ev);
+        });
+    });
 }
 
 export const emitPromise = (e: EventEmitter, k: string): Promise<any> => new Promise(r => e.once(k, r));
