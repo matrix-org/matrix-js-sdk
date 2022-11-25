@@ -961,7 +961,7 @@ describe("SlidingSyncSdk", () => {
                     {
                         type: EventType.RoomMember,
                         state_key: alice,
-                        content: {membership: "join"},
+                        content: { membership: "join" },
                         sender: alice,
                         origin_server_ts: Date.now(),
                         event_id: "$alice",
@@ -982,7 +982,7 @@ describe("SlidingSyncSdk", () => {
                                 "m.read": {
                                     [alice]: {
                                         ts: 1234567,
-                                    }
+                                    },
                                 },
                             },
                         },
@@ -1009,7 +1009,7 @@ describe("SlidingSyncSdk", () => {
                                 "m.read": {
                                     [alice]: {
                                         ts: 1234567,
-                                    }
+                                    },
                                 },
                             },
                         },
