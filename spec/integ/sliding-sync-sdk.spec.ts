@@ -928,4 +928,95 @@ describe("SlidingSyncSdk", () => {
             expect(room.getMember(selfUserId)?.typing).toEqual(false);
         });
     });
+
+    describe("ExtensionReceipts", () => {
+        let ext: Extension;
+
+        beforeAll(async () => {
+            await setupClient();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("receipts");
+        });
+
+        it("gets enabled on the initial request only", () => {
+            expect(ext.onRequest(true)).toEqual({
+                enabled: true,
+            });
+            expect(ext.onRequest(false)).toEqual(undefined);
+        });
+
+        it("processes receipts", async () => {
+            const roomId = "!room:id";
+            const alice = "@alice:alice";
+            const lastEvent = mkOwnEvent(EventType.RoomMessage, { body: "hello" });
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with receipts",
+                required_state: [],
+                timeline: [
+                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    {
+                        type: EventType.RoomMember,
+                        state_key: alice,
+                        content: {membership: "join"},
+                        sender: alice,
+                        origin_server_ts: Date.now(),
+                        event_id: "$alice",
+                    },
+                    lastEvent,
+                ],
+                initial: true,
+            });
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeDefined();
+            expect(room.getReadReceiptForUserId(alice, true)).toBeNull();
+            ext.onResponse({
+                rooms: {
+                    [roomId]: {
+                        type: EventType.Receipt,
+                        content: {
+                            [lastEvent.event_id]: {
+                                "m.read": {
+                                    [alice]: {
+                                        ts: 1234567,
+                                    }
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            const receipt = room.getReadReceiptForUserId(alice);
+            expect(receipt).toBeDefined();
+            expect(receipt?.eventId).toEqual(lastEvent.event_id);
+            expect(receipt?.data.ts).toEqual(1234567);
+            expect(receipt?.data.thread_id).toBeFalsy();
+        });
+
+        it("gracefully handles missing rooms when receiving receipts", async () => {
+            const roomId = "!room:id";
+            const alice = "@alice:alice";
+            const eventId = "$something";
+            ext.onResponse({
+                rooms: {
+                    [roomId]: {
+                        type: EventType.Receipt,
+                        content: {
+                            [eventId]: {
+                                "m.read": {
+                                    [alice]: {
+                                        ts: 1234567,
+                                    }
+                                },
+                            },
+                        },
+                    },
+                },
+            });
+            // we expect it not to crash
+        });
+    });
 });
