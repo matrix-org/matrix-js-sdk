@@ -99,7 +99,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     // eslint-disable-next-line @typescript-eslint/naming-convention
     public static QUEUE_MESSAGES(event: MatrixEvent): "message" | null {
         // enqueue messages or events that associate with another event (redactions and relations)
-        if (event.getType() === EventType.RoomMessage || event.hasAssocation()) {
+        if (event.getType() === EventType.RoomMessage || event.hasAssociation()) {
             // put these events in the 'message' queue.
             return "message";
         }
