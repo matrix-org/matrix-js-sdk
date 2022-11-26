@@ -207,6 +207,7 @@ export class GroupCall extends TypedEventEmitter<
 
     public async create(): Promise<GroupCall> {
         this.client.groupCallEventHandler!.groupCalls.set(this.room.roomId, this);
+        this.client.emit(GroupCallEventHandlerEvent.Outgoing, this);
 
         await this.client.sendStateEvent(
             this.room.roomId,
