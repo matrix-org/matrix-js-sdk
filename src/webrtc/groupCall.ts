@@ -197,6 +197,9 @@ export class GroupCall extends TypedEventEmitter<
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId ?? genCallID();
+        this.creationTs = room.currentState.getStateEvents(
+            EventType.GroupCallPrefix, this.groupCallId,
+        )?.getTs() ?? null;
         this.updateParticipants();
 
         room.on(RoomStateEvent.Update, this.onRoomState);
@@ -206,6 +209,7 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public async create(): Promise<GroupCall> {
+        this.creationTs = Date.now();
         this.client.groupCallEventHandler!.groupCalls.set(this.room.roomId, this);
         this.client.emit(GroupCallEventHandlerEvent.Outgoing, this);
 
@@ -265,6 +269,20 @@ export class GroupCall extends TypedEventEmitter<
             this._participants = value;
             this.emit(GroupCallEvent.ParticipantsChanged, value);
         }
+    }
+
+    private _creationTs: number | null = null;
+
+    /**
+     * The timestamp at which the call was created, or null if it has not yet
+     * been created.
+     */
+    public get creationTs(): number | null {
+        return this._creationTs;
+    }
+
+    private set creationTs(value: number | null) {
+        this._creationTs = value;
     }
 
     /**
