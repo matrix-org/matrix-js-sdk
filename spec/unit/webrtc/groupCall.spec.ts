@@ -58,6 +58,7 @@ const FAKE_STATE_EVENTS = [
         }),
         getStateKey: () => FAKE_USER_ID_1,
         getRoomId: () => FAKE_ROOM_ID,
+        getTs: () => 0,
     },
     {
         getContent: () => ({
@@ -73,6 +74,7 @@ const FAKE_STATE_EVENTS = [
         }),
         getStateKey: () => FAKE_USER_ID_2,
         getRoomId: () => FAKE_ROOM_ID,
+        getTs: () => 0,
     }, {
         getContent: () => ({
             "m.expires_ts": Date.now() + ONE_HOUR,
@@ -88,8 +90,20 @@ const FAKE_STATE_EVENTS = [
         }),
         getStateKey: () => "user3",
         getRoomId: () => FAKE_ROOM_ID,
+        getTs: () => 0,
     },
 ];
+
+const mockGetStateEvents = (type: EventType, userId?: string): MatrixEvent[] | MatrixEvent | null => {
+    if (type === EventType.GroupCallMemberPrefix) {
+        return userId === undefined
+            ? FAKE_STATE_EVENTS as MatrixEvent[]
+            : FAKE_STATE_EVENTS.find(e => e.getStateKey() === userId) as MatrixEvent;
+    } else {
+        const fakeEvent = { getContent: () => ({}), getTs: () => 0 } as MatrixEvent;
+        return userId === undefined ? [fakeEvent] : fakeEvent;
+    }
+};
 
 const ONE_HOUR = 1000 * 60 * 60;
 
@@ -774,11 +788,7 @@ describe('Group Call', function() {
             mockClient = typedMockClient as unknown as MatrixClient;
 
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            room.currentState.getStateEvents = jest.fn().mockImplementation((type: EventType, userId: string) => {
-                return type === EventType.GroupCallMemberPrefix
-                    ? FAKE_STATE_EVENTS.find(e => e.getStateKey() === userId) || FAKE_STATE_EVENTS
-                    : { getContent: () => ([]) };
-            });
+            room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
                 membership: "join",
@@ -1016,11 +1026,7 @@ describe('Group Call', function() {
                 userId: FAKE_USER_ID_2,
                 membership: "join",
             } as unknown as RoomMember;
-            room.currentState.getStateEvents = jest.fn().mockImplementation((type: EventType, userId: string) => {
-                return type === EventType.GroupCallMemberPrefix
-                    ? FAKE_STATE_EVENTS.find(e => e.getStateKey() === userId) || FAKE_STATE_EVENTS
-                    : { getContent: () => ([]) };
-            });
+            room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents);
 
             groupCall = await createAndEnterGroupCall(mockClient, room);
         });

@@ -55,14 +55,20 @@ describe('Group Call Event Handler', function() {
             membership: "join",
         } as unknown as RoomMember;
 
+        const mockEvent = makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID);
+
         mockRoom = {
             on: () => {},
             off: () => {},
             roomId: FAKE_ROOM_ID,
             currentState: {
-                getStateEvents: jest.fn().mockReturnValue([makeMockGroupCallStateEvent(
-                    FAKE_ROOM_ID, FAKE_GROUP_CALL_ID,
-                )]),
+                getStateEvents: jest.fn((type, key) => {
+                    if (type === mockEvent.getType()) {
+                        return key === undefined ? [mockEvent] : mockEvent;
+                    } else {
+                        return key === undefined ? [] : null;
+                    }
+                }),
             },
             getMember: (userId: string) => userId === FAKE_USER_ID ? mockMember : null,
         } as unknown as Room;
