@@ -1,6 +1,6 @@
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
-import { MatrixClient } from "../client";
+import { MatrixClient, IMyDevice } from "../client";
 import {
     CallErrorCode,
     CallEvent,
@@ -1234,11 +1234,12 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Updates the local user's member state with the devices returned by the given function.
-     * @param fn A function from the current devices to the new devices.
+     * @param fn A function from the current devices to the new devices. If it
+     *   returns null, the update will be skipped.
      * @param keepAlive Whether the request should outlive the window.
      */
     private async updateDevices(
-        fn: (devices: IGroupCallRoomMemberDevice[]) => IGroupCallRoomMemberDevice[],
+        fn: (devices: IGroupCallRoomMemberDevice[]) => IGroupCallRoomMemberDevice[] | null,
         keepAlive = false,
     ): Promise<void> {
         const now = Date.now();
@@ -1271,6 +1272,8 @@ export class GroupCall extends TypedEventEmitter<
         )) as unknown as IGroupCallRoomMemberDevice[];
 
         const newDevices = fn(validDevices);
+        if (newDevices === null) return;
+
         const newCalls = [...otherCalls as unknown as IGroupCallRoomMemberCallState[]];
         if (newDevices.length > 0) {
             newCalls.push({
@@ -1327,6 +1330,27 @@ export class GroupCall extends TypedEventEmitter<
                 true,
             );
         }
+    }
+
+    /**
+     * Cleans up our member state by filtering out logged out devices, inactive
+     * devices, and our own device (if we know we haven't entered).
+     */
+    public async cleanMemberState(): Promise<void> {
+        const { devices: myDevices } = await this.client.getDevices();
+        const deviceMap = new Map<string, IMyDevice>(myDevices.map(d => [d.device_id, d]));
+
+        // updateDevices takes care of filtering out inactive devices for us
+        await this.updateDevices(devices => {
+            const newDevices = devices.filter(d => {
+                const device = deviceMap.get(d.device_id);
+                return device?.last_seen_ts !== undefined
+                    && !(d.device_id === this.client.getDeviceId()! && this.state !== GroupCallState.Entered);
+            });
+
+            // Skip the update if the devices are unchanged
+            return newDevices.length === devices.length ? null : newDevices;
+        });
     }
 
     private onRoomState = (): void => this.updateParticipants();
