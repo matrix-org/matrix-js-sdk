@@ -246,7 +246,7 @@ class ExtensionTyping implements Extension {
 
     public onRequest(isInitial: boolean): object | undefined {
         if (!isInitial) {
-            return undefined;
+            return undefined; // don't send a JSON object for subsequent requests, we don't need to.
         }
         return {
             enabled: true,
@@ -283,7 +283,7 @@ class ExtensionReceipts implements Extension {
                 enabled: true,
             };
         }
-        return undefined;
+        return undefined; // don't send a JSON object for subsequent requests, we don't need to.
     }
 
     public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
