@@ -1758,20 +1758,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             let latestMyThreadsRootEvent: MatrixEvent | undefined;
             const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
             for (const rootEvent of threadRoots) {
-                this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, {
+                const opts = {
                     duplicateStrategy: DuplicateStrategy.Ignore,
                     fromCache: false,
                     roomState,
-                });
+                };
+                this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, opts);
 
                 const threadRelationship = rootEvent
                     .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
                 if (threadRelationship?.current_user_participated) {
-                    this.threadsTimelineSets[1]?.addLiveEvent(rootEvent, {
-                        duplicateStrategy: DuplicateStrategy.Ignore,
-                        fromCache: false,
-                        roomState,
-                    });
+                    this.threadsTimelineSets[1]?.addLiveEvent(rootEvent, opts);
                     latestMyThreadsRootEvent = rootEvent;
                 }
             }
