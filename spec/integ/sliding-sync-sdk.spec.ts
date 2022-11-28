@@ -932,6 +932,27 @@ describe("SlidingSyncSdk", () => {
     describe("ExtensionReceipts", () => {
         let ext: Extension;
 
+        const generateReceiptResponse = (
+            userId: string, roomId: string, eventId: string, recType: string, ts: number,
+        ) => {
+            return {
+                rooms: {
+                    [roomId]: {
+                        type: EventType.Receipt,
+                        content: {
+                            [eventId]: {
+                                [recType]: {
+                                    [userId]: {
+                                        ts: ts,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+        };
+
         beforeAll(async () => {
             await setupClient();
             const hasSynced = sdk!.sync();
@@ -973,22 +994,9 @@ describe("SlidingSyncSdk", () => {
             const room = client!.getRoom(roomId)!;
             expect(room).toBeDefined();
             expect(room.getReadReceiptForUserId(alice, true)).toBeNull();
-            ext.onResponse({
-                rooms: {
-                    [roomId]: {
-                        type: EventType.Receipt,
-                        content: {
-                            [lastEvent.event_id]: {
-                                "m.read": {
-                                    [alice]: {
-                                        ts: 1234567,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            });
+            ext.onResponse(
+                generateReceiptResponse(alice, roomId, lastEvent.event_id, "m.read", 1234567),
+            );
             const receipt = room.getReadReceiptForUserId(alice);
             expect(receipt).toBeDefined();
             expect(receipt?.eventId).toEqual(lastEvent.event_id);
@@ -1000,22 +1008,9 @@ describe("SlidingSyncSdk", () => {
             const roomId = "!room:id";
             const alice = "@alice:alice";
             const eventId = "$something";
-            ext.onResponse({
-                rooms: {
-                    [roomId]: {
-                        type: EventType.Receipt,
-                        content: {
-                            [eventId]: {
-                                "m.read": {
-                                    [alice]: {
-                                        ts: 1234567,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
-            });
+            ext.onResponse(
+                generateReceiptResponse(alice, roomId, eventId, "m.read", 1234567),
+            );
             // we expect it not to crash
         });
     });

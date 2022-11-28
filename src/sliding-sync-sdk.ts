@@ -253,22 +253,15 @@ class ExtensionTyping implements Extension {
         };
     }
 
-    public onResponse(data: {rooms: Record<string, Event[]>}): void {
+    public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
         if (!data || !data.rooms) {
             return;
         }
 
         for (const roomId in data.rooms) {
-            const ephemeralEvents = mapEvents(this.client, roomId, [data.rooms[roomId]]);
-            const room = this.client.getRoom(roomId);
-            if (!room) {
-                logger.warn("got typing events for room but room doesn't exist on client:", roomId);
-                continue;
-            }
-            room.addEphemeralEvents(ephemeralEvents);
-            ephemeralEvents.forEach((e) => {
-                this.client.emit(ClientEvent.Event, e);
-            });
+            processEphemeralEvents(
+                this.client, roomId, [data.rooms[roomId]],
+            );
         }
     }
 }
@@ -285,30 +278,23 @@ class ExtensionReceipts implements Extension {
     }
 
     public onRequest(isInitial: boolean): object | undefined {
-        if (!isInitial) {
-            return undefined;
+        if (isInitial) {
+            return {
+                enabled: true,
+            };
         }
-        return {
-            enabled: true,
-        };
+        return undefined;
     }
 
-    public onResponse(data: {rooms: Record<string, Event>}): void {
+    public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
         if (!data || !data.rooms) {
             return;
         }
 
         for (const roomId in data.rooms) {
-            const ephemeralEvents = mapEvents(this.client, roomId, [data.rooms[roomId]]);
-            const room = this.client.getRoom(roomId);
-            if (!room) {
-                logger.warn("got receipts for room but room doesn't exist on client:", roomId);
-                continue;
-            }
-            room.addEphemeralEvents(ephemeralEvents);
-            ephemeralEvents.forEach((e) => {
-                this.client.emit(ClientEvent.Event, e);
-            });
+            processEphemeralEvents(
+                this.client, roomId, [data.rooms[roomId]],
+            );
         }
     }
 }
@@ -968,5 +954,18 @@ function mapEvents(client: MatrixClient, roomId: string | undefined, events: obj
     return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
         e["room_id"] = roomId;
         return mapper(e);
+    });
+}
+
+function processEphemeralEvents(client: MatrixClient, roomId: string, ephEvents: IMinimalEvent[]) {
+    const ephemeralEvents = mapEvents(client, roomId, ephEvents);
+    const room = client.getRoom(roomId);
+    if (!room) {
+        logger.warn("got ephemeral events for room but room doesn't exist on client:", roomId);
+        return;
+    }
+    room.addEphemeralEvents(ephemeralEvents);
+    ephemeralEvents.forEach((e) => {
+        client.emit(ClientEvent.Event, e);
     });
 }
