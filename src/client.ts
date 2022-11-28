@@ -896,6 +896,7 @@ export type EmittedEvents = ClientEvent
     | CallEvent // re-emitted by call.ts using Object.values
     | CallEventHandlerEvent.Incoming
     | GroupCallEventHandlerEvent.Incoming
+    | GroupCallEventHandlerEvent.Outgoing
     | GroupCallEventHandlerEvent.Ended
     | GroupCallEventHandlerEvent.Participants
     | HttpApiEvent.SessionLoggedOut

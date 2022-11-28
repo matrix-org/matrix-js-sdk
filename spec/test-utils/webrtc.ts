@@ -431,6 +431,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 export class MockCallFeed {
     constructor(
         public userId: string,
+        public deviceId: string | undefined,
         public stream: MockMediaStream,
     ) {}
 

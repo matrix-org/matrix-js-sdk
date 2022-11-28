@@ -16,26 +16,21 @@ limitations under the License.
 
 import { mocked } from "jest-mock";
 
+import { ClientEvent } from "../../../src/client";
+import { RoomMember } from "../../../src/models/room-member";
+import { SyncState } from "../../../src/sync";
 import {
-    ClientEvent,
-    GroupCall,
     GroupCallIntent,
     GroupCallState,
     GroupCallType,
-    IContent,
-    MatrixEvent,
-    Room,
-    RoomState,
-} from "../../../src";
-import { SyncState } from "../../../src/sync";
-import { GroupCallTerminationReason } from "../../../src/webrtc/groupCall";
+    GroupCallTerminationReason,
+} from "../../../src/webrtc/groupCall";
+import { IContent, MatrixEvent } from "../../../src/models/event";
+import { Room } from "../../../src/models/room";
+import { RoomState } from "../../../src/models/room-state";
 import { GroupCallEventHandler, GroupCallEventHandlerEvent } from "../../../src/webrtc/groupCallEventHandler";
 import { flushPromises } from "../../test-utils/flushPromises";
-import {
-    makeMockGroupCallMemberStateEvent,
-    makeMockGroupCallStateEvent,
-    MockCallMatrixClient,
-} from "../../test-utils/webrtc";
+import { makeMockGroupCallStateEvent, MockCallMatrixClient } from "../../test-utils/webrtc";
 
 const FAKE_USER_ID = "@alice:test.dummy";
 const FAKE_DEVICE_ID = "AAAAAAA";
@@ -47,6 +42,7 @@ describe('Group Call Event Handler', function() {
     let groupCallEventHandler: GroupCallEventHandler;
     let mockClient: MockCallMatrixClient;
     let mockRoom: Room;
+    let mockMember: RoomMember;
 
     beforeEach(() => {
         mockClient = new MockCallMatrixClient(
@@ -54,13 +50,27 @@ describe('Group Call Event Handler', function() {
         );
         groupCallEventHandler = new GroupCallEventHandler(mockClient.typed());
 
+        mockMember = {
+            userId: FAKE_USER_ID,
+            membership: "join",
+        } as unknown as RoomMember;
+
+        const mockEvent = makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID);
+
         mockRoom = {
+            on: () => {},
+            off: () => {},
             roomId: FAKE_ROOM_ID,
             currentState: {
-                getStateEvents: jest.fn().mockReturnValue([makeMockGroupCallStateEvent(
-                    FAKE_ROOM_ID, FAKE_GROUP_CALL_ID,
-                )]),
+                getStateEvents: jest.fn((type, key) => {
+                    if (type === mockEvent.getType()) {
+                        return key === undefined ? [mockEvent] : mockEvent;
+                    } else {
+                        return key === undefined ? [] : null;
+                    }
+                }),
             },
+            getMember: (userId: string) => userId === FAKE_USER_ID ? mockMember : null,
         } as unknown as Room;
 
         (mockClient as any).getRoom = jest.fn().mockReturnValue(mockRoom);
@@ -209,27 +219,6 @@ describe('Group Call Event Handler', function() {
         expect(groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID)?.dataChannelOptions).toStrictEqual(
             dataChannelOptions,
         );
-    });
-
-    it("sends member events to group calls", async () => {
-        await groupCallEventHandler.start();
-
-        const mockGroupCall = {
-            onMemberStateChanged: jest.fn(),
-        };
-
-        groupCallEventHandler.groupCalls.set(FAKE_ROOM_ID, mockGroupCall as unknown as GroupCall);
-
-        const mockStateEvent = makeMockGroupCallMemberStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID);
-
-        mockClient.emitRoomState(
-            mockStateEvent,
-            {
-                roomId: FAKE_ROOM_ID,
-            } as unknown as RoomState,
-        );
-
-        expect(mockGroupCall.onMemberStateChanged).toHaveBeenCalledWith(mockStateEvent);
     });
 
     describe("ignoring invalid group call state events", () => {
