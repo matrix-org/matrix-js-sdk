@@ -21,19 +21,16 @@ import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
 import {
-    IClaimOTKsResult,
     IContent,
-    IDownloadKeyResult,
     IEvent,
+    IClaimOTKsResult,
     IJoinedRoom,
-    IndexedDBCryptoStore,
     ISyncResponse,
-    IUploadKeysRequest,
+    IDownloadKeyResult,
     MatrixEvent,
     MatrixEventEvent,
+    IndexedDBCryptoStore,
     Room,
-    RoomMember,
-    RoomStateEvent,
 } from "../../src/matrix";
 import { IDeviceKeys } from "../../src/crypto/dehydration";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
@@ -330,9 +327,7 @@ describe("megolm", () => {
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.isEncrypted()).toBe(true);
-
-        // it probably won't be decrypted yet, because it takes a while to process the olm keys
-        const decryptedEvent = await testUtils.awaitDecryption(event, { waitOnDecryptionFailure: true });
+        const decryptedEvent = await testUtils.awaitDecryption(event);
         expect(decryptedEvent.getContent().body).toEqual('42');
     });
 
@@ -878,12 +873,7 @@ describe("megolm", () => {
 
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         await room.decryptCriticalEvents();
-
-        // it probably won't be decrypted yet, because it takes a while to process the olm keys
-        const decryptedEvent = await testUtils.awaitDecryption(
-            room.getLiveTimeline().getEvents()[0], { waitOnDecryptionFailure: true },
-        );
-        expect(decryptedEvent.getContent().body).toEqual('42');
+        expect(room.getLiveTimeline().getEvents()[0].getContent().body).toEqual('42');
 
         const exported = await aliceTestClient.client.exportRoomKeys();
 
@@ -1022,9 +1012,7 @@ describe("megolm", () => {
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.isEncrypted()).toBe(true);
-
-        // it probably won't be decrypted yet, because it takes a while to process the olm keys
-        const decryptedEvent = await testUtils.awaitDecryption(event, { waitOnDecryptionFailure: true });
+        const decryptedEvent = await testUtils.awaitDecryption(event);
         expect(decryptedEvent.getRoomId()).toEqual(ROOM_ID);
         expect(decryptedEvent.getContent()).toEqual({});
         expect(decryptedEvent.getClearContent()).toBeUndefined();
@@ -1375,88 +1363,5 @@ describe("megolm", () => {
         expect(decryptedEvent.isDecryptionFailure()).toBe(true);
 
         await beccaTestClient.stop();
-    });
-
-    it("allows enabling encryption in the createRoom call", async () => {
-        const testRoomId = "!testRoom:id";
-        await aliceTestClient.start();
-
-        aliceTestClient.httpBackend.when("POST", "/keys/query")
-            .respond(200, function(_path, content: IUploadKeysRequest) {
-                return { device_keys: {} };
-            });
-
-        /* Alice makes the /createRoom call */
-        aliceTestClient.httpBackend.when("POST", "/createRoom")
-            .respond(200, { room_id: testRoomId });
-        await Promise.all([
-            aliceTestClient.client.createRoom({
-                initial_state: [{
-                    type: 'm.room.encryption',
-                    state_key: '',
-                    content: { algorithm: 'm.megolm.v1.aes-sha2' },
-                }],
-            }),
-            aliceTestClient.httpBackend.flushAllExpected(),
-        ]);
-
-        /* The sync arrives in two parts; first the m.room.create... */
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
-            rooms: { join: {
-                [testRoomId]: {
-                    timeline: { events: [
-                        {
-                            type: 'm.room.create',
-                            state_key: '',
-                            event_id: "$create",
-                        },
-                        {
-                            type: 'm.room.member',
-                            state_key: aliceTestClient.getUserId(),
-                            content: { membership: "join" },
-                            event_id: "$alijoin",
-                        },
-                    ] },
-                },
-            } },
-        });
-        await aliceTestClient.flushSync();
-
-        // ... and then the e2e event and an invite ...
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
-            rooms: { join: {
-                [testRoomId]: {
-                    timeline: { events: [
-                        {
-                            type: 'm.room.encryption',
-                            state_key: '',
-                            content: { algorithm: 'm.megolm.v1.aes-sha2' },
-                            event_id: "$e2e",
-                        },
-                        {
-                            type: 'm.room.member',
-                            state_key: "@other:user",
-                            content: { membership: "invite" },
-                            event_id: "$otherinvite",
-                        },
-                    ] },
-                },
-            } },
-        });
-
-        // as soon as the roomMember arrives, try to send a message
-        aliceTestClient.client.on(RoomStateEvent.NewMember, (_e, _s, member: RoomMember) => {
-            if (member.userId == "@other:user") {
-                aliceTestClient.client.sendMessage(testRoomId, { msgtype: "m.text", body: "Hello, World" });
-            }
-        });
-
-        // flush the sync and wait for the /send/ request.
-        aliceTestClient.httpBackend.when("PUT", "/send/m.room.encrypted/")
-            .respond(200, (_path, _content) => ({ event_id: "asdfgh" }));
-        await Promise.all([
-            aliceTestClient.flushSync(),
-            aliceTestClient.httpBackend.flush("/send/m.room.encrypted/", 1),
-        ]);
     });
 });
