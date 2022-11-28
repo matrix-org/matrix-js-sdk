@@ -38,9 +38,8 @@ import { RoomState } from "../../src/models/room-state";
 import { UNSTABLE_ELEMENT_FUNCTIONAL_USERS } from "../../src/@types/event";
 import { TestClient } from "../TestClient";
 import { emitPromise } from "../test-utils/test-utils";
-import { ReceiptType } from "../../src/@types/read_receipts";
+import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, ThreadEvent, THREAD_RELATION_TYPE } from "../../src/models/thread";
-import { WrappedReceipt } from "../../src/models/read-receipt";
 import { Crypto } from "../../src/crypto";
 
 describe("Room", function() {

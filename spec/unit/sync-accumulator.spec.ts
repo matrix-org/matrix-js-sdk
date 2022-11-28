@@ -364,6 +364,63 @@ describe("SyncAccumulator", function() {
         });
     });
 
+    it("should accumulate threaded read receipts", () => {
+        const receipt1 = {
+            type: "m.receipt",
+            room_id: "!foo:bar",
+            content: {
+                "$event1:localhost": {
+                    [ReceiptType.Read]: {
+                        "@alice:localhost": { ts: 1, thread_id: "main" },
+                    },
+                },
+            },
+        };
+        const receipt2 = {
+            type: "m.receipt",
+            room_id: "!foo:bar",
+            content: {
+                "$event2:localhost": {
+                    [ReceiptType.Read]: {
+                        "@alice:localhost": { ts: 2, thread_id: "$123" }, // does not clobbers event1 receipt
+                    },
+                },
+            },
+        };
+        sa.accumulate(syncSkeleton({
+            ephemeral: {
+                events: [receipt1],
+            },
+        }));
+        sa.accumulate(syncSkeleton({
+            ephemeral: {
+                events: [receipt2],
+            },
+        }));
+
+        expect(
+            sa.getJSON().roomsData.join["!foo:bar"].ephemeral.events.length,
+        ).toEqual(1);
+        expect(
+            sa.getJSON().roomsData.join["!foo:bar"].ephemeral.events[0],
+        ).toEqual({
+            type: "m.receipt",
+            room_id: "!foo:bar",
+            content: {
+                "$event1:localhost": {
+                    [ReceiptType.Read]: {
+                        "@alice:localhost": { ts: 1, thread_id: "main" },
+                    },
+                },
+                "$event2:localhost": {
+                    [ReceiptType.Read]: {
+                        "@alice:localhost": { ts: 2, thread_id: "$123" },
+                    },
+                },
+            },
+        });
+    });
+
     describe("summary field", function() {
         function createSyncResponseWithSummary(summary) {
             return {

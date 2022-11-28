@@ -42,7 +42,7 @@ export class EventContext {
      *
      * @constructor
      */
-    constructor(public readonly ourEvent: MatrixEvent) {
+    public constructor(public readonly ourEvent: MatrixEvent) {
         this.timeline = [ourEvent];
     }
 

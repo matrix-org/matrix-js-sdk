@@ -179,7 +179,7 @@ describe("RoomWidgetClient", () => {
             // It should've also inserted the event into the room object
             const room = client.getRoom("!1:example.org");
             expect(room).not.toBeNull();
-            expect(room!.currentState.getStateEvents("org.example.foo", "bar").getEffectiveEvent()).toEqual(event);
+            expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
         });
 
         it("backfills", async () => {
@@ -195,7 +195,7 @@ describe("RoomWidgetClient", () => {
 
             const room = client.getRoom("!1:example.org");
             expect(room).not.toBeNull();
-            expect(room!.currentState.getStateEvents("org.example.foo", "bar").getEffectiveEvent()).toEqual(event);
+            expect(room!.currentState.getStateEvents("org.example.foo", "bar")?.getEffectiveEvent()).toEqual(event);
         });
     });
 

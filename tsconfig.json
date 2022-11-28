@@ -14,5 +14,10 @@
   "include": [
     "./src/**/*.ts",
     "./spec/**/*.ts"
-  ]
+  ],
+  "typedocOptions": {
+    "entryPoints": ["src/index.ts"],
+    "excludeExternals": true,
+    "out": "_docs"
+  }
 }

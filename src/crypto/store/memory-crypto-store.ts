@@ -279,7 +279,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     // Olm Account
 
-    public getAccount(txn: unknown, func: (accountPickle: string | null) => void) {
+    public getAccount(txn: unknown, func: (accountPickle: string | null) => void): void {
         func(this.account);
     }
 

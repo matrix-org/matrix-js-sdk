@@ -82,18 +82,22 @@ export async function encryptMessageForDevice(
     recipientUserId: string,
     recipientDevice: DeviceInfo,
     payloadFields: Record<string, any>,
-) {
+): Promise<void> {
     const deviceKey = recipientDevice.getIdentityKey();
     const sessionId = await olmDevice.getSessionIdForDevice(deviceKey);
     if (sessionId === null) {
         // If we don't have a session for a device then
         // we can't encrypt a message for it.
+        logger.log(
+            `[olmlib.encryptMessageForDevice] Unable to find Olm session for device ` +
+            `${recipientUserId}:${recipientDevice.deviceId}`,
+        );
         return;
     }
 
     logger.log(
-        "Using sessionid " + sessionId + " for device " +
-            recipientUserId + ":" + recipientDevice.deviceId,
+        `[olmlib.encryptMessageForDevice] Using Olm session ${sessionId} for device ` +
+        `${recipientUserId}:${recipientDevice.deviceId}`,
     );
 
     const payload = {
@@ -169,7 +173,7 @@ export async function getExistingOlmSessions(
         for (const deviceInfo of devices) {
             const deviceId = deviceInfo.deviceId;
             const key = deviceInfo.getIdentityKey();
-            promises.push((async () => {
+            promises.push((async (): Promise<void> => {
                 const sessionId = await olmDevice.getSessionIdForDevice(
                     key, true,
                 );
@@ -252,7 +256,7 @@ export async function ensureOlmSessionsForDevices(
                 // conditions.  If we find that we already have a session, then
                 // we'll resolve
                 olmDevice.sessionsInProgress[key] = new Promise(resolve => {
-                    resolveSession[key] = (v: any) => {
+                    resolveSession[key] = (v: any): void => {
                         delete olmDevice.sessionsInProgress[key];
                         resolve(v);
                     };
@@ -459,7 +463,7 @@ export async function verifySignature(
     signingUserId: string,
     signingDeviceId: string,
     signingKey: string,
-) {
+): Promise<void> {
     const signKeyId = "ed25519:" + signingDeviceId;
     const signatures = obj.signatures || {};
     const userSigs = signatures[signingUserId] || {};
@@ -523,7 +527,7 @@ export function pkSign(obj: IObject, key: PkSigning, userId: string, pubKey: str
  * @param {string} pubKey The public key to use to verify
  * @param {string} userId The user ID who signed the object
  */
-export function pkVerify(obj: IObject, pubKey: string, userId: string) {
+export function pkVerify(obj: IObject, pubKey: string, userId: string): void {
     const keyId = "ed25519:" + pubKey;
     if (!(obj.signatures && obj.signatures[userId] && obj.signatures[userId][keyId])) {
         throw new Error("No signature");

@@ -45,7 +45,7 @@ import { RoomMemberEvent } from "./models/room-member";
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
 
 class ExtensionE2EE implements Extension {
-    constructor(private readonly crypto: Crypto) {}
+    public constructor(private readonly crypto: Crypto) {}
 
     public name(): string {
         return "e2ee";
@@ -95,7 +95,7 @@ class ExtensionE2EE implements Extension {
 class ExtensionToDevice implements Extension {
     private nextBatch: string | null = null;
 
-    constructor(private readonly client: MatrixClient) {}
+    public constructor(private readonly client: MatrixClient) {}
 
     public name(): string {
         return "to_device";
@@ -170,7 +170,7 @@ class ExtensionToDevice implements Extension {
 }
 
 class ExtensionAccountData implements Extension {
-    constructor(private readonly client: MatrixClient) {}
+    public constructor(private readonly client: MatrixClient) {}
 
     public name(): string {
         return "account_data";
@@ -233,6 +233,72 @@ class ExtensionAccountData implements Extension {
     }
 }
 
+class ExtensionTyping implements Extension {
+    public constructor(private readonly client: MatrixClient) {}
+
+    public name(): string {
+        return "typing";
+    }
+
+    public when(): ExtensionState {
+        return ExtensionState.PostProcess;
+    }
+
+    public onRequest(isInitial: boolean): object | undefined {
+        if (!isInitial) {
+            return undefined; // don't send a JSON object for subsequent requests, we don't need to.
+        }
+        return {
+            enabled: true,
+        };
+    }
+
+    public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
+        if (!data || !data.rooms) {
+            return;
+        }
+
+        for (const roomId in data.rooms) {
+            processEphemeralEvents(
+                this.client, roomId, [data.rooms[roomId]],
+            );
+        }
+    }
+}
+
+class ExtensionReceipts implements Extension {
+    public constructor(private readonly client: MatrixClient) {}
+
+    public name(): string {
+        return "receipts";
+    }
+
+    public when(): ExtensionState {
+        return ExtensionState.PostProcess;
+    }
+
+    public onRequest(isInitial: boolean): object | undefined {
+        if (isInitial) {
+            return {
+                enabled: true,
+            };
+        }
+        return undefined; // don't send a JSON object for subsequent requests, we don't need to.
+    }
+
+    public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
+        if (!data || !data.rooms) {
+            return;
+        }
+
+        for (const roomId in data.rooms) {
+            processEphemeralEvents(
+                this.client, roomId, [data.rooms[roomId]],
+            );
+        }
+    }
+}
+
 /**
  * A copy of SyncApi such that it can be used as a drop-in replacement for sync v2. For the actual
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
@@ -244,7 +310,7 @@ export class SlidingSyncSdk {
     private failCount = 0;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
 
-    constructor(
+    public constructor(
         private readonly slidingSync: SlidingSync,
         private readonly client: MatrixClient,
         private readonly opts: Partial<IStoredClientOpts> = {},
@@ -256,7 +322,7 @@ export class SlidingSyncSdk {
         this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
         if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (_roomId: string) => {
+            opts.canResetEntireTimeline = (_roomId: string): boolean => {
                 return false;
             };
         }
@@ -273,6 +339,8 @@ export class SlidingSyncSdk {
         const extensions: Extension[] = [
             new ExtensionToDevice(this.client),
             new ExtensionAccountData(this.client),
+            new ExtensionTyping(this.client),
+            new ExtensionReceipts(this.client),
         ];
         if (this.opts.crypto) {
             extensions.push(
@@ -348,7 +416,7 @@ export class SlidingSyncSdk {
      * Sync rooms the user has left.
      * @return {Promise} Resolved when they've been added to the store.
      */
-    public async syncLeftRooms() {
+    public async syncLeftRooms(): Promise<Room[]> {
         return []; // TODO
     }
 
@@ -457,7 +525,7 @@ export class SlidingSyncSdk {
         return false;
     }
 
-    private async processRoomData(client: MatrixClient, room: Room, roomData: MSC3575RoomData) {
+    private async processRoomData(client: MatrixClient, room: Room, roomData: MSC3575RoomData): Promise<void> {
         roomData = ensureNameEvent(client, room.roomId, roomData);
         const stateEvents = mapEvents(this.client, room.roomId, roomData.required_state);
         // Prevent events from being decrypted ahead of time
@@ -632,7 +700,7 @@ export class SlidingSyncSdk {
         // we'll purge this once we've fully processed the sync response
         this.addNotifications(timelineEvents);
 
-        const processRoomEvent = async (e: MatrixEvent) => {
+        const processRoomEvent = async (e: MatrixEvent): Promise<void> => {
             client.emit(ClientEvent.Event, e);
             if (e.isState() && e.getType() == EventType.RoomEncryption && this.opts.crypto) {
                 await this.opts.crypto.onCryptoEvent(e);
@@ -767,7 +835,7 @@ export class SlidingSyncSdk {
     /**
      * Main entry point. Blocks until stop() is called.
      */
-    public async sync() {
+    public async sync(): Promise<void> {
         logger.debug("Sliding sync init loop");
 
         //   1) We need to get push rules so we can check if events should bing as we get
@@ -886,5 +954,18 @@ function mapEvents(client: MatrixClient, roomId: string | undefined, events: obj
     return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
         e["room_id"] = roomId;
         return mapper(e);
+    });
+}
+
+function processEphemeralEvents(client: MatrixClient, roomId: string, ephEvents: IMinimalEvent[]): void {
+    const ephemeralEvents = mapEvents(client, roomId, ephEvents);
+    const room = client.getRoom(roomId);
+    if (!room) {
+        logger.warn("got ephemeral events for room but room doesn't exist on client:", roomId);
+        return;
+    }
+    room.addEphemeralEvents(ephemeralEvents);
+    ephemeralEvents.forEach((e) => {
+        client.emit(ClientEvent.Event, e);
     });
 }

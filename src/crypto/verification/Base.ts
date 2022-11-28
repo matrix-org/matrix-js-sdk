@@ -34,7 +34,7 @@ import { ListenerMap, TypedEventEmitter } from "../../models/typed-event-emitter
 const timeoutException = new Error("Verification timed out");
 
 export class SwitchStartEventError extends Error {
-    constructor(public readonly startEvent: MatrixEvent | null) {
+    public constructor(public readonly startEvent: MatrixEvent | null) {
         super();
     }
 }
@@ -91,7 +91,7 @@ export class VerificationBase<
      * @param {object} [request] the key verification request object related to
      * this verification, if any
      */
-    constructor(
+    public constructor(
         public readonly channel: IVerificationChannel,
         public readonly baseApis: MatrixClient,
         public readonly userId: string,
@@ -286,12 +286,12 @@ export class VerificationBase<
         if (this.promise) return this.promise;
 
         this.promise = new Promise((resolve, reject) => {
-            this.resolve = (...args) => {
+            this.resolve = (...args): void => {
                 this._done = true;
                 this.endTimer();
                 resolve(...args);
             };
-            this.reject = (e: Error | MatrixEvent) => {
+            this.reject = (e: Error | MatrixEvent): void => {
                 this._done = true;
                 this.endTimer();
                 reject(e);

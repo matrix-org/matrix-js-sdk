@@ -56,7 +56,7 @@ export class StubStore implements IStore {
      * Set the sync token.
      * @param {string} token
      */
-    public setSyncToken(token: string) {
+    public setSyncToken(token: string): void {
         this.fromToken = token;
     }
 
@@ -64,7 +64,7 @@ export class StubStore implements IStore {
      * No-op.
      * @param {Room} room
      */
-    public storeRoom(room: Room) {}
+    public storeRoom(room: Room): void {}
 
     /**
      * No-op.
@@ -87,7 +87,7 @@ export class StubStore implements IStore {
      * Permanently delete a room.
      * @param {string} roomId
      */
-    public removeRoom(roomId: string) {
+    public removeRoom(roomId: string): void {
         return;
     }
 
@@ -103,7 +103,7 @@ export class StubStore implements IStore {
      * No-op.
      * @param {User} user
      */
-    public storeUser(user: User) {}
+    public storeUser(user: User): void {}
 
     /**
      * No-op.
@@ -139,13 +139,13 @@ export class StubStore implements IStore {
      * @param {string} token The token associated with these events.
      * @param {boolean} toStart True if these are paginated results.
      */
-    public storeEvents(room: Room, events: MatrixEvent[], token: string, toStart: boolean) {}
+    public storeEvents(room: Room, events: MatrixEvent[], token: string, toStart: boolean): void {}
 
     /**
      * Store a filter.
      * @param {Filter} filter
      */
-    public storeFilter(filter: Filter) {}
+    public storeFilter(filter: Filter): void {}
 
     /**
      * Retrieve a filter.
@@ -171,13 +171,13 @@ export class StubStore implements IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    public setFilterIdByName(filterName: string, filterId?: string) {}
+    public setFilterIdByName(filterName: string, filterId?: string): void {}
 
     /**
      * Store user-scoped account data events
      * @param {Array<MatrixEvent>} events The events to store.
      */
-    public storeAccountDataEvents(events: MatrixEvent[]) {}
+    public storeAccountDataEvents(events: MatrixEvent[]): void {}
 
     /**
      * Get account data event by event type
@@ -209,7 +209,7 @@ export class StubStore implements IStore {
     /**
      * Save does nothing as there is no backing data store.
      */
-    public save() {}
+    public save(): void {}
 
     /**
      * Startup does nothing.

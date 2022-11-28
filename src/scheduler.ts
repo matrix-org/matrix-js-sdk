@@ -97,9 +97,9 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * @see module:scheduler~queueAlgorithm
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    public static QUEUE_MESSAGES(event: MatrixEvent) {
+    public static QUEUE_MESSAGES(event: MatrixEvent): "message" | null {
         // enqueue messages or events that associate with another event (redactions and relations)
-        if (event.getType() === EventType.RoomMessage || event.hasAssocation()) {
+        if (event.getType() === EventType.RoomMessage || event.hasAssociation()) {
             // put these events in the 'message' queue.
             return "message";
         }
@@ -116,7 +116,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     private activeQueues: string[] = [];
     private procFn: ProcessFunction<T> | null = null;
 
-    constructor(
+    public constructor(
         public readonly retryAlgorithm = MatrixScheduler.RETRY_BACKOFF_RATELIMIT,
         public readonly queueAlgorithm = MatrixScheduler.QUEUE_MESSAGES,
     ) {}
@@ -283,7 +283,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     }
 }
 
-function debuglog(...args: any[]) {
+function debuglog(...args: any[]): void {
     if (DEBUG) {
         logger.log(...args);
     }

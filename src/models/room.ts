@@ -54,14 +54,11 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { ReceiptType } from "../@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import {
-    MAIN_ROOM_TIMELINE,
     ReadReceipt,
-    Receipt,
-    ReceiptContent,
     synthesizeReceipt,
 } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
@@ -320,7 +317,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {boolean} [opts.timelineSupport = false] Set to true to enable improved
      * timeline support.
      */
-    constructor(
+    public constructor(
         public readonly roomId: string,
         public readonly client: MatrixClient,
         public readonly myUserId: string,
@@ -1667,7 +1664,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let timelineSet: EventTimelineSet;
         if (Thread.hasServerSideListSupport) {
             timelineSet =
-                new EventTimelineSet(this, this.opts, undefined, undefined, filterType ?? ThreadFilterType.All);
+                new EventTimelineSet(this, {
+                    ...this.opts,
+                    pendingEvents: false,
+                }, undefined, undefined, filterType ?? ThreadFilterType.All);
             this.reEmitter.reEmit(timelineSet, [
                 RoomEvent.Timeline,
                 RoomEvent.TimelineReset,
@@ -1966,7 +1966,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         ));
     }
 
-    private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean) => {
+    private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean): void => {
         if (thread.length) {
             this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline);
             if (thread.hasCurrentUserParticipated) {
@@ -1979,7 +1979,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         timelineSet: Optional<EventTimelineSet>,
         thread: Thread,
         toStartOfTimeline: boolean,
-    ) => {
+    ): void => {
         if (timelineSet && thread.rootEvent) {
             if (Thread.hasServerSideSupport) {
                 timelineSet.addLiveEvent(thread.rootEvent, {
@@ -2066,7 +2066,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         redactedEvent.getType(),
                         redactedEvent.getStateKey()!,
                     );
-                    if (currentStateEvent.getId() === redactedEvent.getId()) {
+                    if (currentStateEvent?.getId() === redactedEvent.getId()) {
                         this.currentState.setStateEvents([redactedEvent]);
                     }
                 }
@@ -2929,7 +2929,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let excludedUserIds: string[] = [];
         const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
         if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
-            excludedUserIds = mFunctionalMembers.getContent().service_members;
+            excludedUserIds = mFunctionalMembers!.getContent().service_members;
         }
 
         // get members that are NOT ourselves and are actually in the room.
@@ -3093,7 +3093,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         originalEvent.applyVisibilityEvent(visibilityChange);
     }
 
-    private redactVisibilityChangeEvent(event: MatrixEvent) {
+    private redactVisibilityChangeEvent(event: MatrixEvent): void {
         // Sanity checks.
         if (!event.isVisibilityEvent) {
             throw new Error("expected a visibility change event");

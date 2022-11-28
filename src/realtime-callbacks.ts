@@ -48,7 +48,7 @@ type Callback = {
 const callbackList: Callback[] = [];
 
 // var debuglog = logger.log.bind(logger);
-const debuglog = function(...params: any[]) {};
+const debuglog = function(...params: any[]): void {};
 
 /**
  * reimplementation of window.setTimeout, which will call the callback if

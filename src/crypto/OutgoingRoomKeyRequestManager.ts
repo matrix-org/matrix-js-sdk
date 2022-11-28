@@ -100,20 +100,13 @@ export class OutgoingRoomKeyRequestManager {
     // of sendOutgoingRoomKeyRequests
     private sendOutgoingRoomKeyRequestsRunning = false;
 
-    private clientRunning = false;
+    private clientRunning = true;
 
-    constructor(
+    public constructor(
         private readonly baseApis: MatrixClient,
         private readonly deviceId: string,
         private readonly cryptoStore: CryptoStore,
     ) {}
-
-    /**
-     * Called when the client is started. Sets background processes running.
-     */
-    public start(): void {
-        this.clientRunning = true;
-    }
 
     /**
      * Called when the client is stopped. Stops any running background processes.
@@ -359,7 +352,7 @@ export class OutgoingRoomKeyRequestManager {
             return;
         }
 
-        const startSendingOutgoingRoomKeyRequests = () => {
+        const startSendingOutgoingRoomKeyRequests = (): void => {
             if (this.sendOutgoingRoomKeyRequestsRunning) {
                 throw new Error("RoomKeyRequestSend already in progress!");
             }

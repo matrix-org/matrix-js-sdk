@@ -309,7 +309,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * that getDirectionalContent() will return event.content and not event.prev_content.
      * Default: true. <strong>This property is experimental and may change.</strong>
      */
-    constructor(public event: Partial<IEvent> = {}) {
+    public constructor(public event: Partial<IEvent> = {}) {
         super();
 
         // intern the values of matrix events to force share strings and reduce the
@@ -352,7 +352,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this._cachedExtEv;
     }
 
-    private invalidateExtensibleEvent() {
+    private invalidateExtensibleEvent(): void {
         // just reset the flag - that'll trick the getter into parsing a new event
         this._hasCachedExtEv = false;
     }
@@ -450,6 +450,26 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getDate(): Date | null {
         return this.event.origin_server_ts ? new Date(this.event.origin_server_ts) : null;
+    }
+
+    /**
+     * Get a string containing details of this event
+     *
+     * This is intended for logging, to help trace errors. Example output:
+     *
+     * id=$HjnOHV646n0SjLDAqFrgIjim7RCpB7cdMXFrekWYAn type=m.room.encrypted sender=@user:example.com room=!room:example.com ts=2022-10-25T17:30:28.404Z
+     */
+    public getDetails(): string {
+        let details = `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()}`;
+        const room = this.getRoomId();
+        if (room) {
+            details += ` room=${room}`;
+        }
+        const date = this.getDate();
+        if (date) {
+            details += ` ts=${date.toISOString()}`;
+        }
+        return details;
     }
 
     /**
@@ -659,7 +679,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
     }
 
-    public shouldAttemptDecryption() {
+    public shouldAttemptDecryption(): boolean {
         if (this.isRedacted()) return false;
         if (this.isBeingDecrypted()) return false;
         if (this.clearEvent) return false;
@@ -780,7 +800,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 } else {
                     res = await crypto.decryptEvent(this);
                     if (options.isRetry === true) {
-                        logger.info(`Decrypted event on retry (id=${this.getId()})`);
+                        logger.info(`Decrypted event on retry (${this.getDetails()})`);
                     }
                 }
             } catch (e) {
@@ -790,7 +810,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     const re = options.isRetry ? 're' : '';
                     // For find results: this can produce "Error decrypting event (id=$ev)" and
                     // "Error redecrypting event (id=$ev)".
-                    logger.error(`Error ${re}decrypting event (id=${this.getId()})`, e);
+                    logger.error(`Error ${re}decrypting event (${this.getDetails()})`, e);
                     this.decryptionPromise = null;
                     this.retryDecryption = false;
                     return;
@@ -814,16 +834,21 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(`Got error decrypting event (id=${this.getId()}: ` +
-                        `${(<DecryptionError>e).detailedString}), but retrying`, e);
+                    logger.log(
+                        `Error decrypting event (${this.getDetails()}), but retrying: ` +
+                        (<DecryptionError>e).detailedString,
+                    );
                     continue;
                 }
 
                 // decryption error, no retries queued. Warn about the error and
                 // set it to m.bad.encrypted.
+                //
+                // the detailedString already includes the name and message of the error, and the stack isn't much use,
+                // so we don't bother to log `e` separately.
                 logger.warn(
-                    `Got error decrypting event (id=${this.getId()}: ${(<DecryptionError>e).detailedString})`,
-                    e,
+                    `Error decrypting event (${this.getDetails()}): ` +
+                    (<DecryptionError>e).detailedString,
                 );
 
                 res = this.badEncryptedMessage((<DecryptionError>e).message);
@@ -1418,8 +1443,18 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Checks if this event is associated with another event. See `getAssociatedId`.
      *
      * @return {boolean}
+     * @deprecated use hasAssociation instead.
      */
     public hasAssocation(): boolean {
+        return !!this.getAssociatedId();
+    }
+
+    /**
+     * Checks if this event is associated with another event. See `getAssociatedId`.
+     *
+     * @return {boolean}
+     */
+    public hasAssociation(): boolean {
         return !!this.getAssociatedId();
     }
 
@@ -1455,7 +1490,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * more information.
      * @returns {boolean} True if the event is cancelled, false otherwise.
      */
-    isCancelled(): boolean {
+    public isCancelled(): boolean {
         return this._isCancelled;
     }
 
@@ -1473,7 +1508,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * features (such as sender) surrounding the event.
      * @returns {MatrixEvent} A snapshot of this event.
      */
-    toSnapshot(): MatrixEvent {
+    public toSnapshot(): MatrixEvent {
         const ev = new MatrixEvent(JSON.parse(JSON.stringify(this.event)));
         for (const [p, v] of Object.entries(this)) {
             if (p !== "event") { // exclude the thing we just cloned
@@ -1490,7 +1525,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @param {MatrixEvent} otherEvent The other event to check against.
      * @returns {boolean} True if the events are the same, false otherwise.
      */
-    isEquivalentTo(otherEvent: MatrixEvent): boolean {
+    public isEquivalentTo(otherEvent: MatrixEvent): boolean {
         if (!otherEvent) return false;
         if (otherEvent === this) return true;
         const myProps = deepSortedObjectEntries(this.event);

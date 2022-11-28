@@ -173,7 +173,9 @@ describe("MatrixClient", function() {
                 signatures: {},
             };
 
-            httpBackend!.when("POST", inviteSignUrl).respond(200, signature);
+            httpBackend!.when("POST", inviteSignUrl).check(request => {
+                expect(request.queryParams?.mxid).toEqual(client!.getUserId());
+            }).respond(200, signature);
             httpBackend!.when("POST", "/join/" + encodeURIComponent(roomId)).check(request => {
                 expect(request.data.third_party_signed).toEqual(signature);
             }).respond(200, { room_id: roomId });

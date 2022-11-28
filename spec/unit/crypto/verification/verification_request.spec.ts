@@ -20,7 +20,6 @@ import { ToDeviceChannel } from
     "../../../../src/crypto/verification/request/ToDeviceChannel";
 import { MatrixEvent } from "../../../../src/models/event";
 import { MatrixClient } from "../../../../src/client";
-import { setupWebcrypto, teardownWebcrypto } from "./util";
 import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
 import { VerificationBase } from "../../../../src/crypto/verification/Base";
 
@@ -147,14 +146,6 @@ async function distributeEvent(
 jest.useFakeTimers();
 
 describe("verification request unit tests", function() {
-    beforeAll(function() {
-        setupWebcrypto();
-    });
-
-    afterAll(() => {
-        teardownWebcrypto();
-    });
-
     it("transition from UNSENT to DONE through happy path", async function() {
         const alice = makeMockClient("@alice:matrix.tld", "device1");
         const bob = makeMockClient("@bob:matrix.tld", "device1");

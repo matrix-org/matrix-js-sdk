@@ -143,11 +143,11 @@ export class MSC3906Rendezvous {
         return await this.channel.receive() as MSC3906RendezvousPayload;
     }
 
-    private async send(payload: MSC3906RendezvousPayload) {
+    private async send(payload: MSC3906RendezvousPayload): Promise<void> {
         await this.channel.send(payload);
     }
 
-    public async declineLoginOnExistingDevice() {
+    public async declineLoginOnExistingDevice(): Promise<void> {
         logger.info('User declined sign in');
         await this.send({ type: PayloadType.Finish, outcome: Outcome.Declined });
     }

@@ -93,6 +93,9 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
         ],
         actions: [],
     },
+];
+
+const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
     {
         // For homeservers which don't support MSC3914 yet
         rule_id: ".org.matrix.msc3914.rule.room.call",
@@ -123,7 +126,7 @@ export class PushProcessor {
      * @constructor
      * @param {Object} client The Matrix client object to use
      */
-    constructor(private readonly client: MatrixClient) {}
+    public constructor(private readonly client: MatrixClient) {}
 
     /**
      * Convert a list of actions into a object with the actions as keys and their values
@@ -163,6 +166,7 @@ export class PushProcessor {
         if (!newRules) newRules = {} as IPushRules;
         if (!newRules.global) newRules.global = {} as PushRuleSet;
         if (!newRules.global.override) newRules.global.override = [];
+        if (!newRules.global.override) newRules.global.underride = [];
 
         // Merge the client-level defaults with the ones from the server
         const globalOverrides = newRules.global.override;
@@ -180,6 +184,24 @@ export class PushProcessor {
                 const ruleId = override.rule_id;
                 logger.warn(`Adding default global override for ${ruleId}`);
                 globalOverrides.push(override);
+            }
+        }
+
+        const globalUnderrides = newRules.global.underride ?? [];
+        for (const underride of DEFAULT_UNDERRIDE_RULES) {
+            const existingRule = globalUnderrides
+                .find((r) => r.rule_id === underride.rule_id);
+
+            if (existingRule) {
+                // Copy over the actions, default, and conditions. Don't touch the user's preference.
+                existingRule.default = underride.default;
+                existingRule.conditions = underride.conditions;
+                existingRule.actions = underride.actions;
+            } else {
+                // Add the rule
+                const ruleId = underride.rule_id;
+                logger.warn(`Adding default global underride for ${ruleId}`);
+                globalUnderrides.push(underride);
             }
         }
 

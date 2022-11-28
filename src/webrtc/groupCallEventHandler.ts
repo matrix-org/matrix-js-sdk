@@ -31,12 +31,14 @@ import { SyncState } from '../sync';
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
+    Outgoing = "GroupCall.outgoing",
     Ended = "GroupCall.ended",
     Participants = "GroupCall.participants",
 }
 
 export type GroupCallEventHandlerEventHandlerMap = {
     [GroupCallEventHandlerEvent.Incoming]: (call: GroupCall) => void;
+    [GroupCallEventHandlerEvent.Outgoing]: (call: GroupCall) => void;
     [GroupCallEventHandlerEvent.Ended]: (call: GroupCall) => void;
     [GroupCallEventHandlerEvent.Participants]: (participants: RoomMember[], call: GroupCall) => void;
 };
@@ -55,7 +57,7 @@ export class GroupCallEventHandler {
     // and get
     private roomDeferreds = new Map<string, RoomDeferred>();
 
-    constructor(private client: MatrixClient) { }
+    public constructor(private client: MatrixClient) { }
 
     public async start(): Promise<void> {
         // We wait until the client has started syncing for real.
@@ -66,7 +68,7 @@ export class GroupCallEventHandler {
         if (this.client.getSyncState() !== SyncState.Syncing) {
             logger.debug("Waiting for client to start syncing...");
             await new Promise<void>(resolve => {
-                const onSync = () => {
+                const onSync = (): void => {
                     if (this.client.getSyncState() === SyncState.Syncing) {
                         this.client.off(ClientEvent.Sync, onSync);
                         return resolve();
@@ -192,7 +194,7 @@ export class GroupCallEventHandler {
         return groupCall;
     }
 
-    private onRoomsChanged = (room: Room) => {
+    private onRoomsChanged = (room: Room): void => {
         this.createGroupCallForRoom(room);
     };
 
@@ -220,14 +222,6 @@ export class GroupCallEventHandler {
                 logger.warn(`Multiple group calls detected for room: ${
                     state.roomId}. Multiple group calls are currently unsupported.`);
             }
-        } else if (eventType === EventType.GroupCallMemberPrefix) {
-            const groupCall = this.groupCalls.get(state.roomId);
-
-            if (!groupCall) {
-                return;
-            }
-
-            groupCall.onMemberStateChanged(event);
         }
     };
 }
