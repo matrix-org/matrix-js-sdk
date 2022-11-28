@@ -2815,7 +2815,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             // MatrixClient has already checked that this room should be encrypted,
             // so this is an unexpected situation.
             throw new Error(
-                "Room " + roomId + " was previously configured to use encryption, but is " +
+                "Room was previously configured to use encryption, but is " +
                 "no longer. Perhaps the homeserver is hiding the " +
                 "configuration event.",
             );
