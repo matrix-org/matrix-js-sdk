@@ -957,7 +957,7 @@ function mapEvents(client: MatrixClient, roomId: string | undefined, events: obj
     });
 }
 
-function processEphemeralEvents(client: MatrixClient, roomId: string, ephEvents: IMinimalEvent[]) {
+function processEphemeralEvents(client: MatrixClient, roomId: string, ephEvents: IMinimalEvent[]): void {
     const ephemeralEvents = mapEvents(client, roomId, ephEvents);
     const room = client.getRoom(roomId);
     if (!room) {
