@@ -9297,11 +9297,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Find the event_id closest to the given timestamp in the given direction.
-     * @return {Promise} A promise of an object containing the event_id and
-     *    origin_server_ts of the closest event to the timestamp in the given
-     *    direction
+     * @return {Promise} Resolves: A promise of an object containing the event_id and
+     *    origin_server_ts of the closest event to the timestamp in the given direction
+     * @return {module:http-api.MatrixError} Rejects: when the request fails
      */
-    public timestampToEvent(
+    public async timestampToEvent(
         roomId: string,
         timestamp: number,
         dir: Direction,
@@ -9309,19 +9309,39 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {
             $roomId: roomId,
         });
+        const queryParams = {
+            ts: timestamp.toString(),
+            dir: dir,
+        };
 
-        return this.http.authedRequest(
-            Method.Get,
-            path,
-            {
-                ts: timestamp.toString(),
-                dir: dir,
-            },
-            undefined,
-            {
-                prefix: "/_matrix/client/unstable/org.matrix.msc3030",
-            },
-        );
+        try {
+            return await this.http.authedRequest(
+                Method.Get,
+                path,
+                queryParams,
+                undefined,
+                {
+                    prefix: ClientPrefix.V1,
+                },
+            );
+        } catch (err) {
+            // Fallback to the prefixed unstable endpoint. Since the stable endpoint is
+            // new, we should also try the unstable endpoint before giving up. We can
+            // remove this fallback request in a year (remove after 2023-11-28).
+            if ((<MatrixError>err).httpStatus === 400 && (<MatrixError>err).errcode === "M_UNRECOGNIZED") {
+                return await this.http.authedRequest(
+                    Method.Get,
+                    path,
+                    queryParams,
+                    undefined,
+                    {
+                        prefix: "/_matrix/client/unstable/org.matrix.msc3030",
+                    },
+                );
+            }
+
+            throw err;
+        }
     }
 }
 
