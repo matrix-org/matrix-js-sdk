@@ -5830,8 +5830,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ).then(async (res) => {
                 const mapper = this.getEventMapper();
                 const matrixEvents = res.chunk.map(mapper);
-                for (const event of matrixEvents) {
-                    await eventTimeline.getTimelineSet()?.thread?.processEvent(event);
+
+                // Process latest events first
+                for (const event of matrixEvents.slice().reverse()) {
+                    await thread?.processEvent(event);
+                    const sender = event.getSender()!;
+                    if (!backwards || thread?.getEventReadUpTo(sender) === null) {
+                        room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
+                    }
                 }
 
                 const newToken = res.next_batch;

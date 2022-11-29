@@ -123,7 +123,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
         this.room.on(RoomEvent.Redaction, this.onRedaction);
         this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
-        this.timelineSet.on(RoomEvent.Timeline, this.onEcho);
+        this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
@@ -190,6 +190,18 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         } else {
             await this.initialiseThread();
         }
+    };
+
+    private onTimelineEvent = (
+        event: MatrixEvent,
+        room: Room | undefined,
+        toStartOfTimeline: boolean | undefined,
+    ): void => {
+        // Add a synthesized receipt to all live events added to the timeline
+        if (!toStartOfTimeline) {
+            room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
+        }
+        this.onEcho(event);
     };
 
     private onEcho = async (event: MatrixEvent): Promise<void> => {
