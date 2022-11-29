@@ -180,17 +180,14 @@ describe("Read receipt", () => {
     describe("synthesizeReceipt", () => {
         it.each([
             { event: roomEvent, destinationId: MAIN_ROOM_TIMELINE },
-            { event: threadEvent, destinationId: threadEvent.threadRootId! }
+            { event: threadEvent, destinationId: threadEvent.threadRootId! },
         ])("adds the receipt to $destinationId", ({ event, destinationId }) => {
             const userId = "@bob:example.org";
             const receiptType = ReceiptType.Read;
 
             const fakeReadReceipt = synthesizeReceipt(userId, event, receiptType);
 
-            const content = fakeReadReceipt.getContent()
-                [event.getId()!]
-                [receiptType]
-                [userId];
+            const content = fakeReadReceipt.getContent()[event.getId()!][receiptType][userId];
 
             expect(content.thread_id).toEqual(destinationId);
         });
