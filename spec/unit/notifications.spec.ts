@@ -37,7 +37,7 @@ let event: MatrixEvent;
 let threadEvent: MatrixEvent;
 
 const ROOM_ID = "!roomId:example.org";
-let THREAD_ID;
+let THREAD_ID: string;
 
 function mkPushAction(notify, highlight): IActionsObject {
     return {
@@ -76,7 +76,7 @@ describe("fixNotificationCountOnDecryption", () => {
             event: true,
         }, mockClient);
 
-        THREAD_ID = event.getId();
+        THREAD_ID = event.getId()!;
         threadEvent = mkEvent({
             type: EventType.RoomMessage,
             content: {
