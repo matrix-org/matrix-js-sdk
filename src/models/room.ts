@@ -1193,6 +1193,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Get the notification for the event context (room or thread timeline)
+     */
+    public getUnreadCountForEventContext(type = NotificationCountType.Total, event: MatrixEvent): number {
+        const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
+
+        return (isThreadEvent
+            ? this.getThreadUnreadNotificationCount(event.threadRootId, type)
+            : this.getRoomUnreadNotificationCount(type)) ?? 0;
+    }
+
+    /**
      * Get one of the notification counts for this room
      * @param {String} type The type of notification count to get. default: 'total'
      * @return {Number} The notification count, or undefined if there is no count
