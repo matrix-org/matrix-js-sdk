@@ -2552,12 +2552,45 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param {boolean=} inhibitDeviceQuery true to suppress device list query for
      *   users in the room (for now). In case lazy loading is enabled,
      *   the device query is always inhibited as the members are not tracked.
+     *
+     * @deprecated It is normally incorrect to call this method directly. Encryption
+     *   is enabled by receiving an `m.room.encryption` event (which we may have sent
+     *   previously).
      */
     public async setRoomEncryption(
         roomId: string,
         config: IRoomEncryption,
         inhibitDeviceQuery?: boolean,
     ): Promise<void> {
+        const room = this.clientStore.getRoom(roomId);
+        if (!room) {
+            throw new Error(`Unable to enable encryption tracking devices in unknown room ${roomId}`);
+        }
+        await this.setRoomEncryptionImpl(room, config);
+        if (!this.lazyLoadMembers && !inhibitDeviceQuery) {
+            this.deviceList.refreshOutdatedDeviceLists();
+        }
+    }
+
+    /**
+     * Set up encryption for a room.
+     *
+     * This is called when an <tt>m.room.encryption</tt> event is received. It saves a flag
+     * for the room in the cryptoStore (if it wasn't already set), sets up an "encryptor" for
+     * the room, and enables device-list tracking for the room.
+     *
+     * It does <em>not</em> initiate a device list query for the room. That is normally
+     * done once we finish processing the sync, in onSyncCompleted.
+     *
+     * @param room The room to enable encryption in.
+     * @param config The encryption config for the room.
+     */
+    private async setRoomEncryptionImpl(
+        room: Room,
+        config: IRoomEncryption,
+    ): Promise<void> {
+        const roomId = room.roomId;
+
         // ignore crypto events with no algorithm defined
         // This will happen if a crypto event is redacted before we fetch the room state
         // It would otherwise just throw later as an unknown algorithm would, but we may
@@ -2626,13 +2659,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 "starting to track device lists for all users therein");
 
             await this.trackRoomDevices(roomId);
-            // TODO: this flag is only not used from MatrixClient::setRoomEncryption
-            // which is never used (inside Element at least)
-            // but didn't want to remove it as it technically would
-            // be a breaking change.
-            if (!inhibitDeviceQuery) {
-                this.deviceList.refreshOutdatedDeviceLists();
-            }
         } else {
             logger.log("Enabling encryption in " + roomId);
         }
@@ -2976,16 +3002,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param event encryption event to be processed
      */
     public async onCryptoEvent(room: Room, event: MatrixEvent): Promise<void> {
-        const roomId = room.roomId;
         const content = event.getContent<IRoomEncryption>();
-
-        try {
-            // inhibit the device list refresh for now - it will happen once we've
-            // finished processing the sync, in onSyncCompleted.
-            await this.setRoomEncryption(roomId, content, true);
-        } catch (e) {
-            logger.error(`Error configuring encryption in room ${roomId}`, e);
-        }
+        await this.setRoomEncryptionImpl(room, content);
     }
 
     /**
