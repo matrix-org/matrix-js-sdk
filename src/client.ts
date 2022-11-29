@@ -3809,10 +3809,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         powerLevel: number,
         event: MatrixEvent,
     ): Promise<ISendEventResponse> {
-        type EventContent = {
-          users: Record<string, number>;
-        };
-        let content: EventContent = {
+        type UsersWithPowerLevel = Record<string, number>;
+        let content = {
             users: {},
         };
         if (event.getType() === EventType.RoomPowerLevels) {
@@ -3822,10 +3820,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         if (Array.isArray(userId)) {
             for (const user of userId) {
-                content.users[user] = powerLevel;
+                (content.users as UsersWithPowerLevel)[user] = powerLevel;
             }
         } else {
-            content.users[userId] = powerLevel;
+            (content.users as UsersWithPowerLevel)[userId] = powerLevel;
         }
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
             $roomId: roomId,
