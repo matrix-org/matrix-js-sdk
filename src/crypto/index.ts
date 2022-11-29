@@ -2862,11 +2862,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             );
         }
 
-        if (!this.roomDeviceTrackingState[roomId]) {
-            this.trackRoomDevices(roomId);
-        }
         // wait for all the room devices to be loaded
-        await this.roomDeviceTrackingState[roomId];
+        await this.trackRoomDevicesImpl(room);
 
         let content = event.getContent();
         // If event has an m.relates_to then we need
