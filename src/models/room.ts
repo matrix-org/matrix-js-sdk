@@ -1183,13 +1183,23 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *                  for this type.
      */
     public getUnreadNotificationCount(type = NotificationCountType.Total): number {
-        let count = this.notificationCounts[type] ?? 0;
+        let count = this.getRoomUnreadNotificationCount(type);
         if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
             for (const threadNotification of this.threadNotifications.values()) {
                 count += threadNotification[type] ?? 0;
             }
         }
         return count;
+    }
+
+    /**
+     * Get one of the notification counts for this room
+     * @param {String} type The type of notification count to get. default: 'total'
+     * @return {Number} The notification count, or undefined if there is no count
+     *                  for this type.
+     */
+    public getRoomUnreadNotificationCount(type = NotificationCountType.Total): number {
+        return this.notificationCounts[type] ?? 0;
     }
 
     /**
