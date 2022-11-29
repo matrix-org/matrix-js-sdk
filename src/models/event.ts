@@ -1443,8 +1443,18 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Checks if this event is associated with another event. See `getAssociatedId`.
      *
      * @return {boolean}
+     * @deprecated use hasAssociation instead.
      */
     public hasAssocation(): boolean {
+        return !!this.getAssociatedId();
+    }
+
+    /**
+     * Checks if this event is associated with another event. See `getAssociatedId`.
+     *
+     * @return {boolean}
+     */
+    public hasAssociation(): boolean {
         return !!this.getAssociatedId();
     }
 

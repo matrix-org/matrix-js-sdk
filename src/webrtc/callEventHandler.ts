@@ -189,7 +189,6 @@ export class CallEventHandler {
         const groupCallId = content.conf_id;
         const type = event.getType() as EventType;
         const senderId = event.getSender()!;
-        const weSentTheEvent = senderId === this.client.credentials.userId;
         let call = content.call_id ? this.calls.get(content.call_id) : undefined;
 
         let opponentDeviceId: string | undefined;
@@ -219,6 +218,9 @@ export class CallEventHandler {
                 return;
             }
         }
+
+        const weSentTheEvent = senderId === this.client.credentials.userId
+            && (opponentDeviceId === undefined || opponentDeviceId === this.client.getDeviceId()!);
 
         if (!callRoomId) return;
 

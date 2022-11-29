@@ -31,12 +31,14 @@ import { SyncState } from '../sync';
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
+    Outgoing = "GroupCall.outgoing",
     Ended = "GroupCall.ended",
     Participants = "GroupCall.participants",
 }
 
 export type GroupCallEventHandlerEventHandlerMap = {
     [GroupCallEventHandlerEvent.Incoming]: (call: GroupCall) => void;
+    [GroupCallEventHandlerEvent.Outgoing]: (call: GroupCall) => void;
     [GroupCallEventHandlerEvent.Ended]: (call: GroupCall) => void;
     [GroupCallEventHandlerEvent.Participants]: (participants: RoomMember[], call: GroupCall) => void;
 };
@@ -220,14 +222,6 @@ export class GroupCallEventHandler {
                 logger.warn(`Multiple group calls detected for room: ${
                     state.roomId}. Multiple group calls are currently unsupported.`);
             }
-        } else if (eventType === EventType.GroupCallMemberPrefix) {
-            const groupCall = this.groupCalls.get(state.roomId);
-
-            if (!groupCall) {
-                return;
-            }
-
-            groupCall.onMemberStateChanged(event);
         }
     };
 }

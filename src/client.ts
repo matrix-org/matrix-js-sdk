@@ -896,6 +896,7 @@ export type EmittedEvents = ClientEvent
     | CallEvent // re-emitted by call.ts using Object.values
     | CallEventHandlerEvent.Incoming
     | GroupCallEventHandlerEvent.Incoming
+    | GroupCallEventHandlerEvent.Outgoing
     | GroupCallEventHandlerEvent.Ended
     | GroupCallEventHandlerEvent.Participants
     | HttpApiEvent.SessionLoggedOut
@@ -3629,10 +3630,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let signPromise: Promise<IThirdPartySigned | void> = Promise.resolve();
 
         if (opts.inviteSignUrl) {
-            signPromise = this.http.requestOtherUrl<IThirdPartySigned>(
-                Method.Post,
-                new URL(opts.inviteSignUrl), { mxid: this.credentials.userId },
-            );
+            const url = new URL(opts.inviteSignUrl);
+            url.searchParams.set("mxid", this.credentials.userId!);
+            signPromise = this.http.requestOtherUrl<IThirdPartySigned>(Method.Post, url);
         }
 
         const queryString: Record<string, string | string[]> = {};

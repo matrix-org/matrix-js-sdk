@@ -462,6 +462,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.opponentMember;
     }
 
+    public getOpponentDeviceId(): string | undefined {
+        return this.opponentDeviceId;
+    }
+
     public getOpponentSessionId(): string | undefined {
         return this.opponentSessionId;
     }
@@ -644,6 +648,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             client: this.client,
             roomId: this.roomId,
             userId,
+            deviceId: this.getOpponentDeviceId(),
             stream,
             purpose,
             audioMuted,
@@ -688,6 +693,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             audioMuted: false,
             videoMuted: false,
             userId,
+            deviceId: this.getOpponentDeviceId(),
             stream,
             purpose,
         }));
@@ -718,6 +724,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 audioMuted: false,
                 videoMuted: false,
                 userId,
+                deviceId: this.getOpponentDeviceId(),
                 stream,
                 purpose,
             }),
@@ -1009,6 +1016,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     client: this.client,
                     roomId: this.roomId,
                     userId: this.client.getUserId()!,
+                    deviceId: this.client.getDeviceId() ?? undefined,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
                     audioMuted: false,
@@ -2584,6 +2592,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 client: this.client,
                 roomId: this.roomId,
                 userId: this.client.getUserId()!,
+                deviceId: this.client.getDeviceId() ?? undefined,
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,

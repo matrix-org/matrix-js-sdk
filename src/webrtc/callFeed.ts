@@ -29,6 +29,7 @@ export interface ICallFeedOpts {
     client: MatrixClient;
     roomId?: string;
     userId: string;
+    deviceId: string | undefined;
     stream: MediaStream;
     purpose: SDPStreamMetadataPurpose;
     /**
@@ -63,6 +64,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public stream: MediaStream;
     public sdpMetadataStreamId: string;
     public userId: string;
+    public readonly deviceId: string | undefined;
     public purpose: SDPStreamMetadataPurpose;
     public speakingVolumeSamples: number[];
 
@@ -86,6 +88,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.client = opts.client;
         this.roomId = opts.roomId;
         this.userId = opts.userId;
+        this.deviceId = opts.deviceId;
         this.purpose = opts.purpose;
         this.audioMuted = opts.audioMuted;
         this.videoMuted = opts.videoMuted;
@@ -156,7 +159,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      * @returns {boolean} is local?
      */
     public isLocal(): boolean {
-        return this.userId === this.client.getUserId();
+        return this.userId === this.client.getUserId()
+            && (this.deviceId === undefined || this.deviceId === this.client.getDeviceId());
     }
 
     /**
@@ -282,6 +286,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
             client: this.client,
             roomId: this.roomId,
             userId: this.userId,
+            deviceId: this.deviceId,
             stream,
             purpose: this.purpose,
             audioMuted: this.audioMuted,
