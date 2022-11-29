@@ -2658,7 +2658,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             logger.log("Enabling encryption in " + roomId + "; " +
                 "starting to track device lists for all users therein");
 
-            await this.trackRoomDevices(roomId);
+            await this.trackRoomDevicesImpl(room);
         } else {
             logger.log("Enabling encryption in " + roomId);
         }
@@ -2671,14 +2671,29 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns {Promise} when all devices for the room have been fetched and marked to track
      */
     public trackRoomDevices(roomId: string): Promise<void> {
+        const room = this.clientStore.getRoom(roomId);
+        if (!room) {
+            throw new Error(`Unable to start tracking devices in unknown room ${roomId}`);
+        }
+        return this.trackRoomDevicesImpl(room);
+    }
+
+    /**
+     * Make sure we are tracking the device lists for all users in this room.
+     *
+     * This is normally called when we are about to send an encrypted event, to make sure
+     * we have all the devices in the room; but it is also called when processing an
+     * m.room.encryption state event (if lazy-loading is disabled), or when members are
+     * loaded (if lazy-loading is enabled), to prepare the device list.
+     *
+     * @param room Room to enable device-list tracking in
+     */
+    private trackRoomDevicesImpl(room: Room): Promise<void> {
+        const roomId = room.roomId;
         const trackMembers = async (): Promise<void> => {
             // not an encrypted room
             if (!this.roomEncryptors.has(roomId)) {
                 return;
-            }
-            const room = this.clientStore.getRoom(roomId);
-            if (!room) {
-                throw new Error(`Unable to start tracking devices in unknown room ${roomId}`);
             }
             logger.log(`Starting to track devices for room ${roomId} ...`);
             const members = await room.getEncryptionTargetMembers();
