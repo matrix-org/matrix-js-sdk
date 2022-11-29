@@ -3809,7 +3809,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         powerLevel: number,
         event: MatrixEvent,
     ): Promise<ISendEventResponse> {
-        let content = {
+        type EventContent = {
+          users: Record<string, number>;
+        };
+        let content: EventContent = {
             users: {},
         };
         if (event.getType() === EventType.RoomPowerLevels) {
