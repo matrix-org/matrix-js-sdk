@@ -9331,19 +9331,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 }
 
-export function getCount({ type, room, event }: {
-    type: NotificationCountType; room: Room; event: MatrixEvent;
-}): number {
-    const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
-
-    return (isThreadEvent
-        ? room.getThreadUnreadNotificationCount(
-            event.threadRootId,
-            type,
-        )
-        : room.getRoomUnreadNotificationCount(type)) ?? 0;
-}
-
 /**
  * recalculates an accurate notifications count on event decryption.
  * Servers do not have enough knowledge about encrypted events to calculate an
@@ -9358,8 +9345,8 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 
-    const totalCount = getCount({ type: NotificationCountType.Total, room, event });
-    const currentCount = getCount({ type: NotificationCountType.Highlight, room, event });
+    const totalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
+    const currentCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
 
     // Ensure the unread counts are kept up to date if the event is encrypted
     // We also want to make sure that the notification count goes up if we already
