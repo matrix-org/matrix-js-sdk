@@ -2972,10 +2972,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * handle an m.room.encryption event
      *
-     * @param {module:models/event.MatrixEvent} event encryption event
+     * @param room in which the event was received
+     * @param event encryption event to be processed
      */
-    public async onCryptoEvent(event: MatrixEvent): Promise<void> {
-        const roomId = event.getRoomId()!;
+    public async onCryptoEvent(room: Room, event: MatrixEvent): Promise<void> {
+        const roomId = room.roomId;
         const content = event.getContent<IRoomEncryption>();
 
         try {

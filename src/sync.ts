@@ -1392,7 +1392,7 @@ export class SyncApi {
             const processRoomEvent = async (e): Promise<void> => {
                 client.emit(ClientEvent.Event, e);
                 if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
-                    await this.opts.crypto.onCryptoEvent(e);
+                    await this.opts.crypto.onCryptoEvent(room, e);
                 }
             };
 
