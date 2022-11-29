@@ -90,7 +90,7 @@ interface CallOpts {
     opponentDeviceId?: string;
     opponentSessionId?: string;
     groupCallId?: string;
-    isSfu?: boolean;
+    isFocus?: boolean;
 }
 
 interface TurnServer {
@@ -359,7 +359,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // whether this call should have push-to-talk semantics
     // This should be set by the consumer on incoming & outgoing calls.
     public isPtt = false;
-    public isSfu = false;
+    public isFocus = false;
 
     private readonly client: MatrixClient;
     private readonly forceTURN?: boolean;
@@ -437,7 +437,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.opponentDeviceId = opts.opponentDeviceId;
         this.opponentSessionId = opts.opponentSessionId;
         this.groupCallId = opts.groupCallId;
-        this.isSfu = opts.isSfu ?? false;
+        this.isFocus = opts.isFocus ?? false;
         // Array of Objects with urls, username, credential keys
         this.turnServers = opts.turnServers || [];
         if (this.turnServers.length === 0 && this.client.isFallbackICEServerAllowed()) {
@@ -585,6 +585,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private async initOpponentCrypto() {
+        if (this.isFocus) return;
         if (!this.opponentDeviceId) return;
         if (!this.client.getUseE2eForGroupCall()) return;
         // It's possible to want E2EE and yet not have the means to manage E2EE
@@ -841,7 +842,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // If we're calling with an SFU and we aren't setting up the call, we
         // send the offer manually
-        if (this.isSfu && this.state !== CallState.Fledgling && addToPeerConnection) {
+        if (this.isFocus && this.state !== CallState.Fledgling && addToPeerConnection) {
             this.peerConn!.createOffer().then(async (offer) => {
                 await this.peerConn!.setLocalDescription(offer);
 
@@ -889,7 +890,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.deleteFeed(callFeed);
 
-        if (this.isSfu) {
+        if (this.isFocus) {
             this.peerConn!.createOffer().then(async (offer) => {
                 await this.peerConn!.setLocalDescription(offer);
 
@@ -968,7 +969,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdpStreamMetadata = invite[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
-        } else if (!this.isSfu) {
+        } else if (!this.isFocus) {
             logger.debug(`Call ${
                 this.callId} did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
         }
@@ -1540,7 +1541,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public async sendMetadataUpdate(): Promise<void> {
-        if (this.isSfu) {
+        if (this.isFocus) {
             this.sendSFUDataChannelMessage(SFUDataChannelMessageOp.Metadata);
         } else {
             await this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
@@ -1841,7 +1842,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const sdpStreamMetadata = content[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
-        } else if (!this.isSfu) {
+        } else if (!this.isFocus) {
             logger.warn(`Call ${this.callId} Did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
         }
 
@@ -2067,7 +2068,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             feed.purpose = this.remoteSDPStreamMetadata![streamId]?.purpose;
             feed.userId = this.remoteSDPStreamMetadata![streamId]?.user_id;
         }
-        if (this.isSfu) {
+        if (this.isFocus) {
             this.subscribeToSFU();
         }
     }
@@ -2382,7 +2383,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private onNegotiationNeeded = async (): Promise<void> => {
         // Other than the initial offer, we handle negotiation manually when calling with an SFU
-        if (this.isSfu && ![CallState.Fledgling, CallState.CreateOffer].includes(this.state)) return;
+        if (this.isFocus && ![CallState.Fledgling, CallState.CreateOffer].includes(this.state)) return;
 
         logger.info(`Call ${this.callId} Negotiation is needed!`);
 
@@ -2475,7 +2476,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             });
 
             const userId = this.invitee || this.getOpponentMember()!.userId;
-            if (this.client.getUseE2eForGroupCall()) {
+            if (this.client.getUseE2eForGroupCall() && !this.isFocus) {
                 await this.client.encryptAndSendToDevices([{
                     userId,
                     deviceInfo: this.opponentDeviceInfo!,
@@ -2988,7 +2989,7 @@ export function createNewMatrixCall(
     roomId: string,
     options?: Pick<
         CallOpts,
-        "forceTURN" | "invitee" | "opponentDeviceId" | "opponentSessionId" | "groupCallId" | "isSfu"
+        "forceTURN" | "invitee" | "opponentDeviceId" | "opponentSessionId" | "groupCallId" | "isFocus"
     >,
 ): MatrixCall | null {
     if (!supportsMatrixCall()) return null;
@@ -3005,7 +3006,7 @@ export function createNewMatrixCall(
         opponentDeviceId: options?.opponentDeviceId,
         opponentSessionId: options?.opponentSessionId,
         groupCallId: options?.groupCallId,
-        isSfu: options?.isSfu,
+        isFocus: options?.isFocus,
     };
     const call = new MatrixCall(opts);
 

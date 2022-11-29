@@ -829,7 +829,7 @@ interface ITimestampToEventResponse {
     origin_server_ts: string;
 }
 
-export interface ISfuInfo {
+export interface IFocusInfo {
     user_id: string;
     device_id: string;
 }
@@ -1575,18 +1575,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns boolean Whether group call signalling will be encrypted
      */
     public getUseE2eForGroupCall(): boolean {
-        // FIXME: SFUs don't support E2E atm
-        if (this.getSfu()) return false;
         return this.useE2eForGroupCall;
     }
 
-    public getSfu(): ISfuInfo | null {
-        if (!this.localSfuUserId || !this.localSfuDeviceId) return null;
+    public getFoci(): IFocusInfo[] {
+        if (!this.localSfuUserId || !this.localSfuDeviceId) return [];
 
-        return {
+        return [{
             user_id: this.localSfuUserId,
             device_id: this.localSfuDeviceId,
-        };
+        }];
     }
 
     /**
