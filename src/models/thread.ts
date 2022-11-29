@@ -197,7 +197,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         room: Room | undefined,
         toStartOfTimeline: boolean | undefined,
     ): void => {
-        // Add a synthesized receipt to all live events added to the timeline
+        // Add a synthesized receipt when paginating forward in the timeline
         if (!toStartOfTimeline) {
             room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
         }
