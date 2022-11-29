@@ -86,6 +86,7 @@ import { ISyncStateData } from "../sync";
 import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { IContent } from "../models/event";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -2882,7 +2883,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             delete content['io.element.performance_metrics'];
         }
 
-        const encryptedContent = await alg.encryptMessage(room, event.getType(), content);
+        const encryptedContent = await alg.encryptMessage(room, event.getType(), content) as IContent;
 
         if (mRelatesTo) {
             encryptedContent['m.relates_to'] = mRelatesTo;
