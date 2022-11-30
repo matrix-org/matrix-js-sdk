@@ -33,7 +33,7 @@ export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptTyp
                 [receiptType]: {
                     [userId]: {
                         ts: event.getTs(),
-                        threadId: event.threadRootId ?? MAIN_ROOM_TIMELINE,
+                        thread_id: event.threadRootId ?? MAIN_ROOM_TIMELINE,
                     },
                 },
             },

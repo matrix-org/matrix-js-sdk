@@ -5830,8 +5830,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ).then(async (res) => {
                 const mapper = this.getEventMapper();
                 const matrixEvents = res.chunk.map(mapper);
-                for (const event of matrixEvents) {
-                    await eventTimeline.getTimelineSet()?.thread?.processEvent(event);
+
+                // Process latest events first
+                for (const event of matrixEvents.slice().reverse()) {
+                    await thread?.processEvent(event);
+                    const sender = event.getSender()!;
+                    if (!backwards || thread?.getEventReadUpTo(sender) === null) {
+                        room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
+                    }
                 }
 
                 const newToken = res.next_batch;
@@ -9338,19 +9344,16 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     if (!room || !cli.getUserId()) return;
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
-    const currentCount = (isThreadEvent
-        ? room.getThreadUnreadNotificationCount(
-            event.threadRootId,
-            NotificationCountType.Highlight,
-        )
-        : room.getUnreadNotificationCount(NotificationCountType.Highlight)) ?? 0;
+
+    const totalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
+    const currentCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
 
     // Ensure the unread counts are kept up to date if the event is encrypted
     // We also want to make sure that the notification count goes up if we already
     // have encrypted events to avoid other code from resetting 'highlight' to zero.
     const oldHighlight = !!oldActions?.tweaks?.highlight;
     const newHighlight = !!actions?.tweaks?.highlight;
-    if (oldHighlight !== newHighlight || currentCount > 0) {
+    if ((oldHighlight !== newHighlight || currentCount > 0) && totalCount > 0) {
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
         const hasReadEvent = isThreadEvent
@@ -9375,7 +9378,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
             // Fix 'Mentions Only' rooms from not having the right badge count
             const totalCount = (isThreadEvent
                 ? room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total)
-                : room.getUnreadNotificationCount(NotificationCountType.Total)) ?? 0;
+                : room.getRoomUnreadNotificationCount(NotificationCountType.Total)) ?? 0;
 
             if (totalCount < newCount) {
                 if (isThreadEvent) {
