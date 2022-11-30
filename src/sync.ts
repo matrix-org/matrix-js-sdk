@@ -1362,6 +1362,18 @@ export class SyncApi {
                 }
             }
 
+            // process any crypto events *before* emitting the RoomStateEvent events. This
+            // avoids a race condition if the application tries to send a message after the
+            // state event is processed, but before crypto is enabled, which then causes the
+            // crypto layer to complain.
+            if (this.opts.crypto) {
+                for (const e of stateEvents.concat(events)) {
+                    if (e.isState() && e.getType() === EventType.RoomEncryption && e.getStateKey() === "") {
+                        await this.opts.crypto.onCryptoEvent(room, e);
+                    }
+                }
+            }
+
             try {
                 await this.injectRoomEvents(room, stateEvents, events, syncEventData.fromCache);
             } catch (e) {
@@ -1389,21 +1401,11 @@ export class SyncApi {
 
             this.processEventsForNotifs(room, events);
 
-            const processRoomEvent = async (e): Promise<void> => {
-                client.emit(ClientEvent.Event, e);
-                if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
-                    await this.opts.crypto.onCryptoEvent(e);
-                }
-            };
-
-            await utils.promiseMapSeries(stateEvents, processRoomEvent);
-            await utils.promiseMapSeries(events, processRoomEvent);
-            ephemeralEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
-            accountDataEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
+            const emitEvent = (e: MatrixEvent): boolean => client.emit(ClientEvent.Event, e);
+            stateEvents.forEach(emitEvent);
+            events.forEach(emitEvent);
+            ephemeralEvents.forEach(emitEvent);
+            accountDataEvents.forEach(emitEvent);
 
             // Decrypt only the last message in all rooms to make sure we can generate a preview
             // And decrypt all events after the recorded read receipt to ensure an accurate

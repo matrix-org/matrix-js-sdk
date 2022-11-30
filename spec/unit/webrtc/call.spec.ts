@@ -81,10 +81,13 @@ const fakeIncomingCall = async (client: TestClient, call: MatrixCall, version: s
     call.getFeeds().push(new CallFeed({
         client: client.client,
         userId: "remote_user_id",
-        // @ts-ignore Mock
-        stream: new MockMediaStream("remote_stream_id", [new MockMediaStreamTrack("remote_tack_id")]),
-        id: "remote_feed_id",
+        deviceId: undefined,
+        stream: new MockMediaStream(
+            "remote_stream_id", [new MockMediaStreamTrack("remote_tack_id", "audio")],
+        ) as unknown as MediaStream,
         purpose: SDPStreamMetadataPurpose.Usermedia,
+        audioMuted: false,
+        videoMuted: false,
     }));
     await callPromise;
 };
@@ -447,7 +450,7 @@ describe('Call', function() {
 
         client.client.getRoom = () => {
             return {
-                getMember: (userId) => {
+                getMember: (userId: string) => {
                     if (userId === opponentMember.userId) {
                         return opponentMember;
                     }
@@ -521,10 +524,12 @@ describe('Call', function() {
     it("should correctly generate local SDPStreamMetadata", async () => {
         const callPromise = call.placeCallWithCallFeeds([new CallFeed({
             client: client.client,
-            // @ts-ignore Mock
-            stream: new MockMediaStream("local_stream1", [new MockMediaStreamTrack("track_id", "audio")]),
+            stream: new MockMediaStream(
+                "local_stream1", [new MockMediaStreamTrack("track_id", "audio")],
+            ) as unknown as MediaStream,
             roomId: call.roomId,
             userId: client.getUserId(),
+            deviceId: undefined,
             purpose: SDPStreamMetadataPurpose.Usermedia,
             audioMuted: false,
             videoMuted: false,
@@ -534,8 +539,10 @@ describe('Call', function() {
         call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
         (call as any).pushNewLocalFeed(
-            new MockMediaStream("local_stream2", [new MockMediaStreamTrack("track_id", "video")]),
-            SDPStreamMetadataPurpose.Screenshare, "feed_id2",
+            new MockMediaStream(
+                "local_stream2", [new MockMediaStreamTrack("track_id", "video")],
+            ) as unknown as MediaStream,
+            SDPStreamMetadataPurpose.Screenshare,
         );
         await call.setMicrophoneMuted(true);
 
@@ -563,20 +570,18 @@ describe('Call', function() {
             new CallFeed({
                 client: client.client,
                 userId: client.getUserId(),
-                // @ts-ignore Mock
-                stream: localUsermediaStream,
+                deviceId: undefined,
+                stream: localUsermediaStream as unknown as MediaStream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
-                id: "local_usermedia_feed_id",
                 audioMuted: false,
                 videoMuted: false,
             }),
             new CallFeed({
                 client: client.client,
                 userId: client.getUserId(),
-                // @ts-ignore Mock
-                stream: localScreensharingStream,
+                deviceId: undefined,
+                stream: localScreensharingStream as unknown as MediaStream,
                 purpose: SDPStreamMetadataPurpose.Screenshare,
-                id: "local_screensharing_feed_id",
                 audioMuted: false,
                 videoMuted: false,
             }),

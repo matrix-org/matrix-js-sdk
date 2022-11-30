@@ -694,3 +694,16 @@ export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: Mat
 export function isSupportedReceiptType(receiptType: string): boolean {
     return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receiptType as ReceiptType);
 }
+
+/**
+ * Determines whether two maps are equal.
+ * @param eq The equivalence relation to compare values by. Defaults to strict equality.
+ */
+export function mapsEqual<K, V>(x: Map<K, V>, y: Map<K, V>, eq = (v1: V, v2: V): boolean => v1 === v2): boolean {
+    if (x.size !== y.size) return false;
+    for (const [k, v1] of x) {
+        const v2 = y.get(k);
+        if (v2 === undefined || !eq(v1, v2)) return false;
+    }
+    return true;
+}

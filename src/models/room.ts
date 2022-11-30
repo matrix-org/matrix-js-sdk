@@ -1183,13 +1183,34 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *                  for this type.
      */
     public getUnreadNotificationCount(type = NotificationCountType.Total): number {
-        let count = this.notificationCounts[type] ?? 0;
+        let count = this.getRoomUnreadNotificationCount(type);
         if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
             for (const threadNotification of this.threadNotifications.values()) {
                 count += threadNotification[type] ?? 0;
             }
         }
         return count;
+    }
+
+    /**
+     * Get the notification for the event context (room or thread timeline)
+     */
+    public getUnreadCountForEventContext(type = NotificationCountType.Total, event: MatrixEvent): number {
+        const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
+
+        return (isThreadEvent
+            ? this.getThreadUnreadNotificationCount(event.threadRootId, type)
+            : this.getRoomUnreadNotificationCount(type)) ?? 0;
+    }
+
+    /**
+     * Get one of the notification counts for this room
+     * @param {String} type The type of notification count to get. default: 'total'
+     * @return {Number} The notification count, or undefined if there is no count
+     *                  for this type.
+     */
+    public getRoomUnreadNotificationCount(type = NotificationCountType.Total): number {
+        return this.notificationCounts[type] ?? 0;
     }
 
     /**
@@ -1758,20 +1779,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             let latestMyThreadsRootEvent: MatrixEvent | undefined;
             const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
             for (const rootEvent of threadRoots) {
-                this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, {
+                const opts = {
                     duplicateStrategy: DuplicateStrategy.Ignore,
                     fromCache: false,
                     roomState,
-                });
+                };
+                this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, opts);
 
                 const threadRelationship = rootEvent
                     .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
                 if (threadRelationship?.current_user_participated) {
-                    this.threadsTimelineSets[1]?.addLiveEvent(rootEvent, {
-                        duplicateStrategy: DuplicateStrategy.Ignore,
-                        fromCache: false,
-                        roomState,
-                    });
+                    this.threadsTimelineSets[1]?.addLiveEvent(rootEvent, opts);
                     latestMyThreadsRootEvent = rootEvent;
                 }
             }
