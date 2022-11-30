@@ -807,8 +807,10 @@ export class GroupCall extends TypedEventEmitter<
         }
     }
 
-    private async sendMemberStateEvent(): Promise<ISendEventResponse> {
-        const send = () => this.updateMemberCallState({
+    private async sendMemberStateEvent(): Promise<ISendEventResponse | null> {
+        if (!this.participants.includes(this.room.getMember(this.client.getUserId()!)!)) return null;
+
+        const send = (): Promise<ISendEventResponse> => this.updateMemberCallState({
             "m.call_id": this.groupCallId,
             "m.devices": [
                 {
