@@ -15,16 +15,13 @@ limitations under the License.
 */
 
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import type { MatrixClient, ClientEvent } from "../../src";
+import type * as BrowserMatrix from "../../src/browser-index";
 
 declare global {
     // eslint-disable-next-line @typescript-eslint/no-namespace
     namespace NodeJS {
         interface Global {
-            matrixcs: {
-                MatrixClient: typeof MatrixClient;
-                ClientEvent: typeof ClientEvent;
-            };
+            matrixcs: typeof BrowserMatrix;
         }
     }
 }

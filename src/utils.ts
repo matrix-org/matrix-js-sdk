@@ -316,7 +316,7 @@ export function deepSortedObjectEntries(obj: any): [string, any][] {
  * @param {*} value the value to test
  * @return {boolean} whether or not value is a finite number without type-coercion
  */
-export function isNumber(value: any): boolean {
+export function isNumber(value: any): value is number {
     return typeof value === 'number' && isFinite(value);
 }
 
@@ -665,7 +665,7 @@ export function compare(a: string, b: string): number {
  * @param {Object} source
  * @returns the target object
  */
-export function recursivelyAssign<T1 extends Record<string, any>, T2 extends Record<string, any>>(
+export function recursivelyAssign<T1 extends T2, T2 extends Record<string, any>>(
     target: T1,
     source: T2,
     ignoreNullish = false,
@@ -676,7 +676,7 @@ export function recursivelyAssign<T1 extends Record<string, any>, T2 extends Rec
             continue;
         }
         if ((sourceValue !== null && sourceValue !== undefined) || !ignoreNullish) {
-            target[sourceKey] = sourceValue;
+            target[sourceKey as keyof T1] = sourceValue;
             continue;
         }
     }

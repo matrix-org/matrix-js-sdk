@@ -534,20 +534,20 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            let tl0;
-            let tl3;
+            let tl0: EventTimeline;
+            let tl3: EventTimeline;
             return Promise.all([
                 client.getEventTimeline(timelineSet, EVENTS[0].event_id!,
                 ).then(function(tl) {
                     expect(tl!.getEvents().length).toEqual(1);
-                    tl0 = tl;
+                    tl0 = tl!;
                     return client.getEventTimeline(timelineSet, EVENTS[2].event_id!);
                 }).then(function(tl) {
                     expect(tl!.getEvents().length).toEqual(1);
                     return client.getEventTimeline(timelineSet, EVENTS[3].event_id!);
                 }).then(function(tl) {
                     expect(tl!.getEvents().length).toEqual(1);
-                    tl3 = tl;
+                    tl3 = tl!;
                     return client.getEventTimeline(timelineSet, EVENTS[1].event_id!);
                 }).then(function(tl) {
                     // we expect it to get merged in with event 2
@@ -941,11 +941,11 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            let tl;
+            let tl: EventTimeline;
             return Promise.all([
                 client.getEventTimeline(timelineSet, EVENTS[0].event_id!,
                 ).then(function(tl0) {
-                    tl = tl0;
+                    tl = tl0!;
                     return client.paginateEventTimeline(tl, { backwards: true });
                 }).then(function(success) {
                     expect(success).toBeTruthy();
@@ -1031,11 +1031,11 @@ describe("MatrixClient event timelines", function() {
                     };
                 });
 
-            let tl;
+            let tl: EventTimeline;
             return Promise.all([
                 client.getEventTimeline(timelineSet, EVENTS[0].event_id!,
                 ).then(function(tl0) {
-                    tl = tl0;
+                    tl = tl0!;
                     return client.paginateEventTimeline(
                         tl, { backwards: false, limit: 20 });
                 }).then(function(success) {
@@ -1411,16 +1411,17 @@ describe("MatrixClient event timelines", function() {
         const syncData = {
             next_batch: "batch1",
             rooms: {
-                join: {},
-            },
-        };
-        syncData.rooms.join[roomId] = {
-            timeline: {
-                events: [
-                    event,
-                    redaction,
-                ],
-                limited: false,
+                join: {
+                    [roomId]: {
+                        timeline: {
+                            events: [
+                                event,
+                                redaction,
+                            ],
+                            limited: false,
+                        },
+                    },
+                },
             },
         };
         httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -1437,18 +1438,19 @@ describe("MatrixClient event timelines", function() {
             const sync2 = {
                 next_batch: "batch2",
                 rooms: {
-                    join: {},
-                },
-            };
-            sync2.rooms.join[roomId] = {
-                timeline: {
-                    events: [
-                        utils.mkMessage({
-                            user: otherUserId, msg: "world",
-                        }),
-                    ],
-                    limited: true,
-                    prev_batch: "newerTok",
+                    join: {
+                        [roomId]: {
+                            timeline: {
+                                events: [
+                                    utils.mkMessage({
+                                        user: otherUserId, msg: "world",
+                                    }),
+                                ],
+                                limited: true,
+                                prev_batch: "newerTok",
+                            },
+                        },
+                    },
                 },
             };
             httpBackend.when("GET", "/sync").respond(200, sync2);

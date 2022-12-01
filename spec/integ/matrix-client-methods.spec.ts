@@ -618,13 +618,13 @@ describe("MatrixClient", function() {
     });
 
     describe("partitionThreadedEvents", function() {
-        let room;
+        let room: Room;
         beforeEach(() => {
             room = new Room("!STrMRsukXHtqQdSeHa:matrix.org", client!, userId);
         });
 
         it("returns empty arrays when given an empty arrays", function() {
-            const events = [];
+            const events: MatrixEvent[] = [];
             const [timeline, threaded] = room.partitionThreadedEvents(events);
             expect(timeline).toEqual([]);
             expect(threaded).toEqual([]);
@@ -1645,7 +1645,7 @@ const buildEventCreate = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-function assertObjectContains(obj: object, expected: any): void {
+function assertObjectContains(obj: Record<string, any>, expected: any): void {
     for (const k in expected) {
         if (expected.hasOwnProperty(k)) {
             expect(obj[k]).toEqual(expected[k]);

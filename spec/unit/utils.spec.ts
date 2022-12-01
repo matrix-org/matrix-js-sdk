@@ -455,7 +455,11 @@ describe("utils", function() {
 
     describe("recursivelyAssign", () => {
         it("doesn't override with null/undefined", () => {
-            const result = utils.recursivelyAssign(
+            const result = utils.recursivelyAssign<{
+                string: string;
+                object: object;
+                float: number;
+            }, {}>(
                 {
                     string: "Hello world",
                     object: {},
@@ -475,7 +479,11 @@ describe("utils", function() {
         });
 
         it("assigns recursively", () => {
-            const result = utils.recursivelyAssign(
+            const result = utils.recursivelyAssign<{
+                number: number;
+                object: object;
+                thing: string | object;
+            }, {}>(
                 {
                     number: 42,
                     object: {

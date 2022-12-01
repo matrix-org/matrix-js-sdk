@@ -31,6 +31,7 @@ import { IClaimOTKsResult, MatrixClient } from "../client";
 import { ISignatures } from "../@types/signed";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
+import { IMessage } from "./algorithms/olm";
 
 enum Algorithm {
     Olm = "m.olm.v1.curve25519-aes-sha2",
@@ -75,7 +76,7 @@ export interface IOlmSessionResult {
  *    has been encrypted into `resultsObject`
  */
 export async function encryptMessageForDevice(
-    resultsObject: Record<string, string>,
+    resultsObject: Record<string, IMessage>,
     ourUserId: string,
     ourDeviceId: string | undefined,
     olmDevice: OlmDevice,
@@ -124,6 +125,7 @@ export async function encryptMessageForDevice(
         recipient_keys: {
             "ed25519": recipientDevice.getFingerprint(),
         },
+        ...payloadFields,
     };
 
     // TODO: technically, a bunch of that stuff only needs to be included for
@@ -131,11 +133,7 @@ export async function encryptMessageForDevice(
     // involved in the session. If we're looking to reduce data transfer in the
     // future, we could elide them for subsequent messages.
 
-    Object.assign(payload, payloadFields);
-
-    resultsObject[deviceKey] = await olmDevice.encryptMessage(
-        deviceKey, sessionId, JSON.stringify(payload),
-    );
+    resultsObject[deviceKey] = await olmDevice.encryptMessage(deviceKey, sessionId, JSON.stringify(payload));
 }
 
 interface IExistingOlmSession {
@@ -495,7 +493,7 @@ export async function verifySignature(
  * @param {string} pubKey The public key (ignored if key is a seed)
  * @returns {string} the signature for the object
  */
-export function pkSign(obj: IObject, key: PkSigning, userId: string, pubKey: string): string {
+export function pkSign(obj: object & IObject, key: Uint8Array | PkSigning, userId: string, pubKey: string): string {
     let createdKey = false;
     if (key instanceof Uint8Array) {
         const keyObj = new global.Olm.PkSigning();

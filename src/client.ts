@@ -530,7 +530,7 @@ export interface IPreviewUrlResponse {
     "matrix:image:size"?: number;
 }
 
-interface ITurnServerResponse {
+export interface ITurnServerResponse {
     uris: string[];
     username: string;
     password: string;
@@ -561,7 +561,7 @@ export interface IClientWellKnown {
 }
 
 export interface IWellKnownConfig {
-    raw?: any; // todo typings
+    raw?: IClientWellKnown;
     action?: AutoDiscoveryAction;
     reason?: string;
     error?: Error | string;
@@ -605,10 +605,10 @@ interface ITagMetadata {
 }
 
 interface IMessagesResponse {
-    start: string;
-    end: string;
+    start?: string;
+    end?: string;
     chunk: IRoomEvent[];
-    state: IStateEvent[];
+    state?: IStateEvent[];
 }
 
 interface IThreadedMessagesResponse {
@@ -633,6 +633,17 @@ export interface IUploadKeysRequest {
     device_keys?: Required<IDeviceKeys>;
     one_time_keys?: Record<string, IOneTimeKey>;
     "org.matrix.msc2732.fallback_keys"?: Record<string, IOneTimeKey>;
+}
+
+export interface IQueryKeysRequest {
+    device_keys: { [userId: string]: string[] };
+    timeout?: number;
+    token?: string;
+}
+
+export interface IClaimKeysRequest {
+    one_time_keys: { [userId: string]: { [deviceId: string]: string } };
+    timeout?: number;
 }
 
 export interface IOpenIDToken {
@@ -1744,13 +1755,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
         }
 
-        return this.http.authedRequest<{
+        type Response = {
             capabilities?: ICapabilities;
-        }>(Method.Get, "/capabilities").catch((e: Error): void => {
+        };
+        return this.http.authedRequest<Response>(Method.Get, "/capabilities").catch((e: Error): Response => {
             // We swallow errors because we need a default object anyhow
             logger.error(e);
+            return {};
         }).then((r = {}) => {
-            const capabilities: ICapabilities = r["capabilities"] || {};
+            const capabilities = r["capabilities"] || {};
 
             // If the capabilities missed the cache, cache it for a shorter amount
             // of time to try and refresh them later.
@@ -3229,28 +3242,28 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         targetRoomId: undefined,
         targetSessionId: undefined,
         backupInfo: IKeyBackupInfo,
-        opts: IKeyBackupRestoreOpts,
+        opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     public restoreKeyBackupWithRecoveryKey(
         recoveryKey: string,
         targetRoomId: string,
         targetSessionId: undefined,
         backupInfo: IKeyBackupInfo,
-        opts: IKeyBackupRestoreOpts,
+        opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     public restoreKeyBackupWithRecoveryKey(
         recoveryKey: string,
         targetRoomId: string,
         targetSessionId: string,
         backupInfo: IKeyBackupInfo,
-        opts: IKeyBackupRestoreOpts,
+        opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult>;
     public restoreKeyBackupWithRecoveryKey(
         recoveryKey: string,
         targetRoomId: string | undefined,
         targetSessionId: string | undefined,
         backupInfo: IKeyBackupInfo,
-        opts: IKeyBackupRestoreOpts,
+        opts?: IKeyBackupRestoreOpts,
     ): Promise<IKeyBackupRestoreResult> {
         const privKey = decodeRecoveryKey(recoveryKey);
         return this.restoreKeyBackup(privKey, targetRoomId!, targetSessionId!, backupInfo, opts);
@@ -3442,7 +3455,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         const deviceInfos = await this.crypto.downloadKeys(userIds);
-        const devicesByUser = {};
+        const devicesByUser: Record<string, DeviceInfo[]> = {};
         for (const [userId, devices] of Object.entries(deviceInfos)) {
             devicesByUser[userId] = Object.values(devices);
         }
@@ -3616,7 +3629,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
     public setIgnoredUsers(userIds: string[]): Promise<{}> {
-        const content = { ignored_users: {} };
+        const content = { ignored_users: {} as Record<string, object> };
         userIds.forEach((u) => {
             content.ignored_users[u] = {};
         });
@@ -3910,16 +3923,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<ISendEventResponse>;
     public sendEvent(
         roomId: string,
-        threadId: string | null,
-        eventType: string | IContent,
-        content?: IContent | string,
-        txnId?: string,
+        threadIdOrEventType: string | null,
+        eventTypeOrContent: string | IContent,
+        contentOrTxnId?: IContent | string,
+        txnIdOrVoid?: string,
     ): Promise<ISendEventResponse> {
-        if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
-            txnId = content as string;
-            content = eventType as IContent;
-            eventType = threadId;
+        let threadId: string | null;
+        let eventType: string;
+        let content: IContent;
+        let txnId: string | undefined;
+        if (!threadIdOrEventType?.startsWith(EVENT_ID_PREFIX) && threadIdOrEventType !== null) {
+            txnId = contentOrTxnId as string;
+            content = eventTypeOrContent as IContent;
+            eventType = threadIdOrEventType;
             threadId = null;
+        } else {
+            txnId = txnIdOrVoid;
+            content = contentOrTxnId as IContent;
+            eventType = eventTypeOrContent as string;
+            threadId = threadIdOrEventType;
         }
 
         // If we expect that an event is part of a thread but is missing the relation
@@ -4280,7 +4302,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let eventType: string = EventType.RoomMessage;
         let sendContent: IContent = content as IContent;
         const makeContentExtensible = (content: IContent = {}, recurse = true): IPartialEvent<object> | undefined => {
-            let newEvent: IPartialEvent<object> | undefined;
+            let newEvent: IPartialEvent<IContent> | undefined;
 
             if (content['msgtype'] === MsgType.Text) {
                 newEvent = MessageEvent.from(content['body'], content['formatted_body']).serialize();
@@ -5262,11 +5284,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                 this.processThreadEvents(room, threadedEvents, true);
 
-                room.oldState.paginationToken = res.end;
+                room.oldState.paginationToken = res.end ?? null;
                 if (res.chunk.length === 0) {
                     room.oldState.paginationToken = null;
                 }
-                this.store.storeEvents(room, matrixEvents, res.end, true);
+                this.store.storeEvents(room, matrixEvents, res.end ?? null, true);
                 delete this.ongoingScrollbacks[room.roomId];
                 resolve(room);
             }).catch((err) => {
@@ -6258,7 +6280,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param {string} roomId the id of the room.
      * @return {object} the rule or undefined.
      */
-    public getRoomPushRule(scope: string, roomId: string): IPushRule | undefined {
+    public getRoomPushRule(scope: "global" | "device", roomId: string): IPushRule | undefined {
         // There can be only room-kind push rule per room
         // and its id is the room id.
         if (this.pushRules) {
@@ -6279,7 +6301,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @return {Promise} Resolves: result object
      * @return {module:http-api.MatrixError} Rejects: with an error response.
      */
-    public setRoomMutePushRule(scope: string, roomId: string, mute: boolean): Promise<void> | undefined {
+    public setRoomMutePushRule(scope: "global" | "device", roomId: string, mute: boolean): Promise<void> | undefined {
         let promise: Promise<unknown> | undefined;
         let hasDontNotifyRule = false;
 
@@ -6815,7 +6837,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             .filter(([key, value]) => {
                 return primTypes.includes(typeof value);
             })
-            .reduce((obj, [key, value]) => {
+            .reduce<Record<string, any>>((obj, [key, value]) => {
                 obj[key] = value;
                 return obj;
             }, {});
@@ -7840,7 +7862,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $roomId: roomId,
         });
 
-        const content = {
+        const content: IContent = {
             [ReceiptType.FullyRead]: rmEventId,
             [ReceiptType.Read]: rrEventId,
         };
@@ -8539,7 +8561,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     an error response ({@link module:http-api.MatrixError}).
      */
     public downloadKeysForUsers(userIds: string[], opts: { token?: string } = {}): Promise<IDownloadKeyResult> {
-        const content: any = {
+        const content: IQueryKeysRequest = {
             device_keys: {},
         };
         if ('token' in opts) {
@@ -8581,7 +8603,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             queries[userId] = query;
             query[deviceId] = keyAlgorithm;
         }
-        const content: any = { one_time_keys: queries };
+        const content: IClaimKeysRequest = { one_time_keys: queries };
         if (timeout) {
             content.timeout = timeout;
         }
@@ -8873,7 +8895,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const med = p[1].toLowerCase();
                 const unhashed = `${addr} ${med}`;
                 // Map the unhashed values to a known (case-sensitive) address. We use
-                // the case sensitive version because the caller might be expecting that.
+                // the case-sensitive version because the caller might be expecting that.
                 localMapping[unhashed] = p[0];
                 return unhashed;
             });
@@ -8882,12 +8904,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("Unsupported identity server: unknown hash algorithm");
         }
 
-        const response = await this.http.idServerRequest(
-            Method.Post, "/lookup",
-            params, IdentityPrefix.V2, identityAccessToken,
-        );
+        const response = await this.http.idServerRequest<{
+            mappings: { [address: string]: string };
+        }>(Method.Post, "/lookup", params, IdentityPrefix.V2, identityAccessToken);
 
-        if (!response || !response['mappings']) return []; // no results
+        if (!response?.['mappings']) return []; // no results
 
         const foundAddresses: { address: string, mxid: string }[] = [];
         for (const hashed of Object.keys(response['mappings'])) {
@@ -9027,7 +9048,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             messages: contentMap,
         };
 
-        const targets = Object.keys(contentMap).reduce((obj, key) => {
+        const targets = Object.keys(contentMap).reduce<Record<string, string[]>>((obj, key) => {
             obj[key] = Object.keys(contentMap[key]);
             return obj;
         }, {});

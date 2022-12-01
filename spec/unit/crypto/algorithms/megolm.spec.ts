@@ -17,6 +17,7 @@ limitations under the License.
 import { mocked, MockedObject } from 'jest-mock';
 
 import '../../../olm-loader';
+import type { OutboundGroupSession } from "@matrix-org/olm";
 import * as algorithms from "../../../../src/crypto/algorithms";
 import { MemoryCryptoStore } from "../../../../src/crypto/store/memory-crypto-store";
 import * as testUtils from "../../../test-utils/test-utils";
@@ -31,6 +32,7 @@ import { TypedEventEmitter } from '../../../../src/models/typed-event-emitter';
 import { ClientEvent, MatrixClient, RoomMember } from '../../../../src';
 import { DeviceInfo, IDevice } from '../../../../src/crypto/deviceinfo';
 import { DeviceTrustLevel } from '../../../../src/crypto/CrossSigning';
+import { MegolmEncryption as MegolmEncryptionClass } from "../../../../src/crypto/algorithms/megolm";
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get('m.megolm.v1.aes-sha2')!;
 const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get('m.megolm.v1.aes-sha2')!;
@@ -87,7 +89,7 @@ describe("MegolmDecryption", function() {
     });
 
     describe('receives some keys:', function() {
-        let groupSession;
+        let groupSession: OutboundGroupSession;
         beforeEach(async function() {
             groupSession = new global.Olm.OutboundGroupSession();
             groupSession.create();
@@ -298,10 +300,10 @@ describe("MegolmDecryption", function() {
         describe("session reuse and key reshares", () => {
             const rotationPeriodMs = 999 * 24 * 60 * 60 * 1000; // 999 days, so we don't have to deal with it
 
-            let megolmEncryption;
-            let aliceDeviceInfo;
-            let mockRoom;
-            let olmDevice;
+            let megolmEncryption: MegolmEncryptionClass;
+            let aliceDeviceInfo: DeviceInfo;
+            let mockRoom: Room;
+            let olmDevice: OlmDevice;
 
             beforeEach(async () => {
                 // @ts-ignore assigning to readonly prop
@@ -342,7 +344,7 @@ describe("MegolmDecryption", function() {
                         'YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWE',
                     ),
                     getFingerprint: jest.fn().mockReturnValue(''),
-                };
+                } as unknown as DeviceInfo;
 
                 mockCrypto.downloadKeys.mockReturnValue(Promise.resolve({
                     '@alice:home.server': {
@@ -365,7 +367,7 @@ describe("MegolmDecryption", function() {
                         algorithm: 'm.megolm.v1.aes-sha2',
                         rotation_period_ms: rotationPeriodMs,
                     },
-                });
+                }) as MegolmEncryptionClass;
 
                 // Splice the real method onto the mock object as megolm uses this method
                 // on the crypto class in order to encrypt / start sessions
@@ -381,7 +383,7 @@ describe("MegolmDecryption", function() {
                         [{ userId: "@alice:home.server" }],
                     ),
                     getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
-                };
+                } as unknown as Room;
             });
 
             it("should use larger otkTimeout when preparing to encrypt room", async () => {
@@ -397,11 +399,14 @@ describe("MegolmDecryption", function() {
             });
 
             it("should generate a new session if this one needs rotation", async () => {
+                // @ts-ignore - private method access
                 const session = await megolmEncryption.prepareNewSession(false);
                 session.creationTime -= rotationPeriodMs + 10000; // a smidge over the rotation time
                 // Inject expired session which needs rotation
+                // @ts-ignore - private field access
                 megolmEncryption.setupPromise = Promise.resolve(session);
 
+                // @ts-ignore - private method access
                 const prepareNewSessionSpy = jest.spyOn(megolmEncryption, "prepareNewSession");
                 await megolmEncryption.encryptMessage(mockRoom, "a.fake.type", {
                     body: "Some text",
@@ -446,8 +451,8 @@ describe("MegolmDecryption", function() {
                 });
 
                 mockBaseApis.sendToDevice.mockClear();
-                await megolmEncryption.reshareKeyWithDevice(
-                    olmDevice.deviceCurve25519Key,
+                await megolmEncryption.reshareKeyWithDevice!(
+                    olmDevice.deviceCurve25519Key!,
                     ct1.session_id,
                     '@alice:home.server',
                     aliceDeviceInfo,
@@ -466,8 +471,8 @@ describe("MegolmDecryption", function() {
                 );
 
                 mockBaseApis.queueToDevice.mockClear();
-                await megolmEncryption.reshareKeyWithDevice(
-                    olmDevice.deviceCurve25519Key,
+                await megolmEncryption.reshareKeyWithDevice!(
+                    olmDevice.deviceCurve25519Key!,
                     ct1.session_id,
                     '@alice:home.server',
                     aliceDeviceInfo,

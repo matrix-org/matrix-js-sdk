@@ -18,7 +18,7 @@ import { VerificationRequest, READY_TYPE, START_TYPE, DONE_TYPE } from
 import { InRoomChannel } from "../../../../src/crypto/verification/request/InRoomChannel";
 import { ToDeviceChannel } from
     "../../../../src/crypto/verification/request/ToDeviceChannel";
-import { MatrixEvent } from "../../../../src/models/event";
+import { IContent, MatrixEvent } from "../../../../src/models/event";
 import { MatrixClient } from "../../../../src/client";
 import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
 import { VerificationBase } from "../../../../src/crypto/verification/Base";
@@ -30,12 +30,12 @@ type MockClient = MatrixClient & {
 function makeMockClient(userId: string, deviceId: string): MockClient {
     let counter = 1;
     let events: MatrixEvent[] = [];
-    const deviceEvents = {};
+    const deviceEvents: Record<string, Record<string, MatrixEvent[]>> = {};
     return {
         getUserId() { return userId; },
         getDeviceId() { return deviceId; },
 
-        sendEvent(roomId, type, content) {
+        sendEvent(roomId: string, type: string, content: IContent) {
             counter = counter + 1;
             const eventId = `$${userId}-${deviceId}-${counter}`;
             events.push(new MatrixEvent({
@@ -49,7 +49,7 @@ function makeMockClient(userId: string, deviceId: string): MockClient {
             return Promise.resolve({ event_id: eventId });
         },
 
-        sendToDevice(type, msgMap) {
+        sendToDevice(type: string, msgMap: Record<string, Record<string, IContent>>) {
             for (const userId of Object.keys(msgMap)) {
                 const deviceMap = msgMap[userId];
                 for (const deviceId of Object.keys(deviceMap)) {
@@ -111,7 +111,7 @@ class MockVerifier extends VerificationBase<'', any> {
         }
     }
 
-    async handleEvent(event) {
+    async handleEvent(event: MatrixEvent) {
         if (event.getType() === DONE_TYPE && !this._startEvent) {
             await this._channel.send(DONE_TYPE, {});
         }
@@ -122,7 +122,7 @@ class MockVerifier extends VerificationBase<'', any> {
     }
 }
 
-function makeRemoteEcho(event) {
+function makeRemoteEcho(event: MatrixEvent) {
     return new MatrixEvent(Object.assign({}, event.event, {
         unsigned: {
             transaction_id: "abc",

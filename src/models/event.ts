@@ -1120,7 +1120,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
         for (const key in this.event) {
             if (this.event.hasOwnProperty(key) && !REDACT_KEEP_KEYS.has(key)) {
-                delete this.event[key];
+                delete this.event[key as keyof IEvent];
             }
         }
 
@@ -1514,7 +1514,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const ev = new MatrixEvent(JSON.parse(JSON.stringify(this.event)));
         for (const [p, v] of Object.entries(this)) {
             if (p !== "event") { // exclude the thing we just cloned
-                ev[p] = v;
+                // @ts-ignore - XXX: this is just nasty
+                ev[p as keyof MatrixEvent] = v;
             }
         }
         return ev;
@@ -1614,7 +1615,7 @@ const REDACT_KEEP_KEYS = new Set([
 ]);
 
 // a map from state event type to the .content keys we keep when an event is redacted
-const REDACT_KEEP_CONTENT_MAP = {
+const REDACT_KEEP_CONTENT_MAP: Record<string, Record<string, 1>> = {
     [EventType.RoomMember]: { 'membership': 1 },
     [EventType.RoomCreate]: { 'creator': 1 },
     [EventType.RoomJoinRules]: { 'join_rule': 1 },

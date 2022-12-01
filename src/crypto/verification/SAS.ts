@@ -154,10 +154,11 @@ export interface ISasEvent {
     mismatch(): void;
 }
 
-function generateSas(sasBytes: Uint8Array, methods: (keyof typeof sasGenerators)[]): IGeneratedSas {
+function generateSas(sasBytes: Uint8Array, methods: string[]): IGeneratedSas {
     const sas: IGeneratedSas = {};
     for (const method of methods) {
         if (method in sasGenerators) {
+            // @ts-ignore - ts doesn't like us mixing types like this
             sas[method] = sasGenerators[method](Array.from(sasBytes));
         }
     }
@@ -170,9 +171,9 @@ const macMethods = {
     "hmac-sha256": "calculate_mac_long_kdf",
 } as const;
 
-type Method = keyof typeof macMethods;
+type MacMethod = keyof typeof macMethods;
 
-function calculateMAC(olmSAS: OlmSAS, method: Method) {
+function calculateMAC(olmSAS: OlmSAS, method: MacMethod) {
     return function(input: string, info: string): string {
         const mac = olmSAS[macMethods[method]](input, info);
         logger.log("SAS calculateMAC:", method, [input, info], mac);
@@ -211,7 +212,7 @@ type KeyAgreement = keyof typeof calculateKeyAgreement;
  */
 const KEY_AGREEMENT_LIST: KeyAgreement[] = ["curve25519-hkdf-sha256", "curve25519"];
 const HASHES_LIST = ["sha256"];
-const MAC_LIST: Method[] = ["org.matrix.msc3783.hkdf-hmac-sha256", "hkdf-hmac-sha256", "hmac-sha256"];
+const MAC_LIST: MacMethod[] = ["org.matrix.msc3783.hkdf-hmac-sha256", "hkdf-hmac-sha256", "hmac-sha256"];
 const SAS_LIST = Object.keys(sasGenerators);
 
 const KEY_AGREEMENT_SET = new Set(KEY_AGREEMENT_LIST);
@@ -303,7 +304,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         keyAgreement: KeyAgreement,
         sasMethods: string[],
         olmSAS: OlmSAS,
-        macMethod: Method,
+        macMethod: MacMethod,
     ): Promise<void> {
         const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
         const verifySAS = new Promise<void>((resolve, reject) => {
@@ -355,7 +356,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             throw new SwitchStartEventError(this.startEvent);
         }
 
-        let e;
+        let e: MatrixEvent;
         try {
             e = await this.waitForEvent(EventType.KeyVerificationAccept);
         } finally {
@@ -446,7 +447,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         }
     }
 
-    private sendMAC(olmSAS: OlmSAS, method: Method): Promise<void> {
+    private sendMAC(olmSAS: OlmSAS, method: MacMethod): Promise<void> {
         const mac: Record<string, string> = {};
         const keyList: string[] = [];
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
@@ -456,7 +457,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
 
         const deviceKeyId = `ed25519:${this.baseApis.deviceId}`;
         mac[deviceKeyId] = calculateMAC(olmSAS, method)(
-            this.baseApis.getDeviceEd25519Key(),
+            this.baseApis.getDeviceEd25519Key()!,
             baseInfo + deviceKeyId,
         );
         keyList.push(deviceKeyId);
@@ -478,7 +479,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         return this.send(EventType.KeyVerificationMac, { mac, keys });
     }
 
-    private async checkMAC(olmSAS: OlmSAS, content: IContent, method: Method): Promise<void> {
+    private async checkMAC(olmSAS: OlmSAS, content: IContent, method: MacMethod): Promise<void> {
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this.userId + this.deviceId
               + this.baseApis.getUserId() + this.baseApis.deviceId

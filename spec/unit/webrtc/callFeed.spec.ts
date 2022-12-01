@@ -20,7 +20,7 @@ import { TestClient } from "../../TestClient";
 import { MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
 
 describe("CallFeed", () => {
-    let client;
+    let client: TestClient;
 
     beforeEach(() => {
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
@@ -35,7 +35,7 @@ describe("CallFeed", () => {
 
         beforeEach(() => {
             feed = new CallFeed({
-                client,
+                client: client.client,
                 roomId: "room1",
                 userId: "user1",
                 // @ts-ignore Mock

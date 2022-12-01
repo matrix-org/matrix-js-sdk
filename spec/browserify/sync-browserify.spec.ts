@@ -65,15 +65,16 @@ describe("Browserify Test", function() {
         const syncData = {
             next_batch: "batch1",
             rooms: {
-                join: {},
-            },
-        };
-        syncData.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [
-                    event,
-                ],
-                limited: false,
+                join: {
+                    [ROOM_ID]: {
+                        timeline: {
+                            events: [
+                                event,
+                            ],
+                            limited: false,
+                        },
+                    },
+                },
             },
         };
 

@@ -31,8 +31,8 @@ import { MatrixEvent } from "./models/event";
  * @param {string} keyNesting
  * @param {*} val
  */
-function setProp(obj: object, keyNesting: string, val: any): void {
-    const nestedKeys = keyNesting.split(".");
+function setProp(obj: Record<string, any>, keyNesting: string, val: any): void {
+    const nestedKeys = keyNesting.split(".") as [keyof typeof obj];
     let currentObj = obj;
     for (let i = 0; i < (nestedKeys.length - 1); i++) {
         if (!currentObj[nestedKeys[i]]) {
@@ -70,8 +70,7 @@ interface IStateFilter extends IRoomEventFilter {}
 
 interface IRoomFilter {
     not_rooms?: string[];
-    rooms?: string[];
-    ephemeral?: IRoomEventFilter;
+    rooms?: string[];ephemeral?: IRoomEventFilter;
     include_leave?: boolean;
     state?: IStateFilter;
     timeline?: IRoomEventFilter;
