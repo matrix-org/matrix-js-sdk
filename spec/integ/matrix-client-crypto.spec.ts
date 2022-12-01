@@ -708,10 +708,16 @@ describe("MatrixClient crypto", () => {
                 sender_key: "senderkey",
             },
         });
+        const nonEncryptedEvent = new MatrixEvent({
+            sender: "@bob:example.com",
+            room_id: "!someroom",
+            content: {},
+        });
 
         aliTestClient.client.crypto?.onSyncCompleted({});
         await aliTestClient.client.cancelAndResendEventRoomKeyRequest(eventA0);
         expect(await aliTestClient.client.getOutgoingRoomKeyRequest(eventA1)).not.toBeNull();
         expect(await aliTestClient.client.getOutgoingRoomKeyRequest(eventB)).toBeNull();
+        expect(await aliTestClient.client.getOutgoingRoomKeyRequest(nonEncryptedEvent)).toBeNull();
     });
 });
