@@ -305,14 +305,15 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             bundledRelationship = this.getRootEventBundledRelationship();
         }
 
-        let pendingEvents: MatrixEvent[] = [];
+        let pendingEvents: MatrixEvent[];
         if (this.pendingEventOrdering === PendingEventOrdering.Detached) {
-            pendingEvents = this.room.getPendingEvents().filter((ev) => {
-                const isNotSent = ev.status === EventStatus.NOT_SENT;
-                const belongsToTheThread = this.id === ev.threadRootId;
-                return isNotSent && belongsToTheThread;
-            });
+            pendingEvents = this.room.getPendingEvents()
+                .filter(ev => ev.isRelation(THREAD_RELATION_TYPE.name) && this.id === ev.threadRootId);
             await Promise.all(pendingEvents.map(ev => this.processEvent(ev)));
+        } else {
+            pendingEvents = this.events
+                .filter(ev => ev.isRelation(THREAD_RELATION_TYPE.name))
+                .filter(ev => ev.status !== EventStatus.SENT && ev.status !== EventStatus.CANCELLED);
         }
         this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;
         this.pendingReplyCount = pendingEvents.length;
