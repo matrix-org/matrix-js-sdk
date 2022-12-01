@@ -681,7 +681,7 @@ export class SlidingSyncSdk {
             }
         } */
 
-        this.injectRoomEvents(room, stateEvents, timelineEvents, false);
+        this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.initial);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -725,14 +725,14 @@ export class SlidingSyncSdk {
      * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
      * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
-     * @param {boolean} fromCache whether the sync response came from cache
      * is earlier in time. Higher index is later.
+     * @param {boolean} isInitial whether timeline list is from an initial: true room.
      */
     public injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
-        fromCache = false,
+        isInitial?: boolean,
     ): void {
         timelineEventList = timelineEventList || [];
         stateEventList = stateEventList || [];
@@ -779,7 +779,11 @@ export class SlidingSyncSdk {
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
         room.addLiveEvents(timelineEventList, {
-            fromCache: fromCache,
+            // initial rooms are rooms that have been sent down to the client for the first time,
+            // which may include timeline events. We don't want these events to notify the user,
+            // as they are not live. Use the fromCache flag to control the behaviour, as it has
+            // the same problem (except it's loading from a cache rather than from the server).
+            fromCache: isInitial,
         });
 
         room.recalculate();
