@@ -78,6 +78,7 @@ import {
     IMegolmSessionData,
     isCryptoAvailable,
     VerificationMethod,
+    IRoomKeyRequestBody,
 } from './crypto';
 import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
@@ -184,7 +185,7 @@ import {
     RuleId,
 } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
-import { CryptoStore } from "./crypto/store/base";
+import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
 import {
     GroupCall,
     IGroupCallDataChannelOptions,
@@ -2629,6 +2630,32 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return false;
         }
         return device.isVerified();
+    }
+
+    /**
+     * Get outgoing room key request for this event if there is one.
+     * @param {MatrixEvent} event The event to check for
+     *
+     * @return {Promise} A room key request, or null if there is none
+     */
+    public getOutgoingRoomKeyRequest(event: MatrixEvent): Promise<OutgoingRoomKeyRequest | null> {
+        if (!this.crypto) {
+            throw new Error("End-to-End encryption disabled");
+        }
+        const wireContent = event.getWireContent();
+        const requestBody: IRoomKeyRequestBody = {
+            session_id: wireContent.session_id,
+            sender_key: wireContent.sender_key,
+            algorithm: wireContent.algorithm,
+            room_id: event.getRoomId()!,
+        };
+        if (
+            !requestBody.session_id
+            || !requestBody.sender_key
+            || !requestBody.algorithm
+            || !requestBody.room_id
+        ) return Promise.resolve(null);
+        return this.crypto.cryptoStore.getOutgoingRoomKeyRequest(requestBody);
     }
 
     /**
