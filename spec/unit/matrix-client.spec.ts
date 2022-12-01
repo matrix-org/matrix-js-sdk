@@ -139,7 +139,7 @@ describe("MatrixClient", function() {
         path: string,
         queryParams?: QueryDict,
         body?: Body,
-        requestOpts: IRequestOpts = {}
+        requestOpts: IRequestOpts = {},
     ) {
         const { prefix } = requestOpts;
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
@@ -205,9 +205,22 @@ describe("MatrixClient", function() {
             }
             return Promise.resolve(next.data);
         }
+
+        const receivedRequestQueryString = new URLSearchParams(
+            convertQueryDictToStringRecord(queryParams),
+        ).toString();
+        const receivedRequest = decorateStringWithAnsiColor(
+            `${method} ${prefix}${path}${receivedRequestQueryString}`,
+            AnsiColorCode.Red,
+        );
+        const expectedQueryString = new URLSearchParams(
+            convertQueryDictToStringRecord(next.expectQueryParams),
+        ).toString();
+        const expectedRequest = decorateStringWithAnsiColor(
+            `${next.method} ${next.prefix ?? ''}${next.path}${expectedQueryString}`,
+            AnsiColorCode.Green,
+        );
         // If you're seeing this then you forgot to handle at least 1 pending request.
-        const receivedRequest = decorateStringWithAnsiColor(`${method} ${prefix}${path}${new URLSearchParams(convertQueryDictToStringRecord(queryParams)).toString()}`, AnsiColorCode.Red);
-        const expectedRequest = decorateStringWithAnsiColor(`${next.method} ${next.prefix ?? ''}${next.path}${new URLSearchParams(convertQueryDictToStringRecord(next.expectQueryParams)).toString()}`, AnsiColorCode.Green);
         throw new Error(
             `A pending request was not handled: ${receivedRequest} ` +
             `(next request expected was ${expectedRequest})\n` +
@@ -286,7 +299,7 @@ describe("MatrixClient", function() {
                 data: { event_id: eventId },
                 expectQueryParams: {
                     ts: '0',
-                    dir: 'f'
+                    dir: 'f',
                 },
             }];
 
@@ -297,11 +310,11 @@ describe("MatrixClient", function() {
             expect(method).toStrictEqual('GET');
             expect(prefix).toStrictEqual(ClientPrefix.V1);
             expect(path).toStrictEqual(
-                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`
+                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
             );
             expect(queryParams).toStrictEqual({
                 ts: '0',
-                dir: 'f'
+                dir: 'f',
             });
         });
 
@@ -312,11 +325,11 @@ describe("MatrixClient", function() {
                 prefix: ClientPrefix.V1,
                 error: {
                     httpStatus: 404,
-                    errcode: "M_UNRECOGNIZED"
+                    errcode: "M_UNRECOGNIZED",
                 },
                 expectQueryParams: {
                     ts: '0',
-                    dir: 'f'
+                    dir: 'f',
                 },
             }, {
                 method: "GET",
@@ -325,33 +338,45 @@ describe("MatrixClient", function() {
                 data: { event_id: eventId },
                 expectQueryParams: {
                     ts: '0',
-                    dir: 'f'
+                    dir: 'f',
                 },
             }];
 
             await client.timestampToEvent(roomId, 0, 'f');
 
             expect(client.http.authedRequest.mock.calls.length).toStrictEqual(2);
-            const [stableMethod, stablePath, stableQueryParams,, { prefix: stablePrefix }] = client.http.authedRequest.mock.calls[0];
+            const [
+                stableMethod,
+                stablePath,
+                stableQueryParams,
+                ,
+                { prefix: stablePrefix },
+            ] = client.http.authedRequest.mock.calls[0];
             expect(stableMethod).toStrictEqual('GET');
             expect(stablePrefix).toStrictEqual(ClientPrefix.V1);
             expect(stablePath).toStrictEqual(
-                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`
+                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
             );
             expect(stableQueryParams).toStrictEqual({
                 ts: '0',
-                dir: 'f'
+                dir: 'f',
             });
 
-            const [unstableMethod, unstablePath, unstableQueryParams,, { prefix: unstablePrefix }] = client.http.authedRequest.mock.calls[1];
+            const [
+                unstableMethod,
+                unstablePath,
+                unstableQueryParams,
+                ,
+                { prefix: unstablePrefix },
+            ] = client.http.authedRequest.mock.calls[1];
             expect(unstableMethod).toStrictEqual('GET');
             expect(unstablePrefix).toStrictEqual(unstableMsc3030Prefix);
             expect(unstablePath).toStrictEqual(
-                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`
+                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
             );
             expect(unstableQueryParams).toStrictEqual({
                 ts: '0',
-                dir: 'f'
+                dir: 'f',
             });
         });
 
@@ -362,11 +387,11 @@ describe("MatrixClient", function() {
                 prefix: ClientPrefix.V1,
                 error: {
                     httpStatus: 500,
-                    errcode: "Fake response error"
+                    errcode: "Fake response error",
                 },
                 expectQueryParams: {
                     ts: '0',
-                    dir: 'f'
+                    dir: 'f',
                 },
             }];
 
@@ -377,11 +402,11 @@ describe("MatrixClient", function() {
             expect(method).toStrictEqual('GET');
             expect(prefix).toStrictEqual(ClientPrefix.V1);
             expect(path).toStrictEqual(
-                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`
+                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
             );
             expect(queryParams).toStrictEqual({
                 ts: '0',
-                dir: 'f'
+                dir: 'f',
             });
         });
     });
