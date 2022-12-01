@@ -180,13 +180,13 @@ describe('Group Call', function() {
 
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
             groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+                membership: "join",
+            } as unknown as RoomMember;
         });
 
         it("does not initialize local call feed, if it already is", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.initLocalCallFeed();
             jest.spyOn(groupCall, "initLocalCallFeed");
             await groupCall.enter();
@@ -216,10 +216,6 @@ describe('Group Call', function() {
         });
 
         it("sends member state event to room on enter", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.create();
 
             try {
@@ -249,10 +245,6 @@ describe('Group Call', function() {
         });
 
         it("sends member state event to room on leave", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.create();
             await groupCall.enter();
             mockSendState.mockClear();
@@ -265,6 +257,15 @@ describe('Group Call', function() {
                 FAKE_USER_ID_1,
                 { keepAlive: true }, // Request should outlive the window
             );
+        });
+
+        it("includes local device in participants when entered via another session", async () => {
+            groupCall.enteredViaAnotherSession = true;
+
+            const hasLocalParticipant = groupCall.participants.get(
+                room.getMember(mockClient.getUserId()!)!,
+            )?.has(mockClient.getDeviceId()!);
+            expect(hasLocalParticipant).toBe(true);
         });
 
         it("starts with mic unmuted in regular calls", async () => {
