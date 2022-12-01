@@ -64,7 +64,7 @@ enum AnsiColorCode {
     Yellow = 33,
 }
 // Color text in the terminal
-function decorateStringWithAnsiColor(inputString: string, decorationColor: AnsiColorCode) {
+function decorateStringWithAnsiColor(inputString: string, decorationColor: AnsiColorCode): string {
     return `\x1b[${decorationColor}m${inputString}\x1b[0m`;
 }
 
