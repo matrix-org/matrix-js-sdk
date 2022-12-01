@@ -63,11 +63,13 @@ enum AnsiColorCode {
     Green = 32,
     Yellow = 33,
 }
-// Color text in the terminal
+// Add color to text in the terminal output
 function decorateStringWithAnsiColor(inputString: string, decorationColor: AnsiColorCode): string {
     return `\x1b[${decorationColor}m${inputString}\x1b[0m`;
 }
 
+// Utility function to ease the transition from our QueryDict type to a string record
+// which we can use to stringify with URLSearchParams
 function convertQueryDictToStringRecord(queryDict?: QueryDict): Record<string, string> {
     if (!queryDict) {
         return {};
