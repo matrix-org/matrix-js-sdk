@@ -679,4 +679,39 @@ describe("MatrixClient crypto", () => {
             });
         await httpBackend.flushAllExpected();
     });
+
+    it("Checks for outgoing room key requests for a given event's session", async () => {
+        const eventA0 = new MatrixEvent({
+            sender: "@bob:example.com",
+            room_id: "!someroom",
+            content: {
+                algorithm: 'm.megolm.v1.aes-sha2',
+                session_id: "sessionid",
+                sender_key: "senderkey",
+            },
+        });
+        const eventA1 = new MatrixEvent({
+            sender: "@bob:example.com",
+            room_id: "!someroom",
+            content: {
+                algorithm: 'm.megolm.v1.aes-sha2',
+                session_id: "sessionid",
+                sender_key: "senderkey",
+            },
+        });
+        const eventB = new MatrixEvent({
+            sender: "@bob:example.com",
+            room_id: "!someroom",
+            content: {
+                algorithm: 'm.megolm.v1.aes-sha2',
+                session_id: "othersessionid",
+                sender_key: "senderkey",
+            },
+        });
+
+        aliTestClient.client.crypto?.onSyncCompleted({});
+        await aliTestClient.client.cancelAndResendEventRoomKeyRequest(eventA0);
+        expect(await aliTestClient.client.getOutgoingRoomKeyRequest(eventA1)).not.toBeNull();
+        expect(await aliTestClient.client.getOutgoingRoomKeyRequest(eventB)).toBeNull();
+    });
 });

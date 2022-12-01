@@ -2644,7 +2644,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         const wireContent = event.getWireContent();
         const requestBody: IRoomKeyRequestBody = {
-            session_id: wireContent.sessionId,
+            session_id: wireContent.session_id,
             sender_key: wireContent.sender_key,
             algorithm: wireContent.algorithm,
             room_id: event.getRoomId()!,
