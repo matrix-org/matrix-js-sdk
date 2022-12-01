@@ -78,7 +78,7 @@ function convertQueryDictToStringRecord(queryDict?: QueryDict): Record<string, s
     return Object.entries(queryDict).reduce((resultant, [key, value]) => {
         resultant[key] = String(value);
         return resultant;
-    }, {});
+    }, {} as Record<string, string>);
 }
 
 describe("MatrixClient", function() {
