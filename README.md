@@ -9,8 +9,14 @@
 Matrix Javascript SDK
 =====================
 
-This is the [Matrix](https://matrix.org) Client-Server r0 SDK for
-JavaScript. This SDK can be run in a browser or in Node.js.
+This is the [Matrix](https://matrix.org) Client-Server SDK for JavaScript and TypeScript. This SDK can be run in a
+browser or in Node.js.
+
+The Matrix specification is constantly evolving - while this SDK aims for maximum backwards compatibility, it only
+guarantees that a feature will be supported for at least 4 spec releases. For example, if a feature the js-sdk supports
+is removed in v1.4 then the feature is *eligible* for removal from the SDK when v1.8 is released. This SDK has no
+guarantee on implementing all features of any particular spec release, currently. This can mean that the SDK will call
+endpoints from before Matrix 1.1, for example.
 
 Quickstart
 ==========

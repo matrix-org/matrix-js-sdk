@@ -78,6 +78,7 @@ import {
     IMegolmSessionData,
     isCryptoAvailable,
     VerificationMethod,
+    IRoomKeyRequestBody,
 } from './crypto';
 import { DeviceInfo, IDevice } from "./crypto/deviceinfo";
 import { decodeRecoveryKey } from './crypto/recoverykey';
@@ -184,7 +185,7 @@ import {
     RuleId,
 } from "./@types/PushRules";
 import { IThreepid } from "./@types/threepids";
-import { CryptoStore } from "./crypto/store/base";
+import { CryptoStore, OutgoingRoomKeyRequest } from "./crypto/store/base";
 import {
     GroupCall,
     IGroupCallDataChannelOptions,
@@ -896,6 +897,7 @@ export type EmittedEvents = ClientEvent
     | CallEvent // re-emitted by call.ts using Object.values
     | CallEventHandlerEvent.Incoming
     | GroupCallEventHandlerEvent.Incoming
+    | GroupCallEventHandlerEvent.Outgoing
     | GroupCallEventHandlerEvent.Ended
     | GroupCallEventHandlerEvent.Participants
     | HttpApiEvent.SessionLoggedOut
@@ -2631,6 +2633,32 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Get outgoing room key request for this event if there is one.
+     * @param {MatrixEvent} event The event to check for
+     *
+     * @return {Promise} A room key request, or null if there is none
+     */
+    public getOutgoingRoomKeyRequest(event: MatrixEvent): Promise<OutgoingRoomKeyRequest | null> {
+        if (!this.crypto) {
+            throw new Error("End-to-End encryption disabled");
+        }
+        const wireContent = event.getWireContent();
+        const requestBody: IRoomKeyRequestBody = {
+            session_id: wireContent.session_id,
+            sender_key: wireContent.sender_key,
+            algorithm: wireContent.algorithm,
+            room_id: event.getRoomId()!,
+        };
+        if (
+            !requestBody.session_id
+            || !requestBody.sender_key
+            || !requestBody.algorithm
+            || !requestBody.room_id
+        ) return Promise.resolve(null);
+        return this.crypto.cryptoStore.getOutgoingRoomKeyRequest(requestBody);
+    }
+
+    /**
      * Cancel a room key request for this event if one is ongoing and resend the
      * request.
      * @param  {MatrixEvent} event event of which to cancel and resend the room
@@ -3629,10 +3657,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         let signPromise: Promise<IThirdPartySigned | void> = Promise.resolve();
 
         if (opts.inviteSignUrl) {
-            signPromise = this.http.requestOtherUrl<IThirdPartySigned>(
-                Method.Post,
-                new URL(opts.inviteSignUrl), { mxid: this.credentials.userId },
-            );
+            const url = new URL(opts.inviteSignUrl);
+            url.searchParams.set("mxid", this.credentials.userId!);
+            signPromise = this.http.requestOtherUrl<IThirdPartySigned>(Method.Post, url);
         }
 
         const queryString: Record<string, string | string[]> = {};
@@ -3795,9 +3822,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Set a user's power level.
+     * Set a power level to one or multiple users.
      * @param {string} roomId
-     * @param {string} userId
+     * @param {string|string[]} userId
      * @param {Number} powerLevel
      * @param {MatrixEvent} event
      * @return {Promise} Resolves: to an ISendEventResponse object
@@ -3805,19 +3832,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public setPowerLevel(
         roomId: string,
-        userId: string,
+        userId: string | string[],
         powerLevel: number,
         event: MatrixEvent,
     ): Promise<ISendEventResponse> {
         let content = {
-            users: {},
+            users: {} as Record<string, number>,
         };
-        if (event?.getType() === EventType.RoomPowerLevels) {
+        if (event.getType() === EventType.RoomPowerLevels) {
             // take a copy of the content to ensure we don't corrupt
             // existing client state with a failed power level change
             content = utils.deepCopy(event.getContent());
         }
-        content.users[userId] = powerLevel;
+        if (Array.isArray(userId)) {
+            for (const user of userId) {
+                content.users[user] = powerLevel;
+            }
+        } else {
+            content.users[userId] = powerLevel;
+        }
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
             $roomId: roomId,
         });
@@ -5830,8 +5863,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ).then(async (res) => {
                 const mapper = this.getEventMapper();
                 const matrixEvents = res.chunk.map(mapper);
-                for (const event of matrixEvents) {
-                    await eventTimeline.getTimelineSet()?.thread?.processEvent(event);
+
+                // Process latest events first
+                for (const event of matrixEvents.slice().reverse()) {
+                    await thread?.processEvent(event);
+                    const sender = event.getSender()!;
+                    if (!backwards || thread?.getEventReadUpTo(sender) === null) {
+                        room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
+                    }
                 }
 
                 const newToken = res.next_batch;
@@ -9338,19 +9377,16 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     if (!room || !cli.getUserId()) return;
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
-    const currentCount = (isThreadEvent
-        ? room.getThreadUnreadNotificationCount(
-            event.threadRootId,
-            NotificationCountType.Highlight,
-        )
-        : room.getUnreadNotificationCount(NotificationCountType.Highlight)) ?? 0;
+
+    const totalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
+    const currentCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
 
     // Ensure the unread counts are kept up to date if the event is encrypted
     // We also want to make sure that the notification count goes up if we already
     // have encrypted events to avoid other code from resetting 'highlight' to zero.
     const oldHighlight = !!oldActions?.tweaks?.highlight;
     const newHighlight = !!actions?.tweaks?.highlight;
-    if (oldHighlight !== newHighlight || currentCount > 0) {
+    if ((oldHighlight !== newHighlight || currentCount > 0) && totalCount > 0) {
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
         const hasReadEvent = isThreadEvent
@@ -9375,7 +9411,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
             // Fix 'Mentions Only' rooms from not having the right badge count
             const totalCount = (isThreadEvent
                 ? room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total)
-                : room.getUnreadNotificationCount(NotificationCountType.Total)) ?? 0;
+                : room.getRoomUnreadNotificationCount(NotificationCountType.Total)) ?? 0;
 
             if (totalCount < newCount) {
                 if (isThreadEvent) {

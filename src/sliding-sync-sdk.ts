@@ -233,6 +233,72 @@ class ExtensionAccountData implements Extension {
     }
 }
 
+class ExtensionTyping implements Extension {
+    public constructor(private readonly client: MatrixClient) {}
+
+    public name(): string {
+        return "typing";
+    }
+
+    public when(): ExtensionState {
+        return ExtensionState.PostProcess;
+    }
+
+    public onRequest(isInitial: boolean): object | undefined {
+        if (!isInitial) {
+            return undefined; // don't send a JSON object for subsequent requests, we don't need to.
+        }
+        return {
+            enabled: true,
+        };
+    }
+
+    public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
+        if (!data || !data.rooms) {
+            return;
+        }
+
+        for (const roomId in data.rooms) {
+            processEphemeralEvents(
+                this.client, roomId, [data.rooms[roomId]],
+            );
+        }
+    }
+}
+
+class ExtensionReceipts implements Extension {
+    public constructor(private readonly client: MatrixClient) {}
+
+    public name(): string {
+        return "receipts";
+    }
+
+    public when(): ExtensionState {
+        return ExtensionState.PostProcess;
+    }
+
+    public onRequest(isInitial: boolean): object | undefined {
+        if (isInitial) {
+            return {
+                enabled: true,
+            };
+        }
+        return undefined; // don't send a JSON object for subsequent requests, we don't need to.
+    }
+
+    public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
+        if (!data || !data.rooms) {
+            return;
+        }
+
+        for (const roomId in data.rooms) {
+            processEphemeralEvents(
+                this.client, roomId, [data.rooms[roomId]],
+            );
+        }
+    }
+}
+
 /**
  * A copy of SyncApi such that it can be used as a drop-in replacement for sync v2. For the actual
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
@@ -273,6 +339,8 @@ export class SlidingSyncSdk {
         const extensions: Extension[] = [
             new ExtensionToDevice(this.client),
             new ExtensionAccountData(this.client),
+            new ExtensionTyping(this.client),
+            new ExtensionReceipts(this.client),
         ];
         if (this.opts.crypto) {
             extensions.push(
@@ -635,7 +703,7 @@ export class SlidingSyncSdk {
         const processRoomEvent = async (e: MatrixEvent): Promise<void> => {
             client.emit(ClientEvent.Event, e);
             if (e.isState() && e.getType() == EventType.RoomEncryption && this.opts.crypto) {
-                await this.opts.crypto.onCryptoEvent(e);
+                await this.opts.crypto.onCryptoEvent(room, e);
             }
         };
 
@@ -886,5 +954,18 @@ function mapEvents(client: MatrixClient, roomId: string | undefined, events: obj
     return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
         e["room_id"] = roomId;
         return mapper(e);
+    });
+}
+
+function processEphemeralEvents(client: MatrixClient, roomId: string, ephEvents: IMinimalEvent[]): void {
+    const ephemeralEvents = mapEvents(client, roomId, ephEvents);
+    const room = client.getRoom(roomId);
+    if (!room) {
+        logger.warn("got ephemeral events for room but room doesn't exist on client:", roomId);
+        return;
+    }
+    room.addEphemeralEvents(ephemeralEvents);
+    ephemeralEvents.forEach((e) => {
+        client.emit(ClientEvent.Event, e);
     });
 }
