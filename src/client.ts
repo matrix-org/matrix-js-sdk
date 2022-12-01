@@ -9328,7 +9328,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // Fallback to the prefixed unstable endpoint. Since the stable endpoint is
             // new, we should also try the unstable endpoint before giving up. We can
             // remove this fallback request in a year (remove after 2023-11-28).
-            if ((<MatrixError>err).httpStatus === 400 && (<MatrixError>err).errcode === "M_UNRECOGNIZED") {
+            if (
+                (<MatrixError>err).errcode === "M_UNRECOGNIZED" && (
+                    // XXX: The 400 status code check should be removed in the future
+                    // when Synapse is compliant with MSC3743.
+                    (<MatrixError>err).httpStatus === 400 ||
+                    // This the correct standard status code for an unsupported
+                    // endpoint according to MSC3743.
+                    (<MatrixError>err).httpStatus === 404
+                )
+            ) {
                 return await this.http.authedRequest(
                     Method.Get,
                     path,

@@ -19,6 +19,12 @@ import { mocked } from "jest-mock";
 import { logger } from "../../src/logger";
 import { MatrixClient, ClientEvent } from "../../src/client";
 import { Filter } from "../../src/filter";
+import {
+    Method,
+    ClientPrefix,
+    IRequestOpts,
+} from "../../src/http-api";
+import { QueryDict } from "../../src/utils";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
@@ -51,6 +57,27 @@ jest.mock("../../src/webrtc/call", () => ({
     ...jest.requireActual("../../src/webrtc/call"),
     supportsMatrixCall: jest.fn(() => false),
 }));
+
+enum AnsiColorCode {
+    Red = 31,
+    Green = 32,
+    Yellow = 33,
+}
+// Color text in the terminal
+function decorateStringWithAnsiColor(inputString: string, decorationColor: AnsiColorCode) {
+    return `\x1b[${decorationColor}m${inputString}\x1b[0m`;
+}
+
+function convertQueryDictToStringRecord(queryDict?: QueryDict): Record<string, string> {
+    if (!queryDict) {
+        return {};
+    }
+
+    return Object.entries(queryDict).reduce((resultant, [key, value]) => {
+        resultant[key] = String(value);
+        return resultant;
+    }, {});
+}
 
 describe("MatrixClient", function() {
     const userId = "@alice:bar";
@@ -92,10 +119,11 @@ describe("MatrixClient", function() {
     let httpLookups: {
         method: string;
         path: string;
+        prefix?: string;
         data?: object;
         error?: object;
         expectBody?: object;
-        expectQueryParams?: object;
+        expectQueryParams?: QueryDict;
         thenCall?: Function;
     }[] = [];
     let acceptKeepalives: boolean;
@@ -104,7 +132,14 @@ describe("MatrixClient", function() {
         method: string;
         path: string;
     } | null = null;
-    function httpReq(method, path, qp, data, prefix) {
+    function httpReq(
+        method: Method,
+        path: string,
+        queryParams?: QueryDict,
+        body?: Body,
+        requestOpts: IRequestOpts = {}
+    ) {
+        const { prefix } = requestOpts;
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
                 unstable_features: {
@@ -135,17 +170,20 @@ describe("MatrixClient", function() {
             };
             return pendingLookup.promise;
         }
-        if (next.path === path && next.method === method) {
+        // Either we don't care about the prefix if it wasn't defined in the expected
+        // lookup or it should match.
+        const doesMatchPrefix = !next.prefix || next.prefix === prefix;
+        if (doesMatchPrefix && next.path === path && next.method === method) {
             logger.log(
                 "MatrixClient[UT] Matched. Returning " +
                 (next.error ? "BAD" : "GOOD") + " response",
             );
             if (next.expectBody) {
-                expect(data).toEqual(next.expectBody);
+                expect(body).toEqual(next.expectBody);
             }
             if (next.expectQueryParams) {
                 Object.keys(next.expectQueryParams).forEach(function(k) {
-                    expect(qp[k]).toEqual(next.expectQueryParams![k]);
+                    expect(queryParams?.[k]).toEqual(next.expectQueryParams![k]);
                 });
             }
 
@@ -165,12 +203,15 @@ describe("MatrixClient", function() {
             }
             return Promise.resolve(next.data);
         }
-        // Jest doesn't let us have custom expectation errors, so if you're seeing this then
-        // you forgot to handle at least 1 pending request. Check your tests to ensure your
-        // number of expectations lines up with your number of requests made, and that those
-        // requests match your expectations.
-        expect(true).toBe(false);
-        return new Promise(() => {});
+        // If you're seeing this then you forgot to handle at least 1 pending request.
+        const receivedRequest = decorateStringWithAnsiColor(`${method} ${prefix}${path}${new URLSearchParams(convertQueryDictToStringRecord(queryParams)).toString()}`, AnsiColorCode.Red);
+        const expectedRequest = decorateStringWithAnsiColor(`${next.method} ${next.prefix ?? ''}${next.path}${new URLSearchParams(convertQueryDictToStringRecord(next.expectQueryParams)).toString()}`, AnsiColorCode.Green);
+        throw new Error(
+            `A pending request was not handled: ${receivedRequest} ` +
+            `(next request expected was ${expectedRequest})\n` +
+            `Check your tests to ensure your number of expectations lines up with your number of requests ` +
+            `made, and that those requests match your expectations.`,
+        );
     }
 
     function makeClient() {
@@ -229,6 +270,118 @@ describe("MatrixClient", function() {
             return new Promise(() => {});
         });
         client.stopClient();
+    });
+
+    describe('timestampToEvent', () => {
+        const roomId = '!room:server.org';
+        const eventId = "$eventId:example.org";
+        const unstableMsc3030Prefix = "/_matrix/client/unstable/org.matrix.msc3030";
+
+        it('should call stable endpoint', async () => {
+            httpLookups = [{
+                method: "GET",
+                path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
+                data: { event_id: eventId },
+                expectQueryParams: {
+                    ts: '0',
+                    dir: 'f'
+                },
+            }];
+
+            await client.timestampToEvent(roomId, 0, 'f');
+
+            expect(client.http.authedRequest.mock.calls.length).toStrictEqual(1);
+            const [method, path, queryParams,, { prefix }] = client.http.authedRequest.mock.calls[0];
+            expect(method).toStrictEqual('GET');
+            expect(prefix).toStrictEqual(ClientPrefix.V1);
+            expect(path).toStrictEqual(
+                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`
+            );
+            expect(queryParams).toStrictEqual({
+                ts: '0',
+                dir: 'f'
+            });
+        });
+
+        it('should fallback to unstable endpoint when no support for stable endpoint', async () => {
+            httpLookups = [{
+                method: "GET",
+                path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
+                prefix: ClientPrefix.V1,
+                error: {
+                    httpStatus: 404,
+                    errcode: "M_UNRECOGNIZED"
+                },
+                expectQueryParams: {
+                    ts: '0',
+                    dir: 'f'
+                },
+            }, {
+                method: "GET",
+                path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
+                prefix: unstableMsc3030Prefix,
+                data: { event_id: eventId },
+                expectQueryParams: {
+                    ts: '0',
+                    dir: 'f'
+                },
+            }];
+
+            await client.timestampToEvent(roomId, 0, 'f');
+
+            expect(client.http.authedRequest.mock.calls.length).toStrictEqual(2);
+            const [stableMethod, stablePath, stableQueryParams,, { prefix: stablePrefix }] = client.http.authedRequest.mock.calls[0];
+            expect(stableMethod).toStrictEqual('GET');
+            expect(stablePrefix).toStrictEqual(ClientPrefix.V1);
+            expect(stablePath).toStrictEqual(
+                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`
+            );
+            expect(stableQueryParams).toStrictEqual({
+                ts: '0',
+                dir: 'f'
+            });
+
+            const [unstableMethod, unstablePath, unstableQueryParams,, { prefix: unstablePrefix }] = client.http.authedRequest.mock.calls[1];
+            expect(unstableMethod).toStrictEqual('GET');
+            expect(unstablePrefix).toStrictEqual(unstableMsc3030Prefix);
+            expect(unstablePath).toStrictEqual(
+                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`
+            );
+            expect(unstableQueryParams).toStrictEqual({
+                ts: '0',
+                dir: 'f'
+            });
+        });
+
+        it('should not fallback to unstable endpoint when stable endpoint returns an error', async () => {
+            httpLookups = [{
+                method: "GET",
+                path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
+                prefix: ClientPrefix.V1,
+                error: {
+                    httpStatus: 500,
+                    errcode: "Fake response error"
+                },
+                expectQueryParams: {
+                    ts: '0',
+                    dir: 'f'
+                },
+            }];
+
+            await expect(client.timestampToEvent(roomId, 0, 'f')).rejects.toBeDefined();
+
+            expect(client.http.authedRequest.mock.calls.length).toStrictEqual(1);
+            const [method, path, queryParams,, { prefix }] = client.http.authedRequest.mock.calls[0];
+            expect(method).toStrictEqual('GET');
+            expect(prefix).toStrictEqual(ClientPrefix.V1);
+            expect(path).toStrictEqual(
+                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`
+            );
+            expect(queryParams).toStrictEqual({
+                ts: '0',
+                dir: 'f'
+            });
+        });
     });
 
     describe("sendEvent", () => {
