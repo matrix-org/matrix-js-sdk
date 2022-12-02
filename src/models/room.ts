@@ -2017,6 +2017,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const thread = new Thread(threadId, rootEvent, {
             room: this,
             client: this.client,
+            pendingEventOrdering: this.opts.pendingEventOrdering,
         });
 
         // This is necessary to be able to jump to events in threads:

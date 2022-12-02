@@ -611,7 +611,12 @@ describe("MatrixClient event timelines", function() {
                     return THREAD_ROOT;
                 });
 
-            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+
+            httpBackend.when("GET", "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
                 encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&limit=1")
                 .respond(200, function() {
@@ -650,7 +655,6 @@ describe("MatrixClient event timelines", function() {
                 encodeURIComponent(THREAD_RELATION_TYPE.name) + "?dir=b&limit=1")
                 .respond(200, function() {
                     return {
-                        original_event: THREAD_ROOT,
                         chunk: [THREAD_REPLY],
                         // no next batch as this is the oldest end of the timeline
                     };
@@ -660,11 +664,17 @@ describe("MatrixClient event timelines", function() {
             await httpBackend.flushAllExpected();
             const timelineSet = thread.timelineSet;
 
-            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!);
-            const timeline = await timelinePromise;
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" + encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
 
-            expect(timeline!.getEvents().find(e => e.getId() === THREAD_ROOT.event_id!)).toBeTruthy();
-            expect(timeline!.getEvents().find(e => e.getId() === THREAD_REPLY.event_id!)).toBeTruthy();
+            const timelinePromise = client.getEventTimeline(timelineSet, THREAD_REPLY.event_id!);
+            const [timeline] = await Promise.all([timelinePromise, httpBackend.flushAllExpected()]);
+
+            const eventIds = timeline!.getEvents().map(it => it.getId());
+            expect(eventIds).toContain(THREAD_ROOT.event_id);
+            expect(eventIds).toContain(THREAD_REPLY.event_id);
         });
 
         it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
@@ -1504,7 +1514,22 @@ describe("MatrixClient event timelines", function() {
                     state: [],
                     end: "end_token",
                 });
-            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            httpBackend.when("GET", "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
                 encodeURIComponent(THREAD_RELATION_TYPE.name) + buildParams(Direction.Backward, "start_token"))
                 .respond(200, function() {
@@ -1513,7 +1538,7 @@ describe("MatrixClient event timelines", function() {
                         chunk: [],
                     };
                 });
-            httpBackend.when("GET", "/rooms/!foo%3Abar/relations/" +
+            httpBackend.when("GET", "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
                 encodeURIComponent(THREAD_RELATION_TYPE.name) + buildParams(Direction.Forward, "end_token"))
                 .respond(200, function() {

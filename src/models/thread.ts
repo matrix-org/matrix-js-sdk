@@ -16,10 +16,10 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { MatrixClient } from "../client";
+import { MatrixClient, PendingEventOrdering } from "../client";
 import { TypedReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
-import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
+import { EventStatus, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
 import { NotificationCountType, Room, RoomEvent } from './room';
@@ -51,6 +51,7 @@ export type EventHandlerMap = {
 interface IThreadOpts {
     room: Room;
     client: MatrixClient;
+    pendingEventOrdering?: PendingEventOrdering;
 }
 
 export enum FeatureSupport {
@@ -88,9 +89,12 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private lastEvent: MatrixEvent | undefined;
     private replyCount = 0;
+    private lastPendingEvent: MatrixEvent | undefined;
+    private pendingReplyCount = 0;
 
     public readonly room: Room;
     public readonly client: MatrixClient;
+    private readonly pendingEventOrdering: PendingEventOrdering;
 
     public initialEventsFetched = !Thread.hasServerSideSupport;
 
@@ -109,6 +113,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         this.room = opts.room;
         this.client = opts.client;
+        this.pendingEventOrdering = opts.pendingEventOrdering ?? PendingEventOrdering.Chronological;
         this.timelineSet = new EventTimelineSet(this.room, {
             timelineSupport: true,
             pendingEvents: true,
@@ -307,6 +312,19 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             });
             await this.processEvent(this.lastEvent);
         }
+
+        let pendingEvents: MatrixEvent[];
+        if (this.pendingEventOrdering === PendingEventOrdering.Detached) {
+            pendingEvents = this.room.getPendingEvents()
+                .filter(ev => ev.isRelation(THREAD_RELATION_TYPE.name) && this.id === ev.threadRootId);
+            await Promise.all(pendingEvents.map(ev => this.processEvent(ev)));
+        } else {
+            pendingEvents = this.events
+                .filter(ev => ev.isRelation(THREAD_RELATION_TYPE.name))
+                .filter(ev => ev.status !== EventStatus.SENT && ev.status !== EventStatus.CANCELLED);
+        }
+        this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;
+        this.pendingReplyCount = pendingEvents.length;
     }
 
     private async updateThreadMetadata(): Promise<void> {
@@ -404,14 +422,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * exclude annotations from that number
      */
     public get length(): number {
-        return this.replyCount;
+        return this.replyCount + this.pendingReplyCount;
     }
 
     /**
      * A getter for the last event added to the thread, if known.
      */
     public get replyToEvent(): Optional<MatrixEvent> {
-        return this.lastEvent ?? this.lastReply();
+        return this.lastPendingEvent ?? this.lastEvent ?? this.lastReply();
     }
 
     public get events(): MatrixEvent[] {
