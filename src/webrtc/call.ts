@@ -22,12 +22,13 @@ limitations under the License.
  * @module webrtc/call
  */
 
+import { v4 as uuidv4 } from "uuid";
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from '../logger';
 import * as utils from '../utils';
 import { MatrixEvent } from '../models/event';
-import { EventType } from '../@types/event';
+import { EventType, ToDeviceMessageId } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
 import {
@@ -2272,6 +2273,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 sender_session_id: this.client.getSessionId(),
                 dest_session_id: this.opponentSessionId,
                 seq: toDeviceSeq,
+                [ToDeviceMessageId]: uuidv4(),
             };
 
             this.emit(CallEvent.SendVoipEvent, {
