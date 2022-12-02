@@ -57,8 +57,8 @@ class OlmEncryption extends EncryptionAlgorithm {
     /**
      * @private
 
-     * @param {string[]} roomMembers list of currently-joined users in the room
-     * @return {Promise} Promise which resolves when setup is complete
+     * @param roomMembers list of currently-joined users in the room
+     * @return Promise which resolves when setup is complete
      */
     private ensureSession(roomMembers: string[]): Promise<void> {
         if (this.prepPromise) {
@@ -85,11 +85,11 @@ class OlmEncryption extends EncryptionAlgorithm {
     /**
      * @inheritdoc
      *
-     * @param {module:models/room} room
-     * @param {string} eventType
-     * @param {object} content plaintext event content
+     * @param room
+     * @param eventType
+     * @param content plaintext event content
      *
-     * @return {Promise} Promise which resolves to the new event body
+     * @return Promise which resolves to the new event body
      */
     public async encryptMessage(room: Room, eventType: string, content: object): Promise<object> {
         // pick the list of recipients based on the membership list.
@@ -159,7 +159,7 @@ class OlmDecryption extends DecryptionAlgorithm {
     /**
      * @inheritdoc
      *
-     * @param {MatrixEvent} event
+     * @param event
      *
      * returns a promise which resolves to a
      * {@link module:crypto~EventDecryptionResult} once we have finished
@@ -275,10 +275,10 @@ class OlmDecryption extends DecryptionAlgorithm {
     /**
      * Attempt to decrypt an Olm message
      *
-     * @param {string} theirDeviceIdentityKey  Curve25519 identity key of the sender
-     * @param {object} message  message object, with 'type' and 'body' fields
+     * @param theirDeviceIdentityKey  Curve25519 identity key of the sender
+     * @param message  message object, with 'type' and 'body' fields
      *
-     * @return {string} payload, if decrypted successfully.
+     * @return payload, if decrypted successfully.
      */
     private decryptMessage(theirDeviceIdentityKey: string, message: IMessage): Promise<string> {
         // This is a wrapper that serialises decryptions of prekey messages, because

@@ -27,9 +27,9 @@ import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
 /**
- * @param {Object} obj
- * @param {string} keyNesting
- * @param {*} val
+ * @param obj
+ * @param keyNesting
+ * @param val
  */
 function setProp(obj: object, keyNesting: string, val: any): void {
     const nestedKeys = keyNesting.split(".");
@@ -95,10 +95,10 @@ export class Filter {
     /**
      * Create a filter from existing data.
      * @static
-     * @param {string} userId
-     * @param {string} filterId
-     * @param {Object} jsonObj
-     * @return {Filter}
+     * @param userId
+     * @param filterId
+     * @param jsonObj
+     * @return
      */
     public static fromJson(userId: string | undefined | null, filterId: string, jsonObj: IFilterDefinition): Filter {
         const filter = new Filter(userId, filterId);
@@ -114,7 +114,7 @@ export class Filter {
 
     /**
      * Get the ID of this filter on your homeserver (if known)
-     * @return {?string} The filter ID
+     * @return The filter ID
      */
     public getFilterId(): string | undefined {
         return this.filterId;
@@ -122,7 +122,7 @@ export class Filter {
 
     /**
      * Get the JSON body of the filter.
-     * @return {Object} The filter definition
+     * @return The filter definition
      */
     public getDefinition(): IFilterDefinition {
         return this.definition;
@@ -130,7 +130,7 @@ export class Filter {
 
     /**
      * Set the JSON body of the filter
-     * @param {Object} definition The filter definition
+     * @param definition The filter definition
      */
     public setDefinition(definition: IFilterDefinition): void {
         this.definition = definition;
@@ -199,7 +199,7 @@ export class Filter {
 
     /**
      * Get the room.timeline filter component of the filter
-     * @return {FilterComponent} room timeline filter component
+     * @return room timeline filter component
      */
     public getRoomTimelineFilterComponent(): FilterComponent | undefined {
         return this.roomTimelineFilter;
@@ -208,8 +208,8 @@ export class Filter {
     /**
      * Filter the list of events based on whether they are allowed in a timeline
      * based on this filter
-     * @param {MatrixEvent[]} events  the list of events being filtered
-     * @return {MatrixEvent[]} the list of events which match the filter
+     * @param events  the list of events being filtered
+     * @return the list of events which match the filter
      */
     public filterRoomTimeline(events: MatrixEvent[]): MatrixEvent[] {
         if (this.roomFilter) {
@@ -223,7 +223,7 @@ export class Filter {
 
     /**
      * Set the max number of events to return for each room's timeline.
-     * @param {Number} limit The max number of events to return for each room.
+     * @param limit The max number of events to return for each room.
      */
     public setTimelineLimit(limit: number): void {
         setProp(this.definition, "room.timeline.limit", limit);
@@ -231,7 +231,7 @@ export class Filter {
 
     /**
      * Enable threads unread notification
-     * @param {boolean} enabled
+     * @param enabled
      */
     public setUnreadThreadNotifications(enabled: boolean): void {
         this.definition = {
@@ -252,7 +252,7 @@ export class Filter {
 
     /**
      * Control whether left rooms should be included in responses.
-     * @param {boolean} includeLeave True to make rooms the user has left appear
+     * @param includeLeave True to make rooms the user has left appear
      * in responses.
      */
     public setIncludeLeaveRooms(includeLeave: boolean): void {

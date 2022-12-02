@@ -497,8 +497,8 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Sets the mute state of the local participants's microphone.
-     * @param {boolean} muted Whether to mute the microphone
-     * @returns {Promise<boolean>} Whether muting/unmuting was successful
+     * @param muted Whether to mute the microphone
+     * @returns Whether muting/unmuting was successful
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
         // hasAudioDevice can block indefinitely if the window has lost focus,
@@ -560,8 +560,8 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Sets the mute state of the local participants's video.
-     * @param {boolean} muted Whether to mute the video
-     * @returns {Promise<boolean>} Whether muting/unmuting was successful
+     * @param muted Whether to mute the video
+     * @returns Whether muting/unmuting was successful
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
         // hasAudioDevice can block indefinitely if the window has lost focus,

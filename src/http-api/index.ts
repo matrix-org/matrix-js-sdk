@@ -35,27 +35,27 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     /**
      * Upload content to the homeserver
      *
-     * @param {object} file The object to upload. On a browser, something that
+     * @param file The object to upload. On a browser, something that
      *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,
      *   a Buffer, String or ReadStream.
      *
-     * @param {object} opts  options object
+     * @param opts  options object
      *
-     * @param {string=} opts.name   Name to give the file on the server. Defaults
+     * @param opts.name   Name to give the file on the server. Defaults
      *   to <tt>file.name</tt>.
      *
-     * @param {boolean=} opts.includeFilename if false will not send the filename,
+     * @param opts.includeFilename if false will not send the filename,
      *   e.g for encrypted file uploads where filename leaks are undesirable.
      *   Defaults to true.
      *
-     * @param {string=} opts.type   Content-type for the upload. Defaults to
+     * @param opts.type   Content-type for the upload. Defaults to
      *   <tt>file.type</tt>, or <tt>application/octet-stream</tt>.
      *
-     * @param {Function=} opts.progressHandler Optional. Called when a chunk of
+     * @param opts.progressHandler Optional. Called when a chunk of
      *    data has been uploaded, with an object containing the fields `loaded`
      *    (number of bytes transferred) and `total` (total size, if known).
      *
-     * @return {Promise} Resolves to response object, as
+     * @return Resolves to response object, as
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
@@ -190,7 +190,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
 
     /**
      * Get the content repository url with query parameters.
-     * @return {Object} An object with a 'base', 'path' and 'params' for base URL,
+     * @return An object with a 'base', 'path' and 'params' for base URL,
      *          path and query parameters respectively.
      */
     public getContentUri(): IContentUri {

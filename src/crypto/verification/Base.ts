@@ -76,19 +76,19 @@ export class VerificationBase<
      *
      * @class
      *
-     * @param {Object} channel the verification channel to send verification messages over.
+     * @param channel the verification channel to send verification messages over.
      * TODO: Channel types
      *
-     * @param {MatrixClient} baseApis base matrix api interface
+     * @param baseApis base matrix api interface
      *
-     * @param {string} userId the user ID that is being verified
+     * @param userId the user ID that is being verified
      *
-     * @param {string} deviceId the device ID that is being verified
+     * @param deviceId the device ID that is being verified
      *
-     * @param {object} [startEvent] the m.key.verification.start event that
+     * @param [startEvent] the m.key.verification.start event that
      * initiated this verification, if any
      *
-     * @param {object} [request] the key verification request object related to
+     * @param [request] the key verification request object related to
      * this verification, if any
      */
     public constructor(
@@ -279,7 +279,7 @@ export class VerificationBase<
     /**
      * Begin the key verification
      *
-     * @returns {Promise} Promise which resolves when the verification has
+     * @returns Promise which resolves when the verification has
      *     completed.
      */
     public verify(): Promise<void> {

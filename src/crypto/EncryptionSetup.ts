@@ -58,8 +58,8 @@ export class EncryptionSetupBuilder {
     private sessionBackupPrivateKey?: Uint8Array;
 
     /**
-     * @param {Object.<String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
-     * @param {CryptoCallbacks} delegateCryptoCallbacks crypto callbacks to delegate to if the key isn't in cache yet
+     * @param accountData pre-existing account data, will only be read, not written.
+     * @param delegateCryptoCallbacks crypto callbacks to delegate to if the key isn't in cache yet
      */
     public constructor(accountData: Record<string, MatrixEvent>, delegateCryptoCallbacks?: ICryptoCallbacks) {
         this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
@@ -70,13 +70,13 @@ export class EncryptionSetupBuilder {
     /**
      * Adds new cross-signing public keys
      *
-     * @param {function} authUpload Function called to await an interactive auth
+     * @param authUpload Function called to await an interactive auth
      * flow when uploading device signing keys.
      * Args:
      *     {function} A function that makes the request requiring auth. Receives
      *     the auth data as an object. Can be called multiple times, first with
      *     an empty authDict, to obtain the flows.
-     * @param {Object} keys the new keys
+     * @param keys the new keys
      */
     public addCrossSigningKeys(authUpload: ICrossSigningKeys["authUpload"], keys: ICrossSigningKeys["keys"]): void {
         this.crossSigningKeys = { authUpload, keys };
@@ -88,7 +88,7 @@ export class EncryptionSetupBuilder {
      * Used either to create a new key backup, or add signatures
      * from the new MSK.
      *
-     * @param {Object} keyBackupInfo as received from/sent to the server
+     * @param keyBackupInfo as received from/sent to the server
      */
     public addSessionBackup(keyBackupInfo: IKeyBackupInfo): void {
         this.keyBackupInfo = keyBackupInfo;
@@ -99,7 +99,7 @@ export class EncryptionSetupBuilder {
      *
      * Used after fixing the format of the key
      *
-     * @param {Uint8Array} privateKey
+     * @param privateKey
      */
     public addSessionBackupPrivateKeyToCache(privateKey: Uint8Array): void {
         this.sessionBackupPrivateKey = privateKey;
@@ -109,9 +109,9 @@ export class EncryptionSetupBuilder {
      * Add signatures from a given user and device/x-sign key
      * Used to sign the new cross-signing key with the device key
      *
-     * @param {String} userId
-     * @param {String} deviceId
-     * @param {Object} signature
+     * @param userId
+     * @param deviceId
+     * @param signature
      */
     public addKeySignature(userId: string, deviceId: string, signature: ISignedKey): void {
         if (!this.keySignatures) {
@@ -123,9 +123,9 @@ export class EncryptionSetupBuilder {
     }
 
     /**
-     * @param {String} type
-     * @param {Object} content
-     * @return {Promise}
+     * @param type
+     * @param content
+     * @return
      */
     public async setAccountData(type: string, content: object): Promise<void> {
         await this.accountDataClientAdapter.setAccountData(type, content);
@@ -133,7 +133,7 @@ export class EncryptionSetupBuilder {
 
     /**
      * builds the operation containing all the parts that have been added to the builder
-     * @return {EncryptionSetupOperation}
+     * @return
      */
     public buildOperation(): EncryptionSetupOperation {
         const accountData = this.accountDataClientAdapter.values;
@@ -151,8 +151,8 @@ export class EncryptionSetupBuilder {
      * This does not yet store the operation in a way that it can be restored,
      * but that is the idea in the future.
      *
-     * @param  {Crypto} crypto
-     * @return {Promise}
+     * @param crypto
+     * @return
      */
     public async persist(crypto: Crypto): Promise<void> {
         // store private keys in cache
@@ -187,10 +187,10 @@ export class EncryptionSetupBuilder {
  */
 export class EncryptionSetupOperation {
     /**
-     * @param  {Map<String, Object>} accountData
-     * @param  {Object} crossSigningKeys
-     * @param  {Object} keyBackupInfo
-     * @param  {Object} keySignatures
+     * @param accountData
+     * @param crossSigningKeys
+     * @param keyBackupInfo
+     * @param keySignatures
      */
     public constructor(
         private readonly accountData: Map<string, object>,
@@ -201,7 +201,7 @@ export class EncryptionSetupOperation {
 
     /**
      * Runs the (remaining part of, in the future) operation by sending requests to the server.
-     * @param {Crypto} crypto
+     * @param crypto
      */
     public async apply(crypto: Crypto): Promise<void> {
         const baseApis = crypto.baseApis;
@@ -270,23 +270,23 @@ class AccountDataClientAdapter
     public readonly values = new Map<string, MatrixEvent>();
 
     /**
-     * @param  {Object.<String, MatrixEvent>} existingValues existing account data
+     * @param existingValues existing account data
      */
     public constructor(private readonly existingValues: Record<string, MatrixEvent>) {
         super();
     }
 
     /**
-     * @param  {String} type
-     * @return {Promise<Object>} the content of the account data
+     * @param type
+     * @return the content of the account data
      */
     public getAccountDataFromServer<T extends {[k: string]: any}>(type: string): Promise<T> {
         return Promise.resolve(this.getAccountData(type) as T);
     }
 
     /**
-     * @param  {String} type
-     * @return {Object} the content of the account data
+     * @param type
+     * @return the content of the account data
      */
     public getAccountData(type: string): IContent | null {
         const modifiedValue = this.values.get(type);
@@ -301,9 +301,9 @@ class AccountDataClientAdapter
     }
 
     /**
-     * @param {String} type
-     * @param {Object} content
-     * @return {Promise}
+     * @param type
+     * @param content
+     * @return
      */
     public setAccountData(type: string, content: any): Promise<{}> {
         const lastEvent = this.values.get(type);

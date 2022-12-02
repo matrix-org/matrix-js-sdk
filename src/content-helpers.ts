@@ -37,9 +37,9 @@ import { IContent } from "./models/event";
 
 /**
  * Generates the content for a HTML Message event
- * @param {string} body the plaintext body of the message
- * @param {string} htmlBody the HTML representation of the message
- * @returns {{msgtype: string, format: string, body: string, formatted_body: string}}
+ * @param body the plaintext body of the message
+ * @param htmlBody the HTML representation of the message
+ * @returns
  */
 export function makeHtmlMessage(body: string, htmlBody: string): IContent {
     return {
@@ -52,9 +52,9 @@ export function makeHtmlMessage(body: string, htmlBody: string): IContent {
 
 /**
  * Generates the content for a HTML Notice event
- * @param {string} body the plaintext body of the notice
- * @param {string} htmlBody the HTML representation of the notice
- * @returns {{msgtype: string, format: string, body: string, formatted_body: string}}
+ * @param body the plaintext body of the notice
+ * @param htmlBody the HTML representation of the notice
+ * @returns
  */
 export function makeHtmlNotice(body: string, htmlBody: string): IContent {
     return {
@@ -67,9 +67,9 @@ export function makeHtmlNotice(body: string, htmlBody: string): IContent {
 
 /**
  * Generates the content for a HTML Emote event
- * @param {string} body the plaintext body of the emote
- * @param {string} htmlBody the HTML representation of the emote
- * @returns {{msgtype: string, format: string, body: string, formatted_body: string}}
+ * @param body the plaintext body of the emote
+ * @param htmlBody the HTML representation of the emote
+ * @returns
  */
 export function makeHtmlEmote(body: string, htmlBody: string): IContent {
     return {
@@ -82,8 +82,8 @@ export function makeHtmlEmote(body: string, htmlBody: string): IContent {
 
 /**
  * Generates the content for a Plaintext Message event
- * @param {string} body the plaintext body of the emote
- * @returns {{msgtype: string, body: string}}
+ * @param body the plaintext body of the emote
+ * @returns
  */
 export function makeTextMessage(body: string): IContent {
     return {
@@ -94,8 +94,8 @@ export function makeTextMessage(body: string): IContent {
 
 /**
  * Generates the content for a Plaintext Notice event
- * @param {string} body the plaintext body of the notice
- * @returns {{msgtype: string, body: string}}
+ * @param body the plaintext body of the notice
+ * @returns
  */
 export function makeNotice(body: string): IContent {
     return {
@@ -106,8 +106,8 @@ export function makeNotice(body: string): IContent {
 
 /**
  * Generates the content for a Plaintext Emote event
- * @param {string} body the plaintext body of the emote
- * @returns {{msgtype: string, body: string}}
+ * @param body the plaintext body of the emote
+ * @returns
  */
 export function makeEmoteMessage(body: string): IContent {
     return {

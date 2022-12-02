@@ -94,16 +94,16 @@ export class IndexedDBStore extends MemoryStore {
      *
      * @constructor
      * @extends MemoryStore
-     * @param {Object} opts Options object.
-     * @param {Object} opts.indexedDB The Indexed DB interface e.g.
+     * @param opts Options object.
+     * @param opts.indexedDB The Indexed DB interface e.g.
      * <code>window.indexedDB</code>
-     * @param {string=} opts.dbName Optional database name. The same name must be used
+     * @param opts.dbName Optional database name. The same name must be used
      * to open the same database.
-     * @param {string=} opts.workerScript Optional URL to a script to invoke a web
+     * @param opts.workerScript Optional URL to a script to invoke a web
      * worker with to run IndexedDB queries on the web worker. The IndexedDbStoreWorker
      * class is provided for this purpose and requires the application to provide a
      * trivial wrapper script around it.
-     * @param {Object=} opts.workerApi The webWorker API object. If omitted, the global Worker
+     * @param opts.workerApi The webWorker API object. If omitted, the global Worker
      * object will be used if it exists.
      * @prop {IndexedDBStoreBackend} backend The backend instance. Call through to
      * this API if you need to perform specific indexeddb actions like deleting the
@@ -126,7 +126,7 @@ export class IndexedDBStore extends MemoryStore {
     public on = this.emitter.on.bind(this.emitter);
 
     /**
-     * @return {Promise} Resolved when loaded from indexed db.
+     * @return Resolved when loaded from indexed db.
      */
     public startup(): Promise<void> {
         if (this.startedUp) {
@@ -193,7 +193,7 @@ export class IndexedDBStore extends MemoryStore {
      * not could change between calling this function and calling
      * save().
      *
-     * @return {boolean} True if calling save() will actually save
+     * @return True if calling save() will actually save
      *     (at the time this function is called).
      */
     public wantsSave(): boolean {
@@ -204,8 +204,8 @@ export class IndexedDBStore extends MemoryStore {
     /**
      * Possibly write data to the database.
      *
-     * @param {boolean} force True to force a save to happen
-     * @return {Promise} Promise resolves after the write completes
+     * @param force True to force a save to happen
+     * @return Promise resolves after the write completes
      *     (or immediately if no write is performed)
      */
     public save(force = false): Promise<void> {
@@ -287,9 +287,9 @@ export class IndexedDBStore extends MemoryStore {
      * When IndexedDB fails via any of these paths, we degrade this back to a `MemoryStore`
      * in place so that the current operation and all future ones are in-memory only.
      *
-     * @param {Function} func The degradable work to do.
-     * @param {String} fallback The method name for fallback.
-     * @returns {Function} A wrapped member function.
+     * @param func The degradable work to do.
+     * @param fallback The method name for fallback.
+     * @returns A wrapped member function.
      */
     private degradable<A extends Array<any>, R = void>(
         func: DegradableFn<A, R>,
@@ -368,8 +368,8 @@ export class IndexedDBStore extends MemoryStore {
 }
 
 /**
- * @param {string} roomId ID of the current room
- * @returns {string} Storage key to retrieve pending events
+ * @param roomId ID of the current room
+ * @returns Storage key to retrieve pending events
  */
 function pendingEventsKey(roomId: string): string {
     return `mx_pending_events_${roomId}`;

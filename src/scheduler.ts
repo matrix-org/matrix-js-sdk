@@ -56,10 +56,10 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * times of 2, 4, 8, and 16 seconds (30s total) after which we give up. If the
      * failure was due to a rate limited request, the time specified in the error is
      * waited before being retried.
-     * @param {MatrixEvent} event
-     * @param {Number} attempts Number of attempts that have been made, including the one that just failed (ie. starting at 1)
-     * @param {MatrixError} err
-     * @return {Number}
+     * @param event
+     * @param attempts Number of attempts that have been made, including the one that just failed (ie. starting at 1)
+     * @param err
+     * @return
      * @see module:scheduler~retryAlgorithm
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -92,8 +92,8 @@ export class MatrixScheduler<T = ISendEventResponse> {
     /**
      * Queues <code>m.room.message</code> events and lets other events continue
      * concurrently.
-     * @param {MatrixEvent} event
-     * @return {string}
+     * @param event
+     * @return
      * @see module:scheduler~queueAlgorithm
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -124,8 +124,8 @@ export class MatrixScheduler<T = ISendEventResponse> {
     /**
      * Retrieve a queue based on an event. The event provided does not need to be in
      * the queue.
-     * @param {MatrixEvent} event An event to get the queue for.
-     * @return {?Array<MatrixEvent>} A shallow copy of events in the queue or null.
+     * @param event An event to get the queue for.
+     * @return A shallow copy of events in the queue or null.
      * Modifying this array will not modify the list itself. Modifying events in
      * this array <i>will</i> modify the underlying event in the queue.
      * @see MatrixScheduler.removeEventFromQueue To remove an event from the queue.
@@ -143,8 +143,8 @@ export class MatrixScheduler<T = ISendEventResponse> {
     /**
      * Remove this event from the queue. The event is equal to another event if they
      * have the same ID returned from event.getId().
-     * @param {MatrixEvent} event The event to remove.
-     * @return {boolean} True if this event was removed.
+     * @param event The event to remove.
+     * @return True if this event was removed.
      */
     public removeEventFromQueue(event: MatrixEvent): boolean {
         const name = this.queueAlgorithm(event);
@@ -168,7 +168,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * Set the process function. Required for events in the queue to be processed.
      * If set after events have been added to the queue, this will immediately start
      * processing them.
-     * @param {module:scheduler~processFn} fn The function that can process events
+     * @param fn The function that can process events
      * in the queue.
      */
     public setProcessFunction(fn: ProcessFunction<T>): void {
@@ -178,8 +178,8 @@ export class MatrixScheduler<T = ISendEventResponse> {
 
     /**
      * Queue an event if it is required and start processing queues.
-     * @param {MatrixEvent} event The event that may be queued.
-     * @return {?Promise} A promise if the event was queued, which will be
+     * @param event The event that may be queued.
+     * @return A promise if the event was queued, which will be
      * resolved or rejected in due time, else null.
      */
     public queueEvent(event: MatrixEvent): Promise<T> | null {

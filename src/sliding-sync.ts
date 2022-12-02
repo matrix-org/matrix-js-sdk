@@ -167,7 +167,7 @@ class SlidingList {
 
     /**
      * Construct a new sliding list.
-     * @param {MSC3575List} list The range, sort and filter values to use for this list.
+     * @param list The range, sort and filter values to use for this list.
      */
     public constructor(list: MSC3575List) {
         this.replaceList(list);
@@ -212,7 +212,7 @@ class SlidingList {
 
     /**
      * Return a copy of the list suitable for a request body.
-     * @param {boolean} forceIncludeAllParams True to forcibly include all params even if the list
+     * @param forceIncludeAllParams True to forcibly include all params even if the list
      * hasn't been modified. Callers may want to do this if they are modifying the list prior to calling
      * updateList.
      */
@@ -367,11 +367,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Create a new sliding sync instance
-     * @param {string} proxyBaseUrl The base URL of the sliding sync proxy
-     * @param {MSC3575List[]} lists The lists to use for sliding sync.
-     * @param {MSC3575RoomSubscription} roomSubscriptionInfo The params to use for room subscriptions.
-     * @param {MatrixClient} client The client to use for /sync calls.
-     * @param {number} timeoutMS The number of milliseconds to wait for a response.
+     * @param proxyBaseUrl The base URL of the sliding sync proxy
+     * @param lists The lists to use for sliding sync.
+     * @param roomSubscriptionInfo The params to use for room subscriptions.
+     * @param client The client to use for /sync calls.
+     * @param timeoutMS The number of milliseconds to wait for a response.
      */
     public constructor(
         private readonly proxyBaseUrl: string,
@@ -551,8 +551,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Invoke all attached room data listeners.
-     * @param {string} roomId The room which received some data.
-     * @param {object} roomData The raw sliding sync response JSON.
+     * @param roomId The room which received some data.
+     * @param roomData The raw sliding sync response JSON.
      */
     private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): void {
         if (!roomData.required_state) { roomData.required_state = []; }
@@ -562,9 +562,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Invoke all attached lifecycle listeners.
-     * @param {SlidingSyncState} state The Lifecycle state
-     * @param {object} resp The raw sync response JSON
-     * @param {Error?} err Any error that occurred when making the request e.g. network errors.
+     * @param state The Lifecycle state
+     * @param resp The raw sync response JSON
+     * @param err Any error that occurred when making the request e.g. network errors.
      */
     private invokeLifecycleListeners(
         state: SlidingSyncState,

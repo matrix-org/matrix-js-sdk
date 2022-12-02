@@ -58,7 +58,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * Construct a new User. A User must have an ID and can optionally have extra
      * information associated with it.
      * @constructor
-     * @param {string} userId Required. The ID of this user.
+     * @param userId Required. The ID of this user.
      * @prop {string} userId The ID of the user.
      * @prop {Object} info The info object supplied in the constructor.
      * @prop {string} displayName The 'displayname' of the user if known.
@@ -87,7 +87,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * Update this User with the given presence event. May fire "User.presence",
      * "User.avatarUrl" and/or "User.displayName" if this event updates this user's
      * properties.
-     * @param {MatrixEvent} event The <code>m.presence</code> event.
+     * @param event The <code>m.presence</code> event.
      * @fires module:client~MatrixClient#event:"User.presence"
      * @fires module:client~MatrixClient#event:"User.displayName"
      * @fires module:client~MatrixClient#event:"User.avatarUrl"
@@ -142,7 +142,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     /**
      * Manually set this user's display name. No event is emitted in response to this
      * as there is no underlying MatrixEvent to emit with.
-     * @param {string} name The new display name.
+     * @param name The new display name.
      */
     public setDisplayName(name: string): void {
         const oldName = this.displayName;
@@ -155,7 +155,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     /**
      * Manually set this user's non-disambiguated display name. No event is emitted
      * in response to this as there is no underlying MatrixEvent to emit with.
-     * @param {string} name The new display name.
+     * @param name The new display name.
      */
     public setRawDisplayName(name?: string): void {
         this.rawDisplayName = name;
@@ -164,7 +164,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     /**
      * Manually set this user's avatar URL. No event is emitted in response to this
      * as there is no underlying MatrixEvent to emit with.
-     * @param {string} url The new avatar URL.
+     * @param url The new avatar URL.
      */
     public setAvatarUrl(url?: string): void {
         const oldUrl = this.avatarUrl;
@@ -185,7 +185,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * Get the timestamp when this User was last updated. This timestamp is
      * updated when this User receives a new Presence event which has updated a
      * property on this object. It is updated <i>before</i> firing events.
-     * @return {number} The timestamp
+     * @return The timestamp
      */
     public getLastModifiedTime(): number {
         return this.modified;
@@ -194,7 +194,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     /**
      * Get the absolute timestamp when this User was last known active on the server.
      * It is *NOT* accurate if this.currentlyActive is true.
-     * @return {number} The timestamp
+     * @return The timestamp
      */
     public getLastActiveTs(): number {
         return this.lastPresenceTs - this.lastActiveAgo;

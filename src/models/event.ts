@@ -290,7 +290,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Construct a Matrix Event object
      * @constructor
      *
-     * @param {Object} event The raw event to be wrapped in this DAO
+     * @param event The raw event to be wrapped in this DAO
      *
      * @prop {Object} event The raw (possibly encrypted) event. <b>Do not access
      * this property</b> directly unless you absolutely have to. Prefer the getter
@@ -360,7 +360,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Gets the event as though it would appear unencrypted. If the event is already not
      * encrypted, it is simply returned as-is.
-     * @returns {IEvent} The event in wire format.
+     * @returns The event in wire format.
      */
     public getEffectiveEvent(): IEvent {
         const content = Object.assign({}, this.getContent()); // clone for mutation
@@ -389,7 +389,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the event_id for this event.
-     * @return {string} The event ID, e.g. <code>$143350589368169JsLZx:localhost
+     * @return The event ID, e.g. <code>$143350589368169JsLZx:localhost
      * </code>
      */
     public getId(): string | undefined {
@@ -398,7 +398,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the user_id for this event.
-     * @return {string} The user ID, e.g. <code>@alice:matrix.org</code>
+     * @return The user ID, e.g. <code>@alice:matrix.org</code>
      */
     public getSender(): string | undefined {
         return this.event.sender || this.event.user_id; // v2 / v1
@@ -407,7 +407,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Get the (decrypted, if necessary) type of event.
      *
-     * @return {string} The event type, e.g. <code>m.room.message</code>
+     * @return The event type, e.g. <code>m.room.message</code>
      */
     public getType(): EventType | string {
         if (this.clearEvent) {
@@ -420,7 +420,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the (possibly encrypted) type of the event that will be sent to the
      * homeserver.
      *
-     * @return {string} The event type.
+     * @return The event type.
      */
     public getWireType(): EventType | string {
         return this.event.type!;
@@ -429,7 +429,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Get the room_id for this event. This will return <code>undefined</code>
      * for <code>m.presence</code> events.
-     * @return {string?} The room ID, e.g. <code>!cURbafjkfsMDVwdRDQ:matrix.org
+     * @return The room ID, e.g. <code>!cURbafjkfsMDVwdRDQ:matrix.org
      * </code>
      */
     public getRoomId(): string | undefined {
@@ -438,7 +438,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the timestamp of this event.
-     * @return {Number} The event timestamp, e.g. <code>1433502692297</code>
+     * @return The event timestamp, e.g. <code>1433502692297</code>
      */
     public getTs(): number {
         return this.event.origin_server_ts!;
@@ -446,7 +446,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the timestamp of this event, as a Date object.
-     * @return {Date} The event date, e.g. <code>new Date(1433502692297)</code>
+     * @return The event date, e.g. <code>new Date(1433502692297)</code>
      */
     public getDate(): Date | null {
         return this.event.origin_server_ts ? new Date(this.event.origin_server_ts) : null;
@@ -476,7 +476,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the (decrypted, if necessary) event content JSON, even if the event
      * was replaced by another event.
      *
-     * @return {Object} The event content JSON, or an empty object.
+     * @return The event content JSON, or an empty object.
      */
     public getOriginalContent<T = IContent>(): T {
         if (this._localRedactionEvent) {
@@ -493,7 +493,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * or the content from the replacing event, if any.
      * See `makeReplaced`.
      *
-     * @return {Object} The event content JSON, or an empty object.
+     * @return The event content JSON, or an empty object.
      */
     public getContent<T extends IContent = IContent>(): T {
         if (this._localRedactionEvent) {
@@ -509,7 +509,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the (possibly encrypted) event content JSON that will be sent to the
      * homeserver.
      *
-     * @return {Object} The event content JSON, or an empty object.
+     * @return The event content JSON, or an empty object.
      */
     public getWireContent(): IContent {
         return this.event.content || {};
@@ -560,7 +560,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Get the previous event content JSON. This will only return something for
      * state events which exist in the timeline.
-     * @return {Object} The previous event content JSON, or an empty object.
+     * @return The previous event content JSON, or an empty object.
      */
     public getPrevContent(): IContent {
         // v2 then v1 then default
@@ -573,7 +573,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * In practice, this means we get the chronologically earlier content value
      * for this event (this method should surely be called getEarlierContent)
      * <strong>This method is experimental and may change.</strong>
-     * @return {Object} event.content if this event is forward-looking, else
+     * @return event.content if this event is forward-looking, else
      * event.prev_content.
      */
     public getDirectionalContent(): IContent {
@@ -585,7 +585,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * event arrived at the device, and not the age of the event when this
      * function was called.
      * Can only be returned once the server has echo'ed back
-     * @return {Number|undefined} The age of this event in milliseconds.
+     * @return The age of this event in milliseconds.
      */
     public getAge(): number | undefined {
         return this.getUnsigned().age || this.event.age; // v2 / v1
@@ -595,7 +595,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the age of the event when this function was called.
      * This is the 'age' field adjusted according to how long this client has
      * had the event.
-     * @return {Number} The age of this event in milliseconds.
+     * @return The age of this event in milliseconds.
      */
     public getLocalAge(): number {
         return Date.now() - this.localTimestamp;
@@ -604,7 +604,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Get the event state_key if it has one. This will return <code>undefined
      * </code> for message events.
-     * @return {string} The event's <code>state_key</code>.
+     * @return The event's <code>state_key</code>.
      */
     public getStateKey(): string | undefined {
         return this.event.state_key;
@@ -612,7 +612,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Check if this event is a state event.
-     * @return {boolean} True if this is a state event.
+     * @return True if this is a state event.
      */
     public isState(): boolean {
         return this.event.state_key !== undefined;
@@ -624,16 +624,16 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @internal
      *
-     * @param {string} cryptoType type of the encrypted event - typically
+     * @param cryptoType type of the encrypted event - typically
      * <tt>"m.room.encrypted"</tt>
      *
-     * @param {object} cryptoContent raw 'content' for the encrypted event.
+     * @param cryptoContent raw 'content' for the encrypted event.
      *
-     * @param {string} senderCurve25519Key curve25519 key to record for the
+     * @param senderCurve25519Key curve25519 key to record for the
      *   sender of this event.
      *   See {@link module:models/event.MatrixEvent#getSenderKey}.
      *
-     * @param {string} claimedEd25519Key claimed ed25519 key to record for the
+     * @param claimedEd25519Key claimed ed25519 key to record for the
      *   sender if this event.
      *   See {@link module:models/event.MatrixEvent#getClaimedEd25519Key}
      */
@@ -657,7 +657,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Check if this event is currently being decrypted.
      *
-     * @return {boolean} True if this event is currently being decrypted, else false.
+     * @return True if this event is currently being decrypted, else false.
      */
     public isBeingDecrypted(): boolean {
         return this.decryptionPromise != null;
@@ -672,7 +672,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * (This implies that we might retry decryption at some point in the future)
      *
-     * @return {boolean} True if this event is an encrypted event which we
+     * @return True if this event is an encrypted event which we
      *     couldn't decrypt.
      */
     public isDecryptionFailure(): boolean {
@@ -695,14 +695,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @internal
      *
-     * @param {module:crypto} crypto crypto module
-     * @param {object} options
-     * @param {boolean} options.isRetry True if this is a retry (enables more logging)
-     * @param {boolean} options.emit Emits "event.decrypted" if set to true
-     * @param {boolean} options.forceRedecryptIfUntrusted whether the message should be
+     * @param crypto crypto module
+     * @param options
+     * @param options.isRetry True if this is a retry (enables more logging)
+     * @param options.emit Emits "event.decrypted" if set to true
+     * @param options.forceRedecryptIfUntrusted whether the message should be
      *     re-decrypted if it was previously successfully decrypted with an untrusted key
      *
-     * @returns {Promise} promise which resolves (to undefined) when the decryption
+     * @returns promise which resolves (to undefined) when the decryption
      * attempt is completed.
      */
     public async attemptDecryption(crypto: Crypto, options: IDecryptOptions = {}): Promise<void> {
@@ -741,10 +741,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Cancel any room key request for this event and resend another.
      *
-     * @param {module:crypto} crypto crypto module
-     * @param {string} userId the user who received this event
+     * @param crypto crypto module
+     * @param userId the user who received this event
      *
-     * @returns {Promise} a promise that resolves when the request is queued
+     * @returns a promise that resolves when the request is queued
      */
     public cancelAndResendKeyRequest(crypto: Crypto, userId: string): Promise<void> {
         const wireContent = this.getWireContent();
@@ -759,9 +759,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Calculate the recipients for keyshare requests.
      *
-     * @param {string} userId the user who received this event.
+     * @param userId the user who received this event.
      *
-     * @returns {Array} array of recipients
+     * @returns array of recipients
      */
     public getKeyRequestRecipients(userId: string): IKeyRequestRecipient[] {
         // send the request to all of our own devices, and the
@@ -905,7 +905,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @fires module:models/event.MatrixEvent#"Event.decrypted"
      *
-     * @param {module:crypto~EventDecryptionResult} decryptionResult
+     * @param decryptionResult
      *     the decryption result, including the plaintext and some key info
      */
     private setClearData(decryptionResult: IEventDecryptionResult): void {
@@ -922,7 +922,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Gets the cleartext content for this event. If the event is not encrypted,
      * or encryption has not been completed, this will return null.
      *
-     * @returns {Object} The cleartext (decrypted) content for the event
+     * @returns The cleartext (decrypted) content for the event
      */
     public getClearContent(): IContent | null {
         return this.clearEvent ? this.clearEvent.content : null;
@@ -930,7 +930,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Check if the event is encrypted.
-     * @return {boolean} True if this event is encrypted.
+     * @return True if this event is encrypted.
      */
     public isEncrypted(): boolean {
         return !this.isState() && this.event.type === EventType.RoomMessageEncrypted;
@@ -947,7 +947,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * For a megolm-encrypted event, it is inferred from the Olm message which
      * established the megolm session
      *
-     * @return {string}
+     * @return
      */
     public getSenderKey(): string | null {
         return this.senderCurve25519Key;
@@ -958,7 +958,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * Just a wrapper for #getClaimedEd25519Key (q.v.)
      *
-     * @return {Object<string, string>}
+     * @return
      */
     public getKeysClaimed(): Partial<Record<"ed25519", string>> {
         if (!this.claimedEd25519Key) return {};
@@ -983,7 +983,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * In general, applications should not use this method directly, but should
      * instead use MatrixClient.getEventSenderDeviceInfo.
      *
-     * @return {string}
+     * @return
      */
     public getClaimedEd25519Key(): string | null {
         return this.claimedEd25519Key;
@@ -1001,7 +1001,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * If the device that sent us the key (A) got it from another device which
      * it wasn't prepared to vouch for (B), the result will be [A, B]. And so on.
      *
-     * @return {string[]} base64-encoded curve25519 keys, from oldest to newest.
+     * @return base64-encoded curve25519 keys, from oldest to newest.
      */
     public getForwardingCurve25519KeyChain(): string[] {
         return this.forwardingCurve25519KeyChain;
@@ -1011,7 +1011,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Whether the decryption key was obtained from an untrusted source. If so,
      * we cannot verify the authenticity of the message.
      *
-     * @return {boolean}
+     * @return
      */
     public isKeySourceUntrusted(): boolean | undefined {
         return !!this.untrusted;
@@ -1093,7 +1093,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
-     * @param {module:models/event.MatrixEvent} redactionEvent
+     * @param redactionEvent
      *     event causing the redaction
      */
     public makeRedacted(redactionEvent: MatrixEvent): void {
@@ -1143,7 +1143,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Check if this event has been redacted
      *
-     * @return {boolean} True if this event has been redacted
+     * @return True if this event has been redacted
      */
     public isRedacted(): boolean {
         return Boolean(this.getUnsigned().redacted_because);
@@ -1152,7 +1152,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Check if this event is a redaction of another event
      *
-     * @return {boolean} True if this event is a redaction
+     * @return True if this event is a redaction
      */
     public isRedaction(): boolean {
         return this.getType() === EventType.RoomRedaction;
@@ -1199,7 +1199,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Check if this event alters the visibility of another event,
      * as per https://github.com/matrix-org/matrix-doc/pull/3531.
      *
-     * @returns {boolean} True if this event alters the visibility
+     * @returns True if this event alters the visibility
      * of another event.
      */
     public isVisibilityEvent(): boolean {
@@ -1210,7 +1210,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get the (decrypted, if necessary) redaction event JSON
      * if event was redacted
      *
-     * @returns {object} The redaction event JSON, or an empty object
+     * @returns The redaction event JSON, or an empty object
      */
     public getRedactionEvent(): object | null {
         if (!this.isRedacted()) return null;
@@ -1227,7 +1227,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Get the push actions, if known, for this event
      *
-     * @return {?Object} push actions
+     * @return push actions
      */
     public getPushActions(): IActionsObject | null {
         return this.pushActions;
@@ -1236,7 +1236,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Set the push actions for this event.
      *
-     * @param {Object} pushActions push actions
+     * @param pushActions push actions
      */
     public setPushActions(pushActions: IActionsObject | null): void {
         this.pushActions = pushActions;
@@ -1244,7 +1244,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Replace the `event` property and recalculate any properties based on it.
-     * @param {Object} event the object to assign to the `event` property
+     * @param event the object to assign to the `event` property
      */
     public handleRemoteEcho(event: object): void {
         const oldUnsigned = this.getUnsigned();
@@ -1275,7 +1275,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Whether the event is in any phase of sending, send failure, waiting for
      * remote echo, etc.
      *
-     * @return {boolean}
+     * @return
      */
     public isSending(): boolean {
         return !!this.status;
@@ -1284,7 +1284,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Update the event's sending status and emit an event as well.
      *
-     * @param {String} status The new status
+     * @param status The new status
      */
     public setStatus(status: EventStatus | null): void {
         this.status = status;
@@ -1300,9 +1300,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Get whether the event is a relation event, and of a given type if
      * `relType` is passed in. State events cannot be relation events
      *
-     * @param {string?} relType if given, checks that the relation is of the
+     * @param relType if given, checks that the relation is of the
      * given type
-     * @return {boolean}
+     * @return
      */
     public isRelation(relType?: string): boolean {
         // Relation info is lifted out of the encrypted content when sent to
@@ -1318,7 +1318,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Get relation info for the event, if any.
      *
-     * @return {Object}
+     * @return
      */
     public getRelation(): IEventRelation | null {
         if (!this.isRelation()) {
@@ -1332,7 +1332,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @fires module:models/event.MatrixEvent#"Event.replaced"
      *
-     * @param {MatrixEvent?} newEvent the event with the replacing content, if any.
+     * @param newEvent the event with the replacing content, if any.
      */
     public makeReplaced(newEvent?: MatrixEvent): void {
         // don't allow redacted events to be replaced.
@@ -1358,7 +1358,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * (not for reactions/annotations as their local echo doesn't affect the original event),
      * or else the status of the event.
      *
-     * @return {EventStatus}
+     * @return
      */
     public getAssociatedStatus(): EventStatus | null {
         if (this._replacingEvent) {
@@ -1376,7 +1376,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Returns the event ID of the event replacing the content of this event, if any.
      *
-     * @return {string?}
+     * @return
      */
     public replacingEventId(): string | undefined {
         const replaceRelation = this.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
@@ -1392,7 +1392,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Replacements are aggregated on the server, so this would only
      * return an event in case it came down the sync, or for local echo of edits.
      *
-     * @return {MatrixEvent?}
+     * @return
      */
     public replacingEvent(): MatrixEvent | null {
         return this._replacingEvent;
@@ -1401,7 +1401,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Returns the origin_server_ts of the event replacing the content of this event, if any.
      *
-     * @return {Date?}
+     * @return
      */
     public replacingEventDate(): Date | undefined {
         const replaceRelation = this.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
@@ -1417,7 +1417,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Returns the event that wants to redact this event, but hasn't been sent yet.
-     * @return {MatrixEvent} the event
+     * @return the event
      */
     public localRedactionEvent(): MatrixEvent | null {
         return this._localRedactionEvent;
@@ -1426,7 +1426,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * For relations and redactions, returns the event_id this event is referring to.
      *
-     * @return {string?}
+     * @return
      */
     public getAssociatedId(): string | undefined {
         const relation = this.getRelation();
@@ -1442,7 +1442,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Checks if this event is associated with another event. See `getAssociatedId`.
      *
-     * @return {boolean}
+     * @return
      * @deprecated use hasAssociation instead.
      */
     public hasAssocation(): boolean {
@@ -1452,7 +1452,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Checks if this event is associated with another event. See `getAssociatedId`.
      *
-     * @return {boolean}
+     * @return
      */
     public hasAssociation(): boolean {
         return !!this.getAssociatedId();
@@ -1464,7 +1464,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Used to replace a local id with remote one before sending
      * an event with a related id.
      *
-     * @param {string} eventId the new event id
+     * @param eventId the new event id
      */
     public updateAssociatedId(eventId: string): void {
         const relation = this.getRelation();
@@ -1479,7 +1479,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Flags an event as cancelled due to future conditions. For example, a verification
      * request event in the same sync transaction may be flagged as cancelled to warn
      * listeners that a cancellation event is coming down the same pipe shortly.
-     * @param {boolean} cancelled Whether the event is to be cancelled or not.
+     * @param cancelled Whether the event is to be cancelled or not.
      */
     public flagCancelled(cancelled = true): void {
         this._isCancelled = cancelled;
@@ -1488,7 +1488,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Gets whether or not the event is flagged as cancelled. See flagCancelled() for
      * more information.
-     * @returns {boolean} True if the event is cancelled, false otherwise.
+     * @returns True if the event is cancelled, false otherwise.
      */
     public isCancelled(): boolean {
         return this._isCancelled;
@@ -1506,7 +1506,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * This is meant to be used to snapshot the event details themselves, not the
      * features (such as sender) surrounding the event.
-     * @returns {MatrixEvent} A snapshot of this event.
+     * @returns A snapshot of this event.
      */
     public toSnapshot(): MatrixEvent {
         const ev = new MatrixEvent(JSON.parse(JSON.stringify(this.event)));
@@ -1522,8 +1522,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Determines if this event is equivalent to the given event. This only checks
      * the event object itself, not the other properties of the event. Intended for
      * use with toSnapshot() to identify events changing.
-     * @param {MatrixEvent} otherEvent The other event to check against.
-     * @returns {boolean} True if the events are the same, false otherwise.
+     * @param otherEvent The other event to check against.
+     * @returns True if the events are the same, false otherwise.
      */
     public isEquivalentTo(otherEvent: MatrixEvent): boolean {
         if (!otherEvent) return false;
@@ -1544,7 +1544,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * for functions named `toJSON` and will call them to customise the output
      * if they are defined.
      *
-     * @return {Object}
+     * @return
      */
     public toJSON(): object {
         const event = this.getEffectiveEvent();

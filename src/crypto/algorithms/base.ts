@@ -91,7 +91,7 @@ export abstract class EncryptionAlgorithm {
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
-     * @param {module:models/room} room the room the event is in
+     * @param room the room the event is in
      */
     public prepareToEncrypt(room: Room): void {}
 
@@ -113,9 +113,9 @@ export abstract class EncryptionAlgorithm {
     /**
      * Called when the membership of a member of the room changes.
      *
-     * @param {module:models/event.MatrixEvent} event  event causing the change
-     * @param {module:models/room-member} member  user whose membership changed
-     * @param {string=} oldMembership  previous membership
+     * @param event  event causing the change
+     * @param member  user whose membership changed
+     * @param oldMembership  previous membership
      * @public
      * @abstract
      */
@@ -177,7 +177,7 @@ export abstract class DecryptionAlgorithm {
      *
      * @method module:crypto/algorithms/base.DecryptionAlgorithm#onRoomKeyEvent
      *
-     * @param {module:models/event.MatrixEvent} params event key event
+     * @param params event key event
      */
     public async onRoomKeyEvent(params: MatrixEvent): Promise<void> {
         // ignore by default
@@ -186,8 +186,8 @@ export abstract class DecryptionAlgorithm {
     /**
      * Import a room key
      *
-     * @param {module:crypto/OlmDevice.MegolmSessionData} session
-     * @param {object} opts object
+     * @param session
+     * @param opts object
      */
     public async importRoomKey(session: IMegolmSessionData, opts: object): Promise<void> {
         // ignore by default
@@ -196,8 +196,8 @@ export abstract class DecryptionAlgorithm {
     /**
      * Determine if we have the keys necessary to respond to a room key request
      *
-     * @param {module:crypto~IncomingRoomKeyRequest} keyRequest
-     * @return {Promise<boolean>} true if we have the keys and could (theoretically) share
+     * @param keyRequest
+     * @return true if we have the keys and could (theoretically) share
      *  them; else false.
      */
     public hasKeysForKeyRequest(keyRequest: IncomingRoomKeyRequest): Promise<boolean> {
@@ -207,7 +207,7 @@ export abstract class DecryptionAlgorithm {
     /**
      * Send the response to a room key request
      *
-     * @param {module:crypto~IncomingRoomKeyRequest} keyRequest
+     * @param keyRequest
      */
     public shareKeysWithDevice(keyRequest: IncomingRoomKeyRequest): void {
         throw new Error("shareKeysWithDevice not supported for this DecryptionAlgorithm");
@@ -217,7 +217,7 @@ export abstract class DecryptionAlgorithm {
      * Retry decrypting all the events from a sender that haven't been
      * decrypted yet.
      *
-     * @param {string} senderKey the sender's key
+     * @param senderKey the sender's key
      */
     public async retryDecryptionFromSender(senderKey: string): Promise<boolean> {
         // ignore by default
@@ -286,13 +286,13 @@ export class UnknownDeviceError extends Error {
 /**
  * Registers an encryption/decryption class for a particular algorithm
  *
- * @param {string} algorithm algorithm tag to register for
+ * @param algorithm algorithm tag to register for
  *
- * @param {class} encryptor {@link
+ * @param encryptor {@link
  *     module:crypto/algorithms/base.EncryptionAlgorithm|EncryptionAlgorithm}
  *     implementation
  *
- * @param {class} decryptor {@link
+ * @param decryptor {@link
  *     module:crypto/algorithms/base.DecryptionAlgorithm|DecryptionAlgorithm}
  *     implementation
  */

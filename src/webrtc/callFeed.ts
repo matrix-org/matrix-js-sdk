@@ -156,7 +156,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     /**
      * Returns true if CallFeed is local, otherwise returns false
-     * @returns {boolean} is local?
+     * @returns is local?
      */
     public isLocal(): boolean {
         return this.userId === this.client.getUserId()
@@ -166,7 +166,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     /**
      * Returns true if audio is muted or if there are no audio
      * tracks, otherwise returns false
-     * @returns {boolean} is audio muted?
+     * @returns is audio muted?
      */
     public isAudioMuted(): boolean {
         return this.stream.getAudioTracks().length === 0 || this.audioMuted;
@@ -175,7 +175,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     /**
      * Returns true video is muted or if there are no video
      * tracks, otherwise returns false
-     * @returns {boolean} is video muted?
+     * @returns is video muted?
      */
     public isVideoMuted(): boolean {
         // We assume only one video track

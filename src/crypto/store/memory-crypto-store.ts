@@ -65,7 +65,7 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * This must be called before the store can be used.
      *
-     * @return {Promise} resolves to the store.
+     * @return resolves to the store.
      */
     public async startup(): Promise<CryptoStore> {
         // No startup work to do for the memory store.
@@ -75,7 +75,7 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Delete all data from this store.
      *
-     * @returns {Promise} Promise which resolves when the store has been cleared.
+     * @returns Promise which resolves when the store has been cleared.
      */
     public deleteAllData(): Promise<void> {
         return Promise.resolve();
@@ -85,9 +85,9 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing outgoing room key request, and if none is found,
      * add a new one
      *
-     * @param {module:crypto/store/base~OutgoingRoomKeyRequest} request
+     * @param request
      *
-     * @returns {Promise} resolves to
+     * @returns resolves to
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
      *    same instance as passed in, or the existing one.
      */
@@ -122,10 +122,10 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
+     * @param requestBody
      *    existing request to look for
      *
-     * @return {Promise} resolves to the matching
+     * @return resolves to the matching
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
      *    not found
      */
@@ -138,10 +138,10 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * @internal
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
+     * @param requestBody
      *    existing request to look for
      *
-     * @return {module:crypto/store/base~OutgoingRoomKeyRequest?}
+     * @return
      *    the matching request, or null if not found
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -157,9 +157,9 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for room key requests by state
      *
-     * @param {Array<Number>} wantedStates list of acceptable states
+     * @param wantedStates list of acceptable states
      *
-     * @return {Promise} resolves to the a
+     * @return resolves to the a
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states
      */
@@ -176,8 +176,8 @@ export class MemoryCryptoStore implements CryptoStore {
 
     /**
      *
-     * @param {Number} wantedState
-     * @return {Promise<Array<*>>} All OutgoingRoomKeyRequests in state
+     * @param wantedState
+     * @return All OutgoingRoomKeyRequests in state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
         return Promise.resolve(
@@ -210,11 +210,11 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing room key request by id and state, and update it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
-     * @param {Object} updates        name/value map of updates to apply
+     * @param requestId      ID of request to update
+     * @param expectedState  state we expect to find the request in
+     * @param updates        name/value map of updates to apply
      *
-     * @returns {Promise} resolves to
+     * @returns resolves to
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
      *    updated request, or null if no matching row was found
      */
@@ -246,10 +246,10 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing room key request by id and state, and delete it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
+     * @param requestId      ID of request to update
+     * @param expectedState  state we expect to find the request in
      *
-     * @returns {Promise} resolves once the operation is completed
+     * @returns resolves once the operation is completed
      */
     public deleteOutgoingRoomKeyRequest(
         requestId: string,

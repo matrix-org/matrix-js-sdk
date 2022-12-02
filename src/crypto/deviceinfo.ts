@@ -63,10 +63,10 @@ export class DeviceInfo {
     /**
      * rehydrate a DeviceInfo from the session store
      *
-     * @param {object} obj  raw object from session store
-     * @param {string} deviceId id of the device
+     * @param obj  raw object from session store
+     * @param deviceId id of the device
      *
-     * @return {module:crypto~DeviceInfo} new DeviceInfo
+     * @return new DeviceInfo
      */
     public static fromStorage(obj: Partial<IDevice>, deviceId: string): DeviceInfo {
         const res = new DeviceInfo(deviceId);
@@ -99,7 +99,7 @@ export class DeviceInfo {
     /**
      * Prepare a DeviceInfo for JSON serialisation in the session store
      *
-     * @return {object} deviceinfo with non-serialised members removed
+     * @return deviceinfo with non-serialised members removed
      */
     public toStorage(): IDevice {
         return {
@@ -115,7 +115,7 @@ export class DeviceInfo {
     /**
      * Get the fingerprint for this device (ie, the Ed25519 key)
      *
-     * @return {string} base64-encoded fingerprint of this device
+     * @return base64-encoded fingerprint of this device
      */
     public getFingerprint(): string {
         return this.keys["ed25519:" + this.deviceId];
@@ -124,7 +124,7 @@ export class DeviceInfo {
     /**
      * Get the identity key for this device (ie, the Curve25519 key)
      *
-     * @return {string} base64-encoded identity key of this device
+     * @return base64-encoded identity key of this device
      */
     public getIdentityKey(): string {
         return this.keys["curve25519:" + this.deviceId];
@@ -133,7 +133,7 @@ export class DeviceInfo {
     /**
      * Get the configured display name for this device, if any
      *
-     * @return {string?} displayname
+     * @return displayname
      */
     public getDisplayName(): string | null {
         return this.unsigned.device_display_name || null;
@@ -142,7 +142,7 @@ export class DeviceInfo {
     /**
      * Returns true if this device is blocked
      *
-     * @return {Boolean} true if blocked
+     * @return true if blocked
      */
     public isBlocked(): boolean {
         return this.verified == DeviceVerification.Blocked;
@@ -151,7 +151,7 @@ export class DeviceInfo {
     /**
      * Returns true if this device is verified
      *
-     * @return {Boolean} true if verified
+     * @return true if verified
      */
     public isVerified(): boolean {
         return this.verified == DeviceVerification.Verified;
@@ -160,7 +160,7 @@ export class DeviceInfo {
     /**
      * Returns true if this device is unverified
      *
-     * @return {Boolean} true if unverified
+     * @return true if unverified
      */
     public isUnverified(): boolean {
         return this.verified == DeviceVerification.Unverified;
@@ -169,7 +169,7 @@ export class DeviceInfo {
     /**
      * Returns true if the user knows about this device's existence
      *
-     * @return {Boolean} true if known
+     * @return true if known
      */
     public isKnown(): boolean {
         return this.known === true;

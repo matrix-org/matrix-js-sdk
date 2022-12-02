@@ -124,7 +124,7 @@ export class PushProcessor {
     /**
      * Construct a Push Processor.
      * @constructor
-     * @param {Object} client The Matrix client object to use
+     * @param client The Matrix client object to use
      */
     public constructor(private readonly client: MatrixClient) {}
 
@@ -132,9 +132,9 @@ export class PushProcessor {
      * Convert a list of actions into a object with the actions as keys and their values
      * eg. [ 'notify', { set_tweak: 'sound', value: 'default' } ]
      *     becomes { notify: true, tweaks: { sound: 'default' } }
-     * @param {array} actionList The actions list
+     * @param actionList The actions list
      *
-     * @return {object} A object with key 'notify' (true or false) and an object of actions
+     * @return A object with key 'notify' (true or false) and an object of actions
      */
     public static actionListToActionsObject(actionList: PushRuleAction[]): IActionsObject {
         const actionObj: IActionsObject = { notify: false, tweaks: {} };
@@ -155,8 +155,8 @@ export class PushProcessor {
      * Rewrites conditions on a client's push rules to match the defaults
      * where applicable. Useful for upgrading push rules to more strict
      * conditions when the server is falling behind on defaults.
-     * @param {object} incomingRules The client's existing push rules
-     * @returns {object} The rewritten rules
+     * @param incomingRules The client's existing push rules
+     * @returns The rewritten rules
      */
     public static rewriteDefaultRules(incomingRules: IPushRules): IPushRules {
         let newRules: IPushRules = JSON.parse(JSON.stringify(incomingRules)); // deep clone
@@ -503,9 +503,9 @@ export class PushProcessor {
     /**
      * Get the user's push actions for the given event
      *
-     * @param {module:models/event.MatrixEvent} ev
+     * @param ev
      *
-     * @return {PushAction}
+     * @return
      */
     public actionsForEvent(ev: MatrixEvent): IActionsObject {
         return this.pushActionsForEventAndRulesets(ev, this.client.pushRules);
@@ -514,8 +514,8 @@ export class PushProcessor {
     /**
      * Get one of the users push rules by its ID
      *
-     * @param {string} ruleId The ID of the rule to search for
-     * @return {object} The push rule, or null if no such rule was found
+     * @param ruleId The ID of the rule to search for
+     * @return The push rule, or null if no such rule was found
      */
     public getPushRuleById(ruleId: string): IPushRule | null {
         for (const scope of ['global']) {

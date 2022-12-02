@@ -54,8 +54,8 @@ export class SearchResult {
     /**
      * Construct a new SearchResult
      *
-     * @param {number} rank   where this SearchResult ranks in the results
-     * @param {event-context.EventContext} context  the matching event and its
+     * @param rank   where this SearchResult ranks in the results
+     * @param context  the matching event and its
      *    context
      *
      * @constructor

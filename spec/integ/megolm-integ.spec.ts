@@ -220,8 +220,8 @@ describe("megolm", () => {
      * Get the device keys for testOlmAccount in a format suitable for a
      * response to /keys/query
      *
-     * @param {string} userId The user ID to query for
-     * @returns {IDownloadKeyResult} The fake query response
+     * @param userId The user ID to query for
+     * @returns The fake query response
      */
     function getTestKeysQueryResponse(userId: string): IDownloadKeyResult {
         const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
@@ -248,8 +248,8 @@ describe("megolm", () => {
      * Get a one-time key for testOlmAccount in a format suitable for a
      * response to /keys/claim
 
-     * @param {string} userId The user ID to query for
-     * @returns {IClaimOTKsResult} The fake key claim response
+     * @param userId The user ID to query for
+     * @returns The fake key claim response
      */
     function getTestKeysClaimResponse(userId: string): IClaimOTKsResult {
         testOlmAccount.generate_one_time_keys(1);

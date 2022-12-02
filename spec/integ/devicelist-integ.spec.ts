@@ -26,9 +26,9 @@ const ROOM_ID = "!room:id";
  * get a /sync response which contains a single e2e room (ROOM_ID), with the
  * members given
  *
- * @param {string[]} roomMembers
+ * @param roomMembers
  *
- * @return {object} sync response
+ * @return sync response
  */
 function getSyncResponse(roomMembers) {
     const stateEvents = [

@@ -132,12 +132,12 @@ export class OutgoingRoomKeyRequestManager {
      * Otherwise, a request is added to the pending list, and a job is started
      * in the background to send it.
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     * @param {Array<{userId: string, deviceId: string}>} recipients
-     * @param {boolean} resend whether to resend the key request if there is
+     * @param requestBody
+     * @param recipients
+     * @param resend whether to resend the key request if there is
      *    already one
      *
-     * @returns {Promise} resolves when the request has been added to the
+     * @returns resolves when the request has been added to the
      *    pending list (or we have established that a similar request already
      *    exists)
      */
@@ -237,9 +237,9 @@ export class OutgoingRoomKeyRequestManager {
     /**
      * Cancel room key requests, if any match the given requestBody
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
+     * @param requestBody
      *
-     * @returns {Promise} resolves when the request has been updated in our
+     * @returns resolves when the request has been updated in our
      *    pending list.
      */
     public cancelRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<unknown> {
@@ -322,10 +322,10 @@ export class OutgoingRoomKeyRequestManager {
     /**
      * Look for room key requests by target device and state
      *
-     * @param {string} userId Target user ID
-     * @param {string} deviceId Target device ID
+     * @param userId Target user ID
+     * @param deviceId Target device ID
      *
-     * @return {Promise} resolves to a list of all the
+     * @return resolves to a list of all the
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
      */
     public getOutgoingSentRoomKeyRequest(userId: string, deviceId: string): Promise<OutgoingRoomKeyRequest[]> {
@@ -337,7 +337,7 @@ export class OutgoingRoomKeyRequestManager {
      * This is intended for situations where something substantial has changed, and we
      * don't really expect the other end to even care about the cancellation.
      * For example, after initialization or self-verification.
-     * @return {Promise} An array of `queueRoomKeyRequest` outputs.
+     * @return An array of `queueRoomKeyRequest` outputs.
      */
     public async cancelAndResendAllOutgoingRequests(): Promise<void[]> {
         const outgoings = await this.cryptoStore.getAllOutgoingRoomKeyRequestsByState(RoomKeyRequestState.Sent);

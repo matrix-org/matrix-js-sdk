@@ -125,9 +125,9 @@ export class AutoDiscovery {
      * and identity server URL the client would want. Additional details
      * may also be included, and will be transparently brought into the
      * response object unaltered.
-     * @param {object} wellknown The configuration object itself, as returned
+     * @param wellknown The configuration object itself, as returned
      * by the .well-known auto-discovery endpoint.
-     * @return {Promise<DiscoveredClientConfig>} Resolves to the verified
+     * @return Resolves to the verified
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
@@ -284,9 +284,9 @@ export class AutoDiscovery {
      * and identity server URL the client would want. Additional details
      * may also be discovered, and will be transparently included in the
      * response object unaltered.
-     * @param {string} domain The homeserver domain to perform discovery
+     * @param domain The homeserver domain to perform discovery
      * on. For example, "matrix.org".
-     * @return {Promise<DiscoveredClientConfig>} Resolves to the discovered
+     * @return Resolves to the discovered
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when discovery fails.
      */
@@ -354,8 +354,8 @@ export class AutoDiscovery {
      * Gets the raw discovery client configuration for the given domain name.
      * Should only be used if there's no validation to be done on the resulting
      * object, otherwise use findClientConfig().
-     * @param {string} domain The domain to get the client config for.
-     * @returns {Promise<object>} Resolves to the domain's client config. Can
+     * @param domain The domain to get the client config for.
+     * @returns Resolves to the domain's client config. Can
      * be an empty object.
      */
     public static async getRawClientConfig(domain?: string): Promise<IClientWellKnown> {
@@ -374,8 +374,8 @@ export class AutoDiscovery {
      * Sanitizes a given URL to ensure it is either an HTTP or HTTP URL and
      * is suitable for the requirements laid out by .well-known auto discovery.
      * If valid, the URL will also be stripped of any trailing slashes.
-     * @param {string} url The potentially invalid URL to sanitize.
-     * @return {string|boolean} The sanitized URL or a falsey value if the URL is invalid.
+     * @param url The potentially invalid URL to sanitize.
+     * @return The sanitized URL or a falsey value if the URL is invalid.
      * @private
      */
     private static sanitizeWellKnownUrl(url: string): string | false {
@@ -430,8 +430,8 @@ export class AutoDiscovery {
      *   action: One of SUCCESS, IGNORE, or FAIL_PROMPT.
      *   reason: Relatively human-readable description of what went wrong.
      *   error: The actual Error, if one exists.
-     * @param {string} url The URL to fetch a JSON object from.
-     * @return {Promise<object>} Resolves to the returned state.
+     * @param url The URL to fetch a JSON object from.
+     * @return Resolves to the returned state.
      * @private
      */
     private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {

@@ -203,8 +203,8 @@ export class SyncAccumulator {
     private nextBatch: string | null = null;
 
     /**
-     * @param {Object} opts
-     * @param {Number=} opts.maxTimelineEntries The ideal maximum number of
+     * @param opts
+     * @param opts.maxTimelineEntries The ideal maximum number of
      * timeline entries to keep in the sync response. This is best-effort, as
      * clients do not always have a back-pagination token for each event, so
      * it's possible there may be slightly *less* than this value. There will
@@ -233,8 +233,8 @@ export class SyncAccumulator {
 
     /**
      * Accumulate incremental /sync room data.
-     * @param {Object} syncResponse the complete /sync JSON
-     * @param {boolean} fromDatabase True if the sync response is one saved to the database
+     * @param syncResponse the complete /sync JSON
+     * @param fromDatabase True if the sync response is one saved to the database
      */
     private accumulateRooms(syncResponse: ISyncResponse, fromDatabase = false): void {
         if (!syncResponse.rooms) {
@@ -526,8 +526,8 @@ export class SyncAccumulator {
      * represents all room data that should be stored. This should be paired
      * with the sync token which represents the most recent /sync response
      * provided to accumulate().
-     * @param {boolean} forDatabase True to generate a sync to be saved to storage
-     * @return {Object} An object with a "nextBatch", "roomsData" and "accountData"
+     * @param forDatabase True to generate a sync to be saved to storage
+     * @return An object with a "nextBatch", "roomsData" and "accountData"
      * keys.
      * The "nextBatch" key is a string which represents at what point in the
      * /sync stream the accumulator reached. This token should be used when

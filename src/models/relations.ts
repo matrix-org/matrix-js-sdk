@@ -52,12 +52,12 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     private readonly client: MatrixClient;
 
     /**
-     * @param {RelationType} relationType
+     * @param relationType
      * The type of relation involved, such as "m.annotation", "m.reference",
      * "m.replace", etc.
-     * @param {String} eventType
+     * @param eventType
      * The relation event's type, such as "m.reaction", etc.
-     * @param {MatrixClient|Room} client
+     * @param client
      * The client which created this instance. For backwards compatibility also accepts a Room.
      */
     public constructor(
@@ -72,7 +72,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     /**
      * Add relation events to this collection.
      *
-     * @param {MatrixEvent} event
+     * @param event
      * The new relation event to be added.
      */
     public async addEvent(event: MatrixEvent): Promise<void> {
@@ -120,7 +120,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     /**
      * Remove relation event from this collection.
      *
-     * @param {MatrixEvent} event
+     * @param event
      * The relation event to remove.
      */
     private async removeEvent(event: MatrixEvent): Promise<void> {
@@ -157,8 +157,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     /**
      * Listens for event status changes to remove cancelled events.
      *
-     * @param {MatrixEvent} event The event whose status has changed
-     * @param {EventStatus} status The new status
+     * @param event The event whose status has changed
+     * @param status The new status
      */
     private onEventStatus = (event: MatrixEvent, status: EventStatus | null): void => {
         if (!event.isSending()) {
@@ -181,7 +181,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * won't match timeline order in the case of scrollback.
      * TODO: Tweak `addEvent` to insert correctly for scrollback.
      *
-     * @return {Array}
+     * @return
      * Relation events in insertion order.
      */
     public getRelations(): MatrixEvent[] {
@@ -246,7 +246,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *   - after the server accepted the redaction and remote echoed back to us
      *   - before the original event has been marked redacted in the client
      *
-     * @param {MatrixEvent} redactedEvent
+     * @param redactedEvent
      * The original relation event that is about to be redacted.
      */
     private onBeforeRedaction = async (redactedEvent: MatrixEvent): Promise<void> => {
@@ -275,7 +275,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *
      * This is currently only supported for the annotation relation type.
      *
-     * @return {Array}
+     * @return
      * An array of [key, events] pairs sorted by descending event count.
      * The events are stored in a Set (which preserves insertion order).
      */
@@ -293,7 +293,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *
      * This is currently only supported for the annotation relation type.
      *
-     * @return {Object}
+     * @return
      * An object with each relation sender as a key and the matching Set of
      * events for that sender as a value.
      */
@@ -312,7 +312,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * This is currently only supported for the m.replace relation type,
      * once the target event is known, see `addEvent`.
      *
-     * @return {MatrixEvent?}
+     * @return
      */
     public async getLastReplacement(): Promise<MatrixEvent | null> {
         if (this.relationType !== RelationType.Replace) {

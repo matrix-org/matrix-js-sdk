@@ -85,6 +85,8 @@ module.exports = {
             "quotes": "off",
             // We use a `logger` intermediary module
             "no-console": "error",
+
+            "jsdoc/no-types": "error",
         },
     }, {
         files: [

@@ -241,9 +241,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * the tail/root references if needed
      * Will fire "Thread.update"
      * @param event The event to add
-     * @param {boolean} toStartOfTimeline whether the event is being added
+     * @param toStartOfTimeline whether the event is being added
      * to the start (and not the end) of the timeline.
-     * @param {boolean} emit whether to emit the Update event if the thread was updated or not.
+     * @param emit whether to emit the Update event if the thread was updated or not.
      */
     public async addEvent(event: MatrixEvent, toStartOfTimeline: boolean, emit = true): Promise<void> {
         this.setEventMetadata(event);

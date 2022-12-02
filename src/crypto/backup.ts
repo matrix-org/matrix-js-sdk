@@ -134,7 +134,7 @@ export class BackupManager {
      *
      * Throws an error if a problem is detected.
      *
-     * @param {IKeyBackupInfo} info the key backup info
+     * @param info the key backup info
      */
     public static checkBackupVersion(info: IKeyBackupInfo): void {
         const Algorithm = algorithmsByName[info.algorithm];
@@ -276,7 +276,7 @@ export class BackupManager {
      * Forces a re-check of the key backup and enables/disables it
      * as appropriate.
      *
-     * @return {Object} Object with backup info (as returned by
+     * @return Object with backup info (as returned by
      *     getKeyBackupVersion) in backupInfo and
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
@@ -309,15 +309,15 @@ export class BackupManager {
     /**
      * Check if the given backup info is trusted.
      *
-     * @param {IKeyBackupInfo} backupInfo key backup info dict from /room_keys/version
-     * @return {object} {
-     *     usable: [bool], // is the backup trusted, true iff there is a sig that is valid & from a trusted device
-     *     sigs: [
-     *         valid: [bool || null], // true: valid, false: invalid, null: cannot attempt validation
-     *         deviceId: [string],
-     *         device: [DeviceInfo || null],
-     *     ]
-     * }
+     * @param backupInfo key backup info dict from /room_keys/version
+     * @return
+     *
+     *
+     *
+     *
+     *
+     *
+     *
      */
     public async isKeyBackupTrusted(backupInfo?: IKeyBackupInfo): Promise<TrustInfo> {
         const ret = {
@@ -490,8 +490,8 @@ export class BackupManager {
      * Take some e2e keys waiting to be backed up and send them
      * to the backup.
      *
-     * @param {number} limit Maximum number of keys to back up
-     * @returns {number} Number of sessions backed up
+     * @param limit Maximum number of keys to back up
+     * @returns Number of sessions backed up
      */
     public async backupPendingKeys(limit: number): Promise<number> {
         const sessions = await this.baseApis.crypto!.cryptoStore.getSessionsNeedingBackup(limit);
@@ -573,7 +573,7 @@ export class BackupManager {
     /**
      * Marks all group sessions as needing to be backed up without scheduling
      * them to upload in the background.
-     * @returns {Promise<int>} Resolves to the number of sessions now requiring a backup
+     * @returns Resolves to the number of sessions now requiring a backup
      *     (which will be equal to the number of sessions in the store).
      */
     public async flagAllGroupSessionsForBackup(): Promise<number> {
@@ -599,7 +599,7 @@ export class BackupManager {
 
     /**
      * Counts the number of end to end session keys that are waiting to be backed up
-     * @returns {Promise<int>} Resolves to the number of sessions requiring backup
+     * @returns Resolves to the number of sessions requiring backup
      */
     public countSessionsNeedingBackup(): Promise<number> {
         return this.baseApis.crypto!.cryptoStore.countSessionsNeedingBackup();

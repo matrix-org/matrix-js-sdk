@@ -414,7 +414,7 @@ export class SlidingSyncSdk {
 
     /**
      * Sync rooms the user has left.
-     * @return {Promise} Resolved when they've been added to the store.
+     * @return Resolved when they've been added to the store.
      */
     public async syncLeftRooms(): Promise<Room[]> {
         return []; // TODO
@@ -423,8 +423,8 @@ export class SlidingSyncSdk {
     /**
      * Peek into a room. This will result in the room in question being synced so it
      * is accessible via getRooms(). Live updates for the room will be provided.
-     * @param {string} roomId The room ID to peek into.
-     * @return {Promise} A promise which resolves once the room has been added to the
+     * @param roomId The room ID to peek into.
+     * @return A promise which resolves once the room has been added to the
      * store.
      */
     public async peek(_roomId: string): Promise<Room> {
@@ -442,7 +442,7 @@ export class SlidingSyncSdk {
     /**
      * Returns the current state of this sync object
      * @see module:client~MatrixClient#event:"sync"
-     * @return {?String}
+     * @return
      */
     public getSyncState(): SyncState | null {
         return this.syncState;
@@ -454,7 +454,7 @@ export class SlidingSyncSdk {
      * such data.
      * Sync errors, if available, are put in the 'error' key of
      * this object.
-     * @return {?Object}
+     * @return
      */
     public getSyncStateData(): ISyncStateData | null {
         return this.syncStateData ?? null;
@@ -721,11 +721,11 @@ export class SlidingSyncSdk {
 
     /**
      * Injects events into a room's model.
-     * @param {Room} room
-     * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
+     * @param room
+     * @param stateEventList A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
-     * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param [timelineEventList] A list of timeline events. Lower index
+     * @param fromCache whether the sync response came from cache
      * is earlier in time. Higher index is later.
      */
     public injectRoomEvents(
@@ -869,8 +869,8 @@ export class SlidingSyncSdk {
 
     /**
      * Sets the sync state and emits an event to say so
-     * @param {String} newState The new state string
-     * @param {Object} data Object of additional data to emit in the event
+     * @param newState The new state string
+     * @param data Object of additional data to emit in the event
      */
     private updateSyncState(newState: SyncState, data?: ISyncStateData): void {
         const old = this.syncState;
@@ -884,7 +884,7 @@ export class SlidingSyncSdk {
      * as appropriate.
      * This must be called after the room the events belong to has been stored.
      *
-     * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
+     * @param [timelineEventList] A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
      */
     private addNotifications(timelineEventList: MatrixEvent[]): void {

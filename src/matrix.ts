@@ -70,7 +70,7 @@ let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore;
 /**
  * Configure a different factory to be used for creating crypto stores
  *
- * @param {Function} fac  a function which will return a new
+ * @param fac  a function which will return a new
  *    {@link module:crypto.store.base~CryptoStore}.
  */
 export function setCryptoStoreFactory(fac: () => CryptoStore): void {
@@ -90,20 +90,20 @@ function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
 /**
  * Construct a Matrix Client. Similar to {@link module:client.MatrixClient}
  * except that the 'request', 'store' and 'scheduler' dependencies are satisfied.
- * @param {Object} opts The configuration options for this client. These configuration
+ * @param opts The configuration options for this client. These configuration
  * options will be passed directly to {@link module:client.MatrixClient}.
- * @param {Object} opts.store If not set, defaults to
+ * @param opts.store If not set, defaults to
  * {@link module:store/memory.MemoryStore}.
- * @param {Object} opts.scheduler If not set, defaults to
+ * @param opts.scheduler If not set, defaults to
  * {@link module:scheduler~MatrixScheduler}.
  *
- * @param {module:crypto.store.base~CryptoStore=} opts.cryptoStore
+ * @param opts.cryptoStore
  *    crypto store implementation. Calls the factory supplied to
  *    {@link setCryptoStoreFactory} if unspecified; or if no factory has been
  *    specified, uses a default implementation (indexeddb in the browser,
  *    in-memory otherwise).
  *
- * @return {MatrixClient} A new matrix client.
+ * @return A new matrix client.
  * @see {@link module:client.MatrixClient} for the full list of options for
  * <code>opts</code>.
  */
