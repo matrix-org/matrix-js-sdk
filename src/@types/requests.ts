@@ -74,7 +74,9 @@ export interface ISearchOpts {
 }
 
 export interface IEventSearchOpts {
+    // a JSON filter object to pass in the request
     filter?: IRoomEventFilter;
+    // the term to search for
     term: string;
 }
 

@@ -36,7 +36,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * worker.
      *
      * Construct a new Indexed Database store backend. This requires a call to
-     * <code>connect()</code> before this store can be used.
+     * `connect()` before this store can be used.
      * @param workerFactory - Factory which produces a Worker
      * @param dbName - Optional database name. The same name must be used
      * to open the same database.

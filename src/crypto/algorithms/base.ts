@@ -272,13 +272,9 @@ export class UnknownDeviceError extends Error {
  *
  * @param algorithm - algorithm tag to register for
  *
- * @param encryptor - {@link
- *     algorithms/base.EncryptionAlgorithm|EncryptionAlgorithm}
- *     implementation
+ * @param encryptor - {@link EncryptionAlgorithm} implementation
  *
- * @param decryptor - {@link
- *     algorithms/base.DecryptionAlgorithm|DecryptionAlgorithm}
- *     implementation
+ * @param decryptor - {@link DecryptionAlgorithm} implementation
  */
 export function registerAlgorithm<P extends IParams = IParams>(
     algorithm: string,

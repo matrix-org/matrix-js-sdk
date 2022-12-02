@@ -61,9 +61,8 @@ export class TimelineWindow {
     /**
      * Construct a TimelineWindow.
      *
-     * <p>This abstracts the separate timelines in a Matrix {@link
-        * Room} into a single iterable thing. It keeps track of
-     * the start and endpoints of the window, which can be advanced with the help
+     * <p>This abstracts the separate timelines in a Matrix {@link Room} into a single iterable thing.
+     * It keeps track of the start and endpoints of the window, which can be advanced with the help
      * of pagination requests.
      *
      * <p>Before the window is useful, it must be initialised by calling {@link TimelineWindow#load}.

@@ -401,7 +401,7 @@ export class OlmDevice {
      * store our OlmSession in the session store
      *
      * @param deviceKey -
-     * @param sessionInfo - {session: OlmSession, lastReceivedMessageTs: int}
+     * @param sessionInfo - `{session: OlmSession, lastReceivedMessageTs: int}`
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
      * @internal
      */

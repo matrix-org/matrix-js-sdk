@@ -494,7 +494,7 @@ export class VerificationRequest<
      * @param fn - callback to evaluate whether the request is in the desired state.
      *                      Takes the request as an argument.
      * @returns that resolves once the callback returns true
-     * @throws {@link Error} when the request is cancelled
+     * @throws Error when the request is cancelled
      */
     public waitFor(fn: (request: VerificationRequest) => boolean): Promise<VerificationRequest> {
         return new Promise((resolve, reject) => {

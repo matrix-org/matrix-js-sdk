@@ -77,7 +77,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * Update this User with the given presence event. May fire "User.presence",
      * "User.avatarUrl" and/or "User.displayName" if this event updates this user's
      * properties.
-     * @param event - The <code>m.presence</code> event.
+     * @param event - The `m.presence` event.
      * @fires UserEvent.Presence
      * @fires UserEvent.DisplayName
      * @fires UserEvent.AvatarUrl

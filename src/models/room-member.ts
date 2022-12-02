@@ -60,21 +60,21 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      *
      * @param roomId - The room ID of the member.
      * @param userId - The user ID of the member.
-     * @prop {string} roomId The room ID for this member.
-     * @prop {string} userId The user ID of this member.
-     * @prop {boolean} typing True if the room member is currently typing.
-     * @prop {string} name The human-readable name for this room member. This will be
+     * @prop roomId The room ID for this member.
+     * @prop userId The user ID of this member.
+     * @prop typing True if the room member is currently typing.
+     * @prop name The human-readable name for this room member. This will be
      * disambiguated with a suffix of " (@user_id:matrix.org)" if another member shares the
      * same displayname.
-     * @prop {string} rawDisplayName The ambiguous displayname of this room member.
-     * @prop {Number} powerLevel The power level for this room member.
-     * @prop {Number} powerLevelNorm The normalised power level (0-100) for this
+     * @prop rawDisplayName The ambiguous displayname of this room member.
+     * @prop powerLevel The power level for this room member.
+     * @prop powerLevelNorm The normalised power level (0-100) for this
      * room member.
-     * @prop {User} user The User object for this room member, if one exists.
-     * @prop {string} membership The membership state for this room member e.g. 'join'.
-     * @prop {Object} events The events describing this RoomMember.
-     * @prop {MatrixEvent} events.member The m.room.member event for this RoomMember.
-     * @prop {boolean} disambiguate True if the member's name is disambiguated.
+     * @prop user The User object for this room member, if one exists.
+     * @prop membership The membership state for this room member e.g. 'join'.
+     * @prop events The events describing this RoomMember.
+     * @prop events.member The m.room.member event for this RoomMember.
+     * @prop disambiguate True if the member's name is disambiguated.
      */
     public constructor(public readonly roomId: string, public readonly userId: string) {
         super();
@@ -103,7 +103,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update this room member's membership event. May fire "RoomMember.name" if
      * this event updates this member's name.
-     * @param event - The <code>m.room.member</code> event
+     * @param event - The `m.room.member` event
      * @param roomState - Optional. The room state to take into account
      * when calculating (e.g. for disambiguating users with the same name).
      * @fires MatrixClient#event:"RoomMember.name"
@@ -157,7 +157,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update this room member's power level event. May fire
      * "RoomMember.powerLevel" if this event updates this member's power levels.
-     * @param powerLevelEvent - The <code>m.room.power_levels</code>
+     * @param powerLevelEvent - The `m.room.power_levels`
      * event
      * @fires MatrixClient#event:"RoomMember.powerLevel"
      */

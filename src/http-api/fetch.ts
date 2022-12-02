@@ -199,9 +199,15 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param opts -.headers map of additional request headers
      *
-     * @returns Promise which resolves to <code>{data: {Object},
-     * headers: {Object}, code: {Number}}</code>.
-     * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
+     * @returns Promise which resolves to
+     * ```
+     * {
+     *  data: {Object},
+     *  headers: {Object},
+     *  code: {Number},
+     * }
+     * ```
+     * If `onlyData</code> is set, this will resolve to the <code>data`
      * object only.
      * @returns Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.

@@ -39,7 +39,7 @@ export class RelationsContainer {
      * The type of relationship involved, such as "m.annotation", "m.reference", "m.replace", etc.
      * @param eventType -
      * The relation event's type, such as "m.reaction", etc.
-     * @throws If <code>eventId</code>, <code>relationType</code> or <code>eventType</code>
+     * @throws If `eventId</code>, <code>relationType</code> or <code>eventType`
      * are not valid.
      *
      * @returns

@@ -21,9 +21,9 @@ export interface IRoomSummary {
 }
 
 interface IInfo {
-    // The title of the room (e.g. <code>m.room.name</code>)
+    // The title of the room (e.g. `m.room.name`)
     title: string;
-    // The description of the room (e.g. <code>m.room.topic</code>)
+    // The description of the room (e.g. `m.room.topic`)
     desc?: string;
     // The number of joined users.
     numMembers?: number;

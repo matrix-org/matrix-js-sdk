@@ -79,7 +79,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     }
 
     /**
-     * Queues <code>m.room.message</code> events and lets other events continue
+     * Queues `m.room.message` events and lets other events continue
      * concurrently.
      * @see queueAlgorithm
      */
@@ -117,7 +117,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     public constructor(
         /**
          * The retry algorithm to apply when retrying events. To stop retrying, return
-         * <code>-1</code>. If this event was part of a queue, it will be removed from
+         * `-1`. If this event was part of a queue, it will be removed from
          * the queue.
          * @param event - The event being retried.
          * @param attempts - The number of failed attempts. This will always be \>= 1.
@@ -125,20 +125,20 @@ export class MatrixScheduler<T = ISendEventResponse> {
          * to send this event.
          * @returns The number of milliseconds to wait before trying again. If
          * this is 0, the request will be immediately retried. If this is
-         * <code>-1</code>, the event will be marked as
+         * `-1`, the event will be marked as
          * {@link EventStatus.NOT_SENT} and will not be retried.
          */
         public readonly retryAlgorithm = MatrixScheduler.RETRY_BACKOFF_RATELIMIT,
         /**
          * The queuing algorithm to apply to events. This function must be idempotent as
          * it may be called multiple times with the same event. All queues created are
-         * serviced in a FIFO manner. To send the event ASAP, return <code>null</code>
+         * serviced in a FIFO manner. To send the event ASAP, return `null`
          * which will not put this event in a queue. Events that fail to send that form
          * part of a queue will be removed from the queue and the next event in the
          * queue will be sent.
          * @param event - The event to be sent.
          * @returns The name of the queue to put the event into. If a queue with
-         * this name does not exist, it will be created. If this is <code>null</code>,
+         * this name does not exist, it will be created. If this is `null`,
          * the event is not put into a queue and will be sent concurrently.
          */
         public readonly queueAlgorithm = MatrixScheduler.QUEUE_MESSAGES,

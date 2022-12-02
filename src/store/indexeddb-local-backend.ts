@@ -134,9 +134,9 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Does the actual reading from and writing to the indexeddb
      *
      * Construct a new Indexed Database store backend. This requires a call to
-     * <code>connect()</code> before this store can be used.
+     * `connect()` before this store can be used.
      * @param indexedDB - The Indexed DB interface e.g
-     * <code>window.indexedDB</code>
+     * `window.indexedDB`
      * @param dbName - Optional database name. The same name must be used
      * to open the same database.
      */

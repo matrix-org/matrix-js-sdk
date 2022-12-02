@@ -182,7 +182,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @returns A list of the sent events
      * waiting for remote echo.
      *
-     * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
+     * @throws If `opts.pendingEventOrdering` was not 'detached'
      */
     public getPendingEvents(): MatrixEvent[] {
         if (!this.room || !this.displayPendingEvents) {
@@ -864,8 +864,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * for events which should be shown in the main room timeline.
      * Requires the `room` property to have been set at EventTimelineSet construction time.
      *
-     * @param event - {MatrixEvent} the event to check whether it belongs to this timeline set.
-     * @throws {@link Error} if `room` was not set when constructing this timeline set.
+     * @param event - the event to check whether it belongs to this timeline set.
+     * @throws Error if `room` was not set when constructing this timeline set.
      * @returns whether the event belongs to this timeline set.
      */
     public canContain(event: MatrixEvent): boolean {

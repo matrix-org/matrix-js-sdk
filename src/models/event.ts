@@ -290,20 +290,20 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @param event - The raw event to be wrapped in this DAO
      *
-     * @prop {Object} event The raw (possibly encrypted) event. <b>Do not access
+     * @prop event The raw (possibly encrypted) event. <b>Do not access
      * this property</b> directly unless you absolutely have to. Prefer the getter
      * methods defined on this class. Using the getter methods shields your app
      * from changes to event JSON between Matrix versions.
      *
-     * @prop {RoomMember} sender The room member who sent this event, or null e.g.
+     * @prop sender The room member who sent this event, or null e.g.
      * this is a presence event. This is only guaranteed to be set for events that
      * appear in a timeline, ie. do not guarantee that it will be set on state
      * events.
-     * @prop {RoomMember} target The room member who is the target of this event, e.g.
+     * @prop target The room member who is the target of this event, e.g.
      * the invitee, the person being banned, etc.
-     * @prop {EventStatus} status The sending status of the event.
-     * @prop {Error} error most recent error associated with sending the event, if any
-     * @prop {boolean} forwardLooking True if this event is 'forward looking', meaning
+     * @prop status The sending status of the event.
+     * @prop error most recent error associated with sending the event, if any
+     * @prop forwardLooking True if this event is 'forward looking', meaning
      * that getDirectionalContent() will return event.content and not event.prev_content.
      * Default: true. <strong>This property is experimental and may change.</strong>
      */
@@ -396,7 +396,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the user_id for this event.
-     * @returns The user ID, e.g. <code>@alice:matrix.org</code>
+     * @returns The user ID, e.g. `@alice:matrix.org`
      */
     public getSender(): string | undefined {
         return this.event.sender || this.event.user_id; // v2 / v1
@@ -405,7 +405,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Get the (decrypted, if necessary) type of event.
      *
-     * @returns The event type, e.g. <code>m.room.message</code>
+     * @returns The event type, e.g. `m.room.message`
      */
     public getType(): EventType | string {
         if (this.clearEvent) {
@@ -425,8 +425,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * Get the room_id for this event. This will return <code>undefined</code>
-     * for <code>m.presence</code> events.
+     * Get the room_id for this event. This will return `undefined`
+     * for `m.presence` events.
      * @returns The room ID, e.g. <code>!cURbafjkfsMDVwdRDQ:matrix.org
      * </code>
      */
@@ -436,7 +436,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the timestamp of this event.
-     * @returns The event timestamp, e.g. <code>1433502692297</code>
+     * @returns The event timestamp, e.g. `1433502692297`
      */
     public getTs(): number {
         return this.event.origin_server_ts!;
@@ -444,7 +444,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
     /**
      * Get the timestamp of this event, as a Date object.
-     * @returns The event date, e.g. <code>new Date(1433502692297)</code>
+     * @returns The event date, e.g. `new Date(1433502692297)`
      */
     public getDate(): Date | null {
         return this.event.origin_server_ts ? new Date(this.event.origin_server_ts) : null;
@@ -602,7 +602,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Get the event state_key if it has one. This will return <code>undefined
      * </code> for message events.
-     * @returns The event's <code>state_key</code>.
+     * @returns The event's `state_key`.
      */
     public getStateKey(): string | undefined {
         return this.event.state_key;

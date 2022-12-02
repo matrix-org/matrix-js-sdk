@@ -70,8 +70,7 @@ let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore;
 /**
  * Configure a different factory to be used for creating crypto stores
  *
- * @param fac -  a function which will return a new
- *    {@link CryptoStore}.
+ * @param fac - a function which will return a new {@link CryptoStore}
  */
 export function setCryptoStoreFactory(fac: () => CryptoStore): void {
     cryptoStoreFactory = fac;
@@ -105,7 +104,7 @@ function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
  *
  * @returns A new matrix client.
  * @see {@link MatrixClient} for the full list of options for
- * <code>opts</code>.
+ * `opts`.
  */
 export function createClient(opts: ICreateClientOpts): MatrixClient {
     return new MatrixClient(amendClientOpts(opts));

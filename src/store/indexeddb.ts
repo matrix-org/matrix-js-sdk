@@ -77,9 +77,9 @@ export class IndexedDBStore extends MemoryStore {
      * the contents of the store to an IndexedDB backend.
      *
      * All data is still kept in-memory but can be loaded from disk by calling
-     * <code>startup()</code>. This can make startup times quicker as a complete
+     * `startup()`. This can make startup times quicker as a complete
      * sync from the server is not required. This does not reduce memory usage as all
-     * the data is eagerly fetched when <code>startup()</code> is called.
+     * the data is eagerly fetched when `startup()` is called.
      * ```
      * let opts = { indexedDB: window.indexedDB, localStorage: window.localStorage };
      * let store = new IndexedDBStore(opts);
@@ -97,7 +97,7 @@ export class IndexedDBStore extends MemoryStore {
      *
      * @param opts - Options object.
      * @param opts -.indexedDB The Indexed DB interface e.g.
-     * <code>window.indexedDB</code>
+     * `window.indexedDB`
      * @param opts -.dbName Optional database name. The same name must be used
      * to open the same database.
      * @param opts -.workerScript Optional URL to a script to invoke a web

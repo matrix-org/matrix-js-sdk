@@ -120,11 +120,6 @@ interface IInitOpts {
 }
 
 export interface IBootstrapCrossSigningOpts {
-    /**
-     * @param [opts.setupNewCrossSigning]
-     * Args:
-     *     {function}
-     */
     // Optional. Reset even if keys already exist.
     setupNewCrossSigning?: boolean;
     /**
@@ -695,12 +690,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
      *
-     * @param opts -.authUploadDeviceSigningKeys Function
+     * @param authUploadDeviceSigningKeys - Function
      * called to await an interactive auth flow when uploading device signing keys.
-     * @param [opts.setupNewCrossSigning] Optional. Reset even if keys
+     * @param setupNewCrossSigning Optional. Reset even if keys
      * already exist.
      * Args:
-     *     {function} A function that makes the request requiring auth. Receives the
+     *     A function that makes the request requiring auth. Receives the
      *     auth data as an object. Can be called multiple times, first with an empty
      *     authDict, to obtain the flows.
      */
@@ -840,8 +835,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param [opts.createSecretStorageKey] Optional. Function
      * called to await a secret storage key creation flow.
-     * Returns:
-     *     {Promise<Object>} Object with public key metadata, encoded private
+     * Resolves:
+     *     Object with public key metadata, encoded private
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      * @param [opts.keyBackupInfo] The current key backup object. If passed,
@@ -854,7 +849,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *     current key backup passphrase. Should return a promise that resolves with a Buffer
      *     containing the key, or rejects if the key cannot be obtained.
      * Returns:
-     *     {Promise} A promise which resolves to key creation data for
+     *     A promise which resolves to key creation data for
      *     SecretStorage#addKey: an object with `passphrase` etc fields.
      */
     // TODO this does not resolve with what it says it does
@@ -3158,7 +3153,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param payload - fields to include in the encrypted payload
      * @returns Promise which
      *     resolves once the message has been encrypted and sent to the given
-     *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
+     *     userDeviceMap, and returns the `{ contentMap, deviceInfoByDeviceId }`
      *     of the successfully sent messages.
      */
     public async encryptAndSendToDevices(

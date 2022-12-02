@@ -239,10 +239,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * Get state events from the state of the room.
      * @param eventType - The event type of the state event.
      * @param stateKey - Optional. The state_key of the state event. If
-     * this is <code>undefined</code> then all matching state events will be
+     * this is `undefined` then all matching state events will be
      * returned.
      * @returns A list of events if state_key was
-     * <code>undefined</code>, else a single event (or null if no match found).
+     * `undefined`, else a single event (or null if no match found).
      */
     public getStateEvents(eventType: EventType | string): MatrixEvent[];
     public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent | null;
@@ -328,8 +328,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * Add an array of one or more state MatrixEvents, overwriting any existing
      * state with the same `{type, stateKey}` tuple. Will fire "RoomState.events"
      * for every event added. May fire "RoomState.members" if there are
-     * <code>m.room.member</code> events. May fire "RoomStateEvent.Marker" if there are
-     * <code>UNSTABLE_MSC2716_MARKER</code> events.
+     * `m.room.member` events. May fire "RoomStateEvent.Marker" if there are
+     * `UNSTABLE_MSC2716_MARKER` events.
      * @param stateEvents - a list of state events for this room.
      * @param markerFoundOptions -
      * @fires MatrixClient#event:"RoomState.members"

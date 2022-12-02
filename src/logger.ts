@@ -52,7 +52,7 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
 };
 
 /**
- * Drop-in replacement for <code>console</code> using {@link https://www.npmjs.com/package/loglevel|loglevel}.
+ * Drop-in replacement for `console` using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
  */
 export const logger = log.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;

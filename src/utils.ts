@@ -143,7 +143,7 @@ export function encodeUri(pathTemplate: string, variables: Record<string, Option
  * satisfies (returns true) the provided testing function.
  * @param array - The array.
  * @param fn - Function to execute on each value in the array, with the
- * function signature <code>fn(element, index, array)</code>. Return true to
+ * function signature `fn(element, index, array)`. Return true to
  * remove this element and break.
  * @param reverse - True to search in reverse order.
  * @returns True if an element was removed.

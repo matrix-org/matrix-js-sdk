@@ -145,7 +145,7 @@ export class EventTimeline {
      *
      * @param stateEvents - list of state events to initialise the
      * state with.
-     * @throws {@link Error} if an attempt is made to call this after addEvent is called.
+     * @throws Error if an attempt is made to call this after addEvent is called.
      */
     public initialiseState(stateEvents: MatrixEvent[], { timelineWasEmpty }: IInitialiseStateOptions = {}): void {
         if (this.events.length > 0) {
@@ -330,7 +330,7 @@ export class EventTimeline {
      * @param direction - EventTimeline.BACKWARDS to set the previous
      *   timeline; EventTimeline.FORWARDS to set the next timeline.
      *
-     * @throws {@link Error} if an attempt is made to set the neighbouring timeline when
+     * @throws Error if an attempt is made to set the neighbouring timeline when
      * it is already set.
      */
     public setNeighbouringTimeline(neighbour: EventTimeline, direction: Direction): void {

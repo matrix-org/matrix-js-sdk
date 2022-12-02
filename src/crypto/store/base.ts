@@ -44,8 +44,6 @@ export interface SecretStorePrivateKeys {
 
 /**
  * Abstraction of things that can store data required for end-to-end encryption
- *
- * @interface CryptoStore
  */
 export interface CryptoStore {
     startup(): Promise<CryptoStore>;

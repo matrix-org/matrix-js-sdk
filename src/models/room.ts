@@ -223,7 +223,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public normalizedName: string;
     /**
      * Dict of room tags; the keys are the tag name and the values
-     * are any metadata associated with the tag - e.g. { "fav" : { order: 1 } }
+     * are any metadata associated with the tag - e.g. `{ "fav" : { order: 1 } }`
      */
     public tags: Record<string, Record<string, any>> = {}; // $tagName: { $metadata: $value }
     /**
@@ -304,7 +304,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param opts -.pendingEventOrdering Controls where pending messages
      * appear in a room's timeline. If "<b>chronological</b>", messages will appear
-     * in the timeline when the call to <code>sendEvent</code> was made. If
+     * in the timeline when the call to `sendEvent` was made. If
      * "<b>detached</b>", pending messages will appear in a separate list,
      * accessible via {@link Room#getPendingEvents}. Default:
      * "chronological".
@@ -483,10 +483,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Determines the recommended room version for the room. This returns an
-     * object with 3 properties: <code>version</code> as the new version the
+     * object with 3 properties: `version` as the new version the
      * room should be upgraded to (may be the same as the current version);
-     * <code>needsUpgrade</code> to indicate if the room actually can be
-     * upgraded (ie: does the current version not match?); and <code>urgent</code>
+     * `needsUpgrade` to indicate if the room actually can be
+     * upgraded (ie: does the current version not match?); and `urgent`
      * to indicate if the new version patches a vulnerability in a previous
      * version.
      * @returns
@@ -583,7 +583,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns A list of the sent events
      * waiting for remote echo.
      *
-     * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
+     * @throws If `opts.pendingEventOrdering` was not 'detached'
      */
     public getPendingEvents(): MatrixEvent[] {
         if (!this.pendingEventList) {
@@ -1449,7 +1449,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Get a member from the current room state.
      * @param userId - The user ID of the member.
-     * @returns The member or <code>null</code>.
+     * @returns The member or `null`.
      */
     public getMember(userId: string): RoomMember | null {
         return this.currentState.getMember(userId);
@@ -1547,7 +1547,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Check if the given user_id has the given membership state.
      * @param userId - The user ID to check.
-     * @param membership - The membership e.g. <code>'join'</code>
+     * @param membership - The membership e.g. `'join'`
      * @returns True if this user_id has the given membership state.
      */
     public hasMembershipState(userId: string, membership: string): boolean {
@@ -2464,7 +2464,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param events - A list of events to add.
      * @param addLiveEventOptions - addLiveEvent options
-     * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
+     * @throws If `duplicateStrategy` is not falsey, 'replace' or 'ignore'.
      */
     public addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): void;
     /**

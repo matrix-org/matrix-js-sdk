@@ -43,10 +43,10 @@ export class MatrixError extends HTTPError {
      * Construct a Matrix error. This is a JavaScript Error with additional
      * information specific to the standard Matrix error response.
      * @param errorJson - The Matrix error JSON returned from the homeserver.
-     * @prop {string} errcode The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
-     * @prop {string} name Same as MatrixError.errcode but with a default unknown string.
-     * @prop {string} message The Matrix 'error' value, e.g. "Missing token."
-     * @prop {Object} data The raw Matrix error JSON used to construct this object.
+     * @prop errcode The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
+     * @prop name Same as MatrixError.errcode but with a default unknown string.
+     * @prop message The Matrix 'error' value, e.g. "Missing token."
+     * @prop data The raw Matrix error JSON used to construct this object.
      * @param httpStatus - The numeric HTTP status code given
      */
     public constructor(
