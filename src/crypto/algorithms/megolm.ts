@@ -657,14 +657,17 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const deviceInfo = blockedInfo.deviceInfo;
             const deviceId = deviceInfo.deviceId;
 
-            const message = Object.assign({}, payload);
-            message.code = blockedInfo.code;
-            message.reason = blockedInfo.reason;
+            const message = {
+                ...payload,
+                code: blockedInfo.code,
+                reason: blockedInfo.reason,
+                [ToDeviceMessageId]: uuidv4(),
+            };
+
             if (message.code === "m.no_olm") {
                 delete message.room_id;
                 delete message.session_id;
             }
-            message[ToDeviceMessageId] = uuidv4();
 
             if (!contentMap[userId]) {
                 contentMap[userId] = {};
@@ -1929,7 +1932,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                         algorithm: olmlib.OLM_ALGORITHM,
                         sender_key: this.olmDevice.deviceCurve25519Key!,
                         ciphertext: {},
-                        [ToDeviceMessageId]: uuidv4,
+                        [ToDeviceMessageId]: uuidv4(),
                     };
                     contentMap[userId][deviceInfo.deviceId] = encryptedContent;
                     promises.push(
