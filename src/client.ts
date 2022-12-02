@@ -5453,7 +5453,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                 timelineSet.addEventsToTimeline(events, true, timeline, resNewer.next_batch);
                 if (!resOlder.next_batch) {
-                    timelineSet.addEventsToTimeline([mapper(resOlder.original_event)], true, timeline, null);
+                    const originalEvent = await this.fetchRoomEvent(timelineSet.room.roomId, thread.id);
+                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, timeline, null);
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(resNewer.next_batch ?? null, Direction.Forward);
@@ -5510,7 +5511,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                 timelineSet.addEventsToTimeline(events, true, timeline, null);
                 if (!resOlder.next_batch) {
-                    timelineSet.addEventsToTimeline([mapper(resOlder.original_event)], true, timeline, null);
+                    const originalEvent = await this.fetchRoomEvent(timelineSet.room.roomId, thread.id);
+                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, timeline, null);
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(null, Direction.Forward);
@@ -5858,7 +5860,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 const timelineSet = eventTimeline.getTimelineSet();
                 timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, newToken ?? null);
                 if (!newToken && backwards) {
-                    timelineSet.addEventsToTimeline([mapper(res.original_event)], true, eventTimeline, null);
+                    const originalEvent = await this.fetchRoomEvent(eventTimeline.getRoomId() ?? "", thread.id);
+                    timelineSet.addEventsToTimeline([mapper(originalEvent)], true, eventTimeline, null);
                 }
                 this.processBeaconEvents(timelineSet.room, matrixEvents);
 
@@ -7079,15 +7082,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         prevBatch?: string | null;
     }> {
         const fetchedEventType = eventType ? this.getEncryptedIfNeededEventType(roomId, eventType) : null;
-        const result = await this.fetchRelations(
-            roomId,
-            eventId,
-            relationType,
-            fetchedEventType,
-            opts);
+        const [eventResult, result] = await Promise.all([
+            this.fetchRoomEvent(roomId, eventId),
+            this.fetchRelations(roomId, eventId, relationType, fetchedEventType, opts),
+        ]);
         const mapper = this.getEventMapper();
 
-        const originalEvent = result.original_event ? mapper(result.original_event) : undefined;
+        const originalEvent = eventResult ? mapper(eventResult) : undefined;
         let events = result.chunk.map(mapper);
 
         if (fetchedEventType === EventType.RoomMessageEncrypted) {
@@ -7648,7 +7649,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         return this.http.authedRequest(
             Method.Get, path, undefined, undefined, {
-                prefix: ClientPrefix.Unstable,
+                prefix: ClientPrefix.V1,
             },
         );
     }
@@ -9357,7 +9358,6 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 
-    const totalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
     const currentCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
 
     // Ensure the unread counts are kept up to date if the event is encrypted
@@ -9365,7 +9365,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     // have encrypted events to avoid other code from resetting 'highlight' to zero.
     const oldHighlight = !!oldActions?.tweaks?.highlight;
     const newHighlight = !!actions?.tweaks?.highlight;
-    if ((oldHighlight !== newHighlight || currentCount > 0) && totalCount > 0) {
+    if (oldHighlight !== newHighlight || currentCount > 0) {
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
         const hasReadEvent = isThreadEvent

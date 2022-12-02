@@ -1688,7 +1688,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             Array.from(this.threads)
                 .forEach(([, thread]) => {
                     if (thread.length === 0) return;
-                    const currentUserParticipated = thread.events.some(event => {
+                    const currentUserParticipated = thread.timeline.some(event => {
                         return event.getSender() === this.client.getUserId();
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
@@ -1835,7 +1835,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private onThreadNewReply(thread: Thread): void {
-        this.updateThreadRootEvents(thread, false);
+        this.updateThreadRootEvents(thread, false, true);
     }
 
     private onThreadDelete(thread: Thread): void {
@@ -1960,11 +1960,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         ));
     }
 
-    private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean): void => {
+    private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean, recreateEvent: boolean): void => {
         if (thread.length) {
-            this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline);
+            this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline, recreateEvent);
             if (thread.hasCurrentUserParticipated) {
-                this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline);
+                this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline, recreateEvent);
             }
         }
     };
@@ -1973,8 +1973,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         timelineSet: Optional<EventTimelineSet>,
         thread: Thread,
         toStartOfTimeline: boolean,
+        recreateEvent: boolean,
     ): void => {
         if (timelineSet && thread.rootEvent) {
+            if (recreateEvent) {
+                timelineSet.removeEvent(thread.id);
+            }
             if (Thread.hasServerSideSupport) {
                 timelineSet.addLiveEvent(thread.rootEvent, {
                     duplicateStrategy: DuplicateStrategy.Replace,
@@ -2009,6 +2013,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const thread = new Thread(threadId, rootEvent, {
             room: this,
             client: this.client,
+            pendingEventOrdering: this.opts.pendingEventOrdering,
         });
 
         // This is necessary to be able to jump to events in threads:
@@ -2037,7 +2042,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         if (this.threadsReady) {
-            this.updateThreadRootEvents(thread, toStartOfTimeline);
+            this.updateThreadRootEvents(thread, toStartOfTimeline, false);
         }
 
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);

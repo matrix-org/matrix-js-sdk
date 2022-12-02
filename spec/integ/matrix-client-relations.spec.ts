@@ -55,7 +55,10 @@ describe("MatrixClient relations", () => {
         const response = client!.relations(roomId, '$event-0', null, null);
 
         httpBackend!
-            .when("GET", "/rooms/!room%3Ahere/relations/%24event-0?dir=b")
+            .when("GET", "/rooms/!room%3Ahere/event/%24event-0")
+            .respond(200, null);
+        httpBackend!
+            .when("GET", "/_matrix/client/v1/rooms/!room%3Ahere/relations/%24event-0?dir=b")
             .respond(200, { chunk: [], next_batch: 'NEXT' });
 
         await httpBackend!.flushAllExpected();
@@ -67,7 +70,10 @@ describe("MatrixClient relations", () => {
         const response = client!.relations(roomId, '$event-0', 'm.reference', null);
 
         httpBackend!
-            .when("GET", "/rooms/!room%3Ahere/relations/%24event-0/m.reference?dir=b")
+            .when("GET", "/rooms/!room%3Ahere/event/%24event-0")
+            .respond(200, null);
+        httpBackend!
+            .when("GET", "/_matrix/client/v1/rooms/!room%3Ahere/relations/%24event-0/m.reference?dir=b")
             .respond(200, { chunk: [], next_batch: 'NEXT' });
 
         await httpBackend!.flushAllExpected();
@@ -79,9 +85,12 @@ describe("MatrixClient relations", () => {
         const response = client!.relations(roomId, '$event-0', 'm.reference', 'm.room.message');
 
         httpBackend!
+            .when("GET", "/rooms/!room%3Ahere/event/%24event-0")
+            .respond(200, null);
+        httpBackend!
             .when(
                 "GET",
-                "/rooms/!room%3Ahere/relations/%24event-0/m.reference/m.room.message?dir=b",
+                "/_matrix/client/v1/rooms/!room%3Ahere/relations/%24event-0/m.reference/m.room.message?dir=b",
             )
             .respond(200, { chunk: [], next_batch: 'NEXT' });
 
@@ -99,9 +108,12 @@ describe("MatrixClient relations", () => {
         });
 
         httpBackend!
+            .when("GET", "/rooms/!room%3Ahere/event/%24event-0")
+            .respond(200, null);
+        httpBackend!
             .when(
                 "GET",
-                "/rooms/!room%3Ahere/relations/%24event-0?dir=f&from=FROM&limit=10&to=TO",
+                "/_matrix/client/v1/rooms/!room%3Ahere/relations/%24event-0?dir=f&from=FROM&limit=10&to=TO",
             )
             .respond(200, { chunk: [], next_batch: 'NEXT' });
 
