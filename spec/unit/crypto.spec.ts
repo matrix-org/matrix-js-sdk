@@ -1056,7 +1056,7 @@ describe("Crypto", function() {
                     delete data.messages["@bob:example.org"]["bobweb"]["org.matrix.msgid"];
                     // Carol is nowhere to be seen
                     expect(data).toStrictEqual({
-                        messages: {"@bob:example.org": {bobweb: encryptedPayload}},
+                        messages: { "@bob:example.org": { bobweb: encryptedPayload } },
                     });
                 })
                 .respond(200, {});
