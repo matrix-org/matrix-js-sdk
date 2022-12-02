@@ -81,6 +81,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * A reference to all the events ID at the bottom of the threads
      */
     public readonly timelineSet: EventTimelineSet;
+    public timeline: MatrixEvent[] = [];
 
     private _currentUserParticipated = false;
 
@@ -181,7 +182,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     private onRedaction = async (event: MatrixEvent): Promise<void> => {
         if (event.threadRootId !== this.id) return; // ignore redactions for other timelines
         if (this.replyCount <= 0) {
-            for (const threadEvent of this.events) {
+            for (const threadEvent of this.timeline) {
                 this.clearEventMetadata(threadEvent);
             }
             this.lastEvent = this.rootEvent;
@@ -228,6 +229,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                     roomState: this.roomState,
                 },
             );
+            this.timeline = this.events;
         }
     }
 
@@ -287,6 +289,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.setEventMetadata(event);
             await this.fetchEditsWhereNeeded(event);
         }
+        this.timeline = this.events;
     }
 
     private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {
@@ -374,8 +377,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * Return last reply to the thread, if known.
      */
     public lastReply(matches: (ev: MatrixEvent) => boolean = (): boolean => true): MatrixEvent | null {
-        for (let i = this.events.length - 1; i >= 0; i--) {
-            const event = this.events[i];
+        for (let i = this.timeline.length - 1; i >= 0; i--) {
+            const event = this.timeline[i];
             if (matches(event)) {
                 return event;
             }
@@ -421,10 +424,6 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public getUnfilteredTimelineSet(): EventTimelineSet {
         return this.timelineSet;
-    }
-
-    public get timeline(): MatrixEvent[] {
-        return this.events;
     }
 
     public addReceipt(event: MatrixEvent, synthetic: boolean): void {
