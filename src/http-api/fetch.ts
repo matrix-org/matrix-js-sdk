@@ -64,7 +64,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Sets the base URL for the identity server
-     * @param url The new base url
+     * @param url - The new base url
      */
     public setIdBaseUrl(url: string): void {
         this.opts.idBaseUrl = url;
@@ -104,34 +104,34 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Perform an authorised request to the homeserver.
-     * @param method The HTTP method e.g. "GET".
-     * @param path The HTTP path <b>after</b> the supplied prefix e.g.
+     * @param method - The HTTP method e.g. "GET".
+     * @param path - The HTTP path <b>after</b> the supplied prefix e.g.
      * "/createRoom".
      *
-     * @param queryParams A dict of query params (these will NOT be
+     * @param queryParams - A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
      * @param [body] The HTTP JSON body.
      *
-     * @param opts additional options. If a number is specified,
+     * @param opts - additional options. If a number is specified,
      * this is treated as `opts.localTimeoutMs`.
      *
-     * @param opts.localTimeoutMs The maximum amount of time to wait before
+     * @param opts -.localTimeoutMs The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
      *
-     * @param opts.prefix The full prefix to use e.g.
+     * @param opts -.prefix The full prefix to use e.g.
      * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
      *
-     * @param opts.baseUrl The alternative base url to use.
+     * @param opts -.baseUrl The alternative base url to use.
      * If not specified, uses this.opts.baseUrl
      *
-     * @param opts.headers map of additional request headers
+     * @param opts -.headers map of additional request headers
      *
-     * @return Resolves to <code>{data: {Object},
+     * @returns Resolves to <code>{data: {Object},
      * headers: {Object}, code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
-     * @return Rejects with an error if a problem occurred.
+     * @returns Rejects with an error if a problem occurred.
      * This includes network problems and Matrix-specific error JSON.
      */
     public authedRequest<T>(
@@ -176,30 +176,30 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Perform a request to the homeserver without any credentials.
-     * @param method The HTTP method e.g. "GET".
-     * @param path The HTTP path <b>after</b> the supplied prefix e.g.
+     * @param method - The HTTP method e.g. "GET".
+     * @param path - The HTTP path <b>after</b> the supplied prefix e.g.
      * "/createRoom".
      *
-     * @param queryParams A dict of query params (these will NOT be
+     * @param queryParams - A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
      * @param [body] The HTTP JSON body.
      *
-     * @param opts additional options
+     * @param opts - additional options
      *
-     * @param opts.localTimeoutMs The maximum amount of time to wait before
+     * @param opts -.localTimeoutMs The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
      *
-     * @param opts.prefix The full prefix to use e.g.
+     * @param opts -.prefix The full prefix to use e.g.
      * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
      *
-     * @param opts.headers map of additional request headers
+     * @param opts -.headers map of additional request headers
      *
-     * @return Resolves to <code>{data: {Object},
+     * @returns Resolves to <code>{data: {Object},
      * headers: {Object}, code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
-     * @return Rejects with an error if a problem
+     * @returns Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public request<T>(
@@ -215,21 +215,21 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Perform a request to an arbitrary URL.
-     * @param method The HTTP method e.g. "GET".
-     * @param url The HTTP URL object.
+     * @param method - The HTTP method e.g. "GET".
+     * @param url - The HTTP URL object.
      *
      * @param [body] The HTTP JSON body.
      *
-     * @param opts additional options
+     * @param opts - additional options
      *
-     * @param opts.localTimeoutMs The maximum amount of time to wait before
+     * @param opts -.localTimeoutMs The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
      *
-     * @param opts.headers map of additional request headers
+     * @param opts -.headers map of additional request headers
      *
-     * @return Resolves to data unless `onlyData` is specified as false,
+     * @returns Resolves to data unless `onlyData` is specified as false,
      * where the resolved value will be a fetch Response object.
-     * @return Rejects with an error if a problem
+     * @returns Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public async requestOtherUrl<T>(
@@ -310,11 +310,11 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Form and return a homeserver request URL based on the given path params and prefix.
-     * @param path The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".
-     * @param queryParams A dict of query params (these will NOT be urlencoded).
-     * @param prefix The full prefix to use e.g. "/_matrix/client/v2_alpha", defaulting to this.opts.prefix.
-     * @param baseUrl The baseUrl to use e.g. "https://matrix.org/", defaulting to this.opts.baseUrl.
-     * @return URL
+     * @param path - The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".
+     * @param queryParams - A dict of query params (these will NOT be urlencoded).
+     * @param prefix - The full prefix to use e.g. "/_matrix/client/v2_alpha", defaulting to this.opts.prefix.
+     * @param baseUrl - The baseUrl to use e.g. "https://matrix.org/", defaulting to this.opts.baseUrl.
+     * @returns URL
      */
     public getUrl(
         path: string,

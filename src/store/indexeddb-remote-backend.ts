@@ -38,8 +38,8 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * Construct a new Indexed Database store backend. This requires a call to
      * <code>connect()</code> before this store can be used.
      * @constructor
-     * @param workerFactory Factory which produces a Worker
-     * @param dbName Optional database name. The same name must be used
+     * @param workerFactory - Factory which produces a Worker
+     * @param dbName - Optional database name. The same name must be used
      * to open the same database.
      */
     public constructor(
@@ -50,7 +50,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     /**
      * Attempt to connect to the database. This can fail if the user does not
      * grant permission.
-     * @return Resolves if successfully connected.
+     * @returns Resolves if successfully connected.
      */
     public connect(): Promise<void> {
         return this.ensureStarted().then(() => this.doCmd('connect'));
@@ -59,19 +59,19 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     /**
      * Clear the entire database. This should be used when logging out of a client
      * to prevent mixing data between accounts.
-     * @return Resolved when the database is cleared.
+     * @returns Resolved when the database is cleared.
      */
     public clearDatabase(): Promise<void> {
         return this.ensureStarted().then(() => this.doCmd('clearDatabase'));
     }
 
-    /** @return whether or not the database was newly created in this session. */
+    /** @returns whether or not the database was newly created in this session. */
     public isNewlyCreated(): Promise<boolean> {
         return this.doCmd('isNewlyCreated');
     }
 
     /**
-     * @return Resolves with a sync response to restore the
+     * @returns Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
@@ -94,7 +94,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     /**
      * Returns the out-of-band membership events for this room that
      * were previously loaded.
-     * @param roomId
+     * @param roomId -
      * @returns the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns in case the members for this room haven't been stored yet
      */
@@ -106,8 +106,8 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * Stores the out-of-band membership events for this room. Note that
      * it still makes sense to store an empty array as the OOB status for the room is
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
-     * @param roomId
-     * @param membershipEvents the membership events to store
+     * @param roomId -
+     * @param membershipEvents - the membership events to store
      * @returns when all members have been stored
      */
     public setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
@@ -128,7 +128,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
 
     /**
      * Load all user presence events from the database. This is not cached.
-     * @return A list of presence events in their raw form.
+     * @returns A list of presence events in their raw form.
      */
     public getUserPresenceEvents(): Promise<UserTuple[]> {
         return this.doCmd('getUserPresenceEvents');

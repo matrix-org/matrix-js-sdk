@@ -105,7 +105,7 @@ export class TestClient {
 
     /**
      * stop the client
-     * @return Resolves once the mock http backend has finished all pending flushes
+     * @returns Resolves once the mock http backend has finished all pending flushes
      */
     public async stop(): Promise<void> {
         this.client.stopClient();
@@ -177,7 +177,7 @@ export class TestClient {
      *
      * We check that the query contains each of the users in `response`.
      *
-     * @param response   response to the query.
+     * @param response -   response to the query.
      */
     public expectKeyQuery(response: IDownloadKeyResult) {
         this.httpBackend.when('POST', '/keys/query').respond<IDownloadKeyResult>(
@@ -202,7 +202,7 @@ export class TestClient {
     /**
      * get the uploaded curve25519 device key
      *
-     * @return base64 device key
+     * @returns base64 device key
      */
     public getDeviceKey(): string {
         const keyId = 'curve25519:' + this.deviceId;
@@ -212,7 +212,7 @@ export class TestClient {
     /**
      * get the uploaded ed25519 device key
      *
-     * @return base64 device key
+     * @returns base64 device key
      */
     public getSigningKey(): string {
         const keyId = 'ed25519:' + this.deviceId;

@@ -143,8 +143,8 @@ class OutboundSessionInfo {
     /**
      * Check if it's time to rotate the session
      *
-     * @param rotationPeriodMsgs
-     * @param rotationPeriodMs
+     * @param rotationPeriodMsgs -
+     * @param rotationPeriodMs -
      * @return
      */
     public needsRotation(rotationPeriodMsgs: number, rotationPeriodMs: number): boolean {
@@ -181,10 +181,10 @@ class OutboundSessionInfo {
      * Determine if this session has been shared with devices which it shouldn't
      * have been.
      *
-     * @param devicesInRoom userId -> {deviceId -> object}
+     * @param devicesInRoom - userId -> {deviceId -> object}
      *   devices we should shared the session with.
      *
-     * @return true if we have shared the session with devices which aren't
+     * @returns true if we have shared the session with devices which aren't
      * in devicesInRoom.
      */
     public sharedWithTooManyDevices(devicesInRoom: Record<string, Record<string, object>>): boolean {
@@ -259,13 +259,13 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @private
      *
-     * @param room
-     * @param devicesInRoom The devices in this room, indexed by user ID
-     * @param blocked The devices that are blocked, indexed by user ID
+     * @param room -
+     * @param devicesInRoom - The devices in this room, indexed by user ID
+     * @param blocked - The devices that are blocked, indexed by user ID
      * @param [singleOlmCreationPhase] Only perform one round of olm
      *     session creation
      *
-     * @return Promise which resolves to the
+     * @returns Promise which resolves to the
      *    OutboundSessionInfo when setup is complete.
      */
     private async ensureOutboundSession(
@@ -482,9 +482,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @private
      *
-     * @param sharedHistory
+     * @param sharedHistory -
      *
-     * @return session
+     * @returns session
      */
     private async prepareNewSession(sharedHistory: boolean): Promise<OutboundSessionInfo> {
         const sessionId = this.olmDevice.createOutboundGroupSession();
@@ -508,13 +508,13 @@ class MegolmEncryption extends EncryptionAlgorithm {
      *
      * @private
      *
-     * @param devicemap the devices that have olm sessions, as returned by
+     * @param devicemap - the devices that have olm sessions, as returned by
      *     olmlib.ensureOlmSessionsForDevices.
-     * @param devicesByUser a map of user IDs to array of deviceInfo
+     * @param devicesByUser - a map of user IDs to array of deviceInfo
      * @param [noOlmDevices] an array to fill with devices that don't have
      *     olm sessions
      *
-     * @return an array of devices that don't have olm sessions.  If
+     * @returns an array of devices that don't have olm sessions.  If
      *     noOlmDevices is specified, then noOlmDevices will be returned.
      */
     private getDevicesWithoutSessions(
@@ -552,9 +552,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
      *
      * @private
      *
-     * @param devicesByUser map from userid to list of devices
+     * @param devicesByUser - map from userid to list of devices
      *
-     * @return the blocked devices, split into chunks
+     * @returns the blocked devices, split into chunks
      */
     private splitDevices<T extends DeviceInfo | IBlockedDevice>(
         devicesByUser: Record<string, Record<string, { device: T }>>,
@@ -593,16 +593,16 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @private
      *
-     * @param session
+     * @param session -
      *
-     * @param chainIndex current chain index
+     * @param chainIndex - current chain index
      *
-     * @param userDeviceMap
+     * @param userDeviceMap -
      *   mapping from userId to deviceInfo
      *
-     * @param payload fields to include in the encrypted payload
+     * @param payload - fields to include in the encrypted payload
      *
-     * @return Promise which resolves once the key sharing
+     * @returns Promise which resolves once the key sharing
      *     for the given userDeviceMap is generated and has been sent.
      */
     private encryptAndSendKeysToDevices(
@@ -633,13 +633,13 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @private
      *
-     * @param session
+     * @param session -
      *
-     * @param userDeviceMap list of blocked devices to notify
+     * @param userDeviceMap - list of blocked devices to notify
      *
-     * @param payload fields to include in the notification payload
+     * @param payload - fields to include in the notification payload
      *
-     * @return Promise which resolves once the notifications
+     * @returns Promise which resolves once the notifications
      *     for the given userDeviceMap is generated and has been sent.
      */
     private async sendBlockedNotificationsToDevices(
@@ -683,10 +683,10 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * Re-shares a megolm session key with devices if the key has already been
      * sent to them.
      *
-     * @param senderKey The key of the originating device for the session
-     * @param sessionId ID of the outbound session to share
-     * @param userId ID of the user who owns the target device
-     * @param device The target device
+     * @param senderKey - The key of the originating device for the session
+     * @param sessionId - ID of the outbound session to share
+     * @param userId - ID of the user who owns the target device
+     * @param device - The target device
      */
     public async reshareKeyWithDevice(
         senderKey: string,
@@ -781,17 +781,17 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @private
      *
-     * @param session
+     * @param session -
      *
-     * @param key the session key as returned by
+     * @param key - the session key as returned by
      *    OlmDevice.getOutboundGroupSessionKey
      *
-     * @param payload the base to-device message payload for sharing keys
+     * @param payload - the base to-device message payload for sharing keys
      *
-     * @param devicesByUser
+     * @param devicesByUser -
      *    map from userid to list of devices
      *
-     * @param errorDevices
+     * @param errorDevices -
      *    array that will be populated with the devices that we can't get an
      *    olm session for
      *
@@ -853,11 +853,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * Notify devices that we weren't able to create olm sessions.
      *
-     * @param session
+     * @param session -
      *
-     * @param key
+     * @param key -
      *
-     * @param failedDevices the devices that we were unable to
+     * @param failedDevices - the devices that we were unable to
      *     create olm sessions for, as returned by shareKeyWithDevices
      */
     private async notifyFailedOlmDevices(
@@ -914,9 +914,9 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * Notify blocked devices that they have been blocked.
      *
-     * @param session
+     * @param session -
      *
-     * @param devicesByUser
+     * @param devicesByUser -
      *    map from userid to device ID to blocked data
      */
     private async notifyBlockedDevices(
@@ -950,7 +950,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
-     * @param room the room the event is in
+     * @param room - the room the event is in
      */
     public prepareToEncrypt(room: Room): void {
         if (this.encryptionPreparation != null) {
@@ -997,11 +997,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @inheritdoc
      *
-     * @param room
-     * @param eventType
-     * @param content plaintext event content
+     * @param room -
+     * @param eventType -
+     * @param content - plaintext event content
      *
-     * @return Promise which resolves to the new event body
+     * @returns Promise which resolves to the new event body
      */
     public async encryptMessage(room: Room, eventType: string, content: object): Promise<object> {
         logger.log(`Starting to encrypt event for ${this.roomId}`);
@@ -1092,7 +1092,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * unknown to the user.  If so, warn the user, and mark them as known to
      * give the user a chance to go verify them before re-sending this message.
      *
-     * @param devicesInRoom userId -> {deviceId -> object}
+     * @param devicesInRoom - userId -> {deviceId -> object}
      *   devices we should shared the session with.
      */
     private checkForUnknownDevices(devicesInRoom: DeviceInfoMap): void {
@@ -1122,7 +1122,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * Remove unknown devices from a set of devices.  The devicesInRoom parameter
      * will be modified.
      *
-     * @param devicesInRoom userId -> {deviceId -> object}
+     * @param devicesInRoom - userId -> {deviceId -> object}
      *   devices we should shared the session with.
      */
     private removeUnknownDevices(devicesInRoom: DeviceInfoMap): void {
@@ -1142,11 +1142,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * Get the list of unblocked devices for all users in the room
      *
-     * @param room
-     * @param forceDistributeToUnverified if set to true will include the unverified devices
+     * @param room -
+     * @param forceDistributeToUnverified - if set to true will include the unverified devices
      * even if setting is set to block them (useful for verification)
      *
-     * @return Promise which resolves to an array whose
+     * @returns Promise which resolves to an array whose
      *     first element is a map from userId to deviceId to deviceInfo indicating
      *     the devices that messages should be encrypted to, and whose second
      *     element is a map from userId to deviceId to data indicating the devices
@@ -1239,7 +1239,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
     /**
      * @inheritdoc
      *
-     * @param event
+     * @param event -
      *
      * returns a promise which resolves to a
      * {@link module:crypto~EventDecryptionResult} once we have finished
@@ -1385,7 +1385,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      *
      * @private
      *
-     * @param event
+     * @param event -
      */
     private addEventToPendingList(event: MatrixEvent): void {
         const content = event.getWireContent();
@@ -1406,7 +1406,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      *
      * @private
      *
-     * @param event
+     * @param event -
      */
     private removeEventFromPendingList(event: MatrixEvent): void {
         const content = event.getWireContent();
@@ -1430,7 +1430,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
     /**
      * @inheritdoc
      *
-     * @param event key event
+     * @param event - key event
      */
     public async onRoomKeyEvent(event: MatrixEvent): Promise<void> {
         const content = event.getContent<Partial<IMessage["content"]>>();
@@ -1610,7 +1610,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
     /**
      * @inheritdoc
      *
-     * @param event key event
+     * @param event - key event
      */
     public async onRoomKeyWithheldEvent(event: MatrixEvent): Promise<void> {
         const content = event.getContent();
@@ -1797,7 +1797,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
     /**
      * @inheritdoc
      *
-     * @param session
+     * @param session -
      * @param [opts={}] options for the import
      * @param [opts.untrusted] whether the key should be considered as untrusted
      * @param [opts.source] where the key came from
@@ -1843,12 +1843,12 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * decryption has been re-attempted on all events.
      *
      * @private
-     * @param senderKey
-     * @param sessionId
-     * @param forceRedecryptIfUntrusted whether messages that were already
+     * @param senderKey -
+     * @param sessionId -
+     * @param forceRedecryptIfUntrusted - whether messages that were already
      *     successfully decrypted using untrusted keys should be re-decrypted
      *
-     * @return whether all messages were successfully
+     * @returns whether all messages were successfully
      *     decrypted with trusted keys
      */
     private async retryDecryption(

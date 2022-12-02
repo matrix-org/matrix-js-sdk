@@ -42,12 +42,12 @@ export interface IStore {
     // for when it falls back to being a memory store due to errors.
     on?: (event: EventEmitterEvents | "degraded", handler: (...args: any[]) => void) => void;
 
-    /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
+    /** @returns {Promise<boolean>} whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;
 
     /**
      * Get the sync token.
-     * @return {string}
+     * @returns {string}
      */
     getSyncToken(): string | null;
 
@@ -66,13 +66,13 @@ export interface IStore {
     /**
      * Retrieve a room by its' room ID.
      * @param {string} roomId The room ID.
-     * @return {Room} The room or null.
+     * @returns {Room} The room or null.
      */
     getRoom(roomId: string): Room | null;
 
     /**
      * Retrieve all known rooms.
-     * @return {Room[]} A list of rooms, which may be empty.
+     * @returns {Room[]} A list of rooms, which may be empty.
      */
     getRooms(): Room[];
 
@@ -84,7 +84,7 @@ export interface IStore {
 
     /**
      * Retrieve a summary of all the rooms.
-     * @return {RoomSummary[]} A summary of each room.
+     * @returns {RoomSummary[]} A summary of each room.
      */
     getRoomSummaries(): RoomSummary[];
 
@@ -97,13 +97,13 @@ export interface IStore {
     /**
      * Retrieve a User by its' user ID.
      * @param {string} userId The user ID.
-     * @return {User} The user or null.
+     * @returns {User} The user or null.
      */
     getUser(userId: string): User | null;
 
     /**
      * Retrieve all known users.
-     * @return {User[]} A list of users, which may be empty.
+     * @returns {User[]} A list of users, which may be empty.
      */
     getUsers(): User[];
 
@@ -111,7 +111,7 @@ export interface IStore {
      * Retrieve scrollback for this room.
      * @param {Room} room The matrix room
      * @param {number} limit The max number of old events to retrieve.
-     * @return {Array<Object>} An array of objects which will be at most 'limit'
+     * @returns {Array<Object>} An array of objects which will be at most 'limit'
      * length and at least 0. The objects are the raw event JSON.
      */
     scrollback(room: Room, limit: number): MatrixEvent[];
@@ -135,14 +135,14 @@ export interface IStore {
      * Retrieve a filter.
      * @param {string} userId
      * @param {string} filterId
-     * @return {?Filter} A filter or null.
+     * @returns {?Filter} A filter or null.
      */
     getFilter(userId: string, filterId: string): Filter | null;
 
     /**
      * Retrieve a filter ID with the given name.
      * @param {string} filterName The filter name.
-     * @return {?string} The filter ID or null.
+     * @returns {?string} The filter ID or null.
      */
     getFilterIdByName(filterName: string): string | null;
 
@@ -169,14 +169,14 @@ export interface IStore {
      * setSyncData does nothing as there is no backing data store.
      *
      * @param {Object} syncData The sync data
-     * @return {Promise} An immediately resolved promise.
+     * @returns {Promise} An immediately resolved promise.
      */
     setSyncData(syncData: ISyncResponse): Promise<void>;
 
     /**
      * We never want to save because we have nothing to save to.
      *
-     * @return {boolean} If the store wants to save
+     * @returns {boolean} If the store wants to save
      */
     wantsSave(): boolean;
 
@@ -187,19 +187,19 @@ export interface IStore {
 
     /**
      * Startup does nothing.
-     * @return {Promise} An immediately resolved promise.
+     * @returns {Promise} An immediately resolved promise.
      */
     startup(): Promise<void>;
 
     /**
-     * @return {Promise} Resolves with a sync response to restore the
+     * @returns {Promise} Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
     getSavedSync(): Promise<ISavedSync | null>;
 
     /**
-     * @return {Promise} If there is a saved sync, the nextBatch token
+     * @returns {Promise} If there is a saved sync, the nextBatch token
      * for this sync, otherwise null.
      */
     getSavedSyncToken(): Promise<string | null>;
@@ -207,7 +207,7 @@ export interface IStore {
     /**
      * Delete all data from this store. Does nothing since this store
      * doesn't store anything.
-     * @return {Promise} An immediately resolved promise.
+     * @returns {Promise} An immediately resolved promise.
      */
     deleteAllData(): Promise<void>;
 

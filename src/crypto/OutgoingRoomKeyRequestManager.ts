@@ -132,9 +132,9 @@ export class OutgoingRoomKeyRequestManager {
      * Otherwise, a request is added to the pending list, and a job is started
      * in the background to send it.
      *
-     * @param requestBody
-     * @param recipients
-     * @param resend whether to resend the key request if there is
+     * @param requestBody -
+     * @param recipients -
+     * @param resend - whether to resend the key request if there is
      *    already one
      *
      * @returns resolves when the request has been added to the
@@ -237,7 +237,7 @@ export class OutgoingRoomKeyRequestManager {
     /**
      * Cancel room key requests, if any match the given requestBody
      *
-     * @param requestBody
+     * @param requestBody -
      *
      * @returns resolves when the request has been updated in our
      *    pending list.
@@ -322,10 +322,10 @@ export class OutgoingRoomKeyRequestManager {
     /**
      * Look for room key requests by target device and state
      *
-     * @param userId Target user ID
-     * @param deviceId Target device ID
+     * @param userId - Target user ID
+     * @param deviceId - Target device ID
      *
-     * @return resolves to a list of all the
+     * @returns resolves to a list of all the
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
      */
     public getOutgoingSentRoomKeyRequest(userId: string, deviceId: string): Promise<OutgoingRoomKeyRequest[]> {
@@ -337,7 +337,7 @@ export class OutgoingRoomKeyRequestManager {
      * This is intended for situations where something substantial has changed, and we
      * don't really expect the other end to even care about the cancellation.
      * For example, after initialization or self-verification.
-     * @return An array of `queueRoomKeyRequest` outputs.
+     * @returns An array of `queueRoomKeyRequest` outputs.
      */
     public async cancelAndResendAllOutgoingRequests(): Promise<void[]> {
         const outgoings = await this.cryptoStore.getAllOutgoingRoomKeyRequestsByState(RoomKeyRequestState.Sent);

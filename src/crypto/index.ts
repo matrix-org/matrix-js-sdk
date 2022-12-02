@@ -277,7 +277,7 @@ export type CryptoEventHandlerMap = {
 
 export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> {
     /**
-     * @return The version of Olm.
+     * @returns The version of Olm.
      */
     public static getOlmVersion(): [number, number, number] {
         return OlmDevice.getOlmVersion();
@@ -356,20 +356,20 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @internal
      *
-     * @param baseApis base matrix api interface
+     * @param baseApis - base matrix api interface
      *
-     * @param userId The user ID for the local user
+     * @param userId - The user ID for the local user
      *
-     * @param deviceId The identifier for this device.
+     * @param deviceId - The identifier for this device.
      *
-     * @param clientStore the MatrixClient data store.
+     * @param clientStore - the MatrixClient data store.
      *
-     * @param cryptoStore
+     * @param cryptoStore -
      *    storage for the crypto layer.
      *
-     * @param roomList An initialised RoomList object
+     * @param roomList - An initialised RoomList object
      *
-     * @param verificationMethods Array of verification methods to use.
+     * @param verificationMethods - Array of verification methods to use.
      *    Each element can either be a string from MatrixClient.verificationMethods
      *    or a class that implements a verification method.
      */
@@ -477,8 +477,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * Returns a promise which resolves once the crypto module is ready for use.
      *
-     * @param opts keyword arguments.
-     * @param opts.exportedOlmDevice (Optional) data from exported device
+     * @param opts - keyword arguments.
+     * @param opts -.exportedOlmDevice (Optional) data from exported device
      *     that must be re-created.
      */
     public async init({ exportedOlmDevice, pickleKey }: IInitOpts = {}): Promise<void> {
@@ -545,7 +545,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * Default: true
      *
-     * @return True if trusting cross-signed devices
+     * @returns True if trusting cross-signed devices
      */
     public getCryptoTrustCrossSignedDevices(): boolean {
         return this.trustCrossSignedDevices;
@@ -556,7 +556,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
      * This may be set before initCrypto() is called to ensure no races occur.
      *
-     * @param val True to trust cross-signed devices
+     * @param val - True to trust cross-signed devices
      */
     public setCryptoTrustCrossSignedDevices(val: boolean): void {
         this.trustCrossSignedDevices = val;
@@ -582,7 +582,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Create a recovery key from a user-supplied passphrase.
      *
-     * @param password Passphrase string that can be entered by the user
+     * @param password - Passphrase string that can be entered by the user
      *     when restoring the backup as an alternative to entering the recovery key.
      *     Optional.
      * @returns Object with public key metadata, encoded private
@@ -628,7 +628,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
      *
-     * @return True if cross-signing is ready to be used on this device
+     * @returns True if cross-signing is ready to be used on this device
      */
     public async isCrossSigningReady(): Promise<boolean> {
         const publicKeysOnDevice = this.crossSigningInfo.getId();
@@ -653,7 +653,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
-     * @return True if secret storage is ready to be used on this device
+     * @returns True if secret storage is ready to be used on this device
      */
     public async isSecretStorageReady(): Promise<boolean> {
         const secretStorageKeyInAccount = await this.secretStorage.hasKey();
@@ -683,7 +683,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
      *
-     * @param opts.authUploadDeviceSigningKeys Function
+     * @param opts -.authUploadDeviceSigningKeys Function
      * called to await an interactive auth flow when uploading device signing keys.
      * @param [opts.setupNewCrossSigning] Optional. Reset even if keys
      * already exist.
@@ -1139,8 +1139,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * This can be used by the getSecretStorageKey callback to verify that the
      * private key it is about to supply is the one that was requested.
      *
-     * @param privateKey The private key
-     * @param expectedPublicKey The public key
+     * @param privateKey - The private key
+     * @param expectedPublicKey - The public key
      * @returns true if the key matches, otherwise false
      */
     public checkSecretStoragePrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
@@ -1189,7 +1189,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     /**
      * Stores the session backup key to the cache
-     * @param key the private key
+     * @param key - the private key
      * @returns so you can catch failures
      */
     public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
@@ -1212,8 +1212,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * This can be used by the getCrossSigningKey callback to verify that the
      * private key it is about to supply is the one that was requested.
      *
-     * @param privateKey The private key
-     * @param expectedPublicKey The public key
+     * @param privateKey - The private key
+     * @param expectedPublicKey - The public key
      * @returns true if the key matches, otherwise false
      */
     public checkCrossSigningPrivateKey(privateKey: Uint8Array, expectedPublicKey: string): boolean {
@@ -1317,8 +1317,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Check if a user's cross-signing key is a candidate for upgrading from device
      * verification.
      *
-     * @param userId the user whose cross-signing information is to be checked
-     * @param crossSigningInfo the cross-signing information to check
+     * @param userId - the user whose cross-signing information is to be checked
+     * @param crossSigningInfo - the cross-signing information to check
      */
     private async checkForDeviceVerificationUpgrade(
         userId: string,
@@ -1346,9 +1346,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Check if the cross-signing key is signed by a verified device.
      *
-     * @param userId the user ID whose key is being checked
-     * @param key the key that is being checked
-     * @param devices the user's devices.  Should be a map from device ID
+     * @param userId - the user ID whose key is being checked
+     * @param key - the key that is being checked
+     * @param devices - the user's devices.  Should be a map from device ID
      *     to device info
      */
     private async checkForValidDeviceSignature(
@@ -1393,7 +1393,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the cross signing information for a given user.
      *
-     * @param userId the user ID to get the cross-signing info for.
+     * @param userId - the user ID to get the cross-signing info for.
      *
      * @returns the cross signing information for the user.
      */
@@ -1404,7 +1404,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Check whether a given user is trusted.
      *
-     * @param userId The ID of the user to check.
+     * @param userId - The ID of the user to check.
      *
      * @returns
      */
@@ -1419,8 +1419,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Check whether a given device is trusted.
      *
-     * @param userId The ID of the user whose devices is to be checked.
-     * @param deviceId The ID of the device to check
+     * @param userId - The ID of the user whose devices is to be checked.
+     * @param deviceId - The ID of the device to check
      *
      * @returns
      */
@@ -1432,8 +1432,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Check whether a given deviceinfo is trusted.
      *
-     * @param userId The ID of the user whose devices is to be checked.
-     * @param device The device info object to check
+     * @param userId - The ID of the user whose devices is to be checked.
+     * @param device - The device info object to check
      *
      * @returns
      */
@@ -1457,7 +1457,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Check whether one of our own devices is cross-signed by our
      * user's stored keys, regardless of whether we trust those keys yet.
      *
-     * @param deviceId The ID of the device to check
+     * @param deviceId - The ID of the device to check
      *
      * @returns true if the device is cross-signed
      */
@@ -1701,7 +1701,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Store a set of keys as our own, trusted, cross-signing keys.
      *
-     * @param keys The new trusted set of keys
+     * @param keys - The new trusted set of keys
      */
     private async storeTrustedSelfKeys(keys: Record<string, ICrossSigningKey> | null): Promise<void> {
         if (keys) {
@@ -1721,7 +1721,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Check if the master key is signed by a verified device, and if so, prompt
      * the application to mark it as verified.
      *
-     * @param userId the user ID whose key should be checked
+     * @param userId - the user ID whose key should be checked
      */
     private async checkDeviceVerifications(userId: string): Promise<void> {
         const shouldUpgradeCb = (
@@ -1763,7 +1763,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Tell the crypto module to register for MatrixClient events which it needs to
      * listen for
      *
-     * @param eventEmitter event source where we can register
+     * @param eventEmitter - event source where we can register
      *    for event notifications
      */
     public registerEventHandlers(eventEmitter: TypedEventEmitter<
@@ -1793,7 +1793,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the Ed25519 key for this device
      *
-     * @return base64-encoded ed25519 key.
+     * @returns base64-encoded ed25519 key.
      */
     public getDeviceEd25519Key(): string | null {
         return this.olmDevice.deviceEd25519Key;
@@ -1802,7 +1802,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the Curve25519 key for this device
      *
-     * @return base64-encoded curve25519 key.
+     * @returns base64-encoded curve25519 key.
      */
     public getDeviceCurve25519Key(): string | null {
         return this.olmDevice.deviceCurve25519Key;
@@ -1813,7 +1813,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * messages to unverified devices.  This provides the default for rooms which
      * do not specify a value.
      *
-     * @param value whether to blacklist all unverified devices by default
+     * @param value - whether to blacklist all unverified devices by default
      *
      * @deprecated For external code, use {@link MatrixClient#setGlobalBlacklistUnverifiedDevices}. For
      *   internal code, set {@link #globalBlacklistUnverifiedDevices} directly.
@@ -1823,7 +1823,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
-     * @return whether to blacklist all unverified devices by default
+     * @returns whether to blacklist all unverified devices by default
      *
      * @deprecated For external code, use {@link MatrixClient#getGlobalBlacklistUnverifiedDevices}. For
      *   internal code, reference {@link #globalBlacklistUnverifiedDevices} directly.
@@ -1834,7 +1834,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     /**
      * Upload the device keys to the homeserver.
-     * @return A promise that will resolve when the keys are uploaded.
+     * @returns A promise that will resolve when the keys are uploaded.
      */
     public uploadDeviceKeys(): Promise<IKeysUploadResponse> {
         const deviceKeys = {
@@ -1855,7 +1855,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Stores the current one_time_key count which will be handled later (in a call of
      * onSyncCompleted). The count is e.g. coming from a /sync response.
      *
-     * @param currentCount The current count of one_time_keys to be stored
+     * @param currentCount - The current count of one_time_keys to be stored
      */
     public updateOneTimeKeyCount(currentCount: number): void {
         if (isFinite(currentCount)) {
@@ -2045,10 +2045,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Download the keys for a list of users and stores the keys in the session
      * store.
-     * @param userIds The users to fetch.
-     * @param forceDownload Always download the keys even if cached.
+     * @param userIds - The users to fetch.
+     * @param forceDownload - Always download the keys even if cached.
      *
-     * @return A promise which resolves to a map userId->deviceId->{@link
+     * @returns A promise which resolves to a map userId->deviceId->{@link
         * module:crypto/deviceinfo|DeviceInfo}.
      */
     public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
@@ -2058,9 +2058,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the stored device keys for a user id
      *
-     * @param userId the user to list keys for.
+     * @param userId - the user to list keys for.
      *
-     * @return list of devices, or null if we haven't
+     * @returns list of devices, or null if we haven't
      * managed to get a list of devices for this user yet.
      */
     public getStoredDevicesForUser(userId: string): Array<DeviceInfo> | null {
@@ -2070,10 +2070,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the stored keys for a single device
      *
-     * @param userId
-     * @param deviceId
+     * @param userId -
+     * @param deviceId -
      *
-     * @return device, or undefined
+     * @returns device, or undefined
      * if we don't know about this device
      */
     public getStoredDevice(userId: string, deviceId: string): DeviceInfo | undefined {
@@ -2083,11 +2083,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Save the device list, if necessary
      *
-     * @param delay Time in ms before which the save actually happens.
+     * @param delay - Time in ms before which the save actually happens.
      *     By default, the save is delayed for a short period in order to batch
      *     multiple writes, but this behaviour can be disabled by passing 0.
      *
-     * @return true if the data was saved, false if
+     * @returns true if the data was saved, false if
      *     it was not (eg. because no changes were pending). The promise
      *     will only resolve once the data is saved, so may take some time
      *     to resolve.
@@ -2099,24 +2099,24 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Update the blocked/verified state of the given device
      *
-     * @param userId owner of the device
-     * @param deviceId unique identifier for the device or user's
+     * @param userId - owner of the device
+     * @param deviceId - unique identifier for the device or user's
      * cross-signing public key ID.
      *
-     * @param verified whether to mark the device as verified. Null to
+     * @param verified - whether to mark the device as verified. Null to
      *     leave unchanged.
      *
-     * @param blocked whether to mark the device as blocked. Null to
+     * @param blocked - whether to mark the device as blocked. Null to
      *      leave unchanged.
      *
-     * @param known whether to mark that the user has been made aware of
+     * @param known - whether to mark that the user has been made aware of
      *      the existence of this device. Null to leave unchanged
      *
-     * @param keys The list of keys that was present
+     * @param keys - The list of keys that was present
      * during the device verification. This will be double checked with the list
      * of keys the given device has currently.
      *
-     * @return updated DeviceInfo
+     * @returns updated DeviceInfo
      */
     public async setDeviceVerification(
         userId: string,
@@ -2382,7 +2382,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * <p>
      * This method is provided for debugging purposes.
      *
-     * @param userId id of user to inspect
+     * @param userId - id of user to inspect
      *
      * @return
      */
@@ -2404,7 +2404,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the device which sent an event
      *
-     * @param event event to be checked
+     * @param event - event to be checked
      *
      * @return
      */
@@ -2462,9 +2462,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get information about the encryption of an event
      *
-     * @param event event to be checked
+     * @param event - event to be checked
      *
-     * @return An object with the fields:
+     * @returns An object with the fields:
      *    - encrypted: whether the event is encrypted (if not encrypted, some of the
      *      other properties may not be set)
      *    - senderKey: the sender's key
@@ -2530,7 +2530,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Forces the current outbound group session to be discarded such
      * that another one will be created next time an event is sent.
      *
-     * @param roomId The ID of the room to discard the session for
+     * @param roomId - The ID of the room to discard the session for
      *
      * This should not normally be necessary.
      */
@@ -2546,11 +2546,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Configure a room to use encryption (ie, save a flag in the cryptoStore).
      *
-     * @param roomId The room ID to enable encryption in.
+     * @param roomId - The room ID to enable encryption in.
      *
-     * @param config The encryption config for the room.
+     * @param config - The encryption config for the room.
      *
-     * @param inhibitDeviceQuery true to suppress device list query for
+     * @param inhibitDeviceQuery - true to suppress device list query for
      *   users in the room (for now). In case lazy loading is enabled,
      *   the device query is always inhibited as the members are not tracked.
      *
@@ -2583,8 +2583,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * It does <em>not</em> initiate a device list query for the room. That is normally
      * done once we finish processing the sync, in onSyncCompleted.
      *
-     * @param room The room to enable encryption in.
-     * @param config The encryption config for the room.
+     * @param room - The room to enable encryption in.
+     * @param config - The encryption config for the room.
      */
     private async setRoomEncryptionImpl(
         room: Room,
@@ -2668,7 +2668,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Make sure we are tracking the device lists for all users in this room.
      *
-     * @param roomId The room ID to start tracking devices in.
+     * @param roomId - The room ID to start tracking devices in.
      * @returns when all devices for the room have been fetched and marked to track
      */
     public trackRoomDevices(roomId: string): Promise<void> {
@@ -2687,7 +2687,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * m.room.encryption state event (if lazy-loading is disabled), or when members are
      * loaded (if lazy-loading is enabled), to prepare the device list.
      *
-     * @param room Room to enable device-list tracking in
+     * @param room - Room to enable device-list tracking in
      */
     private trackRoomDevicesImpl(room: Room): Promise<void> {
         const roomId = room.roomId;
@@ -2718,10 +2718,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Try to make sure we have established olm sessions for all known devices for
      * the given users.
      *
-     * @param users list of user ids
-     * @param force If true, force a new Olm session to be created. Default false.
+     * @param users - list of user ids
+     * @param force - If true, force a new Olm session to be created. Default false.
      *
-     * @return resolves once the sessions are complete, to
+     * @returns resolves once the sessions are complete, to
      *    an Object mapping from userId to deviceId to
      *    {@link module:crypto~OlmSessionResult}
      */
@@ -2756,7 +2756,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get a list containing all of the room keys
      *
-     * @return a list of session export objects
+     * @returns a list of session export objects
      */
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         const exportedSessions: IMegolmSessionData[] = [];
@@ -2779,10 +2779,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Import a list of room keys previously exported by exportRoomKeys
      *
-     * @param keys a list of session export objects
-     * @param opts
-     * @param opts.progressCallback called with an object which has a stage param
-     * @return a promise which resolves once the keys have been imported
+     * @param keys - a list of session export objects
+     * @param opts -
+     * @param opts -.progressCallback called with an object which has a stage param
+     * @returns a promise which resolves once the keys have been imported
      */
     public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<void> {
         let successes = 0;
@@ -2826,7 +2826,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Perform any background tasks that can be done before a message is ready to
      * send, in order to speed up sending of the message.
      *
-     * @param room the room the event is in
+     * @param room - the room the event is in
      */
     public prepareToEncrypt(room: Room): void {
         const alg = this.roomEncryptors.get(room.roomId);
@@ -2838,11 +2838,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Encrypt an event according to the configuration of the room.
      *
-     * @param event  event to be sent
+     * @param event -  event to be sent
      *
-     * @param room destination room.
+     * @param room - destination room.
      *
-     * @return Promise which resolves when the event has been
+     * @returns Promise which resolves when the event has been
      *     encrypted, or null if nothing was needed
      */
     public async encryptEvent(event: MatrixEvent, room?: Room): Promise<void> {
@@ -2903,9 +2903,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Decrypt a received event
      *
-     * @param event
+     * @param event -
      *
-     * @return resolves once we have
+     * @returns resolves once we have
      *  finished decrypting. Rejects with an `algorithms.DecryptionError` if there
      *  is a problem decrypting the event.
      */
@@ -2938,8 +2938,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Handle the notification from /sync or /keys/changes that device lists have
      * been changed.
      *
-     * @param syncData Object containing sync tokens associated with this sync
-     * @param syncDeviceLists device_lists field from /sync, or response from
+     * @param syncData - Object containing sync tokens associated with this sync
+     * @param syncDeviceLists - device_lists field from /sync, or response from
      * /keys/changes
      */
     public async handleDeviceListChanges(syncData: ISyncStateData, syncDeviceLists: ISyncDeviceLists): Promise<void> {
@@ -2961,12 +2961,12 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Send a request for some room keys, if we have not already done so
      *
-     * @param requestBody
-     * @param recipients
-     * @param resend whether to resend the key request if there is
+     * @param requestBody -
+     * @param recipients -
+     * @param resend - whether to resend the key request if there is
      *    already one
      *
-     * @return a promise that resolves when the key request is queued
+     * @returns a promise that resolves when the key request is queued
      */
     public requestRoomKey(
         requestBody: IRoomKeyRequestBody,
@@ -2990,7 +2990,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Cancel any earlier room key request
      *
-     * @param requestBody
+     * @param requestBody -
      *    parameters to match for cancellation
      */
     public cancelRoomKeyRequest(requestBody: IRoomKeyRequestBody): void {
@@ -3011,8 +3011,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * handle an m.room.encryption event
      *
-     * @param room in which the event was received
-     * @param event encryption event to be processed
+     * @param room - in which the event was received
+     * @param event - encryption event to be processed
      */
     public async onCryptoEvent(room: Room, event: MatrixEvent): Promise<void> {
         const content = event.getContent<IRoomEncryption>();
@@ -3022,7 +3022,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Called before the result of a sync is processed
      *
-     * @param syncData  the data from the 'MatrixClient.sync' event
+     * @param syncData -  the data from the 'MatrixClient.sync' event
      */
     public async onSyncWillProcess(syncData: ISyncStateData): Promise<void> {
         if (!syncData.oldSyncToken) {
@@ -3046,7 +3046,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * This is called after the processing of each successful /sync response.
      * It is an opportunity to do a batch process on the information received.
      *
-     * @param syncData  the data from the 'MatrixClient.sync' event
+     * @param syncData -  the data from the 'MatrixClient.sync' event
      */
     public async onSyncCompleted(syncData: ISyncStateData): Promise<void> {
         this.deviceList.setSyncToken(syncData.nextSyncToken ?? null);
@@ -3079,7 +3079,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Trigger the appropriate invalidations and removes for a given
      * device list
      *
-     * @param deviceLists device_lists field from /sync, or response from
+     * @param deviceLists - device_lists field from /sync, or response from
      * /keys/changes
      */
     private async evalDeviceListChanges(deviceLists: ISyncDeviceLists): Promise<void> {
@@ -3147,9 +3147,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Encrypts and sends a given object via Olm to-device messages to a given
      * set of devices.
-     * @param userDeviceInfoArr the devices to send to
-     * @param payload fields to include in the encrypted payload
-     * @return Promise which
+     * @param userDeviceInfoArr - the devices to send to
+     * @param payload - fields to include in the encrypted payload
+     * @returns Promise which
      *     resolves once the message has been encrypted and sent to the given
      *     userDeviceMap, and returns the { contentMap, deviceInfoByDeviceId }
      *     of the successfully sent messages.
@@ -3265,7 +3265,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Handle a key event
      *
      * @private
-     * @param event key event
+     * @param event - key event
      */
     private onRoomKeyEvent(event: MatrixEvent): void {
         const content = event.getContent();
@@ -3289,7 +3289,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Handle a key withheld event
      *
      * @private
-     * @param event key withheld event
+     * @param event - key withheld event
      */
     private onRoomKeyWithheldEvent(event: MatrixEvent): void {
         const content = event.getContent();
@@ -3325,7 +3325,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Handle a general key verification event.
      *
      * @private
-     * @param event verification start event
+     * @param event - verification start event
      */
     private onKeyVerificationMessage(event: MatrixEvent): void {
         if (!ToDeviceChannel.validateEvent(event, this.baseApis)) {
@@ -3356,11 +3356,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Handle key verification requests sent as timeline events
      *
      * @private
-     * @param event the timeline event
-     * @param room not used
-     * @param atStart not used
-     * @param removed not used
-     * @param whether this is a live event
+     * @param event - the timeline event
+     * @param room - not used
+     * @param atStart - not used
+     * @param removed - not used
+     * @param whether - this is a live event
      */
     private onTimelineEvent = (
         event: MatrixEvent,
@@ -3441,7 +3441,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Handle a toDevice event that couldn't be decrypted
      *
      * @private
-     * @param event undecryptable event
+     * @param event - undecryptable event
      */
     private async onToDeviceBadEncrypted(event: MatrixEvent): Promise<void> {
         const content = event.getWireContent();
@@ -3548,9 +3548,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Handle a change in the membership state of a member of a room
      *
      * @private
-     * @param event  event causing the change
-     * @param member  user whose membership changed
-     * @param oldMembership  previous membership
+     * @param event -  event causing the change
+     * @param member -  user whose membership changed
+     * @param oldMembership -  previous membership
      */
     private onRoomMembership(event: MatrixEvent, member: RoomMember, oldMembership?: string): void {
         // this event handler is registered on the *client* (as opposed to the room
@@ -3592,7 +3592,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Called when we get an m.room_key_request event.
      *
      * @private
-     * @param event key request event
+     * @param event - key request event
      */
     private onRoomKeyRequestEvent(event: MatrixEvent): void {
         const content = event.getContent();
@@ -3651,7 +3651,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Helper for processReceivedRoomKeyRequests
      *
-     * @param req
+     * @param req -
      */
     private async processReceivedRoomKeyRequest(req: IncomingRoomKeyRequest): Promise<void> {
         const userId = req.userId;
@@ -3741,7 +3741,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Helper for processReceivedRoomKeyRequests
      *
-     * @param cancellation
+     * @param cancellation -
      */
     private async processReceivedRoomKeyRequestCancellation(
         cancellation: IncomingRoomKeyRequestCancellation,
@@ -3765,10 +3765,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @private
      *
-     * @param roomId   room id for decryptor. If undefined, a temporary
+     * @param roomId -   room id for decryptor. If undefined, a temporary
      * decryptor is instantiated.
      *
-     * @param algorithm  crypto algorithm
+     * @param algorithm -  crypto algorithm
      *
      * @return
      *
@@ -3816,9 +3816,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get all the room decryptors for a given encryption algorithm.
      *
-     * @param algorithm The encryption algorithm
+     * @param algorithm - The encryption algorithm
      *
-     * @return An array of room decryptors
+     * @returns An array of room decryptors
      */
     private getRoomDecryptors(algorithm: string): DecryptionAlgorithm[] {
         const decryptors: DecryptionAlgorithm[] = [];
@@ -3833,7 +3833,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * sign the given object with our ed25519 key
      *
-     * @param obj  Object to which we will add a 'signatures' property
+     * @param obj -  Object to which we will add a 'signatures' property
      */
     public async signObject(obj: object & ISignableObject): Promise<void> {
         const sigs = obj.signatures || {};
@@ -3856,7 +3856,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
  * passed a string that looks like a list of integers rather than a base64
  * string, it will attempt to convert it to the right format.
  *
- * @param key the key to check
+ * @param key - the key to check
  * @returns If the key is in the wrong format, then the fixed
  * key will be returned. Otherwise null will be returned.
  *

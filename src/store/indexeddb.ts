@@ -94,16 +94,16 @@ export class IndexedDBStore extends MemoryStore {
      *
      * @constructor
      * @extends MemoryStore
-     * @param opts Options object.
-     * @param opts.indexedDB The Indexed DB interface e.g.
+     * @param opts - Options object.
+     * @param opts -.indexedDB The Indexed DB interface e.g.
      * <code>window.indexedDB</code>
-     * @param opts.dbName Optional database name. The same name must be used
+     * @param opts -.dbName Optional database name. The same name must be used
      * to open the same database.
-     * @param opts.workerScript Optional URL to a script to invoke a web
+     * @param opts -.workerScript Optional URL to a script to invoke a web
      * worker with to run IndexedDB queries on the web worker. The IndexedDbStoreWorker
      * class is provided for this purpose and requires the application to provide a
      * trivial wrapper script around it.
-     * @param opts.workerApi The webWorker API object. If omitted, the global Worker
+     * @param opts -.workerApi The webWorker API object. If omitted, the global Worker
      * object will be used if it exists.
      * @prop {IndexedDBStoreBackend} backend The backend instance. Call through to
      * this API if you need to perform specific indexeddb actions like deleting the
@@ -126,7 +126,7 @@ export class IndexedDBStore extends MemoryStore {
     public on = this.emitter.on.bind(this.emitter);
 
     /**
-     * @return Resolved when loaded from indexed db.
+     * @returns Resolved when loaded from indexed db.
      */
     public startup(): Promise<void> {
         if (this.startedUp) {
@@ -152,7 +152,7 @@ export class IndexedDBStore extends MemoryStore {
     }
 
     /**
-     * @return {Promise} Resolves with a sync response to restore the
+     * @returns {Promise} Resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
@@ -160,13 +160,13 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.getSavedSync();
     }, "getSavedSync");
 
-    /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
+    /** @returns {Promise<boolean>} whether or not the database was newly created in this session. */
     public isNewlyCreated = this.degradable((): Promise<boolean> => {
         return this.backend.isNewlyCreated();
     }, "isNewlyCreated");
 
     /**
-     * @return {Promise} If there is a saved sync, the nextBatch token
+     * @returns {Promise} If there is a saved sync, the nextBatch token
      * for this sync, otherwise null.
      */
     public getSavedSyncToken = this.degradable((): Promise<string | null> => {
@@ -175,7 +175,7 @@ export class IndexedDBStore extends MemoryStore {
 
     /**
      * Delete all data from this store.
-     * @return {Promise} Resolves if the data was deleted from the database.
+     * @returns {Promise} Resolves if the data was deleted from the database.
      */
     public deleteAllData = this.degradable((): Promise<void> => {
         super.deleteAllData();
@@ -193,7 +193,7 @@ export class IndexedDBStore extends MemoryStore {
      * not could change between calling this function and calling
      * save().
      *
-     * @return True if calling save() will actually save
+     * @returns True if calling save() will actually save
      *     (at the time this function is called).
      */
     public wantsSave(): boolean {
@@ -204,8 +204,8 @@ export class IndexedDBStore extends MemoryStore {
     /**
      * Possibly write data to the database.
      *
-     * @param force True to force a save to happen
-     * @return Promise resolves after the write completes
+     * @param force - True to force a save to happen
+     * @returns Promise resolves after the write completes
      *     (or immediately if no write is performed)
      */
     public save(force = false): Promise<void> {
@@ -287,8 +287,8 @@ export class IndexedDBStore extends MemoryStore {
      * When IndexedDB fails via any of these paths, we degrade this back to a `MemoryStore`
      * in place so that the current operation and all future ones are in-memory only.
      *
-     * @param func The degradable work to do.
-     * @param fallback The method name for fallback.
+     * @param func - The degradable work to do.
+     * @param fallback - The method name for fallback.
      * @returns A wrapped member function.
      */
     private degradable<A extends Array<any>, R = void>(
@@ -368,7 +368,7 @@ export class IndexedDBStore extends MemoryStore {
 }
 
 /**
- * @param roomId ID of the current room
+ * @param roomId - ID of the current room
  * @returns Storage key to retrieve pending events
  */
 function pendingEventsKey(roomId: string): string {

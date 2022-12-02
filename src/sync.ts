@@ -197,7 +197,7 @@ export class SyncApi {
     }
 
     /**
-     * @param roomId
+     * @param roomId -
      * @return
      */
     public createRoom(roomId: string): Room {
@@ -214,9 +214,9 @@ export class SyncApi {
      * new historical messages imported by MSC2716 `/batch_send` somewhere in
      * the room and we need to throw away the timeline to make sure the
      * historical messages are shown when we paginate `/messages` again.
-     * @param room The room where the marker event was sent
-     * @param markerEvent The new marker event
-     * @param setStateOptions When `timelineWasEmpty` is set
+     * @param room - The room where the marker event was sent
+     * @param markerEvent - The new marker event
+     * @param setStateOptions - When `timelineWasEmpty` is set
      * as `true`, the given marker event will be ignored
     */
     private onMarkerStateEvent(
@@ -279,7 +279,7 @@ export class SyncApi {
 
     /**
      * Sync rooms the user has left.
-     * @return Resolved when they've been added to the store.
+     * @returns Resolved when they've been added to the store.
      */
     public async syncLeftRooms(): Promise<Room[]> {
         const client = this.client;
@@ -350,8 +350,8 @@ export class SyncApi {
     /**
      * Peek into a room. This will result in the room in question being synced so it
      * is accessible via getRooms(). Live updates for the room will be provided.
-     * @param roomId The room ID to peek into.
-     * @return A promise which resolves once the room has been added to the
+     * @param roomId - The room ID to peek into.
+     * @returns A promise which resolves once the room has been added to the
      * store.
      */
     public peek(roomId: string): Promise<Room> {
@@ -430,8 +430,8 @@ export class SyncApi {
 
     /**
      * Do a peek room poll.
-     * @param peekRoom
-     * @param token from= token
+     * @param peekRoom -
+     * @param token - from= token
      */
     private peekPoll(peekRoom: Room, token?: string): void {
         if (this._peekRoom !== peekRoom) {
@@ -526,8 +526,8 @@ export class SyncApi {
 
     /**
      * Is the lazy loading option different than in previous session?
-     * @param lazyLoadMembers current options for lazy loading
-     * @return whether or not the option has changed compared to the previous session */
+     * @param lazyLoadMembers - current options for lazy loading
+     * @returns whether or not the option has changed compared to the previous session */
     private async wasLazyLoadingToggled(lazyLoadMembers = false): Promise<boolean> {
         // assume it was turned off before
         // if we don't know any better
@@ -758,7 +758,7 @@ export class SyncApi {
     /**
      * Retry a backed off syncing request immediately. This should only be used when
      * the user <b>explicitly</b> attempts to retry their lost connection.
-     * @return True if this resulted in a request being retried.
+     * @returns True if this resulted in a request being retried.
      */
     public retryImmediately(): boolean {
         if (!this.connectionReturnedDefer) {
@@ -769,7 +769,7 @@ export class SyncApi {
     }
     /**
      * Process a single set of cached sync data.
-     * @param savedSync a saved sync that was persisted by a store. This
+     * @param savedSync - a saved sync that was persisted by a store. This
      * should have been acquired via client.store.getSavedSync().
      */
     private async syncFromCache(savedSync: ISavedSync): Promise<void> {
@@ -811,9 +811,9 @@ export class SyncApi {
 
     /**
      * Invoke me to do /sync calls
-     * @param syncOptions
-     * @param syncOptions.filterId
-     * @param syncOptions.hasSyncedBefore
+     * @param syncOptions -
+     * @param syncOptions -.filterId
+     * @param syncOptions -.hasSyncedBefore
      */
     private async doSync(syncOptions: ISyncOptions): Promise<void> {
         while (this.running) {
@@ -1023,8 +1023,8 @@ export class SyncApi {
      * Process data returned from a sync response and propagate it
      * into the model objects
      *
-     * @param syncEventData Object containing sync tokens associated with this sync
-     * @param data The response from /sync
+     * @param syncEventData - Object containing sync tokens associated with this sync
+     * @param data - The response from /sync
      */
     private async processSyncResponse(syncEventData: ISyncStateData, data: ISyncResponse): Promise<void> {
         const client = this.client;
@@ -1489,10 +1489,10 @@ export class SyncApi {
 
     /**
      * Starts polling the connectivity check endpoint
-     * @param delay How long to delay until the first poll.
+     * @param delay - How long to delay until the first poll.
      *        defaults to a short, randomised interval (to prevent
      *        tight-looping if /versions succeeds but /sync etc. fail).
-     * @return which resolves once the connection returns
+     * @returns which resolves once the connection returns
      */
     private startKeepAlives(delay?: number): Promise<boolean> {
         if (delay === undefined) {
@@ -1520,7 +1520,7 @@ export class SyncApi {
      * On failure, schedules a call back to itself. On success, resolves
      * this.connectionReturnedDefer.
      *
-     * @param connDidFail True if a connectivity failure has been detected. Optional.
+     * @param connDidFail - True if a connectivity failure has been detected. Optional.
      */
     private pokeKeepAlive(connDidFail = false): void {
         const success = (): void => {
@@ -1568,7 +1568,7 @@ export class SyncApi {
     }
 
     /**
-     * @param obj
+     * @param obj -
      * @return
      */
     private mapSyncResponseToRoomArray<T extends ILeftRoom | IJoinedRoom | IInvitedRoom>(
@@ -1593,9 +1593,9 @@ export class SyncApi {
     }
 
     /**
-     * @param obj
-     * @param room
-     * @param decrypt
+     * @param obj -
+     * @param room -
+     * @param decrypt -
      * @return
      */
     private mapSyncEventsFormat(
@@ -1616,7 +1616,7 @@ export class SyncApi {
     }
 
     /**
-     * @param room
+     * @param room -
      */
     private resolveInvites(room: Room): void {
         if (!room || !this.opts.resolveInvitesToProfiles) {
@@ -1660,12 +1660,12 @@ export class SyncApi {
 
     /**
      * Injects events into a room's model.
-     * @param room
-     * @param stateEventList A list of state events. This is the state
+     * @param room -
+     * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
      * @param [timelineEventList] A list of timeline events, including threaded. Lower index
      * is earlier in time. Higher index is later.
-     * @param fromCache whether the sync response came from cache
+     * @param fromCache - whether the sync response came from cache
      */
     public async injectRoomEvents(
         room: Room,
@@ -1741,7 +1741,7 @@ export class SyncApi {
      * as appropriate.
      * This must be called after the room the events belong to has been stored.
      *
-     * @param room
+     * @param room -
      * @param [timelineEventList] A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
      */
@@ -1768,8 +1768,8 @@ export class SyncApi {
 
     /**
      * Sets the sync state and emits an event to say so
-     * @param newState The new state string
-     * @param data Object of additional data to emit in the event
+     * @param newState - The new state string
+     * @param data - Object of additional data to emit in the event
      */
     private updateSyncState(newState: SyncState, data?: ISyncStateData): void {
         const old = this.syncState;

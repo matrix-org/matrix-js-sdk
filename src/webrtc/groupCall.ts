@@ -287,7 +287,7 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Executes the given callback on all calls in this group call.
-     * @param f The callback.
+     * @param f - The callback.
      */
     public forEachCall(f: (call: MatrixCall) => void): void {
         for (const deviceMap of this.calls.values()) {
@@ -497,7 +497,7 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Sets the mute state of the local participants's microphone.
-     * @param muted Whether to mute the microphone
+     * @param muted - Whether to mute the microphone
      * @returns Whether muting/unmuting was successful
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
@@ -560,7 +560,7 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Sets the mute state of the local participants's video.
-     * @param muted Whether to mute the video
+     * @param muted - Whether to mute the video
      * @returns Whether muting/unmuting was successful
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
@@ -718,8 +718,8 @@ export class GroupCall extends TypedEventEmitter<
     /**
      * Determines whether a given participant expects us to call them (versus
      * them calling us).
-     * @param userId The participant's user ID.
-     * @param deviceId The participant's device ID.
+     * @param userId - The participant's user ID.
+     * @param deviceId - The participant's device ID.
      * @returns Whether we need to place an outgoing call to the participant.
      */
     private wantsOutgoingCall(userId: string, deviceId: string): boolean {
@@ -1234,9 +1234,9 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Updates the local user's member state with the devices returned by the given function.
-     * @param fn A function from the current devices to the new devices. If it
+     * @param fn - A function from the current devices to the new devices. If it
      *   returns null, the update will be skipped.
-     * @param keepAlive Whether the request should outlive the window.
+     * @param keepAlive - Whether the request should outlive the window.
      */
     private async updateDevices(
         fn: (devices: IGroupCallRoomMemberDevice[]) => IGroupCallRoomMemberDevice[] | null,

@@ -13,9 +13,9 @@ import { eventMapperFor } from "../../src/event-mapper";
 /**
  * Return a promise that is resolved when the client next emits a
  * SYNCING event.
- * @param client The client
- * @param count Number of syncs to wait for (default 1)
- * @return Resolves once the client has emitted a SYNCING event
+ * @param client - The client
+ * @param count - Number of syncs to wait for (default 1)
+ * @returns Resolves once the client has emitted a SYNCING event
  */
 export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
     if (count <= 0) {
@@ -41,9 +41,9 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
 
 /**
  * Create a spy for an object and automatically spy its methods.
- * @param constr The class constructor (used with 'new')
- * @param name The name of the class
- * @return An instantiated object with spied methods/properties.
+ * @param constr - The class constructor (used with 'new')
+ * @param name - The name of the class
+ * @returns An instantiated object with spied methods/properties.
  */
 export function mock<T>(constr: { new(...args: any[]): T }, name: string): T {
     // Based on http://eclipsesource.com/blogs/2014/03/27/mocks-in-jasmine-tests/
@@ -84,15 +84,15 @@ interface IEventOpts {
 let testEventIndex = 1; // counter for events, easier for comparison of randomly generated events
 /**
  * Create an Event.
- * @param opts Values for the event.
- * @param opts.type The event.type
- * @param opts.room The event.room_id
- * @param opts.sender The event.sender
- * @param opts.skey Optional. The state key (auto inserts empty string)
- * @param opts.content The event.content
- * @param opts.event True to make a MatrixEvent.
- * @param client If passed along with opts.event=true will be used to set up re-emitters.
- * @return a JSON object representing this event.
+ * @param opts - Values for the event.
+ * @param opts -.type The event.type
+ * @param opts -.room The event.room_id
+ * @param opts -.sender The event.sender
+ * @param opts -.skey Optional. The state key (auto inserts empty string)
+ * @param opts -.content The event.content
+ * @param opts -.event True to make a MatrixEvent.
+ * @param client - If passed along with opts.event=true will be used to set up re-emitters.
+ * @returns a JSON object representing this event.
  */
 export function mkEvent(opts: IEventOpts & { event: true }, client?: MatrixClient): MatrixEvent;
 export function mkEvent(opts: IEventOpts & { event?: false }, client?: MatrixClient): Partial<IEvent>;
@@ -160,8 +160,8 @@ interface IPresenceOpts {
 
 /**
  * Create an m.presence event.
- * @param opts Values for the presence.
- * @return The event
+ * @param opts - Values for the presence.
+ * @returns The event
  */
 export function mkPresence(opts: IPresenceOpts & { event: true }): MatrixEvent;
 export function mkPresence(opts: IPresenceOpts & { event?: false }): Partial<IEvent>;
@@ -193,16 +193,16 @@ interface IMembershipOpts {
 
 /**
  * Create an m.room.member event.
- * @param opts Values for the membership.
- * @param opts.room The room ID for the event.
- * @param opts.mship The content.membership for the event.
- * @param opts.sender The sender user ID for the event.
- * @param opts.skey The target user ID for the event if applicable
+ * @param opts - Values for the membership.
+ * @param opts -.room The room ID for the event.
+ * @param opts -.mship The content.membership for the event.
+ * @param opts -.sender The sender user ID for the event.
+ * @param opts -.skey The target user ID for the event if applicable
  * e.g. for invites/bans.
- * @param opts.name The content.displayname for the event.
- * @param opts.url The content.avatar_url for the event.
- * @param opts.event True to make a MatrixEvent.
- * @return The event
+ * @param opts -.name The content.displayname for the event.
+ * @param opts -.url The content.avatar_url for the event.
+ * @param opts -.event True to make a MatrixEvent.
+ * @returns The event
  */
 export function mkMembership(opts: IMembershipOpts & { event: true }): MatrixEvent;
 export function mkMembership(opts: IMembershipOpts & { event?: false }): Partial<IEvent>;
@@ -250,13 +250,13 @@ export interface IMessageOpts {
 
 /**
  * Create an m.room.message event.
- * @param opts Values for the message
- * @param opts.room The room ID for the event.
- * @param opts.user The user ID for the event.
- * @param opts.msg Optional. The content.body for the event.
- * @param opts.event True to make a MatrixEvent.
- * @param client If passed along with opts.event=true will be used to set up re-emitters.
- * @return The event
+ * @param opts - Values for the message
+ * @param opts -.room The room ID for the event.
+ * @param opts -.user The user ID for the event.
+ * @param opts -.msg Optional. The content.body for the event.
+ * @param opts -.event True to make a MatrixEvent.
+ * @param client - If passed along with opts.event=true will be used to set up re-emitters.
+ * @returns The event
  */
 export function mkMessage(opts: IMessageOpts & { event: true }, client?: MatrixClient): MatrixEvent;
 export function mkMessage(opts: IMessageOpts & { event?: false }, client?: MatrixClient): Partial<IEvent>;
@@ -290,14 +290,14 @@ interface IReplyMessageOpts extends IMessageOpts {
 /**
  * Create a reply message.
  *
- * @param opts Values for the message
- * @param opts.room The room ID for the event.
- * @param opts.user The user ID for the event.
- * @param opts.msg Optional. The content.body for the event.
- * @param opts.replyToMessage The replied message
- * @param opts.event True to make a MatrixEvent.
- * @param client If passed along with opts.event=true will be used to set up re-emitters.
- * @return The event
+ * @param opts - Values for the message
+ * @param opts -.room The room ID for the event.
+ * @param opts -.user The user ID for the event.
+ * @param opts -.msg Optional. The content.body for the event.
+ * @param opts -.replyToMessage The replied message
+ * @param opts -.event True to make a MatrixEvent.
+ * @param client - If passed along with opts.event=true will be used to set up re-emitters.
+ * @returns The event
  */
 export function mkReplyMessage(opts: IReplyMessageOpts & { event: true }, client?: MatrixClient): MatrixEvent;
 export function mkReplyMessage(opts: IReplyMessageOpts & { event?: false }, client?: MatrixClient): Partial<IEvent>;
@@ -359,7 +359,7 @@ export class MockStorageApi {
 /**
  * If an event is being decrypted, wait for it to finish being decrypted.
  *
- * @param event
+ * @param event -
  * @returns promise which resolves (to `event`) when the event has been decrypted
  */
 export async function awaitDecryption(

@@ -30,10 +30,10 @@ export interface IEncryptedPayload {
 /**
  * encrypt a string
  *
- * @param data the plaintext to encrypt
- * @param key the encryption key to use
- * @param name the name of the secret
- * @param ivStr the initialization vector to use
+ * @param data - the plaintext to encrypt
+ * @param key - the encryption key to use
+ * @param name - the name of the secret
+ * @param ivStr - the initialization vector to use
  */
 export async function encryptAES(
     data: string,
@@ -83,12 +83,12 @@ export async function encryptAES(
 /**
  * decrypt a string
  *
- * @param data the encrypted data
- * @param data.ciphertext the ciphertext in base64
- * @param data.iv the initialization vector in base64
- * @param data.mac the HMAC in base64
- * @param key the encryption key to use
- * @param name the name of the secret
+ * @param data - the encrypted data
+ * @param data -.ciphertext the ciphertext in base64
+ * @param data -.iv the initialization vector in base64
+ * @param data -.mac the HMAC in base64
+ * @param key - the encryption key to use
+ * @param name - the name of the secret
  */
 export async function decryptAES(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
     const [aesKey, hmacKey] = await deriveKeys(key, name);
@@ -168,10 +168,10 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
 
 /** Calculate the MAC for checking the key.
  *
- * @param key the key to use
+ * @param key - the key to use
  * @param [iv] The initialization vector as a base64-encoded string.
  *     If omitted, a random initialization vector will be created.
- * @return An object that contains, `mac` and `iv` properties.
+ * @returns An object that contains, `mac` and `iv` properties.
  */
 export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<IEncryptedPayload> {
     return encryptAES(ZERO_STR, key, "", iv);

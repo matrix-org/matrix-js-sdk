@@ -414,7 +414,7 @@ export class SlidingSyncSdk {
 
     /**
      * Sync rooms the user has left.
-     * @return Resolved when they've been added to the store.
+     * @returns Resolved when they've been added to the store.
      */
     public async syncLeftRooms(): Promise<Room[]> {
         return []; // TODO
@@ -423,8 +423,8 @@ export class SlidingSyncSdk {
     /**
      * Peek into a room. This will result in the room in question being synced so it
      * is accessible via getRooms(). Live updates for the room will be provided.
-     * @param roomId The room ID to peek into.
-     * @return A promise which resolves once the room has been added to the
+     * @param roomId - The room ID to peek into.
+     * @returns A promise which resolves once the room has been added to the
      * store.
      */
     public async peek(_roomId: string): Promise<Room> {
@@ -721,11 +721,11 @@ export class SlidingSyncSdk {
 
     /**
      * Injects events into a room's model.
-     * @param room
-     * @param stateEventList A list of state events. This is the state
+     * @param room -
+     * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
      * @param [timelineEventList] A list of timeline events. Lower index
-     * @param fromCache whether the sync response came from cache
+     * @param fromCache - whether the sync response came from cache
      * is earlier in time. Higher index is later.
      */
     public injectRoomEvents(
@@ -869,8 +869,8 @@ export class SlidingSyncSdk {
 
     /**
      * Sets the sync state and emits an event to say so
-     * @param newState The new state string
-     * @param data Object of additional data to emit in the event
+     * @param newState - The new state string
+     * @param data - Object of additional data to emit in the event
      */
     private updateSyncState(newState: SyncState, data?: ISyncStateData): void {
         const old = this.syncState;

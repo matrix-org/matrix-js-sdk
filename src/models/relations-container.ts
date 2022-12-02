@@ -32,12 +32,12 @@ export class RelationsContainer {
     /**
      * Get a collection of child events to a given event in this timeline set.
      *
-     * @param eventId
+     * @param eventId -
      * The ID of the event that you'd like to access child events for.
      * For example, with annotations, this would be the ID of the event being annotated.
-     * @param relationType
+     * @param relationType -
      * The type of relationship involved, such as "m.annotation", "m.reference", "m.replace", etc.
-     * @param eventType
+     * @param eventType -
      * The relation event's type, such as "m.reaction", etc.
      * @throws If <code>eventId</code>, <code>relationType</code> or <code>eventType</code>
      * are not valid.
@@ -71,7 +71,7 @@ export class RelationsContainer {
      * Child events can point to other child events as their parent, so this method may be
      * called for events which are also logically child events.
      *
-     * @param event The event to check as relation target.
+     * @param event - The event to check as relation target.
      */
     public aggregateParentEvent(event: MatrixEvent): void {
         const relationsForEvent = this.relations.get(event.getId()!);
@@ -87,8 +87,8 @@ export class RelationsContainer {
     /**
      * Add relation events to the relevant relation collection.
      *
-     * @param event The new child event to be aggregated.
-     * @param timelineSet The event timeline set within which to search for the related event if any.
+     * @param event - The new child event to be aggregated.
+     * @param timelineSet - The event timeline set within which to search for the related event if any.
      */
     public aggregateChildEvent(event: MatrixEvent, timelineSet?: EventTimelineSet): void {
         if (event.isRedacted() || event.status === EventStatus.CANCELLED) {

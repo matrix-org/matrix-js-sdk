@@ -76,14 +76,14 @@ export class VerificationBase<
      *
      * @class
      *
-     * @param channel the verification channel to send verification messages over.
+     * @param channel - the verification channel to send verification messages over.
      * TODO: Channel types
      *
-     * @param baseApis base matrix api interface
+     * @param baseApis - base matrix api interface
      *
-     * @param userId the user ID that is being verified
+     * @param userId - the user ID that is being verified
      *
-     * @param deviceId the device ID that is being verified
+     * @param deviceId - the device ID that is being verified
      *
      * @param [startEvent] the m.key.verification.start event that
      * initiated this verification, if any

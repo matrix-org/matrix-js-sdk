@@ -65,7 +65,7 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * This must be called before the store can be used.
      *
-     * @return resolves to the store.
+     * @returns resolves to the store.
      */
     public async startup(): Promise<CryptoStore> {
         // No startup work to do for the memory store.
@@ -85,7 +85,7 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing outgoing room key request, and if none is found,
      * add a new one
      *
-     * @param request
+     * @param request -
      *
      * @returns resolves to
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
@@ -122,10 +122,10 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     * @param requestBody
+     * @param requestBody -
      *    existing request to look for
      *
-     * @return resolves to the matching
+     * @returns resolves to the matching
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
      *    not found
      */
@@ -138,7 +138,7 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * @internal
      *
-     * @param requestBody
+     * @param requestBody -
      *    existing request to look for
      *
      * @return
@@ -157,9 +157,9 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for room key requests by state
      *
-     * @param wantedStates list of acceptable states
+     * @param wantedStates - list of acceptable states
      *
-     * @return resolves to the a
+     * @returns resolves to the a
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states
      */
@@ -176,8 +176,8 @@ export class MemoryCryptoStore implements CryptoStore {
 
     /**
      *
-     * @param wantedState
-     * @return All OutgoingRoomKeyRequests in state
+     * @param wantedState -
+     * @returns All OutgoingRoomKeyRequests in state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
         return Promise.resolve(
@@ -210,9 +210,9 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing room key request by id and state, and update it if
      * found
      *
-     * @param requestId      ID of request to update
-     * @param expectedState  state we expect to find the request in
-     * @param updates        name/value map of updates to apply
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
+     * @param updates -        name/value map of updates to apply
      *
      * @returns resolves to
      *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
@@ -246,8 +246,8 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing room key request by id and state, and delete it if
      * found
      *
-     * @param requestId      ID of request to update
-     * @param expectedState  state we expect to find the request in
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
      *
      * @returns resolves once the operation is completed
      */

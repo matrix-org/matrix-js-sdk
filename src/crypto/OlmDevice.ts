@@ -181,7 +181,7 @@ export class OlmDevice {
     }
 
     /**
-     * @return The version of Olm.
+     * @returns The version of Olm.
      */
     public static getOlmVersion(): [number, number, number] {
         return global.Olm.get_library_version();
@@ -199,12 +199,12 @@ export class OlmDevice {
      *
      * Reads the device keys from the OlmAccount object.
      *
-     * @param opts
-     * @param opts.fromExportedDevice (Optional) data from exported device
+     * @param opts -
+     * @param opts -.fromExportedDevice (Optional) data from exported device
      *     that must be re-created.
      *     If present, opts.pickleKey is ignored
      *     (exported data already provides a pickle key)
-     * @param opts.pickleKey (Optional) pickle key to set instead of default one
+     * @param opts -.pickleKey (Optional) pickle key to set instead of default one
      */
     public async init({ pickleKey, fromExportedDevice }: IInitOpts = {}): Promise<void> {
         let e2eKeys;
@@ -242,9 +242,9 @@ export class OlmDevice {
      * Note that for now only the “account” and “sessions” stores are populated;
      * Other stores will be as with a new device.
      *
-     * @param exportedData Data exported from another device
+     * @param exportedData - Data exported from another device
      *     through the “export” method.
-     * @param account an olm account to initialize
+     * @param account - an olm account to initialize
      */
     private async initialiseFromExportedDevice(exportedData: IExportedDevice, account: Account): Promise<void> {
         await this.cryptoStore.doTxn(
@@ -302,8 +302,8 @@ export class OlmDevice {
      * This function requires a live transaction object from cryptoStore.doTxn()
      * and therefore may only be called in a doTxn() callback.
      *
-     * @param txn Opaque transaction object from cryptoStore.doTxn()
-     * @param func
+     * @param txn - Opaque transaction object from cryptoStore.doTxn()
+     * @param func -
      * @private
      */
     private getAccount(txn: unknown, func: (account: Account) => void): void {
@@ -335,7 +335,7 @@ export class OlmDevice {
      * Export data for re-creating the Olm device later.
      * TODO export data other than just account and (P2P) sessions.
      *
-     * @return The exported data
+     * @returns The exported data
      */
     public async export(): Promise<IExportedDevice> {
         const result: Partial<IExportedDevice> = {
@@ -370,10 +370,10 @@ export class OlmDevice {
      * function and will be freed as soon the callback returns. It is *not*
      * usable for the rest of the lifetime of the transaction.
      *
-     * @param deviceKey
-     * @param sessionId
-     * @param txn Opaque transaction object from cryptoStore.doTxn()
-     * @param func
+     * @param deviceKey -
+     * @param sessionId -
+     * @param txn - Opaque transaction object from cryptoStore.doTxn()
+     * @param func -
      * @private
      */
     private getSession(
@@ -394,8 +394,8 @@ export class OlmDevice {
      * function with it. The session object is destroyed once the function
      * returns.
      *
-     * @param sessionInfo
-     * @param func
+     * @param sessionInfo -
+     * @param func -
      * @private
      */
     private unpickleSession(
@@ -416,9 +416,9 @@ export class OlmDevice {
     /**
      * store our OlmSession in the session store
      *
-     * @param deviceKey
-     * @param sessionInfo {session: OlmSession, lastReceivedMessageTs: int}
-     * @param txn Opaque transaction object from cryptoStore.doTxn()
+     * @param deviceKey -
+     * @param sessionInfo - {session: OlmSession, lastReceivedMessageTs: int}
+     * @param txn - Opaque transaction object from cryptoStore.doTxn()
      * @private
      */
     private saveSession(deviceKey: string, sessionInfo: IUnpickledSessionInfo, txn: unknown): void {
@@ -432,8 +432,8 @@ export class OlmDevice {
     /**
      * get an OlmUtility and call the given function
      *
-     * @param func
-     * @return result of func
+     * @param func -
+     * @returns result of func
      * @private
      */
     private getUtility<T>(func: (utility: Utility) => T): T {
@@ -448,8 +448,8 @@ export class OlmDevice {
     /**
      * Signs a message with the ed25519 key for this account.
      *
-     * @param message  message to be signed
-     * @return base64-encoded signature
+     * @param message -  message to be signed
+     * @returns base64-encoded signature
      */
     public async sign(message: string): Promise<string> {
         let result;
@@ -466,7 +466,7 @@ export class OlmDevice {
     /**
      * Get the current (unused, unpublished) one-time keys for this account.
      *
-     * @return one time keys; an object with the single property
+     * @returns one time keys; an object with the single property
      * <tt>curve25519</tt>, which is itself an object mapping key id to Curve25519
      * key.
      */
@@ -487,7 +487,7 @@ export class OlmDevice {
     /**
      * Get the maximum number of one-time keys we can store.
      *
-     * @return number of keys
+     * @returns number of keys
      */
     public maxNumberOfOneTimeKeys(): number {
         return this.maxOneTimeKeys ?? -1;
@@ -511,8 +511,8 @@ export class OlmDevice {
     /**
      * Generate some new one-time keys
      *
-     * @param numKeys number of keys to generate
-     * @return Resolved once the account is saved back having generated the keys
+     * @param numKeys - number of keys to generate
+     * @returns Resolved once the account is saved back having generated the keys
      */
     public generateOneTimeKeys(numKeys: number): Promise<void> {
         return this.cryptoStore.doTxn(
@@ -529,7 +529,7 @@ export class OlmDevice {
     /**
      * Generate a new fallback keys
      *
-     * @return Resolved once the account is saved back having generated the key
+     * @returns Resolved once the account is saved back having generated the key
      */
     public async generateFallbackKey(): Promise<void> {
         await this.cryptoStore.doTxn(
@@ -573,9 +573,9 @@ export class OlmDevice {
      *
      * The new session will be stored in the cryptoStore.
      *
-     * @param theirIdentityKey remote user's Curve25519 identity key
-     * @param theirOneTimeKey  remote user's one-time Curve25519 key
-     * @return sessionId for the outbound session.
+     * @param theirIdentityKey - remote user's Curve25519 identity key
+     * @param theirOneTimeKey -  remote user's one-time Curve25519 key
+     * @returns sessionId for the outbound session.
      */
     public async createOutboundSession(theirIdentityKey: string, theirOneTimeKey: string): Promise<string> {
         let newSessionId: string;
@@ -612,11 +612,11 @@ export class OlmDevice {
     /**
      * Generate a new inbound session, given an incoming message
      *
-     * @param theirDeviceIdentityKey remote user's Curve25519 identity key
-     * @param messageType  messageType field from the received message (must be 0)
-     * @param ciphertext base64-encoded body from the received message
+     * @param theirDeviceIdentityKey - remote user's Curve25519 identity key
+     * @param messageType -  messageType field from the received message (must be 0)
+     * @param ciphertext - base64-encoded body from the received message
      *
-     * @return decrypted payload, and
+     * @returns decrypted payload, and
      *     session id of new session
      *
      * @raises {Error} if the received message was not valid (for instance, it
@@ -673,9 +673,9 @@ export class OlmDevice {
     /**
      * Get a list of known session IDs for the given device
      *
-     * @param theirDeviceIdentityKey Curve25519 identity key for the
+     * @param theirDeviceIdentityKey - Curve25519 identity key for the
      *     remote device
-     * @return  a list of known session ids for the device
+     * @returns  a list of known session ids for the device
      */
     public async getSessionIdsForDevice(theirDeviceIdentityKey: string): Promise<string[]> {
         const log = logger.withPrefix("[getSessionIdsForDevice]");
@@ -708,13 +708,13 @@ export class OlmDevice {
     /**
      * Get the right olm session id for encrypting messages to the given identity key
      *
-     * @param theirDeviceIdentityKey Curve25519 identity key for the
+     * @param theirDeviceIdentityKey - Curve25519 identity key for the
      *     remote device
-     * @param nowait Don't wait for an in-progress session to complete.
+     * @param nowait - Don't wait for an in-progress session to complete.
      *     This should only be set to true of the calling function is the function
      *     that marked the session as being in-progress.
      * @param [log] A possibly customised log
-     * @return  session id, or null if no established session
+     * @returns  session id, or null if no established session
      */
     public async getSessionIdForDevice(
         theirDeviceIdentityKey: string,
@@ -756,8 +756,8 @@ export class OlmDevice {
      * the keys 'hasReceivedMessage' (true if the session has received an incoming
      * message and is therefore past the pre-key stage), and 'sessionId'.
      *
-     * @param deviceIdentityKey Curve25519 identity key for the device
-     * @param nowait Don't wait for an in-progress session to complete.
+     * @param deviceIdentityKey - Curve25519 identity key for the device
+     * @param nowait - Don't wait for an in-progress session to complete.
      *     This should only be set to true of the calling function is the function
      *     that marked the session as being in-progress.
      * @param [log] A possibly customised log
@@ -810,12 +810,12 @@ export class OlmDevice {
     /**
      * Encrypt an outgoing message using an existing session
      *
-     * @param theirDeviceIdentityKey Curve25519 identity key for the
+     * @param theirDeviceIdentityKey - Curve25519 identity key for the
      *     remote device
-     * @param sessionId  the id of the active session
-     * @param payloadString  payload to be encrypted and sent
+     * @param sessionId -  the id of the active session
+     * @param payloadString -  payload to be encrypted and sent
      *
-     * @return ciphertext
+     * @returns ciphertext
      */
     public async encryptMessage(
         theirDeviceIdentityKey: string,
@@ -846,13 +846,13 @@ export class OlmDevice {
     /**
      * Decrypt an incoming message using an existing session
      *
-     * @param theirDeviceIdentityKey Curve25519 identity key for the
+     * @param theirDeviceIdentityKey - Curve25519 identity key for the
      *     remote device
-     * @param sessionId  the id of the active session
-     * @param messageType  messageType field from the received message
-     * @param ciphertext base64-encoded body from the received message
+     * @param sessionId -  the id of the active session
+     * @param messageType -  messageType field from the received message
+     * @param ciphertext - base64-encoded body from the received message
      *
-     * @return decrypted payload.
+     * @returns decrypted payload.
      */
     public async decryptMessage(
         theirDeviceIdentityKey: string,
@@ -883,13 +883,13 @@ export class OlmDevice {
     /**
      * Determine if an incoming messages is a prekey message matching an existing session
      *
-     * @param theirDeviceIdentityKey Curve25519 identity key for the
+     * @param theirDeviceIdentityKey - Curve25519 identity key for the
      *     remote device
-     * @param sessionId  the id of the active session
-     * @param messageType  messageType field from the received message
-     * @param ciphertext base64-encoded body from the received message
+     * @param sessionId -  the id of the active session
+     * @param messageType -  messageType field from the received message
+     * @param ciphertext - base64-encoded body from the received message
      *
-     * @return true if the received message is a prekey message which matches
+     * @returns true if the received message is a prekey message which matches
      *    the given session.
      */
     public async matchesSession(
@@ -934,7 +934,7 @@ export class OlmDevice {
     /**
      * store an OutboundGroupSession in outboundGroupSessionStore
      *
-     * @param session
+     * @param session -
      * @private
      */
     private saveOutboundGroupSession(session: OutboundGroupSession): void {
@@ -945,9 +945,9 @@ export class OlmDevice {
      * extract an OutboundGroupSession from outboundGroupSessionStore and call the
      * given function
      *
-     * @param sessionId
-     * @param func
-     * @return result of func
+     * @param sessionId -
+     * @param func -
+     * @returns result of func
      * @private
      */
     private getOutboundGroupSession<T>(sessionId: string, func: (session: OutboundGroupSession) => T): T {
@@ -968,7 +968,7 @@ export class OlmDevice {
     /**
      * Generate a new outbound group session
      *
-     * @return sessionId for the outbound session.
+     * @returns sessionId for the outbound session.
      */
     public createOutboundGroupSession(): string {
         const session = new global.Olm.OutboundGroupSession();
@@ -984,10 +984,10 @@ export class OlmDevice {
     /**
      * Encrypt an outgoing message with an outbound group session
      *
-     * @param sessionId  the id of the outboundgroupsession
-     * @param payloadString  payload to be encrypted and sent
+     * @param sessionId -  the id of the outboundgroupsession
+     * @param payloadString -  payload to be encrypted and sent
      *
-     * @return ciphertext
+     * @returns ciphertext
      */
     public encryptGroupMessage(sessionId: string, payloadString: string): string {
         logger.log(`encrypting msg with megolm session ${sessionId}`);
@@ -1004,9 +1004,9 @@ export class OlmDevice {
     /**
      * Get the session keys for an outbound group session
      *
-     * @param sessionId  the id of the outbound group session
+     * @param sessionId -  the id of the outbound group session
      *
-     * @return current chain index, and
+     * @returns current chain index, and
      *     base64-encoded secret key.
      */
     public getOutboundGroupSessionKey(sessionId: string): IOutboundGroupSessionKey {
@@ -1025,9 +1025,9 @@ export class OlmDevice {
      * Unpickle a session from a sessionData object and invoke the given function.
      * The session is valid only until func returns.
      *
-     * @param sessionData Object describing the session.
-     * @param func Invoked with the unpickled session
-     * @return result of func
+     * @param sessionData - Object describing the session.
+     * @param func - Invoked with the unpickled session
+     * @returns result of func
      */
     private unpickleInboundGroupSession<T>(
         sessionData: InboundGroupSessionData,
@@ -1045,12 +1045,12 @@ export class OlmDevice {
     /**
      * extract an InboundGroupSession from the crypto store and call the given function
      *
-     * @param roomId The room ID to extract the session for, or null to fetch
+     * @param roomId - The room ID to extract the session for, or null to fetch
      *     sessions for any room.
-     * @param senderKey
-     * @param sessionId
-     * @param txn Opaque transaction object from cryptoStore.doTxn()
-     * @param func
+     * @param senderKey -
+     * @param sessionId -
+     * @param txn - Opaque transaction object from cryptoStore.doTxn()
+     * @param func -
      *   function to call.
      *
      * @private
@@ -1092,14 +1092,14 @@ export class OlmDevice {
     /**
      * Add an inbound group session to the session store
      *
-     * @param roomId     room in which this session will be used
-     * @param senderKey  base64-encoded curve25519 key of the sender
-     * @param forwardingCurve25519KeyChain  Devices involved in forwarding
+     * @param roomId -     room in which this session will be used
+     * @param senderKey -  base64-encoded curve25519 key of the sender
+     * @param forwardingCurve25519KeyChain -  Devices involved in forwarding
      *     this session to us.
-     * @param sessionId  session identifier
-     * @param sessionKey base64-encoded secret key
-     * @param keysClaimed Other keys the sender claims.
-     * @param exportFormat true if the megolm keys are in export format
+     * @param sessionId -  session identifier
+     * @param sessionKey - base64-encoded secret key
+     * @param keysClaimed - Other keys the sender claims.
+     * @param exportFormat - true if the megolm keys are in export format
      *    (ie, they lack an ed25519 signature)
      * @param [extraSessionData={}] any other data to be include with the session
      */
@@ -1213,11 +1213,11 @@ export class OlmDevice {
     /**
      * Record in the data store why an inbound group session was withheld.
      *
-     * @param roomId     room that the session belongs to
-     * @param senderKey  base64-encoded curve25519 key of the sender
-     * @param sessionId  session identifier
-     * @param code       reason code
-     * @param reason     human-readable version of `code`
+     * @param roomId -     room that the session belongs to
+     * @param senderKey -  base64-encoded curve25519 key of the sender
+     * @param sessionId -  session identifier
+     * @param code -       reason code
+     * @param reason -     human-readable version of `code`
      */
     public async addInboundGroupSessionWithheld(
         roomId: string,
@@ -1245,14 +1245,14 @@ export class OlmDevice {
     /**
      * Decrypt a received message with an inbound group session
      *
-     * @param roomId    room in which the message was received
-     * @param senderKey base64-encoded curve25519 key of the sender
-     * @param sessionId session identifier
-     * @param body      base64-encoded body of the encrypted message
-     * @param eventId   ID of the event being decrypted
-     * @param timestamp timestamp of the event being decrypted
+     * @param roomId -    room in which the message was received
+     * @param senderKey - base64-encoded curve25519 key of the sender
+     * @param sessionId - session identifier
+     * @param body -      base64-encoded body of the encrypted message
+     * @param eventId -   ID of the event being decrypted
+     * @param timestamp - timestamp of the event being decrypted
      *
-     * @return the sessionId is unknown
+     * @returns the sessionId is unknown
      *
      * @return
      *
@@ -1372,9 +1372,9 @@ export class OlmDevice {
     /**
      * Determine if we have the keys for a given megolm session
      *
-     * @param roomId    room in which the message was received
-     * @param senderKey base64-encoded curve25519 key of the sender
-     * @param sessionId session identifier
+     * @param roomId -    room in which the message was received
+     * @param senderKey - base64-encoded curve25519 key of the sender
+     * @param sessionId - session identifier
      *
      * @returns true if we have the keys to this session
      */
@@ -1415,10 +1415,10 @@ export class OlmDevice {
     /**
      * Extract the keys to a given megolm session, for sharing
      *
-     * @param roomId    room in which the message was received
-     * @param senderKey base64-encoded curve25519 key of the sender
-     * @param sessionId session identifier
-     * @param chainIndex The chain index at which to export the session.
+     * @param roomId -    room in which the message was received
+     * @param senderKey - base64-encoded curve25519 key of the sender
+     * @param sessionId - session identifier
+     * @param chainIndex - The chain index at which to export the session.
      *     If omitted, export at the first index we know about.
      *
      * @returns
@@ -1489,10 +1489,10 @@ export class OlmDevice {
     /**
      * Export an inbound group session
      *
-     * @param senderKey base64-encoded curve25519 key of the sender
-     * @param sessionId session identifier
-     * @param sessionData The session object from the store
-     * @return exported session data
+     * @param senderKey - base64-encoded curve25519 key of the sender
+     * @param sessionId - session identifier
+     * @param sessionData - The session object from the store
+     * @returns exported session data
      */
     public exportInboundGroupSession(
         senderKey: string,
@@ -1536,9 +1536,9 @@ export class OlmDevice {
     /**
      * Verify an ed25519 signature.
      *
-     * @param key ed25519 key
-     * @param message message which was signed
-     * @param signature base64-encoded signature to be checked
+     * @param key - ed25519 key
+     * @param message - message which was signed
+     * @param signature - base64-encoded signature to be checked
      *
      * @raises {Error} if there is a problem with the verification. If the key was
      * too small then the message will be "OLM.INVALID_BASE64". If the signature
@@ -1565,9 +1565,9 @@ export const WITHHELD_MESSAGES = {
 /**
  * Calculate the message to use for the exception when a session key is withheld.
  *
- * @param withheld  An object that describes why the key was withheld.
+ * @param withheld -  An object that describes why the key was withheld.
  *
- * @return the message
+ * @returns the message
  *
  * @private
  */

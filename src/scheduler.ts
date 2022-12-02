@@ -56,9 +56,9 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * times of 2, 4, 8, and 16 seconds (30s total) after which we give up. If the
      * failure was due to a rate limited request, the time specified in the error is
      * waited before being retried.
-     * @param event
-     * @param attempts Number of attempts that have been made, including the one that just failed (ie. starting at 1)
-     * @param err
+     * @param event -
+     * @param attempts - Number of attempts that have been made, including the one that just failed (ie. starting at 1)
+     * @param err -
      * @return
      * @see module:scheduler~retryAlgorithm
      */
@@ -92,7 +92,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
     /**
      * Queues <code>m.room.message</code> events and lets other events continue
      * concurrently.
-     * @param event
+     * @param event -
      * @return
      * @see module:scheduler~queueAlgorithm
      */
@@ -124,8 +124,8 @@ export class MatrixScheduler<T = ISendEventResponse> {
     /**
      * Retrieve a queue based on an event. The event provided does not need to be in
      * the queue.
-     * @param event An event to get the queue for.
-     * @return A shallow copy of events in the queue or null.
+     * @param event - An event to get the queue for.
+     * @returns A shallow copy of events in the queue or null.
      * Modifying this array will not modify the list itself. Modifying events in
      * this array <i>will</i> modify the underlying event in the queue.
      * @see MatrixScheduler.removeEventFromQueue To remove an event from the queue.
@@ -143,8 +143,8 @@ export class MatrixScheduler<T = ISendEventResponse> {
     /**
      * Remove this event from the queue. The event is equal to another event if they
      * have the same ID returned from event.getId().
-     * @param event The event to remove.
-     * @return True if this event was removed.
+     * @param event - The event to remove.
+     * @returns True if this event was removed.
      */
     public removeEventFromQueue(event: MatrixEvent): boolean {
         const name = this.queueAlgorithm(event);
@@ -168,7 +168,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * Set the process function. Required for events in the queue to be processed.
      * If set after events have been added to the queue, this will immediately start
      * processing them.
-     * @param fn The function that can process events
+     * @param fn - The function that can process events
      * in the queue.
      */
     public setProcessFunction(fn: ProcessFunction<T>): void {
@@ -178,8 +178,8 @@ export class MatrixScheduler<T = ISendEventResponse> {
 
     /**
      * Queue an event if it is required and start processing queues.
-     * @param event The event that may be queued.
-     * @return A promise if the event was queued, which will be
+     * @param event - The event that may be queued.
+     * @returns A promise if the event was queued, which will be
      * resolved or rejected in due time, else null.
      */
     public queueEvent(event: MatrixEvent): Promise<T> | null {
@@ -299,7 +299,7 @@ function debuglog(...args: any[]): void {
  * >= 1.
  * @param {MatrixError} err The most recent error message received when trying
  * to send this event.
- * @return {Number} The number of milliseconds to wait before trying again. If
+ * @returns {Number} The number of milliseconds to wait before trying again. If
  * this is 0, the request will be immediately retried. If this is
  * <code>-1</code>, the event will be marked as
  * {@link module:models/event.EventStatus.NOT_SENT} and will not be retried.
@@ -314,7 +314,7 @@ function debuglog(...args: any[]): void {
  * queue will be sent.
  * @callback queueAlgorithm
  * @param {MatrixEvent} event The event to be sent.
- * @return {string} The name of the queue to put the event into. If a queue with
+ * @returns {string} The name of the queue to put the event into. If a queue with
  * this name does not exist, it will be created. If this is <code>null</code>,
  * the event is not put into a queue and will be sent concurrently.
  */
@@ -323,6 +323,6 @@ function debuglog(...args: any[]): void {
  * The function to invoke to process (send) events in the queue.
  * @callback processFn
  * @param {MatrixEvent} event The event to send.
- * @return {Promise} Resolved/rejected depending on the outcome of the request.
+ * @returns {Promise} Resolved/rejected depending on the outcome of the request.
  */
 

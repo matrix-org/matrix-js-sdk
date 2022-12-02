@@ -220,7 +220,7 @@ describe("megolm", () => {
      * Get the device keys for testOlmAccount in a format suitable for a
      * response to /keys/query
      *
-     * @param userId The user ID to query for
+     * @param userId - The user ID to query for
      * @returns The fake query response
      */
     function getTestKeysQueryResponse(userId: string): IDownloadKeyResult {
@@ -248,7 +248,7 @@ describe("megolm", () => {
      * Get a one-time key for testOlmAccount in a format suitable for a
      * response to /keys/claim
 
-     * @param userId The user ID to query for
+     * @param userId - The user ID to query for
      * @returns The fake key claim response
      */
     function getTestKeysClaimResponse(userId: string): IClaimOTKsResult {

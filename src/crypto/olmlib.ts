@@ -61,15 +61,15 @@ export interface IOlmSessionResult {
 /**
  * Encrypt an event payload for an Olm device
  *
- * @param resultsObject  The `ciphertext` property
+ * @param resultsObject -  The `ciphertext` property
  *   of the m.room.encrypted event to which to add our result
  *
- * @param ourUserId
- * @param ourDeviceId
- * @param olmDevice olm.js wrapper
- * @param recipientUserId
- * @param recipientDevice
- * @param payloadFields fields to include in the encrypted payload
+ * @param ourUserId -
+ * @param ourDeviceId -
+ * @param olmDevice - olm.js wrapper
+ * @param recipientUserId -
+ * @param recipientDevice -
+ * @param payloadFields - fields to include in the encrypted payload
  *
  * Returns a promise which resolves (to undefined) when the payload
  *    has been encrypted into `resultsObject`
@@ -147,14 +147,14 @@ interface IExistingOlmSession {
  * Get the existing olm sessions for the given devices, and the devices that
  * don't have olm sessions.
  *
- * @param olmDevice
+ * @param olmDevice -
  *
- * @param baseApis
+ * @param baseApis -
  *
- * @param devicesByUser
+ * @param devicesByUser -
  *    map from userid to list of devices to ensure sessions for
  *
- * @return resolves to an array.  The first element of the array is a
+ * @returns resolves to an array.  The first element of the array is a
  *    a map of user IDs to arrays of deviceInfo, representing the devices that
  *    don't have established olm sessions.  The second element of the array is
  *    a map from userId to deviceId to {@link module:crypto~OlmSessionResult}
@@ -199,11 +199,11 @@ export async function getExistingOlmSessions(
 /**
  * Try to make sure we have established olm sessions for the given devices.
  *
- * @param olmDevice
+ * @param olmDevice -
  *
- * @param baseApis
+ * @param baseApis -
  *
- * @param devicesByUser
+ * @param devicesByUser -
  *    map from userid to list of devices to ensure sessions for
  *
  * @param [force=false] If true, establish a new session even if one
@@ -217,7 +217,7 @@ export async function getExistingOlmSessions(
  *
  * @param [log] A possibly customised log
  *
- * @return resolves once the sessions are complete, to
+ * @returns resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
  *    {@link module:crypto~OlmSessionResult}
  */
@@ -444,15 +444,15 @@ export interface IObject {
 /**
  * Verify the signature on an object
  *
- * @param olmDevice olm wrapper to use for verify op
+ * @param olmDevice - olm wrapper to use for verify op
  *
- * @param obj object to check signature on.
+ * @param obj - object to check signature on.
  *
- * @param signingUserId  ID of the user whose signature should be checked
+ * @param signingUserId -  ID of the user whose signature should be checked
  *
- * @param signingDeviceId  ID of the device whose signature should be checked
+ * @param signingDeviceId -  ID of the device whose signature should be checked
  *
- * @param signingKey   base64-ed ed25519 public key
+ * @param signingKey -   base64-ed ed25519 public key
  *
  * Returns a promise which resolves (to undefined) if the the signature is good,
  * or rejects with an Error if it is bad.
@@ -487,12 +487,12 @@ export async function verifySignature(
 
 /**
  * Sign a JSON object using public key cryptography
- * @param obj Object to sign.  The object will be modified to include
+ * @param obj - Object to sign.  The object will be modified to include
  *     the new signature
- * @param key the signing object or the private key
+ * @param key - the signing object or the private key
  * seed
- * @param userId The user ID who owns the signing key
- * @param pubKey The public key (ignored if key is a seed)
+ * @param userId - The user ID who owns the signing key
+ * @param pubKey - The public key (ignored if key is a seed)
  * @returns the signature for the object
  */
 export function pkSign(obj: IObject, key: PkSigning, userId: string, pubKey: string): string {
@@ -523,9 +523,9 @@ export function pkSign(obj: IObject, key: PkSigning, userId: string, pubKey: str
 
 /**
  * Verify a signed JSON object
- * @param obj Object to verify
- * @param pubKey The public key to use to verify
- * @param userId The user ID who signed the object
+ * @param obj - Object to verify
+ * @param pubKey - The public key to use to verify
+ * @param userId - The user ID who signed the object
  */
 export function pkVerify(obj: IObject, pubKey: string, userId: string): void {
     const keyId = "ed25519:" + pubKey;
@@ -565,8 +565,8 @@ export function isOlmEncrypted(event: MatrixEvent): boolean {
 
 /**
  * Encode a typed array of uint8 as base64.
- * @param uint8Array The data to encode.
- * @return The base64.
+ * @param uint8Array - The data to encode.
+ * @returns The base64.
  */
 export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return Buffer.from(uint8Array).toString("base64");
@@ -574,8 +574,8 @@ export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
 
 /**
  * Encode a typed array of uint8 as unpadded base64.
- * @param uint8Array The data to encode.
- * @return The unpadded base64.
+ * @param uint8Array - The data to encode.
+ * @returns The unpadded base64.
  */
 export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return encodeBase64(uint8Array).replace(/=+$/g, '');
@@ -583,8 +583,8 @@ export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): stri
 
 /**
  * Decode a base64 string to a typed array of uint8.
- * @param base64 The base64 to decode.
- * @return The decoded data.
+ * @param base64 - The base64 to decode.
+ * @returns The decoded data.
  */
 export function decodeBase64(base64: string): Uint8Array {
     return Buffer.from(base64, "base64");

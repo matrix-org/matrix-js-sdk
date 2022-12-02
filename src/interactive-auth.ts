@@ -236,7 +236,7 @@ export class InteractiveAuth {
     /**
      * begin the authentication process.
      *
-     * @return which resolves to the response on success,
+     * @returns which resolves to the response on success,
      * or rejects with the error on failure. Rejects with NoAuthFlowFoundError if
      *     no suitable authentication flow can be found
      */
@@ -307,7 +307,7 @@ export class InteractiveAuth {
     /**
      * get the auth session ID
      *
-     * @return session id
+     * @returns session id
      */
     public getSessionId(): string | undefined {
         return this.data?.session;
@@ -317,7 +317,7 @@ export class InteractiveAuth {
      * get the client secret used for validation sessions
      * with the identity server.
      *
-     * @return client secret
+     * @returns client secret
      */
     public getClientSecret(): string {
         return this.clientSecret;
@@ -326,8 +326,8 @@ export class InteractiveAuth {
     /**
      * get the server params for a given stage
      *
-     * @param loginType login type for the stage
-     * @return any parameters from the server for this stage
+     * @param loginType - login type for the stage
+     * @returns any parameters from the server for this stage
      */
     public getStageParams(loginType: string): Record<string, any> | undefined {
         return this.data.params?.[loginType];
@@ -342,10 +342,10 @@ export class InteractiveAuth {
      * make attemptAuth resolve/reject, or cause the startAuthStage callback
      * to be called for a new stage.
      *
-     * @param authData new auth dict to send to the server. Should
+     * @param authData - new auth dict to send to the server. Should
      *    include a `type` property denoting the login type, as well as any
      *    other params for that stage.
-     * @param background If true, this request failing will not result
+     * @param background - If true, this request failing will not result
      *    in the attemptAuth promise being rejected. This can be set to true
      *    for requests that just poll to see if auth has been completed elsewhere.
      */
@@ -410,7 +410,7 @@ export class InteractiveAuth {
      * of the email validation.
      * Specific to m.login.email.identity
      *
-     * @param sid The sid for the email validation session
+     * @param sid - The sid for the email validation session
      */
     public setEmailSid(sid: string): void {
         this.emailSid = sid;
@@ -449,8 +449,8 @@ export class InteractiveAuth {
      * startAuthStage.
      *
      * @private
-     * @param auth new auth dict, including session id
-     * @param background If true, this request is a background poll, so it
+     * @param auth - new auth dict, including session id
+     * @param background - If true, this request is a background poll, so it
      *    failing will not result in the attemptAuth promise being rejected.
      *    This can be set to true for requests that just poll to see if auth has
      *    been completed elsewhere.
@@ -560,7 +560,7 @@ export class InteractiveAuth {
      * Pick the next auth stage
      *
      * @private
-     * @return login type
+     * @returns login type
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     private chooseStage(): AuthType | undefined {
@@ -585,7 +585,7 @@ export class InteractiveAuth {
      * the account with no means to reset a password.
      *
      * @private
-     * @return flow
+     * @returns flow
      * @throws {NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
     private chooseFlow(): IFlow {
@@ -626,8 +626,8 @@ export class InteractiveAuth {
      * Get the first uncompleted stage in the given flow
      *
      * @private
-     * @param flow
-     * @return login type
+     * @param flow -
+     * @returns login type
      */
     private firstUncompletedStage(flow: IFlow): AuthType | undefined {
         const completed = this.data.completed || [];

@@ -41,10 +41,10 @@ export class RoomHierarchy {
      *
      * A RoomHierarchy instance allows you to easily make use of the /hierarchy API and paginate it.
      *
-     * @param root the root of this hierarchy
-     * @param pageSize the maximum number of rooms to return per page, can be overridden per load request.
-     * @param maxDepth the maximum depth to traverse the hierarchy to
-     * @param suggestedOnly whether to only return rooms with suggested=true.
+     * @param root - the root of this hierarchy
+     * @param pageSize - the maximum number of rooms to return per page, can be overridden per load request.
+     * @param maxDepth - the maximum depth to traverse the hierarchy to
+     * @param suggestedOnly - whether to only return rooms with suggested=true.
      * @constructor
      */
     public constructor(

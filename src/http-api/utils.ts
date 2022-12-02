@@ -67,8 +67,8 @@ export function anySignal(signals: AbortSignal[]): {
  * If it is a JSON response, we will parse it into a MatrixError. Otherwise
  * we return a generic Error.
  *
- * @param response response object
- * @param body raw body of the response
+ * @param response - response object
+ * @param body - raw body of the response
  * @returns
  */
 export function parseErrorResponse(response: XMLHttpRequest | Response, body?: string): Error {
@@ -102,7 +102,7 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
  *
  * returns null if no content-type header could be found.
  *
- * @param response response object
+ * @param response - response object
  * @returns parsed content-type header, or null if not found
  */
 function getResponseContentType(response: XMLHttpRequest | Response): ParsedMediaType | null {
@@ -125,8 +125,8 @@ function getResponseContentType(response: XMLHttpRequest | Response): ParsedMedi
 /**
  * Retries a network operation run in a callback.
  * @param   maxAttempts maximum attempts to try
- * @param callback    callback that returns a promise of the network operation. If rejected with ConnectionError, it will be retried by calling the callback again.
- * @return the result of the network operation
+ * @param callback -    callback that returns a promise of the network operation. If rejected with ConnectionError, it will be retried by calling the callback again.
+ * @returns the result of the network operation
  * @throws {ConnectionError} If after maxAttempts the callback still throws ConnectionError
  */
 export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => Promise<T>): Promise<T> {

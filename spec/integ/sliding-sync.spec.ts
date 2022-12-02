@@ -1438,10 +1438,10 @@ function timeout(delayMs: number, reason: string): { promise: Promise<never>, ca
 
 /**
  * Listen until a callback returns data.
- * @param emitter The event emitter
- * @param eventName The event to listen for
- * @param callback The callback which will be invoked when events fire. Return something truthy from this to resolve the promise.
- * @param timeoutMs The number of milliseconds to wait for the callback to return data. Default: 500ms.
+ * @param emitter - The event emitter
+ * @param eventName - The event to listen for
+ * @param callback - The callback which will be invoked when events fire. Return something truthy from this to resolve the promise.
+ * @param timeoutMs - The number of milliseconds to wait for the callback to return data. Default: 500ms.
  * @returns A promise which will be resolved when the callback returns data. If the callback throws or the timeout is reached,
  * the promise is rejected.
  */

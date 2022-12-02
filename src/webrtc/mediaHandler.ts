@@ -67,7 +67,7 @@ export class MediaHandler extends TypedEventEmitter<
 
     /**
      * Set an audio input device to use for MatrixCalls
-     * @param deviceId the identifier for the device
+     * @param deviceId - the identifier for the device
      * undefined treated as unset
      */
     public async setAudioInput(deviceId: string): Promise<void> {
@@ -81,7 +81,7 @@ export class MediaHandler extends TypedEventEmitter<
 
     /**
      * Set audio settings for MatrixCalls
-     * @param opts audio options to set
+     * @param opts - audio options to set
      */
     public async setAudioSettings(opts: AudioSettings): Promise<void> {
         logger.info("Setting audio settings to", opts);
@@ -92,7 +92,7 @@ export class MediaHandler extends TypedEventEmitter<
 
     /**
      * Set a video input device to use for MatrixCalls
-     * @param deviceId the identifier for the device
+     * @param deviceId - the identifier for the device
      * undefined treated as unset
      */
     public async setVideoInput(deviceId: string): Promise<void> {
@@ -106,8 +106,8 @@ export class MediaHandler extends TypedEventEmitter<
 
     /**
      * Set media input devices to use for MatrixCalls
-     * @param audioInput the identifier for the audio device
-     * @param videoInput the identifier for the video device
+     * @param audioInput - the identifier for the audio device
+     * @param videoInput - the identifier for the video device
      * undefined treated as unset
      */
     public async setMediaInputs(audioInput: string, videoInput: string): Promise<void> {
@@ -191,9 +191,9 @@ export class MediaHandler extends TypedEventEmitter<
     }
 
     /**
-     * @param audio should have an audio track
-     * @param video should have a video track
-     * @param reusable is allowed to be reused by the MediaHandler
+     * @param audio - should have an audio track
+     * @param video - should have a video track
+     * @param reusable - is allowed to be reused by the MediaHandler
      * @returns based on passed parameters
      */
     public async getUserMediaStream(audio: boolean, video: boolean, reusable = true): Promise<MediaStream> {
@@ -296,8 +296,8 @@ export class MediaHandler extends TypedEventEmitter<
     }
 
     /**
-     * @param desktopCapturerSourceId sourceId for Electron DesktopCapturer
-     * @param reusable is allowed to be reused by the MediaHandler
+     * @param desktopCapturerSourceId - sourceId for Electron DesktopCapturer
+     * @param reusable - is allowed to be reused by the MediaHandler
      * @returns based on passed parameters
      */
     public async getScreensharingStream(opts: IScreensharingOpts = {}, reusable = true): Promise<MediaStream> {

@@ -167,7 +167,7 @@ class SlidingList {
 
     /**
      * Construct a new sliding list.
-     * @param list The range, sort and filter values to use for this list.
+     * @param list - The range, sort and filter values to use for this list.
      */
     public constructor(list: MSC3575List) {
         this.replaceList(list);
@@ -176,7 +176,7 @@ class SlidingList {
     /**
      * Mark this list as modified or not. Modified lists will return sticky params with calls to getList.
      * This is useful for the first time the list is sent, or if the list has changed in some way.
-     * @param modified True to mark this list as modified so all sticky parameters will be re-sent.
+     * @param modified - True to mark this list as modified so all sticky parameters will be re-sent.
      */
     public setModified(modified: boolean): void {
         this.isModified = modified;
@@ -184,7 +184,7 @@ class SlidingList {
 
     /**
      * Update the list range for this list. Does not affect modified status as list ranges are non-sticky.
-     * @param newRanges The new ranges for the list
+     * @param newRanges - The new ranges for the list
      */
     public updateListRange(newRanges: number[][]): void {
         this.list.ranges = JSON.parse(JSON.stringify(newRanges));
@@ -192,7 +192,7 @@ class SlidingList {
 
     /**
      * Replace list parameters. All fields will be replaced with the new list parameters.
-     * @param list The new list parameters
+     * @param list - The new list parameters
      */
     public replaceList(list: MSC3575List): void {
         list.filters = list.filters || {};
@@ -212,7 +212,7 @@ class SlidingList {
 
     /**
      * Return a copy of the list suitable for a request body.
-     * @param forceIncludeAllParams True to forcibly include all params even if the list
+     * @param forceIncludeAllParams - True to forcibly include all params even if the list
      * hasn't been modified. Callers may want to do this if they are modifying the list prior to calling
      * updateList.
      */
@@ -234,7 +234,7 @@ class SlidingList {
      *   a b c       d _ f   COMMAND: DELETE 7;
      *   e a b c       d f   COMMAND: INSERT 0 e;
      *   c=3 is wrong as we are not tracking it, ergo we need to see if `i` is in range else drop it
-     * @param i The index to check
+     * @param i - The index to check
      * @returns True if the index is within a sliding window
      */
     public isIndexInRange(i: number): boolean {
@@ -273,13 +273,13 @@ export interface Extension {
     /**
      * A function which is called when the request JSON is being formed.
      * Returns the data to insert under this key.
-     * @param isInitial True when this is part of the initial request (send sticky params)
+     * @param isInitial - True when this is part of the initial request (send sticky params)
      * @returns The request JSON to send.
      */
     onRequest(isInitial: boolean): object | undefined;
     /**
      * A function which is called when there is response JSON under this extension.
-     * @param data The response JSON under the extension name.
+     * @param data - The response JSON under the extension name.
      */
     onResponse(data: object);
     /**
@@ -367,11 +367,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Create a new sliding sync instance
-     * @param proxyBaseUrl The base URL of the sliding sync proxy
-     * @param lists The lists to use for sliding sync.
-     * @param roomSubscriptionInfo The params to use for room subscriptions.
-     * @param client The client to use for /sync calls.
-     * @param timeoutMS The number of milliseconds to wait for a response.
+     * @param proxyBaseUrl - The base URL of the sliding sync proxy
+     * @param lists - The lists to use for sliding sync.
+     * @param roomSubscriptionInfo - The params to use for room subscriptions.
+     * @param client - The client to use for /sync calls.
+     * @param timeoutMS - The number of milliseconds to wait for a response.
      */
     public constructor(
         private readonly proxyBaseUrl: string,
@@ -387,9 +387,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     /**
      * Add a custom room subscription, referred to by an arbitrary name. If a subscription with this
      * name already exists, it is replaced. No requests are sent by calling this method.
-     * @param name The name of the subscription. Only used to reference this subscription in
+     * @param name - The name of the subscription. Only used to reference this subscription in
      * useCustomSubscription.
-     * @param sub The subscription information.
+     * @param sub - The subscription information.
      */
     public addCustomSubscription(name: string, sub: MSC3575RoomSubscription): void {
         this.customSubscriptions.set(name, sub);
@@ -398,8 +398,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     /**
      * Use a custom subscription previously added via addCustomSubscription. No requests are sent
      * by calling this method. Use modifyRoomSubscriptions to resend subscription information.
-     * @param roomId The room to use the subscription in.
-     * @param name The name of the subscription. If this name is unknown, the default subscription
+     * @param roomId - The room to use the subscription in.
+     * @param name - The name of the subscription. If this name is unknown, the default subscription
      * will be used.
      */
     public useCustomSubscription(roomId: string, name: string): void {
@@ -418,7 +418,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Get the room data for a list.
-     * @param index The list index
+     * @param index - The list index
      * @returns The list data which contains the rooms in this list
      */
     public getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} | null {
@@ -434,7 +434,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     /**
      * Get the full list parameters for a list index. This function is provided for callers to use
      * in conjunction with setList to update fields on an existing list.
-     * @param index The list index to get the list for.
+     * @param index - The list index to get the list for.
      * @returns A copy of the list or undefined.
      */
     public getList(index: number): MSC3575List | null {
@@ -448,9 +448,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Set new ranges for an existing list. Calling this function when _only_ the ranges have changed
      * is more efficient than calling setList(index,list) as this function won't resend sticky params,
      * whereas setList always will.
-     * @param index The list index to modify
-     * @param ranges The new ranges to apply.
-     * @return A promise which resolves to the transaction ID when it has been received down sync
+     * @param index - The list index to modify
+     * @param ranges - The new ranges to apply.
+     * @returns A promise which resolves to the transaction ID when it has been received down sync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
@@ -462,9 +462,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     /**
      * Add or replace a list. Calling this function will interrupt the /sync request to resend new
      * lists.
-     * @param index The index to modify
-     * @param list The new list parameters.
-     * @return A promise which resolves to the transaction ID when it has been received down sync
+     * @param index - The index to modify
+     * @param list - The new list parameters.
+     * @returns A promise which resolves to the transaction ID when it has been received down sync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
@@ -490,8 +490,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Modify the room subscriptions for the sync API. Calling this function will interrupt the
      * /sync request to resend new subscriptions. If the /sync stream has not started, this will
      * prepare the room subscriptions for when start() is called.
-     * @param s The new desired room subscriptions.
-     * @return A promise which resolves to the transaction ID when it has been received down sync
+     * @param s - The new desired room subscriptions.
+     * @returns A promise which resolves to the transaction ID when it has been received down sync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
@@ -503,8 +503,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     /**
      * Modify which events to retrieve for room subscriptions. Invalidates all room subscriptions
      * such that they will be sent up afresh.
-     * @param rs The new room subscription fields to fetch.
-     * @return A promise which resolves to the transaction ID when it has been received down sync
+     * @param rs - The new room subscription fields to fetch.
+     * @returns A promise which resolves to the transaction ID when it has been received down sync
      * (or rejects with the transaction ID if the action was not applied e.g the request was cancelled
      * immediately after sending, in which case the action will be applied in the subsequent request)
      */
@@ -516,7 +516,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Register an extension to send with the /sync request.
-     * @param ext The extension to register.
+     * @param ext - The extension to register.
      */
     public registerExtension(ext: Extension): void {
         if (this.extensions[ext.name()]) {
@@ -551,8 +551,8 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Invoke all attached room data listeners.
-     * @param roomId The room which received some data.
-     * @param roomData The raw sliding sync response JSON.
+     * @param roomId - The room which received some data.
+     * @param roomData - The raw sliding sync response JSON.
      */
     private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): void {
         if (!roomData.required_state) { roomData.required_state = []; }
@@ -562,9 +562,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     /**
      * Invoke all attached lifecycle listeners.
-     * @param state The Lifecycle state
-     * @param resp The raw sync response JSON
-     * @param err Any error that occurred when making the request e.g. network errors.
+     * @param state - The Lifecycle state
+     * @param resp - The raw sync response JSON
+     * @param err - Any error that occurred when making the request e.g. network errors.
      */
     private invokeLifecycleListeners(
         state: SlidingSyncState,

@@ -134,7 +134,7 @@ export class BackupManager {
      *
      * Throws an error if a problem is detected.
      *
-     * @param info the key backup info
+     * @param info - the key backup info
      */
     public static checkBackupVersion(info: IKeyBackupInfo): void {
         const Algorithm = algorithmsByName[info.algorithm];
@@ -276,7 +276,7 @@ export class BackupManager {
      * Forces a re-check of the key backup and enables/disables it
      * as appropriate.
      *
-     * @return Object with backup info (as returned by
+     * @returns Object with backup info (as returned by
      *     getKeyBackupVersion) in backupInfo and
      *     trust information (as returned by isKeyBackupTrusted)
      *     in trustInfo.
@@ -309,7 +309,7 @@ export class BackupManager {
     /**
      * Check if the given backup info is trusted.
      *
-     * @param backupInfo key backup info dict from /room_keys/version
+     * @param backupInfo - key backup info dict from /room_keys/version
      * @return
      *
      *
@@ -432,7 +432,7 @@ export class BackupManager {
      * Schedules sending all keys waiting to be sent to the backup, if not already
      * scheduled. Retries if necessary.
      *
-     * @param maxDelay Maximum delay to wait in ms. 0 means no delay.
+     * @param maxDelay - Maximum delay to wait in ms. 0 means no delay.
      */
     public async scheduleKeyBackupSend(maxDelay = 10000): Promise<void> {
         if (this.sendingBackups) return;
@@ -490,7 +490,7 @@ export class BackupManager {
      * Take some e2e keys waiting to be backed up and send them
      * to the backup.
      *
-     * @param limit Maximum number of keys to back up
+     * @param limit - Maximum number of keys to back up
      * @returns Number of sessions backed up
      */
     public async backupPendingKeys(limit: number): Promise<number> {

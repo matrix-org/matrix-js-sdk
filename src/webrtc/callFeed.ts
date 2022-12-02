@@ -191,7 +191,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      * The stream will be different and new stream as remore parties are
      * concerned, but this can be used for convenience locally to set up
      * volume listeners automatically on the new stream etc.
-     * @param newStream new stream with which to replace the current one
+     * @param newStream - new stream with which to replace the current one
      */
     public setNewStream(newStream: MediaStream): void {
         this.updateStream(this.stream, newStream);
@@ -200,8 +200,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     /**
      * Set one or both of feed's internal audio and video video mute state
      * Either value may be null to leave it as-is
-     * @param audioMuted is the feed's audio muted?
-     * @param videoMuted is the feed's video muted?
+     * @param audioMuted - is the feed's audio muted?
+     * @param videoMuted - is the feed's video muted?
      */
     public setAudioVideoMuted(audioMuted: boolean | null, videoMuted: boolean | null): void {
         if (audioMuted !== null) {
@@ -216,7 +216,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     /**
      * Starts emitting volume_changed events where the emitter value is in decibels
-     * @param enabled emit volume changes
+     * @param enabled - emit volume changes
      */
     public measureVolumeActivity(enabled: boolean): void {
         if (enabled) {

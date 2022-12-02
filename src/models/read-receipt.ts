@@ -63,9 +63,9 @@ export abstract class ReadReceipt<
 
     /**
      * Gets the latest receipt for a given user in the room
-     * @param userId The id of the user for which we want the receipt
-     * @param ignoreSynthesized Whether to ignore synthesized receipts or not
-     * @param receiptType Optional. The type of the receipt we want to get
+     * @param userId - The id of the user for which we want the receipt
+     * @param ignoreSynthesized - Whether to ignore synthesized receipts or not
+     * @param receiptType - Optional. The type of the receipt we want to get
      * @returns the latest receipts of the chosen type for the chosen user
      */
     public getReadReceiptForUserId(
@@ -82,11 +82,11 @@ export abstract class ReadReceipt<
     /**
      * Get the ID of the event that a given user has read up to, or null if we
      * have received no read receipts from them.
-     * @param userId The user ID to get read receipt event ID for
-     * @param ignoreSynthesized If true, return only receipts that have been
+     * @param userId - The user ID to get read receipt event ID for
+     * @param ignoreSynthesized - If true, return only receipts that have been
      *                                    sent by the server, not implicit ones generated
      *                                    by the JS SDK.
-     * @return ID of the latest event that the given user has read, or null.
+     * @returns ID of the latest event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
         // XXX: This is very very ugly and I hope I won't have to ever add a new
@@ -212,8 +212,8 @@ export abstract class ReadReceipt<
 
     /**
      * Get a list of receipts for the given event.
-     * @param event the event to get receipts for
-     * @return A list of receipts with a userId, type and data keys or
+     * @param event - the event to get receipts for
+     * @returns A list of receipts with a userId, type and data keys or
      * an empty list.
      */
     public getReceiptsForEvent(event: MatrixEvent): CachedReceipt[] {
@@ -225,9 +225,9 @@ export abstract class ReadReceipt<
     /**
      * Add a temporary local-echo receipt to the room to reflect in the
      * client the fact that we've sent one.
-     * @param userId The user ID if the receipt sender
-     * @param e The event that is to be acknowledged
-     * @param receiptType The type of receipt
+     * @param userId - The user ID if the receipt sender
+     * @param e - The event that is to be acknowledged
+     * @param receiptType - The type of receipt
      */
     public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: ReceiptType): void {
         this.addReceipt(synthesizeReceipt(userId, e, receiptType), true);
@@ -235,8 +235,8 @@ export abstract class ReadReceipt<
 
     /**
      * Get a list of user IDs who have <b>read up to</b> the given event.
-     * @param event the event to get read receipts for.
-     * @return A list of user IDs.
+     * @param event - the event to get read receipts for.
+     * @returns A list of user IDs.
      */
     public getUsersReadUpTo(event: MatrixEvent): string[] {
         return this.getReceiptsForEvent(event).filter(function(receipt) {
@@ -250,8 +250,8 @@ export abstract class ReadReceipt<
      * Determines if the given user has read a particular event ID with the known
      * history of the room. This is not a definitive check as it relies only on
      * what is available to the room at the time of execution.
-     * @param userId The user ID to check the read state of.
-     * @param eventId The event ID to check if the user read.
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
      * @returns True if the user has read the event, false otherwise.
      */
     public hasUserReadEvent(userId: string, eventId: string): boolean {

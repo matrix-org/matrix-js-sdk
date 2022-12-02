@@ -65,7 +65,7 @@ async function bobUploadsDeviceKeys(): Promise<void> {
 /**
  * Set an expectation that querier will query uploader's keys; then flush the http request.
  *
- * @return resolves once the http request has completed.
+ * @returns resolves once the http request has completed.
  */
 function expectQueryKeys(querier: TestClient, uploader: TestClient): Promise<number> {
     // can't query keys before bob has uploaded them
@@ -88,7 +88,7 @@ const expectBobQueryKeys = () => expectQueryKeys(bobTestClient, aliTestClient);
 /**
  * Set an expectation that ali will claim one of bob's keys; then flush the http request.
  *
- * @return resolves once the http request has completed.
+ * @returns resolves once the http request has completed.
  */
 async function expectAliClaimKeys(): Promise<void> {
     const keys = await bobTestClient.awaitOneTimeKeyUpload();
@@ -156,7 +156,7 @@ const bobEnablesEncryption = () => clientEnablesEncryption(bobTestClient.client)
  * Ali sends a message, first claiming e2e keys. Set the expectations and
  * check the results.
  *
- * @return which resolves to the ciphertext for Bob's device.
+ * @returns which resolves to the ciphertext for Bob's device.
  */
 async function aliSendsFirstMessage(): Promise<OlmPayload> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -173,7 +173,7 @@ async function aliSendsFirstMessage(): Promise<OlmPayload> {
  * Ali sends a message without first claiming e2e keys. Set the expectations
  * and check the results.
  *
- * @return which resolves to the ciphertext for Bob's device.
+ * @returns which resolves to the ciphertext for Bob's device.
  */
 async function aliSendsMessage(): Promise<OlmPayload> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -188,7 +188,7 @@ async function aliSendsMessage(): Promise<OlmPayload> {
  * Bob sends a message, first querying (but not claiming) e2e keys. Set the
  * expectations and check the results.
  *
- * @return which resolves to the ciphertext for Ali's device.
+ * @returns which resolves to the ciphertext for Ali's device.
  */
 async function bobSendsReplyMessage(): Promise<OlmPayload> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -203,7 +203,7 @@ async function bobSendsReplyMessage(): Promise<OlmPayload> {
 /**
  * Set an expectation that Ali will send a message, and flush the request
  *
- * @return which resolves to the ciphertext for Bob's device.
+ * @returns which resolves to the ciphertext for Bob's device.
  */
 async function expectAliSendMessageRequest(): Promise<OlmPayload> {
     const content = await expectSendMessageRequest(aliTestClient.httpBackend);
@@ -217,7 +217,7 @@ async function expectAliSendMessageRequest(): Promise<OlmPayload> {
 /**
  * Set an expectation that Bob will send a message, and flush the request
  *
- * @return which resolves to the ciphertext for Bob's device.
+ * @returns which resolves to the ciphertext for Bob's device.
  */
 async function expectBobSendMessageRequest(): Promise<OlmPayload> {
     const content = await expectSendMessageRequest(bobTestClient.httpBackend);
@@ -327,7 +327,7 @@ async function recvMessage(
  * Send an initial sync response to the client (which just includes the member
  * list for our test room).
  *
- * @param testClient
+ * @param testClient -
  * @returns which resolves when the sync has been flushed.
  */
 function firstSync(testClient: TestClient): Promise<void> {

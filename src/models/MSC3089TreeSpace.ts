@@ -111,7 +111,7 @@ export class MSC3089TreeSpace {
 
     /**
      * Sets the name of the tree space.
-     * @param name The new name for the space.
+     * @param name - The new name for the space.
      * @returns Resolves when complete.
      */
     public async setName(name: string): Promise<void> {
@@ -121,10 +121,10 @@ export class MSC3089TreeSpace {
     /**
      * Invites a user to the tree space. They will be given the default Viewer
      * permission level unless specified elsewhere.
-     * @param userId The user ID to invite.
-     * @param andSubspaces True (default) to invite the user to all
+     * @param userId - The user ID to invite.
+     * @param andSubspaces - True (default) to invite the user to all
      * directories/subspaces too, recursively.
-     * @param shareHistoryKeys True (default) to share encryption keys
+     * @param shareHistoryKeys - True (default) to share encryption keys
      * with the invited user. This will allow them to decrypt the events (files)
      * in the tree. Keys will not be shared if the room is lacking appropriate
      * history visibility (by default, history visibility is "shared" in trees,
@@ -164,8 +164,8 @@ export class MSC3089TreeSpace {
      * Sets the permissions of a user to the given role. Note that if setting a user
      * to Owner then they will NOT be able to be demoted. If the user does not have
      * permission to change the power level of the target, an error will be thrown.
-     * @param userId The user ID to change the role of.
-     * @param role The role to assign.
+     * @param userId - The user ID to change the role of.
+     * @param role - The role to assign.
      * @returns Resolves when complete.
      */
     public async setPermissions(userId: string, role: TreePermissions): Promise<void> {
@@ -200,7 +200,7 @@ export class MSC3089TreeSpace {
      * Gets the current permissions of a user. Note that any users missing explicit permissions (or not
      * in the space) will be considered Viewers. Appropriate membership checks need to be performed
      * elsewhere.
-     * @param userId The user ID to check permissions of.
+     * @param userId - The user ID to check permissions of.
      * @returns The permissions for the user, defaulting to Viewer.
      */
     public getPermissions(userId: string): TreePermissions {
@@ -220,7 +220,7 @@ export class MSC3089TreeSpace {
 
     /**
      * Creates a directory under this tree space, represented as another tree space.
-     * @param name The name for the directory.
+     * @param name - The name for the directory.
      * @returns Resolves to the created directory.
      */
     public async createDirectory(name: string): Promise<MSC3089TreeSpace> {
@@ -261,7 +261,7 @@ export class MSC3089TreeSpace {
     /**
      * Gets a subdirectory of a given ID under this tree space. Note that this will not recurse
      * into children and instead only look one level deep.
-     * @param roomId The room ID (directory ID) to find.
+     * @param roomId - The room ID (directory ID) to find.
      * @returns The directory, or undefined if not found.
      */
     public getDirectory(roomId: string): MSC3089TreeSpace | undefined {
@@ -357,7 +357,7 @@ export class MSC3089TreeSpace {
      * Sets the order index for this directory within its parent. Note that if this is a top level
      * space then an error will be thrown. -1 can be used to move the child to the start, and numbers
      * larger than the number of children can be used to move the child to the end.
-     * @param index The new order index for this space.
+     * @param index - The new order index for this space.
      * @returns Resolves when complete.
      * @throws Throws if this is a top level space.
      */
@@ -464,10 +464,10 @@ export class MSC3089TreeSpace {
     /**
      * Creates (uploads) a new file to this tree. The file must have already been encrypted for the room.
      * The file contents are in a type that is compatible with MatrixClient.uploadContent().
-     * @param name The name of the file.
-     * @param encryptedContents The encrypted contents.
-     * @param info The encrypted file information.
-     * @param additionalContent Optional event content fields to include in the message.
+     * @param name - The name of the file.
+     * @param encryptedContents - The encrypted contents.
+     * @param info - The encrypted file information.
+     * @param additionalContent - Optional event content fields to include in the message.
      * @returns Resolves to the file event's sent response.
      */
     public async createFile(
@@ -512,7 +512,7 @@ export class MSC3089TreeSpace {
 
     /**
      * Retrieves a file from the tree.
-     * @param fileEventId The event ID of the file.
+     * @param fileEventId - The event ID of the file.
      * @returns The file, or null if not found.
      */
     public getFile(fileEventId: string): MSC3089Branch | null {

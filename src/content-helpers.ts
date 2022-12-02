@@ -37,8 +37,8 @@ import { IContent } from "./models/event";
 
 /**
  * Generates the content for a HTML Message event
- * @param body the plaintext body of the message
- * @param htmlBody the HTML representation of the message
+ * @param body - the plaintext body of the message
+ * @param htmlBody - the HTML representation of the message
  * @returns
  */
 export function makeHtmlMessage(body: string, htmlBody: string): IContent {
@@ -52,8 +52,8 @@ export function makeHtmlMessage(body: string, htmlBody: string): IContent {
 
 /**
  * Generates the content for a HTML Notice event
- * @param body the plaintext body of the notice
- * @param htmlBody the HTML representation of the notice
+ * @param body - the plaintext body of the notice
+ * @param htmlBody - the HTML representation of the notice
  * @returns
  */
 export function makeHtmlNotice(body: string, htmlBody: string): IContent {
@@ -67,8 +67,8 @@ export function makeHtmlNotice(body: string, htmlBody: string): IContent {
 
 /**
  * Generates the content for a HTML Emote event
- * @param body the plaintext body of the emote
- * @param htmlBody the HTML representation of the emote
+ * @param body - the plaintext body of the emote
+ * @param htmlBody - the HTML representation of the emote
  * @returns
  */
 export function makeHtmlEmote(body: string, htmlBody: string): IContent {
@@ -82,7 +82,7 @@ export function makeHtmlEmote(body: string, htmlBody: string): IContent {
 
 /**
  * Generates the content for a Plaintext Message event
- * @param body the plaintext body of the emote
+ * @param body - the plaintext body of the emote
  * @returns
  */
 export function makeTextMessage(body: string): IContent {
@@ -94,7 +94,7 @@ export function makeTextMessage(body: string): IContent {
 
 /**
  * Generates the content for a Plaintext Notice event
- * @param body the plaintext body of the notice
+ * @param body - the plaintext body of the notice
  * @returns
  */
 export function makeNotice(body: string): IContent {
@@ -106,7 +106,7 @@ export function makeNotice(body: string): IContent {
 
 /**
  * Generates the content for a Plaintext Emote event
- * @param body the plaintext body of the emote
+ * @param body - the plaintext body of the emote
  * @returns
  */
 export function makeEmoteMessage(body: string): IContent {
@@ -139,11 +139,11 @@ export const getTextForLocationEvent = (
 
 /**
  * Generates the content for a Location event
- * @param uri a geo:// uri for the location
- * @param timestamp the timestamp when the location was correct (milliseconds since the UNIX epoch)
- * @param description the (optional) label for this location on the map
- * @param assetType the (optional) asset type of this location e.g. "m.self"
- * @param text optional. A text for the location
+ * @param uri - a geo:// uri for the location
+ * @param timestamp - the timestamp when the location was correct (milliseconds since the UNIX epoch)
+ * @param description - the (optional) label for this location on the map
+ * @param assetType - the (optional) asset type of this location e.g. "m.self"
+ * @param text - optional. A text for the location
  */
 export const makeLocationContent = (
     // this is first but optional

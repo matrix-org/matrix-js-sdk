@@ -28,7 +28,7 @@ export class SearchResult {
      * @static
      * @param {Object} jsonObj
      * @param {function} eventMapper
-     * @return {SearchResult}
+     * @returns {SearchResult}
      */
 
     public static fromJson(jsonObj: ISearchResult, eventMapper: EventMapper): SearchResult {
@@ -54,8 +54,8 @@ export class SearchResult {
     /**
      * Construct a new SearchResult
      *
-     * @param rank   where this SearchResult ranks in the results
-     * @param context  the matching event and its
+     * @param rank -   where this SearchResult ranks in the results
+     * @param context -  the matching event and its
      *    context
      *
      * @constructor

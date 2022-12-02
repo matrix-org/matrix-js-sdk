@@ -65,8 +65,8 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * @constructor
      * @alias module:models/room-member
      *
-     * @param roomId The room ID of the member.
-     * @param userId The user ID of the member.
+     * @param roomId - The room ID of the member.
+     * @param userId - The user ID of the member.
      * @prop {string} roomId The room ID for this member.
      * @prop {string} userId The user ID of this member.
      * @prop {boolean} typing True if the room member is currently typing.
@@ -99,7 +99,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 
     /**
-     * @return does the member come from a channel that is not sync?
+     * @returns does the member come from a channel that is not sync?
      * This is used to store the member seperately
      * from the sync state so it available across browser sessions.
      */
@@ -110,8 +110,8 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update this room member's membership event. May fire "RoomMember.name" if
      * this event updates this member's name.
-     * @param event The <code>m.room.member</code> event
-     * @param roomState Optional. The room state to take into account
+     * @param event - The <code>m.room.member</code> event
+     * @param roomState - Optional. The room state to take into account
      * when calculating (e.g. for disambiguating users with the same name).
      * @fires module:client~MatrixClient#event:"RoomMember.name"
      * @fires module:client~MatrixClient#event:"RoomMember.membership"
@@ -164,7 +164,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update this room member's power level event. May fire
      * "RoomMember.powerLevel" if this event updates this member's power levels.
-     * @param powerLevelEvent The <code>m.room.power_levels</code>
+     * @param powerLevelEvent - The <code>m.room.power_levels</code>
      * event
      * @fires module:client~MatrixClient#event:"RoomMember.powerLevel"
      */
@@ -206,7 +206,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update this room member's typing event. May fire "RoomMember.typing" if
      * this event changes this member's typing state.
-     * @param event The typing event
+     * @param event - The typing event
      * @fires module:client~MatrixClient#event:"RoomMember.typing"
      */
     public setTypingEvent(event: MatrixEvent): void {
@@ -240,7 +240,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * Get the timestamp when this RoomMember was last updated. This timestamp is
      * updated when properties on this RoomMember are updated.
      * It is updated <i>before</i> firing events.
-     * @return The timestamp
+     * @returns The timestamp
      */
     public getLastModifiedTime(): number {
         return this.modified;
@@ -255,7 +255,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * If this member was invited with the is_direct flag set, return
      * the user that invited this member
-     * @return user id of the inviter
+     * @returns user id of the inviter
      */
     public getDMInviter(): string | undefined {
         // when not available because that room state hasn't been loaded in,
@@ -285,21 +285,21 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
     /**
      * Get the avatar URL for a room member.
-     * @param baseUrl The base homeserver URL See
+     * @param baseUrl - The base homeserver URL See
      * {@link module:client~MatrixClient#getHomeserverUrl}.
-     * @param width The desired width of the thumbnail.
-     * @param height The desired height of the thumbnail.
-     * @param resizeMethod The thumbnail resize method to use, either
+     * @param width - The desired width of the thumbnail.
+     * @param height - The desired height of the thumbnail.
+     * @param resizeMethod - The thumbnail resize method to use, either
      * "crop" or "scale".
-     * @param allowDefault (optional) Passing false causes this method to
+     * @param allowDefault - (optional) Passing false causes this method to
      * return null if the user has no avatar image. Otherwise, a default image URL
      * will be returned. Default: true. (Deprecated)
-     * @param allowDirectLinks (optional) If true, the avatar URL will be
+     * @param allowDirectLinks - (optional) If true, the avatar URL will be
      * returned even if it is a direct hyperlink rather than a matrix content URL.
      * If false, any non-matrix content URLs will be ignored. Setting this option to
      * true will expose URLs that, if fetched, will leak information about the user
      * to anyone who they share a room with.
-     * @return the avatar URL or null.
+     * @returns the avatar URL or null.
      */
     public getAvatarUrl(
         baseUrl: string,
@@ -323,7 +323,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
     /**
      * get the mxc avatar url, either from a state event, or from a lazily loaded member
-     * @return the mxc avatar url
+     * @returns the mxc avatar url
      */
     public getMxcAvatarUrl(): string | undefined {
         if (this.events.member) {

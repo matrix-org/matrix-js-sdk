@@ -1651,7 +1651,7 @@ describe("MatrixClient syncing", () => {
     /**
      * waits for the MatrixClient to emit one or more 'sync' events.
      *
-     * @param numSyncs number of syncs to wait for
+     * @param numSyncs - number of syncs to wait for
      * @returns promise which resolves after the sync events have happened
      */
     function awaitSyncEvent(numSyncs?: number) {

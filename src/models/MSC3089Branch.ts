@@ -87,7 +87,7 @@ export class MSC3089Branch {
 
     /**
      * Sets the name for this file.
-     * @param name The new name for this file.
+     * @param name - The new name for this file.
      * @returns Resolves when complete.
      */
     public async setName(name: string): Promise<void> {
@@ -107,7 +107,7 @@ export class MSC3089Branch {
 
     /**
      * Sets a file as locked or unlocked.
-     * @param locked True to lock the file, false otherwise.
+     * @param locked - True to lock the file, false otherwise.
      * @returns Resolves when complete.
      */
     public async setLocked(locked: boolean): Promise<void> {
@@ -161,10 +161,10 @@ export class MSC3089Branch {
 
     /**
      * Creates a new version of this file with contents in a type that is compatible with MatrixClient.uploadContent().
-     * @param name The name of the file.
-     * @param encryptedContents The encrypted contents.
-     * @param info The encrypted file information.
-     * @param additionalContent Optional event content fields to include in the message.
+     * @param name - The name of the file.
+     * @param encryptedContents - The encrypted contents.
+     * @param info - The encrypted file information.
+     * @param additionalContent - Optional event content fields to include in the message.
      * @returns Resolves to the file event's sent response.
      */
     public async createNewVersion(

@@ -69,10 +69,10 @@ export class CrossSigningInfo {
      *
      * @class
      *
-     * @param userId the user that the information is about
-     * @param callbacks Callbacks used to interact with the app
+     * @param userId - the user that the information is about
+     * @param callbacks - Callbacks used to interact with the app
      *     Requires getCrossSigningKey and saveCrossSigningKeys
-     * @param cacheCallbacks Callbacks used to interact with the cache
+     * @param cacheCallbacks - Callbacks used to interact with the cache
      */
     public constructor(
         public readonly userId: string,
@@ -101,8 +101,8 @@ export class CrossSigningInfo {
     /**
      * Calls the app callback to ask for a private key
      *
-     * @param type The key type ("master", "self_signing", or "user_signing")
-     * @param expectedPubkey The matching public key or undefined to use
+     * @param type - The key type ("master", "self_signing", or "user_signing")
+     * @param expectedPubkey - The matching public key or undefined to use
      *     the stored public key for the given key type.
      * @returns An array with [ public key, Olm.PkSigning ]
      */
@@ -164,7 +164,7 @@ export class CrossSigningInfo {
      * XXX: This could be static, be we often seem to have an instance when we
      * want to know this anyway...
      *
-     * @param secretStorage The secret store using account data
+     * @param secretStorage - The secret store using account data
      * @returns map of key name to key info the secret is encrypted
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
@@ -193,8 +193,8 @@ export class CrossSigningInfo {
      * typically called in conjunction with the creation of new cross-signing
      * keys.
      *
-     * @param keys The keys to store
-     * @param secretStorage The secret store using account data
+     * @param keys - The keys to store
+     * @param secretStorage - The secret store using account data
      */
     public static async storeInSecretStorage(
         keys: Map<string, Uint8Array>,
@@ -210,10 +210,10 @@ export class CrossSigningInfo {
      * Get private keys from secret storage created by some other device. This
      * also passes the private keys to the app-specific callback.
      *
-     * @param type The type of key to get.  One of "master",
+     * @param type - The type of key to get.  One of "master",
      * "self_signing", or "user_signing".
-     * @param secretStorage The secret store using account data
-     * @return The private key
+     * @param secretStorage - The secret store using account data
+     * @returns The private key
      */
     public static async getFromSecretStorage(type: string, secretStorage: SecretStorage): Promise<Uint8Array | null> {
         const encodedKey = await secretStorage.get(`m.cross_signing.${type}`);
@@ -265,10 +265,10 @@ export class CrossSigningInfo {
      * Get the ID used to identify the user. This can also be used to test for
      * the existence of a given key type.
      *
-     * @param type The type of key to get the ID of.  One of "master",
+     * @param type - The type of key to get the ID of.  One of "master",
      * "self_signing", or "user_signing".  Defaults to "master".
      *
-     * @return the ID
+     * @returns the ID
      */
     public getId(type = "master"): string | null {
         if (!this.keys[type]) return null;
@@ -281,7 +281,7 @@ export class CrossSigningInfo {
      * will be held in this class, while the private keys are passed off to the
      * `saveCrossSigningKeys` application callback.
      *
-     * @param level The key types to reset
+     * @param level - The key types to reset
      */
     public async resetKeys(level?: CrossSigningLevel): Promise<void> {
         if (!this.callbacks.saveCrossSigningKeys) {
@@ -501,7 +501,7 @@ export class CrossSigningInfo {
     /**
      * Check whether a given user is trusted.
      *
-     * @param userCrossSigning Cross signing info for user
+     * @param userCrossSigning - Cross signing info for user
      *
      * @returns
      */
@@ -541,10 +541,10 @@ export class CrossSigningInfo {
     /**
      * Check whether a given device is trusted.
      *
-     * @param userCrossSigning Cross signing info for user
-     * @param device The device to check
-     * @param localTrust Whether the device is trusted locally
-     * @param trustCrossSignedDevices Whether we trust cross signed devices
+     * @param userCrossSigning - Cross signing info for user
+     * @param device - The device to check
+     * @param localTrust - Whether the device is trusted locally
+     * @param trustCrossSignedDevices - Whether we trust cross signed devices
      *
      * @returns
      */
@@ -756,9 +756,9 @@ export type KeysDuringVerification = [[string, PkSigning], [string, PkSigning], 
 /**
  * Request cross-signing keys from another device during verification.
  *
- * @param baseApis base Matrix API interface
- * @param userId The user ID being verified
- * @param deviceId The device ID being verified
+ * @param baseApis - base Matrix API interface
+ * @param userId - The user ID being verified
+ * @param deviceId - The device ID being verified
  */
 export async function requestKeysDuringVerification(
     baseApis: MatrixClient,
