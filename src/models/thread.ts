@@ -132,7 +132,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
-        this.initialiseThread();
+        this.updateThreadMetadata();
         this.setEventMetadata(this.rootEvent);
     }
 
@@ -193,7 +193,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = false;
             this.emit(ThreadEvent.Delete, this);
         } else {
-            await this.initialiseThread();
+            await this.updateThreadMetadata();
         }
     };
 
@@ -214,7 +214,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         if (this.lastEvent === event) return;
         if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
 
-        await this.initialiseThread();
+        await this.updateThreadMetadata();
         this.emit(ThreadEvent.NewReply, this, event);
     };
 
@@ -238,7 +238,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(ev => this.addEvent(ev, toStartOfTimeline, false));
-        this.initialiseThread();
+        this.updateThreadMetadata();
     }
 
     /**
@@ -283,7 +283,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         if (emit) {
             this.emit(ThreadEvent.NewReply, this, event);
-            this.initialiseThread();
+            this.updateThreadMetadata();
         }
     }
 
@@ -298,11 +298,19 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
-    public async initialiseThread(): Promise<void> {
-        let bundledRelationship = this.getRootEventBundledRelationship();
-        if (Thread.hasServerSideSupport) {
-            await this.fetchRootEvent();
-            bundledRelationship = this.getRootEventBundledRelationship();
+    private async processRootEvent(): Promise<void> {
+        const bundledRelationship = this.getRootEventBundledRelationship();
+        if (Thread.hasServerSideSupport && bundledRelationship) {
+            this.replyCount = bundledRelationship.count;
+            this._currentUserParticipated = !!bundledRelationship.current_user_participated;
+
+            const mapper = this.client.getEventMapper();
+            // re-insert roomId
+            this.lastEvent = mapper({
+                ...bundledRelationship.latest_event,
+                room_id: this.roomId,
+            });
+            await this.processEvent(this.lastEvent);
         }
 
         let pendingEvents: MatrixEvent[];
@@ -317,15 +325,18 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
         this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;
         this.pendingReplyCount = pendingEvents.length;
+    }
 
-        if (Thread.hasServerSideSupport && bundledRelationship) {
-            this.replyCount = bundledRelationship.count;
-            this._currentUserParticipated = !!bundledRelationship.current_user_participated;
-
-            const mapper = this.client.getEventMapper();
-            this.lastEvent = mapper(bundledRelationship.latest_event);
-            await this.processEvent(this.lastEvent);
+    private async updateThreadMetadata(): Promise<void> {
+        if (Thread.hasServerSideSupport) {
+            // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
+            // don't want the thread preview to be empty if we can avoid it
+            if (!this.initialEventsFetched) {
+                await this.processRootEvent();
+            }
+            await this.fetchRootEvent();
         }
+        await this.processRootEvent();
 
         if (!this.initialEventsFetched) {
             this.initialEventsFetched = true;
