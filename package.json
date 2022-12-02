@@ -55,6 +55,7 @@
   "dependencies": {
     "@babel/runtime": "^7.12.5",
     "@types/sdp-transform": "^2.4.5",
+    "@types/uuid": "7",
     "another-json": "^0.2.0",
     "bs58": "^5.0.0",
     "content-type": "^1.0.4",
@@ -64,7 +65,8 @@
     "p-retry": "4",
     "qs": "^6.9.6",
     "sdp-transform": "^2.14.1",
-    "unhomoglyph": "^1.0.6"
+    "unhomoglyph": "^1.0.6",
+    "uuid": "7"
   },
   "devDependencies": {
     "@babel/cli": "^7.12.10",
