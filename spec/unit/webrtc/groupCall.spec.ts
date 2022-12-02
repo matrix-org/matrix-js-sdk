@@ -25,7 +25,7 @@ import {
 } from '../../../src';
 import { RoomStateEvent } from "../../../src/models/room-state";
 import { GroupCall, GroupCallEvent, GroupCallState } from "../../../src/webrtc/groupCall";
-import { MatrixClient } from "../../../src/client";
+import { IMyDevice, MatrixClient } from "../../../src/client";
 import {
     installWebRTCMocks,
     MockCallFeed,
@@ -180,13 +180,13 @@ describe('Group Call', function() {
 
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
             groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+                membership: "join",
+            } as unknown as RoomMember;
         });
 
         it("does not initialize local call feed, if it already is", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.initLocalCallFeed();
             jest.spyOn(groupCall, "initLocalCallFeed");
             await groupCall.enter();
@@ -216,10 +216,6 @@ describe('Group Call', function() {
         });
 
         it("sends member state event to room on enter", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.create();
 
             try {
@@ -249,10 +245,6 @@ describe('Group Call', function() {
         });
 
         it("sends member state event to room on leave", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.create();
             await groupCall.enter();
             mockSendState.mockClear();
@@ -265,6 +257,18 @@ describe('Group Call', function() {
                 FAKE_USER_ID_1,
                 { keepAlive: true }, // Request should outlive the window
             );
+        });
+
+        it("includes local device in participants when entered via another session", async () => {
+            const hasLocalParticipant = () => groupCall.participants.get(
+                room.getMember(mockClient.getUserId()!)!,
+            )?.has(mockClient.getDeviceId()!) ?? false;
+
+            expect(groupCall.enteredViaAnotherSession).toBe(false);
+            expect(hasLocalParticipant()).toBe(false);
+
+            groupCall.enteredViaAnotherSession = true;
+            expect(hasLocalParticipant()).toBe(true);
         });
 
         it("starts with mic unmuted in regular calls", async () => {
@@ -1268,6 +1272,157 @@ describe('Group Call', function() {
                 expect(groupCall.isPtt).toBe(false);
                 expect(groupCall.intent).toBe(GroupCallIntent.Prompt);
             });
+        });
+    });
+
+    describe("cleaning member state", () => {
+        const bobWeb: IMyDevice = {
+            device_id: "bobweb",
+            last_seen_ts: 0,
+        };
+        const bobDesktop: IMyDevice = {
+            device_id: "bobdesktop",
+            last_seen_ts: 0,
+        };
+        const bobDesktopOffline: IMyDevice = {
+            device_id: "bobdesktopoffline",
+            last_seen_ts: 1000 * 60 * 60 * -2, // 2 hours ago
+        };
+        const bobDesktopNeverOnline: IMyDevice = {
+            device_id: "bobdesktopneveronline",
+        };
+
+        const mkContent = (devices: IMyDevice[]) => ({
+            "m.calls": [{
+                "m.call_id": groupCall.groupCallId,
+                "m.devices": devices.map(d => ({
+                    device_id: d.device_id, session_id: "1", feeds: [], expires_ts: 1000 * 60 * 10,
+                })),
+            }],
+        });
+
+        const expectDevices = (devices: IMyDevice[]) => expect(
+            room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, FAKE_USER_ID_2)?.getContent(),
+        ).toEqual({
+            "m.calls": [{
+                "m.call_id": groupCall.groupCallId,
+                "m.devices": devices.map(d => ({
+                    device_id: d.device_id, session_id: "1", feeds: [], expires_ts: expect.any(Number),
+                })),
+            }],
+        });
+
+        let mockClient: MatrixClient;
+        let room: Room;
+        let groupCall: GroupCall;
+
+        beforeAll(() => {
+            jest.useFakeTimers();
+            jest.setSystemTime(0);
+        });
+
+        afterAll(() => jest.useRealTimers());
+
+        beforeEach(async () => {
+            const typedMockClient = new MockCallMatrixClient(
+                FAKE_USER_ID_2, bobWeb.device_id, FAKE_SESSION_ID_2,
+            );
+            jest.spyOn(typedMockClient, "sendStateEvent").mockImplementation(
+                async (roomId, eventType, content, stateKey) => {
+                    const eventId = `$${Math.random()}`;
+                    if (roomId === room.roomId) {
+                        room.addLiveEvents([new MatrixEvent({
+                            event_id: eventId,
+                            type: eventType,
+                            room_id: roomId,
+                            sender: FAKE_USER_ID_2,
+                            content,
+                            state_key: stateKey,
+                        })]);
+                    }
+                    return { event_id: eventId };
+                },
+            );
+            mockClient = typedMockClient as unknown as MatrixClient;
+
+            room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_2);
+            room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
+
+            groupCall = new GroupCall(
+                mockClient,
+                room,
+                GroupCallType.Video,
+                false,
+                GroupCallIntent.Prompt,
+                FAKE_CONF_ID,
+            );
+            await groupCall.create();
+
+            mockClient.getDevices = async () => ({
+                devices: [
+                    bobWeb,
+                    bobDesktop,
+                    bobDesktopOffline,
+                    bobDesktopNeverOnline,
+                ],
+            });
+        });
+
+        afterEach(() => groupCall.leave());
+
+        it("doesn't clean up valid devices", async () => {
+            await groupCall.enter();
+            await mockClient.sendStateEvent(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                mkContent([bobWeb, bobDesktop]),
+                FAKE_USER_ID_2,
+            );
+
+            await groupCall.cleanMemberState();
+            expectDevices([bobWeb, bobDesktop]);
+        });
+
+        it("cleans up our own device if we're disconnected", async () => {
+            await mockClient.sendStateEvent(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                mkContent([bobWeb, bobDesktop]),
+                FAKE_USER_ID_2,
+            );
+
+            await groupCall.cleanMemberState();
+            expectDevices([bobDesktop]);
+        });
+
+        it("doesn't clean up the local device if entered via another session", async () => {
+            groupCall.enteredViaAnotherSession = true;
+            await mockClient.sendStateEvent(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                mkContent([bobWeb]),
+                FAKE_USER_ID_2,
+            );
+
+            await groupCall.cleanMemberState();
+            expectDevices([bobWeb]);
+        });
+
+        it("cleans up devices that have never been online", async () => {
+            await mockClient.sendStateEvent(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                mkContent([bobDesktop, bobDesktopNeverOnline]),
+                FAKE_USER_ID_2,
+            );
+
+            await groupCall.cleanMemberState();
+            expectDevices([bobDesktop]);
+        });
+
+        it("no-ops if there are no state events", async () => {
+            await groupCall.cleanMemberState();
+            expect(room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, FAKE_USER_ID_2)).toBe(null);
         });
     });
 });

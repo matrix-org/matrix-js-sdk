@@ -285,6 +285,21 @@ export class GroupCall extends TypedEventEmitter<
         this._creationTs = value;
     }
 
+    private _enteredViaAnotherSession = false;
+
+    /**
+     * Whether the local device has entered this call via another session, such
+     * as a widget.
+     */
+    public get enteredViaAnotherSession(): boolean {
+        return this._enteredViaAnotherSession;
+    }
+
+    public set enteredViaAnotherSession(value: boolean) {
+        this._enteredViaAnotherSession = value;
+        this.updateParticipants();
+    }
+
     /**
      * Executes the given callback on all calls in this group call.
      * @param f The callback.
@@ -1170,7 +1185,7 @@ export class GroupCall extends TypedEventEmitter<
 
         const participants = new Map<RoomMember, Map<string, ParticipantState>>();
         const now = Date.now();
-        const entered = this.state === GroupCallState.Entered;
+        const entered = this.state === GroupCallState.Entered || this.enteredViaAnotherSession;
         let nextExpiration = Infinity;
 
         for (const e of this.getMemberStateEvents()) {
@@ -1344,8 +1359,11 @@ export class GroupCall extends TypedEventEmitter<
         await this.updateDevices(devices => {
             const newDevices = devices.filter(d => {
                 const device = deviceMap.get(d.device_id);
-                return device?.last_seen_ts !== undefined
-                    && !(d.device_id === this.client.getDeviceId()! && this.state !== GroupCallState.Entered);
+                return device?.last_seen_ts !== undefined && !(
+                    d.device_id === this.client.getDeviceId()!
+                    && this.state !== GroupCallState.Entered
+                    && !this.enteredViaAnotherSession
+                );
             });
 
             // Skip the update if the devices are unchanged
