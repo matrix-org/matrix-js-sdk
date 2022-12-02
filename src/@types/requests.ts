@@ -153,7 +153,6 @@ export interface IRelationsRequestOpts {
 }
 
 export interface IRelationsResponse {
-    original_event: IEvent;
     chunk: IEvent[];
     next_batch?: string;
     prev_batch?: string;
