@@ -23,7 +23,7 @@ import { TestClient } from "../TestClient";
 import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
 import {
     MatrixClient, MatrixEvent, NotificationCountType, JoinRule, MatrixError,
-    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent, RoomMemberEvent, RoomEvent, Room, EventTimelineSet, IRoomTimelineData,
+    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent, RoomMemberEvent, RoomEvent, Room, IRoomTimelineData,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
@@ -341,7 +341,13 @@ describe("SlidingSyncSdk", () => {
 
             it("can be created with live events", () => {
                 let seenLiveEvent = false;
-                const listener = (ev: MatrixEvent, room?: Room, toStartOfTimeline?: boolean, deleted?: boolean, timelineData?: IRoomTimelineData) => {
+                const listener = (
+                    ev: MatrixEvent,
+                    room?: Room,
+                    toStartOfTimeline?: boolean,
+                    deleted?: boolean,
+                    timelineData?: IRoomTimelineData,
+                ) => {
                     if (timelineData?.liveEvent) {
                         assertTimelineEvents([ev], data[roomH].timeline.slice(-1));
                         seenLiveEvent = true;
