@@ -17,7 +17,6 @@ limitations under the License.
 
 /**
  * This is an internal module.
- * @module utils
  */
 
 import unhomoglyph from "unhomoglyph";
@@ -56,7 +55,7 @@ export function internaliseString(str: string): string {
  * Encode a dictionary of query parameters.
  * Omits any undefined/null values.
  * @param params - A dict of key/values to encode e.g.
- * {"foo": "bar", "baz": "taz"}
+ * `{"foo": "bar", "baz": "taz"}`
  * @returns The encoded string e.g. foo=bar&baz=taz
  */
 export function encodeParams(params: QueryDict, urlSearchParams?: URLSearchParams): URLSearchParams {
@@ -120,7 +119,7 @@ export function decodeParams(query: string): Record<string, string | string[]> {
  * passed through encodeURIComponent.
  * @param pathTemplate - The path with template variables e.g. '/foo/$bar'.
  * @param variables - The key/value pairs to replace the template
- * variables with. E.g. { "$bar": "baz" }.
+ * variables with. E.g. `{ "$bar": "baz" }`.
  * @returns The result of replacing all template variables e.g. '/foo/baz'.
  */
 export function encodeUri(pathTemplate: string, variables: Record<string, Optional<string>>): string {
@@ -661,11 +660,13 @@ export function compare(a: string, b: string): number {
  * This function is similar to Object.assign() but it assigns recursively and
  * allows you to ignore nullish values from the source
  *
- * @param target -
- * @param source -
  * @returns the target object
  */
-export function recursivelyAssign(target: Object, source: Object, ignoreNullish = false): any {
+export function recursivelyAssign<T extends Record<string, unknown>, S extends Record<string, unknown>>(
+    target: T,
+    source: S,
+    ignoreNullish = false,
+): T | S {
     for (const [sourceKey, sourceValue] of Object.entries(source)) {
         if (target[sourceKey] instanceof Object && sourceValue) {
             recursivelyAssign(target[sourceKey], sourceValue);

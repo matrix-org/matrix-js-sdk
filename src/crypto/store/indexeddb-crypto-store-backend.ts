@@ -39,8 +39,6 @@ const PROFILE_TRANSACTIONS = false;
  * Implementation of a CryptoStore which is backed by an existing
  * IndexedDB connection. Generally you want IndexedDBCryptoStore
  * which connects to the database and defers to one of these.
- *
- * @implements {module:crypto/store/base~CryptoStore}
  */
 export class Backend implements CryptoStore {
     private nextTxnId = 0;
@@ -74,7 +72,7 @@ export class Backend implements CryptoStore {
      * @param request -
      *
      * @returns resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     *    {@link OutgoingRoomKeyRequest}: either the
      *    same instance as passed in, or the existing one.
      */
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
@@ -117,7 +115,7 @@ export class Backend implements CryptoStore {
      *    existing request to look for
      *
      * @returns resolves to the matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found
      */
     public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
@@ -134,13 +132,13 @@ export class Backend implements CryptoStore {
     /**
      * look for an existing room key request in the db
      *
-     * @private
+     * @internal
      * @param txn -  database transaction
      * @param requestBody -
      *    existing request to look for
      * @param callback -  function to call with the results of the
      *    search. Either passed a matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found.
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -184,7 +182,7 @@ export class Backend implements CryptoStore {
      * @param wantedStates - list of acceptable states
      *
      * @returns resolves to the a
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states. If there are multiple
      *    requests in those states, an arbitrary one is chosen.
      */
@@ -299,7 +297,7 @@ export class Backend implements CryptoStore {
      * @param updates -        name/value map of updates to apply
      *
      * @returns resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     *    {@link OutgoingRoomKeyRequest}
      *    updated request, or null if no matching row was found
      */
     public updateOutgoingRoomKeyRequest(

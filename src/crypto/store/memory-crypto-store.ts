@@ -35,13 +35,8 @@ import { InboundGroupSessionData } from "../OlmDevice";
 
 /**
  * Internal module. in-memory storage for e2e.
- *
- * @module
  */
 
-/**
- * @implements {module:crypto/store/base~CryptoStore}
- */
 export class MemoryCryptoStore implements CryptoStore {
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string | null = null;
@@ -88,7 +83,7 @@ export class MemoryCryptoStore implements CryptoStore {
      * @param request -
      *
      * @returns resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     *    {@link OutgoingRoomKeyRequest}: either the
      *    same instance as passed in, or the existing one.
      */
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
@@ -126,7 +121,7 @@ export class MemoryCryptoStore implements CryptoStore {
      *    existing request to look for
      *
      * @returns resolves to the matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found
      */
     public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
@@ -141,7 +136,7 @@ export class MemoryCryptoStore implements CryptoStore {
      * @param requestBody -
      *    existing request to look for
      *
-     * @return
+     * @returns
      *    the matching request, or null if not found
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -160,7 +155,7 @@ export class MemoryCryptoStore implements CryptoStore {
      * @param wantedStates - list of acceptable states
      *
      * @returns resolves to the a
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states
      */
     public getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null> {
@@ -215,7 +210,7 @@ export class MemoryCryptoStore implements CryptoStore {
      * @param updates -        name/value map of updates to apply
      *
      * @returns resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     *    {@link OutgoingRoomKeyRequest}
      *    updated request, or null if no matching row was found
      */
     public updateOutgoingRoomKeyRequest(

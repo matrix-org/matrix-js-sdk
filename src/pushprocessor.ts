@@ -38,10 +38,6 @@ import {
 } from "./@types/PushRules";
 import { EventType } from "./@types/event";
 
-/**
- * @module pushprocessor
- */
-
 const RULEKINDS_IN_ORDER = [
     PushRuleKind.Override,
     PushRuleKind.ContentSpecific,
@@ -116,22 +112,24 @@ const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
 ];
 
 export interface IActionsObject {
+    // Whether this event should notify the user or not.
     notify: boolean;
+    // How this event should be notified.
     tweaks: Partial<Record<TweakName, any>>;
 }
 
 export class PushProcessor {
     /**
      * Construct a Push Processor.
-     * @constructor
      * @param client - The Matrix client object to use
      */
     public constructor(private readonly client: MatrixClient) {}
 
     /**
      * Convert a list of actions into a object with the actions as keys and their values
-     * eg. [ 'notify', { set_tweak: 'sound', value: 'default' } ]
-     *     becomes { notify: true, tweaks: { sound: 'default' } }
+     * @example
+     * eg. `[ 'notify', { set_tweak: 'sound', value: 'default' } ]`
+     *     becomes `{ notify: true, tweaks: { sound: 'default' } }`
      * @param actionList - The actions list
      *
      * @returns A object with key 'notify' (true or false) and an object of actions
@@ -502,10 +500,6 @@ export class PushProcessor {
 
     /**
      * Get the user's push actions for the given event
-     *
-     * @param ev -
-     *
-     * @return
      */
     public actionsForEvent(ev: MatrixEvent): IActionsObject {
         return this.pushActionsForEventAndRulesets(ev, this.client.pushRules);
@@ -532,15 +526,3 @@ export class PushProcessor {
         return null;
     }
 }
-
-/**
- * @typedef {Object} PushAction
- * @type {Object}
- * @property {boolean} notify Whether this event should notify the user or not.
- * @property {Object} tweaks How this event should be notified.
- * @property {boolean} tweaks.highlight Whether this event should be highlighted
- * on the UI.
- * @property {boolean} tweaks.sound Whether this notification should produce a
- * noise.
- */
-

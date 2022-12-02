@@ -69,7 +69,7 @@ export class TypedEventEmitter<
         return super.listenerCount(event);
     }
 
-    public listeners(event: Events | EventEmitterEvents): Function[] {
+    public listeners(event: Events | EventEmitterEvents): ReturnType<EventEmitter["listeners"]> {
         return super.listeners(event);
     }
 
@@ -119,7 +119,7 @@ export class TypedEventEmitter<
         return super.removeListener(event, listener);
     }
 
-    public rawListeners(event: Events | EventEmitterEvents): Function[] {
+    public rawListeners(event: Events | EventEmitterEvents): ReturnType<EventEmitter["rawListeners"]> {
         return super.rawListeners(event);
     }
 }

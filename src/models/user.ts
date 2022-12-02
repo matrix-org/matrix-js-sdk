@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/user
- */
-
 import { MatrixEvent } from "./event";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
@@ -41,40 +37,34 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     private modified = -1;
 
     // XXX these should be read-only
+    // The 'displayname' of the user if known.
     public displayName?: string;
     public rawDisplayName?: string;
+    // The 'avatar_url' of the user if known.
     public avatarUrl?: string;
+    // The presence status message if known.
     public presenceStatusMsg?: string;
+    // The presence enum if known.
     public presence = "offline";
+    /**
+     * Timestamp (ms since the epoch) for when we last received presence data for this user.
+     * We can subtract lastActiveAgo from this to approximate an absolute value for when a user was last active.
+     */
     public lastActiveAgo = 0;
+    // The time elapsed in ms since the user interacted proactively with the server, or we saw a message from the user
     public lastPresenceTs = 0;
+    // Whether we should consider lastActiveAgo to be an approximation and that the user should be seen as active 'now'
     public currentlyActive = false;
+    // The events describing this user.
     public events: {
+        // The m.presence event for this user.
         presence?: MatrixEvent;
         profile?: MatrixEvent;
     } = {};
 
     /**
-     * Construct a new User. A User must have an ID and can optionally have extra
-     * information associated with it.
-     * @constructor
+     * Construct a new User. A User must have an ID and can optionally have extra information associated with it.
      * @param userId - Required. The ID of this user.
-     * @prop {string} userId The ID of the user.
-     * @prop {Object} info The info object supplied in the constructor.
-     * @prop {string} displayName The 'displayname' of the user if known.
-     * @prop {string} avatarUrl The 'avatar_url' of the user if known.
-     * @prop {string} presence The presence enum if known.
-     * @prop {string} presenceStatusMsg The presence status message if known.
-     * @prop {Number} lastActiveAgo The time elapsed in ms since the user interacted
-     *                proactively with the server, or we saw a message from the user
-     * @prop {Number} lastPresenceTs Timestamp (ms since the epoch) for when we last
-     *                received presence data for this user.  We can subtract
-     *                lastActiveAgo from this to approximate an absolute value for
-     *                when a user was last active.
-     * @prop {Boolean} currentlyActive Whether we should consider lastActiveAgo to be
-     *               an approximation and that the user should be seen as active 'now'
-     * @prop {Object} events The events describing this user.
-     * @prop {MatrixEvent} events.presence The m.presence event for this user.
      */
     public constructor(public readonly userId: string) {
         super();
@@ -88,9 +78,9 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * "User.avatarUrl" and/or "User.displayName" if this event updates this user's
      * properties.
      * @param event - The <code>m.presence</code> event.
-     * @fires module:client~MatrixClient#event:"User.presence"
-     * @fires module:client~MatrixClient#event:"User.displayName"
-     * @fires module:client~MatrixClient#event:"User.avatarUrl"
+     * @fires UserEvent.Presence
+     * @fires UserEvent.DisplayName
+     * @fires UserEvent.AvatarUrl
      */
     public setPresenceEvent(event: MatrixEvent): void {
         if (event.getType() !== "m.presence") {
@@ -204,55 +194,65 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
 /**
  * Fires whenever any user's lastPresenceTs changes,
  * ie. whenever any presence event is received for a user.
- * @event module:client~MatrixClient#"User.lastPresenceTs"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {User} user The user whose User.lastPresenceTs changed.
+ * @event MatrixClient#"User.lastPresenceTs"
+ * @param event - The matrix event which caused this event to fire.
+ * @param user - The user whose User.lastPresenceTs changed.
  * @example
+ * ```
  * matrixClient.on("User.lastPresenceTs", function(event, user){
  *   var newlastPresenceTs = user.lastPresenceTs;
  * });
+ * ```
  */
 
 /**
  * Fires whenever any user's presence changes.
- * @event module:client~MatrixClient#"User.presence"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {User} user The user whose User.presence changed.
+ * @event MatrixClient#"User.presence"
+ * @param event - The matrix event which caused this event to fire.
+ * @param user - The user whose User.presence changed.
  * @example
+ * ```
  * matrixClient.on("User.presence", function(event, user){
  *   var newPresence = user.presence;
  * });
+ * ```
  */
 
 /**
  * Fires whenever any user's currentlyActive changes.
- * @event module:client~MatrixClient#"User.currentlyActive"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {User} user The user whose User.currentlyActive changed.
+ * @event MatrixClient#"User.currentlyActive"
+ * @param event - The matrix event which caused this event to fire.
+ * @param user - The user whose User.currentlyActive changed.
  * @example
+ * ```
  * matrixClient.on("User.currentlyActive", function(event, user){
  *   var newCurrentlyActive = user.currentlyActive;
  * });
+ * ```
  */
 
 /**
  * Fires whenever any user's display name changes.
- * @event module:client~MatrixClient#"User.displayName"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {User} user The user whose User.displayName changed.
+ * @event MatrixClient#"User.displayName"
+ * @param event - The matrix event which caused this event to fire.
+ * @param user - The user whose User.displayName changed.
  * @example
+ * ```
  * matrixClient.on("User.displayName", function(event, user){
  *   var newName = user.displayName;
  * });
+ * ```
  */
 
 /**
  * Fires whenever any user's avatar URL changes.
- * @event module:client~MatrixClient#"User.avatarUrl"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {User} user The user whose User.avatarUrl changed.
+ * @event MatrixClient#"User.avatarUrl"
+ * @param event - The matrix event which caused this event to fire.
+ * @param user - The user whose User.avatarUrl changed.
  * @example
+ * ```
  * matrixClient.on("User.avatarUrl", function(event, user){
  *   var newUrl = user.avatarUrl;
  * });
+ * ```
  */

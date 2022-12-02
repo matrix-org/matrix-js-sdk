@@ -155,7 +155,7 @@ export enum SlidingSyncState {
 
 /**
  * Internal Class. SlidingList represents a single list in sliding sync. The list can have filters,
- * multiple sliding windows, and maintains the index->room_id mapping.
+ * multiple sliding windows, and maintains the index-\>room_id mapping.
  */
 class SlidingList {
     private list!: MSC3575List;

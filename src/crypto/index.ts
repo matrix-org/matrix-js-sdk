@@ -17,10 +17,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module crypto
- */
-
 import anotherjson from "another-json";
 
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
@@ -124,7 +120,18 @@ interface IInitOpts {
 }
 
 export interface IBootstrapCrossSigningOpts {
+    /**
+     * @param [opts.setupNewCrossSigning]
+     * Args:
+     *     {function}
+     */
+    // Optional. Reset even if keys already exist.
     setupNewCrossSigning?: boolean;
+    /**
+     * A function that makes the request requiring auth. Receives the auth data as an object.
+     * Can be called multiple times, first with an empty authDict, to obtain the flows.
+     */
+
     authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
@@ -162,13 +169,22 @@ export interface IRoomKeyRequestBody extends IRoomKey {
     sender_key: string;
 }
 
-export interface IMegolmSessionData {
-    [key: string]: any; // extensible
+interface Extensible {
+    [key: string]: any;
+}
+
+export interface IMegolmSessionData extends Extensible {
+    // Sender's Curve25519 device key
     sender_key: string;
+    // Devices which forwarded this session to us (normally empty).
     forwarding_curve25519_key_chain: string[];
+    // Other keys the sender claims.
     sender_claimed_keys: Record<string, string>;
+    // Room this session is used in
     room_id: string;
+    // Unique id for the session
     session_id: string;
+    // Base64'ed key data
     session_key: string;
     algorithm?: string;
     untrusted?: boolean;
@@ -185,10 +201,9 @@ export interface ICheckOwnCrossSigningTrustOpts {
 }
 
 /**
- * @typedef {Object} module:crypto~OlmSessionResult
- * @property {module:crypto/deviceinfo} device  device info
- * @property {string?} sessionId base64 olm session id; null if no session
- *    could be established
+ * @typedef {Object} OlmSessionResult
+ * @property {DeviceInfo} device device info
+ * @property {string?} sessionId base64 olm session id; null if no session could be established
  */
 
 interface IUserOlmSession {
@@ -350,9 +365,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Cryptography bits
      *
      * This module is internal to the js-sdk; the public API is via MatrixClient.
-     *
-     * @constructor
-     * @alias module:crypto
      *
      * @internal
      *
@@ -1381,7 +1393,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the user's cross-signing key ID.
      *
-     * @param [type=master] The type of key to get the ID of.  One of
+     * @param type - The type of key to get the ID of.  One of
      *     "master", "self_signing", or "user_signing".  Defaults to "master".
      *
      * @returns the key ID
@@ -2048,8 +2060,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param userIds - The users to fetch.
      * @param forceDownload - Always download the keys even if cached.
      *
-     * @returns A promise which resolves to a map userId->deviceId->{@link
-        * module:crypto/deviceinfo|DeviceInfo}.
+     * @returns A promise which resolves to a map userId->deviceId->{@link DeviceInfo}.
      */
     public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
         return this.deviceList.downloadKeys(userIds, !!forceDownload);
@@ -2378,13 +2389,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Returns a map from device id to an object with keys 'deviceIdKey' (the
      * device's curve25519 identity key) and 'sessions' (an array of objects in the
      * same format as that returned by
-     * {@link module:crypto/OlmDevice#getSessionInfoForDevice}).
+     * {@link OlmDevice#getSessionInfoForDevice}).
      * <p>
      * This method is provided for debugging purposes.
      *
      * @param userId - id of user to inspect
-     *
-     * @return
      */
     public async getOlmSessionsForUser(userId: string): Promise<Record<string, IUserOlmSession>> {
         const devices = this.getStoredDevicesForUser(userId) || [];
@@ -2405,8 +2414,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Get the device which sent an event
      *
      * @param event - event to be checked
-     *
-     * @return
      */
     public getEventSenderDeviceInfo(event: MatrixEvent): DeviceInfo | null {
         const senderKey = event.getSenderKey();
@@ -2723,7 +2730,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @returns resolves once the sessions are complete, to
      *    an Object mapping from userId to deviceId to
-     *    {@link module:crypto~OlmSessionResult}
+     *    {@link OlmSessionResult}
      */
     public ensureOlmSessionsForUsers(
         users: string[],
@@ -2816,7 +2823,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     /**
      * Counts the number of end to end session keys that are waiting to be backed up
-     * @returns Resolves to the number of sessions requiring backup
+     * @returns Promise which resolves to the number of sessions requiring backup
      */
     public countSessionsNeedingBackup(): Promise<number> {
         return this.backupManager.countSessionsNeedingBackup();
@@ -3264,7 +3271,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Handle a key event
      *
-     * @private
+     * @internal
      * @param event - key event
      */
     private onRoomKeyEvent(event: MatrixEvent): void {
@@ -3288,7 +3295,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Handle a key withheld event
      *
-     * @private
+     * @internal
      * @param event - key withheld event
      */
     private onRoomKeyWithheldEvent(event: MatrixEvent): void {
@@ -3324,7 +3331,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Handle a general key verification event.
      *
-     * @private
+     * @internal
      * @param event - verification start event
      */
     private onKeyVerificationMessage(event: MatrixEvent): void {
@@ -3355,7 +3362,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Handle key verification requests sent as timeline events
      *
-     * @private
+     * @internal
      * @param event - the timeline event
      * @param room - not used
      * @param atStart - not used
@@ -3440,7 +3447,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Handle a toDevice event that couldn't be decrypted
      *
-     * @private
+     * @internal
      * @param event - undecryptable event
      */
     private async onToDeviceBadEncrypted(event: MatrixEvent): Promise<void> {
@@ -3547,7 +3554,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Handle a change in the membership state of a member of a room
      *
-     * @private
+     * @internal
      * @param event -  event causing the change
      * @param member -  user whose membership changed
      * @param oldMembership -  previous membership
@@ -3591,7 +3598,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Called when we get an m.room_key_request event.
      *
-     * @private
+     * @internal
      * @param event - key request event
      */
     private onRoomKeyRequestEvent(event: MatrixEvent): void {
@@ -3612,7 +3619,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Process any m.room_key_request events which were queued up during the
      * current sync.
      *
-     * @private
+     * @internal
      */
     private async processReceivedRoomKeyRequests(): Promise<void> {
         if (this.processingRoomKeyRequests) {
@@ -3763,17 +3770,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * If we already have a decryptor for the given room and algorithm, return
      * it. Otherwise try to instantiate it.
      *
-     * @private
+     * @internal
      *
      * @param roomId -   room id for decryptor. If undefined, a temporary
      * decryptor is instantiated.
      *
      * @param algorithm -  crypto algorithm
      *
-     * @return
-     *
-     * @raises {module:crypto.algorithms.DecryptionError} if the algorithm is
-     * unknown
+     * @raises {DecryptionError} if the algorithm is unknown
      */
     public getRoomDecryptor(roomId: string | null, algorithm: string): DecryptionAlgorithm {
         let decryptors: Map<string, DecryptionAlgorithm> | undefined;
@@ -3883,7 +3887,7 @@ export function fixBackupKey(key?: string): string | null {
  * @property {string} userId    user requesting the key
  * @property {string} deviceId  device requesting the key
  * @property {string} requestId unique id for the request
- * @property {module:crypto~RoomKeyRequestBody} requestBody
+ * @property {RoomKeyRequestBody} requestBody
  * @property {function()} share  callback which, when called, will ask
  *    the relevant crypto algorithm implementation to share the keys for
  *    this request.
@@ -3938,36 +3942,36 @@ class IncomingRoomKeyRequestCancellation {
  *     (typically containing <tt>type</tt> and <tt>content</tt> fields).
  *
  * @property {?string} senderCurve25519Key Key owned by the sender of this
- *    event.  See {@link module:models/event.MatrixEvent#getSenderKey}.
+ *    event.  See {@link MatrixEvent#getSenderKey}.
  *
  * @property {?string} claimedEd25519Key ed25519 key claimed by the sender of
  *    this event. See
- *    {@link module:models/event.MatrixEvent#getClaimedEd25519Key}.
+ *    {@link MatrixEvent#getClaimedEd25519Key}.
  *
  * @property {?Array<string>} forwardingCurve25519KeyChain list of curve25519
  *     keys involved in telling us about the senderCurve25519Key and
  *     claimedEd25519Key. See
- *     {@link module:models/event.MatrixEvent#getForwardingCurve25519KeyChain}.
+ *     {@link MatrixEvent#getForwardingCurve25519KeyChain}.
  */
 
 /**
  * Fires when we receive a room key request
  *
- * @event module:client~MatrixClient#"crypto.roomKeyRequest"
- * @param {module:crypto~IncomingRoomKeyRequest} req  request details
+ * @event MatrixClient#"crypto.roomKeyRequest"
+ * @param req  request details
  */
 
 /**
  * Fires when we receive a room key request cancellation
  *
- * @event module:client~MatrixClient#"crypto.roomKeyRequestCancellation"
- * @param {module:crypto~IncomingRoomKeyRequestCancellation} req
+ * @event MatrixClient#"crypto.roomKeyRequestCancellation"
+ * @param req
  */
 
 /**
  * Fires when the app may wish to warn the user about something related
  * the end-to-end crypto.
  *
- * @event module:client~MatrixClient#"crypto.warning"
- * @param {string} type One of the strings listed above
+ * @event MatrixClient#"crypto.warning"
+ * @param type - One of the strings listed above
  */

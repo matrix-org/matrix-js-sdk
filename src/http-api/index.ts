@@ -55,7 +55,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
      *    data has been uploaded, with an object containing the fields `loaded`
      *    (number of bytes transferred) and `total` (total size, if known).
      *
-     * @returns Resolves to response object, as
+     * @returns Promise which resolves to response object, as
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */

@@ -67,7 +67,7 @@ export class MSC3089Branch {
 
     /**
      * Deletes the file from the tree, including all prior edits/versions.
-     * @returns Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async delete(): Promise<void> {
         await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {}, this.id);
@@ -88,7 +88,7 @@ export class MSC3089Branch {
     /**
      * Sets the name for this file.
      * @param name - The new name for this file.
-     * @returns Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async setName(name: string): Promise<void> {
         await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
@@ -108,7 +108,7 @@ export class MSC3089Branch {
     /**
      * Sets a file as locked or unlocked.
      * @param locked - True to lock the file, false otherwise.
-     * @returns Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async setLocked(locked: boolean): Promise<void> {
         await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
@@ -136,7 +136,7 @@ export class MSC3089Branch {
 
     /**
      * Gets the event the file points to.
-     * @returns Resolves to the file's event.
+     * @returns Promise which resolves to the file's event.
      */
     public async getFileEvent(): Promise<MatrixEvent> {
         const room = this.client.getRoom(this.roomId);
@@ -165,7 +165,7 @@ export class MSC3089Branch {
      * @param encryptedContents - The encrypted contents.
      * @param info - The encrypted file information.
      * @param additionalContent - Optional event content fields to include in the message.
-     * @returns Resolves to the file event's sent response.
+     * @returns Promise which resolves to the file event's sent response.
      */
     public async createNewVersion(
         name: string,
@@ -200,7 +200,7 @@ export class MSC3089Branch {
 
     /**
      * Gets the file's version history, starting at this file.
-     * @returns Resolves to the file's version history, with the
+     * @returns Promise which resolves to the file's version history, with the
      * first element being the current version and the last element being the first version.
      */
     public async getVersionHistory(): Promise<MSC3089Branch[]> {

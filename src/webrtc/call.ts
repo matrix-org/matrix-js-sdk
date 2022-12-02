@@ -19,7 +19,6 @@ limitations under the License.
 
 /**
  * This is an internal module. See {@link createNewMatrixCall} for the public API.
- * @module webrtc/call
  */
 
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
@@ -63,19 +62,25 @@ import { MatrixError } from "../http-api";
  * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
  * to their audio/video hardware.
  *
- * @event module:webrtc/call~MatrixCall#"error"
- * @param {Error} err The error raised by MatrixCall.
+ * @event MatrixCall#"error"
+ * @param err - The error raised by MatrixCall.
  * @example
+ * ```
  * matrixCall.on("error", function(err){
  *   console.error(err.code, err);
  * });
+ * ```
  */
 
 interface CallOpts {
+    // The room ID for this call.
     roomId?: string;
     invitee?: string;
+    // The Matrix Client instance to send events to.
     client: MatrixClient;
+    // whether relay through TURN should be forced.
     forceTURN?: boolean;
+    // A list of TURN servers.
     turnServers?: Array<TurnServer>;
     opponentDeviceId?: string;
     opponentSessionId?: string;
@@ -319,17 +324,6 @@ function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: TransceiverK
     return purpose + ':' + kind;
 }
 
-/**
- * Construct a new Matrix Call.
- * @constructor
- * @param {Object} opts Config options.
- * @param {string} opts.roomId The room ID for this call.
- * @param {Object} opts.webRtc The WebRTC globals from the browser.
- * @param {boolean} opts.forceTURN whether relay through TURN should be forced.
- * @param {Object} opts.URL The URL global.
- * @param {Array<Object>} opts.turnServers Optional. A list of TURN servers.
- * @param {MatrixClient} opts.client The Matrix Client instance to send events to.
- */
 export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
     public roomId?: string;
     public callId: string;
@@ -404,6 +398,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentSessionId?: string;
     public groupCallId?: string;
 
+    /**
+     * Construct a new Matrix Call.
+     * @param opts - Config options.
+     */
     public constructor(opts: CallOpts) {
         super();
 
@@ -2251,10 +2249,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     /**
-     * Internal
-     * @param eventType -
-     * @param content -
-     * @return
+     * @internal
      */
     private async sendVoipEvent(eventType: string, content: object): Promise<void> {
         const realContent = Object.assign({}, content, {

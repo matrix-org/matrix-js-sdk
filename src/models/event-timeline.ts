@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/event-timeline
- */
-
 import { logger } from '../logger';
 import { IMarkerFoundOptions, RoomState } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
@@ -128,7 +124,6 @@ export class EventTimeline {
      * doubly-linked list.
      *
      * @param eventTimelineSet - the set of timelines this is part of
-     * @constructor
      */
     public constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
@@ -150,7 +145,7 @@ export class EventTimeline {
      *
      * @param stateEvents - list of state events to initialise the
      * state with.
-     * @throws {Error} if an attempt is made to call this after addEvent is called.
+     * @throws {@link Error} if an attempt is made to call this after addEvent is called.
      */
     public initialiseState(stateEvents: MatrixEvent[], { timelineWasEmpty }: IInitialiseStateOptions = {}): void {
         if (this.events.length > 0) {
@@ -237,8 +232,6 @@ export class EventTimeline {
      * relative to the base index (although note that a given event's index may
      * well be less than the base index, thus giving that event a negative relative
      * index).
-     *
-     * @return
      */
     public getBaseIndex(): number {
         return this.baseIndex;
@@ -337,7 +330,7 @@ export class EventTimeline {
      * @param direction - EventTimeline.BACKWARDS to set the previous
      *   timeline; EventTimeline.FORWARDS to set the next timeline.
      *
-     * @throws {Error} if an attempt is made to set the neighbouring timeline when
+     * @throws {@link Error} if an attempt is made to set the neighbouring timeline when
      * it is already set.
      */
     public setNeighbouringTimeline(neighbour: EventTimeline, direction: Direction): void {
@@ -361,8 +354,8 @@ export class EventTimeline {
     /**
      * Add a new event to the timeline, and update the state
      *
-     * @param {MatrixEvent} event   new event
-     * @param {IAddEventOptions} options addEvent options
+     * @param event - new event
+     * @param options - addEvent options
      */
     public addEvent(
         event: MatrixEvent,

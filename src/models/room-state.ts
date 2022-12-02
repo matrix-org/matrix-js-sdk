@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/room-state
- */
-
 import { RoomMember } from "./room-member";
 import { logger } from '../logger';
 import * as utils from "../utils";
@@ -95,8 +91,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     private modified = -1;
 
     // XXX: Should be read-only
+    // The room member dictionary, keyed on the user's ID.
     public members: Record<string, RoomMember> = {}; // userId: RoomMember
+    // The state events dictionary, keyed on the event type and then the state_key value.
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
+    // The pagination token for this state.
     public paginationToken: string | null = null;
 
     public readonly beacons = new Map<BeaconIdentifier, Beacon>();
@@ -109,8 +108,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * It can be mutated by adding state events to it.
      * There are two types of room member associated with a state event:
      * normal member objects (accessed via getMember/getMembers) which mutate
-     * with the state to represent the current state of that room/user, eg.
-     * the object returned by getMember('@bob:example.com') will mutate to
+     * with the state to represent the current state of that room/user,
+     * @example
+     * e.g.
+     * the object returned by `getMember('@bob:example.com')` will mutate to
      * get a different display name if Bob later changes his display name
      * in the room.
      * There are also 'sentinel' members (accessed via getSentinelMember).
@@ -123,18 +124,12 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * after the display name change will return a new RoomMember object
      * with Bob's new display name.
      *
-     * @constructor
      * @param roomId - Optional. The ID of the room which has this state.
      * If none is specified it just tracks paginationTokens, useful for notifTimelineSet
      * @param oobMemberFlags - Optional. The state of loading out of bound members.
      * As the timeline might get reset while they are loading, this state needs to be inherited
      * and shared when the room state is cloned for the new timeline.
      * This should only be passed from clone.
-     * @prop {Object.<string, RoomMember>} members The room member dictionary, keyed
-     * on the user's ID.
-     * @prop {Object.<string, Object.<string, MatrixEvent>>} events The state
-     * events dictionary, keyed on the event type and then the state_key value.
-     * @prop {string} paginationToken The pagination token for this state.
      */
     public constructor(public readonly roomId: string, private oobMemberFlags = { status: OobStatus.NotStarted }) {
         super();
@@ -242,11 +237,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Get state events from the state of the room.
-     * @param {string} eventType The event type of the state event.
-     * @param {string} stateKey Optional. The state_key of the state event. If
+     * @param eventType - The event type of the state event.
+     * @param stateKey - Optional. The state_key of the state event. If
      * this is <code>undefined</code> then all matching state events will be
      * returned.
-     * @returns {MatrixEvent[]|MatrixEvent} A list of events if state_key was
+     * @returns A list of events if state_key was
      * <code>undefined</code>, else a single event (or null if no match found).
      */
     public getStateEvents(eventType: EventType | string): MatrixEvent[];
@@ -331,16 +326,16 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Add an array of one or more state MatrixEvents, overwriting any existing
-     * state with the same {type, stateKey} tuple. Will fire "RoomState.events"
+     * state with the same `{type, stateKey}` tuple. Will fire "RoomState.events"
      * for every event added. May fire "RoomState.members" if there are
      * <code>m.room.member</code> events. May fire "RoomStateEvent.Marker" if there are
      * <code>UNSTABLE_MSC2716_MARKER</code> events.
      * @param stateEvents - a list of state events for this room.
      * @param markerFoundOptions -
-     * @fires module:client~MatrixClient#event:"RoomState.members"
-     * @fires module:client~MatrixClient#event:"RoomState.newMember"
-     * @fires module:client~MatrixClient#event:"RoomState.events"
-     * @fires module:client~MatrixClient#event:"RoomStateEvent.Marker"
+     * @fires MatrixClient#event:"RoomState.members"
+     * @fires MatrixClient#event:"RoomState.newMember"
+     * @fires MatrixClient#event:"RoomState.events"
+     * @fires MatrixClient#event:"RoomStateEvent.Marker"
      */
     public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions): void {
         this.updateModifiedTime();
@@ -467,7 +462,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * before emitting, as this is done from setStateEvents and setOutOfBandMember.
      * @param userId - the id of the user to look up
      * @param event - the membership event for the (new) member. Used to emit.
-     * @fires module:client~MatrixClient#event:"RoomState.newMember"
+     * @fires MatrixClient#event:"RoomState.newMember"
      * @returns the member, existing or newly created.
      */
     private getOrCreateMember(userId: string, event: MatrixEvent): RoomMember {
@@ -948,44 +943,50 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
 /**
  * Fires whenever the event dictionary in room state is updated.
- * @event module:client~MatrixClient#"RoomState.events"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomState} state The room state whose RoomState.events dictionary
+ * @event MatrixClient#"RoomState.events"
+ * @param event - The matrix event which caused this event to fire.
+ * @param state - The room state whose RoomState.events dictionary
  * was updated.
- * @param {MatrixEvent} prevEvent The event being replaced by the new state, if
+ * @param prevEvent - The event being replaced by the new state, if
  * known. Note that this can differ from `getPrevContent()` on the new state event
  * as this is the store's view of the last state, not the previous state provided
  * by the server.
  * @example
+ * ```
  * matrixClient.on("RoomState.events", function(event, state, prevEvent){
  *   var newStateEvent = event;
  * });
+ * ```
  */
 
 /**
  * Fires whenever a member in the members dictionary is updated in any way.
- * @event module:client~MatrixClient#"RoomState.members"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomState} state The room state whose RoomState.members dictionary
+ * @event MatrixClient#"RoomState.members"
+ * @param event - The matrix event which caused this event to fire.
+ * @param state - The room state whose RoomState.members dictionary
  * was updated.
- * @param {RoomMember} member The room member that was updated.
+ * @param member - The room member that was updated.
  * @example
+ * ```
  * matrixClient.on("RoomState.members", function(event, state, member){
  *   var newMembershipState = member.membership;
  * });
+ * ```
  */
 
 /**
  * Fires whenever a member is added to the members dictionary. The RoomMember
  * will not be fully populated yet (e.g. no membership state) but will already
  * be available in the members dictionary.
- * @event module:client~MatrixClient#"RoomState.newMember"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomState} state The room state whose RoomState.members dictionary
+ * @event MatrixClient#"RoomState.newMember"
+ * @param event - The matrix event which caused this event to fire.
+ * @param state - The room state whose RoomState.members dictionary
  * was updated with a new entry.
- * @param {RoomMember} member The room member that was added.
+ * @param member - The room member that was added.
  * @example
+ * ```
  * matrixClient.on("RoomState.newMember", function(event, state, member){
  *   // add event listeners on 'member'
  * });
+ * ```
  */

@@ -23,10 +23,6 @@ import {
 } from "./models/thread";
 
 /**
- * @module filter-component
- */
-
-/**
  * Checks if a value matches a given field value, which may be a * terminated
  * wildcard pattern.
  * @param actualValue -  The value to be compared
@@ -68,9 +64,6 @@ export interface IFilterComponent {
  *
  * N.B. that synapse refers to these as 'Filters', and what js-sdk refers to as
  * 'Filters' are referred to as 'FilterCollections'.
- *
- * @constructor
- * @param {Object} filterJson the definition of this filter JSON, e.g. { 'contains_url': true }
  */
 export class FilterComponent {
     public constructor(private filterJson: IFilterComponent, public readonly userId?: string | undefined | null) {}

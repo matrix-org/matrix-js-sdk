@@ -16,8 +16,6 @@ limitations under the License.
 
 /**
  * Error messages.
- *
- * @module crypto/verification/Error
  */
 
 import { MatrixEvent } from "../../models/event";

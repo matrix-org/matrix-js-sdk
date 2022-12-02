@@ -73,7 +73,7 @@ export class EncryptionSetupBuilder {
      * @param authUpload - Function called to await an interactive auth
      * flow when uploading device signing keys.
      * Args:
-     *     {function} A function that makes the request requiring auth. Receives
+     *     A function that makes the request requiring auth. Receives
      *     the auth data as an object. Can be called multiple times, first with
      *     an empty authDict, to obtain the flows.
      * @param keys - the new keys
@@ -122,18 +122,12 @@ export class EncryptionSetupBuilder {
         userSignatures[deviceId] = signature;
     }
 
-    /**
-     * @param type -
-     * @param content -
-     * @return
-     */
     public async setAccountData(type: string, content: object): Promise<void> {
         await this.accountDataClientAdapter.setAccountData(type, content);
     }
 
     /**
      * builds the operation containing all the parts that have been added to the builder
-     * @return
      */
     public buildOperation(): EncryptionSetupOperation {
         const accountData = this.accountDataClientAdapter.values;
@@ -150,9 +144,6 @@ export class EncryptionSetupBuilder {
      *
      * This does not yet store the operation in a way that it can be restored,
      * but that is the idea in the future.
-     *
-     * @param crypto -
-     * @return
      */
     public async persist(crypto: Crypto): Promise<void> {
         // store private keys in cache
@@ -300,11 +291,6 @@ class AccountDataClientAdapter
         return null;
     }
 
-    /**
-     * @param type -
-     * @param content -
-     * @return
-     */
     public setAccountData(type: string, content: any): Promise<{}> {
         const lastEvent = this.values.get(type);
         this.values.set(type, content);

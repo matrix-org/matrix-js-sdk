@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * QR code key verification.
- * @module crypto/verification/QRCode
  */
 
 import { VerificationBase as Base, VerificationEventHandlerMap } from "./Base";
@@ -44,10 +43,6 @@ type EventHandlerMap = {
     [QrCodeEvent.ShowReciprocateQr]: (qr: IReciprocateQr) => void;
 } & VerificationEventHandlerMap;
 
-/**
- * @class crypto/verification/QRCode/ReciprocateQRCode
- * @extends {module:crypto/verification/Base}
- */
 export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
     public reciprocateQREvent?: IReciprocateQr;
 

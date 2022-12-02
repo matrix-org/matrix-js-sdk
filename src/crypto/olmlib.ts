@@ -15,8 +15,6 @@ limitations under the License.
 */
 
 /**
- * @module olmlib
- *
  * Utilities common to olm encryption algorithms
  */
 
@@ -157,7 +155,7 @@ interface IExistingOlmSession {
  * @returns resolves to an array.  The first element of the array is a
  *    a map of user IDs to arrays of deviceInfo, representing the devices that
  *    don't have established olm sessions.  The second element of the array is
- *    a map from userId to deviceId to {@link module:crypto~OlmSessionResult}
+ *    a map from userId to deviceId to {@link OlmSessionResult}
  */
 export async function getExistingOlmSessions(
     olmDevice: OlmDevice,
@@ -199,27 +197,22 @@ export async function getExistingOlmSessions(
 /**
  * Try to make sure we have established olm sessions for the given devices.
  *
- * @param olmDevice -
+ * @param devicesByUser - map from userid to list of devices to ensure sessions for
  *
- * @param baseApis -
- *
- * @param devicesByUser -
- *    map from userid to list of devices to ensure sessions for
- *
- * @param [force=false] If true, establish a new session even if one
+ * @param force - If true, establish a new session even if one
  *     already exists.
  *
- * @param [otkTimeout] The timeout in milliseconds when requesting
+ * @param otkTimeout - The timeout in milliseconds when requesting
  *     one-time keys for establishing new olm sessions.
  *
- * @param [failedServers] An array to fill with remote servers that
+ * @param failedServers - An array to fill with remote servers that
  *     failed to respond to one-time-key requests.
  *
- * @param [log] A possibly customised log
+ * @param log - A possibly customised log
  *
  * @returns resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
- *    {@link module:crypto~OlmSessionResult}
+ *    {@link OlmSessionResult}
  */
 export async function ensureOlmSessionsForDevices(
     olmDevice: OlmDevice,

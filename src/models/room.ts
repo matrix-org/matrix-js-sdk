@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/room
- */
-
 import { Optional } from "matrix-events-sdk";
 
 import {
@@ -301,8 +297,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * <p>In order that we can find events from their ids later, we also maintain a
      * map from event_id to timeline and index.
      *
-     * @constructor
-     * @alias module:models/room
      * @param roomId - Required. The ID of this room.
      * @param client - Required. The client, used to lazy load members.
      * @param myUserId - Required. The ID of the syncing user.
@@ -312,9 +306,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * appear in a room's timeline. If "<b>chronological</b>", messages will appear
      * in the timeline when the call to <code>sendEvent</code> was made. If
      * "<b>detached</b>", pending messages will appear in a separate list,
-     * accessible via {@link module:models/room#getPendingEvents}. Default:
+     * accessible via {@link Room#getPendingEvents}. Default:
      * "chronological".
-     * @param [opts.timelineSupport = false] Set to true to enable improved
+     * @param opts.timelineSupport - Set to true to enable improved
      * timeline support.
      */
     public constructor(
@@ -631,7 +625,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * If pending event ordering is not "detached" then this returns false.
      *
      * @param eventId - The event ID to check for.
-     * @return
      */
     public hasPendingEvent(eventId: string): boolean {
         return this.pendingEventList?.some(event => event.getId() === eventId) ?? false;
@@ -641,7 +634,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Get a specific event from the pending event list, if configured, null otherwise.
      *
      * @param eventId - The event ID to check for.
-     * @return
      */
     public getPendingEvent(eventId: string): MatrixEvent | null {
         return this.pendingEventList?.find(event => event.getId() === eventId) ?? null;
@@ -1018,7 +1010,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Fix up this.timeline, this.oldState and this.currentState
      *
-     * @private
+     * @internal
      */
     private fixUpLegacyTimelineFields(): void {
         const previousOldState = this.oldState;
@@ -1349,7 +1341,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Get the avatar URL for a room if one was set.
      * @param baseUrl - The homeserver base URL. See
-     * {@link module:client~MatrixClient#getHomeserverUrl}.
+     * {@link MatrixClient#getHomeserverUrl}.
      * @param width - The desired width of the thumbnail.
      * @param height - The desired height of the thumbnail.
      * @param resizeMethod - The thumbnail resize method to use, either
@@ -1428,7 +1420,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param paginationToken -   token for the next batch of events
      *
-     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @fires MatrixClient#event:"Room.timeline"
      *
      */
     public addEventsToTimeline(
@@ -1810,7 +1802,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Fetch a single page of threadlist messages for the specific thread filter
      * @param filter -
-     * @private
+     * @internal
      */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {
         const timelineSet = filter === ThreadFilterType.My
@@ -2139,8 +2131,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param event - Event to be added
      * @param addLiveEventOptions - addLiveEvent options
-     * @fires module:client~MatrixClient#event:"Room.timeline"
-     * @private
+     * @fires MatrixClient#event:"Room.timeline"
+     * @internal
      */
     private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions): void {
         const { duplicateStrategy, timelineWasEmpty, fromCache } = addLiveEventOptions;
@@ -2184,7 +2176,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param txnId - Transaction id for this outgoing event
      *
-     * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
+     * @fires MatrixClient#event:"Room.localEchoUpdated"
      *
      * @throws if the event doesn't have status SENDING, or we aren't given a
      * unique transaction id.
@@ -2312,8 +2304,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param localEvent -    The local echo, which
      *    should be either in the pendingEventList or the timeline.
      *
-     * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
-     * @private
+     * @fires MatrixClient#event:"Room.localEchoUpdated"
+     * @internal
      */
     public handleRemoteEcho(remoteEvent: MatrixEvent, localEvent: MatrixEvent): void {
         const oldEventId = localEvent.getId()!;
@@ -2358,7 +2350,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param newStatus -  status to assign
      * @param newEventId -      new event id to assign. Ignored unless
      *    newStatus == EventStatus.SENT.
-     * @fires module:client~MatrixClient#event:"Room.localEchoUpdated"
+     * @fires MatrixClient#event:"Room.localEchoUpdated"
      */
     public updatePendingEvent(event: MatrixEvent, newStatus: EventStatus, newEventId?: string): void {
         logger.log(
@@ -2465,8 +2457,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * events and typing notifications. These events are treated as "live" so
      * they will go to the end of the timeline.
      *
-     * @param {MatrixEvent[]} events A list of events to add.
-     * @param {IAddLiveEventOptions} addLiveEventOptions addLiveEvent options
+     * @param events - A list of events to add.
+     * @param addLiveEventOptions - addLiveEvent options
      * @throws If <code>duplicateStrategy</code> is not falsey, 'replace' or 'ignore'.
      */
     public addLiveEvents(events: MatrixEvent[], addLiveEventOptions?: IAddLiveEventOptions): void;
@@ -2688,7 +2680,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Recalculate various aspects of the room, including the room name and
      * room summary. Call this any time the room's current state is modified.
      * May fire "Room.name" if the room name is updated.
-     * @fires module:client~MatrixClient#event:"Room.name"
+     * @fires MatrixClient#event:"Room.name"
      */
     public recalculate(): void {
         // set fake stripped state events if this is an invite room so logic remains
@@ -3252,9 +3244,9 @@ function memberNamesToRoomName(names: string[], count: number): string {
  * (Note this is *not* fired when the redaction happens before we receive the
  * event).
  *
- * @event module:client~MatrixClient#"Room.redaction"
- * @param {MatrixEvent} event The matrix redaction event
- * @param {Room} room The room containing the redacted event
+ * @event MatrixClient#"Room.redaction"
+ * @param event - The matrix redaction event
+ * @param room - The room containing the redacted event
  */
 
 /**
@@ -3263,15 +3255,15 @@ function memberNamesToRoomName(names: string[], count: number): string {
  * was subsequently cancelled by the user. Redactions have a local echo
  * which is undone in this scenario.
  *
- * @event module:client~MatrixClient#"Room.redactionCancelled"
- * @param {MatrixEvent} event The matrix redaction event that was cancelled.
- * @param {Room} room The room containing the unredacted event
+ * @event MatrixClient#"Room.redactionCancelled"
+ * @param event - The matrix redaction event that was cancelled.
+ * @param room - The room containing the unredacted event
  */
 
 /**
  * Fires whenever the name of a room is updated.
- * @event module:client~MatrixClient#"Room.name"
- * @param {Room} room The room whose Room.name was updated.
+ * @event MatrixClient#"Room.name"
+ * @param room - The room whose Room.name was updated.
  * @example
  * matrixClient.on("Room.name", function(room){
  *   var newName = room.name;
@@ -3280,9 +3272,9 @@ function memberNamesToRoomName(names: string[], count: number): string {
 
 /**
  * Fires whenever a receipt is received for a room
- * @event module:client~MatrixClient#"Room.receipt"
- * @param {event} event The receipt event
- * @param {Room} room The room whose receipts was updated.
+ * @event MatrixClient#"Room.receipt"
+ * @param event - The receipt event
+ * @param room - The room whose receipts was updated.
  * @example
  * matrixClient.on("Room.receipt", function(event, room){
  *   var receiptContent = event.getContent();
@@ -3291,9 +3283,9 @@ function memberNamesToRoomName(names: string[], count: number): string {
 
 /**
  * Fires whenever a room's tags are updated.
- * @event module:client~MatrixClient#"Room.tags"
- * @param {event} event The tags event
- * @param {Room} room The room whose Room.tags was updated.
+ * @event MatrixClient#"Room.tags"
+ * @param event - The tags event
+ * @param room - The room whose Room.tags was updated.
  * @example
  * matrixClient.on("Room.tags", function(event, room){
  *   var newTags = event.getContent().tags;
@@ -3303,10 +3295,10 @@ function memberNamesToRoomName(names: string[], count: number): string {
 
 /**
  * Fires whenever a room's account_data is updated.
- * @event module:client~MatrixClient#"Room.accountData"
- * @param {event} event The account_data event
- * @param {Room} room The room whose account_data was updated.
- * @param {MatrixEvent} prevEvent The event being replaced by
+ * @event MatrixClient#"Room.accountData"
+ * @param event - The account_data event
+ * @param room - The room whose account_data was updated.
+ * @param prevEvent - The event being replaced by
  * the new account data, if known.
  * @example
  * matrixClient.on("Room.accountData", function(event, room, oldEvent){
@@ -3339,24 +3331,24 @@ function memberNamesToRoomName(names: string[], count: number): string {
  *
  * <p>This event is raised to reflect each of the transitions above.
  *
- * @event module:client~MatrixClient#"Room.localEchoUpdated"
+ * @event MatrixClient#"Room.localEchoUpdated"
  *
- * @param {MatrixEvent} event The matrix event which has been updated
+ * @param event - The matrix event which has been updated
  *
- * @param {Room} room The room containing the redacted event
+ * @param room - The room containing the redacted event
  *
- * @param {string} oldEventId The previous event id (the temporary event id,
+ * @param oldEventId - The previous event id (the temporary event id,
  *    except when updating a successfully-sent event when its echo arrives)
  *
- * @param {EventStatus} oldStatus The previous event status.
+ * @param oldStatus - The previous event status.
  */
 
 /**
  * Fires when the logged in user's membership in the room is updated.
  *
- * @event module:models/room~Room#"Room.myMembership"
- * @param {Room} room The room in which the membership has been updated
- * @param {string} membership The new membership value
- * @param {string} prevMembership The previous membership value
+ * @event Room#"Room.myMembership"
+ * @param room - The room in which the membership has been updated
+ * @param membership - The new membership value
+ * @param prevMembership - The previous membership value
  */
 

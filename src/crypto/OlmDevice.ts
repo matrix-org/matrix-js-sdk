@@ -52,19 +52,6 @@ function checkPayloadLength(payloadString: string): void {
     }
 }
 
-/**
- * The type of object we use for importing and exporting megolm session data.
- *
- * @typedef {Object} module:crypto/OlmDevice.MegolmSessionData
- * @property {String} sender_key  Sender's Curve25519 device key
- * @property {String[]} forwarding_curve25519_key_chain Devices which forwarded
- *     this session to us (normally empty).
- * @property {Object<string, string>} sender_claimed_keys Other keys the sender claims.
- * @property {String} room_id     Room this session is used in
- * @property {String} session_id  Unique id for the session
- * @property {String} session_key Base64'ed key data
- */
-
 interface IInitOpts {
     fromExportedDevice?: IExportedDevice;
     pickleKey?: string;
@@ -132,10 +119,7 @@ interface IInboundGroupSessionKey {
  *
  * Accounts and sessions are kept pickled in the cryptoStore.
  *
- * @constructor
- * @alias module:crypto/OlmDevice
- *
- * @param {Object} cryptoStore A store for crypto data
+ * @param cryptoStore - A store for crypto data
  *
  * @property {string} deviceCurve25519Key   Curve25519 key for the account
  * @property {string} deviceEd25519Key      Ed25519 key for the account
@@ -304,7 +288,7 @@ export class OlmDevice {
      *
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
      * @param func -
-     * @private
+     * @internal
      */
     private getAccount(txn: unknown, func: (account: Account) => void): void {
         this.cryptoStore.getAccount(txn, (pickledAccount: string | null) => {
@@ -323,9 +307,9 @@ export class OlmDevice {
      * This function requires a live transaction object from cryptoStore.doTxn()
      * and therefore may only be called in a doTxn() callback.
      *
-     * @param {*} txn Opaque transaction object from cryptoStore.doTxn()
-     * @param {object} Olm.Account object
-     * @private
+     * @param txn - Opaque transaction object from cryptoStore.doTxn()
+     * @param Olm.Account object
+     * @internal
      */
     private storeAccount(txn: unknown, account: Account): void {
         this.cryptoStore.storeAccount(txn, account.pickle(this.pickleKey));
@@ -374,7 +358,7 @@ export class OlmDevice {
      * @param sessionId -
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
      * @param func -
-     * @private
+     * @internal
      */
     private getSession(
         deviceKey: string,
@@ -396,7 +380,7 @@ export class OlmDevice {
      *
      * @param sessionInfo -
      * @param func -
-     * @private
+     * @internal
      */
     private unpickleSession(
         sessionInfo: ISessionInfo,
@@ -419,7 +403,7 @@ export class OlmDevice {
      * @param deviceKey -
      * @param sessionInfo - {session: OlmSession, lastReceivedMessageTs: int}
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
-     * @private
+     * @internal
      */
     private saveSession(deviceKey: string, sessionInfo: IUnpickledSessionInfo, txn: unknown): void {
         const sessionId = sessionInfo.session.session_id();
@@ -434,7 +418,7 @@ export class OlmDevice {
      *
      * @param func -
      * @returns result of func
-     * @private
+     * @internal
      */
     private getUtility<T>(func: (utility: Utility) => T): T {
         const utility = new global.Olm.Utility();
@@ -713,7 +697,7 @@ export class OlmDevice {
      * @param nowait - Don't wait for an in-progress session to complete.
      *     This should only be set to true of the calling function is the function
      *     that marked the session as being in-progress.
-     * @param [log] A possibly customised log
+     * @param log - A possibly customised log
      * @returns  session id, or null if no established session
      */
     public async getSessionIdForDevice(
@@ -760,8 +744,7 @@ export class OlmDevice {
      * @param nowait - Don't wait for an in-progress session to complete.
      *     This should only be set to true of the calling function is the function
      *     that marked the session as being in-progress.
-     * @param [log] A possibly customised log
-     * @return
+     * @param log - A possibly customised log
      */
     public async getSessionInfoForDevice(
         deviceIdentityKey: string,
@@ -935,7 +918,7 @@ export class OlmDevice {
      * store an OutboundGroupSession in outboundGroupSessionStore
      *
      * @param session -
-     * @private
+     * @internal
      */
     private saveOutboundGroupSession(session: OutboundGroupSession): void {
         this.outboundGroupSessionStore[session.session_id()] = session.pickle(this.pickleKey);
@@ -948,7 +931,7 @@ export class OlmDevice {
      * @param sessionId -
      * @param func -
      * @returns result of func
-     * @private
+     * @internal
      */
     private getOutboundGroupSession<T>(sessionId: string, func: (session: OutboundGroupSession) => T): T {
         const pickled = this.outboundGroupSessionStore[sessionId];
@@ -1053,7 +1036,7 @@ export class OlmDevice {
      * @param func -
      *   function to call.
      *
-     * @private
+     * @internal
      */
     private getInboundGroupSession(
         roomId: string,
@@ -1101,7 +1084,7 @@ export class OlmDevice {
      * @param keysClaimed - Other keys the sender claims.
      * @param exportFormat - true if the megolm keys are in export format
      *    (ie, they lack an ed25519 signature)
-     * @param [extraSessionData={}] any other data to be include with the session
+     * @param extraSessionData - any other data to be include with the session
      */
     public async addInboundGroupSession(
         roomId: string,
@@ -1253,10 +1236,6 @@ export class OlmDevice {
      * @param timestamp - timestamp of the event being decrypted
      *
      * @returns the sessionId is unknown
-     *
-     * @return
-     *
-     *
      */
     public async decryptGroupMessage(
         roomId: string,
@@ -1569,7 +1548,7 @@ export const WITHHELD_MESSAGES = {
  *
  * @returns the message
  *
- * @private
+ * @internal
  */
 function calculateWithheldMessage(withheld: IWithheld): string {
     if (withheld.code && withheld.code in WITHHELD_MESSAGES) {

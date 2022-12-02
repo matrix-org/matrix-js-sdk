@@ -25,15 +25,13 @@ import { EventType } from "../@types/event";
  *
  * See https://docs.google.com/document/d/1m4gQkcnJkxNuBmb5NoFCIadIY-DyqqNAS3lloE73BlQ
  * for draft documentation on what we're supposed to be implementing here.
- *
- * @module
  */
 
 // delay between deciding we want some keys, and sending out the request, to
 // allow for (a) it turning up anyway, (b) grouping requests together
 const SEND_KEY_REQUESTS_DELAY_MS = 500;
 
-/** possible states for a room key request
+/* possible states for a room key request
  *
  * The state machine looks like:
  *
@@ -58,8 +56,6 @@ const SEND_KEY_REQUESTS_DELAY_MS = 500;
  *     | (cancellation sent)              |
  *     V                                  |
  * (deleted)  <---------------------------+
- *
- * @enum {number}
  */
 export enum RoomKeyRequestState {
     /** request not yet sent */
@@ -325,8 +321,7 @@ export class OutgoingRoomKeyRequestManager {
      * @param userId - Target user ID
      * @param deviceId - Target device ID
      *
-     * @returns resolves to a list of all the
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     * @returns resolves to a list of all the {@link OutgoingRoomKeyRequest}
      */
     public getOutgoingSentRoomKeyRequest(userId: string, deviceId: string): Promise<OutgoingRoomKeyRequest[]> {
         return this.cryptoStore.getOutgoingRoomKeyRequestsByTarget(userId, deviceId, [RoomKeyRequestState.Sent]);

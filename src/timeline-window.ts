@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/** @module timeline-window */
-
 import { Optional } from "matrix-events-sdk";
 
 import { Direction, EventTimeline } from './models/event-timeline';
@@ -25,23 +23,28 @@ import { EventTimelineSet } from "./models/event-timeline-set";
 import { MatrixEvent } from "./models/event";
 
 /**
- * @private
+ * @internal
  */
 const DEBUG = false;
 
 /**
- * @private
+ * @internal
  */
+/* istanbul ignore next */
 const debuglog = DEBUG ? logger.log.bind(logger) : function(): void {};
 
 /**
  * the number of times we ask the server for more events before giving up
  *
- * @private
+ * @internal
  */
 const DEFAULT_PAGINATE_LOOP_LIMIT = 5;
 
 interface IOpts {
+    /**
+     * Maximum number of events to keep in the window. If more events are retrieved via pagination requests,
+     * excess events will be dropped from the other end of the window.
+     */
     windowLimit?: number;
 }
 
@@ -59,30 +62,22 @@ export class TimelineWindow {
      * Construct a TimelineWindow.
      *
      * <p>This abstracts the separate timelines in a Matrix {@link
-        * module:models/room|Room} into a single iterable thing. It keeps track of
+        * Room} into a single iterable thing. It keeps track of
      * the start and endpoints of the window, which can be advanced with the help
      * of pagination requests.
      *
-     * <p>Before the window is useful, it must be initialised by calling {@link
-        * module:timeline-window~TimelineWindow#load|load}.
+     * <p>Before the window is useful, it must be initialised by calling {@link TimelineWindow#load}.
      *
      * <p>Note that the window will not automatically extend itself when new events
-     * are received from /sync; you should arrange to call {@link
-        * module:timeline-window~TimelineWindow#paginate|paginate} on {@link
-        * module:client~MatrixClient.event:"Room.timeline"|Room.timeline} events.
+     * are received from /sync; you should arrange to call {@link TimelineWindow#paginate}
+     * on {@link RoomEvent.Timeline} events.
      *
      * @param client -   MatrixClient to be used for context/pagination
      *   requests.
      *
      * @param timelineSet -  The timelineSet to track
      *
-     * @param [opts] Configuration options for this window
-     *
-     * @param [opts.windowLimit = 1000] maximum number of events to keep
-     *    in the window. If more events are retrieved via pagination requests,
-     *    excess events will be dropped from the other end of the window.
-     *
-     * @constructor
+     * @param opts - Configuration options for this window
      */
     public constructor(
         private readonly client: MatrixClient,
@@ -95,11 +90,9 @@ export class TimelineWindow {
     /**
      * Initialise the window to point at a given event, or the live timeline
      *
-     * @param [initialEventId]   If given, the window will contain the
+     * @param initialEventId -   If given, the window will contain the
      *    given event
-     * @param [initialWindowSize = 20]   Size of the initial window
-     *
-     * @return
+     * @param initialWindowSize -   Size of the initial window
      */
     public load(initialEventId?: string, initialWindowSize = 20): Promise<void> {
         // given an EventTimeline, find the event we were looking for, and initialise our
@@ -247,16 +240,16 @@ export class TimelineWindow {
      *    number are immediately available, then we return immediately rather than
      *    making an API call.
      *
-     * @param [makeRequest = true] whether we should make API calls to
+     * @param makeRequest - whether we should make API calls to
      *    fetch further events if we don't have any at all. (This has no effect if
      *    the room already knows about additional events in the relevant direction,
      *    even if there are fewer than 'size' of them, as we will just return those
      *    we already know about.)
      *
-     * @param [requestLimit = 5] limit for the number of API requests we
+     * @param requestLimit - limit for the number of API requests we
      *    should make.
      *
-     * @returns Resolves to a boolean which is true if more events
+     * @returns Promise which resolves to a boolean which is true if more events
      *    were successfully retrieved.
      */
     public async paginate(
@@ -330,7 +323,7 @@ export class TimelineWindow {
     /**
      * Remove `delta` events from the start or end of the timeline.
      *
-     * @param  delta           number of events to remove from the timeline
+     * @param delta - number of events to remove from the timeline
      * @param startOfTimeline - if events should be removed from the start
      *     of the timeline.
      */
@@ -419,12 +412,8 @@ export class TimelineWindow {
 }
 
 /**
- * a thing which contains a timeline reference, and an index into it.
- *
- * @constructor
- * @param {EventTimeline} timeline
- * @param {number} index
- * @private
+ * A thing which contains a timeline reference, and an index into it.
+ * @internal
  */
 export class TimelineIndex {
     public pendingPaginate?: Promise<boolean>;

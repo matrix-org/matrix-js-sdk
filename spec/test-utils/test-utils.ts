@@ -15,7 +15,7 @@ import { eventMapperFor } from "../../src/event-mapper";
  * SYNCING event.
  * @param client - The client
  * @param count - Number of syncs to wait for (default 1)
- * @returns Resolves once the client has emitted a SYNCING event
+ * @returns Promise which resolves once the client has emitted a SYNCING event
  */
 export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
     if (count <= 0) {
@@ -329,8 +329,6 @@ export function mkReplyMessage(
 
 /**
  * A mock implementation of webstorage
- *
- * @constructor
  */
 export class MockStorageApi {
     private data: Record<string, any> = {};

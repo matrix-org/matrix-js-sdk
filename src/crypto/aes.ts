@@ -169,7 +169,7 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
 /** Calculate the MAC for checking the key.
  *
  * @param key - the key to use
- * @param [iv] The initialization vector as a base64-encoded string.
+ * @param iv - The initialization vector as a base64-encoded string.
  *     If omitted, a random initialization vector will be created.
  * @returns An object that contains, `mac` and `iv` properties.
  */

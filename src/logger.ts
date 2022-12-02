@@ -15,10 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module logger
- */
-
 import log, { Logger } from "loglevel";
 
 // This is to demonstrate, that you can use any namespace you want.

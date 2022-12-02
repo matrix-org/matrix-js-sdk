@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * Cross signing methods
- * @module crypto/CrossSigning
  */
 
 import { PkSigning } from "@matrix-org/olm";
@@ -66,8 +65,6 @@ export class CrossSigningInfo {
 
     /**
      * Information about a user's cross-signing keys
-     *
-     * @class
      *
      * @param userId - the user that the information is about
      * @param callbacks - Callbacks used to interact with the app
@@ -226,7 +223,7 @@ export class CrossSigningInfo {
     /**
      * Check whether the private keys exist in the local key cache.
      *
-     * @param [type] The type of key to get. One of "master",
+     * @param type - The type of key to get. One of "master",
      * "self_signing", or "user_signing". Optional, will check all by default.
      * @returns True if all keys are stored in the local cache.
      */

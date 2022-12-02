@@ -106,6 +106,7 @@ function getFilterName(userId: string, suffix?: string): string {
     return `FILTER_SYNC_${userId}` + (suffix ? "_" + suffix : "");
 }
 
+/* istanbul ignore next */
 function debuglog(...params): void {
     if (!DEBUG) return;
     logger.log(...params);
@@ -146,21 +147,6 @@ type WrappedRoom<T> = T & {
     isBrandNewRoom: boolean;
 };
 
-/**
- * <b>Internal class - unstable.</b>
- * Construct an entity which is able to sync with a homeserver.
- * @constructor
- * @param {MatrixClient} client The matrix client instance to use.
- * @param {Object} opts Config options
- * @param {module:crypto=} opts.crypto Crypto manager
- * @param {Function=} opts.canResetEntireTimeline A function which is called
- * with a room ID and returns a boolean. It should return 'true' if the SDK can
- * SAFELY remove events from this room. It may not be safe to remove events if
- * there are other references to the timelines for this room.
- * Default: returns false.
- * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
- * updating presence.
- */
 export class SyncApi {
     private _peekRoom: Optional<Room> = null;
     private currentSyncRequest?: Promise<ISyncResponse>;
@@ -175,6 +161,12 @@ export class SyncApi {
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
 
+    /**
+     * Construct an entity which is able to sync with a homeserver.
+     * @param client - The matrix client instance to use.
+     * @param opts - Config options
+     * @internal
+     */
     public constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
@@ -196,10 +188,6 @@ export class SyncApi {
         }
     }
 
-    /**
-     * @param roomId -
-     * @return
-     */
     public createRoom(roomId: string): Room {
         const room = _createAndReEmitRoom(this.client, roomId, this.opts);
 
@@ -494,8 +482,7 @@ export class SyncApi {
 
     /**
      * Returns the current state of this sync object
-     * @see module:client~MatrixClient#event:"sync"
-     * @return
+     * @see MatrixClient#event:"sync"
      */
     public getSyncState(): SyncState | null {
         return this.syncState;
@@ -507,7 +494,6 @@ export class SyncApi {
      * such data.
      * Sync errors, if available, are put in the 'error' key of
      * this object.
-     * @return
      */
     public getSyncStateData(): ISyncStateData | null {
         return this.syncStateData ?? null;
@@ -1567,10 +1553,6 @@ export class SyncApi {
         });
     }
 
-    /**
-     * @param obj -
-     * @return
-     */
     private mapSyncResponseToRoomArray<T extends ILeftRoom | IJoinedRoom | IInvitedRoom>(
         obj: Record<string, T>,
     ): Array<WrappedRoom<T>> {
@@ -1592,12 +1574,6 @@ export class SyncApi {
         });
     }
 
-    /**
-     * @param obj -
-     * @param room -
-     * @param decrypt -
-     * @return
-     */
     private mapSyncEventsFormat(
         obj: IInviteState | ITimeline | IEphemeral,
         room?: Room,
@@ -1663,7 +1639,7 @@ export class SyncApi {
      * @param room -
      * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
-     * @param [timelineEventList] A list of timeline events, including threaded. Lower index
+     * @param timelineEventList - A list of timeline events, including threaded. Lower index
      * is earlier in time. Higher index is later.
      * @param fromCache - whether the sync response came from cache
      */
@@ -1742,7 +1718,7 @@ export class SyncApi {
      * This must be called after the room the events belong to has been stored.
      *
      * @param room -
-     * @param [timelineEventList] A list of timeline events. Lower index
+     * @param timelineEventList - A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
      */
     private processEventsForNotifs(room: Room, timelineEventList: MatrixEvent[]): void {
@@ -1757,9 +1733,6 @@ export class SyncApi {
         }
     }
 
-    /**
-     * @return
-     */
     private getGuestFilter(): string {
         // Dev note: This used to be conditional to return a filter of 20 events maximum, but
         // the condition never went to the other branch. This is now hardcoded.

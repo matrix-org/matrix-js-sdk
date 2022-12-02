@@ -30,8 +30,6 @@ import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. Definitions for storage for the crypto module
- *
- * @module
  */
 
 export interface SecretStorePrivateKeys {
@@ -211,11 +209,11 @@ export interface IWithheld {
  * @property {Array<{userId: string, deviceId: string}>} recipients
  *    list of recipients for the request
  *
- * @property {module:crypto~RoomKeyRequestBody} requestBody
+ * @property {RoomKeyRequestBody} requestBody
  *    parameters for the request.
  *
  * @property {Number} state   current state of this request (states are defined
- *    in {@link module:crypto/OutgoingRoomKeyRequestManager~ROOM_KEY_REQUEST_STATES})
+ *    in {@link OutgoingRoomKeyRequestManager~ROOM_KEY_REQUEST_STATES})
  */
 export interface OutgoingRoomKeyRequest {
     requestId: string;

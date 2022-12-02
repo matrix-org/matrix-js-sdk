@@ -15,8 +15,6 @@ limitations under the License.
 */
 
 /**
- * @module crypto/backup
- *
  * Classes for dealing with key backup.
  */
 
@@ -310,14 +308,6 @@ export class BackupManager {
      * Check if the given backup info is trusted.
      *
      * @param backupInfo - key backup info dict from /room_keys/version
-     * @return
-     *
-     *
-     *
-     *
-     *
-     *
-     *
      */
     public async isKeyBackupTrusted(backupInfo?: IKeyBackupInfo): Promise<TrustInfo> {
         const ret = {
@@ -573,7 +563,7 @@ export class BackupManager {
     /**
      * Marks all group sessions as needing to be backed up without scheduling
      * them to upload in the background.
-     * @returns Resolves to the number of sessions now requiring a backup
+     * @returns Promise which resolves to the number of sessions now requiring a backup
      *     (which will be equal to the number of sessions in the store).
      */
     public async flagAllGroupSessionsForBackup(): Promise<number> {
@@ -599,7 +589,7 @@ export class BackupManager {
 
     /**
      * Counts the number of end to end session keys that are waiting to be backed up
-     * @returns Resolves to the number of sessions requiring backup
+     * @returns Promise which resolves to the number of sessions requiring backup
      */
     public countSessionsNeedingBackup(): Promise<number> {
         return this.baseApis.crypto!.cryptoStore.countSessionsNeedingBackup();

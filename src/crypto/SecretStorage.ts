@@ -65,7 +65,6 @@ interface ISecretInfo {
 
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
- * @module crypto/SecretStorage
  */
 export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     private requests = new Map<string, ISecretRequestInternal>();
@@ -121,12 +120,12 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
      * @param algorithm - the algorithm used by the key.
      * @param opts - the options for the algorithm.  The properties used
      *     depend on the algorithm given.
-     * @param [keyId] the ID of the key.  If not given, a random
+     * @param keyId - the ID of the key.  If not given, a random
      *     ID will be generated.
      *
      * @returns An object with:
-     *     keyId: {string} the ID of the key
-     *     keyInfo: {object} details about the key (iv, mac, passphrase)
+     *     keyId: the ID of the key
+     *     keyInfo: details about the key (iv, mac, passphrase)
      */
     public async addKey(
         algorithm: string,
@@ -175,7 +174,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Get the key information for a given ID.
      *
-     * @param [keyId = default key's ID] The ID of the key to check
+     * @param keyId - The ID of the key to check
      *     for. Defaults to the default key ID if not provided.
      * @returns If the key was found, the return value is an array of
      *     the form [keyId, keyInfo].  Otherwise, null is returned.
@@ -198,7 +197,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Check whether we have a key with a given ID.
      *
-     * @param [keyId = default key's ID] The ID of the key to check
+     * @param keyId - The ID of the key to check
      *     for. Defaults to the default key ID if not provided.
      * @returns Whether we have the key.
      */

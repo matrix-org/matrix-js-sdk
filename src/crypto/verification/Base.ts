@@ -17,7 +17,6 @@ limitations under the License.
 
 /**
  * Base class for verification methods.
- * @module crypto/verification/Base
  */
 
 import { MatrixEvent } from '../../models/event';
@@ -74,8 +73,6 @@ export class VerificationBase<
      *
      * <p>Subclasses must have a NAME class property.</p>
      *
-     * @class
-     *
      * @param channel - the verification channel to send verification messages over.
      * TODO: Channel types
      *
@@ -85,10 +82,10 @@ export class VerificationBase<
      *
      * @param deviceId - the device ID that is being verified
      *
-     * @param [startEvent] the m.key.verification.start event that
+     * @param startEvent - the m.key.verification.start event that
      * initiated this verification, if any
      *
-     * @param [request] the key verification request object related to
+     * @param request - the key verification request object related to
      * this verification, if any
      */
     public constructor(

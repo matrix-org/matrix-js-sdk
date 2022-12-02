@@ -15,8 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/** @module auto-discovery */
-
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from './logger';
 import { MatrixError, Method, timeoutSignal } from "./http-api";
@@ -87,8 +85,6 @@ export class AutoDiscovery {
     /**
      * The auto discovery failed. The client is expected to communicate
      * the error to the user and refuse logging in.
-     * @returns {string}
-     * @constructor
      */
     public static readonly FAIL_ERROR = AutoDiscoveryAction.FAIL_ERROR;
 
@@ -98,8 +94,6 @@ export class AutoDiscovery {
      * action it would for PROMPT while also warning the user about
      * what went wrong. The client may also treat this the same as
      * a FAIL_ERROR state.
-     * @returns {string}
-     * @constructor
      */
     public static readonly FAIL_PROMPT = AutoDiscoveryAction.FAIL_PROMPT;
 
@@ -107,15 +101,11 @@ export class AutoDiscovery {
      * The auto discovery didn't fail but did not find anything of
      * interest. The client is expected to prompt the user for more
      * information, or fail if it prefers.
-     * @returns {string}
-     * @constructor
      */
     public static readonly PROMPT = AutoDiscoveryAction.PROMPT;
 
     /**
      * The auto discovery was successful.
-     * @returns {string}
-     * @constructor
      */
     public static readonly SUCCESS = AutoDiscoveryAction.SUCCESS;
 
@@ -127,7 +117,7 @@ export class AutoDiscovery {
      * response object unaltered.
      * @param wellknown - The configuration object itself, as returned
      * by the .well-known auto-discovery endpoint.
-     * @returns Resolves to the verified
+     * @returns Promise which resolves to the verified
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
@@ -286,7 +276,7 @@ export class AutoDiscovery {
      * response object unaltered.
      * @param domain - The homeserver domain to perform discovery
      * on. For example, "matrix.org".
-     * @returns Resolves to the discovered
+     * @returns Promise which resolves to the discovered
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when discovery fails.
      */
@@ -355,7 +345,7 @@ export class AutoDiscovery {
      * Should only be used if there's no validation to be done on the resulting
      * object, otherwise use findClientConfig().
      * @param domain - The domain to get the client config for.
-     * @returns Resolves to the domain's client config. Can
+     * @returns Promise which resolves to the domain's client config. Can
      * be an empty object.
      */
     public static async getRawClientConfig(domain?: string): Promise<IClientWellKnown> {
@@ -376,7 +366,7 @@ export class AutoDiscovery {
      * If valid, the URL will also be stripped of any trailing slashes.
      * @param url - The potentially invalid URL to sanitize.
      * @returns The sanitized URL or a falsey value if the URL is invalid.
-     * @private
+     * @internal
      */
     private static sanitizeWellKnownUrl(url: string): string | false {
         if (!url) return false;
@@ -431,8 +421,8 @@ export class AutoDiscovery {
      *   reason: Relatively human-readable description of what went wrong.
      *   error: The actual Error, if one exists.
      * @param url - The URL to fetch a JSON object from.
-     * @returns Resolves to the returned state.
-     * @private
+     * @returns Promise which resolves to the returned state.
+     * @internal
      */
     private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
         let response: Response;

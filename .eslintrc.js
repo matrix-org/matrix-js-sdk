@@ -62,6 +62,9 @@ module.exports = {
         files: [
             "**/*.ts",
         ],
+        plugins: [
+            "eslint-plugin-tsdoc",
+        ],
         extends: [
             "plugin:matrix-org/typescript",
         ],
@@ -86,7 +89,21 @@ module.exports = {
             // We use a `logger` intermediary module
             "no-console": "error",
 
+        },
+    }, {
+        files: [
+            "src/**/*.ts",
+        ],
+        rules: {
+            // We don't need amazing docs in our spec files
+            "tsdoc/syntax": "error",
             "jsdoc/no-types": "error",
+            "jsdoc/empty-tags": "error",
+            // "jsdoc/check-param-names": "error",
+            // "jsdoc/check-property-names": "error",
+            // "jsdoc/check-tag-names": "error",
+            // "jsdoc/check-indentation": "error",
+            // "jsdoc/check-values": "error",
         },
     }, {
         files: [

@@ -56,7 +56,7 @@ const VERSION = DB_MIGRATIONS.length;
  * @param resultMapper - A function which is repeatedly called with a
  * Cursor.
  * Return the data you want to keep.
- * @returns Resolves to an array of whatever you returned from
+ * @returns Promise which resolves to an array of whatever you returned from
  * resultMapper.
  */
 function selectQuery<T>(
@@ -135,7 +135,6 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      *
      * Construct a new Indexed Database store backend. This requires a call to
      * <code>connect()</code> before this store can be used.
-     * @constructor
      * @param indexedDB - The Indexed DB interface e.g
      * <code>window.indexedDB</code>
      * @param dbName - Optional database name. The same name must be used
@@ -149,7 +148,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     /**
      * Attempt to connect to the database. This can fail if the user does not
      * grant permission.
-     * @returns Resolves if successfully connected.
+     * @returns Promise which resolves if successfully connected.
      */
     public connect(): Promise<void> {
         if (!this.disconnected) {
@@ -202,7 +201,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
     /**
      * Having connected, load initial data from the database and prepare for use
-     * @returns Resolves on success
+     * @returns Promise which resolves on success
      */
     private init(): Promise<unknown> {
         return Promise.all([
@@ -370,7 +369,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * buffers and must not be mutated. Otherwise, a copy is made before
      * returning such that the data can be safely mutated. Default: true.
      *
-     * @returns Resolves with a sync response to restore the
+     * @returns Promise which resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
@@ -423,7 +422,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Persist rooms /sync data along with the next batch token.
      * @param nextBatch - The next_batch /sync value.
      * @param roomsData - The 'rooms' /sync data from a SyncAccumulator
-     * @returns Resolves if the data was persisted.
+     * @returns Promise which resolves if the data was persisted.
      */
     private persistSyncData(
         nextBatch: string,
@@ -448,7 +447,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Persist a list of account data events. Events with the same 'type' will
      * be replaced.
      * @param accountData - An array of raw user-scoped account data events
-     * @returns Resolves if the events were persisted.
+     * @returns Promise which resolves if the events were persisted.
      */
     private persistAccountData(accountData: IMinimalEvent[]): Promise<void> {
         return utils.promiseTry<void>(() => {
@@ -467,7 +466,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Presence events should be the event in its raw form (not the Event
      * object)
      * @param tuples - An array of [userid, event] tuples
-     * @returns Resolves if the users were persisted.
+     * @returns Promise which resolves if the users were persisted.
      */
     private persistUserPresenceEvents(tuples: UserTuple[]): Promise<void> {
         return utils.promiseTry<void>(() => {

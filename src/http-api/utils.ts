@@ -124,10 +124,10 @@ function getResponseContentType(response: XMLHttpRequest | Response): ParsedMedi
 
 /**
  * Retries a network operation run in a callback.
- * @param   maxAttempts maximum attempts to try
- * @param callback -    callback that returns a promise of the network operation. If rejected with ConnectionError, it will be retried by calling the callback again.
+ * @param maxAttempts - maximum attempts to try
+ * @param callback - callback that returns a promise of the network operation. If rejected with ConnectionError, it will be retried by calling the callback again.
  * @returns the result of the network operation
- * @throws {ConnectionError} If after maxAttempts the callback still throws ConnectionError
+ * @throws {@link ConnectionError} If after maxAttempts the callback still throws ConnectionError
  */
 export async function retryNetworkOperation<T>(maxAttempts: number, callback: () => Promise<T>): Promise<T> {
     let attempts = 0;

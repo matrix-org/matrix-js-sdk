@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * This is an internal module.
- * @module store/stub
  */
 
 import { EventType } from "../@types/event";
@@ -33,7 +32,6 @@ import { IStoredClientOpts } from "../client";
 
 /**
  * Construct a stub store. This does no-ops on most store methods.
- * @constructor
  */
 export class StubStore implements IStore {
     public readonly accountData = {}; // stub
@@ -46,7 +44,6 @@ export class StubStore implements IStore {
 
     /**
      * Get the sync token.
-     * @return
      */
     public getSyncToken(): string | null {
         return this.fromToken;
@@ -68,8 +65,6 @@ export class StubStore implements IStore {
 
     /**
      * No-op.
-     * @param roomId -
-     * @return
      */
     public getRoom(roomId: string): Room | null {
         return null;
@@ -107,8 +102,6 @@ export class StubStore implements IStore {
 
     /**
      * No-op.
-     * @param userId -
-     * @return
      */
     public getUser(userId: string): User | null {
         return null;
@@ -116,7 +109,6 @@ export class StubStore implements IStore {
 
     /**
      * No-op.
-     * @return
      */
     public getUsers(): User[] {
         return [];
@@ -124,9 +116,6 @@ export class StubStore implements IStore {
 
     /**
      * No-op.
-     * @param room -
-     * @param limit -
-     * @return
      */
     public scrollback(room: Room, limit: number): MatrixEvent[] {
         return [];
@@ -220,7 +209,7 @@ export class StubStore implements IStore {
     }
 
     /**
-     * @returns Resolves with a sync response to restore the
+     * @returns Promise which resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */

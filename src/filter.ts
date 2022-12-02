@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module filter
- */
-
 import {
     EventType,
     RelationType,
@@ -79,14 +75,6 @@ interface IRoomFilter {
 }
 /* eslint-enable camelcase */
 
-/**
- * Construct a new Filter.
- * @constructor
- * @param {string} userId The user ID for this filter.
- * @param {string=} filterId The filter ID if known.
- * @prop {string} userId The user ID of the filter
- * @prop {?string} filterId The filter ID
- */
 export class Filter {
     public static LAZY_LOADING_MESSAGES_FILTER = {
         lazy_load_members: true,
@@ -94,11 +82,6 @@ export class Filter {
 
     /**
      * Create a filter from existing data.
-     * @static
-     * @param userId -
-     * @param filterId -
-     * @param jsonObj -
-     * @return
      */
     public static fromJson(userId: string | undefined | null, filterId: string, jsonObj: IFilterDefinition): Filter {
         const filter = new Filter(userId, filterId);
@@ -110,6 +93,11 @@ export class Filter {
     private roomFilter?: FilterComponent;
     private roomTimelineFilter?: FilterComponent;
 
+    /**
+     * Construct a new Filter.
+     * @param userId - The user ID for this filter.
+     * @param filterId - The filter ID if known.
+     */
     public constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
 
     /**

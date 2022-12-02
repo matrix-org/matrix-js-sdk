@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * This is an internal module. See {@link MatrixClient} for the public class.
- * @module client
  */
 
 import * as utils from "../test-utils/test-utils";

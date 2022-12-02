@@ -38,7 +38,7 @@ export interface MSC3886SimpleHttpRendezvousTransportDetails extends RendezvousT
  * simple HTTP rendezvous protocol.
  * Note that this is UNSTABLE and may have breaking changes without notice.
  */
-export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements RendezvousTransport<T> {
+export class MSC3886SimpleHttpRendezvousTransport<T extends Record<string, unknown>> implements RendezvousTransport<T> {
     private uri?: string;
     private etag?: string;
     private expiresAt?: Date;

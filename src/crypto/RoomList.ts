@@ -15,8 +15,6 @@ limitations under the License.
 */
 
 /**
- * @module crypto/RoomList
- *
  * Manages the list of encrypted rooms
  */
 
@@ -31,9 +29,6 @@ export interface IRoomEncryption {
 }
 /* eslint-enable camelcase */
 
-/**
- * @alias module:crypto/RoomList
- */
 export class RoomList {
     // Object of roomId -> room e2e info object (body of the m.room.encryption event)
     private roomEncryption: Record<string, IRoomEncryption> = {};

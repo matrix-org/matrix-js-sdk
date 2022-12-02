@@ -21,10 +21,10 @@ import { UnstableValue } from "../NamespacedValue";
 /**
  * Extensible topic event type based on MSC3765
  * https://github.com/matrix-org/matrix-spec-proposals/pull/3765
- */
-
-/**
- * Eg
+ *
+ * @example
+ * E.g.
+ * ```
  * {
  *      "type": "m.room.topic,
  *      "state_key": "",
@@ -39,6 +39,7 @@ import { UnstableValue } from "../NamespacedValue";
  *          }],
  *      }
  * }
+ * ```
  */
 
 /**

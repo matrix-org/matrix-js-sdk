@@ -15,8 +15,6 @@ limitations under the License.
 */
 
 /**
- * @module crypto/DeviceList
- *
  * Manages the list of other users' devices
  */
 
@@ -64,9 +62,6 @@ export type DeviceInfoMap = Record<string, Record<string, DeviceInfo>>;
 
 type EmittedEvents = CryptoEvent.WillUpdateDevices | CryptoEvent.DevicesUpdated | CryptoEvent.UserCrossSigningUpdated;
 
-/**
- * @alias module:crypto/DeviceList
- */
 export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHandlerMap> {
     private devices: { [userId: string]: { [deviceId: string]: IDevice } } = {};
 
@@ -263,8 +258,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * @param userIds - The users to fetch.
      * @param forceDownload - Always download the keys even if cached.
      *
-     * @returns A promise which resolves to a map userId->deviceId->{@link
-     * module:crypto/deviceinfo|DeviceInfo}.
+     * @returns A promise which resolves to a map userId-\>deviceId-\>{@link DeviceInfo}.
      */
     public downloadKeys(userIds: string[], forceDownload: boolean): Promise<DeviceInfoMap> {
         const usersToDownload: string[] = [];
@@ -305,7 +299,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      *
      * @param userIds - the list of users to list keys for.
      *
-     * @returns userId->deviceId->{@link module:crypto/deviceinfo|DeviceInfo}.
+     * @returns userId-\>deviceId-\>{@link DeviceInfo}.
      */
     private getDevicesFromStore(userIds: string[]): DeviceInfoMap {
         const stored: DeviceInfoMap = {};
@@ -355,7 +349,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      *
      * @param userId - the user to get data for
      *
-     * @returns deviceId->{object} devices, or undefined if
+     * @returns `deviceId->{object}` devices, or undefined if
      * there is no data for this user.
      */
     public getRawStoredDevicesForUser(userId: string): Record<string, IDevice> {
@@ -412,8 +406,6 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      *
      * @param algorithm -  encryption algorithm
      * @param senderKey -  curve25519 key to match
-     *
-     * @return
      */
     public getDeviceByIdentityKey(algorithm: string, senderKey: string): DeviceInfo | null {
         const userId = this.getUserByIdentityKey(algorithm, senderKey);
@@ -571,7 +563,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      *
      * @param userId - the user to get data for
      *
-     * @param devices - deviceId->{object} the new devices
+     * @param devices - `deviceId->{object}` the new devices
      */
     public setRawStoredDevicesForUser(userId: string, devices: Record<string, IDevice>): void {
         // remove old devices from userByIdentityKey
@@ -689,9 +681,9 @@ class DeviceListUpdateSerialiser {
     private syncToken?: string; // The sync token we send with the requests
 
     /*
-     * @param {object} baseApis Base API object
-     * @param {object} olmDevice The Olm Device
-     * @param {object} deviceList The device list object, the device list to be updated
+     * @param baseApis - Base API object
+     * @param olmDevice - The Olm Device
+     * @param deviceList - The device list object, the device list to be updated
      */
     public constructor(
         private readonly baseApis: MatrixClient,

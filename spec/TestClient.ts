@@ -105,7 +105,7 @@ export class TestClient {
 
     /**
      * stop the client
-     * @returns Resolves once the mock http backend has finished all pending flushes
+     * @returns Promise which resolves once the mock http backend has finished all pending flushes
      */
     public async stop(): Promise<void> {
         this.client.stopClient();

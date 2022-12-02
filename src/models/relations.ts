@@ -181,7 +181,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * won't match timeline order in the case of scrollback.
      * TODO: Tweak `addEvent` to insert correctly for scrollback.
      *
-     * @return
      * Relation events in insertion order.
      */
     public getRelations(): MatrixEvent[] {
@@ -275,7 +274,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *
      * This is currently only supported for the annotation relation type.
      *
-     * @return
      * An array of [key, events] pairs sorted by descending event count.
      * The events are stored in a Set (which preserves insertion order).
      */
@@ -293,7 +291,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *
      * This is currently only supported for the annotation relation type.
      *
-     * @return
      * An object with each relation sender as a key and the matching Set of
      * events for that sender as a value.
      */
@@ -311,8 +308,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *
      * This is currently only supported for the m.replace relation type,
      * once the target event is known, see `addEvent`.
-     *
-     * @return
      */
     public async getLastReplacement(): Promise<MatrixEvent | null> {
         if (this.relationType !== RelationType.Replace) {
@@ -354,7 +349,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     }
 
     /*
-     * @param {MatrixEvent} targetEvent the event the relations are related to.
+     * @param targetEvent - the event the relations are related to.
      */
     public async setTargetEvent(event: MatrixEvent): Promise<void> {
         if (this.targetEvent) {

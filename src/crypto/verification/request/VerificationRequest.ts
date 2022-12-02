@@ -415,10 +415,10 @@ export class VerificationRequest<
 
     /* Start the key verification, creating a verifier and sending a .start event.
      * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
-     * @param {string} method the name of the verification method to use.
-     * @param {string?} targetDevice.userId the id of the user to direct this request to
-     * @param {string?} targetDevice.deviceId the id of the device to direct this request to
-     * @returns {VerifierBase} the verifier of the given method
+     * @param method - the name of the verification method to use.
+     * @param targetDevice.userId the id of the user to direct this request to
+     * @param targetDevice.deviceId the id of the device to direct this request to
+     * @returns the verifier of the given method
      */
     public beginKeyVerification(
         method: VerificationMethod,
@@ -494,7 +494,7 @@ export class VerificationRequest<
      * @param fn - callback to evaluate whether the request is in the desired state.
      *                      Takes the request as an argument.
      * @returns that resolves once the callback returns true
-     * @throws {Error} when the request is cancelled
+     * @throws {@link Error} when the request is cancelled
      */
     public waitFor(fn: (request: VerificationRequest) => boolean): Promise<VerificationRequest> {
         return new Promise((resolve, reject) => {

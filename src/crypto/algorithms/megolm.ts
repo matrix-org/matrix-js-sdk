@@ -16,8 +16,6 @@ limitations under the License.
 
 /**
  * Defines m.olm encryption/decryption
- *
- * @module crypto/algorithms/megolm
  */
 
 import { logger } from '../../logger';
@@ -115,11 +113,9 @@ interface SharedWithData {
 }
 
 /**
- * @private
- * @constructor
- *
- * @param {string} sessionId
- * @param {boolean} sharedHistory whether the session can be freely shared with
+ * @internal
+ * @param sessionId
+ * @param sharedHistory - whether the session can be freely shared with
  *    other group members, according to the room history visibility settings
  *
  * @property {string} sessionId
@@ -142,10 +138,6 @@ class OutboundSessionInfo {
 
     /**
      * Check if it's time to rotate the session
-     *
-     * @param rotationPeriodMsgs -
-     * @param rotationPeriodMs -
-     * @return
      */
     public needsRotation(rotationPeriodMsgs: number, rotationPeriodMs: number): boolean {
         const sessionLifetime = new Date().getTime() - this.creationTime;
@@ -220,11 +212,7 @@ class OutboundSessionInfo {
 /**
  * Megolm encryption implementation
  *
- * @constructor
- * @extends {module:crypto/algorithms/EncryptionAlgorithm}
- *
- * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/EncryptionAlgorithm}
+ * @param params - parameters, as per {@link algorithms/EncryptionAlgorithm}
  */
 class MegolmEncryption extends EncryptionAlgorithm {
     // the most recent attempt to set up a session. This is used to serialise
@@ -257,12 +245,12 @@ class MegolmEncryption extends EncryptionAlgorithm {
     }
 
     /**
-     * @private
+     * @internal
      *
      * @param room -
      * @param devicesInRoom - The devices in this room, indexed by user ID
      * @param blocked - The devices that are blocked, indexed by user ID
-     * @param [singleOlmCreationPhase] Only perform one round of olm
+     * @param singleOlmCreationPhase - Only perform one round of olm
      *     session creation
      *
      * @returns Promise which resolves to the
@@ -480,7 +468,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
     }
 
     /**
-     * @private
+     * @internal
      *
      * @param sharedHistory -
      *
@@ -506,12 +494,12 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * Determines what devices in devicesByUser don't have an olm session as given
      * in devicemap.
      *
-     * @private
+     * @internal
      *
      * @param devicemap - the devices that have olm sessions, as returned by
      *     olmlib.ensureOlmSessionsForDevices.
      * @param devicesByUser - a map of user IDs to array of deviceInfo
-     * @param [noOlmDevices] an array to fill with devices that don't have
+     * @param noOlmDevices - an array to fill with devices that don't have
      *     olm sessions
      *
      * @returns an array of devices that don't have olm sessions.  If
@@ -550,7 +538,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * Splits the user device map into multiple chunks to reduce the number of
      * devices we encrypt to per API call.
      *
-     * @private
+     * @internal
      *
      * @param devicesByUser - map from userid to list of devices
      *
@@ -591,7 +579,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
     }
 
     /**
-     * @private
+     * @internal
      *
      * @param session -
      *
@@ -631,7 +619,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
     }
 
     /**
-     * @private
+     * @internal
      *
      * @param session -
      *
@@ -779,7 +767,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
     }
 
     /**
-     * @private
+     * @internal
      *
      * @param session -
      *
@@ -795,10 +783,10 @@ class MegolmEncryption extends EncryptionAlgorithm {
      *    array that will be populated with the devices that we can't get an
      *    olm session for
      *
-     * @param [otkTimeout] The timeout in milliseconds when requesting
+     * @param otkTimeout - The timeout in milliseconds when requesting
      *     one-time keys for establishing new olm sessions.
      *
-     * @param [failedServers] An array to fill with remote servers that
+     * @param failedServers - An array to fill with remote servers that
      *     failed to respond to one-time-key requests.
      */
     private async shareKeyWithDevices(
@@ -1214,11 +1202,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 /**
  * Megolm decryption implementation
  *
- * @constructor
- * @extends {module:crypto/algorithms/DecryptionAlgorithm}
- *
- * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/DecryptionAlgorithm}
+ * @param params - parameters, as per {@link algorithms/DecryptionAlgorithm}
  */
 class MegolmDecryption extends DecryptionAlgorithm {
     // events which we couldn't decrypt due to unknown sessions /
@@ -1242,7 +1226,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * @param event -
      *
      * returns a promise which resolves to a
-     * {@link module:crypto~EventDecryptionResult} once we have finished
+     * {@link EventDecryptionResult} once we have finished
      * decrypting, or rejects with an `algorithms.DecryptionError` if there is a
      * problem decrypting the event.
      */
@@ -1383,7 +1367,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
     /**
      * Add an event to the list of those awaiting their session keys.
      *
-     * @private
+     * @internal
      *
      * @param event -
      */
@@ -1404,7 +1388,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
     /**
      * Remove an event from the list of those awaiting their session keys.
      *
-     * @private
+     * @internal
      *
      * @param event -
      */
@@ -1798,7 +1782,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * @inheritdoc
      *
      * @param session -
-     * @param [opts={}] options for the import
+     * @param opts - options for the import
      * @param [opts.untrusted] whether the key should be considered as untrusted
      * @param [opts.source] where the key came from
      */
@@ -1842,7 +1826,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
      * Have another go at decrypting events after we receive a key. Resolves once
      * decryption has been re-attempted on all events.
      *
-     * @private
+     * @internal
      * @param senderKey -
      * @param sessionId -
      * @param forceRedecryptIfUntrusted - whether messages that were already

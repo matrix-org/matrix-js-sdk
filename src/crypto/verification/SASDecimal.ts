@@ -21,7 +21,7 @@ limitations under the License.
  * @returns the derived three numbers between 1000 and 9191 inclusive
  */
 export function generateDecimalSas(sasBytes: number[]): [number, number, number] {
-    /**
+    /*
      *      +--------+--------+--------+--------+--------+
      *      | Byte 0 | Byte 1 | Byte 2 | Byte 3 | Byte 4 |
      *      +--------+--------+--------+--------+--------+

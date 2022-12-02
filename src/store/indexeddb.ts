@@ -32,7 +32,6 @@ import { IStoredClientOpts } from "../client";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
- * @module store/indexeddb
  */
 
 // If this value is too small we'll be writing very often which will cause
@@ -57,6 +56,10 @@ export class IndexedDBStore extends MemoryStore {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
     }
 
+    /**
+     * The backend instance.
+     * Call through to this API if you need to perform specific indexeddb actions like deleting the database.
+     */
     public readonly backend: IIndexedDBBackend;
 
     private startedUp = false;
@@ -77,7 +80,7 @@ export class IndexedDBStore extends MemoryStore {
      * <code>startup()</code>. This can make startup times quicker as a complete
      * sync from the server is not required. This does not reduce memory usage as all
      * the data is eagerly fetched when <code>startup()</code> is called.
-     * <pre>
+     * ```
      * let opts = { indexedDB: window.indexedDB, localStorage: window.localStorage };
      * let store = new IndexedDBStore(opts);
      * await store.startup(); // load from indexed db
@@ -90,10 +93,8 @@ export class IndexedDBStore extends MemoryStore {
      *         console.log("Started up, now with go faster stripes!");
      *     }
      * });
-     * </pre>
+     * ```
      *
-     * @constructor
-     * @extends MemoryStore
      * @param opts - Options object.
      * @param opts -.indexedDB The Indexed DB interface e.g.
      * <code>window.indexedDB</code>
@@ -105,9 +106,6 @@ export class IndexedDBStore extends MemoryStore {
      * trivial wrapper script around it.
      * @param opts -.workerApi The webWorker API object. If omitted, the global Worker
      * object will be used if it exists.
-     * @prop {IndexedDBStoreBackend} backend The backend instance. Call through to
-     * this API if you need to perform specific indexeddb actions like deleting the
-     * database.
      */
     public constructor(opts: IOpts) {
         super(opts);
@@ -152,7 +150,7 @@ export class IndexedDBStore extends MemoryStore {
     }
 
     /**
-     * @returns {Promise} Resolves with a sync response to restore the
+     * @returns Promise which resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
@@ -160,13 +158,13 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.getSavedSync();
     }, "getSavedSync");
 
-    /** @returns {Promise<boolean>} whether or not the database was newly created in this session. */
+    /** @returns whether or not the database was newly created in this session. */
     public isNewlyCreated = this.degradable((): Promise<boolean> => {
         return this.backend.isNewlyCreated();
     }, "isNewlyCreated");
 
     /**
-     * @returns {Promise} If there is a saved sync, the nextBatch token
+     * @returns If there is a saved sync, the nextBatch token
      * for this sync, otherwise null.
      */
     public getSavedSyncToken = this.degradable((): Promise<string | null> => {
@@ -175,7 +173,7 @@ export class IndexedDBStore extends MemoryStore {
 
     /**
      * Delete all data from this store.
-     * @returns {Promise} Resolves if the data was deleted from the database.
+     * @returns Promise which resolves if the data was deleted from the database.
      */
     public deleteAllData = this.degradable((): Promise<void> => {
         super.deleteAllData();
@@ -241,9 +239,8 @@ export class IndexedDBStore extends MemoryStore {
     /**
      * Returns the out-of-band membership events for this room that
      * were previously loaded.
-     * @param {string} roomId
-     * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
-     * @returns {null} in case the members for this room haven't been stored yet
+     * @returns the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns in case the members for this room haven't been stored yet
      */
     public getOutOfBandMembers = this.degradable((roomId: string): Promise<IStateEventWithRoomId[] | null> => {
         return this.backend.getOutOfBandMembers(roomId);
@@ -253,9 +250,8 @@ export class IndexedDBStore extends MemoryStore {
      * Stores the out-of-band membership events for this room. Note that
      * it still makes sense to store an empty array as the OOB status for the room is
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
-     * @param {string} roomId
-     * @param {event[]} membershipEvents the membership events to store
-     * @returns {Promise} when all members have been stored
+     * @param membershipEvents - the membership events to store
+     * @returns when all members have been stored
      */
     public setOutOfBandMembers = this.degradable(
         (roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> => {

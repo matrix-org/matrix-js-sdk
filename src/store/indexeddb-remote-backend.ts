@@ -37,7 +37,6 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      *
      * Construct a new Indexed Database store backend. This requires a call to
      * <code>connect()</code> before this store can be used.
-     * @constructor
      * @param workerFactory - Factory which produces a Worker
      * @param dbName - Optional database name. The same name must be used
      * to open the same database.
@@ -50,7 +49,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     /**
      * Attempt to connect to the database. This can fail if the user does not
      * grant permission.
-     * @returns Resolves if successfully connected.
+     * @returns Promise which resolves if successfully connected.
      */
     public connect(): Promise<void> {
         return this.ensureStarted().then(() => this.doCmd('connect'));
@@ -71,7 +70,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     /**
-     * @returns Resolves with a sync response to restore the
+     * @returns Promise which resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */

@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/** @module ContentHelpers */
-
 import { isProvided, REFERENCE_RELATION } from "matrix-events-sdk";
 
 import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon";

@@ -39,15 +39,11 @@ import { InboundGroupSessionData } from "../OlmDevice";
 
 /**
  * Internal module. indexeddb storage for e2e.
- *
- * @module
  */
 
 /**
  * An implementation of CryptoStore, which is normally backed by an indexeddb,
  * but with fallback to MemoryCryptoStore.
- *
- * @implements {module:crypto/store/base~CryptoStore}
  */
 export class IndexedDBCryptoStore implements CryptoStore {
     public static STORE_ACCOUNT = 'account';
@@ -209,7 +205,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param request -
      *
      * @returns resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     *    {@link OutgoingRoomKeyRequest}: either the
      *    same instance as passed in, or the existing one.
      */
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
@@ -223,7 +219,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *    existing request to look for
      *
      * @returns resolves to the matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found
      */
     public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
@@ -236,7 +232,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param wantedStates - list of acceptable states
      *
      * @returns resolves to the a
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states. If there are multiple
      *    requests in those states, an arbitrary one is chosen.
      */
@@ -263,7 +259,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param wantedStates - list of acceptable states
      *
      * @returns resolves to a list of all the
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     *    {@link OutgoingRoomKeyRequest}
      */
     public getOutgoingRoomKeyRequestsByTarget(
         userId: string,
@@ -284,7 +280,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param updates -        name/value map of updates to apply
      *
      * @returns resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     *    {@link OutgoingRoomKeyRequest}
      *    updated request, or null if no matching row was found
      */
     public updateOutgoingRoomKeyRequest(
@@ -319,8 +315,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Get the account pickle from the store.
      * This requires an active transaction. See doTxn().
      *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(string)} func Called with the account pickle
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called with the account pickle
      */
     public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void): void {
         this.backend!.getAccount(txn, func);
@@ -343,7 +339,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *
      * @param txn - An active transaction. See doTxn().
      * @param func - Called with the account keys object:
-     *        { key_type: base64 encoded seed } where key type = user_signing_key_seed or self_signing_key_seed
+     *        `{ key_type: base64 encoded seed }` where key type = user_signing_key_seed or self_signing_key_seed
      */
     public getCrossSigningKeys(
         txn: IDBTransaction,
@@ -504,8 +500,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Fetches all inbound group sessions in the store
      * @param txn - An active transaction. See doTxn().
      * @param func - Called once for each group session
-     *     in the store with an object having keys {senderKey, sessionId,
-     *     sessionData}, then once with null to indicate the end of the list.
+     *     in the store with an object having keys `{senderKey, sessionId, sessionData}`,
+     *     then once with null to indicate the end of the list.
      */
     public getAllEndToEndInboundGroupSessions(
         txn: IDBTransaction,
@@ -599,9 +595,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
     }
 
     /**
-     * Get an object of roomId->roomInfo for all e2e rooms in the store
+     * Get an object of `roomId->roomInfo` for all e2e rooms in the store
      * @param txn - An active transaction. See doTxn().
-     * @param func - Function called with the end to end encrypted rooms
+     * @param func - Function called with the end-to-end encrypted rooms
      */
     public getEndToEndRooms(txn: IDBTransaction, func: (rooms: Record<string, IRoomEncryption>) => void): void {
         this.backend!.getEndToEndRooms(txn, func);
@@ -668,7 +664,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Get the shared-history group session for a room.
      * @param roomId - The room that the key belongs to
      * @param txn - An active transaction. See doTxn(). (optional)
-     * @returns Resolves to an array of [senderKey, sessionId]
+     * @returns Promise which resolves to an array of [senderKey, sessionId]
      */
     public getSharedHistoryInboundGroupSessions(
         roomId: string,
@@ -712,7 +708,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param func - Function called with the
      *     transaction object: an opaque object that should be passed
      *     to store functions.
-     * @param [log] A possibly customised log
+     * @param log - A possibly customised log
      * @returns Promise that resolves with the result of the `func`
      *     when the transaction is complete. If the backend is
      *     async (ie. the indexeddb backend) any of the callback

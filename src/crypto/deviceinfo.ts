@@ -16,10 +16,6 @@ limitations under the License.
 
 import { ISignatures } from "../@types/signed";
 
-/**
- * @module crypto/deviceinfo
- */
-
 export interface IDevice {
     keys: Record<string, string>;
     algorithms: string[];
@@ -37,27 +33,6 @@ enum DeviceVerification {
 
 /**
   * Information about a user's device
-  *
-  * @constructor
-  * @alias module:crypto/deviceinfo
-  *
-  * @property {string} deviceId the ID of this device
-  *
-  * @property {string[]} algorithms list of algorithms supported by this device
-  *
-  * @property {Object.<string,string>} keys a map from
-  *      &lt;key type&gt;:&lt;id&gt; -> &lt;base64-encoded key&gt;>
-  *
-  * @property {module:crypto/deviceinfo.DeviceVerification} verified
-  *     whether the device has been verified/blocked by the user
-  *
-  * @property {boolean} known
-  *     whether the user knows of this device's existence (useful when warning
-  *     the user that a user has added new devices)
-  *
-  * @property {Object} unsigned  additional data from the homeserver
-  *
-  * @param {string} deviceId id of the device
   */
 export class DeviceInfo {
     /**
@@ -78,22 +53,28 @@ export class DeviceInfo {
         return res;
     }
 
-    /**
-     * @enum
-     */
     public static DeviceVerification = {
         VERIFIED: DeviceVerification.Verified,
         UNVERIFIED: DeviceVerification.Unverified,
         BLOCKED: DeviceVerification.Blocked,
     };
 
+    // list of algorithms supported by this device
     public algorithms: string[] = [];
+    // a map from &lt;key type&gt;:&lt;id&gt; -> &lt;base64-encoded key&gt;>
     public keys: Record<string, string> = {};
+    // whether the device has been verified/blocked by the user
     public verified = DeviceVerification.Unverified;
+    // whether the user knows of this device's existence
+    // (useful when warning the user that a user has added new devices)
     public known = false;
+    // additional data from the homeserver
     public unsigned: Record<string, any> = {};
     public signatures: ISignatures = {};
 
+    /**
+     * @param deviceId - id of the device
+     */
     public constructor(public readonly deviceId: string) {}
 
     /**

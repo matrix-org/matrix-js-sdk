@@ -17,9 +17,6 @@ limitations under the License.
 import { MatrixEvent } from "./event";
 import { Direction } from "./event-timeline";
 
-/**
- * @module models/event-context
- */
 export class EventContext {
     private timeline: MatrixEvent[];
     private ourEventIndex = 0;
@@ -38,9 +35,7 @@ export class EventContext {
      * It also stores pagination tokens for going backwards and forwards in the
      * timeline.
      *
-     * @param ourEvent -  the event at the centre of this context
-     *
-     * @constructor
+     * @param ourEvent - the event at the centre of this context
      */
     public constructor(public readonly ourEvent: MatrixEvent) {
         this.timeline = [ourEvent];
@@ -68,8 +63,6 @@ export class EventContext {
 
     /**
      * Get the index in the timeline of our event
-     *
-     * @return
      */
     public getOurEventIndex(): number {
         return this.ourEventIndex;
@@ -79,8 +72,6 @@ export class EventContext {
      * Get a pagination token.
      *
      * @param backwards -   true to get the pagination token for going
-     *                                  backwards in time
-     * @return
      */
     public getPaginateToken(backwards = false): string | null {
         return this.paginateTokens[backwards ? Direction.Backward : Direction.Forward];

@@ -441,8 +441,7 @@ export class SlidingSyncSdk {
 
     /**
      * Returns the current state of this sync object
-     * @see module:client~MatrixClient#event:"sync"
-     * @return
+     * @see MatrixClient#event:"sync"
      */
     public getSyncState(): SyncState | null {
         return this.syncState;
@@ -454,7 +453,6 @@ export class SlidingSyncSdk {
      * such data.
      * Sync errors, if available, are put in the 'error' key of
      * this object.
-     * @return
      */
     public getSyncStateData(): ISyncStateData | null {
         return this.syncStateData ?? null;
@@ -724,7 +722,7 @@ export class SlidingSyncSdk {
      * @param room -
      * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
-     * @param [timelineEventList] A list of timeline events. Lower index
+     * @param timelineEventList - A list of timeline events. Lower index
      * @param fromCache - whether the sync response came from cache
      * is earlier in time. Higher index is later.
      */
@@ -884,7 +882,7 @@ export class SlidingSyncSdk {
      * as appropriate.
      * This must be called after the room the events belong to has been stored.
      *
-     * @param [timelineEventList] A list of timeline events. Lower index
+     * @param timelineEventList - A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
      */
     private addNotifications(timelineEventList: MatrixEvent[]): void {

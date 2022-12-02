@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
- * @module http-api
  */
 
 import * as utils from "../utils";
@@ -70,7 +69,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         this.opts.idBaseUrl = url;
     }
 
-    public idServerRequest<T extends {}>(
+    public idServerRequest<T extends Record<string, unknown>>(
         method: Method,
         path: string,
         params: Record<string, string | string[]> | undefined,
@@ -111,7 +110,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @param queryParams - A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
-     * @param [body] The HTTP JSON body.
+     * @param body - The HTTP JSON body.
      *
      * @param opts - additional options. If a number is specified,
      * this is treated as `opts.localTimeoutMs`.
@@ -127,10 +126,15 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param opts -.headers map of additional request headers
      *
-     * @returns Resolves to <code>{data: {Object},
-     * headers: {Object}, code: {Number}}</code>.
-     * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
-     * object only.
+     * @returns Promise which resolves to
+     * ```
+     * {
+     *     data: {Object},
+     *     headers: {Object},
+     *     code: {Number},
+     * }
+     * ````
+     * If `onlyData` is set, this will resolve to the `data` object only.
      * @returns Rejects with an error if a problem occurred.
      * This includes network problems and Matrix-specific error JSON.
      */
@@ -183,7 +187,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @param queryParams - A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
-     * @param [body] The HTTP JSON body.
+     * @param body - The HTTP JSON body.
      *
      * @param opts - additional options
      *
@@ -195,7 +199,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param opts -.headers map of additional request headers
      *
-     * @returns Resolves to <code>{data: {Object},
+     * @returns Promise which resolves to <code>{data: {Object},
      * headers: {Object}, code: {Number}}</code>.
      * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
      * object only.
@@ -218,7 +222,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @param method - The HTTP method e.g. "GET".
      * @param url - The HTTP URL object.
      *
-     * @param [body] The HTTP JSON body.
+     * @param body - The HTTP JSON body.
      *
      * @param opts - additional options
      *
@@ -227,7 +231,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param opts -.headers map of additional request headers
      *
-     * @returns Resolves to data unless `onlyData` is specified as false,
+     * @returns Promise which resolves to data unless `onlyData` is specified as false,
      * where the resolved value will be a fetch Response object.
      * @returns Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.

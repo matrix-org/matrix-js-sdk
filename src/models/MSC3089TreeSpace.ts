@@ -112,7 +112,7 @@ export class MSC3089TreeSpace {
     /**
      * Sets the name of the tree space.
      * @param name - The new name for the space.
-     * @returns Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async setName(name: string): Promise<void> {
         await this.client.sendStateEvent(this.roomId, EventType.RoomName, { name }, "");
@@ -129,7 +129,7 @@ export class MSC3089TreeSpace {
      * in the tree. Keys will not be shared if the room is lacking appropriate
      * history visibility (by default, history visibility is "shared" in trees,
      * which is an appropriate visibility for these purposes).
-     * @returns Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async invite(userId: string, andSubspaces = true, shareHistoryKeys = true): Promise<void> {
         const promises: Promise<void>[] = [this.retryInvite(userId)];
@@ -166,7 +166,7 @@ export class MSC3089TreeSpace {
      * permission to change the power level of the target, an error will be thrown.
      * @param userId - The user ID to change the role of.
      * @param role - The role to assign.
-     * @returns Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async setPermissions(userId: string, role: TreePermissions): Promise<void> {
         const currentPls = this.room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
@@ -221,7 +221,7 @@ export class MSC3089TreeSpace {
     /**
      * Creates a directory under this tree space, represented as another tree space.
      * @param name - The name for the directory.
-     * @returns Resolves to the created directory.
+     * @returns Promise which resolves to the created directory.
      */
     public async createDirectory(name: string): Promise<MSC3089TreeSpace> {
         const directory = await this.client.unstableCreateFileTree(name);
@@ -270,7 +270,7 @@ export class MSC3089TreeSpace {
 
     /**
      * Deletes the tree, kicking all members and deleting **all subdirectories**.
-     * @returns Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async delete(): Promise<void> {
         const subdirectories = this.getDirectories();
@@ -358,7 +358,7 @@ export class MSC3089TreeSpace {
      * space then an error will be thrown. -1 can be used to move the child to the start, and numbers
      * larger than the number of children can be used to move the child to the end.
      * @param index - The new order index for this space.
-     * @returns Resolves when complete.
+     * @returns Promise which resolves when complete.
      * @throws Throws if this is a top level space.
      */
     public async setOrder(index: number): Promise<void> {
@@ -468,7 +468,7 @@ export class MSC3089TreeSpace {
      * @param encryptedContents - The encrypted contents.
      * @param info - The encrypted file information.
      * @param additionalContent - Optional event content fields to include in the message.
-     * @returns Resolves to the file event's sent response.
+     * @returns Promise which resolves to the file event's sent response.
      */
     public async createFile(
         name: string,

@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/event-timeline-set
- */
-
 import { EventTimeline, IAddEventOptions } from "./event-timeline";
 import { MatrixEvent } from "./event";
 import { logger } from '../logger';
@@ -31,16 +27,20 @@ import { Thread, ThreadFilterType } from "./thread";
 
 const DEBUG = true;
 
+/* istanbul ignore next */
 let debuglog: (...args: any[]) => void;
 if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
     debuglog = logger.log.bind(logger);
 } else {
+    /* istanbul ignore next */
     debuglog = function(): void {};
 }
 
 interface IOpts {
+    // Set to true to enable improved timeline support.
     timelineSupport?: boolean;
+    // The filter object, if any, for this timelineSet.
     filter?: Filter;
     pendingEvents?: boolean;
 }
@@ -119,16 +119,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * <p>In order that we can find events from their ids later, we also maintain a
      * map from event_id to timeline and index.
      *
-     * @constructor
-     * @param room -
-     * Room for this timelineSet. May be null for non-room cases, such as the
+     * @param room - Room for this timelineSet. May be null for non-room cases, such as the
      * notification timeline.
      * @param opts - Options inherited from Room.
-     *
-     * @param [opts.timelineSupport = false]
-     * Set to true to enable improved timeline support.
-     * @param [opts.filter = null]
-     * The filter object, if any, for this timelineSet.
      * @param client - the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
      * @param thread - the thread to which this timeline set relates.
@@ -248,7 +241,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param forwardPaginationToken - token for forward-paginating the old live timeline,
      * if absent or null, all timelines are reset.
      *
-     * @fires module:client~MatrixClient#event:"Room.timelineReset"
+     * @fires MatrixClient#event:"Room.timelineReset"
      */
     public resetLiveTimeline(backPaginationToken?: string, forwardPaginationToken?: string): void {
         // Each EventTimeline has RoomState objects tracking the state at the start
@@ -352,7 +345,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @param paginationToken -   token for the next batch of events
      *
-     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @fires MatrixClient#event:"Room.timeline"
      *
      */
     public addEventsToTimeline(
@@ -557,8 +550,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Add an event to the end of this live timeline.
      *
-     * @param {MatrixEvent} event Event to be added
-     * @param {IAddLiveEventOptions} options addLiveEvent options
+     * @param event - Event to be added
+     * @param options - addLiveEvent options
      */
     public addLiveEvent(
         event: MatrixEvent,
@@ -653,11 +646,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * Will fire "Room.timeline" for each event added.
      *
-     * @param {MatrixEvent} event
-     * @param {EventTimeline} timeline
-     * @param {IAddEventToTimelineOptions} options addEventToTimeline options
+     * @param options - addEventToTimeline options
      *
-     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @fires MatrixClient#event:"Room.timeline"
      */
     public addEventToTimeline(
         event: MatrixEvent,
@@ -749,7 +740,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param oldEventId -          the ID of the original event
      * @param newEventId -         the ID of the replacement event
      *
-     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @fires MatrixClient#event:"Room.timeline"
      */
     public handleRemoteEcho(
         localEvent: MatrixEvent,
@@ -874,7 +865,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Requires the `room` property to have been set at EventTimelineSet construction time.
      *
      * @param event - {MatrixEvent} the event to check whether it belongs to this timeline set.
-     * @throws {Error} if `room` was not set when constructing this timeline set.
+     * @throws {@link Error} if `room` was not set when constructing this timeline set.
      * @returns whether the event belongs to this timeline set.
      */
     public canContain(event: MatrixEvent): boolean {
@@ -894,19 +885,19 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
 /**
  * Fires whenever the timeline in a room is updated.
- * @event module:client~MatrixClient#"Room.timeline"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {?Room} room The room, if any, whose timeline was updated.
- * @param {boolean} toStartOfTimeline True if this event was added to the start
- * @param {boolean} removed True if this event has just been removed from the timeline
+ * @event MatrixClient#"Room.timeline"
+ * @param event - The matrix event which caused this event to fire.
+ * @param room - The room, if any, whose timeline was updated.
+ * @param toStartOfTimeline - True if this event was added to the start
+ * @param removed - True if this event has just been removed from the timeline
  * (beginning; oldest) of the timeline e.g. due to pagination.
  *
- * @param {object} data  more data about the event
+ * @param data  more data about the event
  *
- * @param {module:models/event-timeline.EventTimeline} data.timeline the timeline the
+ * @param data.timeline the timeline the
  * event was added to/removed from
  *
- * @param {boolean} data.liveEvent true if the event was a real-time event
+ * @param data.liveEvent true if the event was a real-time event
  * added to the end of the live timeline
  *
  * @example
@@ -926,8 +917,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
  * timeline. This event is fired after the timeline is reset, and before the
  * new events are added.
  *
- * @event module:client~MatrixClient#"Room.timelineReset"
- * @param {Room} room The room whose live timeline was reset, if any
- * @param {EventTimelineSet} timelineSet timelineSet room whose live timeline was reset
- * @param {boolean} resetAllTimelines True if all timelines were reset.
+ * @event MatrixClient#"Room.timelineReset"
+ * @param room - The room whose live timeline was reset, if any
+ * @param timelineSet - timelineSet room whose live timeline was reset
+ * @param resetAllTimelines - True if all timelines were reset.
  */

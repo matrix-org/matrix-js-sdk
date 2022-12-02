@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module room-hierarchy
- */
-
 import { Room } from "./models/room";
 import { IHierarchyRoom, IHierarchyRelation } from "./@types/spaces";
 import { MatrixClient } from "./client";
@@ -45,7 +41,6 @@ export class RoomHierarchy {
      * @param pageSize - the maximum number of rooms to return per page, can be overridden per load request.
      * @param maxDepth - the maximum depth to traverse the hierarchy to
      * @param suggestedOnly - whether to only return rooms with suggested=true.
-     * @constructor
      */
     public constructor(
         public readonly root: Room,

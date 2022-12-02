@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * This is an internal module. See {@link MemoryStore} for the public class.
- * @module store/memory
  */
 
 import { EventType } from "../@types/event";
@@ -43,16 +42,10 @@ function isValidFilterId(filterId?: string | number | null): boolean {
 }
 
 export interface IOpts {
+    // The local storage instance to persist some forms of data such as tokens. Rooms will NOT be stored.
     localStorage?: Storage;
 }
 
-/**
- * Construct a new in-memory data store for the Matrix Client.
- * @constructor
- * @param {Object=} opts Config options
- * @param {Storage} opts.localStorage The local storage instance to persist
- * some forms of data such as tokens. Rooms will NOT be stored.
- */
 export class MemoryStore implements IStore {
     private rooms: Record<string, Room> = {}; // roomId: Room
     private users: Record<string, User> = {}; // userId: User
@@ -69,6 +62,10 @@ export class MemoryStore implements IStore {
     private pendingToDeviceBatches: IndexedToDeviceBatch[] = [];
     private nextToDeviceBatchId = 0;
 
+    /**
+     * Construct a new in-memory data store for the Matrix Client.
+     * @param opts - Config options
+     */
     public constructor(opts: IOpts = {}) {
         this.localStorage = opts.localStorage;
     }
@@ -345,7 +342,7 @@ export class MemoryStore implements IStore {
     }
 
     /**
-     * @returns Resolves with a sync response to restore the
+     * @returns Promise which resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */

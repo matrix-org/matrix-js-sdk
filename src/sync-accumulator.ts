@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * This is an internal module. See {@link SyncAccumulator} for the public class.
- * @module sync-accumulator
  */
 
 import { logger } from './logger';

@@ -16,8 +16,6 @@ limitations under the License.
 
 /**
  * Defines m.olm encryption/decryption
- *
- * @module crypto/algorithms/olm
  */
 
 import { logger } from '../../logger';
@@ -44,18 +42,14 @@ interface IMessage {
 /**
  * Olm encryption implementation
  *
- * @constructor
- * @extends {module:crypto/algorithms/EncryptionAlgorithm}
- *
- * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/EncryptionAlgorithm}
+ * @param params - parameters, as per {@link EncryptionAlgorithm}
  */
 class OlmEncryption extends EncryptionAlgorithm {
     private sessionPrepared = false;
     private prepPromise: Promise<void> | null = null;
 
     /**
-     * @private
+     * @internal
 
      * @param roomMembers - list of currently-joined users in the room
      * @returns Promise which resolves when setup is complete
@@ -83,10 +77,6 @@ class OlmEncryption extends EncryptionAlgorithm {
     }
 
     /**
-     * @inheritdoc
-     *
-     * @param room -
-     * @param eventType -
      * @param content - plaintext event content
      *
      * @returns Promise which resolves to the new event body
@@ -150,19 +140,12 @@ class OlmEncryption extends EncryptionAlgorithm {
 /**
  * Olm decryption implementation
  *
- * @constructor
- * @extends {module:crypto/algorithms/DecryptionAlgorithm}
- * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/DecryptionAlgorithm}
+ * @param params - parameters, as per {@link algorithms/DecryptionAlgorithm}
  */
 class OlmDecryption extends DecryptionAlgorithm {
     /**
-     * @inheritdoc
-     *
-     * @param event -
-     *
      * returns a promise which resolves to a
-     * {@link module:crypto~EventDecryptionResult} once we have finished
+     * {@link EventDecryptionResult} once we have finished
      * decrypting. Rejects with an `algorithms.DecryptionError` if there is a
      * problem decrypting the event.
      */
