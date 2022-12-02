@@ -16,10 +16,10 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { MatrixClient } from "../client";
+import { MatrixClient, PendingEventOrdering } from "../client";
 import { TypedReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
-import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
+import { EventStatus, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
 import { NotificationCountType, Room, RoomEvent } from './room';
@@ -51,6 +51,7 @@ export type EventHandlerMap = {
 interface IThreadOpts {
     room: Room;
     client: MatrixClient;
+    pendingEventOrdering?: PendingEventOrdering;
 }
 
 export enum FeatureSupport {
@@ -88,9 +89,12 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private lastEvent: MatrixEvent | undefined;
     private replyCount = 0;
+    private lastPendingEvent: MatrixEvent | undefined;
+    private pendingReplyCount = 0;
 
     public readonly room: Room;
     public readonly client: MatrixClient;
+    private readonly pendingEventOrdering: PendingEventOrdering;
 
     public initialEventsFetched = !Thread.hasServerSideSupport;
 
@@ -109,6 +113,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         this.room = opts.room;
         this.client = opts.client;
+        this.pendingEventOrdering = opts.pendingEventOrdering ?? PendingEventOrdering.Chronological;
         this.timelineSet = new EventTimelineSet(this.room, {
             timelineSupport: true,
             pendingEvents: true,
@@ -127,7 +132,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
-        this.initialiseThread();
+        this.updateThreadMetadata();
         this.setEventMetadata(this.rootEvent);
     }
 
@@ -188,7 +193,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this._currentUserParticipated = false;
             this.emit(ThreadEvent.Delete, this);
         } else {
-            await this.initialiseThread();
+            await this.updateThreadMetadata();
         }
     };
 
@@ -209,7 +214,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         if (this.lastEvent === event) return;
         if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
 
-        await this.initialiseThread();
+        await this.updateThreadMetadata();
         this.emit(ThreadEvent.NewReply, this, event);
     };
 
@@ -233,7 +238,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(ev => this.addEvent(ev, toStartOfTimeline, false));
-        this.initialiseThread();
+        this.updateThreadMetadata();
     }
 
     /**
@@ -278,7 +283,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         if (emit) {
             this.emit(ThreadEvent.NewReply, this, event);
-            this.initialiseThread();
+            this.updateThreadMetadata();
         }
     }
 
@@ -293,21 +298,45 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
-    public async initialiseThread(): Promise<void> {
-        let bundledRelationship = this.getRootEventBundledRelationship();
-        if (Thread.hasServerSideSupport) {
-            await this.fetchRootEvent();
-            bundledRelationship = this.getRootEventBundledRelationship();
-        }
-
+    private async processRootEvent(): Promise<void> {
+        const bundledRelationship = this.getRootEventBundledRelationship();
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
             const mapper = this.client.getEventMapper();
-            this.lastEvent = mapper(bundledRelationship.latest_event);
+            // re-insert roomId
+            this.lastEvent = mapper({
+                ...bundledRelationship.latest_event,
+                room_id: this.roomId,
+            });
             await this.processEvent(this.lastEvent);
         }
+
+        let pendingEvents: MatrixEvent[];
+        if (this.pendingEventOrdering === PendingEventOrdering.Detached) {
+            pendingEvents = this.room.getPendingEvents()
+                .filter(ev => ev.isRelation(THREAD_RELATION_TYPE.name) && this.id === ev.threadRootId);
+            await Promise.all(pendingEvents.map(ev => this.processEvent(ev)));
+        } else {
+            pendingEvents = this.events
+                .filter(ev => ev.isRelation(THREAD_RELATION_TYPE.name))
+                .filter(ev => ev.status !== EventStatus.SENT && ev.status !== EventStatus.CANCELLED);
+        }
+        this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;
+        this.pendingReplyCount = pendingEvents.length;
+    }
+
+    private async updateThreadMetadata(): Promise<void> {
+        if (Thread.hasServerSideSupport) {
+            // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
+            // don't want the thread preview to be empty if we can avoid it
+            if (!this.initialEventsFetched) {
+                await this.processRootEvent();
+            }
+            await this.fetchRootEvent();
+        }
+        await this.processRootEvent();
 
         if (!this.initialEventsFetched) {
             this.initialEventsFetched = true;
@@ -393,14 +422,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * exclude annotations from that number
      */
     public get length(): number {
-        return this.replyCount;
+        return this.replyCount + this.pendingReplyCount;
     }
 
     /**
      * A getter for the last event added to the thread, if known.
      */
     public get replyToEvent(): Optional<MatrixEvent> {
-        return this.lastEvent ?? this.lastReply();
+        return this.lastPendingEvent ?? this.lastEvent ?? this.lastReply();
     }
 
     public get events(): MatrixEvent[] {
