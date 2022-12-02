@@ -55,7 +55,6 @@
   "dependencies": {
     "@babel/runtime": "^7.12.5",
     "@types/sdp-transform": "^2.4.5",
-    "@types/uuid": "7",
     "another-json": "^0.2.0",
     "bs58": "^5.0.0",
     "content-type": "^1.0.4",
@@ -88,6 +87,7 @@
     "@types/domexception": "^4.0.0",
     "@types/jest": "^29.0.0",
     "@types/node": "18",
+    "@types/uuid": "7",
     "@typescript-eslint/eslint-plugin": "^5.6.0",
     "@typescript-eslint/parser": "^5.6.0",
     "allchange": "^1.0.6",
