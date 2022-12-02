@@ -9345,7 +9345,6 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
 
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 
-    const totalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
     const currentCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
 
     // Ensure the unread counts are kept up to date if the event is encrypted
@@ -9353,7 +9352,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     // have encrypted events to avoid other code from resetting 'highlight' to zero.
     const oldHighlight = !!oldActions?.tweaks?.highlight;
     const newHighlight = !!actions?.tweaks?.highlight;
-    if ((oldHighlight !== newHighlight || currentCount > 0) && totalCount > 0) {
+    if (oldHighlight !== newHighlight || currentCount > 0) {
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
         const hasReadEvent = isThreadEvent
