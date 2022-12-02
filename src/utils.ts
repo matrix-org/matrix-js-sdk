@@ -662,13 +662,13 @@ export function compare(a: string, b: string): number {
  *
  * @returns the target object
  */
-export function recursivelyAssign<T extends Record<string, unknown>, S extends Record<string, unknown>>(
+export function recursivelyAssign<T extends {}, S extends {}>(
     target: T,
     source: S,
     ignoreNullish = false,
 ): T | S {
     for (const [sourceKey, sourceValue] of Object.entries(source)) {
-        if (target[sourceKey] instanceof Object && sourceValue) {
+        if (target[sourceKey as keyof T] instanceof Object && sourceValue) {
             recursivelyAssign(target[sourceKey], sourceValue);
             continue;
         }
