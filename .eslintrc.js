@@ -2,6 +2,7 @@ module.exports = {
     plugins: [
         "matrix-org",
         "import",
+        "jsdoc",
     ],
     extends: [
         "plugin:matrix-org/babel",
@@ -45,7 +46,7 @@ module.exports = {
         // restrict EventEmitters to force callers to use TypedEventEmitter
         "no-restricted-imports": ["error", {
             name: "events",
-            message: "Please use TypedEventEmitter instead"
+            message: "Please use TypedEventEmitter instead",
         }],
 
         "import/no-restricted-paths": ["error", {
