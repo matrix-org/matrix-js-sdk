@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../../../src/client";
+import { MatrixClient, PendingEventOrdering } from "../../../src/client";
 import { Room } from "../../../src/models/room";
-import { Thread } from "../../../src/models/thread";
+import { Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../../src/models/thread";
 import { mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
+import { emitPromise, mkMessage } from "../../test-utils/test-utils";
+import { EventStatus } from "../../../src";
 
 describe('Thread', () => {
     describe("constructor", () => {
@@ -28,6 +30,50 @@ describe('Thread', () => {
                 new Thread("$event", undefined, {} as any); // deliberate cast to test error case
             }).toThrow("element-web#22141: A thread requires a room in order to function");
         });
+    });
+
+    it("includes pending events in replyCount", async () => {
+        const myUserId = "@bob:example.org";
+        const testClient = new TestClient(
+            myUserId,
+            "DEVICE",
+            "ACCESS_TOKEN",
+            undefined,
+            { timelineSupport: false },
+        );
+        const client = testClient.client;
+        const room = new Room("123", client, myUserId, {
+            pendingEventOrdering: PendingEventOrdering.Detached,
+        });
+
+        jest.spyOn(client, "getRoom").mockReturnValue(room);
+
+        const { thread } = mkThread({
+            room,
+            client,
+            authorId: myUserId,
+            participantUserIds: ["@alice:example.org"],
+            length: 3,
+        });
+        await emitPromise(thread, ThreadEvent.Update);
+        expect(thread.length).toBe(2);
+
+        const event = mkMessage({
+            room: room.roomId,
+            user: myUserId,
+            msg: "thread reply",
+            relatesTo: {
+                rel_type: THREAD_RELATION_TYPE.name,
+                event_id: thread.id,
+            },
+            event: true,
+        });
+        await thread.processEvent(event);
+        event.setStatus(EventStatus.SENDING);
+        room.addPendingEvent(event, "txn01");
+
+        await emitPromise(thread, ThreadEvent.Update);
+        expect(thread.length).toBe(3);
     });
 
     describe("hasUserReadEvent", () => {
