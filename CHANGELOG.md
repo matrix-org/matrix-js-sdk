@@ -1,3 +1,11 @@
+Changes in [22.0.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v22.0.0-rc.2) (2022-12-02)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Make GroupCall work better with widgets ([\#2935](https://github.com/matrix-org/matrix-js-sdk/pull/2935)).
+ * Fix highlight notifications increasing when total notification is zero ([\#2937](https://github.com/matrix-org/matrix-js-sdk/pull/2937)). Fixes vector-im/element-web#23885.
+ * Fix synthesizeReceipt ([\#2916](https://github.com/matrix-org/matrix-js-sdk/pull/2916)). Fixes vector-im/element-web#23827 vector-im/element-web#23754 and vector-im/element-web#23847.
+
 Changes in [22.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v22.0.0-rc.1) (2022-11-29)
 ============================================================================================================
 
