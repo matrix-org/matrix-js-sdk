@@ -241,7 +241,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param forwardPaginationToken - token for forward-paginating the old live timeline,
      * if absent or null, all timelines are reset.
      *
-     * @fires MatrixClient#event:"Room.timelineReset"
+     * @remarks
+     * Fires {@link RoomEvent.TimelineReset}
      */
     public resetLiveTimeline(backPaginationToken?: string, forwardPaginationToken?: string): void {
         // Each EventTimeline has RoomState objects tracking the state at the start
@@ -345,7 +346,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @param paginationToken -   token for the next batch of events
      *
-     * @fires MatrixClient#event:"Room.timeline"
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
      *
      */
     public addEventsToTimeline(
@@ -648,7 +650,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * @param options - addEventToTimeline options
      *
-     * @fires MatrixClient#event:"Room.timeline"
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
      */
     public addEventToTimeline(
         event: MatrixEvent,
@@ -740,7 +743,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @param oldEventId -          the ID of the original event
      * @param newEventId -         the ID of the replacement event
      *
-     * @fires MatrixClient#event:"Room.timeline"
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
      */
     public handleRemoteEcho(
         localEvent: MatrixEvent,
@@ -901,12 +905,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
  * added to the end of the live timeline
  *
  * @example
+ * ```
  * matrixClient.on("Room.timeline",
  *                 function(event, room, toStartOfTimeline, removed, data) {
  *   if (!toStartOfTimeline && data.liveEvent) {
  *     var messageToAppend = room.timeline.[room.timeline.length - 1];
  *   }
  * });
+ * ```
  */
 
 /**

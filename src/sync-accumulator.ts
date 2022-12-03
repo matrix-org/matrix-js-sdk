@@ -27,6 +27,13 @@ import { MAIN_ROOM_TIMELINE, ReceiptContent, ReceiptType } from "./@types/read_r
 import { UNREAD_THREAD_NOTIFICATIONS } from './@types/sync';
 
 interface IOpts {
+    /**
+     * The ideal maximum number of timeline entries to keep in the sync response.
+     * This is best-effort, as clients do not always have a back-pagination token for each event,
+     * so it's possible there may be slightly *less* than this value. There will never be more.
+     * This cannot be 0 or else it makes it impossible to scroll back in a room.
+     * Default: 50.
+     */
     maxTimelineEntries?: number;
 }
 
@@ -201,15 +208,6 @@ export class SyncAccumulator {
     // streaming from without losing events.
     private nextBatch: string | null = null;
 
-    /**
-     * @param opts -
-     * @param opts -.maxTimelineEntries The ideal maximum number of
-     * timeline entries to keep in the sync response. This is best-effort, as
-     * clients do not always have a back-pagination token for each event, so
-     * it's possible there may be slightly *less* than this value. There will
-     * never be more. This cannot be 0 or else it makes it impossible to scroll
-     * back in a room. Default: 50.
-     */
     public constructor(private readonly opts: IOpts = {}) {
         this.opts.maxTimelineEntries = this.opts.maxTimelineEntries || 50;
     }

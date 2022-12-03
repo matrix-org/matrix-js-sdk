@@ -126,7 +126,6 @@ export interface IBootstrapCrossSigningOpts {
      * A function that makes the request requiring auth. Receives the auth data as an object.
      * Can be called multiple times, first with an empty authDict, to obtain the flows.
      */
-
     authUploadDeviceSigningKeys?(makeRequest: (authData: any) => Promise<{}>): Promise<void>;
 }
 
@@ -224,10 +223,26 @@ interface ISignableObject {
     unsigned?: object;
 }
 
+/**
+ * The result of a (successful) call to decryptEvent.
+ */
 export interface IEventDecryptionResult {
+    /**
+     * The plaintext payload for the event (typically containing <tt>type</tt> and <tt>content</tt> fields).
+     */
     clearEvent: IClearEvent;
+    /**
+     * List of curve25519 keys involved in telling us about the senderCurve25519Key and claimedEd25519Key.
+     * See {@link MatrixEvent#getForwardingCurve25519KeyChain}.
+     */
     forwardingCurve25519KeyChain?: string[];
+    /**
+     * Key owned by the sender of this event.  See {@link MatrixEvent#getSenderKey}.
+     */
     senderCurve25519Key?: string;
+    /**
+     * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
+     */
     claimedEd25519Key?: string;
     untrusted?: boolean;
 }
@@ -267,7 +282,17 @@ export enum CryptoEvent {
 export type CryptoEventHandlerMap = {
     [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
+    /**
+     * @event
+     * Fires when we receive a room key request
+     *
+     * @param req  request details
+     */
     [CryptoEvent.RoomKeyRequest]: (request: IncomingRoomKeyRequest) => void;
+    /**
+     * @event
+     * Fires when we receive a room key request cancellation
+     */
     [CryptoEvent.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
     [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
     [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
@@ -278,6 +303,13 @@ export type CryptoEventHandlerMap = {
         upload: (opts: { shouldEmit: boolean }) => Promise<void>
     ) => void;
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
+    /**
+     * @event
+     * Fires when the app may wish to warn the user about something related
+     * the end-to-end crypto.
+     *
+     * @param type - One of the strings listed above
+     */
     [CryptoEvent.Warning]: (type: string) => void;
     [CryptoEvent.KeysChanged]: (data: {}) => void;
     [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
@@ -485,7 +517,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Returns a promise which resolves once the crypto module is ready for use.
      *
      * @param opts - keyword arguments.
-     * @param opts -.exportedOlmDevice (Optional) data from exported device
+     * @param opts.exportedOlmDevice - (Optional) data from exported device
      *     that must be re-created.
      */
     public async init({ exportedOlmDevice, pickleKey }: IInitOpts = {}): Promise<void> {
@@ -1823,7 +1855,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param value - whether to blacklist all unverified devices by default
      *
      * @deprecated For external code, use {@link MatrixClient#setGlobalBlacklistUnverifiedDevices}. For
-     *   internal code, set {@link #globalBlacklistUnverifiedDevices} directly.
+     *   internal code, set {@link MatrixClient#globalBlacklistUnverifiedDevices} directly.
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): void {
         this.globalBlacklistUnverifiedDevices = value;
@@ -1833,7 +1865,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns whether to blacklist all unverified devices by default
      *
      * @deprecated For external code, use {@link MatrixClient#getGlobalBlacklistUnverifiedDevices}. For
-     *   internal code, reference {@link #globalBlacklistUnverifiedDevices} directly.
+     *   internal code, reference {@link MatrixClient#globalBlacklistUnverifiedDevices} directly.
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
         return this.globalBlacklistUnverifiedDevices;
@@ -2783,7 +2815,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param keys - a list of session export objects
      * @param opts -
-     * @param opts -.progressCallback called with an object which has a stage param
+     * @param opts.progressCallback - called with an object which has a stage param
      * @returns a promise which resolves once the keys have been imported
      */
     public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<void> {
@@ -3927,46 +3959,3 @@ class IncomingRoomKeyRequestCancellation {
         this.requestId = content.request_id;
     }
 }
-
-/**
- * The result of a (successful) call to decryptEvent.
- *
- * @typedef {Object} EventDecryptionResult
- *
- * @property {Object} clearEvent The plaintext payload for the event
- *     (typically containing <tt>type</tt> and <tt>content</tt> fields).
- *
- * @property {?string} senderCurve25519Key Key owned by the sender of this
- *    event.  See {@link MatrixEvent#getSenderKey}.
- *
- * @property {?string} claimedEd25519Key ed25519 key claimed by the sender of
- *    this event. See
- *    {@link MatrixEvent#getClaimedEd25519Key}.
- *
- * @property {?Array<string>} forwardingCurve25519KeyChain list of curve25519
- *     keys involved in telling us about the senderCurve25519Key and
- *     claimedEd25519Key. See
- *     {@link MatrixEvent#getForwardingCurve25519KeyChain}.
- */
-
-/**
- * Fires when we receive a room key request
- *
- * @event MatrixClient#"crypto.roomKeyRequest"
- * @param req  request details
- */
-
-/**
- * Fires when we receive a room key request cancellation
- *
- * @event MatrixClient#"crypto.roomKeyRequestCancellation"
- * @param req
- */
-
-/**
- * Fires when the app may wish to warn the user about something related
- * the end-to-end crypto.
- *
- * @event MatrixClient#"crypto.warning"
- * @param type - One of the strings listed above
- */

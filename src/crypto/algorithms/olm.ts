@@ -140,7 +140,7 @@ class OlmEncryption extends EncryptionAlgorithm {
 /**
  * Olm decryption implementation
  *
- * @param params - parameters, as per {@link algorithms/DecryptionAlgorithm}
+ * @param params - parameters, as per {@link DecryptionAlgorithm}
  */
 class OlmDecryption extends DecryptionAlgorithm {
     /**

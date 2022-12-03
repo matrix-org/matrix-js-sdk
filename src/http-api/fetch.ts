@@ -115,16 +115,16 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @param opts - additional options. If a number is specified,
      * this is treated as `opts.localTimeoutMs`.
      *
-     * @param opts -.localTimeoutMs The maximum amount of time to wait before
+     * @param opts.localTimeoutMs - The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
      *
-     * @param opts -.prefix The full prefix to use e.g.
+     * @param opts.prefix - The full prefix to use e.g.
      * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
      *
-     * @param opts -.baseUrl The alternative base url to use.
+     * @param opts.baseUrl - The alternative base url to use.
      * If not specified, uses this.opts.baseUrl
      *
-     * @param opts -.headers map of additional request headers
+     * @param opts.headers - map of additional request headers
      *
      * @returns Promise which resolves to
      * ```
@@ -133,7 +133,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *     headers: {Object},
      *     code: {Number},
      * }
-     * ````
+     * ```
      * If `onlyData` is set, this will resolve to the `data` object only.
      * @returns Rejects with an error if a problem occurred.
      * This includes network problems and Matrix-specific error JSON.
@@ -191,13 +191,13 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param opts - additional options
      *
-     * @param opts -.localTimeoutMs The maximum amount of time to wait before
+     * @param opts.localTimeoutMs - The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
      *
-     * @param opts -.prefix The full prefix to use e.g.
+     * @param opts.prefix - The full prefix to use e.g.
      * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
      *
-     * @param opts -.headers map of additional request headers
+     * @param opts.headers - map of additional request headers
      *
      * @returns Promise which resolves to
      * ```
@@ -232,10 +232,10 @@ export class FetchHttpApi<O extends IHttpOpts> {
      *
      * @param opts - additional options
      *
-     * @param opts -.localTimeoutMs The maximum amount of time to wait before
+     * @param opts.localTimeoutMs - The maximum amount of time to wait before
      * timing out the request. If not specified, there is no timeout.
      *
-     * @param opts -.headers map of additional request headers
+     * @param opts.headers - map of additional request headers
      *
      * @returns Promise which resolves to data unless `onlyData` is specified as false,
      * where the resolved value will be a fetch Response object.

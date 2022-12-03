@@ -331,11 +331,12 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * `m.room.member` events. May fire "RoomStateEvent.Marker" if there are
      * `UNSTABLE_MSC2716_MARKER` events.
      * @param stateEvents - a list of state events for this room.
-     * @param markerFoundOptions -
-     * @fires MatrixClient#event:"RoomState.members"
-     * @fires MatrixClient#event:"RoomState.newMember"
-     * @fires MatrixClient#event:"RoomState.events"
-     * @fires MatrixClient#event:"RoomStateEvent.Marker"
+     *
+     * @remarks
+     * Fires {@link RoomStateEvent.Members}
+     * Fires {@link RoomStateEvent.NewMember}
+     * Fires {@link RoomStateEvent.Events}
+     * Fires {@link RoomStateEvent.Marker}
      */
     public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions): void {
         this.updateModifiedTime();
@@ -462,8 +463,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * before emitting, as this is done from setStateEvents and setOutOfBandMember.
      * @param userId - the id of the user to look up
      * @param event - the membership event for the (new) member. Used to emit.
-     * @fires MatrixClient#event:"RoomState.newMember"
      * @returns the member, existing or newly created.
+     *
+     * @remarks
+     * Fires {@link RoomStateEvent.NewMember}
      */
     private getOrCreateMember(userId: string, event: MatrixEvent): RoomMember {
         let member = this.members[userId];

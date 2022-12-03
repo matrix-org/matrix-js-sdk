@@ -113,6 +113,7 @@ export type MBeaconInfoEventContent = &
  * m.beacon event example
  * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
  * @example
+ * ```
  * {
  *   "type": "m.beacon",
  *   "sender": "@matthew:matrix.org",
@@ -128,6 +129,7 @@ export type MBeaconInfoEventContent = &
  *       "m.ts": 1636829458432,
  *   }
  * }
+ * ```
 */
 
 /**

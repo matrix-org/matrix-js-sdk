@@ -42,8 +42,11 @@ import { IStoredClientOpts } from "../client";
 const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 
 interface IOpts extends IBaseOpts {
+    // The Indexed DB interface e.g. `window.indexedDB`
     indexedDB: IDBFactory;
+    // Optional database name. The same name must be used to open the same database.
     dbName?: string;
+    // Optional factory to spin up a Worker to execute the IDB transactions within.
     workerFactory?: () => Worker;
 }
 
@@ -96,16 +99,6 @@ export class IndexedDBStore extends MemoryStore {
      * ```
      *
      * @param opts - Options object.
-     * @param opts -.indexedDB The Indexed DB interface e.g.
-     * `window.indexedDB`
-     * @param opts -.dbName Optional database name. The same name must be used
-     * to open the same database.
-     * @param opts -.workerScript Optional URL to a script to invoke a web
-     * worker with to run IndexedDB queries on the web worker. The IndexedDbStoreWorker
-     * class is provided for this purpose and requires the application to provide a
-     * trivial wrapper script around it.
-     * @param opts -.workerApi The webWorker API object. If omitted, the global Worker
-     * object will be used if it exists.
      */
     public constructor(opts: IOpts) {
         super(opts);

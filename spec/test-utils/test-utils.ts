@@ -85,12 +85,12 @@ let testEventIndex = 1; // counter for events, easier for comparison of randomly
 /**
  * Create an Event.
  * @param opts - Values for the event.
- * @param opts -.type The event.type
- * @param opts -.room The event.room_id
- * @param opts -.sender The event.sender
- * @param opts -.skey Optional. The state key (auto inserts empty string)
- * @param opts -.content The event.content
- * @param opts -.event True to make a MatrixEvent.
+ * @param opts.type - The event.type
+ * @param opts.room - The event.room_id
+ * @param opts.sender - The event.sender
+ * @param opts.skey - Optional. The state key (auto inserts empty string)
+ * @param opts.content - The event.content
+ * @param opts.event - True to make a MatrixEvent.
  * @param client - If passed along with opts.event=true will be used to set up re-emitters.
  * @returns a JSON object representing this event.
  */
@@ -194,14 +194,14 @@ interface IMembershipOpts {
 /**
  * Create an m.room.member event.
  * @param opts - Values for the membership.
- * @param opts -.room The room ID for the event.
- * @param opts -.mship The content.membership for the event.
- * @param opts -.sender The sender user ID for the event.
- * @param opts -.skey The target user ID for the event if applicable
+ * @param opts.room - The room ID for the event.
+ * @param opts.mship - The content.membership for the event.
+ * @param opts.sender - The sender user ID for the event.
+ * @param opts.skey - The target user ID for the event if applicable
  * e.g. for invites/bans.
- * @param opts -.name The content.displayname for the event.
- * @param opts -.url The content.avatar_url for the event.
- * @param opts -.event True to make a MatrixEvent.
+ * @param opts.name - The content.displayname for the event.
+ * @param opts.url - The content.avatar_url for the event.
+ * @param opts.event - True to make a MatrixEvent.
  * @returns The event
  */
 export function mkMembership(opts: IMembershipOpts & { event: true }): MatrixEvent;
@@ -251,10 +251,10 @@ export interface IMessageOpts {
 /**
  * Create an m.room.message event.
  * @param opts - Values for the message
- * @param opts -.room The room ID for the event.
- * @param opts -.user The user ID for the event.
- * @param opts -.msg Optional. The content.body for the event.
- * @param opts -.event True to make a MatrixEvent.
+ * @param opts.room - The room ID for the event.
+ * @param opts.user - The user ID for the event.
+ * @param opts.msg - Optional. The content.body for the event.
+ * @param opts.event - True to make a MatrixEvent.
  * @param client - If passed along with opts.event=true will be used to set up re-emitters.
  * @returns The event
  */
@@ -291,11 +291,11 @@ interface IReplyMessageOpts extends IMessageOpts {
  * Create a reply message.
  *
  * @param opts - Values for the message
- * @param opts -.room The room ID for the event.
- * @param opts -.user The user ID for the event.
- * @param opts -.msg Optional. The content.body for the event.
- * @param opts -.replyToMessage The replied message
- * @param opts -.event True to make a MatrixEvent.
+ * @param opts.room - The room ID for the event.
+ * @param opts.user - The user ID for the event.
+ * @param opts.msg - Optional. The content.body for the event.
+ * @param opts.replyToMessage - The replied message
+ * @param opts.event - True to make a MatrixEvent.
  * @param client - If passed along with opts.event=true will be used to set up re-emitters.
  * @returns The event
  */

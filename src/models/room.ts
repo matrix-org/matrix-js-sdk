@@ -69,7 +69,17 @@ export const KNOWN_SAFE_ROOM_VERSION = '9';
 const SAFE_ROOM_VERSIONS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 interface IOpts {
+    /**
+     * Controls where pending messages appear in a room's timeline.
+     * If "<b>chronological</b>", messages will appear in the timeline when the call to `sendEvent` was made.
+     * If "<b>detached</b>", pending messages will appear in a separate list,
+     * accessible via {@link Room#getPendingEvents}.
+     * Default: "chronological".
+     */
     pendingEventOrdering?: PendingEventOrdering;
+    /**
+     * Set to true to enable improved timeline support.
+     */
     timelineSupport?: boolean;
     lazyLoadMembers?: boolean;
 }
@@ -301,15 +311,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param client - Required. The client, used to lazy load members.
      * @param myUserId - Required. The ID of the syncing user.
      * @param opts - Configuration options
-     *
-     * @param opts -.pendingEventOrdering Controls where pending messages
-     * appear in a room's timeline. If "<b>chronological</b>", messages will appear
-     * in the timeline when the call to `sendEvent` was made. If
-     * "<b>detached</b>", pending messages will appear in a separate list,
-     * accessible via {@link Room#getPendingEvents}. Default:
-     * "chronological".
-     * @param opts.timelineSupport - Set to true to enable improved
-     * timeline support.
      */
     public constructor(
         public readonly roomId: string,
@@ -885,7 +886,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Empty out the current live timeline and re-request it. This is used when
-     * historical messages are imported into the room via MSC2716 `/batch_send
+     * historical messages are imported into the room via MSC2716 `/batch_send`
      * because the client may already have that section of the timeline loaded.
      * We need to force the client to throw away their current timeline so that
      * when they back paginate over the area again with the historical messages
@@ -1420,8 +1421,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param paginationToken -   token for the next batch of events
      *
-     * @fires MatrixClient#event:"Room.timeline"
-     *
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
      */
     public addEventsToTimeline(
         events: MatrixEvent[],
@@ -2136,8 +2137,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param event - Event to be added
      * @param addLiveEventOptions - addLiveEvent options
-     * @fires MatrixClient#event:"Room.timeline"
      * @internal
+     *
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
      */
     private addLiveEvent(event: MatrixEvent, addLiveEventOptions: IAddLiveEventOptions): void {
         const { duplicateStrategy, timelineWasEmpty, fromCache } = addLiveEventOptions;
@@ -2181,10 +2184,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param txnId - Transaction id for this outgoing event
      *
-     * @fires MatrixClient#event:"Room.localEchoUpdated"
-     *
      * @throws if the event doesn't have status SENDING, or we aren't given a
      * unique transaction id.
+     *
+     * @remarks
+     * Fires {@link RoomEvent.LocalEchoUpdated}
      */
     public addPendingEvent(event: MatrixEvent, txnId: string): void {
         if (event.status !== EventStatus.SENDING && event.status !== EventStatus.NOT_SENT) {
@@ -2256,7 +2260,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * all messages that are not yet encrypted will be discarded
      *
      * This is because the flow of EVENT_STATUS transition is
-     * queued => sending => encrypting => sending => sent
+     * `queued => sending => encrypting => sending => sent`
      *
      * Steps 3 and 4 are skipped for unencrypted room.
      * It is better to discard an unencrypted message rather than persisting
@@ -2309,8 +2313,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param localEvent -    The local echo, which
      *    should be either in the pendingEventList or the timeline.
      *
-     * @fires MatrixClient#event:"Room.localEchoUpdated"
      * @internal
+     *
+     * @remarks
+     * Fires {@link RoomEvent.LocalEchoUpdated}
      */
     public handleRemoteEcho(remoteEvent: MatrixEvent, localEvent: MatrixEvent): void {
         const oldEventId = localEvent.getId()!;
@@ -2353,9 +2359,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *
      * @param event -      local echo event
      * @param newStatus -  status to assign
-     * @param newEventId -      new event id to assign. Ignored unless
-     *    newStatus == EventStatus.SENT.
-     * @fires MatrixClient#event:"Room.localEchoUpdated"
+     * @param newEventId -      new event id to assign. Ignored unless newStatus == EventStatus.SENT.
+     *
+     * @remarks
+     * Fires {@link RoomEvent.LocalEchoUpdated}
      */
     public updatePendingEvent(event: MatrixEvent, newStatus: EventStatus, newEventId?: string): void {
         logger.log(
@@ -2685,7 +2692,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Recalculate various aspects of the room, including the room name and
      * room summary. Call this any time the room's current state is modified.
      * May fire "Room.name" if the room name is updated.
-     * @fires MatrixClient#event:"Room.name"
+     *
+     * @remarks
+     * Fires {@link RoomEvent.Name}
      */
     public recalculate(): void {
         // set fake stripped state events if this is an invite room so logic remains
@@ -3270,9 +3279,11 @@ function memberNamesToRoomName(names: string[], count: number): string {
  * @event MatrixClient#"Room.name"
  * @param room - The room whose Room.name was updated.
  * @example
+ * ```
  * matrixClient.on("Room.name", function(room){
  *   var newName = room.name;
  * });
+ * ```
  */
 
 /**
@@ -3281,9 +3292,11 @@ function memberNamesToRoomName(names: string[], count: number): string {
  * @param event - The receipt event
  * @param room - The room whose receipts was updated.
  * @example
+ * ```
  * matrixClient.on("Room.receipt", function(event, room){
  *   var receiptContent = event.getContent();
  * });
+ * ```
  */
 
 /**
@@ -3292,10 +3305,12 @@ function memberNamesToRoomName(names: string[], count: number): string {
  * @param event - The tags event
  * @param room - The room whose Room.tags was updated.
  * @example
+ * ```
  * matrixClient.on("Room.tags", function(event, room){
  *   var newTags = event.getContent().tags;
  *   if (newTags["favourite"]) showStar(room);
  * });
+ * ```
  */
 
 /**
@@ -3306,11 +3321,13 @@ function memberNamesToRoomName(names: string[], count: number): string {
  * @param prevEvent - The event being replaced by
  * the new account data, if known.
  * @example
+ * ```
  * matrixClient.on("Room.accountData", function(event, room, oldEvent){
  *   if (event.getType() === "m.room.colorscheme") {
  *       applyColorScheme(event.getContents());
  *   }
  * });
+ * ```
  */
 
 /**

@@ -41,17 +41,17 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
      *
      * @param opts -  options object
      *
-     * @param opts -.name   Name to give the file on the server. Defaults
+     * @param opts.name -   Name to give the file on the server. Defaults
      *   to <tt>file.name</tt>.
      *
-     * @param opts -.includeFilename if false will not send the filename,
+     * @param opts.includeFilename - if false will not send the filename,
      *   e.g for encrypted file uploads where filename leaks are undesirable.
      *   Defaults to true.
      *
-     * @param opts -.type   Content-type for the upload. Defaults to
+     * @param opts.type -   Content-type for the upload. Defaults to
      *   <tt>file.type</tt>, or <tt>application/octet-stream</tt>.
      *
-     * @param opts -.progressHandler Optional. Called when a chunk of
+     * @param opts.progressHandler - Optional. Called when a chunk of
      *    data has been uploaded, with an object containing the fields `loaded`
      *    (number of bytes transferred) and `total` (total size, if known).
      *

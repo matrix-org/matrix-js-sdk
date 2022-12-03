@@ -310,8 +310,8 @@ export interface ICreateClientOpts {
 
     /**
      * Set to true to enable
-     * improved timeline support ({@link MatrixClient#getEventTimeline getEventTimeline}). It is
-     * disabled by default for compatibility with older clients - in particular to
+     * improved timeline support, see {@link MatrixClient#getEventTimeline}.
+     * It is disabled by default for compatibility with older clients - in particular to
      * maintain support for back-paginating the live timeline after a '/sync'
      * result with a gap.
      */
@@ -1956,7 +1956,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns
      *
-     * @fires event:MatrixClient"deviceVerificationChanged"
+     * @remarks
+     * Fires {@link CryptoEvent.DeviceVerificationChanged}
      */
     public setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         const prom = this.setDeviceVerification(userId, deviceId, verified, null, null);
@@ -1982,7 +1983,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns
      *
-     * @fires event:MatrixClient"deviceVerificationChanged"
+     * @remarks
+     * Fires {@link CryptoEvent.DeviceVerificationChanged}
      */
     public setDeviceBlocked(userId: string, deviceId: string, blocked = true): Promise<void> {
         return this.setDeviceVerification(userId, deviceId, null, blocked, null);
@@ -2000,7 +2002,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @returns
      *
-     * @fires event:MatrixClient"deviceVerificationChanged"
+     * @remarks
+     * Fires {@link CryptoEvent.DeviceVerificationChanged}
      */
     public setDeviceKnown(userId: string, deviceId: string, known = true): Promise<void> {
         return this.setDeviceVerification(userId, deviceId, null, null, known);
@@ -2316,9 +2319,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *   secret storage (if it has been setup)
      *
      * The cross-signing API is currently UNSTABLE and may change without notice.
-     *
-     * @param opts -.authUploadDeviceSigningKeys Function
-     * called to await an interactive auth flow when uploading device signing keys.
      */
     public bootstrapCrossSigning(opts: IBootstrapCrossSigningOpts): Promise<void> {
         if (!this.crypto) {
@@ -2762,11 +2762,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
-     * @param opts -
-     * @param opts -.progressCallback called with an object that has a "stage" param
      *
-     * @returns a promise which resolves when the keys
-     *    have been imported
+     * @returns a promise which resolves when the keys have been imported
      */
     public importRoomKeys(keys: IMegolmSessionData[], opts?: IImportRoomKeysOpts): Promise<void> {
         if (!this.crypto) {
@@ -3621,11 +3618,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Join a room. If you have already joined the room, this will no-op.
      * @param roomIdOrAlias - The room ID or room alias to join.
      * @param opts - Options when joining the room.
-     * @param opts -.syncRoom True to do a room initial sync on the resulting
+     * @param opts.syncRoom - True to do a room initial sync on the resulting
      * room. If false, the <strong>returned Room object will have no current state.
      * </strong> Default: true.
-     * @param opts -.inviteSignUrl If the caller has a keypair 3pid invite, the signing URL is passed in this parameter.
-     * @param opts -.viaServers The server names to try and join through in addition to those that are automatically chosen.
+     * @param opts.inviteSignUrl - If the caller has a keypair 3pid invite, the signing URL is passed in this parameter.
+     * @param opts.viaServers - The server names to try and join through in addition to those that are automatically chosen.
      * @returns Promise which resolves: Room object.
      * @returns Rejects: with an error response.
      */
@@ -5154,8 +5151,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param opts - Options to apply
-     * @param opts -.presence One of "online", "offline" or "unavailable"
-     * @param opts -.status_msg The status message to attach.
+     * @param opts.presence - One of "online", "offline" or "unavailable"
+     * @param opts.status_msg - The status message to attach.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      * @throws If 'presence' isn't a valid presence enum value.
@@ -5982,10 +5979,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set r/w flags for guest access in a room.
      * @param roomId - The room to configure guest access in.
      * @param opts - Options
-     * @param opts -.allowJoin True to allow guests to join this room. This
+     * @param opts.allowJoin - True to allow guests to join this room. This
      * implicitly gives guests write access. If false or not given, guests are
      * explicitly forbidden from joining the room.
-     * @param opts -.allowRead True to set history visibility to
+     * @param opts.allowRead - True to set history visibility to
      * be world_readable. This gives guests read access *from this point forward*.
      * If false or not given, history visibility is not modified.
      * @returns Promise which resolves: TODO
@@ -7318,7 +7315,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * ```
      *
      * @param opts - Registration options
-     * @param opts -.body JSON HTTP body to provide.
+     * @param opts.body - JSON HTTP body to provide.
      * @returns Promise which resolves: JSON object that contains:
      *                   `{ user_id, device_id, access_token, home_server }`
      * @returns Rejects: with an error response.
@@ -8004,8 +8001,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Query the user directory with a term matching user IDs, display names and domains.
      * @param opts - options
-     * @param opts -.term the term with which to search.
-     * @param opts -.limit the maximum number of results to return. The server will
+     * @param opts.term - the term with which to search.
+     * @param opts.limit - the maximum number of results to return. The server will
      *                 apply a limit if unspecified.
      * @returns Promise which resolves: an array of results.
      */
@@ -8030,17 +8027,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param opts -  options object
      *
-     * @param opts -.name   Name to give the file on the server. Defaults
+     * @param opts.name -   Name to give the file on the server. Defaults
      *   to <tt>file.name</tt>.
      *
-     * @param opts -.includeFilename if false will not send the filename,
+     * @param opts.includeFilename - if false will not send the filename,
      *   e.g for encrypted file uploads where filename leaks are undesirable.
      *   Defaults to true.
      *
-     * @param opts -.type   Content-type for the upload. Defaults to
+     * @param opts.type -   Content-type for the upload. Defaults to
      *   <tt>file.type</tt>, or <tt>applicaton/octet-stream</tt>.
      *
-     * @param opts -.progressHandler Optional. Called when a chunk of
+     * @param opts.progressHandler - Optional. Called when a chunk of
      *    data has been uploaded, with an object containing the fields `loaded`
      *    (number of bytes transferred) and `total` (total size, if known).
      *
@@ -8166,7 +8163,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * where all 3PIDs for the account are bound.
      *
      * @param medium - The threepid medium (eg. 'email')
-     * @param address - The threepid address (eg. 'bob@example.com')
+     * @param address - The threepid address (eg. 'bob\@example.com')
      *        this must be as returned by getThreePids.
      * @returns Promise which resolves: on success
      * @returns Rejects: with an error response.
@@ -8188,7 +8185,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param medium - The threepid medium (eg. 'email')
-     * @param address - The threepid address (eg. 'bob@example.com')
+     * @param address - The threepid address (eg. 'bob\@example.com')
      *        this must be as returned by getThreePids.
      * @returns Promise which resolves: The server response on success
      *     (generally the empty JSON object)
@@ -8456,8 +8453,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Perform a server-side search.
      * @param opts -
-     * @param opts -.next_batch the batch token to pass in the query string
-     * @param opts -.body the JSON object to pass to the request body.
+     * @param opts.next_batch - the batch token to pass in the query string
+     * @param opts.body - the JSON object to pass to the request body.
      * @param abortSignal - optional signal used to cancel the http request.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
@@ -8507,7 +8504,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param opts -
      *
-     * @param opts -.token   sync token to pass in the query request, to help
+     * @param opts.token -   sync token to pass in the query request, to help
      *   the HS give the most recent results
      *
      * @returns Promise which resolves: result object. Rejects: with
@@ -9411,9 +9408,11 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * @event MatrixClient#"event"
  * @param event - The matrix event which caused this event to fire.
  * @example
+ * ```
  * matrixClient.on("event", function(event){
  *   var sender = event.getSender();
  * });
+ * ```
  */
 
 /**
@@ -9421,9 +9420,11 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * @event MatrixClient#"toDeviceEvent"
  * @param event - The matrix event which caused this event to fire.
  * @example
+ * ```
  * matrixClient.on("toDeviceEvent", function(event){
  *   var sender = event.getSender();
  * });
+ * ```
  */
 
 /**
@@ -9533,6 +9534,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  *    backlog of events after connecting. Only present if `state=SYNCING`.
  *
  * @example
+ * ```
  * matrixClient.on("sync", function(state, prevState, data) {
  *   switch (state) {
  *     case "ERROR":
@@ -9547,6 +9549,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  *       break;
  *   }
  * });
+ * ```
  */
 
 /**
@@ -9556,9 +9559,11 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * @event MatrixClient#"Room"
  * @param room - The newly created, fully populated room.
  * @example
+ * ```
  * matrixClient.on("Room", function(room){
  *   var roomId = room.roomId;
  * });
+ * ```
  */
 
 /**
@@ -9567,9 +9572,11 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * @event MatrixClient#"deleteRoom"
  * @param roomId - The deleted room ID.
  * @example
+ * ```
  * matrixClient.on("deleteRoom", function(roomId){
  *   // update UI from getRooms()
  * });
+ * ```
  */
 
 /**
@@ -9577,9 +9584,11 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * @event MatrixClient#"Call.incoming"
  * @param call - The incoming call.
  * @example
+ * ```
  * matrixClient.on("Call.incoming", function(call){
  *   call.answer(); // auto-answer
  * });
+ * ```
  */
 
 /**
@@ -9589,9 +9598,11 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * when then login session can be renewed by using a refresh token.
  * @event MatrixClient#"Session.logged_out"
  * @example
+ * ```
  * matrixClient.on("Session.logged_out", function(errorObj){
  *   // show the login screen
  * });
+ * ```
  */
 
 /**
@@ -9599,9 +9610,11 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * to a HTTP request.
  * @event MatrixClient#"no_consent"
  * @example
+ * ```
  * matrixClient.on("no_consent", function(message, contentUri) {
  *     console.info(message + ' Go to ' + contentUri);
  * });
+ * ```
  */
 
 /**
@@ -9647,9 +9660,11 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * @param event - The event describing the account_data just added
  * @param event - The previous account data, if known.
  * @example
+ * ```
  * matrixClient.on("accountData", function(event, oldEvent){
  *   myAccountData[event.type] = event.content;
  * });
+ * ```
  */
 
 /**
@@ -9673,11 +9688,13 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
  * @event MatrixClient#"crypto.keyBackupStatus"
  * @param enabled - true if key backup has been enabled, otherwise false
  * @example
+ * ```
  * matrixClient.on("crypto.keyBackupStatus", function(enabled){
  *   if (enabled) {
  *     [...]
  *   }
  * });
+ * ```
  */
 
 /**

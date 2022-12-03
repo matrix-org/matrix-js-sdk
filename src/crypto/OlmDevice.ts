@@ -184,11 +184,11 @@ export class OlmDevice {
      * Reads the device keys from the OlmAccount object.
      *
      * @param opts -
-     * @param opts -.fromExportedDevice (Optional) data from exported device
+     * @param opts.fromExportedDevice - (Optional) data from exported device
      *     that must be re-created.
      *     If present, opts.pickleKey is ignored
      *     (exported data already provides a pickle key)
-     * @param opts -.pickleKey (Optional) pickle key to set instead of default one
+     * @param opts.pickleKey - (Optional) pickle key to set instead of default one
      */
     public async init({ pickleKey, fromExportedDevice }: IInitOpts = {}): Promise<void> {
         let e2eKeys;

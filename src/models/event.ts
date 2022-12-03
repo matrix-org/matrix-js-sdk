@@ -901,10 +901,11 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @internal
      *
-     * @fires MatrixEvent#"Event.decrypted"
-     *
      * @param decryptionResult -
      *     the decryption result, including the plaintext and some key info
+     *
+     * @remarks
+     * Fires {@link MatrixEventEvent.Decrypted}
      */
     private setClearData(decryptionResult: IEventDecryptionResult): void {
         this.clearEvent = decryptionResult.clearEvent;
@@ -1037,13 +1038,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Change the visibility of an event, as per https://github.com/matrix-org/matrix-doc/pull/3531 .
      *
-     * @fires MatrixEvent#"Event.visibilityChange" if `visibilityEvent`
-     *   caused a change in the actual visibility of this event, either by making it
-     *   visible (if it was hidden), by making it hidden (if it was visible) or by
-     *   changing the reason (if it was hidden).
      * @param visibilityChange - event holding a hide/unhide payload, or nothing
      *   if the event is being reset to its original visibility (presumably
      *   by a visibility event being redacted).
+     *
+     * @remarks
+     * Fires {@link MatrixEventEvent.VisibilityChange} if `visibilityEvent`
+     *   caused a change in the actual visibility of this event, either by making it
+     *   visible (if it was hidden), by making it hidden (if it was visible) or by
+     *   changing the reason (if it was hidden).
      */
     public applyVisibilityEvent(visibilityChange?: IVisibilityChange): void {
         const visible = visibilityChange?.visible ?? true;
@@ -1315,9 +1318,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Set an event that replaces the content of this event, through an m.replace relation.
      *
-     * @fires MatrixEvent#"Event.replaced"
-     *
      * @param newEvent - the event with the replacing content, if any.
+     *
+     * @remarks
+     * Fires {@link MatrixEventEvent.Replaced}
      */
     public makeReplaced(newEvent?: MatrixEvent): void {
         // don't allow redacted events to be replaced.

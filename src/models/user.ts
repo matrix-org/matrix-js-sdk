@@ -78,9 +78,11 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * "User.avatarUrl" and/or "User.displayName" if this event updates this user's
      * properties.
      * @param event - The `m.presence` event.
-     * @fires UserEvent.Presence
-     * @fires UserEvent.DisplayName
-     * @fires UserEvent.AvatarUrl
+     *
+     * @remarks
+     * Fires {@link UserEvent.Presence}
+     * Fires {@link UserEvent.DisplayName}
+     * Fires {@link UserEvent.AvatarUrl}
      */
     public setPresenceEvent(event: MatrixEvent): void {
         if (event.getType() !== "m.presence") {

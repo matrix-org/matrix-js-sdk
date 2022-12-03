@@ -334,7 +334,6 @@ export function removeHiddenChars(str: string): string {
 
 /**
  * Removes the direction override characters from a string
- * @param input -
  * @returns string with chars removed
  */
 export function removeDirectionOverrideChars(str: string): string {

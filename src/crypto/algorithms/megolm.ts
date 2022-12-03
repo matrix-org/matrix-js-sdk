@@ -124,7 +124,7 @@ interface SharedWithData {
  *
  * @property {object} sharedWithDevices
  *    devices with which we have shared the session key
- *        userId -> {deviceId -> SharedWithData}
+ *        `userId -> {deviceId -> SharedWithData}`
  */
 class OutboundSessionInfo {
     public useCount = 0;
@@ -983,10 +983,6 @@ class MegolmEncryption extends EncryptionAlgorithm {
     }
 
     /**
-     * @inheritdoc
-     *
-     * @param room -
-     * @param eventType -
      * @param content - plaintext event content
      *
      * @returns Promise which resolves to the new event body
@@ -1202,7 +1198,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 /**
  * Megolm decryption implementation
  *
- * @param params - parameters, as per {@link algorithms/DecryptionAlgorithm}
+ * @param params - parameters, as per {@link DecryptionAlgorithm}
  */
 class MegolmDecryption extends DecryptionAlgorithm {
     // events which we couldn't decrypt due to unknown sessions /
@@ -1221,10 +1217,6 @@ class MegolmDecryption extends DecryptionAlgorithm {
     }
 
     /**
-     * @inheritdoc
-     *
-     * @param event -
-     *
      * returns a promise which resolves to a
      * {@link EventDecryptionResult} once we have finished
      * decrypting, or rejects with an `algorithms.DecryptionError` if there is a
@@ -1411,11 +1403,6 @@ class MegolmDecryption extends DecryptionAlgorithm {
         }
     }
 
-    /**
-     * @inheritdoc
-     *
-     * @param event - key event
-     */
     public async onRoomKeyEvent(event: MatrixEvent): Promise<void> {
         const content = event.getContent<Partial<IMessage["content"]>>();
         let senderKey = event.getSenderKey()!;
@@ -1592,8 +1579,6 @@ class MegolmDecryption extends DecryptionAlgorithm {
     }
 
     /**
-     * @inheritdoc
-     *
      * @param event - key event
      */
     public async onRoomKeyWithheldEvent(event: MatrixEvent): Promise<void> {
@@ -1678,9 +1663,6 @@ class MegolmDecryption extends DecryptionAlgorithm {
         }
     }
 
-    /**
-     * @inheritdoc
-     */
     public hasKeysForKeyRequest(keyRequest: IncomingRoomKeyRequest): Promise<boolean> {
         const body = keyRequest.requestBody;
 
@@ -1692,9 +1674,6 @@ class MegolmDecryption extends DecryptionAlgorithm {
         );
     }
 
-    /**
-     * @inheritdoc
-     */
     public shareKeysWithDevice(keyRequest: IncomingRoomKeyRequest): void {
         const userId = keyRequest.userId;
         const deviceId = keyRequest.deviceId;
@@ -1779,9 +1758,6 @@ class MegolmDecryption extends DecryptionAlgorithm {
     }
 
     /**
-     * @inheritdoc
-     *
-     * @param session -
      * @param opts - options for the import
      * @param [opts.untrusted] whether the key should be considered as untrusted
      * @param [opts.source] where the key came from

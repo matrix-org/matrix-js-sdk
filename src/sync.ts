@@ -797,9 +797,6 @@ export class SyncApi {
 
     /**
      * Invoke me to do /sync calls
-     * @param syncOptions -
-     * @param syncOptions -.filterId
-     * @param syncOptions -.hasSyncedBefore
      */
     private async doSync(syncOptions: ISyncOptions): Promise<void> {
         while (this.running) {

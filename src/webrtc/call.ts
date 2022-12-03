@@ -52,8 +52,6 @@ import { GroupCallUnknownDeviceError } from './groupCall';
 import { IScreensharingOpts } from "./mediaHandler";
 import { MatrixError } from "../http-api";
 
-// events: hangup, error(err), replaced(call), state(state, oldState)
-
 /**
  * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
  * <p>
