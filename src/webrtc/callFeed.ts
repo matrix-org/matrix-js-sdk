@@ -20,6 +20,7 @@ import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 import { logger } from "../logger";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
+import { CallEvent, CallState, MatrixCall } from "./call";
 
 const POLLING_INTERVAL = 200; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
@@ -40,6 +41,10 @@ export interface ICallFeedOpts {
      * Whether or not the remote SDPStreamMetadata says video is muted
      */
     videoMuted: boolean;
+    /**
+     * The MatrixCall which is the source of this CallFeed
+     */
+    call?: MatrixCall;
 }
 
 export enum CallFeedEvent {
@@ -47,6 +52,7 @@ export enum CallFeedEvent {
     MuteStateChanged = "mute_state_changed",
     LocalVolumeChanged = "local_volume_changed",
     VolumeChanged = "volume_changed",
+    ConnectedChanged = "connected_changed",
     Speaking = "speaking",
     Disposed = "disposed",
 }
@@ -56,6 +62,7 @@ type EventHandlerMap = {
     [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
+    [CallFeedEvent.ConnectedChanged]: (connected: boolean) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
     [CallFeedEvent.Disposed]: () => void;
 };
@@ -69,6 +76,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public speakingVolumeSamples: number[];
 
     private client: MatrixClient;
+    private call?: MatrixCall;
     private roomId?: string;
     private audioMuted: boolean;
     private videoMuted: boolean;
@@ -81,11 +89,13 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private speaking = false;
     private volumeLooperTimeout?: ReturnType<typeof setTimeout>;
     private _disposed = false;
+    private _connected = false;
 
     public constructor(opts: ICallFeedOpts) {
         super();
 
         this.client = opts.client;
+        this.call = opts.call;
         this.roomId = opts.roomId;
         this.userId = opts.userId;
         this.deviceId = opts.deviceId;
@@ -101,6 +111,21 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
         }
+
+        if (opts.call) {
+            opts.call.addListener(CallEvent.State, this.onCallState);
+            this.onCallState(opts.call.state);
+        }
+    }
+
+    public get connected(): boolean {
+        // Local feeds are always considered connected
+        return this.isLocal() || this._connected;
+    }
+
+    private set connected(connected: boolean) {
+        this._connected = connected;
+        this.emit(CallFeedEvent.ConnectedChanged, connected);
     }
 
     private get hasAudioTrack(): boolean {
@@ -143,6 +168,14 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     private onAddTrack = (): void => {
         this.emit(CallFeedEvent.NewStream, this.stream);
+    };
+
+    private onCallState = (state: CallState): void => {
+        if (state === CallState.Connected) {
+            this.connected = true;
+        } else if (state === CallState.Connecting) {
+            this.connected = false;
+        }
     };
 
     /**
@@ -297,6 +330,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public dispose(): void {
         clearTimeout(this.volumeLooperTimeout);
         this.stream?.removeEventListener("addtrack", this.onAddTrack);
+        this.call?.removeListener(CallEvent.State, this.onCallState);
         if (this.audioContext) {
             this.audioContext = undefined;
             this.analyser = undefined;

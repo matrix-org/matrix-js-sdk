@@ -656,6 +656,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.feeds.push(new CallFeed({
             client: this.client,
+            call: this,
             roomId: this.roomId,
             userId,
             deviceId: this.getOpponentDeviceId(),
@@ -699,6 +700,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.feeds.push(new CallFeed({
             client: this.client,
+            call: this,
             roomId: this.roomId,
             audioMuted: false,
             videoMuted: false,
