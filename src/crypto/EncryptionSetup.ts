@@ -61,7 +61,7 @@ export class EncryptionSetupBuilder {
      * @param {Object.<String, MatrixEvent>} accountData pre-existing account data, will only be read, not written.
      * @param {CryptoCallbacks} delegateCryptoCallbacks crypto callbacks to delegate to if the key isn't in cache yet
      */
-    constructor(accountData: Record<string, MatrixEvent>, delegateCryptoCallbacks?: ICryptoCallbacks) {
+    public constructor(accountData: Record<string, MatrixEvent>, delegateCryptoCallbacks?: ICryptoCallbacks) {
         this.accountDataClientAdapter = new AccountDataClientAdapter(accountData);
         this.crossSigningCallbacks = new CrossSigningCallbacks();
         this.ssssCryptoCallbacks = new SSSSCryptoCallbacks(delegateCryptoCallbacks);
@@ -192,7 +192,7 @@ export class EncryptionSetupOperation {
      * @param  {Object} keyBackupInfo
      * @param  {Object} keySignatures
      */
-    constructor(
+    public constructor(
         private readonly accountData: Map<string, object>,
         private readonly crossSigningKeys?: ICrossSigningKeys,
         private readonly keyBackupInfo?: IKeyBackupInfo,
@@ -272,7 +272,7 @@ class AccountDataClientAdapter
     /**
      * @param  {Object.<String, MatrixEvent>} existingValues existing account data
      */
-    constructor(private readonly existingValues: Record<string, MatrixEvent>) {
+    public constructor(private readonly existingValues: Record<string, MatrixEvent>) {
         super();
     }
 
@@ -342,7 +342,7 @@ class CrossSigningCallbacks implements ICryptoCallbacks, ICacheCallbacks {
         return Promise.resolve(this.privateKeys.get(type) ?? null);
     }
 
-    public saveCrossSigningKeys(privateKeys: Record<string, Uint8Array>) {
+    public saveCrossSigningKeys(privateKeys: Record<string, Uint8Array>): void {
         for (const [type, privateKey] of Object.entries(privateKeys)) {
             this.privateKeys.set(type, privateKey);
         }
@@ -356,7 +356,7 @@ class CrossSigningCallbacks implements ICryptoCallbacks, ICacheCallbacks {
 class SSSSCryptoCallbacks {
     private readonly privateKeys = new Map<string, Uint8Array>();
 
-    constructor(private readonly delegateCryptoCallbacks?: ICryptoCallbacks) {}
+    public constructor(private readonly delegateCryptoCallbacks?: ICryptoCallbacks) {}
 
     public async getSecretStorageKey(
         { keys }: { keys: Record<string, ISecretStorageKeyInfo> },

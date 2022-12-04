@@ -106,7 +106,7 @@ function getFilterName(userId: string, suffix?: string): string {
     return `FILTER_SYNC_${userId}` + (suffix ? "_" + suffix : "");
 }
 
-function debuglog(...params) {
+function debuglog(...params): void {
     if (!DEBUG) return;
     logger.log(...params);
 }
@@ -175,7 +175,7 @@ export class SyncApi {
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
 
-    constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
+    public constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
         this.opts.pollTimeout = this.opts.pollTimeout || (30 * 1000);
@@ -183,7 +183,7 @@ export class SyncApi {
         this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
         if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (roomId: string) => {
+            opts.canResetEntireTimeline = (roomId: string): boolean => {
                 return false;
             };
         }
@@ -554,7 +554,7 @@ export class SyncApi {
         return false;
     }
 
-    private getPushRules = async () => {
+    private getPushRules = async (): Promise<void> => {
         try {
             debuglog("Getting push rules...");
             const result = await this.client.getPushRules();
@@ -572,7 +572,7 @@ export class SyncApi {
         }
     };
 
-    private buildDefaultFilter = () => {
+    private buildDefaultFilter = (): Filter => {
         const filter = new Filter(this.client.credentials.userId);
         if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
             filter.setUnreadThreadNotifications(true);
@@ -580,7 +580,7 @@ export class SyncApi {
         return filter;
     };
 
-    private checkLazyLoadStatus = async () => {
+    private checkLazyLoadStatus = async (): Promise<void> => {
         debuglog("Checking lazy load status...");
         if (this.opts.lazyLoadMembers && this.client.isGuest()) {
             this.opts.lazyLoadMembers = false;
@@ -1362,6 +1362,18 @@ export class SyncApi {
                 }
             }
 
+            // process any crypto events *before* emitting the RoomStateEvent events. This
+            // avoids a race condition if the application tries to send a message after the
+            // state event is processed, but before crypto is enabled, which then causes the
+            // crypto layer to complain.
+            if (this.opts.crypto) {
+                for (const e of stateEvents.concat(events)) {
+                    if (e.isState() && e.getType() === EventType.RoomEncryption && e.getStateKey() === "") {
+                        await this.opts.crypto.onCryptoEvent(room, e);
+                    }
+                }
+            }
+
             try {
                 await this.injectRoomEvents(room, stateEvents, events, syncEventData.fromCache);
             } catch (e) {
@@ -1389,21 +1401,11 @@ export class SyncApi {
 
             this.processEventsForNotifs(room, events);
 
-            const processRoomEvent = async (e) => {
-                client.emit(ClientEvent.Event, e);
-                if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
-                    await this.opts.crypto.onCryptoEvent(e);
-                }
-            };
-
-            await utils.promiseMapSeries(stateEvents, processRoomEvent);
-            await utils.promiseMapSeries(events, processRoomEvent);
-            ephemeralEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
-            accountDataEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
+            const emitEvent = (e: MatrixEvent): boolean => client.emit(ClientEvent.Event, e);
+            stateEvents.forEach(emitEvent);
+            events.forEach(emitEvent);
+            ephemeralEvents.forEach(emitEvent);
+            accountDataEvents.forEach(emitEvent);
 
             // Decrypt only the last message in all rooms to make sure we can generate a preview
             // And decrypt all events after the recorded read receipt to ensure an accurate
@@ -1521,7 +1523,7 @@ export class SyncApi {
      * @param {boolean} connDidFail True if a connectivity failure has been detected. Optional.
      */
     private pokeKeepAlive(connDidFail = false): void {
-        const success = () => {
+        const success = (): void => {
             clearTimeout(this.keepAliveTimer);
             if (this.connectionReturnedDefer) {
                 this.connectionReturnedDefer.resolve(connDidFail);

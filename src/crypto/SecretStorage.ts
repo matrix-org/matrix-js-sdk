@@ -78,7 +78,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     // as you don't request any secrets.
     // A better solution would probably be to split this class up into secret storage and
     // secret sharing which are really two separate things, even though they share an MSC.
-    constructor(
+    public constructor(
         private readonly accountDataAdapter: IAccountDataClient,
         private readonly cryptoCallbacks: ICryptoCallbacks,
         private readonly baseApis: B,
@@ -381,7 +381,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
         const deferred = defer<string>();
         this.requests.set(requestId, { name, devices, deferred });
 
-        const cancel = (reason: string) => {
+        const cancel = (reason: string): void => {
             // send cancellation event
             const cancelData = {
                 action: "request_cancellation",

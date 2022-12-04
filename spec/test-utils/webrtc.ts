@@ -360,7 +360,7 @@ export class MockMediaDevices {
         Promise.resolve(new MockMediaStream("local_stream").typed()),
     );
 
-    public getDisplayMedia = jest.fn<Promise<MediaStream>, [DisplayMediaStreamConstraints]>().mockReturnValue(
+    public getDisplayMedia = jest.fn<Promise<MediaStream>, [MediaStreamConstraints]>().mockReturnValue(
         Promise.resolve(new MockMediaStream("local_display_stream").typed()),
     );
 
@@ -431,6 +431,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 export class MockCallFeed {
     constructor(
         public userId: string,
+        public deviceId: string | undefined,
         public stream: MockMediaStream,
     ) {}
 

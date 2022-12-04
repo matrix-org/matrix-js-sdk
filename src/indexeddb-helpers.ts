@@ -26,13 +26,13 @@ export function exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> 
     return new Promise<boolean>((resolve, reject) => {
         let exists = true;
         const req = indexedDB.open(dbName);
-        req.onupgradeneeded = () => {
+        req.onupgradeneeded = (): void => {
             // Since we did not provide an explicit version when opening, this event
             // should only fire if the DB did not exist before at any version.
             exists = false;
         };
-        req.onblocked = () => reject(req.error);
-        req.onsuccess = () => {
+        req.onblocked = (): void => reject(req.error);
+        req.onsuccess = (): void => {
             const db = req.result;
             db.close();
             if (!exists) {
@@ -45,6 +45,6 @@ export function exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> 
             }
             resolve(exists);
         };
-        req.onerror = ev => reject(req.error);
+        req.onerror = (): void => reject(req.error);
     });
 }

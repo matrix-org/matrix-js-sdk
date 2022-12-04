@@ -177,13 +177,13 @@ export class OlmDevice {
     // Used by olm to serialise prekey message decryptions
     public olmPrekeyPromise: Promise<any> = Promise.resolve(); // set by consumers
 
-    constructor(private readonly cryptoStore: CryptoStore) {
+    public constructor(private readonly cryptoStore: CryptoStore) {
     }
 
     /**
      * @return {array} The version of Olm.
      */
-    static getOlmVersion(): [number, number, number] {
+    public static getOlmVersion(): [number, number, number] {
         return global.Olm.get_library_version();
     }
 
@@ -916,6 +916,7 @@ export class OlmDevice {
     }
 
     public async recordSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
+        logger.info(`Recording problem on olm session with ${deviceKey} of type ${type}. Recreating: ${fixed}`);
         await this.cryptoStore.storeEndToEndSessionProblem(deviceKey, type, fixed);
     }
 
@@ -1139,17 +1140,14 @@ export class OlmDevice {
                         }
 
                         if (existingSession) {
-                            logger.log(
-                                "Update for megolm session "
-                                + senderKey + "/" + sessionId,
-                            );
+                            logger.log(`Update for megolm session ${senderKey}|${sessionId}`);
                             if (existingSession.first_known_index() <= session.first_known_index()) {
                                 if (!existingSessionData!.untrusted || extraSessionData.untrusted) {
                                     // existing session has less-than-or-equal index
                                     // (i.e. can decrypt at least as much), and the
                                     // new session's trust does not win over the old
                                     // session's trust, so keep it
-                                    logger.log(`Keeping existing megolm session ${sessionId}`);
+                                    logger.log(`Keeping existing megolm session ${senderKey}|${sessionId}`);
                                     return;
                                 }
                                 if (existingSession.first_known_index() < session.first_known_index()) {
@@ -1164,7 +1162,7 @@ export class OlmDevice {
                                     ) {
                                         logger.info(
                                             "Upgrading trust of existing megolm session " +
-                                            sessionId + " based on newly-received trusted session",
+                                            `${senderKey}|${sessionId} based on newly-received trusted session`,
                                         );
                                         existingSessionData!.untrusted = false;
                                         this.cryptoStore.storeEndToEndInboundGroupSession(
@@ -1172,7 +1170,7 @@ export class OlmDevice {
                                         );
                                     } else {
                                         logger.warn(
-                                            "Newly-received megolm session " + sessionId +
+                                            `Newly-received megolm session ${senderKey}|$sessionId}` +
                                             " does not match existing session! Keeping existing session",
                                         );
                                     }
@@ -1183,8 +1181,8 @@ export class OlmDevice {
                         }
 
                         logger.info(
-                            "Storing megolm session " + senderKey + "/" + sessionId +
-                            " with first index " + session.first_known_index(),
+                            `Storing megolm session ${senderKey}|${sessionId} with first index `+
+                            session.first_known_index(),
                         );
 
                         const sessionData = Object.assign({}, extraSessionData, {
@@ -1517,7 +1515,9 @@ export class OlmDevice {
         });
     }
 
-    async getSharedHistoryInboundGroupSessions(roomId: string): Promise<[senderKey: string, sessionId: string][]> {
+    public async getSharedHistoryInboundGroupSessions(
+        roomId: string,
+    ): Promise<[senderKey: string, sessionId: string][]> {
         let result: Promise<[senderKey: string, sessionId: string][]>;
         await this.cryptoStore.doTxn(
             'readonly', [

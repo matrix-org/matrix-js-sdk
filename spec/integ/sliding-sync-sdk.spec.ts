@@ -542,6 +542,7 @@ describe("SlidingSyncSdk", () => {
 
     describe("ExtensionE2EE", () => {
         let ext: Extension;
+
         beforeAll(async () => {
             await setupClient({
                 withCrypto: true,
@@ -551,18 +552,21 @@ describe("SlidingSyncSdk", () => {
             await hasSynced;
             ext = findExtension("e2ee");
         });
+
         afterAll(async () => {
             // needed else we do some async operations in the background which can cause Jest to whine:
             // "Cannot log after tests are done. Did you forget to wait for something async in your test?"
             // Attempted to log "Saving device tracking data null"."
             client!.crypto!.stop();
         });
+
         it("gets enabled on the initial request only", () => {
             expect(ext.onRequest(true)).toEqual({
                 enabled: true,
             });
             expect(ext.onRequest(false)).toEqual(undefined);
         });
+
         it("can update device lists", () => {
             ext.onResponse({
                 device_lists: {
@@ -572,6 +576,7 @@ describe("SlidingSyncSdk", () => {
             });
             // TODO: more assertions?
         });
+
         it("can update OTK counts", () => {
             client!.crypto!.updateOneTimeKeyCount = jest.fn();
             ext.onResponse({
@@ -588,6 +593,7 @@ describe("SlidingSyncSdk", () => {
             });
             expect(client!.crypto!.updateOneTimeKeyCount).toHaveBeenCalledWith(0);
         });
+
         it("can update fallback keys", () => {
             ext.onResponse({
                 device_unused_fallback_key_types: ["signed_curve25519"],
@@ -599,8 +605,10 @@ describe("SlidingSyncSdk", () => {
             expect(client!.crypto!.getNeedsNewFallback()).toEqual(true);
         });
     });
+
     describe("ExtensionAccountData", () => {
         let ext: Extension;
+
         beforeAll(async () => {
             await setupClient();
             const hasSynced = sdk!.sync();
@@ -608,12 +616,14 @@ describe("SlidingSyncSdk", () => {
             await hasSynced;
             ext = findExtension("account_data");
         });
+
         it("gets enabled on the initial request only", () => {
             expect(ext.onRequest(true)).toEqual({
                 enabled: true,
             });
             expect(ext.onRequest(false)).toEqual(undefined);
         });
+
         it("processes global account data", async () => {
             const globalType = "global_test";
             const globalContent = {
@@ -633,6 +643,7 @@ describe("SlidingSyncSdk", () => {
             expect(globalData).toBeDefined();
             expect(globalData.getContent()).toEqual(globalContent);
         });
+
         it("processes rooms account data", async () => {
             const roomId = "!room:id";
             mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
@@ -667,6 +678,7 @@ describe("SlidingSyncSdk", () => {
             expect(event).toBeDefined();
             expect(event.getContent()).toEqual(roomContent);
         });
+
         it("doesn't crash for unknown room account data", async () => {
             const unknownRoomId = "!unknown:id";
             const roomType = "tester";
@@ -686,6 +698,7 @@ describe("SlidingSyncSdk", () => {
             expect(room).toBeNull();
             expect(client!.getAccountData(roomType)).toBeUndefined();
         });
+
         it("can update push rules via account data", async () => {
             const roomId = "!foo:bar";
             const pushRulesContent: IPushRules = {
@@ -718,8 +731,10 @@ describe("SlidingSyncSdk", () => {
             expect(pushRule).toEqual(pushRulesContent.global[PushRuleKind.RoomSpecific]![0]);
         });
     });
+
     describe("ExtensionToDevice", () => {
         let ext: Extension;
+
         beforeAll(async () => {
             await setupClient();
             const hasSynced = sdk!.sync();
@@ -727,12 +742,14 @@ describe("SlidingSyncSdk", () => {
             await hasSynced;
             ext = findExtension("to_device");
         });
+
         it("gets enabled with a limit on the initial request only", () => {
             const reqJson: any = ext.onRequest(true);
             expect(reqJson.enabled).toEqual(true);
             expect(reqJson.limit).toBeGreaterThan(0);
             expect(reqJson.since).toBeUndefined();
         });
+
         it("updates the since value", async () => {
             ext.onResponse({
                 next_batch: "12345",
@@ -742,12 +759,14 @@ describe("SlidingSyncSdk", () => {
                 since: "12345",
             });
         });
+
         it("can handle missing fields", async () => {
             ext.onResponse({
                 next_batch: "23456",
                 // no events array
             });
         });
+
         it("emits to-device events on the client", async () => {
             const toDeviceType = "custom_test";
             const toDeviceContent = {
@@ -770,6 +789,7 @@ describe("SlidingSyncSdk", () => {
             });
             expect(called).toBe(true);
         });
+
         it("can cancel key verification requests", async () => {
             const seen: Record<string, boolean> = {};
             client!.on(ClientEvent.ToDeviceEvent, (ev) => {
@@ -807,6 +827,191 @@ describe("SlidingSyncSdk", () => {
                     },
                 ],
             });
+        });
+    });
+
+    describe("ExtensionTyping", () => {
+        let ext: Extension;
+
+        beforeAll(async () => {
+            await setupClient();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("typing");
+        });
+
+        it("gets enabled on the initial request only", () => {
+            expect(ext.onRequest(true)).toEqual({
+                enabled: true,
+            });
+            expect(ext.onRequest(false)).toEqual(undefined);
+        });
+
+        it("processes typing notifications", async () => {
+            const roomId = "!room:id";
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with typing",
+                required_state: [],
+                timeline: [
+                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
+                ],
+                initial: true,
+            });
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeDefined();
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+            ext.onResponse({
+                rooms: {
+                    [roomId]: {
+                        type: EventType.Typing,
+                        content: {
+                            user_ids: [selfUserId],
+                        },
+                    },
+                },
+            });
+            expect(room.getMember(selfUserId)?.typing).toEqual(true);
+            ext.onResponse({
+                rooms: {
+                    [roomId]: {
+                        type: EventType.Typing,
+                        content: {
+                            user_ids: [],
+                        },
+                    },
+                },
+            });
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+        });
+
+        it("gracefully handles missing rooms and members when typing", async () => {
+            const roomId = "!room:id";
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with typing",
+                required_state: [],
+                timeline: [
+                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    mkOwnEvent(EventType.RoomMessage, { body: "hello" }),
+                ],
+                initial: true,
+            });
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeDefined();
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+            ext.onResponse({
+                rooms: {
+                    [roomId]: {
+                        type: EventType.Typing,
+                        content: {
+                            user_ids: ["@someone:else"],
+                        },
+                    },
+                },
+            });
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+            ext.onResponse({
+                rooms: {
+                    "!something:else": {
+                        type: EventType.Typing,
+                        content: {
+                            user_ids: [selfUserId],
+                        },
+                    },
+                },
+            });
+            expect(room.getMember(selfUserId)?.typing).toEqual(false);
+        });
+    });
+
+    describe("ExtensionReceipts", () => {
+        let ext: Extension;
+
+        const generateReceiptResponse = (
+            userId: string, roomId: string, eventId: string, recType: string, ts: number,
+        ) => {
+            return {
+                rooms: {
+                    [roomId]: {
+                        type: EventType.Receipt,
+                        content: {
+                            [eventId]: {
+                                [recType]: {
+                                    [userId]: {
+                                        ts: ts,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            };
+        };
+
+        beforeAll(async () => {
+            await setupClient();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("receipts");
+        });
+
+        it("gets enabled on the initial request only", () => {
+            expect(ext.onRequest(true)).toEqual({
+                enabled: true,
+            });
+            expect(ext.onRequest(false)).toEqual(undefined);
+        });
+
+        it("processes receipts", async () => {
+            const roomId = "!room:id";
+            const alice = "@alice:alice";
+            const lastEvent = mkOwnEvent(EventType.RoomMessage, { body: "hello" });
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with receipts",
+                required_state: [],
+                timeline: [
+                    mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                    {
+                        type: EventType.RoomMember,
+                        state_key: alice,
+                        content: { membership: "join" },
+                        sender: alice,
+                        origin_server_ts: Date.now(),
+                        event_id: "$alice",
+                    },
+                    lastEvent,
+                ],
+                initial: true,
+            });
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeDefined();
+            expect(room.getReadReceiptForUserId(alice, true)).toBeNull();
+            ext.onResponse(
+                generateReceiptResponse(alice, roomId, lastEvent.event_id, "m.read", 1234567),
+            );
+            const receipt = room.getReadReceiptForUserId(alice);
+            expect(receipt).toBeDefined();
+            expect(receipt?.eventId).toEqual(lastEvent.event_id);
+            expect(receipt?.data.ts).toEqual(1234567);
+            expect(receipt?.data.thread_id).toBeFalsy();
+        });
+
+        it("gracefully handles missing rooms when receiving receipts", async () => {
+            const roomId = "!room:id";
+            const alice = "@alice:alice";
+            const eventId = "$something";
+            ext.onResponse(
+                generateReceiptResponse(alice, roomId, eventId, "m.read", 1234567),
+            );
+            // we expect it not to crash
         });
     });
 });

@@ -102,7 +102,7 @@ export class OutgoingRoomKeyRequestManager {
 
     private clientRunning = true;
 
-    constructor(
+    public constructor(
         private readonly baseApis: MatrixClient,
         private readonly deviceId: string,
         private readonly cryptoStore: CryptoStore,
@@ -352,7 +352,7 @@ export class OutgoingRoomKeyRequestManager {
             return;
         }
 
-        const startSendingOutgoingRoomKeyRequests = () => {
+        const startSendingOutgoingRoomKeyRequests = (): void => {
             if (this.sendOutgoingRoomKeyRequestsRunning) {
                 throw new Error("RoomKeyRequestSend already in progress!");
             }

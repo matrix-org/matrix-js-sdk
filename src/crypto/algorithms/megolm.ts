@@ -136,7 +136,7 @@ class OutboundSessionInfo {
     public sharedWithDevices: Record<string, Record<string, SharedWithData>> = {};
     public blockedDevicesNotified: Record<string, Record<string, boolean>> = {};
 
-    constructor(public readonly sessionId: string, public readonly sharedHistory = false) {
+    public constructor(public readonly sessionId: string, public readonly sharedHistory = false) {
         this.creationTime = new Date().getTime();
     }
 
@@ -248,7 +248,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
     protected readonly roomId: string;
 
-    constructor(params: IParams & Required<Pick<IParams, "roomId">>) {
+    public constructor(params: IParams & Required<Pick<IParams, "roomId">>) {
         super(params);
         this.roomId = params.roomId;
 
@@ -347,7 +347,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         singleOlmCreationPhase: boolean,
         blocked: IBlockedMap,
         session: OutboundSessionInfo,
-    ) {
+    ): Promise<void> {
         // now check if we need to share with any devices
         const shareMap: Record<string, DeviceInfo[]> = {};
 
@@ -386,13 +386,13 @@ class MegolmEncryption extends EncryptionAlgorithm {
         );
 
         await Promise.all([
-            (async () => {
+            (async (): Promise<void> => {
                 // share keys with devices that we already have a session for
                 logger.debug(`Sharing keys with existing Olm sessions in ${this.roomId}`, olmSessions);
                 await this.shareKeyWithOlmSessions(session, key, payload, olmSessions);
                 logger.debug(`Shared keys with existing Olm sessions in ${this.roomId}`);
             })(),
-            (async () => {
+            (async (): Promise<void> => {
                 logger.debug(
                     `Sharing keys (start phase 1) with new Olm sessions in ${this.roomId}`,
                     devicesWithoutSession,
@@ -415,7 +415,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 if (!singleOlmCreationPhase && (Date.now() - start < 10000)) {
                     // perform the second phase of olm session creation if requested,
                     // and if the first phase didn't take too long
-                    (async () => {
+                    (async (): Promise<void> => {
                         // Retry sending keys to devices that we were unable to establish
                         // an olm session for.  This time, we use a longer timeout, but we
                         // do this in the background and don't block anything else while we
@@ -452,7 +452,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 }
                 logger.debug(`Shared keys (all phases done) with new Olm sessions in ${this.roomId}`);
             })(),
-            (async () => {
+            (async (): Promise<void> => {
                 logger.debug(`There are ${Object.entries(blocked).length} blocked devices in ${this.roomId}`,
                     Object.entries(blocked));
 
@@ -696,28 +696,27 @@ class MegolmEncryption extends EncryptionAlgorithm {
     ): Promise<void> {
         const obSessionInfo = this.outboundSessions[sessionId];
         if (!obSessionInfo) {
-            logger.debug(`megolm session ${sessionId} not found: not re-sharing keys`);
+            logger.debug(`megolm session ${senderKey}|${sessionId} not found: not re-sharing keys`);
             return;
         }
 
         // The chain index of the key we previously sent this device
         if (obSessionInfo.sharedWithDevices[userId] === undefined) {
-            logger.debug(`megolm session ${sessionId} never shared with user ${userId}`);
+            logger.debug(`megolm session ${senderKey}|${sessionId} never shared with user ${userId}`);
             return;
         }
         const sessionSharedData = obSessionInfo.sharedWithDevices[userId][device.deviceId];
         if (sessionSharedData === undefined) {
             logger.debug(
-                "megolm session ID " + sessionId + " never shared with device " +
-                userId + ":" + device.deviceId,
+                `megolm session ${senderKey}|${sessionId} never shared with device ${userId}:${device.deviceId}`,
             );
             return;
         }
 
         if (sessionSharedData.deviceKey !== device.getIdentityKey()) {
             logger.warn(
-                `Session has been shared with device ${device.deviceId} but with identity ` +
-                `key ${sessionSharedData.deviceKey}. Key is now ${device.getIdentityKey()}!`,
+                `Megolm session ${senderKey}|${sessionId} has been shared with device ${device.deviceId} but ` +
+                `with identity key ${sessionSharedData.deviceKey}. Key is now ${device.getIdentityKey()}!`,
             );
             return;
         }
@@ -730,7 +729,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         if (!key) {
             logger.warn(
-                `No inbound session key found for megolm ${sessionId}: not re-sharing keys`,
+                `No inbound session key found for megolm session ${senderKey}|${sessionId}: not re-sharing keys`,
             );
             return;
         }
@@ -776,7 +775,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
                 [device.deviceId]: encryptedContent,
             },
         });
-        logger.debug(`Re-shared key for megolm session ${sessionId} with ${userId}:${device.deviceId}`);
+        logger.debug(`Re-shared key for megolm session ${senderKey}|${sessionId} with ${userId}:${device.deviceId}`);
     }
 
     /**
@@ -810,7 +809,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         errorDevices: IOlmDevice[],
         otkTimeout: number,
         failedServers?: string[],
-    ) {
+    ): Promise<void> {
         logger.debug(`Ensuring Olm sessions for devices in ${this.roomId}`);
         const devicemap = await olmlib.ensureOlmSessionsForDevices(
             this.olmDevice, this.baseApis, devicesByUser, false, otkTimeout, failedServers,
@@ -970,7 +969,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
 
         this.encryptionPreparation = {
             startTime: Date.now(),
-            promise: (async () => {
+            promise: (async (): Promise<void> => {
                 try {
                     logger.debug(`Getting devices in ${this.roomId}`);
                     const [devicesInRoom, blocked] = await this.getDevicesInRoom(room);
@@ -1232,7 +1231,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
 
     protected readonly roomId: string;
 
-    constructor(params: DecryptionClassParams<IParams & Required<Pick<IParams, "roomId">>>) {
+    public constructor(params: DecryptionClassParams<IParams & Required<Pick<IParams, "roomId">>>) {
         super(params);
         this.roomId = params.roomId;
     }
@@ -1312,6 +1311,10 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 content.sender_key, event.getTs() - 120000,
             );
             if (problem) {
+                logger.info(
+                    `When handling UISI from ${event.getSender()} (sender key ${content.sender_key}): ` +
+                    `recent session problem with that sender: ${problem}`,
+                );
                 let problemDescription = PROBLEM_DESCRIPTIONS[problem.type as "no_olm"] || PROBLEM_DESCRIPTIONS.unknown;
                 if (problem.fixed) {
                     problemDescription +=
@@ -1902,10 +1905,11 @@ class MegolmDecryption extends DecryptionAlgorithm {
     public async sendSharedHistoryInboundSessions(devicesByUser: Record<string, DeviceInfo[]>): Promise<void> {
         await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, devicesByUser);
 
-        logger.log("sendSharedHistoryInboundSessions to users", Object.keys(devicesByUser));
-
         const sharedHistorySessions = await this.olmDevice.getSharedHistoryInboundGroupSessions(this.roomId);
-        logger.log("shared-history sessions", sharedHistorySessions);
+        logger.log(
+            `Sharing history in ${this.roomId} with users ${Object.keys(devicesByUser)}`,
+            sharedHistorySessions.map(([senderKey, sessionId]) => `${senderKey}|${sessionId}`),
+        );
         for (const [senderKey, sessionId] of sharedHistorySessions) {
             const payload = await this.buildKeyForwardingMessage(this.roomId, senderKey, sessionId);
 

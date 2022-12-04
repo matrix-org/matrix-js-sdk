@@ -31,7 +31,7 @@ import { MatrixEvent } from "./models/event";
  * @param {string} keyNesting
  * @param {*} val
  */
-function setProp(obj: object, keyNesting: string, val: any) {
+function setProp(obj: object, keyNesting: string, val: any): void {
     const nestedKeys = keyNesting.split(".");
     let currentObj = obj;
     for (let i = 0; i < (nestedKeys.length - 1); i++) {
@@ -88,7 +88,7 @@ interface IRoomFilter {
  * @prop {?string} filterId The filter ID
  */
 export class Filter {
-    static LAZY_LOADING_MESSAGES_FILTER = {
+    public static LAZY_LOADING_MESSAGES_FILTER = {
         lazy_load_members: true,
     };
 
@@ -110,7 +110,7 @@ export class Filter {
     private roomFilter?: FilterComponent;
     private roomTimelineFilter?: FilterComponent;
 
-    constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
+    public constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
 
     /**
      * Get the ID of this filter on your homeserver (if known)
@@ -132,7 +132,7 @@ export class Filter {
      * Set the JSON body of the filter
      * @param {Object} definition The filter definition
      */
-    public setDefinition(definition: IFilterDefinition) {
+    public setDefinition(definition: IFilterDefinition): void {
         this.definition = definition;
 
         // This is all ported from synapse's FilterCollection()
@@ -225,7 +225,7 @@ export class Filter {
      * Set the max number of events to return for each room's timeline.
      * @param {Number} limit The max number of events to return for each room.
      */
-    public setTimelineLimit(limit: number) {
+    public setTimelineLimit(limit: number): void {
         setProp(this.definition, "room.timeline.limit", limit);
     }
 
@@ -255,7 +255,7 @@ export class Filter {
      * @param {boolean} includeLeave True to make rooms the user has left appear
      * in responses.
      */
-    public setIncludeLeaveRooms(includeLeave: boolean) {
+    public setIncludeLeaveRooms(includeLeave: boolean): void {
         setProp(this.definition, "room.include_leave", includeLeave);
     }
 }

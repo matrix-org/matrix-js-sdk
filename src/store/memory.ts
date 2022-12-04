@@ -69,7 +69,7 @@ export class MemoryStore implements IStore {
     private pendingToDeviceBatches: IndexedToDeviceBatch[] = [];
     private nextToDeviceBatchId = 0;
 
-    constructor(opts: IOpts = {}) {
+    public constructor(opts: IOpts = {}) {
         this.localStorage = opts.localStorage;
     }
 
@@ -90,7 +90,7 @@ export class MemoryStore implements IStore {
      * Set the token to stream from.
      * @param {string} token The token to stream from.
      */
-    public setSyncToken(token: string) {
+    public setSyncToken(token: string): void {
         this.syncToken = token;
     }
 
@@ -98,7 +98,7 @@ export class MemoryStore implements IStore {
      * Store the given room.
      * @param {Room} room The room to be stored. All properties must be stored.
      */
-    public storeRoom(room: Room) {
+    public storeRoom(room: Room): void {
         this.rooms[room.roomId] = room;
         // add listeners for room member changes so we can keep the room member
         // map up-to-date.
@@ -116,7 +116,7 @@ export class MemoryStore implements IStore {
      * @param {RoomState} state
      * @param {RoomMember} member
      */
-    private onRoomMember = (event: MatrixEvent | null, state: RoomState, member: RoomMember) => {
+    private onRoomMember = (event: MatrixEvent | null, state: RoomState, member: RoomMember): void => {
         if (member.membership === "invite") {
             // We do NOT add invited members because people love to typo user IDs
             // which would then show up in these lists (!)
@@ -217,7 +217,7 @@ export class MemoryStore implements IStore {
      * @param {string} token The token associated with these events.
      * @param {boolean} toStart True if these are paginated results.
      */
-    public storeEvents(room: Room, events: MatrixEvent[], token: string, toStart: boolean) {
+    public storeEvents(room: Room, events: MatrixEvent[], token: string, toStart: boolean): void {
         // no-op because they've already been added to the room instance.
     }
 
@@ -275,7 +275,7 @@ export class MemoryStore implements IStore {
      * @param {string} filterName
      * @param {string} filterId
      */
-    public setFilterIdByName(filterName: string, filterId?: string) {
+    public setFilterIdByName(filterName: string, filterId?: string): void {
         if (!this.localStorage) {
             return;
         }

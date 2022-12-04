@@ -282,7 +282,7 @@ const SFU_KEEP_ALIVE_INTERVAL = 30 * 1000; // 30 seconds
 export class CallError extends Error {
     public readonly code: string;
 
-    constructor(code: CallErrorCode, msg: string, err: Error) {
+    public constructor(code: CallErrorCode, msg: string, err: Error) {
         // Still don't think there's any way to have proper nested errors
         super(msg + ": " + err);
 
@@ -423,7 +423,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public groupCallId?: string;
     public dataChannel?: RTCDataChannel;
 
-    constructor(opts: CallOpts) {
+    public constructor(opts: CallOpts) {
         super();
 
         this.roomId = opts.roomId;
@@ -472,7 +472,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param label A human readable label for this datachannel
      * @param options An object providing configuration options for the data channel.
      */
-    public createDataChannel(label: string, options: RTCDataChannelInit | undefined) {
+    public createDataChannel(label: string, options: RTCDataChannelInit | undefined): RTCDataChannel {
         const dataChannel = this.peerConn!.createDataChannel(label, options);
         this.setupDataChannel(dataChannel);
         return dataChannel;
@@ -480,6 +480,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public getOpponentMember(): RoomMember | undefined {
         return this.opponentMember;
+    }
+
+    public getOpponentDeviceId(): string | undefined {
+        return this.opponentDeviceId;
     }
 
     public getOpponentSessionId(): string | undefined {
@@ -667,6 +671,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
 
         const userId = metadata.user_id;
+        const deviceId = metadata.device_id;
         const purpose = metadata.purpose;
         const audioMuted = metadata.audio_muted;
         const videoMuted = metadata.video_muted;
@@ -686,6 +691,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             client: this.client,
             roomId: this.roomId,
             userId,
+            deviceId,
             stream,
             purpose,
             audioMuted,
@@ -734,6 +740,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             audioMuted: false,
             videoMuted: false,
             userId,
+            deviceId: this.getOpponentDeviceId(),
             stream,
             purpose,
         }));
@@ -764,6 +771,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 audioMuted: false,
                 videoMuted: false,
                 userId,
+                deviceId: this.getOpponentDeviceId(),
                 stream,
                 purpose,
             }),
@@ -1017,7 +1025,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 }
             }, invite.lifetime - event.getLocalAge());
 
-            const onState = (state: CallState) => {
+            const onState = (state: CallState): void => {
                 if (state !== CallState.Ringing) {
                     clearTimeout(ringingTimer);
                     this.off(CallEvent.State, onState);
@@ -1088,6 +1096,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     client: this.client,
                     roomId: this.roomId,
                     userId: this.client.getUserId()!,
+                    deviceId: this.client.getDeviceId() ?? undefined,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
                     audioMuted: false,
@@ -1158,7 +1167,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         logger.debug(`Ending call ${this.callId} with reason ${reason}`);
         this.terminate(CallParty.Local, reason, !suppressEvent);
         // We don't want to send hangup here if we didn't even get to sending an invite
-        if (this.state === CallState.WaitLocalMedia) return;
+        if ([CallState.Fledgling, CallState.WaitLocalMedia].includes(this.state)) return;
         const content = {};
         // Don't send UserHangup reason to older clients
         if ((this.opponentVersion && this.opponentVersion !== 0) || reason !== CallErrorCode.UserHangup) {
@@ -2324,7 +2333,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.pushRemoteFeed(stream);
 
         if (!this.removeTrackListeners.has(stream)) {
-            const onRemoveTrack = () => {
+            const onRemoveTrack = (): void => {
                 if (stream.getTracks().length === 0) {
                     logger.info(`Call ${this.callId} removing track streamId: ${stream.id}`);
                     this.deleteFeedByStream(stream);
@@ -2804,6 +2813,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 client: this.client,
                 roomId: this.roomId,
                 userId: this.client.getUserId()!,
+                deviceId: this.client.getDeviceId() ?? undefined,
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,

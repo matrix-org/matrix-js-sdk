@@ -100,7 +100,7 @@ class NoAuthFlowFoundError extends Error {
     public name = "NoAuthFlowFoundError";
 
     // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-    constructor(m: string, public readonly required_stages: string[], public readonly flows: IFlow[]) {
+    public constructor(m: string, public readonly required_stages: string[], public readonly flows: IFlow[]) {
         super(m);
     }
 }
@@ -218,7 +218,7 @@ export class InteractiveAuth {
     // the promise the will resolve/reject when it completes
     private submitPromise: Promise<void> | null = null;
 
-    constructor(opts: IOpts) {
+    public constructor(opts: IOpts) {
         this.matrixClient = opts.matrixClient;
         this.data = opts.authData || {};
         this.requestCallback = opts.doRequest;
@@ -419,7 +419,7 @@ export class InteractiveAuth {
     /**
      * Requests a new email token and sets the email sid for the validation session
      */
-    public requestEmailToken = async () => {
+    public requestEmailToken = async (): Promise<void> => {
         if (!this.requestingEmailToken) {
             logger.trace("Requesting email token. Attempt: " + this.emailAttempt);
             // If we've picked a flow with email auth, we send the email
