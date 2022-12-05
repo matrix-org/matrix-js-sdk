@@ -2299,6 +2299,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Checks if the user has previously published cross-signing keys
+     *
+     * This means downloading the devicelist for the user and checking if the list includes
+     * the cross-signing pseudo-device.
+     */
+    public userHasCrossSigningKeys(): Promise<boolean> {
+        if (!this.crypto) {
+            throw new Error("End-to-end encryption disabled");
+        }
+        return this.crypto.userHasCrossSigningKeys();
+    }
+
+    /**
      * Checks whether cross signing:
      * - is enabled on this account and trusted by this device
      * - has private keys either cached locally or stored in secret storage
