@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { EventEmitter } from "stream";
+
 import {
     ClientEvent,
     ClientEventHandlerMap,
@@ -26,6 +28,7 @@ import {
     MatrixClient,
     MatrixEvent,
     Room,
+    RoomMember,
     RoomState,
     RoomStateEvent,
     RoomStateEventHandlerMap,
@@ -33,7 +36,7 @@ import {
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 import { ReEmitter } from "../../src/ReEmitter";
 import { SyncState } from "../../src/sync";
-import { CallEvent, CallEventHandlerMap, MatrixCall } from "../../src/webrtc/call";
+import { CallEvent, CallEventHandlerMap, CallState, MatrixCall } from "../../src/webrtc/call";
 import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "../../src/webrtc/callEventHandler";
 import { CallFeed } from "../../src/webrtc/callFeed";
 import { GroupCallEventHandlerMap } from "../../src/webrtc/groupCall";
@@ -82,6 +85,17 @@ export const DUMMY_SDP = (
 
 export const USERMEDIA_STREAM_ID = "mock_stream_from_media_handler";
 export const SCREENSHARE_STREAM_ID = "mock_screen_stream_from_media_handler";
+
+export const FAKE_ROOM_ID = "!fake:test.dummy";
+export const FAKE_CONF_ID = "fakegroupcallid";
+
+export const FAKE_USER_ID_1 = "@alice:test.dummy";
+export const FAKE_DEVICE_ID_1 = "@AAAAAA";
+export const FAKE_SESSION_ID_1 = "alice1";
+export const FAKE_USER_ID_2 = "@bob:test.dummy";
+export const FAKE_DEVICE_ID_2 = "@BBBBBB";
+export const FAKE_SESSION_ID_2 = "bob1";
+export const FAKE_USER_ID_3 = "@charlie:test.dummy";
 
 class MockMediaStreamAudioSourceNode {
     public connect() {}
@@ -429,6 +443,43 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
             null,
         );
     }
+}
+
+export class MockMatrixCall extends EventEmitter {
+    constructor(public roomId: string, public groupCallId?: string) {
+        super();
+    }
+
+    public state = CallState.Ringing;
+    public opponentUserId = FAKE_USER_ID_1;
+    public opponentDeviceId = FAKE_DEVICE_ID_1;
+    public opponentMember = { userId: this.opponentUserId };
+    public callId = "1";
+    public localUsermediaFeed = {
+        setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
+        stream: new MockMediaStream("stream"),
+    };
+    public remoteUsermediaFeed?: CallFeed;
+    public remoteScreensharingFeed?: CallFeed;
+
+    public reject = jest.fn<void, []>();
+    public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
+    public hangup = jest.fn<void, []>();
+
+    public sendMetadataUpdate = jest.fn<void, []>();
+
+    public on = jest.fn();
+    public removeListener = jest.fn();
+
+    public getOpponentMember(): Partial<RoomMember> {
+        return this.opponentMember;
+    }
+
+    public getOpponentDeviceId(): string | undefined {
+        return this.opponentDeviceId;
+    }
+
+    public typed(): MatrixCall { return this as unknown as MatrixCall; }
 }
 
 export class MockCallFeed {
