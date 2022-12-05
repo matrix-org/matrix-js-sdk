@@ -726,7 +726,8 @@ export class SlidingSyncSdk {
      * at the *START* of the timeline list if it is supplied.
      * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
-     * @param {boolean} isInitial whether timeline list is from an initial: true room.
+     * @param {number} numLive the number of events in timelineEventList which just happened,
+     * supplied from the server.
      */
     public injectRoomEvents(
         room: Room,
