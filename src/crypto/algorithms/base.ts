@@ -39,26 +39,24 @@ export type DecryptionClassParams<P extends IParams = IParams> = Omit<P, "device
 export const DECRYPTION_CLASSES = new Map<string, new (params: DecryptionClassParams) => DecryptionAlgorithm>();
 
 export interface IParams {
+    // The UserID for the local user
     userId: string;
+    // The identifier for this device.
     deviceId: string;
+    // crypto core
     crypto: Crypto;
+    // olm.js wrapper
     olmDevice: OlmDevice;
+    // base matrix api interface
     baseApis: MatrixClient;
+    // The ID of the room we will be sending to
     roomId?: string;
+    // The body of the m.room.encryption event
     config: IRoomEncryption & object;
 }
 
 /**
  * base type for encryption implementations
- *
- * @param params - parameters
- * @param params.userId  The UserID for the local user
- * @param params.deviceId The identifier for this device.
- * @param params.crypto crypto core
- * @param params.olmDevice olm.js wrapper
- * @param baseApis - base matrix api interface
- * @param params.roomId  The ID of the room we will be sending to
- * @param params.config  The body of the m.room.encryption event
  */
 export abstract class EncryptionAlgorithm {
     protected readonly userId: string;
@@ -68,6 +66,9 @@ export abstract class EncryptionAlgorithm {
     protected readonly baseApis: MatrixClient;
     protected readonly roomId?: string;
 
+    /**
+     * @param params - parameters
+     */
     public constructor(params: IParams) {
         this.userId = params.userId;
         this.deviceId = params.deviceId;
@@ -88,12 +89,8 @@ export abstract class EncryptionAlgorithm {
     /**
      * Encrypt a message event
      *
-     * @method algorithms/base.EncryptionAlgorithm.encryptMessage
      * @public
-     * @abstract
      *
-     * @param room
-     * @param eventType
      * @param content - event content
      *
      * @returns Promise which resolves to the new event body
@@ -107,7 +104,6 @@ export abstract class EncryptionAlgorithm {
      * @param member -  user whose membership changed
      * @param oldMembership -  previous membership
      * @public
-     * @abstract
      */
     public onRoomMembership(event: MatrixEvent, member: RoomMember, oldMembership?: string): void {}
 
@@ -123,14 +119,6 @@ export abstract class EncryptionAlgorithm {
 
 /**
  * base type for decryption implementations
- *
- * @param params - parameters
- * @param params.userId  The UserID for the local user
- * @param params.crypto crypto core
- * @param params.olmDevice olm.js wrapper
- * @param baseApis - base matrix api interface
- * @param params.roomId The ID of the room we will be receiving
- *     from. Null for to-device events.
  */
 export abstract class DecryptionAlgorithm {
     protected readonly userId: string;
@@ -150,9 +138,6 @@ export abstract class DecryptionAlgorithm {
     /**
      * Decrypt an event
      *
-     * @method algorithms/base.DecryptionAlgorithm#decryptEvent
-     * @abstract
-     *
      * @param event - undecrypted event
      *
      * @returns promise which
@@ -163,8 +148,6 @@ export abstract class DecryptionAlgorithm {
 
     /**
      * Handle a key event
-     *
-     * @method algorithms/base.DecryptionAlgorithm#onRoomKeyEvent
      *
      * @param params - event key event
      */

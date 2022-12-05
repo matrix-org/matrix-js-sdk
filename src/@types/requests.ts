@@ -54,17 +54,31 @@ export interface ISendEventResponse {
 }
 
 export interface IPresenceOpts {
+    // One of "online", "offline" or "unavailable"
     presence: "online" | "offline" | "unavailable";
+    // The status message to attach.
     status_msg?: string;
 }
 
 export interface IPaginateOpts {
+    // true to fill backwards, false to go forwards
     backwards?: boolean;
+    // number of events to request
     limit?: number;
 }
 
 export interface IGuestAccessOpts {
+    /**
+     * True to allow guests to join this room. This
+     * implicitly gives guests write access. If false or not given, guests are
+     * explicitly forbidden from joining the room.
+     */
     allowJoin: boolean;
+    /**
+     * True to set history visibility to
+     * be world_readable. This gives guests read access *from this point forward*.
+     * If false or not given, history visibility is not modified.
+     */
     allowRead: boolean;
 }
 

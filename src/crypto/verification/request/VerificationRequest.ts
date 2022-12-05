@@ -81,6 +81,9 @@ export enum VerificationRequestEvent {
 }
 
 type EventHandlerMap = {
+    /**
+     * Fires whenever the state of the request object has changed.
+     */
     [VerificationRequestEvent.Change]: () => void;
 };
 
@@ -88,7 +91,6 @@ type EventHandlerMap = {
  * State machine for verification requests.
  * Things that differ based on what channel is used to
  * send and receive verification events are put in `InRoomChannel` or `ToDeviceChannel`.
- * @event "change" whenever the state of the request object has changed.
  */
 export class VerificationRequest<
     C extends IVerificationChannel = IVerificationChannel,

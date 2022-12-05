@@ -39,21 +39,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
      *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,
      *   a Buffer, String or ReadStream.
      *
-     * @param opts -  options object
-     *
-     * @param opts.name -   Name to give the file on the server. Defaults
-     *   to <tt>file.name</tt>.
-     *
-     * @param opts.includeFilename - if false will not send the filename,
-     *   e.g for encrypted file uploads where filename leaks are undesirable.
-     *   Defaults to true.
-     *
-     * @param opts.type -   Content-type for the upload. Defaults to
-     *   <tt>file.type</tt>, or <tt>application/octet-stream</tt>.
-     *
-     * @param opts.progressHandler - Optional. Called when a chunk of
-     *    data has been uploaded, with an object containing the fields `loaded`
-     *    (number of bytes transferred) and `total` (total size, if known).
+     * @param opts - options object
      *
      * @returns Promise which resolves to response object, as
      *    determined by this.opts.onlyData, opts.rawResponse, and

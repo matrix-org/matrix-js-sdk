@@ -158,6 +158,11 @@ interface IRoomKey {
     algorithm: string;
 }
 
+/**
+ * The parameters of a room key request. The details of the request may
+ * vary with the crypto algorithm, but the management and storage layers for
+ * outgoing requests expect it to have 'room_id' and 'session_id' properties.
+ */
 export interface IRoomKeyRequestBody extends IRoomKey {
     session_id: string;
     sender_key: string;
@@ -193,12 +198,6 @@ interface IDeviceVerificationUpgrade {
 export interface ICheckOwnCrossSigningTrustOpts {
     allowPrivateKeyRequests?: boolean;
 }
-
-/**
- * @typedef {Object} OlmSessionResult
- * @property {DeviceInfo} device device info
- * @property {string?} sessionId base64 olm session id; null if no session could be established
- */
 
 interface IUserOlmSession {
     deviceIdKey: string;
@@ -280,20 +279,50 @@ export enum CryptoEvent {
 }
 
 export type CryptoEventHandlerMap = {
+    /**
+     * Fires when a device is marked as verified/unverified/blocked/unblocked by
+     * {@link MatrixClient#setDeviceVerified|MatrixClient.setDeviceVerified} or
+     * {@link MatrixClient#setDeviceBlocked|MatrixClient.setDeviceBlocked}.
+     *
+     * @param userId - the owner of the verified device
+     * @param deviceId - the id of the verified device
+     * @param deviceInfo - updated device information
+     */
     [CryptoEvent.DeviceVerificationChanged]: (userId: string, deviceId: string, device: DeviceInfo) => void;
+    /**
+     * Fires when the trust status of a user changes
+     * If userId is the userId of the logged-in user, this indicated a change
+     * in the trust status of the cross-signing data on the account.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     * @experimental
+     *
+     * @param userId - the userId of the user in question
+     * @param trustLevel - The new trust level of the user
+     */
     [CryptoEvent.UserTrustStatusChanged]: (userId: string, trustLevel: UserTrustLevel) => void;
     /**
-     * @event
      * Fires when we receive a room key request
      *
-     * @param req  request details
+     * @param req - request details
      */
     [CryptoEvent.RoomKeyRequest]: (request: IncomingRoomKeyRequest) => void;
     /**
-     * @event
      * Fires when we receive a room key request cancellation
      */
     [CryptoEvent.RoomKeyRequestCancellation]: (request: IncomingRoomKeyRequestCancellation) => void;
+    /**
+     * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
+     * @param enabled - true if key backup has been enabled, otherwise false
+     * @example
+     * ```
+     * matrixClient.on("crypto.keyBackupStatus", function(enabled){
+     *   if (enabled) {
+     *     [...]
+     *   }
+     * });
+     * ```
+     */
     [CryptoEvent.KeyBackupStatus]: (enabled: boolean) => void;
     [CryptoEvent.KeyBackupFailed]: (errcode: string) => void;
     [CryptoEvent.KeyBackupSessionsRemaining]: (remaining: number) => void;
@@ -301,18 +330,43 @@ export type CryptoEventHandlerMap = {
         failures: IUploadKeySignaturesResponse["failures"],
         source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
         upload: (opts: { shouldEmit: boolean }) => Promise<void>
-    ) => void;
+    ) => void;/**
+     * Fires when a key verification is requested.
+     */
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
     /**
-     * @event
      * Fires when the app may wish to warn the user about something related
      * the end-to-end crypto.
      *
      * @param type - One of the strings listed above
      */
     [CryptoEvent.Warning]: (type: string) => void;
+    /**
+     * Fires when the user's cross-signing keys have changed or cross-signing
+     * has been enabled/disabled. The client can use getStoredCrossSigningForUser
+     * with the user ID of the logged in user to check if cross-signing is
+     * enabled on the account. If enabled, it can test whether the current key
+     * is trusted using with checkUserTrust with the user ID of the logged
+     * in user. The checkOwnCrossSigningTrust function may be used to reconcile
+     * the trust in the account key.
+     *
+     * The cross-signing API is currently UNSTABLE and may change without notice.
+     * @experimental
+     */
     [CryptoEvent.KeysChanged]: (data: {}) => void;
+    /**
+     * Fires whenever the stored devices for a user will be updated
+     * @param users - A list of user IDs that will be updated
+     * @param initialFetch - If true, the store is empty (apart
+     *     from our own device) and is being seeded.
+     */
     [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
+    /**
+     * Fires whenever the stored devices for a user have changed
+     * @param users - A list of user IDs that were updated
+     * @param initialFetch - If true, the store was empty (apart
+     *     from our own device) and has been seeded.
+     */
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
 };
@@ -516,8 +570,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * Returns a promise which resolves once the crypto module is ready for use.
      *
-     * @param opts - keyword arguments.
-     * @param opts.exportedOlmDevice - (Optional) data from exported device
+     * @param exportedOlmDevice - (Optional) data from exported device
      *     that must be re-created.
      */
     public async init({ exportedOlmDevice, pickleKey }: IInitOpts = {}): Promise<void> {
@@ -724,7 +777,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param authUploadDeviceSigningKeys - Function
      * called to await an interactive auth flow when uploading device signing keys.
-     * @param setupNewCrossSigning Optional. Reset even if keys
+     * @param setupNewCrossSigning - Optional. Reset even if keys
      * already exist.
      * Args:
      *     A function that makes the request requiring auth. Receives the
@@ -865,19 +918,19 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
      *
-     * @param [opts.createSecretStorageKey] Optional. Function
+     * @param createSecretStorageKey - Optional. Function
      * called to await a secret storage key creation flow.
      * Resolves:
      *     Object with public key metadata, encoded private
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
-     * @param [opts.keyBackupInfo] The current key backup object. If passed,
+     * @param keyBackupInfo - The current key backup object. If passed,
      * the passphrase and recovery key from this backup will be used.
-     * @param [opts.setupNewKeyBackup] If true, a new key backup version will be
+     * @param setupNewKeyBackup - If true, a new key backup version will be
      * created and the private key stored in the new SSSS store. Ignored if keyBackupInfo
      * is supplied.
-     * @param [opts.setupNewSecretStorage] Optional. Reset even if keys already exist.
-     * @param [opts.getKeyBackupPassphrase] Optional. Function called to get the user's
+     * @param setupNewSecretStorage - Optional. Reset even if keys already exist.
+     * @param getKeyBackupPassphrase - Optional. Function called to get the user's
      *     current key backup passphrase. Should return a promise that resolves with a Buffer
      *     containing the key, or rejects if the key cannot be obtained.
      * Returns:
@@ -2087,7 +2140,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param userIds - The users to fetch.
      * @param forceDownload - Always download the keys even if cached.
      *
-     * @returns A promise which resolves to a map userId->deviceId->{@link DeviceInfo}.
+     * @returns A promise which resolves to a map `userId->deviceId->{@link DeviceInfo}`.
      */
     public downloadKeys(userIds: string[], forceDownload?: boolean): Promise<DeviceInfoMap> {
         return this.deviceList.downloadKeys(userIds, !!forceDownload);
@@ -2814,8 +2867,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * Import a list of room keys previously exported by exportRoomKeys
      *
      * @param keys - a list of session export objects
-     * @param opts -
-     * @param opts.progressCallback - called with an object which has a stage param
      * @returns a promise which resolves once the keys have been imported
      */
     public importRoomKeys(keys: IMegolmSessionData[], opts: IImportRoomKeysOpts = {}): Promise<void> {
@@ -3804,7 +3855,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param algorithm -  crypto algorithm
      *
-     * @raises {DecryptionError} if the algorithm is unknown
+     * @throws {@link DecryptionError} if the algorithm is unknown
      */
     public getRoomDecryptor(roomId: string | null, algorithm: string): DecryptionAlgorithm {
         let decryptors: Map<string, DecryptionAlgorithm> | undefined;
@@ -3901,29 +3952,21 @@ export function fixBackupKey(key?: string): string | null {
 }
 
 /**
- * The parameters of a room key request. The details of the request may
- * vary with the crypto algorithm, but the management and storage layers for
- * outgoing requests expect it to have 'room_id' and 'session_id' properties.
- *
- * @typedef {Object} RoomKeyRequestBody
- */
-
-/**
  * Represents a received m.room_key_request event
- *
- * @property {string} userId    user requesting the key
- * @property {string} deviceId  device requesting the key
- * @property {string} requestId unique id for the request
- * @property {RoomKeyRequestBody} requestBody
- * @property {function()} share  callback which, when called, will ask
- *    the relevant crypto algorithm implementation to share the keys for
- *    this request.
  */
 export class IncomingRoomKeyRequest {
+    // user requesting the key
     public readonly userId: string;
+    // device requesting the key
     public readonly deviceId: string;
+    // unique id for the request
     public readonly requestId: string;
     public readonly requestBody: IRoomKeyRequestBody;
+    /**
+     * callback which, when called, will ask
+     *    the relevant crypto algorithm implementation to share the keys for
+     *    this request.
+     */
     public share: () => void;
 
     public constructor(event: MatrixEvent) {
@@ -3941,14 +3984,13 @@ export class IncomingRoomKeyRequest {
 
 /**
  * Represents a received m.room_key_request cancellation
- *
- * @property {string} userId    user requesting the cancellation
- * @property {string} deviceId  device requesting the cancellation
- * @property {string} requestId unique id for the request to be cancelled
  */
 class IncomingRoomKeyRequestCancellation {
+    // user requesting the cancellation
     public readonly userId: string;
+    // device requesting the cancellation
     public readonly deviceId: string;
+    // unique id for the request to be cancelled
     public readonly requestId: string;
 
     public constructor(event: MatrixEvent) {

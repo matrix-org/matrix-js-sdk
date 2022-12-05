@@ -52,7 +52,9 @@ export const MEGOLM_ALGORITHM = Algorithm.Megolm;
 export const MEGOLM_BACKUP_ALGORITHM = Algorithm.MegolmBackup;
 
 export interface IOlmSessionResult {
+    // device info
     device: DeviceInfo;
+    // base64 olm session id; null if no session could be established
     sessionId: string | null;
 }
 

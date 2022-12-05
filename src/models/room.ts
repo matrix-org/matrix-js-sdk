@@ -157,13 +157,117 @@ export type RoomEmittedEvents = RoomEvent
     | BeaconEvent.LivenessChange;
 
 export type RoomEventHandlerMap = {
+    /**
+     * Fires when the logged in user's membership in the room is updated.
+     *
+     * @param room - The room in which the membership has been updated
+     * @param membership - The new membership value
+     * @param prevMembership - The previous membership value
+     */
     [RoomEvent.MyMembership]: (room: Room, membership: string, prevMembership?: string) => void;
+    /**
+     * Fires whenever a room's tags are updated.
+     * @param event - The tags event
+     * @param room - The room whose Room.tags was updated.
+     * @example
+     * ```
+     * matrixClient.on("Room.tags", function(event, room){
+     *   var newTags = event.getContent().tags;
+     *   if (newTags["favourite"]) showStar(room);
+     * });
+     * ```
+     */
     [RoomEvent.Tags]: (event: MatrixEvent, room: Room) => void;
+    /**
+     * Fires whenever a room's account_data is updated.
+     * @param event - The account_data event
+     * @param room - The room whose account_data was updated.
+     * @param prevEvent - The event being replaced by
+     * the new account data, if known.
+     * @example
+     * ```
+     * matrixClient.on("Room.accountData", function(event, room, oldEvent){
+     *   if (event.getType() === "m.room.colorscheme") {
+     *       applyColorScheme(event.getContents());
+     *   }
+     * });
+     * ```
+     */
     [RoomEvent.AccountData]: (event: MatrixEvent, room: Room, lastEvent?: MatrixEvent) => void;
-    [RoomEvent.Receipt]: (event: MatrixEvent, room: Room) => void;
+    /**
+     * Fires whenever a receipt is received for a room
+     * @param event - The receipt event
+     * @param room - The room whose receipts was updated.
+     * @example
+     * ```
+     * matrixClient.on("Room.receipt", function(event, room){
+     *   var receiptContent = event.getContent();
+     * });
+     * ```
+     */
+    [RoomEvent.Receipt]: (event: MatrixEvent, room: Room) => void;/**
+     * Fires whenever the name of a room is updated.
+     * @param room - The room whose Room.name was updated.
+     * @example
+     * ```
+     * matrixClient.on("Room.name", function(room){
+     *   var newName = room.name;
+     * });
+     * ```
+     */
     [RoomEvent.Name]: (room: Room) => void;
+    /**
+     * Fires when an event we had previously received is redacted.
+     *
+     * (Note this is *not* fired when the redaction happens before we receive the
+     * event).
+     *
+     * @param event - The matrix redaction event
+     * @param room - The room containing the redacted event
+     */
     [RoomEvent.Redaction]: (event: MatrixEvent, room: Room) => void;
+    /**
+     * Fires when an event that was previously redacted isn't anymore.
+     * This happens when the redaction couldn't be sent and
+     * was subsequently cancelled by the user. Redactions have a local echo
+     * which is undone in this scenario.
+     *
+     * @param event - The matrix redaction event that was cancelled.
+     * @param room - The room containing the unredacted event
+     */
     [RoomEvent.RedactionCancelled]: (event: MatrixEvent, room: Room) => void;
+    /**
+     * Fires when the status of a transmitted event is updated.
+     *
+     * <p>When an event is first transmitted, a temporary copy of the event is
+     * inserted into the timeline, with a temporary event id, and a status of
+     * 'SENDING'.
+     *
+     * <p>Once the echo comes back from the server, the content of the event
+     * (MatrixEvent.event) is replaced by the complete event from the homeserver,
+     * thus updating its event id, as well as server-generated fields such as the
+     * timestamp. Its status is set to null.
+     *
+     * <p>Once the /send request completes, if the remote echo has not already
+     * arrived, the event is updated with a new event id and the status is set to
+     * 'SENT'. The server-generated fields are of course not updated yet.
+     *
+     * <p>If the /send fails, In this case, the event's status is set to
+     * 'NOT_SENT'. If it is later resent, the process starts again, setting the
+     * status to 'SENDING'. Alternatively, the message may be cancelled, which
+     * removes the event from the room, and sets the status to 'CANCELLED'.
+     *
+     * <p>This event is raised to reflect each of the transitions above.
+     *
+     * @param event - The matrix event which has been updated
+     *
+     * @param room - The room containing the redacted event
+     *
+     * @param oldEventId - The previous event id (the temporary event id,
+     *    except when updating a successfully-sent event when its echo arrives)
+     *
+     * @param oldStatus - The previous event status.
+     */
     [RoomEvent.LocalEchoUpdated]: (
         event: MatrixEvent,
         room: Room,
@@ -3251,126 +3355,3 @@ function memberNamesToRoomName(names: string[], count: number): string {
         }
     }
 }
-
-/**
- * Fires when an event we had previously received is redacted.
- *
- * (Note this is *not* fired when the redaction happens before we receive the
- * event).
- *
- * @event MatrixClient#"Room.redaction"
- * @param event - The matrix redaction event
- * @param room - The room containing the redacted event
- */
-
-/**
- * Fires when an event that was previously redacted isn't anymore.
- * This happens when the redaction couldn't be sent and
- * was subsequently cancelled by the user. Redactions have a local echo
- * which is undone in this scenario.
- *
- * @event MatrixClient#"Room.redactionCancelled"
- * @param event - The matrix redaction event that was cancelled.
- * @param room - The room containing the unredacted event
- */
-
-/**
- * Fires whenever the name of a room is updated.
- * @event MatrixClient#"Room.name"
- * @param room - The room whose Room.name was updated.
- * @example
- * ```
- * matrixClient.on("Room.name", function(room){
- *   var newName = room.name;
- * });
- * ```
- */
-
-/**
- * Fires whenever a receipt is received for a room
- * @event MatrixClient#"Room.receipt"
- * @param event - The receipt event
- * @param room - The room whose receipts was updated.
- * @example
- * ```
- * matrixClient.on("Room.receipt", function(event, room){
- *   var receiptContent = event.getContent();
- * });
- * ```
- */
-
-/**
- * Fires whenever a room's tags are updated.
- * @event MatrixClient#"Room.tags"
- * @param event - The tags event
- * @param room - The room whose Room.tags was updated.
- * @example
- * ```
- * matrixClient.on("Room.tags", function(event, room){
- *   var newTags = event.getContent().tags;
- *   if (newTags["favourite"]) showStar(room);
- * });
- * ```
- */
-
-/**
- * Fires whenever a room's account_data is updated.
- * @event MatrixClient#"Room.accountData"
- * @param event - The account_data event
- * @param room - The room whose account_data was updated.
- * @param prevEvent - The event being replaced by
- * the new account data, if known.
- * @example
- * ```
- * matrixClient.on("Room.accountData", function(event, room, oldEvent){
- *   if (event.getType() === "m.room.colorscheme") {
- *       applyColorScheme(event.getContents());
- *   }
- * });
- * ```
- */
-
-/**
- * Fires when the status of a transmitted event is updated.
- *
- * <p>When an event is first transmitted, a temporary copy of the event is
- * inserted into the timeline, with a temporary event id, and a status of
- * 'SENDING'.
- *
- * <p>Once the echo comes back from the server, the content of the event
- * (MatrixEvent.event) is replaced by the complete event from the homeserver,
- * thus updating its event id, as well as server-generated fields such as the
- * timestamp. Its status is set to null.
- *
- * <p>Once the /send request completes, if the remote echo has not already
- * arrived, the event is updated with a new event id and the status is set to
- * 'SENT'. The server-generated fields are of course not updated yet.
- *
- * <p>If the /send fails, In this case, the event's status is set to
- * 'NOT_SENT'. If it is later resent, the process starts again, setting the
- * status to 'SENDING'. Alternatively, the message may be cancelled, which
- * removes the event from the room, and sets the status to 'CANCELLED'.
- *
- * <p>This event is raised to reflect each of the transitions above.
- *
- * @event MatrixClient#"Room.localEchoUpdated"
- *
- * @param event - The matrix event which has been updated
- *
- * @param room - The room containing the redacted event
- *
- * @param oldEventId - The previous event id (the temporary event id,
- *    except when updating a successfully-sent event when its echo arrives)
- *
- * @param oldStatus - The previous event status.
- */
-
-/**
- * Fires when the logged in user's membership in the room is updated.
- *
- * @event Room#"Room.myMembership"
- * @param room - The room in which the membership has been updated
- * @param membership - The new membership value
- * @param prevMembership - The previous membership value
- */
-

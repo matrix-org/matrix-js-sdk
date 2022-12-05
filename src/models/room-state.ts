@@ -59,8 +59,52 @@ export enum RoomStateEvent {
 }
 
 export type RoomStateEventHandlerMap = {
+    /**
+     * Fires whenever the event dictionary in room state is updated.
+     * @param event - The matrix event which caused this event to fire.
+     * @param state - The room state whose RoomState.events dictionary
+     * was updated.
+     * @param prevEvent - The event being replaced by the new state, if
+     * known. Note that this can differ from `getPrevContent()` on the new state event
+     * as this is the store's view of the last state, not the previous state provided
+     * by the server.
+     * @example
+     * ```
+     * matrixClient.on("RoomState.events", function(event, state, prevEvent){
+     *   var newStateEvent = event;
+     * });
+     * ```
+     */
     [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
+    /**
+     * Fires whenever a member in the members dictionary is updated in any way.
+     * @param event - The matrix event which caused this event to fire.
+     * @param state - The room state whose RoomState.members dictionary
+     * was updated.
+     * @param member - The room member that was updated.
+     * @example
+     * ```
+     * matrixClient.on("RoomState.members", function(event, state, member){
+     *   var newMembershipState = member.membership;
+     * });
+     * ```
+     */
     [RoomStateEvent.Members]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
+    /**
+     * Fires whenever a member is added to the members dictionary. The RoomMember
+     * will not be fully populated yet (e.g. no membership state) but will already
+     * be available in the members dictionary.
+     * @param event - The matrix event which caused this event to fire.
+     * @param state - The room state whose RoomState.members dictionary
+     * was updated with a new entry.
+     * @param member - The room member that was added.
+     * @example
+     * ```
+     * matrixClient.on("RoomState.newMember", function(event, state, member){
+     *   // add event listeners on 'member'
+     * });
+     * ```
+     */
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
@@ -943,53 +987,3 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
     }
 }
-
-/**
- * Fires whenever the event dictionary in room state is updated.
- * @event MatrixClient#"RoomState.events"
- * @param event - The matrix event which caused this event to fire.
- * @param state - The room state whose RoomState.events dictionary
- * was updated.
- * @param prevEvent - The event being replaced by the new state, if
- * known. Note that this can differ from `getPrevContent()` on the new state event
- * as this is the store's view of the last state, not the previous state provided
- * by the server.
- * @example
- * ```
- * matrixClient.on("RoomState.events", function(event, state, prevEvent){
- *   var newStateEvent = event;
- * });
- * ```
- */
-
-/**
- * Fires whenever a member in the members dictionary is updated in any way.
- * @event MatrixClient#"RoomState.members"
- * @param event - The matrix event which caused this event to fire.
- * @param state - The room state whose RoomState.members dictionary
- * was updated.
- * @param member - The room member that was updated.
- * @example
- * ```
- * matrixClient.on("RoomState.members", function(event, state, member){
- *   var newMembershipState = member.membership;
- * });
- * ```
- */
-
-/**
- * Fires whenever a member is added to the members dictionary. The RoomMember
- * will not be fully populated yet (e.g. no membership state) but will already
- * be available in the members dictionary.
- * @event MatrixClient#"RoomState.newMember"
- * @param event - The matrix event which caused this event to fire.
- * @param state - The room state whose RoomState.members dictionary
- * was updated with a new entry.
- * @param member - The room member that was added.
- * @example
- * ```
- * matrixClient.on("RoomState.newMember", function(event, state, member){
- *   // add event listeners on 'member'
- * });
- * ```
- */

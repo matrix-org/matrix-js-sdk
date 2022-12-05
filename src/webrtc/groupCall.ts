@@ -63,6 +63,21 @@ export type GroupCallEventHandlerMap = {
     ) => void;
     [GroupCallEvent.LocalMuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [GroupCallEvent.ParticipantsChanged]: (participants: Map<RoomMember, Map<string, ParticipantState>>) => void;
+    /**
+     * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
+     * <p>
+     * The error given will have a code equal to either `MatrixCall.ERR_LOCAL_OFFER_FAILED` or
+     * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
+     * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
+     * to their audio/video hardware.
+     * @param err - The error raised by MatrixCall.
+     * @example
+     * ```
+     * matrixCall.on("error", function(err){
+     *   console.error(err.code, err);
+     * });
+     * ```
+     */
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
 };
 

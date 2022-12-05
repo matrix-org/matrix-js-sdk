@@ -26,10 +26,66 @@ export enum UserEvent {
 }
 
 export type UserEventHandlerMap = {
+    /**
+     * Fires whenever any user's display name changes.
+     * @param event - The matrix event which caused this event to fire.
+     * @param user - The user whose User.displayName changed.
+     * @example
+     * ```
+     * matrixClient.on("User.displayName", function(event, user){
+     *   var newName = user.displayName;
+     * });
+     * ```
+     */
     [UserEvent.DisplayName]: (event: MatrixEvent | undefined, user: User) => void;
+    /**
+     * Fires whenever any user's avatar URL changes.
+     * @param event - The matrix event which caused this event to fire.
+     * @param user - The user whose User.avatarUrl changed.
+     * @example
+     * ```
+     * matrixClient.on("User.avatarUrl", function(event, user){
+     *   var newUrl = user.avatarUrl;
+     * });
+     * ```
+     */
     [UserEvent.AvatarUrl]: (event: MatrixEvent | undefined, user: User) => void;
+    /**
+     * Fires whenever any user's presence changes.
+     * @param event - The matrix event which caused this event to fire.
+     * @param user - The user whose User.presence changed.
+     * @example
+     * ```
+     * matrixClient.on("User.presence", function(event, user){
+     *   var newPresence = user.presence;
+     * });
+     * ```
+     */
     [UserEvent.Presence]: (event: MatrixEvent | undefined, user: User) => void;
+    /**
+     * Fires whenever any user's currentlyActive changes.
+     * @param event - The matrix event which caused this event to fire.
+     * @param user - The user whose User.currentlyActive changed.
+     * @example
+     * ```
+     * matrixClient.on("User.currentlyActive", function(event, user){
+     *   var newCurrentlyActive = user.currentlyActive;
+     * });
+     * ```
+     */
     [UserEvent.CurrentlyActive]: (event: MatrixEvent | undefined, user: User) => void;
+    /**
+     * Fires whenever any user's lastPresenceTs changes,
+     * ie. whenever any presence event is received for a user.
+     * @param event - The matrix event which caused this event to fire.
+     * @param user - The user whose User.lastPresenceTs changed.
+     * @example
+     * ```
+     * matrixClient.on("User.lastPresenceTs", function(event, user){
+     *   var newlastPresenceTs = user.lastPresenceTs;
+     * });
+     * ```
+     */
     [UserEvent.LastPresenceTs]: (event: MatrixEvent | undefined, user: User) => void;
 };
 
@@ -192,69 +248,3 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
         return this.lastPresenceTs - this.lastActiveAgo;
     }
 }
-
-/**
- * Fires whenever any user's lastPresenceTs changes,
- * ie. whenever any presence event is received for a user.
- * @event MatrixClient#"User.lastPresenceTs"
- * @param event - The matrix event which caused this event to fire.
- * @param user - The user whose User.lastPresenceTs changed.
- * @example
- * ```
- * matrixClient.on("User.lastPresenceTs", function(event, user){
- *   var newlastPresenceTs = user.lastPresenceTs;
- * });
- * ```
- */
-
-/**
- * Fires whenever any user's presence changes.
- * @event MatrixClient#"User.presence"
- * @param event - The matrix event which caused this event to fire.
- * @param user - The user whose User.presence changed.
- * @example
- * ```
- * matrixClient.on("User.presence", function(event, user){
- *   var newPresence = user.presence;
- * });
- * ```
- */
-
-/**
- * Fires whenever any user's currentlyActive changes.
- * @event MatrixClient#"User.currentlyActive"
- * @param event - The matrix event which caused this event to fire.
- * @param user - The user whose User.currentlyActive changed.
- * @example
- * ```
- * matrixClient.on("User.currentlyActive", function(event, user){
- *   var newCurrentlyActive = user.currentlyActive;
- * });
- * ```
- */
-
-/**
- * Fires whenever any user's display name changes.
- * @event MatrixClient#"User.displayName"
- * @param event - The matrix event which caused this event to fire.
- * @param user - The user whose User.displayName changed.
- * @example
- * ```
- * matrixClient.on("User.displayName", function(event, user){
- *   var newName = user.displayName;
- * });
- * ```
- */
-
-/**
- * Fires whenever any user's avatar URL changes.
- * @event MatrixClient#"User.avatarUrl"
- * @param event - The matrix event which caused this event to fire.
- * @param user - The user whose User.avatarUrl changed.
- * @example
- * ```
- * matrixClient.on("User.avatarUrl", function(event, user){
- *   var newUrl = user.avatarUrl;
- * });
- * ```
- */

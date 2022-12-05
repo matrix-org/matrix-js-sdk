@@ -79,15 +79,15 @@ export interface IEvent {
     redacts?: string;
 
     /**
-     * @deprecated
+     * @deprecated in favour of `sender`
      */
     user_id?: string;
     /**
-     * @deprecated
+     * @deprecated in favour of `unsigned.prev_content`
      */
     prev_content?: IContent;
     /**
-     * @deprecated
+     * @deprecated in favour of `origin_server_ts`
      */
     age?: number;
 }
@@ -191,6 +191,12 @@ export enum MatrixEventEvent {
 export type MatrixEventEmittedEvents = MatrixEventEvent | ThreadEvent.Update;
 
 export type MatrixEventHandlerMap = {
+    /**
+     * Fires when an event is decrypted
+     *
+     * @param event - The matrix event which has been decrypted
+     * @param err - The error that occurred during decryption, or `undefined` if no error occurred.
+     */
     [MatrixEventEvent.Decrypted]: (event: MatrixEvent, err?: Error) => void;
     [MatrixEventEvent.BeforeRedaction]: (event: MatrixEvent, redactionEvent: MatrixEvent) => void;
     [MatrixEventEvent.VisibilityChange]: (event: MatrixEvent, visible: boolean) => void;
@@ -271,11 +277,33 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     public localTimestamp: number;
 
     // XXX: these should be read-only
+    /**
+     * The room member who sent this event, or null e.g.
+     * this is a presence event. This is only guaranteed to be set for events that
+     * appear in a timeline, ie. do not guarantee that it will be set on state
+     * events.
+     */
     public sender: RoomMember | null = null;
+    /**
+     * The room member who is the target of this event, e.g.
+     * the invitee, the person being banned, etc.
+     */
     public target: RoomMember | null = null;
+    /**
+     * The sending status of the event.
+     */
     public status: EventStatus | null = null;
+    /**
+     * most recent error associated with sending the event, if any
+     */
     public error: MatrixError | null = null;
-    public forwardLooking = true; // only state events may be backwards looking
+    /**
+     * True if this event is 'forward looking', meaning
+     * that getDirectionalContent() will return event.content and not event.prev_content.
+     * Only state events may be backwards looking
+     * Default: true. <strong>This property is experimental and may change.</strong>
+     */
+    public forwardLooking = true;
 
     /* If the event is a `m.key.verification.request` (or to_device `m.key.verification.start`) event,
      * `Crypto` will set this the `VerificationRequest` for the event
@@ -288,24 +316,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     /**
      * Construct a Matrix Event object
      *
-     * @param event - The raw event to be wrapped in this DAO
-     *
-     * @prop event The raw (possibly encrypted) event. <b>Do not access
+     * @param event - The raw (possibly encrypted) event. <b>Do not access
      * this property</b> directly unless you absolutely have to. Prefer the getter
      * methods defined on this class. Using the getter methods shields your app
      * from changes to event JSON between Matrix versions.
-     *
-     * @prop sender The room member who sent this event, or null e.g.
-     * this is a presence event. This is only guaranteed to be set for events that
-     * appear in a timeline, ie. do not guarantee that it will be set on state
-     * events.
-     * @prop target The room member who is the target of this event, e.g.
-     * the invitee, the person being banned, etc.
-     * @prop status The sending status of the event.
-     * @prop error most recent error associated with sending the event, if any
-     * @prop forwardLooking True if this event is 'forward looking', meaning
-     * that getDirectionalContent() will return event.content and not event.prev_content.
-     * Default: true. <strong>This property is experimental and may change.</strong>
      */
     public constructor(public event: Partial<IEvent> = {}) {
         super();
@@ -455,7 +469,11 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * This is intended for logging, to help trace errors. Example output:
      *
-     * id=$HjnOHV646n0SjLDAqFrgIjim7RCpB7cdMXFrekWYAn type=m.room.encrypted sender=@user:example.com room=!room:example.com ts=2022-10-25T17:30:28.404Z
+     * @example
+     * ```
+     * id=$HjnOHV646n0SjLDAqFrgIjim7RCpB7cdMXFrekWYAn type=m.room.encrypted
+     * sender=@user:example.com room=!room:example.com ts=2022-10-25T17:30:28.404Z
+     * ```
      */
     public getDetails(): string {
         let details = `id=${this.getId()} type=${this.getWireType()} sender=${this.getSender()}`;
@@ -1595,15 +1613,3 @@ const REDACT_KEEP_CONTENT_MAP = {
         'users': 1, 'users_default': 1,
     },
 };
-
-/**
- * Fires when an event is decrypted
- *
- * @event MatrixEvent#"Event.decrypted"
- *
- * @param event
- *    The matrix event which has been decrypted
- * @param err
- *    The error that occurred during decryption, or `undefined` if no
- *    error occurred.
- */

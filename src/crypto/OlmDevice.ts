@@ -57,25 +57,17 @@ interface IInitOpts {
     pickleKey?: string;
 }
 
-/**
- * data stored in the session store about an inbound group session
- *
- * @typedef {Object} InboundGroupSessionData
- * @property {string} room_id
- * @property {string} session   pickled Olm.InboundGroupSession
- * @property {Object<string, string>} keysClaimed
- * @property {Array<string>} forwardingCurve25519KeyChain  Devices involved in forwarding
- *     this session to us (normally empty).
- * @property {boolean=} untrusted whether this session is untrusted.
- * @property {boolean=} sharedHistory whether this session exists during the room being set to shared history.
- */
-
+// data stored in the session store about an inbound group session
 export interface InboundGroupSessionData {
     room_id: string; // eslint-disable-line camelcase
+    // pickled Olm.InboundGroupSession
     session: string;
     keysClaimed: Record<string, string>;
+    // Devices involved in forwarding this session to us (normally empty).
     forwardingCurve25519KeyChain: string[];
+    // whether this session is untrusted.
     untrusted?: boolean;
+    // whether this session exists during the room being set to shared history.
     sharedHistory?: boolean;
 }
 
@@ -118,17 +110,14 @@ interface IInboundGroupSessionKey {
  * OlmAccount and a number of OlmSessions.
  *
  * Accounts and sessions are kept pickled in the cryptoStore.
- *
- * @param cryptoStore - A store for crypto data
- *
- * @property {string} deviceCurve25519Key   Curve25519 key for the account
- * @property {string} deviceEd25519Key      Ed25519 key for the account
  */
 export class OlmDevice {
     public pickleKey = "DEFAULT_KEY"; // set by consumers
 
     // don't know these until we load the account from storage in init()
+    // Curve25519 key for the account
     public deviceCurve25519Key: string | null = null;
+    // Ed25519 key for the account
     public deviceEd25519Key: string | null = null;
     private maxOneTimeKeys: number | null = null;
 
@@ -183,12 +172,11 @@ export class OlmDevice {
      *
      * Reads the device keys from the OlmAccount object.
      *
-     * @param opts -
-     * @param opts.fromExportedDevice - (Optional) data from exported device
+     * @param fromExportedDevice - (Optional) data from exported device
      *     that must be re-created.
      *     If present, opts.pickleKey is ignored
      *     (exported data already provides a pickle key)
-     * @param opts.pickleKey - (Optional) pickle key to set instead of default one
+     * @param pickleKey - (Optional) pickle key to set instead of default one
      */
     public async init({ pickleKey, fromExportedDevice }: IInitOpts = {}): Promise<void> {
         let e2eKeys;
@@ -603,8 +591,7 @@ export class OlmDevice {
      * @returns decrypted payload, and
      *     session id of new session
      *
-     * @raises {Error} if the received message was not valid (for instance, it
-     *     didn't use a valid one-time key).
+     * @throws Error if the received message was not valid (for instance, it didn't use a valid one-time key).
      */
     public async createInboundSession(
         theirDeviceIdentityKey: string,
@@ -1519,7 +1506,7 @@ export class OlmDevice {
      * @param message - message which was signed
      * @param signature - base64-encoded signature to be checked
      *
-     * @raises {Error} if there is a problem with the verification. If the key was
+     * @throws Error if there is a problem with the verification. If the key was
      * too small then the message will be "OLM.INVALID_BASE64". If the signature
      * was invalid then the message will be "OLM.BAD_MESSAGE_MAC".
      */

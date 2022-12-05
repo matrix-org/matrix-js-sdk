@@ -52,24 +52,6 @@ import { GroupCallUnknownDeviceError } from './groupCall';
 import { IScreensharingOpts } from "./mediaHandler";
 import { MatrixError } from "../http-api";
 
-/**
- * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
- * <p>
- * The error given will have a code equal to either `MatrixCall.ERR_LOCAL_OFFER_FAILED` or
- * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
- * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
- * to their audio/video hardware.
- *
- * @event MatrixCall#"error"
- * @param err - The error raised by MatrixCall.
- * @example
- * ```
- * matrixCall.on("error", function(err){
- *   console.error(err.code, err);
- * });
- * ```
- */
-
 interface CallOpts {
     // The room ID for this call.
     roomId?: string;

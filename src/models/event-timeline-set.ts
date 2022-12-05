@@ -51,7 +51,9 @@ export enum DuplicateStrategy {
 }
 
 export interface IRoomTimelineData {
+    // the timeline the event was added to/removed from
     timeline: EventTimeline;
+    // true if the event was a real-time event added to the end of the live timeline
     liveEvent?: boolean;
 }
 
@@ -75,6 +77,26 @@ export interface IAddLiveEventOptions
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;
 
 export type EventTimelineSetHandlerMap = {
+    /**
+     * Fires whenever the timeline in a room is updated.
+     * @param event - The matrix event which caused this event to fire.
+     * @param room - The room, if any, whose timeline was updated.
+     * @param toStartOfTimeline - True if this event was added to the start
+     * @param removed - True if this event has just been removed from the timeline
+     * (beginning; oldest) of the timeline e.g. due to pagination.
+     *
+     * @param data - more data about the event
+     *
+     * @example
+     * ```
+     * matrixClient.on("Room.timeline",
+     *                 function(event, room, toStartOfTimeline, removed, data) {
+     *   if (!toStartOfTimeline && data.liveEvent) {
+     *     var messageToAppend = room.timeline.[room.timeline.length - 1];
+     *   }
+     * });
+     * ```
+     */
     [RoomEvent.Timeline]: (
         event: MatrixEvent,
         room: Room | undefined,
@@ -82,6 +104,18 @@ export type EventTimelineSetHandlerMap = {
         removed: boolean,
         data: IRoomTimelineData,
     ) => void;
+    /**
+     * Fires whenever the live timeline in a room is reset.
+     *
+     * When we get a 'limited' sync (for example, after a network outage), we reset
+     * the live timeline to be empty before adding the recent events to the new
+     * timeline. This event is fired after the timeline is reset, and before the
+     * new events are added.
+     *
+     * @param room - The room whose live timeline was reset, if any
+     * @param timelineSet - timelineSet room whose live timeline was reset
+     * @param resetAllTimelines - True if all timelines were reset.
+     */
     [RoomEvent.TimelineReset]: (
         room: Room | undefined,
         eventTimelineSet: EventTimelineSet,
@@ -886,45 +920,3 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         return shouldLiveInRoom;
     }
 }
-
-/**
- * Fires whenever the timeline in a room is updated.
- * @event MatrixClient#"Room.timeline"
- * @param event - The matrix event which caused this event to fire.
- * @param room - The room, if any, whose timeline was updated.
- * @param toStartOfTimeline - True if this event was added to the start
- * @param removed - True if this event has just been removed from the timeline
- * (beginning; oldest) of the timeline e.g. due to pagination.
- *
- * @param data  more data about the event
- *
- * @param data.timeline the timeline the
- * event was added to/removed from
- *
- * @param data.liveEvent true if the event was a real-time event
- * added to the end of the live timeline
- *
- * @example
- * ```
- * matrixClient.on("Room.timeline",
- *                 function(event, room, toStartOfTimeline, removed, data) {
- *   if (!toStartOfTimeline && data.liveEvent) {
- *     var messageToAppend = room.timeline.[room.timeline.length - 1];
- *   }
- * });
- * ```
- */
-
-/**
- * Fires whenever the live timeline in a room is reset.
- *
- * When we get a 'limited' sync (for example, after a network outage), we reset
- * the live timeline to be empty before adding the recent events to the new
- * timeline. This event is fired after the timeline is reset, and before the
- * new events are added.
- *
- * @event MatrixClient#"Room.timelineReset"
- * @param room - The room whose live timeline was reset, if any
- * @param timelineSet - timelineSet room whose live timeline was reset
- * @param resetAllTimelines - True if all timelines were reset.
- */

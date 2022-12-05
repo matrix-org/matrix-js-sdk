@@ -118,9 +118,27 @@ interface ISyncOptions {
 }
 
 export interface ISyncStateData {
+    /**
+     * The matrix error if `state=ERROR`.
+     */
     error?: Error;
+    /**
+     * The 'since' token passed to /sync.
+     *    `null` for the first successful sync since this client was
+     *    started. Only present if `state=PREPARED` or
+     *    `state=SYNCING`.
+     */
     oldSyncToken?: string;
+    /**
+     * The 'next_batch' result from /sync, which
+     *    will become the 'since' token for the next call to /sync. Only present if
+     *    `state=PREPARED</code> or <code>state=SYNCING`.
+     */
     nextSyncToken?: string;
+    /**
+     * True if we are working our way through a
+     *    backlog of events after connecting. Only present if `state=SYNCING`.
+     */
     catchingUp?: boolean;
     fromCache?: boolean;
 }

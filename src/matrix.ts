@@ -91,16 +91,6 @@ function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
  * except that the 'request', 'store' and 'scheduler' dependencies are satisfied.
  * @param opts - The configuration options for this client. These configuration
  * options will be passed directly to {@link MatrixClient}.
- * @param opts.store - If not set, defaults to
- * {@link MemoryStore}.
- * @param opts.scheduler - If not set, defaults to
- * {@link MatrixScheduler}.
- *
- * @param opts.cryptoStore -
- *    crypto store implementation. Calls the factory supplied to
- *    {@link setCryptoStoreFactory} if unspecified; or if no factory has been
- *    specified, uses a default implementation (indexeddb in the browser,
- *    in-memory otherwise).
  *
  * @returns A new matrix client.
  * @see {@link MatrixClient} for the full list of options for

@@ -114,24 +114,20 @@ interface SharedWithData {
 
 /**
  * @internal
- * @param sessionId
- * @param sharedHistory - whether the session can be freely shared with
- *    other group members, according to the room history visibility settings
- *
- * @property {string} sessionId
- * @property {Number} useCount     number of times this session has been used
- * @property {Number} creationTime when the session was created (ms since the epoch)
- *
- * @property {object} sharedWithDevices
- *    devices with which we have shared the session key
- *        `userId -> {deviceId -> SharedWithData}`
  */
 class OutboundSessionInfo {
+    // number of times this session has been used
     public useCount = 0;
+    // when the session was created (ms since the epoch)
     public creationTime: number;
+    // devices with which we have shared the session key `userId -> {deviceId -> SharedWithData}`
     public sharedWithDevices: Record<string, Record<string, SharedWithData>> = {};
     public blockedDevicesNotified: Record<string, Record<string, boolean>> = {};
 
+    /**
+     * @param sharedHistory - whether the session can be freely shared with
+     *    other group members, according to the room history visibility settings
+     */
     public constructor(public readonly sessionId: string, public readonly sharedHistory = false) {
         this.creationTime = new Date().getTime();
     }
@@ -173,7 +169,7 @@ class OutboundSessionInfo {
      * Determine if this session has been shared with devices which it shouldn't
      * have been.
      *
-     * @param devicesInRoom - userId -> {deviceId -> object}
+     * @param devicesInRoom - `userId -> {deviceId -> object}`
      *   devices we should shared the session with.
      *
      * @returns true if we have shared the session with devices which aren't
@@ -212,7 +208,7 @@ class OutboundSessionInfo {
 /**
  * Megolm encryption implementation
  *
- * @param params - parameters, as per {@link algorithms/EncryptionAlgorithm}
+ * @param params - parameters, as per {@link EncryptionAlgorithm}
  */
 class MegolmEncryption extends EncryptionAlgorithm {
     // the most recent attempt to set up a session. This is used to serialise
@@ -1076,7 +1072,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * unknown to the user.  If so, warn the user, and mark them as known to
      * give the user a chance to go verify them before re-sending this message.
      *
-     * @param devicesInRoom - userId -> {deviceId -> object}
+     * @param devicesInRoom - `userId -> {deviceId -> object}`
      *   devices we should shared the session with.
      */
     private checkForUnknownDevices(devicesInRoom: DeviceInfoMap): void {
@@ -1106,7 +1102,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      * Remove unknown devices from a set of devices.  The devicesInRoom parameter
      * will be modified.
      *
-     * @param devicesInRoom - userId -> {deviceId -> object}
+     * @param devicesInRoom - `userId -> {deviceId -> object}`
      *   devices we should shared the session with.
      */
     private removeUnknownDevices(devicesInRoom: DeviceInfoMap): void {
@@ -1758,16 +1754,15 @@ class MegolmDecryption extends DecryptionAlgorithm {
     }
 
     /**
-     * @param opts - options for the import
-     * @param [opts.untrusted] whether the key should be considered as untrusted
-     * @param [opts.source] where the key came from
+     * @param untrusted - whether the key should be considered as untrusted
+     * @param source - where the key came from
      */
     public importRoomKey(
         session: IMegolmSessionData,
-        opts: { untrusted?: boolean, source?: string } = {},
+        { untrusted, source }: { untrusted?: boolean, source?: string } = {},
     ): Promise<void> {
         const extraSessionData: OlmGroupSessionExtraData = {};
-        if (opts.untrusted || session.untrusted) {
+        if (untrusted || session.untrusted) {
             extraSessionData.untrusted = true;
         }
         if (session["org.matrix.msc3061.shared_history"]) {
@@ -1783,7 +1778,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
             true,
             extraSessionData,
         ).then(() => {
-            if (opts.source !== "backup") {
+            if (source !== "backup") {
                 // don't wait for it to complete
                 this.crypto.backupManager.backupGroupSession(
                     session.sender_key, session.session_id,

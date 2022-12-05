@@ -257,7 +257,10 @@ export interface ICreateClientOpts {
     /**
      * A store to be used for end-to-end crypto session data. If not specified,
      * end-to-end crypto will be disabled. The `createClient` helper will create
-     * a default store if needed.
+     * a default store if needed. Calls the factory supplied to
+     * {@link setCryptoStoreFactory} if unspecified; or if no factory has been
+     * specified, uses a default implementation (indexeddb in the browser,
+     * in-memory otherwise).
      */
     cryptoStore?: CryptoStore;
 
@@ -911,13 +914,183 @@ export type EmittedEvents = ClientEvent
     | BeaconEvent;
 
 export type ClientEventHandlerMap = {
+    /**
+     * Fires whenever the SDK's syncing state is updated. The state can be one of:
+     * <ul>
+     *
+     * <li>PREPARED: The client has synced with the server at least once and is
+     * ready for methods to be called on it. This will be immediately followed by
+     * a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
+     * previous API.</i></li>
+     *
+     * <li>CATCHUP: The client has detected the connection to the server might be
+     * available again and will now try to do a sync again. As this sync might take
+     * a long time (depending how long ago was last synced, and general server
+     * performance) the client is put in this mode so the UI can reflect trying
+     * to catch up with the server after losing connection.</li>
+     *
+     * <li>SYNCING : The client is currently polling for new events from the server.
+     * This will be called <i>after</i> processing latest events from a sync.</li>
+     *
+     * <li>ERROR : The client has had a problem syncing with the server. If this is
+     * called <i>before</i> PREPARED then there was a problem performing the initial
+     * sync. If this is called <i>after</i> PREPARED then there was a problem polling
+     * the server for updates. This may be called multiple times even if the state is
+     * already ERROR. <i>This is the equivalent of "syncError" in the previous
+     * API.</i></li>
+     *
+     * <li>RECONNECTING: The sync connection has dropped, but not (yet) in a way that
+     * should be considered erroneous.
+     * </li>
+     *
+     * <li>STOPPED: The client has stopped syncing with server due to stopClient
+     * being called.
+     * </li>
+     * </ul>
+     * State transition diagram:
+     * ```
+     *                                          +---->STOPPED
+     *                                          |
+     *              +----->PREPARED -------> SYNCING <--+
+     *              |                        ^  |  ^    |
+     *              |      CATCHUP ----------+  |  |    |
+     *              |        ^                  V  |    |
+     *   null ------+        |  +------- RECONNECTING   |
+     *              |        V  V                       |
+     *              +------->ERROR ---------------------+
+     *
+     * NB: 'null' will never be emitted by this event.
+     *
+     * ```
+     * Transitions:
+     * <ul>
+     *
+     * <li>`null -> PREPARED` : Occurs when the initial sync is completed
+     * first time. This involves setting up filters and obtaining push rules.
+     *
+     * <li>`null -> ERROR` : Occurs when the initial sync failed first time.
+     *
+     * <li>`ERROR -> PREPARED` : Occurs when the initial sync succeeds
+     * after previously failing.
+     *
+     * <li>`PREPARED -> SYNCING` : Occurs immediately after transitioning
+     * to PREPARED. Starts listening for live updates rather than catching up.
+     *
+     * <li>`SYNCING -> RECONNECTING` : Occurs when the live update fails.
+     *
+     * <li>`RECONNECTING -> RECONNECTING` : Can occur if the update calls
+     * continue to fail, but the keepalive calls (to /versions) succeed.
+     *
+     * <li>`RECONNECTING -> ERROR` : Occurs when the keepalive call also fails
+     *
+     * <li>`ERROR -> SYNCING` : Occurs when the client has performed a
+     * live update after having previously failed.
+     *
+     * <li>`ERROR -> ERROR` : Occurs when the client has failed to keepalive
+     * for a second time or more.</li>
+     *
+     * <li>`SYNCING -> SYNCING` : Occurs when the client has performed a live
+     * update. This is called <i>after</i> processing.</li>
+     *
+     * <li>`* -> STOPPED` : Occurs once the client has stopped syncing or
+     * trying to sync after stopClient has been called.</li>
+     * </ul>
+     *
+     * @param state - An enum representing the syncing state. One of "PREPARED",
+     * "SYNCING", "ERROR", "STOPPED".
+     *
+     * @param prevState - An enum representing the previous syncing state.
+     * One of "PREPARED", "SYNCING", "ERROR", "STOPPED" <b>or null</b>.
+     *
+     * @param data - Data about this transition.
+     *
+     * @example
+     * ```
+     * matrixClient.on("sync", function(state, prevState, data) {
+     *   switch (state) {
+     *     case "ERROR":
+     *       // update UI to say "Connection Lost"
+     *       break;
+     *     case "SYNCING":
+     *       // update UI to remove any "Connection Lost" message
+     *       break;
+     *     case "PREPARED":
+     *       // the client instance is ready to be queried.
+     *       var rooms = matrixClient.getRooms();
+     *       break;
+     *   }
+     * });
+     * ```
+     */
     [ClientEvent.Sync]: (state: SyncState, lastState: SyncState | null, data?: ISyncStateData) => void;
+    /**
+     * Fires whenever the SDK receives a new event.
+     * <p>
+     * This is only fired for live events received via /sync - it is not fired for
+     * events received over context, search, or pagination APIs.
+     *
+     * @param event - The matrix event which caused this event to fire.
+     * @example
+     * ```
+     * matrixClient.on("event", function(event){
+     *   var sender = event.getSender();
+     * });
+     * ```
+     */
     [ClientEvent.Event]: (event: MatrixEvent) => void;
+    /**
+     * Fires whenever the SDK receives a new to-device event.
+     * @param event - The matrix event which caused this event to fire.
+     * @example
+     * ```
+     * matrixClient.on("toDeviceEvent", function(event){
+     *   var sender = event.getSender();
+     * });
+     * ```
+     */
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
+    /**
+     * Fires whenever new user-scoped account_data is added.
+     * @param event - The event describing the account_data just added
+     * @param event - The previous account data, if known.
+     * @example
+     * ```
+     * matrixClient.on("accountData", function(event, oldEvent){
+     *   myAccountData[event.type] = event.content;
+     * });
+     * ```
+     */
     [ClientEvent.AccountData]: (event: MatrixEvent, lastEvent?: MatrixEvent) => void;
+    /**
+     * Fires whenever a new Room is added. This will fire when you are invited to a
+     * room, as well as when you join a room. <strong>This event is experimental and
+     * may change.</strong>
+     * @param room - The newly created, fully populated room.
+     * @example
+     * ```
+     * matrixClient.on("Room", function(room){
+     *   var roomId = room.roomId;
+     * });
+     * ```
+     */
     [ClientEvent.Room]: (room: Room) => void;
+    /**
+     * Fires whenever a Room is removed. This will fire when you forget a room.
+     * <strong>This event is experimental and may change.</strong>
+     * @param roomId - The deleted room ID.
+     * @example
+     * ```
+     * matrixClient.on("deleteRoom", function(roomId){
+     *   // update UI from getRooms()
+     * });
+     * ```
+     */
     [ClientEvent.DeleteRoom]: (roomId: string) => void;
-    [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
+    [ClientEvent.SyncUnexpectedError]: (error: Error) => void;/**
+     * Fires when the client .well-known info is fetched.
+     *
+     * @param data - The JSON object returned by the server
+     */
     [ClientEvent.ClientWellKnown]: (data: IClientWellKnown) => void;
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
@@ -2865,14 +3038,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param password - Passphrase string that can be entered by the user
      *     when restoring the backup as an alternative to entering the recovery key.
      *     Optional.
-     * @param opts.secureSecretStorage - Whether to use Secure
-     *     Secret Storage to store the key encrypting key backups.
-     *     Optional, defaults to false.
      *
      * @returns Object that can be passed to createKeyBackupVersion and
      *     additionally has a 'recovery_key' member with the user-facing recovery key string.
      */
-    // TODO: Verify types
     public async prepareKeyBackupVersion(
         password?: string | Uint8Array | null,
         opts: IKeyBackupPrepareOpts = { secureSecretStorage: false },
@@ -3618,11 +3787,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Join a room. If you have already joined the room, this will no-op.
      * @param roomIdOrAlias - The room ID or room alias to join.
      * @param opts - Options when joining the room.
-     * @param opts.syncRoom - True to do a room initial sync on the resulting
-     * room. If false, the <strong>returned Room object will have no current state.
-     * </strong> Default: true.
-     * @param opts.inviteSignUrl - If the caller has a keypair 3pid invite, the signing URL is passed in this parameter.
-     * @param opts.viaServers - The server names to try and join through in addition to those that are automatically chosen.
      * @returns Promise which resolves: Room object.
      * @returns Rejects: with an error response.
      */
@@ -3868,15 +4032,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.sendStateEvent(roomId, M_BEACON_INFO.name, beaconInfoContent, this.getUserId()!);
     }
 
-    /**
-     * @param roomId
-     * @param threadId
-     * @param eventType
-     * @param content
-     * @param txnId - Optional.
-     * @returns
-     * @returns Rejects: with an error response.
-     */
     public sendEvent(
         roomId: string,
         eventType: string,
@@ -4185,8 +4340,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param eventId
      * @param txnId -  transaction id. One will be made up if not supplied.
      * @param opts - Options to pass on, may contain `reason`.
      * @returns Promise which resolves: TODO
@@ -4227,9 +4380,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param threadId
-     * @param content
      * @param txnId - Optional.
      * @returns Promise which resolves: to an ISendEventResponse object
      * @returns Rejects: with an error response.
@@ -4306,9 +4456,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param threadId
-     * @param body
      * @param txnId - Optional.
      * @returns
      * @returns Rejects: with an error response.
@@ -4340,9 +4487,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param threadId
-     * @param body
      * @param txnId - Optional.
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
@@ -4374,9 +4518,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param threadId
-     * @param body
      * @param txnId - Optional.
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
@@ -4408,11 +4549,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param threadId
-     * @param url
-     * @param info
-     * @param text
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
      */
@@ -4452,11 +4588,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param threadId
-     * @param url
-     * @param info
-     * @param text
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
      */
@@ -4496,10 +4627,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param threadId
-     * @param body
-     * @param htmlBody
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
      */
@@ -4530,9 +4657,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param body
-     * @param htmlBody
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
      */
@@ -4563,10 +4687,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId
-     * @param threadId
-     * @param body
-     * @param htmlBody
      * @returns Promise which resolves: to a ISendEventResponse object
      * @returns Rejects: with an error response.
      */
@@ -5151,9 +5271,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param opts - Options to apply
-     * @param opts.presence - One of "online", "offline" or "unavailable"
-     * @param opts.status_msg - The status message to attach.
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves
      * @returns Rejects: with an error response.
      * @throws If 'presence' isn't a valid presence enum value.
      */
@@ -5701,12 +5819,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Take an EventTimeline, and back/forward-fill results.
      *
-     * @param eventTimeline - timeline
-     *    object to be updated
-     * @param   [opts]
-     * @param     [opts.backwards = false]  true to fill backwards,
-     *    false to go forwards
-     * @param   [opts.limit = 30]         number of events to request
+     * @param eventTimeline - timeline object to be updated
      *
      * @returns Promise which resolves to a boolean: false if there are no
      *    events and we reached either end of the timeline; else true.
@@ -5979,13 +6092,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Set r/w flags for guest access in a room.
      * @param roomId - The room to configure guest access in.
      * @param opts - Options
-     * @param opts.allowJoin - True to allow guests to join this room. This
-     * implicitly gives guests write access. If false or not given, guests are
-     * explicitly forbidden from joining the room.
-     * @param opts.allowRead - True to set history visibility to
-     * be world_readable. This gives guests read access *from this point forward*.
-     * If false or not given, history visibility is not modified.
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves
      * @returns Rejects: with an error response.
      */
     public setGuestAccess(roomId: string, opts: IGuestAccessOpts): Promise<void> {
@@ -7314,16 +7421,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * client.setGuest(true);
      * ```
      *
-     * @param opts - Registration options
-     * @param opts.body - JSON HTTP body to provide.
+     * @param body - JSON HTTP body to provide.
      * @returns Promise which resolves: JSON object that contains:
      *                   `{ user_id, device_id, access_token, home_server }`
      * @returns Rejects: with an error response.
      */
-    public registerGuest(opts: { body?: any }): Promise<any> { // TODO: Types
-        opts = opts || {};
-        opts.body = opts.body || {};
-        return this.registerRequest(opts.body, "guest");
+    public registerGuest({ body }: { body?: any } = {}): Promise<any> { // TODO: Types
+        return this.registerRequest(body || {}, "guest");
     }
 
     /**
@@ -8000,19 +8104,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Query the user directory with a term matching user IDs, display names and domains.
-     * @param opts - options
-     * @param opts.term - the term with which to search.
-     * @param opts.limit - the maximum number of results to return. The server will
+     * @param term - the term with which to search.
+     * @param limit - the maximum number of results to return. The server will
      *                 apply a limit if unspecified.
      * @returns Promise which resolves: an array of results.
      */
-    public searchUserDirectory(opts: { term: string, limit?: number }): Promise<IUserDirectoryResponse> {
+    public searchUserDirectory({ term, limit }: { term: string, limit?: number }): Promise<IUserDirectoryResponse> {
         const body: any = {
-            search_term: opts.term,
+            search_term: term,
         };
 
-        if (opts.limit !== undefined) {
-            body.limit = opts.limit;
+        if (limit !== undefined) {
+            body.limit = limit;
         }
 
         return this.http.authedRequest(Method.Post, "/user_directory/search", undefined, body);
@@ -8026,20 +8129,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *   a a Buffer, String or ReadStream.
      *
      * @param opts -  options object
-     *
-     * @param opts.name -   Name to give the file on the server. Defaults
-     *   to <tt>file.name</tt>.
-     *
-     * @param opts.includeFilename - if false will not send the filename,
-     *   e.g for encrypted file uploads where filename leaks are undesirable.
-     *   Defaults to true.
-     *
-     * @param opts.type -   Content-type for the upload. Defaults to
-     *   <tt>file.type</tt>, or <tt>applicaton/octet-stream</tt>.
-     *
-     * @param opts.progressHandler - Optional. Called when a chunk of
-     *    data has been uploaded, with an object containing the fields `loaded`
-     *    (number of bytes transferred) and `total` (total size, if known).
      *
      * @returns Promise which resolves to response object, as
      *    determined by this.opts.onlyData, opts.rawResponse, and
@@ -8452,22 +8541,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Perform a server-side search.
-     * @param opts -
-     * @param opts.next_batch - the batch token to pass in the query string
-     * @param opts.body - the JSON object to pass to the request body.
+     * @param next_batch - the batch token to pass in the query string
+     * @param body - the JSON object to pass to the request body.
      * @param abortSignal - optional signal used to cancel the http request.
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to the search response object.
      * @returns Rejects: with an error response.
      */
     public search(
-        opts: { body: ISearchRequestBody, next_batch?: string }, // eslint-disable-line camelcase
+        { body, next_batch: nextBatch }: { body: ISearchRequestBody, next_batch?: string },
         abortSignal?: AbortSignal,
     ): Promise<ISearchResponse> {
         const queryParams: any = {};
-        if (opts.next_batch) {
-            queryParams.next_batch = opts.next_batch;
+        if (nextBatch) {
+            queryParams.next_batch = nextBatch;
         }
-        return this.http.authedRequest(Method.Post, "/search", queryParams, opts.body, { abortSignal });
+        return this.http.authedRequest(Method.Post, "/search", queryParams, body, { abortSignal });
     }
 
     /**
@@ -8502,20 +8590,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @param userIds -  list of users to get keys for
      *
-     * @param opts -
-     *
-     * @param opts.token -   sync token to pass in the query request, to help
+     * @param token - sync token to pass in the query request, to help
      *   the HS give the most recent results
      *
      * @returns Promise which resolves: result object. Rejects: with
      *     an error response ({@link MatrixError}).
      */
-    public downloadKeysForUsers(userIds: string[], opts: { token?: string } = {}): Promise<IDownloadKeyResult> {
+    public downloadKeysForUsers(userIds: string[], { token }: { token?: string } = {}): Promise<IDownloadKeyResult> {
         const content: any = {
             device_keys: {},
         };
-        if ('token' in opts) {
-            content.token = opts.token;
+        if (token !== undefined) {
+            content.token = token;
         }
         userIds.forEach((u) => {
             content.device_keys[u] = [];
@@ -8796,7 +8882,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * only supported on identity servers which have at least the version 2 API.
      * @param addressPairs - An array of 2 element arrays.
      * The first element of each pair is the address, the second is the 3PID medium.
-     * Eg: ["email@example.org", "email"]
+     * Eg: `["email@example.org", "email"]`
      * @param identityAccessToken - The access token for the identity server.
      * @returns A collection of address mappings to
      * found MXIDs. Results where no user could be found will not be listed.
@@ -9398,353 +9484,3 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
         }
     }
 }
-
-/**
- * Fires whenever the SDK receives a new event.
- * <p>
- * This is only fired for live events received via /sync - it is not fired for
- * events received over context, search, or pagination APIs.
- *
- * @event MatrixClient#"event"
- * @param event - The matrix event which caused this event to fire.
- * @example
- * ```
- * matrixClient.on("event", function(event){
- *   var sender = event.getSender();
- * });
- * ```
- */
-
-/**
- * Fires whenever the SDK receives a new to-device event.
- * @event MatrixClient#"toDeviceEvent"
- * @param event - The matrix event which caused this event to fire.
- * @example
- * ```
- * matrixClient.on("toDeviceEvent", function(event){
- *   var sender = event.getSender();
- * });
- * ```
- */
-
-/**
- * Fires whenever the SDK's syncing state is updated. The state can be one of:
- * <ul>
- *
- * <li>PREPARED: The client has synced with the server at least once and is
- * ready for methods to be called on it. This will be immediately followed by
- * a state of SYNCING. <i>This is the equivalent of "syncComplete" in the
- * previous API.</i></li>
- *
- * <li>CATCHUP: The client has detected the connection to the server might be
- * available again and will now try to do a sync again. As this sync might take
- * a long time (depending how long ago was last synced, and general server
- * performance) the client is put in this mode so the UI can reflect trying
- * to catch up with the server after losing connection.</li>
- *
- * <li>SYNCING : The client is currently polling for new events from the server.
- * This will be called <i>after</i> processing latest events from a sync.</li>
- *
- * <li>ERROR : The client has had a problem syncing with the server. If this is
- * called <i>before</i> PREPARED then there was a problem performing the initial
- * sync. If this is called <i>after</i> PREPARED then there was a problem polling
- * the server for updates. This may be called multiple times even if the state is
- * already ERROR. <i>This is the equivalent of "syncError" in the previous
- * API.</i></li>
- *
- * <li>RECONNECTING: The sync connection has dropped, but not (yet) in a way that
- * should be considered erroneous.
- * </li>
- *
- * <li>STOPPED: The client has stopped syncing with server due to stopClient
- * being called.
- * </li>
- * </ul>
- * State transition diagram:
- * ```
- *                                          +---->STOPPED
- *                                          |
- *              +----->PREPARED -------> SYNCING <--+
- *              |                        ^  |  ^    |
- *              |      CATCHUP ----------+  |  |    |
- *              |        ^                  V  |    |
- *   null ------+        |  +------- RECONNECTING   |
- *              |        V  V                       |
- *              +------->ERROR ---------------------+
- *
- * NB: 'null' will never be emitted by this event.
- *
- * ```
- * Transitions:
- * <ul>
- *
- * <li>`null -> PREPARED` : Occurs when the initial sync is completed
- * first time. This involves setting up filters and obtaining push rules.
- *
- * <li>`null -> ERROR` : Occurs when the initial sync failed first time.
- *
- * <li>`ERROR -> PREPARED` : Occurs when the initial sync succeeds
- * after previously failing.
- *
- * <li>`PREPARED -> SYNCING` : Occurs immediately after transitioning
- * to PREPARED. Starts listening for live updates rather than catching up.
- *
- * <li>`SYNCING -> RECONNECTING` : Occurs when the live update fails.
- *
- * <li>`RECONNECTING -> RECONNECTING` : Can occur if the update calls
- * continue to fail, but the keepalive calls (to /versions) succeed.
- *
- * <li>`RECONNECTING -> ERROR` : Occurs when the keepalive call also fails
- *
- * <li>`ERROR -> SYNCING` : Occurs when the client has performed a
- * live update after having previously failed.
- *
- * <li>`ERROR -> ERROR` : Occurs when the client has failed to keepalive
- * for a second time or more.</li>
- *
- * <li>`SYNCING -> SYNCING` : Occurs when the client has performed a live
- * update. This is called <i>after</i> processing.</li>
- *
- * <li>`* -> STOPPED` : Occurs once the client has stopped syncing or
- * trying to sync after stopClient has been called.</li>
- * </ul>
- *
- * @event MatrixClient#"sync"
- *
- * @param state - An enum representing the syncing state. One of "PREPARED",
- * "SYNCING", "ERROR", "STOPPED".
- *
- * @param prevState - An enum representing the previous syncing state.
- * One of "PREPARED", "SYNCING", "ERROR", "STOPPED" <b>or null</b>.
- *
- * @param data - Data about this transition.
- *
- * @param data.error The matrix error if `state=ERROR`.
- *
- * @param data.oldSyncToken The 'since' token passed to /sync.
- *    `null` for the first successful sync since this client was
- *    started. Only present if `state=PREPARED` or
- *    `state=SYNCING`.
- *
- * @param data.nextSyncToken The 'next_batch' result from /sync, which
- *    will become the 'since' token for the next call to /sync. Only present if
- *    `state=PREPARED</code> or <code>state=SYNCING`.
- *
- * @param data.catchingUp True if we are working our way through a
- *    backlog of events after connecting. Only present if `state=SYNCING`.
- *
- * @example
- * ```
- * matrixClient.on("sync", function(state, prevState, data) {
- *   switch (state) {
- *     case "ERROR":
- *       // update UI to say "Connection Lost"
- *       break;
- *     case "SYNCING":
- *       // update UI to remove any "Connection Lost" message
- *       break;
- *     case "PREPARED":
- *       // the client instance is ready to be queried.
- *       var rooms = matrixClient.getRooms();
- *       break;
- *   }
- * });
- * ```
- */
-
-/**
- * Fires whenever a new Room is added. This will fire when you are invited to a
- * room, as well as when you join a room. <strong>This event is experimental and
- * may change.</strong>
- * @event MatrixClient#"Room"
- * @param room - The newly created, fully populated room.
- * @example
- * ```
- * matrixClient.on("Room", function(room){
- *   var roomId = room.roomId;
- * });
- * ```
- */
-
-/**
- * Fires whenever a Room is removed. This will fire when you forget a room.
- * <strong>This event is experimental and may change.</strong>
- * @event MatrixClient#"deleteRoom"
- * @param roomId - The deleted room ID.
- * @example
- * ```
- * matrixClient.on("deleteRoom", function(roomId){
- *   // update UI from getRooms()
- * });
- * ```
- */
-
-/**
- * Fires whenever an incoming call arrives.
- * @event MatrixClient#"Call.incoming"
- * @param call - The incoming call.
- * @example
- * ```
- * matrixClient.on("Call.incoming", function(call){
- *   call.answer(); // auto-answer
- * });
- * ```
- */
-
-/**
- * Fires whenever the login session the JS SDK is using is no
- * longer valid and the user must log in again.
- * NB. This only fires when action is required from the user, not
- * when then login session can be renewed by using a refresh token.
- * @event MatrixClient#"Session.logged_out"
- * @example
- * ```
- * matrixClient.on("Session.logged_out", function(errorObj){
- *   // show the login screen
- * });
- * ```
- */
-
-/**
- * Fires when the JS SDK receives a M_CONSENT_NOT_GIVEN error in response
- * to a HTTP request.
- * @event MatrixClient#"no_consent"
- * @example
- * ```
- * matrixClient.on("no_consent", function(message, contentUri) {
- *     console.info(message + ' Go to ' + contentUri);
- * });
- * ```
- */
-
-/**
- * Fires when a device is marked as verified/unverified/blocked/unblocked by
- * {@link MatrixClient#setDeviceVerified|MatrixClient.setDeviceVerified} or
- * {@link MatrixClient#setDeviceBlocked|MatrixClient.setDeviceBlocked}.
- *
- * @event MatrixClient#"deviceVerificationChanged"
- * @param userId - the owner of the verified device
- * @param deviceId - the id of the verified device
- * @param deviceInfo - updated device information
- */
-
-/**
- * Fires when the trust status of a user changes
- * If userId is the userId of the logged in user, this indicated a change
- * in the trust status of the cross-signing data on the account.
- *
- * The cross-signing API is currently UNSTABLE and may change without notice.
- *
- * @event MatrixClient#"userTrustStatusChanged"
- * @param userId - the userId of the user in question
- * @param trustLevel - The new trust level of the user
- */
-
-/**
- * Fires when the user's cross-signing keys have changed or cross-signing
- * has been enabled/disabled. The client can use getStoredCrossSigningForUser
- * with the user ID of the logged in user to check if cross-signing is
- * enabled on the account. If enabled, it can test whether the current key
- * is trusted using with checkUserTrust with the user ID of the logged
- * in user. The checkOwnCrossSigningTrust function may be used to reconcile
- * the trust in the account key.
- *
- * The cross-signing API is currently UNSTABLE and may change without notice.
- *
- * @event MatrixClient#"crossSigning.keysChanged"
- */
-
-/**
- * Fires whenever new user-scoped account_data is added.
- * @event MatrixClient#"accountData"
- * @param event - The event describing the account_data just added
- * @param event - The previous account data, if known.
- * @example
- * ```
- * matrixClient.on("accountData", function(event, oldEvent){
- *   myAccountData[event.type] = event.content;
- * });
- * ```
- */
-
-/**
- * Fires whenever the stored devices for a user have changed
- * @event MatrixClient#"crypto.devicesUpdated"
- * @param users - A list of user IDs that were updated
- * @param initialFetch - If true, the store was empty (apart
- *     from our own device) and has been seeded.
- */
-
-/**
- * Fires whenever the stored devices for a user will be updated
- * @event MatrixClient#"crypto.willUpdateDevices"
- * @param users - A list of user IDs that will be updated
- * @param initialFetch - If true, the store is empty (apart
- *     from our own device) and is being seeded.
- */
-
-/**
- * Fires whenever the status of e2e key backup changes, as returned by getKeyBackupEnabled()
- * @event MatrixClient#"crypto.keyBackupStatus"
- * @param enabled - true if key backup has been enabled, otherwise false
- * @example
- * ```
- * matrixClient.on("crypto.keyBackupStatus", function(enabled){
- *   if (enabled) {
- *     [...]
- *   }
- * });
- * ```
- */
-
-/**
- * Fires when we want to suggest to the user that they restore their megolm keys
- * from backup or by cross-signing the device.
- *
- * @event MatrixClient#"crypto.suggestKeyRestore"
- */
-
-/**
- * Fires when a key verification is requested.
- * @event MatrixClient#"crypto.verification.request"
- * @param data
- * @param data.event the original verification request message
- * @param data.methods the verification methods that can be used
- * @param data.timeout the amount of milliseconds that should be waited
- *                 before cancelling the request automatically.
- * @param data.beginKeyVerification a function to call if a key
- *     verification should be performed.  The function takes one argument: the
- *     name of the key verification method (taken from data.methods) to use.
- * @param data.cancel a function to call if the key verification is
- *     rejected.
- */
-
-/**
- * Fires when a key verification is requested with an unknown method.
- * @event MatrixClient#"crypto.verification.request.unknown"
- * @param userId - the user ID who requested the key verification
- * @param cancel - a function that will send a cancellation message to
- *     reject the key verification.
- */
-
-/**
- * Fires when a secret request has been cancelled.  If the client is prompting
- * the user to ask whether they want to share a secret, the prompt can be
- * dismissed.
- *
- * The Secure Secret Storage API is currently UNSTABLE and may change without notice.
- *
- * @event MatrixClient#"crypto.secrets.requestCancelled"
- * @param data
- * @param data.user_id The user ID of the client that had requested the secret.
- * @param data.device_id The device ID of the client that had requested the
- *     secret.
- * @param data.request_id The ID of the original request.
- */
-
-/**
- * Fires when the client .well-known info is fetched.
- *
- * @event MatrixClient#"WellKnown.client"
- * @param data - The JSON object returned by the server
- */
