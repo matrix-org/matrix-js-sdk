@@ -168,11 +168,11 @@ export class GroupCall extends TypedEventEmitter<
     public localCallFeed?: CallFeed;
     public localScreenshareFeed?: CallFeed;
     public localDesktopCapturerSourceId?: string;
-    public readonly calls = new Map<RoomMember, Map<string, MatrixCall>>();
     public readonly userMediaFeeds: CallFeed[] = [];
     public readonly screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
 
+    private readonly calls = new Map<RoomMember, Map<string, MatrixCall>>(); // RoomMember -> device ID -> MatrixCall
     private callHandlers = new Map<string, Map<string, ICallHandlers>>(); // User ID -> device ID -> handlers
     private activeSpeakerLoopInterval?: ReturnType<typeof setTimeout>;
     private retryCallLoopInterval?: ReturnType<typeof setTimeout>;
