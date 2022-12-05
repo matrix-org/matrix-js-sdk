@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "stream";
-
 import {
     ClientEvent,
     ClientEventHandlerMap,
@@ -445,7 +443,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     }
 }
 
-export class MockMatrixCall extends EventEmitter {
+export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
     constructor(public roomId: string, public groupCallId?: string) {
         super();
     }
