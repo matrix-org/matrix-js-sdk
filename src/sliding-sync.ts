@@ -95,6 +95,7 @@ export interface MSC3575RoomData {
     limited?: boolean;
     is_dm?: boolean;
     prev_batch?: string;
+    num_live?: number;
 }
 
 interface ListResponse {
