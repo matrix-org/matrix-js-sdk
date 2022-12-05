@@ -479,9 +479,10 @@ describe('Group Call', function() {
 
             it("sends metadata updates before unmuting in PTT mode", async () => {
                 const mockCall = new MockMatrixCall(FAKE_ROOM_ID, groupCall.groupCallId);
-                (groupCall as any).calls.set(
+                // @ts-ignore
+                groupCall.calls.set(
                     mockCall.getOpponentMember() as RoomMember,
-                    new Map([[mockCall.getOpponentDeviceId(), mockCall.typed()]]),
+                    new Map([[mockCall.getOpponentDeviceId()!, mockCall.typed()]]),
                 );
 
                 let metadataUpdateResolve: () => void;
@@ -504,9 +505,10 @@ describe('Group Call', function() {
 
             it("sends metadata updates after muting in PTT mode", async () => {
                 const mockCall = new MockMatrixCall(FAKE_ROOM_ID, groupCall.groupCallId);
-                (groupCall as any).calls.set(
+                // @ts-ignore
+                groupCall.calls.set(
                     mockCall.getOpponentMember() as RoomMember,
-                    new Map([[mockCall.getOpponentDeviceId(), mockCall.typed()]]),
+                    new Map([[mockCall.getOpponentDeviceId()!, mockCall.typed()]]),
                 );
 
                 // the call starts muted, so unmute to get in the right state to test
@@ -662,7 +664,8 @@ describe('Group Call', function() {
 
                 expect(client1.sendToDevice).toHaveBeenCalled();
 
-                const oldCall = (groupCall1 as any).calls.get(
+                // @ts-ignore
+                const oldCall = groupCall1.calls.get(
                     groupCall1.room.getMember(client2.userId)!,
                 )!.get(client2.deviceId)!;
                 oldCall.emit(CallEvent.Hangup, oldCall!);
@@ -683,7 +686,8 @@ describe('Group Call', function() {
                 // to even be created...
                 let newCall: MatrixCall | undefined;
                 while (
-                    (newCall = (groupCall1 as any).calls.get(
+                    // @ts-ignore
+                    (newCall = groupCall1.calls.get(
                         groupCall1.room.getMember(client2.userId)!,
                     )?.get(client2.deviceId)) === undefined
                     || newCall.peerConn === undefined
@@ -727,7 +731,8 @@ describe('Group Call', function() {
                 groupCall1.setMicrophoneMuted(false);
                 groupCall1.setLocalVideoMuted(false);
 
-                const call = (groupCall1 as any).calls.get(
+                // @ts-ignore
+                const call = groupCall1.calls.get(
                     groupCall1.room.getMember(client2.userId)!,
                 )!.get(client2.deviceId)!;
                 call.isMicrophoneMuted = jest.fn().mockReturnValue(true);
@@ -838,7 +843,8 @@ describe('Group Call', function() {
                 // It takes a bit of time for the calls to get created
                 await sleep(10);
 
-                const call = (groupCall as any).calls
+                // @ts-ignore
+                const call = groupCall.calls
                     .get(groupCall.room.getMember(FAKE_USER_ID_2)!)!
                     .get(FAKE_DEVICE_ID_2)!;
                 call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
@@ -863,7 +869,8 @@ describe('Group Call', function() {
                 // It takes a bit of time for the calls to get created
                 await sleep(10);
 
-                const call = (groupCall as any).calls
+                // @ts-ignore
+                const call = groupCall.calls
                     .get(groupCall.room.getMember(FAKE_USER_ID_2)!)!
                     .get(FAKE_DEVICE_ID_2)!;
                 call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
@@ -940,7 +947,8 @@ describe('Group Call', function() {
 
             expect(mockCall.reject).not.toHaveBeenCalled();
             expect(mockCall.answerWithCallFeeds).toHaveBeenCalled();
-            expect((groupCall as any).calls).toEqual(new Map([[
+            // @ts-ignore
+            expect(groupCall.calls).toEqual(new Map([[
                 groupCall.room.getMember(FAKE_USER_ID_1)!,
                 new Map([[FAKE_DEVICE_ID_1, mockCall]]),
             ]]));
@@ -957,7 +965,8 @@ describe('Group Call', function() {
 
             expect(oldMockCall.hangup).toHaveBeenCalled();
             expect(newMockCall.answerWithCallFeeds).toHaveBeenCalled();
-            expect((groupCall as any).calls).toEqual(new Map([[
+            // @ts-ignore
+            expect(groupCall.calls).toEqual(new Map([[
                 groupCall.room.getMember(FAKE_USER_ID_1)!,
                 new Map([[FAKE_DEVICE_ID_1, newMockCall]]),
             ]]));
@@ -1040,7 +1049,8 @@ describe('Group Call', function() {
             // It takes a bit of time for the calls to get created
             await sleep(10);
 
-            const call = (groupCall as any).calls
+            // @ts-ignore
+            const call = groupCall.calls
                 .get(groupCall.room.getMember(FAKE_USER_ID_2)!)!
                 .get(FAKE_DEVICE_ID_2)!;
             call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
