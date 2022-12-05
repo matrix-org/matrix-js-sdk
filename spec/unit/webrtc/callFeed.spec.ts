@@ -17,13 +17,30 @@ limitations under the License.
 import { SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { TestClient } from "../../TestClient";
-import { MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
+import { MockMatrixCall, MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
+import { CallEvent, CallState } from "../../../src/webrtc/call";
 
 describe("CallFeed", () => {
-    let client;
+    const roomId = "room1";
+    let client: TestClient;
+    let call: MockMatrixCall;
+    let feed: CallFeed;
 
     beforeEach(() => {
         client = new TestClient("@alice:foo", "somedevice", "token", undefined, {});
+        call = new MockMatrixCall(roomId);
+
+        feed = new CallFeed({
+            client: client.client,
+            call: call.typed(),
+            roomId,
+            userId: "user1",
+            // @ts-ignore Mock
+            stream: new MockMediaStream("stream1"),
+            purpose: SDPStreamMetadataPurpose.Usermedia,
+            audioMuted: false,
+            videoMuted: false,
+        });
     });
 
     afterEach(() => {
@@ -31,21 +48,6 @@ describe("CallFeed", () => {
     });
 
     describe("muting", () => {
-        let feed: CallFeed;
-
-        beforeEach(() => {
-            feed = new CallFeed({
-                client,
-                roomId: "room1",
-                userId: "user1",
-                // @ts-ignore Mock
-                stream: new MockMediaStream("stream1"),
-                purpose: SDPStreamMetadataPurpose.Usermedia,
-                audioMuted: false,
-                videoMuted: false,
-            });
-        });
-
         describe("muting by default", () => {
             it("should mute audio by default", () => {
                 expect(feed.isAudioMuted()).toBeTruthy();
@@ -84,6 +86,25 @@ describe("CallFeed", () => {
                 feed.setAudioVideoMuted(false, true);
                 expect(feed.isVideoMuted()).toBeTruthy();
             });
+        });
+    });
+
+    describe("connected", () => {
+        it.each([true, false])("should always be connected, if isLocal()", (val: boolean) => {
+            // @ts-ignore
+            feed._connected = val;
+            jest.spyOn(feed, "isLocal").mockReturnValue(true);
+
+            expect(feed.connected).toBeTruthy();
+        });
+
+        it.each([
+            [CallState.Connected, true],
+            [CallState.Connecting, false],
+        ])("should react to call state, when !isLocal()", (state: CallState, expected: Boolean) => {
+            call.emit(CallEvent.State, state);
+
+            expect(feed.connected).toBe(expected);
         });
     });
 });
