@@ -233,6 +233,7 @@ export interface IOlmEncryptedContent {
     algorithm: typeof olmlib.OLM_ALGORITHM;
     sender_key: string;
     ciphertext: Record<string, IMessage>;
+    [ToDeviceMessageId]: string;
 }
 
 export interface IMegolmEncryptedContent {
