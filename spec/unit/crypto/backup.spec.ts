@@ -131,7 +131,7 @@ function makeTestClient(cryptoStore) {
         baseUrl: "https://my.home.server",
         idBaseUrl: "https://identity.server",
         accessToken: "my.access.token",
-        fetchFn: jest.fn(), // NOP //httpBackend.fetchFn,
+        fetchFn: jest.fn(), // NOP
         store: store,
         scheduler: scheduler,
         userId: "@alice:bar",
