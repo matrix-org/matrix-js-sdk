@@ -128,7 +128,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
         this.room.on(RoomEvent.Redaction, this.onRedaction);
-        this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
+        this.room.on(RoomEvent.LocalEchoUpdated, this.onLocalEcho);
         this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
@@ -198,6 +198,10 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
     };
 
+    private onLocalEcho = async (event: MatrixEvent): Promise<void> => {
+        this.onNewReply(event, true);
+    };
+
     private onTimelineEvent = (
         event: MatrixEvent,
         room: Room | undefined,
@@ -207,16 +211,17 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         if (!toStartOfTimeline) {
             room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
         }
-        this.onEcho(event);
+        this.onNewReply(event, !toStartOfTimeline);
     };
 
-    private onEcho = async (event: MatrixEvent): Promise<void> => {
+    private onNewReply = async (event: MatrixEvent, emit: boolean): Promise<void> => {
         if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
         if (this.lastEvent === event) return;
-        if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
 
         await this.updateThreadMetadata();
-        this.emit(ThreadEvent.NewReply, this, event);
+        if (emit) {
+            this.emit(ThreadEvent.NewReply, this, event);
+        }
     };
 
     public get roomState(): RoomState {
