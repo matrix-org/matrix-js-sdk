@@ -15,16 +15,7 @@ limitations under the License.
 */
 
 import "../../dist/browser-matrix"; // uses browser-matrix instead of the src
-import type * as BrowserMatrix from "../../src/browser-index";
-
-declare global {
-    // eslint-disable-next-line @typescript-eslint/no-namespace
-    namespace NodeJS {
-        interface Global {
-            matrixcs: typeof BrowserMatrix;
-        }
-    }
-}
+import type { default as BrowserMatrix } from "../../src/browser-index";
 
 // stub for browser-matrix browserify tests
 // @ts-ignore
@@ -40,4 +31,4 @@ afterAll(() => {
 global.matrixcs = {
     ...global.matrixcs,
     timeoutSignal: () => new AbortController().signal,
-};
+} as typeof BrowserMatrix;
