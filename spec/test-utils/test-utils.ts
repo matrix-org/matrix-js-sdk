@@ -332,7 +332,7 @@ export function mkReplyMessage(
  *
  * @constructor
  */
-export class MockStorageApi {
+export class MockStorageApi implements Storage {
     private data: Record<string, any> = {};
 
     public get length() {
@@ -353,6 +353,10 @@ export class MockStorageApi {
 
     public removeItem(k: string): void {
         delete this.data[k];
+    }
+
+    public clear(): void {
+        this.data = {};
     }
 }
 

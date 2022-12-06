@@ -72,14 +72,21 @@ describe("DeviceList management:", function() {
     }
 
     let aliceTestClient: TestClient;
+    let sessionStoreBackend: Storage;
 
     async function createTestClient() {
-        const testClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs");
+        const testClient = new TestClient(
+            "@alice:localhost", "xzcvb", "akjgkrgjs", sessionStoreBackend,
+        );
         await testClient.client.initCrypto();
         return testClient;
     }
 
     beforeEach(async function() {
+        // we create our own sessionStoreBackend so that we can use it for
+        // another TestClient.
+        sessionStoreBackend = new testUtils.MockStorageApi();
+
         aliceTestClient = await createTestClient();
     });
 
@@ -369,9 +376,7 @@ describe("DeviceList management:", function() {
                 const bobStat = data!.trackingStatus['@bob:xyz'];
 
                 // Alice should have marked bob's device list as untracked
-                expect(bobStat).toEqual(
-                    0,
-                );
+                expect(bobStat).toEqual(0);
             });
         });
 
@@ -392,9 +397,7 @@ describe("DeviceList management:", function() {
                     const bobStat = data!.trackingStatus['@bob:xyz'];
 
                     // Alice should have marked bob's device list as untracked
-                    expect(bobStat).toEqual(
-                        0,
-                    );
+                    expect(bobStat).toEqual(0);
                 });
             } finally {
                 anotherTestClient.stop();

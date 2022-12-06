@@ -1096,7 +1096,7 @@ export class SyncApi {
             const prevEventsMap = events.reduce<Record<string, MatrixEvent | undefined>>((m, c) => {
                 m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
-            }, {} as Record<string, MatrixEvent | undefined>);
+            }, {});
             client.store.storeAccountDataEvents(events);
             events.forEach(
                 function(accountDataEvent) {

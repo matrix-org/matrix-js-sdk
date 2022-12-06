@@ -240,8 +240,6 @@ export interface IMegolmEncryptedContent {
     algorithm: typeof olmlib.MEGOLM_ALGORITHM;
     sender_key: string;
     session_id: string;
-    // Include our device ID so that recipients can send us a m.new_device message if they don't have our session key.
-    // XXX: Do we still need this now that m.new_device messages no longer exist since #483?
     device_id: string;
     ciphertext: string;
     [ToDeviceMessageId]?: string;

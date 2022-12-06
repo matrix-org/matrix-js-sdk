@@ -106,10 +106,7 @@ const CURVE25519_BACKUP_INFO = {
 const AES256_BACKUP_INFO: IKeyBackupInfo = {
     algorithm: "org.matrix.msc3270.v1.aes-hmac-sha2",
     version: '1',
-    auth_data: {
-        iv: "iv",
-        mac: "mac",
-    },
+    auth_data: {} as IKeyBackupInfo["auth_data"],
 };
 
 const keys: Record<string, Uint8Array> = {};

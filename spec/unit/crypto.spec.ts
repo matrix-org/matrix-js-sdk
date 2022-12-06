@@ -991,7 +991,7 @@ describe("Crypto", function() {
             ensureOlmSessionsForDevices.mockResolvedValue({});
             encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
             encryptMessageForDevice.mockImplementation(async (...[result,,,,,, payload]) => {
-                result.plaintext.body = JSON.stringify(payload);
+                result.plaintext = { type: 0, body: JSON.stringify(payload) };
             });
 
             client = new TestClient("@alice:example.org", "aliceweb");
@@ -1000,7 +1000,7 @@ describe("Crypto", function() {
             encryptedPayload = {
                 algorithm: "m.olm.v1.curve25519-aes-sha2",
                 sender_key: client.client.crypto!.olmDevice.deviceCurve25519Key,
-                ciphertext: { plaintext: JSON.stringify(payload) },
+                ciphertext: { plaintext: { type: 0, body: JSON.stringify(payload) } },
             };
         });
 
@@ -1048,7 +1048,7 @@ describe("Crypto", function() {
             encryptMessageForDevice.mockImplementation(async (...[result,,,, userId, device, payload]) => {
                 // Refuse to encrypt to Carol's desktop device
                 if (userId === "@carol:example.org" && device.deviceId === "caroldesktop") return;
-                result.plaintext.body = JSON.stringify(payload);
+                result.plaintext = { type: 0, body: JSON.stringify(payload) };
             });
 
             client.httpBackend
