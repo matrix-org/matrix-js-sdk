@@ -20,6 +20,8 @@ limitations under the License.
  * @module crypto/algorithms/megolm
  */
 
+import { v4 as uuidv4 } from "uuid";
+
 import { logger } from '../../logger';
 import * as olmlib from "../olmlib";
 import {
@@ -37,7 +39,7 @@ import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
 import { MatrixEvent } from "../../models/event";
-import { EventType, MsgType } from '../../@types/event';
+import { EventType, MsgType, ToDeviceMessageId } from '../../@types/event';
 import { IEncryptedContent, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
 import { RoomKeyRequestState } from '../OutgoingRoomKeyRequestManager';
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
@@ -655,9 +657,13 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const deviceInfo = blockedInfo.deviceInfo;
             const deviceId = deviceInfo.deviceId;
 
-            const message = Object.assign({}, payload);
-            message.code = blockedInfo.code;
-            message.reason = blockedInfo.reason;
+            const message = {
+                ...payload,
+                code: blockedInfo.code,
+                reason: blockedInfo.reason,
+                [ToDeviceMessageId]: uuidv4(),
+            };
+
             if (message.code === "m.no_olm") {
                 delete message.room_id;
                 delete message.session_id;
@@ -759,6 +765,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
             algorithm: olmlib.OLM_ALGORITHM,
             sender_key: this.olmDevice.deviceCurve25519Key,
             ciphertext: {},
+            [ToDeviceMessageId]: uuidv4(),
         };
         await olmlib.encryptMessageForDevice(
             encryptedContent.ciphertext,
@@ -1667,6 +1674,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 algorithm: olmlib.OLM_ALGORITHM,
                 sender_key: this.olmDevice.deviceCurve25519Key,
                 ciphertext: {},
+                [ToDeviceMessageId]: uuidv4(),
             };
             await olmlib.encryptMessageForDevice(
                 encryptedContent.ciphertext,
@@ -1748,6 +1756,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 algorithm: olmlib.OLM_ALGORITHM,
                 sender_key: this.olmDevice.deviceCurve25519Key,
                 ciphertext: {},
+                [ToDeviceMessageId]: uuidv4,
             };
 
             return this.olmlib.encryptMessageForDevice(
@@ -1923,6 +1932,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                         algorithm: olmlib.OLM_ALGORITHM,
                         sender_key: this.olmDevice.deviceCurve25519Key!,
                         ciphertext: {},
+                        [ToDeviceMessageId]: uuidv4(),
                     };
                     contentMap[userId][deviceInfo.deviceId] = encryptedContent;
                     promises.push(

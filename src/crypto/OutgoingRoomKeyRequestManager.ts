@@ -14,11 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { v4 as uuidv4 } from "uuid";
+
 import { logger } from '../logger';
 import { MatrixClient } from "../client";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index";
 import { CryptoStore, OutgoingRoomKeyRequest } from './store/base';
-import { EventType } from "../@types/event";
+import { EventType, ToDeviceMessageId } from "../@types/event";
 
 /**
  * Internal module. Management of outgoing room key requests.
@@ -483,7 +485,10 @@ export class OutgoingRoomKeyRequestManager {
             if (!contentMap[recip.userId]) {
                 contentMap[recip.userId] = {};
             }
-            contentMap[recip.userId][recip.deviceId] = message;
+            contentMap[recip.userId][recip.deviceId] = {
+                ...message,
+                [ToDeviceMessageId]: uuidv4(),
+            };
         }
 
         return this.baseApis.sendToDevice(EventType.RoomKeyRequest, contentMap, txnId);

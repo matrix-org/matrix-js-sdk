@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "21.2.0",
+  "version": "22.0.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "engines": {
     "node": ">=16.0.0"
@@ -63,7 +63,8 @@
     "p-retry": "4",
     "qs": "^6.9.6",
     "sdp-transform": "^2.14.1",
-    "unhomoglyph": "^1.0.6"
+    "unhomoglyph": "^1.0.6",
+    "uuid": "7"
   },
   "devDependencies": {
     "@babel/cli": "^7.12.10",
@@ -86,6 +87,7 @@
     "@types/jest": "^29.0.0",
     "@types/node": "18",
     "@types/sdp-transform": "^2.4.5",
+    "@types/uuid": "7",
     "@typescript-eslint/eslint-plugin": "^5.6.0",
     "@typescript-eslint/parser": "^5.6.0",
     "allchange": "^1.0.6",

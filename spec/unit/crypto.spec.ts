@@ -1016,18 +1016,24 @@ describe("Crypto", function() {
 
         it("encrypts and sends to devices", async () => {
             client.httpBackend
-                .when("PUT", "/sendToDevice/m.room.encrypted", {
-                    messages: {
-                        "@bob:example.org": {
-                            bobweb: encryptedPayload,
-                            bobmobile: encryptedPayload,
+                .when("PUT", "/sendToDevice/m.room.encrypted")
+                .check((request) => {
+                    const data = request.data;
+                    delete data.messages["@bob:example.org"]["bobweb"]["org.matrix.msgid"];
+                    delete data.messages["@bob:example.org"]["bobmobile"]["org.matrix.msgid"];
+                    delete data.messages["@carol:example.org"]["caroldesktop"]["org.matrix.msgid"];
+                    expect(data).toStrictEqual({
+                        messages: {
+                            "@bob:example.org": {
+                                bobweb: encryptedPayload,
+                                bobmobile: encryptedPayload,
+                            },
+                            "@carol:example.org": {
+                                caroldesktop: encryptedPayload,
+                            },
                         },
-                        "@carol:example.org": {
-                            caroldesktop: encryptedPayload,
-                        },
-                    },
-                })
-                .respond(200, {});
+                    });
+                }).respond(200, {});
 
             await Promise.all([
                 client.client.encryptAndSendToDevices(
@@ -1050,9 +1056,14 @@ describe("Crypto", function() {
             });
 
             client.httpBackend
-                .when("PUT", "/sendToDevice/m.room.encrypted", {
+                .when("PUT", "/sendToDevice/m.room.encrypted")
+                .check((req) => {
+                    const data = req.data;
+                    delete data.messages["@bob:example.org"]["bobweb"]["org.matrix.msgid"];
                     // Carol is nowhere to be seen
-                    messages: { "@bob:example.org": { bobweb: encryptedPayload } },
+                    expect(data).toStrictEqual({
+                        messages: { "@bob:example.org": { bobweb: encryptedPayload } },
+                    });
                 })
                 .respond(200, {});
 
