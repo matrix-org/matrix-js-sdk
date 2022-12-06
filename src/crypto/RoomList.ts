@@ -38,7 +38,7 @@ export class RoomList {
     // Object of roomId -> room e2e info object (body of the m.room.encryption event)
     private roomEncryption: Record<string, IRoomEncryption> = {};
 
-    constructor(private readonly cryptoStore?: CryptoStore) {}
+    public constructor(private readonly cryptoStore?: CryptoStore) {}
 
     public async init(): Promise<void> {
         await this.cryptoStore!.doTxn(

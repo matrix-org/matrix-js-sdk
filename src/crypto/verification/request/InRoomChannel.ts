@@ -44,7 +44,7 @@ export class InRoomChannel implements IVerificationChannel {
      * @param {string} roomId id of the room where verification events should be posted in, should be a DM with the given user.
      * @param {string} userId id of user that the verification request is directed at, should be present in the room.
      */
-    constructor(
+    public constructor(
         private readonly client: MatrixClient,
         public readonly roomId: string,
         public userId?: string,

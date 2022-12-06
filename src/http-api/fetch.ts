@@ -41,7 +41,7 @@ export type ResponseType<T, O extends IHttpOpts> =
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
 
-    constructor(
+    public constructor(
         private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,
         public readonly opts: O,
     ) {

@@ -173,7 +173,9 @@ describe("MatrixClient", function() {
                 signatures: {},
             };
 
-            httpBackend!.when("POST", inviteSignUrl).respond(200, signature);
+            httpBackend!.when("POST", inviteSignUrl).check(request => {
+                expect(request.queryParams?.mxid).toEqual(client!.getUserId());
+            }).respond(200, signature);
             httpBackend!.when("POST", "/join/" + encodeURIComponent(roomId)).check(request => {
                 expect(request.data.third_party_signed).toEqual(signature);
             }).respond(200, { room_id: roomId });
@@ -1340,27 +1342,38 @@ describe("MatrixClient", function() {
         });
     });
 
-    describe("registerWithIdentityServer", () => {
-        it("should pass data to POST request", async () => {
-            const token = {
-                access_token: "access_token",
-                token_type: "Bearer",
-                matrix_server_name: "server_name",
-                expires_in: 12345,
-            };
+    describe("setPowerLevel", () => {
+        it.each([
+            {
+                userId: "alice@localhost",
+                expectation: {
+                    "alice@localhost": 100,
+                },
+            },
+            {
+                userId: ["alice@localhost", "bob@localhost"],
+                expectation: {
+                    "alice@localhost": 100,
+                    "bob@localhost": 100,
+                },
+            },
+        ])("should modify power levels of $userId correctly", async ({ userId, expectation }) => {
+            const event = {
+                getType: () => "m.room.power_levels",
+                getContent: () => ({
+                    users: {
+                        "alice@localhost": 50,
+                    },
+                }),
+            } as MatrixEvent;
 
-            httpBackend!.when("POST", "/account/register").check(req => {
-                expect(req.data).toStrictEqual(token);
-            }).respond(200, {
-                access_token: "at",
-                token: "tt",
-            });
+            httpBackend!.when("PUT", "/state/m.room.power_levels").check(req => {
+                expect(req.data.users).toStrictEqual(expectation);
+            }).respond(200, {});
 
-            const prom = client!.registerWithIdentityServer(token);
+            const prom = client!.setPowerLevel("!room_id:server", userId, 100, event);
             await httpBackend!.flushAllExpected();
-            const resp = await prom;
-            expect(resp.access_token).toBe("at");
-            expect(resp.token).toBe("tt");
+            await prom;
         });
     });
 

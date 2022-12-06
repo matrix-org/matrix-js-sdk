@@ -37,7 +37,7 @@ let event: MatrixEvent;
 let threadEvent: MatrixEvent;
 
 const ROOM_ID = "!roomId:example.org";
-let THREAD_ID;
+let THREAD_ID: string;
 
 function mkPushAction(notify, highlight): IActionsObject {
     return {
@@ -76,7 +76,7 @@ describe("fixNotificationCountOnDecryption", () => {
             event: true,
         }, mockClient);
 
-        THREAD_ID = event.getId();
+        THREAD_ID = event.getId()!;
         threadEvent = mkEvent({
             type: EventType.RoomMessage,
             content: {
@@ -108,6 +108,16 @@ describe("fixNotificationCountOnDecryption", () => {
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
     });
 
+    it("does not change the room count when there's no unread count", () => {
+        room.setUnreadNotificationCount(NotificationCountType.Total, 0);
+        room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
+
+        fixNotificationCountOnDecryption(mockClient, event);
+
+        expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(1);
+        expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
+    });
+
     it("changes the thread count to highlight on decryption", () => {
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(1);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
@@ -116,6 +126,16 @@ describe("fixNotificationCountOnDecryption", () => {
 
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(1);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(1);
+    });
+
+    it("does not change the room count when there's no unread count", () => {
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
+
+        fixNotificationCountOnDecryption(mockClient, event);
+
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
     });
 
     it("emits events", () => {

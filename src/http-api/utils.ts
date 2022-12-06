@@ -36,13 +36,13 @@ export function anySignal(signals: AbortSignal[]): {
 } {
     const controller = new AbortController();
 
-    function cleanup() {
+    function cleanup(): void {
         for (const signal of signals) {
             signal.removeEventListener("abort", onAbort);
         }
     }
 
-    function onAbort() {
+    function onAbort(): void {
         controller.abort();
         cleanup();
     }

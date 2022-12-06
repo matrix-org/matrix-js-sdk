@@ -24,7 +24,7 @@ import { deepCopy, isSupportedReceiptType } from "./utils";
 import { IContent, IUnsigned } from "./models/event";
 import { IRoomSummary } from "./models/room-summary";
 import { EventType } from "./@types/event";
-import { ReceiptType } from "./@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, ReceiptContent, ReceiptType } from "./@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from './@types/sync';
 
 interface IOpts {
@@ -165,6 +165,15 @@ interface IRoom {
             eventId: string;
         };
     };
+    _threadReadReceipts: {
+        [threadId: string]: {
+            [userId: string]: {
+                data: IMinimalEvent;
+                type: ReceiptType;
+                eventId: string;
+            };
+        };
+    };
 }
 
 export interface ISyncData {
@@ -202,7 +211,7 @@ export class SyncAccumulator {
      * never be more. This cannot be 0 or else it makes it impossible to scroll
      * back in a room. Default: 50.
      */
-    constructor(private readonly opts: IOpts = {}) {
+    public constructor(private readonly opts: IOpts = {}) {
         this.opts.maxTimelineEntries = this.opts.maxTimelineEntries || 50;
     }
 
@@ -369,6 +378,7 @@ export class SyncAccumulator {
                 _unreadThreadNotifications: {},
                 _summary: {},
                 _readReceipts: {},
+                _threadReadReceipts: {},
             };
         }
         const currentData = this.joinRooms[roomId];
@@ -425,23 +435,30 @@ export class SyncAccumulator {
             // of a hassle to work with. We'll inflate this back out when
             // getJSON() is called.
             Object.keys(e.content).forEach((eventId) => {
-                Object.entries<{
-                    [eventId: string]: {
-                        [receiptType: string]: {
-                            [userId: string]: IMinimalEvent;
-                        };
-                    };
-                }>(e.content[eventId]).forEach(([key, value]) => {
+                Object.entries<ReceiptContent>(e.content[eventId]).forEach(([key, value]) => {
                     if (!isSupportedReceiptType(key)) return;
 
-                    Object.keys(value).forEach((userId) => {
-                        // clobber on user ID
-                        currentData._readReceipts[userId] = {
+                    for (const userId of Object.keys(value)) {
+                        const data = e.content[eventId][key][userId];
+
+                        const receipt = {
                             data: e.content[eventId][key][userId],
                             type: key as ReceiptType,
                             eventId: eventId,
                         };
-                    });
+
+                        if (!data.thread_id || data.thread_id === MAIN_ROOM_TIMELINE) {
+                            currentData._readReceipts[userId] = receipt;
+                        } else {
+                            currentData._threadReadReceipts = {
+                                ...currentData._threadReadReceipts,
+                                [data.thread_id]: {
+                                    ...(currentData._threadReadReceipts[data.thread_id] ?? {}),
+                                    [userId]: receipt,
+                                },
+                            };
+                        }
+                    }
                 });
             });
         });
@@ -566,8 +583,8 @@ export class SyncAccumulator {
                     // $event_id: { "m.read": { $user_id: $json } }
                 },
             };
-            Object.keys(roomData._readReceipts).forEach((userId) => {
-                const receiptData = roomData._readReceipts[userId];
+
+            for (const [userId, receiptData] of Object.entries(roomData._readReceipts)) {
                 if (!receiptEvent.content[receiptData.eventId]) {
                     receiptEvent.content[receiptData.eventId] = {};
                 }
@@ -577,7 +594,21 @@ export class SyncAccumulator {
                 receiptEvent.content[receiptData.eventId][receiptData.type][userId] = (
                     receiptData.data
                 );
-            });
+            }
+
+            for (const threadReceipts of Object.values(roomData._threadReadReceipts)) {
+                for (const [userId, receiptData] of Object.entries(threadReceipts)) {
+                    if (!receiptEvent.content[receiptData.eventId]) {
+                        receiptEvent.content[receiptData.eventId] = {};
+                    }
+                    if (!receiptEvent.content[receiptData.eventId][receiptData.type]) {
+                        receiptEvent.content[receiptData.eventId][receiptData.type] = {};
+                    }
+                    receiptEvent.content[receiptData.eventId][receiptData.type][userId] = (
+                        receiptData.data
+                    );
+                }
+            }
             // add only if we have some receipt data
             if (Object.keys(receiptEvent.content).length > 0) {
                 roomJson.ephemeral.events.push(receiptEvent as IMinimalEvent);

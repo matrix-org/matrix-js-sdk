@@ -268,7 +268,7 @@ const CALL_TIMEOUT_MS = 60000;
 export class CallError extends Error {
     public readonly code: string;
 
-    constructor(code: CallErrorCode, msg: string, err: Error) {
+    public constructor(code: CallErrorCode, msg: string, err: Error) {
         // Still don't think there's any way to have proper nested errors
         super(msg + ": " + err);
 
@@ -404,7 +404,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentSessionId?: string;
     public groupCallId?: string;
 
-    constructor(opts: CallOpts) {
+    public constructor(opts: CallOpts) {
         super();
 
         this.roomId = opts.roomId;
@@ -452,7 +452,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param label A human readable label for this datachannel
      * @param options An object providing configuration options for the data channel.
      */
-    public createDataChannel(label: string, options: RTCDataChannelInit | undefined) {
+    public createDataChannel(label: string, options: RTCDataChannelInit | undefined): RTCDataChannel {
         const dataChannel = this.peerConn!.createDataChannel(label, options);
         this.emit(CallEvent.DataChannel, dataChannel);
         return dataChannel;
@@ -460,6 +460,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public getOpponentMember(): RoomMember | undefined {
         return this.opponentMember;
+    }
+
+    public getOpponentDeviceId(): string | undefined {
+        return this.opponentDeviceId;
     }
 
     public getOpponentSessionId(): string | undefined {
@@ -564,7 +568,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.feeds.filter((feed) => !feed.isLocal());
     }
 
-    private async initOpponentCrypto() {
+    private async initOpponentCrypto(): Promise<void> {
         if (!this.opponentDeviceId) return;
         if (!this.client.getUseE2eForGroupCall()) return;
         // It's possible to want E2EE and yet not have the means to manage E2EE
@@ -644,6 +648,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             client: this.client,
             roomId: this.roomId,
             userId,
+            deviceId: this.getOpponentDeviceId(),
             stream,
             purpose,
             audioMuted,
@@ -688,6 +693,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             audioMuted: false,
             videoMuted: false,
             userId,
+            deviceId: this.getOpponentDeviceId(),
             stream,
             purpose,
         }));
@@ -718,6 +724,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 audioMuted: false,
                 videoMuted: false,
                 userId,
+                deviceId: this.getOpponentDeviceId(),
                 stream,
                 purpose,
             }),
@@ -938,7 +945,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 }
             }, invite.lifetime - event.getLocalAge());
 
-            const onState = (state: CallState) => {
+            const onState = (state: CallState): void => {
                 if (state !== CallState.Ringing) {
                     clearTimeout(ringingTimer);
                     this.off(CallEvent.State, onState);
@@ -1009,6 +1016,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     client: this.client,
                     roomId: this.roomId,
                     userId: this.client.getUserId()!,
+                    deviceId: this.client.getDeviceId() ?? undefined,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
                     audioMuted: false,
@@ -1079,7 +1087,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         logger.debug(`Ending call ${this.callId} with reason ${reason}`);
         this.terminate(CallParty.Local, reason, !suppressEvent);
         // We don't want to send hangup here if we didn't even get to sending an invite
-        if (this.state === CallState.WaitLocalMedia) return;
+        if ([CallState.Fledgling, CallState.WaitLocalMedia].includes(this.state)) return;
         const content = {};
         // Don't send UserHangup reason to older clients
         if ((this.opponentVersion && this.opponentVersion !== 0) || reason !== CallErrorCode.UserHangup) {
@@ -2104,6 +2112,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.info(`Hanging up call ${this.callId} (ICE disconnected for too long)`);
                 this.hangup(CallErrorCode.IceFailed, false);
             }, 30 * 1000);
+            this.setState(CallState.Connecting);
         }
 
         // In PTT mode, override feed status to muted when we lose connection to
@@ -2131,7 +2140,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.pushRemoteFeed(stream);
 
         if (!this.removeTrackListeners.has(stream)) {
-            const onRemoveTrack = () => {
+            const onRemoveTrack = (): void => {
                 if (stream.getTracks().length === 0) {
                     logger.info(`Call ${this.callId} removing track streamId: ${stream.id}`);
                     this.deleteFeedByStream(stream);
@@ -2583,6 +2592,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 client: this.client,
                 roomId: this.roomId,
                 userId: this.client.getUserId()!,
+                deviceId: this.client.getDeviceId() ?? undefined,
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,

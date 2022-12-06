@@ -11,14 +11,20 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ReceiptType } from "../@types/read_receipts";
+import {
+    CachedReceipt,
+    MAIN_ROOM_TIMELINE,
+    Receipt,
+    ReceiptCache,
+    Receipts,
+    ReceiptType,
+    WrappedReceipt,
+} from "../@types/read_receipts";
 import { ListenerMap, TypedEventEmitter } from "./typed-event-emitter";
 import * as utils from "../utils";
 import { MatrixEvent } from "./event";
 import { EventType } from "../@types/event";
 import { EventTimelineSet } from "./event-timeline-set";
-
-export const MAIN_ROOM_TIMELINE = "main";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
@@ -27,7 +33,7 @@ export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptTyp
                 [receiptType]: {
                     [userId]: {
                         ts: event.getTs(),
-                        threadId: event.threadRootId ?? MAIN_ROOM_TIMELINE,
+                        thread_id: event.threadRootId ?? MAIN_ROOM_TIMELINE,
                     },
                 },
             },
@@ -37,40 +43,8 @@ export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptTyp
     });
 }
 
-export interface Receipt {
-    ts: number;
-    thread_id?: string;
-}
-
-export interface WrappedReceipt {
-    eventId: string;
-    data: Receipt;
-}
-
-interface CachedReceipt {
-    type: ReceiptType;
-    userId: string;
-    data: Receipt;
-}
-
-type ReceiptCache = {[eventId: string]: CachedReceipt[]};
-
-export interface ReceiptContent {
-    [eventId: string]: {
-        [key in ReceiptType]: {
-            [userId: string]: Receipt;
-        };
-    };
-}
-
 const ReceiptPairRealIndex = 0;
 const ReceiptPairSyntheticIndex = 1;
-// We will only hold a synthetic receipt if we do not have a real receipt or the synthetic is newer.
-type Receipts = {
-    [receiptType: string]: {
-        [userId: string]: [WrappedReceipt | null, WrappedReceipt | null]; // Pair<real receipt, synthetic receipt> (both nullable)
-    };
-};
 
 export abstract class ReadReceipt<
     Events extends string,

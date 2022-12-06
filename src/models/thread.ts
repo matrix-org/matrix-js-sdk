@@ -16,10 +16,10 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import { MatrixClient } from "../client";
+import { MatrixClient, PendingEventOrdering } from "../client";
 import { TypedReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
-import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
+import { EventStatus, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from './event-timeline-set';
 import { NotificationCountType, Room, RoomEvent } from './room';
@@ -51,6 +51,7 @@ export type EventHandlerMap = {
 interface IThreadOpts {
     room: Room;
     client: MatrixClient;
+    pendingEventOrdering?: PendingEventOrdering;
 }
 
 export enum FeatureSupport {
@@ -81,6 +82,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * A reference to all the events ID at the bottom of the threads
      */
     public readonly timelineSet: EventTimelineSet;
+    public timeline: MatrixEvent[] = [];
 
     private _currentUserParticipated = false;
 
@@ -88,13 +90,16 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     private lastEvent: MatrixEvent | undefined;
     private replyCount = 0;
+    private lastPendingEvent: MatrixEvent | undefined;
+    private pendingReplyCount = 0;
 
     public readonly room: Room;
     public readonly client: MatrixClient;
+    private readonly pendingEventOrdering: PendingEventOrdering;
 
     public initialEventsFetched = !Thread.hasServerSideSupport;
 
-    constructor(
+    public constructor(
         public readonly id: string,
         public rootEvent: MatrixEvent | undefined,
         opts: IThreadOpts,
@@ -109,6 +114,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         this.room = opts.room;
         this.client = opts.client;
+        this.pendingEventOrdering = opts.pendingEventOrdering ?? PendingEventOrdering.Chronological;
         this.timelineSet = new EventTimelineSet(this.room, {
             timelineSupport: true,
             pendingEvents: true,
@@ -123,11 +129,11 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
         this.room.on(RoomEvent.Redaction, this.onRedaction);
         this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
-        this.timelineSet.on(RoomEvent.Timeline, this.onEcho);
+        this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
-        this.initialiseThread();
+        this.updateThreadMetadata();
         this.setEventMetadata(this.rootEvent);
     }
 
@@ -167,7 +173,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         Thread.hasServerSideFwdPaginationSupport = status;
     }
 
-    private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent) => {
+    private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent): void => {
         if (event?.isRelation(THREAD_RELATION_TYPE.name) &&
             this.room.eventShouldLiveIn(event).threadId === this.id &&
             event.getId() !== this.id && // the root event isn't counted in the length so ignore this redaction
@@ -178,26 +184,38 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
     };
 
-    private onRedaction = async (event: MatrixEvent) => {
+    private onRedaction = async (event: MatrixEvent): Promise<void> => {
         if (event.threadRootId !== this.id) return; // ignore redactions for other timelines
         if (this.replyCount <= 0) {
-            for (const threadEvent of this.events) {
+            for (const threadEvent of this.timeline) {
                 this.clearEventMetadata(threadEvent);
             }
             this.lastEvent = this.rootEvent;
             this._currentUserParticipated = false;
             this.emit(ThreadEvent.Delete, this);
         } else {
-            await this.initialiseThread();
+            await this.updateThreadMetadata();
         }
     };
 
-    private onEcho = async (event: MatrixEvent) => {
+    private onTimelineEvent = (
+        event: MatrixEvent,
+        room: Room | undefined,
+        toStartOfTimeline: boolean | undefined,
+    ): void => {
+        // Add a synthesized receipt when paginating forward in the timeline
+        if (!toStartOfTimeline) {
+            room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
+        }
+        this.onEcho(event);
+    };
+
+    private onEcho = async (event: MatrixEvent): Promise<void> => {
         if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
         if (this.lastEvent === event) return;
         if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
 
-        await this.initialiseThread();
+        await this.updateThreadMetadata();
         this.emit(ThreadEvent.NewReply, this, event);
     };
 
@@ -216,12 +234,13 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                     roomState: this.roomState,
                 },
             );
+            this.timeline = this.events;
         }
     }
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(ev => this.addEvent(ev, toStartOfTimeline, false));
-        this.initialiseThread();
+        this.updateThreadMetadata();
     }
 
     /**
@@ -266,7 +285,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         if (emit) {
             this.emit(ThreadEvent.NewReply, this, event);
-            this.initialiseThread();
+            this.updateThreadMetadata();
         }
     }
 
@@ -275,27 +294,52 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.setEventMetadata(event);
             await this.fetchEditsWhereNeeded(event);
         }
+        this.timeline = this.events;
     }
 
     private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
-    public async initialiseThread(): Promise<void> {
-        let bundledRelationship = this.getRootEventBundledRelationship();
-        if (Thread.hasServerSideSupport) {
-            await this.fetchRootEvent();
-            bundledRelationship = this.getRootEventBundledRelationship();
-        }
-
+    private async processRootEvent(): Promise<void> {
+        const bundledRelationship = this.getRootEventBundledRelationship();
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
             const mapper = this.client.getEventMapper();
-            this.lastEvent = mapper(bundledRelationship.latest_event);
+            // re-insert roomId
+            this.lastEvent = mapper({
+                ...bundledRelationship.latest_event,
+                room_id: this.roomId,
+            });
             await this.processEvent(this.lastEvent);
         }
+
+        let pendingEvents: MatrixEvent[];
+        if (this.pendingEventOrdering === PendingEventOrdering.Detached) {
+            pendingEvents = this.room.getPendingEvents()
+                .filter(ev => ev.isRelation(THREAD_RELATION_TYPE.name) && this.id === ev.threadRootId);
+            await Promise.all(pendingEvents.map(ev => this.processEvent(ev)));
+        } else {
+            pendingEvents = this.events
+                .filter(ev => ev.isRelation(THREAD_RELATION_TYPE.name))
+                .filter(ev => ev.status !== EventStatus.SENT && ev.status !== EventStatus.CANCELLED);
+        }
+        this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;
+        this.pendingReplyCount = pendingEvents.length;
+    }
+
+    private async updateThreadMetadata(): Promise<void> {
+        if (Thread.hasServerSideSupport) {
+            // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
+            // don't want the thread preview to be empty if we can avoid it
+            if (!this.initialEventsFetched) {
+                await this.processRootEvent();
+            }
+            await this.fetchRootEvent();
+        }
+        await this.processRootEvent();
 
         if (!this.initialEventsFetched) {
             this.initialEventsFetched = true;
@@ -349,7 +393,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     /**
      * Finds an event by ID in the current thread
      */
-    public findEventById(eventId: string) {
+    public findEventById(eventId: string): MatrixEvent | undefined {
         // Check the lastEvent as it may have been created based on a bundled relationship and not in a timeline
         if (this.lastEvent?.getId() === eventId) {
             return this.lastEvent;
@@ -361,9 +405,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     /**
      * Return last reply to the thread, if known.
      */
-    public lastReply(matches: (ev: MatrixEvent) => boolean = () => true): MatrixEvent | null {
-        for (let i = this.events.length - 1; i >= 0; i--) {
-            const event = this.events[i];
+    public lastReply(matches: (ev: MatrixEvent) => boolean = (): boolean => true): MatrixEvent | null {
+        for (let i = this.timeline.length - 1; i >= 0; i--) {
+            const event = this.timeline[i];
             if (matches(event)) {
                 return event;
             }
@@ -381,14 +425,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * exclude annotations from that number
      */
     public get length(): number {
-        return this.replyCount;
+        return this.replyCount + this.pendingReplyCount;
     }
 
     /**
      * A getter for the last event added to the thread, if known.
      */
     public get replyToEvent(): Optional<MatrixEvent> {
-        return this.lastEvent ?? this.lastReply();
+        return this.lastPendingEvent ?? this.lastEvent ?? this.lastReply();
     }
 
     public get events(): MatrixEvent[] {
@@ -409,10 +453,6 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public getUnfilteredTimelineSet(): EventTimelineSet {
         return this.timelineSet;
-    }
-
-    public get timeline(): MatrixEvent[] {
-        return this.events;
     }
 
     public addReceipt(event: MatrixEvent, synthetic: boolean): void {

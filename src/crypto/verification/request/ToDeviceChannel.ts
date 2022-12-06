@@ -42,7 +42,7 @@ export class ToDeviceChannel implements IVerificationChannel {
     public request?: VerificationRequest;
 
     // userId and devices of user we're about to verify
-    constructor(
+    public constructor(
         private readonly client: MatrixClient,
         public readonly userId: string,
         private readonly devices: string[],

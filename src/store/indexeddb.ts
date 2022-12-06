@@ -53,7 +53,7 @@ type EventHandlerMap = {
 };
 
 export class IndexedDBStore extends MemoryStore {
-    static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
+    public static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
     }
 
@@ -109,7 +109,7 @@ export class IndexedDBStore extends MemoryStore {
      * this API if you need to perform specific indexeddb actions like deleting the
      * database.
      */
-    constructor(opts: IOpts) {
+    public constructor(opts: IOpts) {
         super(opts);
 
         if (!opts.indexedDB) {

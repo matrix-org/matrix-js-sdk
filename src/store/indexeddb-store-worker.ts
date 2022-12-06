@@ -45,7 +45,7 @@ export class IndexedDBStoreWorker {
      * @param {function} postMessage The web worker postMessage function that
      * should be used to communicate back to the main script.
      */
-    constructor(private readonly postMessage: InstanceType<typeof Worker>["postMessage"]) {}
+    public constructor(private readonly postMessage: InstanceType<typeof Worker>["postMessage"]) {}
 
     /**
      * Passes a message event from the main script into the class. This method

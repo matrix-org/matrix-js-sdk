@@ -709,11 +709,11 @@ describe("MatrixClient syncing", () => {
                 const room = client!.getRoom(roomOne)!;
                 const stateAtStart = room.getLiveTimeline().getState(EventTimeline.BACKWARDS)!;
                 const startRoomNameEvent = stateAtStart.getStateEvents('m.room.name', '');
-                expect(startRoomNameEvent.getContent().name).toEqual('Old room name');
+                expect(startRoomNameEvent!.getContent().name).toEqual('Old room name');
 
                 const stateAtEnd = room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
                 const endRoomNameEvent = stateAtEnd.getStateEvents('m.room.name', '');
-                expect(endRoomNameEvent.getContent().name).toEqual('A new room name');
+                expect(endRoomNameEvent!.getContent().name).toEqual('A new room name');
             });
         });
 
@@ -1599,7 +1599,7 @@ describe("MatrixClient syncing", () => {
             expect(room.roomId).toBe(roomOne);
             expect(room.getMyMembership()).toBe("leave");
             expect(room.name).toBe("Room Name");
-            expect(room.currentState.getStateEvents("m.room.name", "").getId()).toBe("$eventId");
+            expect(room.currentState.getStateEvents("m.room.name", "")?.getId()).toBe("$eventId");
             expect(room.timeline[0].getContent().body).toBe("Message 1");
             expect(room.timeline[1].getContent().body).toBe("Message 2");
             client?.stopPeeking();

@@ -21,7 +21,7 @@ limitations under the License.
 
 import { PkSigning } from "@matrix-org/olm";
 
-import { decodeBase64, encodeBase64, pkSign, pkVerify } from './olmlib';
+import { decodeBase64, encodeBase64, IObject, pkSign, pkVerify } from './olmlib';
 import { logger } from '../logger';
 import { IndexedDBCryptoStore } from '../crypto/store/indexeddb-crypto-store';
 import { decryptAES, encryptAES } from './aes';
@@ -74,7 +74,7 @@ export class CrossSigningInfo {
      *     Requires getCrossSigningKey and saveCrossSigningKeys
      * @param {object} cacheCallbacks Callbacks used to interact with the cache
      */
-    constructor(
+    public constructor(
         public readonly userId: string,
         private callbacks: ICryptoCallbacks = {},
         private cacheCallbacks: ICacheCallbacks = {},
@@ -175,7 +175,7 @@ export class CrossSigningInfo {
         // check what SSSS keys have encrypted the master key (if any)
         const stored = await secretStorage.isStored("m.cross_signing.master") || {};
         // then check which of those SSSS keys have also encrypted the SSK and USK
-        function intersect(s: Record<string, ISecretStorageKeyInfo>) {
+        function intersect(s: Record<string, ISecretStorageKeyInfo>): void {
             for (const k of Object.keys(stored)) {
                 if (!s[k]) {
                     delete stored[k];
@@ -586,7 +586,14 @@ export class CrossSigningInfo {
     }
 }
 
-function deviceToObject(device: DeviceInfo, userId: string) {
+interface DeviceObject extends IObject {
+    algorithms: string[];
+    keys: Record<string, string>;
+    device_id: string;
+    user_id: string;
+}
+
+function deviceToObject(device: DeviceInfo, userId: string): DeviceObject {
     return {
         algorithms: device.algorithms,
         keys: device.keys,
@@ -606,7 +613,7 @@ export enum CrossSigningLevel {
  * Represents the ways in which we trust a user
  */
 export class UserTrustLevel {
-    constructor(
+    public constructor(
         private readonly crossSigningVerified: boolean,
         private readonly crossSigningVerifiedBefore: boolean,
         private readonly tofu: boolean,
@@ -646,7 +653,7 @@ export class UserTrustLevel {
  * Represents the ways in which we trust a device
  */
 export class DeviceTrustLevel {
-    constructor(
+    public constructor(
         public readonly crossSigningVerified: boolean,
         public readonly tofu: boolean,
         private readonly localVerified: boolean,
@@ -775,7 +782,7 @@ export async function requestKeysDuringVerification(
         // CrossSigningInfo.getCrossSigningKey() to validate/cache
         const crossSigning = new CrossSigningInfo(
             original.userId,
-            { getCrossSigningKey: async (type) => {
+            { getCrossSigningKey: async (type): Promise<Uint8Array> => {
                 logger.debug("Cross-signing: requesting secret", type, deviceId);
                 const { promise } = client.requestSecret(
                     `m.cross_signing.${type}`, [deviceId],
@@ -801,7 +808,7 @@ export async function requestKeysDuringVerification(
         });
 
         // also request and cache the key backup key
-        const backupKeyPromise = (async () => {
+        const backupKeyPromise = (async (): Promise<void> => {
             const cachedKey = await client.crypto!.getSessionBackupPrivateKey();
             if (!cachedKey) {
                 logger.info("No cached backup key found. Requesting...");

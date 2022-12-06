@@ -54,14 +54,11 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { ReceiptType } from "../@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import {
-    MAIN_ROOM_TIMELINE,
     ReadReceipt,
-    Receipt,
-    ReceiptContent,
     synthesizeReceipt,
 } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
@@ -320,7 +317,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param {boolean} [opts.timelineSupport = false] Set to true to enable improved
      * timeline support.
      */
-    constructor(
+    public constructor(
         public readonly roomId: string,
         public readonly client: MatrixClient,
         public readonly myUserId: string,
@@ -1186,13 +1183,34 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *                  for this type.
      */
     public getUnreadNotificationCount(type = NotificationCountType.Total): number {
-        let count = this.notificationCounts[type] ?? 0;
+        let count = this.getRoomUnreadNotificationCount(type);
         if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
             for (const threadNotification of this.threadNotifications.values()) {
                 count += threadNotification[type] ?? 0;
             }
         }
         return count;
+    }
+
+    /**
+     * Get the notification for the event context (room or thread timeline)
+     */
+    public getUnreadCountForEventContext(type = NotificationCountType.Total, event: MatrixEvent): number {
+        const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
+
+        return (isThreadEvent
+            ? this.getThreadUnreadNotificationCount(event.threadRootId, type)
+            : this.getRoomUnreadNotificationCount(type)) ?? 0;
+    }
+
+    /**
+     * Get one of the notification counts for this room
+     * @param {String} type The type of notification count to get. default: 'total'
+     * @return {Number} The notification count, or undefined if there is no count
+     *                  for this type.
+     */
+    public getRoomUnreadNotificationCount(type = NotificationCountType.Total): number {
+        return this.notificationCounts[type] ?? 0;
     }
 
     /**
@@ -1678,7 +1696,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             Array.from(this.threads)
                 .forEach(([, thread]) => {
                     if (thread.length === 0) return;
-                    const currentUserParticipated = thread.events.some(event => {
+                    const currentUserParticipated = thread.timeline.some(event => {
                         return event.getSender() === this.client.getUserId();
                     });
                     if (filterType !== ThreadFilterType.My || currentUserParticipated) {
@@ -1761,20 +1779,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             let latestMyThreadsRootEvent: MatrixEvent | undefined;
             const roomState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
             for (const rootEvent of threadRoots) {
-                this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, {
+                const opts = {
                     duplicateStrategy: DuplicateStrategy.Ignore,
                     fromCache: false,
                     roomState,
-                });
+                };
+                this.threadsTimelineSets[0]?.addLiveEvent(rootEvent, opts);
 
                 const threadRelationship = rootEvent
                     .getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
                 if (threadRelationship?.current_user_participated) {
-                    this.threadsTimelineSets[1]?.addLiveEvent(rootEvent, {
-                        duplicateStrategy: DuplicateStrategy.Ignore,
-                        fromCache: false,
-                        roomState,
-                    });
+                    this.threadsTimelineSets[1]?.addLiveEvent(rootEvent, opts);
                     latestMyThreadsRootEvent = rootEvent;
                 }
             }
@@ -1828,7 +1843,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private onThreadNewReply(thread: Thread): void {
-        this.updateThreadRootEvents(thread, false);
+        this.updateThreadRootEvents(thread, false, true);
     }
 
     private onThreadDelete(thread: Thread): void {
@@ -1953,11 +1968,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         ));
     }
 
-    private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean) => {
+    private updateThreadRootEvents = (thread: Thread, toStartOfTimeline: boolean, recreateEvent: boolean): void => {
         if (thread.length) {
-            this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline);
+            this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline, recreateEvent);
             if (thread.hasCurrentUserParticipated) {
-                this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline);
+                this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline, recreateEvent);
             }
         }
     };
@@ -1966,8 +1981,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         timelineSet: Optional<EventTimelineSet>,
         thread: Thread,
         toStartOfTimeline: boolean,
-    ) => {
+        recreateEvent: boolean,
+    ): void => {
         if (timelineSet && thread.rootEvent) {
+            if (recreateEvent) {
+                timelineSet.removeEvent(thread.id);
+            }
             if (Thread.hasServerSideSupport) {
                 timelineSet.addLiveEvent(thread.rootEvent, {
                     duplicateStrategy: DuplicateStrategy.Replace,
@@ -2002,6 +2021,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const thread = new Thread(threadId, rootEvent, {
             room: this,
             client: this.client,
+            pendingEventOrdering: this.opts.pendingEventOrdering,
         });
 
         // This is necessary to be able to jump to events in threads:
@@ -2030,7 +2050,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         if (this.threadsReady) {
-            this.updateThreadRootEvents(thread, toStartOfTimeline);
+            this.updateThreadRootEvents(thread, toStartOfTimeline, false);
         }
 
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);
@@ -2053,7 +2073,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         redactedEvent.getType(),
                         redactedEvent.getStateKey()!,
                     );
-                    if (currentStateEvent.getId() === redactedEvent.getId()) {
+                    if (currentStateEvent?.getId() === redactedEvent.getId()) {
                         this.currentState.setStateEvents([redactedEvent]);
                     }
                 }
@@ -2916,7 +2936,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let excludedUserIds: string[] = [];
         const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
         if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
-            excludedUserIds = mFunctionalMembers.getContent().service_members;
+            excludedUserIds = mFunctionalMembers!.getContent().service_members;
         }
 
         // get members that are NOT ourselves and are actually in the room.
@@ -3080,7 +3100,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         originalEvent.applyVisibilityEvent(visibilityChange);
     }
 
-    private redactVisibilityChangeEvent(event: MatrixEvent) {
+    private redactVisibilityChangeEvent(event: MatrixEvent): void {
         // Sanity checks.
         if (!event.isVisibilityEvent) {
             throw new Error("expected a visibility change event");

@@ -77,7 +77,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         if (global.XMLHttpRequest) {
             const xhr = new global.XMLHttpRequest();
 
-            const timeoutFn = function() {
+            const timeoutFn = function(): void {
                 xhr.abort();
                 defer.reject(new Error("Timeout"));
             };
@@ -85,7 +85,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             // set an initial timeout of 30s; we'll advance it each time we get a progress notification
             let timeoutTimer = callbacks.setTimeout(timeoutFn, 30000);
 
-            xhr.onreadystatechange = function() {
+            xhr.onreadystatechange = function(): void {
                 switch (xhr.readyState) {
                     case global.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(timeoutTimer);
@@ -113,7 +113,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 }
             };
 
-            xhr.upload.onprogress = (ev: ProgressEvent) => {
+            xhr.upload.onprogress = (ev: ProgressEvent): void => {
                 callbacks.clearTimeout(timeoutTimer);
                 upload.loaded = ev.loaded;
                 upload.total = ev.total;

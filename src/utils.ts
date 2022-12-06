@@ -178,7 +178,7 @@ export function removeElement<T>(
  * @param {*} value The thing to check.
  * @return {boolean} True if it is a function.
  */
-export function isFunction(value: any) {
+export function isFunction(value: any): boolean {
     return Object.prototype.toString.call(value) === "[object Function]";
 }
 
@@ -189,7 +189,7 @@ export function isFunction(value: any) {
  * @throws If the object is missing keys.
  */
 // note using 'keys' here would shadow the 'keys' function defined above
-export function checkObjectHasKeys(obj: object, keys: string[]) {
+export function checkObjectHasKeys(obj: object, keys: string[]): void {
     for (const key of keys) {
         if (!obj.hasOwnProperty(key)) {
             throw new Error("Missing required key: " + key);
@@ -383,7 +383,7 @@ export function globToRegexp(glob: string, extended = false): string {
     if (!extended) {
         replacements.push([
             /\\\[(!|)(.*)\\]/g,
-            (_match: string, neg: string, pat: string) => [
+            (_match: string, neg: string, pat: string): string => [
                 '[',
                 neg ? '^' : '',
                 pat.replace(/\\-/, '-'),
@@ -490,7 +490,7 @@ export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<
  * The default alphabet used by string averaging in this SDK. This matches
  * all usefully printable ASCII characters (0x20-0x7E, inclusive).
  */
-export const DEFAULT_ALPHABET = (() => {
+export const DEFAULT_ALPHABET = ((): string => {
     let str = "";
     for (let c = 0x20; c <= 0x7E; c++) {
         str += String.fromCharCode(c);
@@ -693,4 +693,17 @@ export function sortEventsByLatestContentTimestamp(left: MatrixEvent, right: Mat
 
 export function isSupportedReceiptType(receiptType: string): boolean {
     return [ReceiptType.Read, ReceiptType.ReadPrivate].includes(receiptType as ReceiptType);
+}
+
+/**
+ * Determines whether two maps are equal.
+ * @param eq The equivalence relation to compare values by. Defaults to strict equality.
+ */
+export function mapsEqual<K, V>(x: Map<K, V>, y: Map<K, V>, eq = (v1: V, v2: V): boolean => v1 === v2): boolean {
+    if (x.size !== y.size) return false;
+    for (const [k, v1] of x) {
+        const v2 = y.get(k);
+        if (v2 === undefined || !eq(v1, v2)) return false;
+    }
+    return true;
 }

@@ -23,8 +23,9 @@ import {
     Room,
     RoomMember,
 } from '../../../src';
+import { RoomStateEvent } from "../../../src/models/room-state";
 import { GroupCall, GroupCallEvent, GroupCallState } from "../../../src/webrtc/groupCall";
-import { MatrixClient } from "../../../src/client";
+import { IMyDevice, MatrixClient } from "../../../src/client";
 import {
     installWebRTCMocks,
     MockCallFeed,
@@ -53,39 +54,56 @@ const FAKE_USER_ID_3 = "@charlie:test.dummy";
 const FAKE_STATE_EVENTS = [
     {
         getContent: () => ({
-            ["m.expires_ts"]: Date.now() + ONE_HOUR,
+            "m.calls": [],
         }),
         getStateKey: () => FAKE_USER_ID_1,
         getRoomId: () => FAKE_ROOM_ID,
+        getTs: () => 0,
     },
     {
         getContent: () => ({
-            ["m.expires_ts"]: Date.now() + ONE_HOUR,
-            ["m.calls"]: [{
-                ["m.call_id"]: FAKE_CONF_ID,
-                ["m.devices"]: [{
+            "m.calls": [{
+                "m.call_id": FAKE_CONF_ID,
+                "m.devices": [{
                     device_id: FAKE_DEVICE_ID_2,
+                    session_id: FAKE_SESSION_ID_2,
+                    expires_ts: Date.now() + ONE_HOUR,
                     feeds: [],
                 }],
             }],
         }),
         getStateKey: () => FAKE_USER_ID_2,
         getRoomId: () => FAKE_ROOM_ID,
+        getTs: () => 0,
     }, {
         getContent: () => ({
-            ["m.expires_ts"]: Date.now() + ONE_HOUR,
-            ["m.calls"]: [{
-                ["m.call_id"]: FAKE_CONF_ID,
-                ["m.devices"]: [{
+            "m.expires_ts": Date.now() + ONE_HOUR,
+            "m.calls": [{
+                "m.call_id": FAKE_CONF_ID,
+                "m.devices": [{
                     device_id: "user3_device",
+                    session_id: "user3_session",
+                    expires_ts: Date.now() + ONE_HOUR,
                     feeds: [],
                 }],
             }],
         }),
         getStateKey: () => "user3",
         getRoomId: () => FAKE_ROOM_ID,
+        getTs: () => 0,
     },
 ];
+
+const mockGetStateEvents = (type: EventType, userId?: string): MatrixEvent[] | MatrixEvent | null => {
+    if (type === EventType.GroupCallMemberPrefix) {
+        return userId === undefined
+            ? FAKE_STATE_EVENTS as MatrixEvent[]
+            : FAKE_STATE_EVENTS.find(e => e.getStateKey() === userId) as MatrixEvent;
+    } else {
+        const fakeEvent = { getContent: () => ({}), getTs: () => 0 } as MatrixEvent;
+        return userId === undefined ? [fakeEvent] : fakeEvent;
+    }
+};
 
 const ONE_HOUR = 1000 * 60 * 60;
 
@@ -111,6 +129,8 @@ class MockCall {
 
     public state = CallState.Ringing;
     public opponentUserId = FAKE_USER_ID_1;
+    public opponentDeviceId = FAKE_DEVICE_ID_1;
+    public opponentMember = { userId: this.opponentUserId };
     public callId = "1";
     public localUsermediaFeed = {
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
@@ -129,9 +149,11 @@ class MockCall {
     public removeListener = jest.fn();
 
     public getOpponentMember(): Partial<RoomMember> {
-        return {
-            userId: this.opponentUserId,
-        };
+        return this.opponentMember;
+    }
+
+    public getOpponentDeviceId(): string {
+        return this.opponentDeviceId;
     }
 
     public typed(): MatrixCall { return this as unknown as MatrixCall; }
@@ -158,13 +180,13 @@ describe('Group Call', function() {
 
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
             groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+                membership: "join",
+            } as unknown as RoomMember;
         });
 
         it("does not initialize local call feed, if it already is", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.initLocalCallFeed();
             jest.spyOn(groupCall, "initLocalCallFeed");
             await groupCall.enter();
@@ -194,10 +216,6 @@ describe('Group Call', function() {
         });
 
         it("sends member state event to room on enter", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.create();
 
             try {
@@ -227,10 +245,6 @@ describe('Group Call', function() {
         });
 
         it("sends member state event to room on leave", async () => {
-            room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-
             await groupCall.create();
             await groupCall.enter();
             mockSendState.mockClear();
@@ -243,6 +257,18 @@ describe('Group Call', function() {
                 FAKE_USER_ID_1,
                 { keepAlive: true }, // Request should outlive the window
             );
+        });
+
+        it("includes local device in participants when entered via another session", async () => {
+            const hasLocalParticipant = () => groupCall.participants.get(
+                room.getMember(mockClient.getUserId()!)!,
+            )?.has(mockClient.getDeviceId()!) ?? false;
+
+            expect(groupCall.enteredViaAnotherSession).toBe(false);
+            expect(hasLocalParticipant()).toBe(false);
+
+            groupCall.enteredViaAnotherSession = true;
+            expect(hasLocalParticipant()).toBe(true);
         });
 
         it("starts with mic unmuted in regular calls", async () => {
@@ -326,8 +352,8 @@ describe('Group Call', function() {
 
         describe("call feeds changing", () => {
             let call: MockCall;
-            const currentFeed = new MockCallFeed(FAKE_USER_ID_1, new MockMediaStream("current"));
-            const newFeed = new MockCallFeed(FAKE_USER_ID_1, new MockMediaStream("new"));
+            const currentFeed = new MockCallFeed(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, new MockMediaStream("current"));
+            const newFeed = new MockCallFeed(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, new MockMediaStream("new"));
 
             beforeEach(async () => {
                 jest.spyOn(currentFeed, "dispose");
@@ -358,7 +384,7 @@ describe('Group Call', function() {
                 });
 
                 it("replaces usermedia feed", async () => {
-                    groupCall.userMediaFeeds = [currentFeed.typed()];
+                    groupCall.userMediaFeeds.push(currentFeed.typed());
 
                     call.remoteUsermediaFeed = newFeed.typed();
                     // @ts-ignore Mock
@@ -368,7 +394,7 @@ describe('Group Call', function() {
                 });
 
                 it("removes usermedia feed", async () => {
-                    groupCall.userMediaFeeds = [currentFeed.typed()];
+                    groupCall.userMediaFeeds.push(currentFeed.typed());
 
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
@@ -387,7 +413,7 @@ describe('Group Call', function() {
                 });
 
                 it("replaces screenshare feed", async () => {
-                    groupCall.screenshareFeeds = [currentFeed.typed()];
+                    groupCall.screenshareFeeds.push(currentFeed.typed());
 
                     call.remoteScreensharingFeed = newFeed.typed();
                     // @ts-ignore Mock
@@ -397,7 +423,7 @@ describe('Group Call', function() {
                 });
 
                 it("removes screenshare feed", async () => {
-                    groupCall.screenshareFeeds = [currentFeed.typed()];
+                    groupCall.screenshareFeeds.push(currentFeed.typed());
 
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
@@ -408,7 +434,7 @@ describe('Group Call', function() {
 
             describe("feed replacing", () => {
                 it("replaces usermedia feed", async () => {
-                    groupCall.userMediaFeeds = [currentFeed.typed()];
+                    groupCall.userMediaFeeds.push(currentFeed.typed());
 
                     // @ts-ignore Mock
                     groupCall.replaceUserMediaFeed(currentFeed, newFeed);
@@ -422,7 +448,7 @@ describe('Group Call', function() {
                 });
 
                 it("replaces screenshare feed", async () => {
-                    groupCall.screenshareFeeds = [currentFeed.typed()];
+                    groupCall.screenshareFeeds.push(currentFeed.typed());
 
                     // @ts-ignore Mock
                     groupCall.replaceScreenshareFeed(currentFeed, newFeed);
@@ -489,7 +515,10 @@ describe('Group Call', function() {
 
             it("sends metadata updates before unmuting in PTT mode", async () => {
                 const mockCall = new MockCall(FAKE_ROOM_ID, groupCall.groupCallId);
-                groupCall.calls.push(mockCall as unknown as MatrixCall);
+                groupCall.calls.set(
+                    mockCall.getOpponentMember() as RoomMember,
+                    new Map([[mockCall.getOpponentDeviceId(), mockCall.typed()]]),
+                );
 
                 let metadataUpdateResolve: () => void;
                 const metadataUpdatePromise = new Promise<void>(resolve => {
@@ -511,7 +540,10 @@ describe('Group Call', function() {
 
             it("sends metadata updates after muting in PTT mode", async () => {
                 const mockCall = new MockCall(FAKE_ROOM_ID, groupCall.groupCallId);
-                groupCall.calls.push(mockCall as unknown as MatrixCall);
+                groupCall.calls.set(
+                    mockCall.getOpponentMember() as RoomMember,
+                    new Map([[mockCall.getOpponentDeviceId(), mockCall.typed()]]),
+                );
 
                 // the call starts muted, so unmute to get in the right state to test
                 await groupCall.setMicrophoneMuted(false);
@@ -560,7 +592,7 @@ describe('Group Call', function() {
                 if (eventType === EventType.GroupCallMemberPrefix) {
                     const fakeEvent = {
                         getContent: () => content,
-                        getRoomId: () => FAKE_ROOM_ID,
+                        getRoomId: () => roomId,
                         getStateKey: () => statekey,
                     } as unknown as MatrixEvent;
 
@@ -574,8 +606,8 @@ describe('Group Call', function() {
                     // just add it once.
                     subMap.set(statekey, fakeEvent);
 
-                    groupCall1.onMemberStateChanged(fakeEvent);
-                    groupCall2.onMemberStateChanged(fakeEvent);
+                    client1Room.currentState.emit(RoomStateEvent.Update, client1Room.currentState);
+                    client2Room.currentState.emit(RoomStateEvent.Update, client2Room.currentState);
                 }
                 return Promise.resolve({ "event_id": "foo" });
             };
@@ -584,8 +616,16 @@ describe('Group Call', function() {
             client2.sendStateEvent.mockImplementation(fakeSendStateEvents);
 
             const client1Room = new Room(FAKE_ROOM_ID, client1.typed(), FAKE_USER_ID_1);
-
             const client2Room = new Room(FAKE_ROOM_ID, client2.typed(), FAKE_USER_ID_2);
+
+            client1Room.currentState.members[FAKE_USER_ID_1] = client2Room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+                membership: "join",
+            } as unknown as RoomMember;
+            client1Room.currentState.members[FAKE_USER_ID_2] = client2Room.currentState.members[FAKE_USER_ID_2] = {
+                userId: FAKE_USER_ID_2,
+                membership: "join",
+            } as unknown as RoomMember;
 
             groupCall1 = new GroupCall(
                 client1.typed(), client1Room, GroupCallType.Video, false, GroupCallIntent.Prompt, FAKE_CONF_ID,
@@ -594,20 +634,6 @@ describe('Group Call', function() {
             groupCall2 = new GroupCall(
                 client2.typed(), client2Room, GroupCallType.Video, false, GroupCallIntent.Prompt, FAKE_CONF_ID,
             );
-
-            client1Room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-            client1Room.currentState.members[FAKE_USER_ID_2] = {
-                userId: FAKE_USER_ID_2,
-            } as unknown as RoomMember;
-
-            client2Room.currentState.members[FAKE_USER_ID_1] = {
-                userId: FAKE_USER_ID_1,
-            } as unknown as RoomMember;
-            client2Room.currentState.members[FAKE_USER_ID_2] = {
-                userId: FAKE_USER_ID_2,
-            } as unknown as RoomMember;
         });
 
         afterEach(function() {
@@ -672,8 +698,10 @@ describe('Group Call', function() {
 
                 expect(client1.sendToDevice).toHaveBeenCalled();
 
-                const oldCall = groupCall1.getCallByUserId(client2.userId);
-                oldCall!.emit(CallEvent.Hangup, oldCall!);
+                const oldCall = groupCall1.calls.get(
+                    groupCall1.room.getMember(client2.userId)!,
+                )!.get(client2.deviceId)!;
+                oldCall.emit(CallEvent.Hangup, oldCall!);
 
                 client1.sendToDevice.mockClear();
 
@@ -691,9 +719,11 @@ describe('Group Call', function() {
                 // to even be created...
                 let newCall: MatrixCall | undefined;
                 while (
-                    (newCall = groupCall1.getCallByUserId(client2.userId)) === undefined ||
-                    newCall.peerConn === undefined ||
-                    newCall.callId == oldCall!.callId
+                    (newCall = groupCall1.calls.get(
+                        groupCall1.room.getMember(client2.userId)!,
+                    )?.get(client2.deviceId)) === undefined
+                    || newCall.peerConn === undefined
+                    || newCall.callId == oldCall.callId
                 ) {
                     await flushPromises();
                 }
@@ -733,7 +763,9 @@ describe('Group Call', function() {
                 groupCall1.setMicrophoneMuted(false);
                 groupCall1.setLocalVideoMuted(false);
 
-                const call = groupCall1.getCallByUserId(client2.userId)!;
+                const call = groupCall1.calls.get(
+                    groupCall1.room.getMember(client2.userId)!,
+                )!.get(client2.deviceId)!;
                 call.isMicrophoneMuted = jest.fn().mockReturnValue(true);
                 call.setMicrophoneMuted = jest.fn();
                 call.isLocalVideoMuted = jest.fn().mockReturnValue(true);
@@ -760,12 +792,15 @@ describe('Group Call', function() {
             mockClient = typedMockClient as unknown as MatrixClient;
 
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            room.currentState.getStateEvents = jest.fn().mockImplementation((type: EventType, userId: string) => {
-                return type === EventType.GroupCallMemberPrefix
-                    ? FAKE_STATE_EVENTS.find(e => e.getStateKey() === userId) || FAKE_STATE_EVENTS
-                    : { getContent: () => ([]) };
-            });
-            room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
+            room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents);
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+                membership: "join",
+            } as unknown as RoomMember;
+            room.currentState.members[FAKE_USER_ID_2] = {
+                userId: FAKE_USER_ID_2,
+                membership: "join",
+            } as unknown as RoomMember;
         });
 
         describe("local muting", () => {
@@ -773,17 +808,13 @@ describe('Group Call', function() {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
 
                 groupCall.localCallFeed!.setAudioVideoMuted = jest.fn();
-                const setAVMutedArray = groupCall.calls.map(call => {
-                    call.localUsermediaFeed!.setAudioVideoMuted = jest.fn();
-                    return call.localUsermediaFeed!.setAudioVideoMuted;
-                });
-                const tracksArray = groupCall.calls.reduce((acc: MediaStreamTrack[], call: MatrixCall) => {
-                    acc.push(...call.localUsermediaStream!.getAudioTracks());
-                    return acc;
-                }, []);
-                const sendMetadataUpdateArray = groupCall.calls.map(call => {
-                    call.sendMetadataUpdate = jest.fn();
-                    return call.sendMetadataUpdate;
+                const setAVMutedArray: ((audioMuted: boolean | null, videoMuted: boolean | null) => void)[] = [];
+                const tracksArray: MediaStreamTrack[] = [];
+                const sendMetadataUpdateArray: (() => Promise<void>)[] = [];
+                groupCall.forEachCall(call => {
+                    setAVMutedArray.push(call.localUsermediaFeed!.setAudioVideoMuted = jest.fn());
+                    tracksArray.push(...call.localUsermediaStream!.getAudioTracks());
+                    sendMetadataUpdateArray.push(call.sendMetadataUpdate = jest.fn());
                 });
 
                 await groupCall.setMicrophoneMuted(true);
@@ -801,18 +832,14 @@ describe('Group Call', function() {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
 
                 groupCall.localCallFeed!.setAudioVideoMuted = jest.fn();
-                const setAVMutedArray = groupCall.calls.map(call => {
-                    call.localUsermediaFeed!.setAudioVideoMuted = jest.fn();
+                const setAVMutedArray: ((audioMuted: boolean | null, videoMuted: boolean | null) => void)[] = [];
+                const tracksArray: MediaStreamTrack[] = [];
+                const sendMetadataUpdateArray: (() => Promise<void>)[] = [];
+                groupCall.forEachCall(call => {
                     call.localUsermediaFeed!.isVideoMuted = jest.fn().mockReturnValue(true);
-                    return call.localUsermediaFeed!.setAudioVideoMuted;
-                });
-                const tracksArray = groupCall.calls.reduce((acc: MediaStreamTrack[], call: MatrixCall) => {
-                    acc.push(...call.localUsermediaStream!.getVideoTracks());
-                    return acc;
-                }, []);
-                const sendMetadataUpdateArray = groupCall.calls.map(call => {
-                    call.sendMetadataUpdate = jest.fn();
-                    return call.sendMetadataUpdate;
+                    setAVMutedArray.push(call.localUsermediaFeed!.setAudioVideoMuted = jest.fn());
+                    tracksArray.push(...call.localUsermediaStream!.getVideoTracks());
+                    sendMetadataUpdateArray.push(call.sendMetadataUpdate = jest.fn());
                 });
 
                 await groupCall.setLocalVideoMuted(true);
@@ -847,7 +874,7 @@ describe('Group Call', function() {
                 // It takes a bit of time for the calls to get created
                 await sleep(10);
 
-                const call = groupCall.calls[0];
+                const call = groupCall.calls.get(groupCall.room.getMember(FAKE_USER_ID_2)!)!.get(FAKE_DEVICE_ID_2)!;
                 call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
                 // @ts-ignore Mock
                 call.pushRemoteFeed(new MockMediaStream("stream", [
@@ -856,7 +883,7 @@ describe('Group Call', function() {
                 ]));
                 call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
-                const feed = groupCall.getUserMediaFeedByUserId(call.invitee!);
+                const feed = groupCall.getUserMediaFeed(call.invitee!, call.getOpponentDeviceId()!);
                 expect(feed!.isAudioMuted()).toBe(true);
                 expect(feed!.isVideoMuted()).toBe(false);
 
@@ -870,7 +897,7 @@ describe('Group Call', function() {
                 // It takes a bit of time for the calls to get created
                 await sleep(10);
 
-                const call = groupCall.calls[0];
+                const call = groupCall.calls.get(groupCall.room.getMember(FAKE_USER_ID_2)!)!.get(FAKE_DEVICE_ID_2)!;
                 call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
                 // @ts-ignore Mock
                 call.pushRemoteFeed(new MockMediaStream("stream", [
@@ -879,7 +906,7 @@ describe('Group Call', function() {
                 ]));
                 call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
-                const feed = groupCall.getUserMediaFeedByUserId(call.invitee!);
+                const feed = groupCall.getUserMediaFeed(call.invitee!, call.getOpponentDeviceId()!);
                 expect(feed!.isAudioMuted()).toBe(false);
                 expect(feed!.isVideoMuted()).toBe(true);
 
@@ -945,12 +972,16 @@ describe('Group Call', function() {
 
             expect(mockCall.reject).not.toHaveBeenCalled();
             expect(mockCall.answerWithCallFeeds).toHaveBeenCalled();
-            expect(groupCall.calls).toEqual([mockCall]);
+            expect(groupCall.calls).toEqual(new Map([[
+                groupCall.room.getMember(FAKE_USER_ID_1)!,
+                new Map([[FAKE_DEVICE_ID_1, mockCall]]),
+            ]]));
         });
 
         it("replaces calls if it already has one with the same user", async () => {
             const oldMockCall = new MockCall(room.roomId, groupCall.groupCallId);
             const newMockCall = new MockCall(room.roomId, groupCall.groupCallId);
+            newMockCall.opponentMember = oldMockCall.opponentMember; // Ensure referential equality
             newMockCall.callId = "not " + oldMockCall.callId;
 
             mockClient.emit(CallEventHandlerEvent.Incoming, oldMockCall as unknown as MatrixCall);
@@ -958,7 +989,10 @@ describe('Group Call', function() {
 
             expect(oldMockCall.hangup).toHaveBeenCalled();
             expect(newMockCall.answerWithCallFeeds).toHaveBeenCalled();
-            expect(groupCall.calls).toEqual([newMockCall]);
+            expect(groupCall.calls).toEqual(new Map([[
+                groupCall.room.getMember(FAKE_USER_ID_1)!,
+                new Map([[FAKE_DEVICE_ID_1, newMockCall]]),
+            ]]));
         });
 
         it("starts to process incoming calls when we've entered", async () => {
@@ -988,32 +1022,34 @@ describe('Group Call', function() {
             mockClient = typedMockClient.typed();
 
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
-            room.currentState.getStateEvents = jest.fn().mockImplementation((type: EventType, userId: string) => {
-                return type === EventType.GroupCallMemberPrefix
-                    ? FAKE_STATE_EVENTS.find(e => e.getStateKey() === userId) || FAKE_STATE_EVENTS
-                    : { getContent: () => ([]) };
-            });
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+                membership: "join",
+            } as unknown as RoomMember;
+            room.currentState.members[FAKE_USER_ID_2] = {
+                userId: FAKE_USER_ID_2,
+                membership: "join",
+            } as unknown as RoomMember;
+            room.currentState.getStateEvents = jest.fn().mockImplementation(mockGetStateEvents);
 
             groupCall = await createAndEnterGroupCall(mockClient, room);
         });
 
         it("sending screensharing stream", async () => {
-            const onNegotiationNeededArray = groupCall.calls.map(call => {
+            const onNegotiationNeededArray: (() => Promise<void>)[] = [];
+            groupCall.forEachCall(call => {
                 // @ts-ignore Mock
-                call.gotLocalOffer = jest.fn();
-                // @ts-ignore Mock
-                return call.gotLocalOffer;
+                onNegotiationNeededArray.push(call.gotLocalOffer = jest.fn());
             });
 
-            let enabledResult;
+            let enabledResult: boolean;
             enabledResult = await groupCall.setScreensharingEnabled(true);
             expect(enabledResult).toEqual(true);
             expect(typedMockClient.mediaHandler.getScreensharingStream).toHaveBeenCalled();
             MockRTCPeerConnection.triggerAllNegotiations();
 
             expect(groupCall.screenshareFeeds).toHaveLength(1);
-            groupCall.calls.forEach(c => {
+            groupCall.forEachCall(c => {
                 expect(c.getLocalFeeds().find(f => f.purpose === SDPStreamMetadataPurpose.Screenshare)).toBeDefined();
             });
             onNegotiationNeededArray.forEach(f => expect(f).toHaveBeenCalled());
@@ -1036,7 +1072,7 @@ describe('Group Call', function() {
             // It takes a bit of time for the calls to get created
             await sleep(10);
 
-            const call = groupCall.calls[0];
+            const call = groupCall.calls.get(groupCall.room.getMember(FAKE_USER_ID_2)!)!.get(FAKE_DEVICE_ID_2)!;
             call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
             call.onNegotiateReceived({
                 getContent: () => ({
@@ -1057,7 +1093,7 @@ describe('Group Call', function() {
             ]));
 
             expect(groupCall.screenshareFeeds).toHaveLength(1);
-            expect(groupCall.getScreenshareFeedByUserId(call.invitee!)).toBeDefined();
+            expect(groupCall.getScreenshareFeed(call.invitee!, call.getOpponentDeviceId()!)).toBeDefined();
 
             groupCall.terminate();
         });
@@ -1097,12 +1133,16 @@ describe('Group Call', function() {
             );
 
             room = new Room(FAKE_ROOM_ID, mockClient.typed(), FAKE_USER_ID_1);
+            room.currentState.members[FAKE_USER_ID_1] = {
+                userId: FAKE_USER_ID_1,
+            } as unknown as RoomMember;
             groupCall = await createAndEnterGroupCall(mockClient.typed(), room);
 
             mediaFeed1 = new CallFeed({
                 client: mockClient.typed(),
                 roomId: FAKE_ROOM_ID,
                 userId: FAKE_USER_ID_2,
+                deviceId: FAKE_DEVICE_ID_1,
                 stream: (new MockMediaStream("foo", [])).typed(),
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,
@@ -1114,6 +1154,7 @@ describe('Group Call', function() {
                 client: mockClient.typed(),
                 roomId: FAKE_ROOM_ID,
                 userId: FAKE_USER_ID_3,
+                deviceId: FAKE_DEVICE_ID_1,
                 stream: (new MockMediaStream("foo", [])).typed(),
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,
@@ -1136,15 +1177,15 @@ describe('Group Call', function() {
             mediaFeed2.speakingVolumeSamples = [0, 0];
 
             jest.runOnlyPendingTimers();
-            expect(groupCall.activeSpeaker).toEqual(FAKE_USER_ID_2);
-            expect(onActiveSpeakerEvent).toHaveBeenCalledWith(FAKE_USER_ID_2);
+            expect(groupCall.activeSpeaker).toEqual(mediaFeed1);
+            expect(onActiveSpeakerEvent).toHaveBeenCalledWith(mediaFeed1);
 
             mediaFeed1.speakingVolumeSamples = [0, 0];
             mediaFeed2.speakingVolumeSamples = [100, 100];
 
             jest.runOnlyPendingTimers();
-            expect(groupCall.activeSpeaker).toEqual(FAKE_USER_ID_3);
-            expect(onActiveSpeakerEvent).toHaveBeenCalledWith(FAKE_USER_ID_3);
+            expect(groupCall.activeSpeaker).toEqual(mediaFeed2);
+            expect(onActiveSpeakerEvent).toHaveBeenCalledWith(mediaFeed2);
         });
     });
 
@@ -1231,6 +1272,157 @@ describe('Group Call', function() {
                 expect(groupCall.isPtt).toBe(false);
                 expect(groupCall.intent).toBe(GroupCallIntent.Prompt);
             });
+        });
+    });
+
+    describe("cleaning member state", () => {
+        const bobWeb: IMyDevice = {
+            device_id: "bobweb",
+            last_seen_ts: 0,
+        };
+        const bobDesktop: IMyDevice = {
+            device_id: "bobdesktop",
+            last_seen_ts: 0,
+        };
+        const bobDesktopOffline: IMyDevice = {
+            device_id: "bobdesktopoffline",
+            last_seen_ts: 1000 * 60 * 60 * -2, // 2 hours ago
+        };
+        const bobDesktopNeverOnline: IMyDevice = {
+            device_id: "bobdesktopneveronline",
+        };
+
+        const mkContent = (devices: IMyDevice[]) => ({
+            "m.calls": [{
+                "m.call_id": groupCall.groupCallId,
+                "m.devices": devices.map(d => ({
+                    device_id: d.device_id, session_id: "1", feeds: [], expires_ts: 1000 * 60 * 10,
+                })),
+            }],
+        });
+
+        const expectDevices = (devices: IMyDevice[]) => expect(
+            room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, FAKE_USER_ID_2)?.getContent(),
+        ).toEqual({
+            "m.calls": [{
+                "m.call_id": groupCall.groupCallId,
+                "m.devices": devices.map(d => ({
+                    device_id: d.device_id, session_id: "1", feeds: [], expires_ts: expect.any(Number),
+                })),
+            }],
+        });
+
+        let mockClient: MatrixClient;
+        let room: Room;
+        let groupCall: GroupCall;
+
+        beforeAll(() => {
+            jest.useFakeTimers();
+            jest.setSystemTime(0);
+        });
+
+        afterAll(() => jest.useRealTimers());
+
+        beforeEach(async () => {
+            const typedMockClient = new MockCallMatrixClient(
+                FAKE_USER_ID_2, bobWeb.device_id, FAKE_SESSION_ID_2,
+            );
+            jest.spyOn(typedMockClient, "sendStateEvent").mockImplementation(
+                async (roomId, eventType, content, stateKey) => {
+                    const eventId = `$${Math.random()}`;
+                    if (roomId === room.roomId) {
+                        room.addLiveEvents([new MatrixEvent({
+                            event_id: eventId,
+                            type: eventType,
+                            room_id: roomId,
+                            sender: FAKE_USER_ID_2,
+                            content,
+                            state_key: stateKey,
+                        })]);
+                    }
+                    return { event_id: eventId };
+                },
+            );
+            mockClient = typedMockClient as unknown as MatrixClient;
+
+            room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_2);
+            room.getMember = jest.fn().mockImplementation((userId) => ({ userId }));
+
+            groupCall = new GroupCall(
+                mockClient,
+                room,
+                GroupCallType.Video,
+                false,
+                GroupCallIntent.Prompt,
+                FAKE_CONF_ID,
+            );
+            await groupCall.create();
+
+            mockClient.getDevices = async () => ({
+                devices: [
+                    bobWeb,
+                    bobDesktop,
+                    bobDesktopOffline,
+                    bobDesktopNeverOnline,
+                ],
+            });
+        });
+
+        afterEach(() => groupCall.leave());
+
+        it("doesn't clean up valid devices", async () => {
+            await groupCall.enter();
+            await mockClient.sendStateEvent(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                mkContent([bobWeb, bobDesktop]),
+                FAKE_USER_ID_2,
+            );
+
+            await groupCall.cleanMemberState();
+            expectDevices([bobWeb, bobDesktop]);
+        });
+
+        it("cleans up our own device if we're disconnected", async () => {
+            await mockClient.sendStateEvent(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                mkContent([bobWeb, bobDesktop]),
+                FAKE_USER_ID_2,
+            );
+
+            await groupCall.cleanMemberState();
+            expectDevices([bobDesktop]);
+        });
+
+        it("doesn't clean up the local device if entered via another session", async () => {
+            groupCall.enteredViaAnotherSession = true;
+            await mockClient.sendStateEvent(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                mkContent([bobWeb]),
+                FAKE_USER_ID_2,
+            );
+
+            await groupCall.cleanMemberState();
+            expectDevices([bobWeb]);
+        });
+
+        it("cleans up devices that have never been online", async () => {
+            await mockClient.sendStateEvent(
+                room.roomId,
+                EventType.GroupCallMemberPrefix,
+                mkContent([bobDesktop, bobDesktopNeverOnline]),
+                FAKE_USER_ID_2,
+            );
+
+            await groupCall.cleanMemberState();
+            expectDevices([bobDesktop]);
+        });
+
+        it("no-ops if there are no state events", async () => {
+            await groupCall.cleanMemberState();
+            expect(room.currentState.getStateEvents(EventType.GroupCallMemberPrefix, FAKE_USER_ID_2)).toBe(null);
         });
     });
 });

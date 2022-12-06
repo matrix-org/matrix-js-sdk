@@ -360,7 +360,7 @@ export class MockMediaDevices {
         Promise.resolve(new MockMediaStream("local_stream").typed()),
     );
 
-    public getDisplayMedia = jest.fn<Promise<MediaStream>, [DisplayMediaStreamConstraints]>().mockReturnValue(
+    public getDisplayMedia = jest.fn<Promise<MediaStream>, [MediaStreamConstraints]>().mockReturnValue(
         Promise.resolve(new MockMediaStream("local_display_stream").typed()),
     );
 
@@ -416,6 +416,9 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     public getRooms = jest.fn<Room[], []>().mockReturnValue([]);
     public getRoom = jest.fn();
 
+    public supportsExperimentalThreads(): boolean { return true; }
+    public async decryptEventIfNeeded(): Promise<void> {}
+
     public typed(): MatrixClient { return this as unknown as MatrixClient; }
 
     public emitRoomState(event: MatrixEvent, state: RoomState): void {
@@ -431,6 +434,7 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 export class MockCallFeed {
     constructor(
         public userId: string,
+        public deviceId: string | undefined,
         public stream: MockMediaStream,
     ) {}
 

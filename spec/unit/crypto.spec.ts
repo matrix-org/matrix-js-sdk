@@ -19,6 +19,7 @@ import { MemoryStore } from "../../src";
 import { RoomKeyRequestState } from '../../src/crypto/OutgoingRoomKeyRequestManager';
 import { RoomMember } from '../../src/models/room-member';
 import { IStore } from '../../src/store';
+import { IRoomEncryption, RoomList } from "../../src/crypto/RoomList";
 
 const Olm = global.Olm;
 
@@ -1144,6 +1145,50 @@ describe("Crypto", function() {
         // start() is a no-op nowadays, so there's not much to test here.
         it("should complete successfully", async () => {
             await client!.client.crypto!.start();
+        });
+    });
+
+    describe("setRoomEncryption", () => {
+        let mockClient: MatrixClient;
+        let mockRoomList: RoomList;
+        let clientStore: IStore;
+        let crypto: Crypto;
+
+        beforeEach(async function() {
+            mockClient = {} as MatrixClient;
+            const mockStorage = new MockStorageApi() as unknown as Storage;
+            clientStore = new MemoryStore({ localStorage: mockStorage }) as unknown as IStore;
+            const cryptoStore = new MemoryCryptoStore();
+
+            mockRoomList = {
+                getRoomEncryption: jest.fn().mockReturnValue(null),
+                setRoomEncryption: jest.fn().mockResolvedValue(undefined),
+            } as unknown as RoomList;
+
+            crypto = new Crypto(
+                mockClient,
+                "@alice:home.server",
+                "FLIBBLE",
+                clientStore,
+                cryptoStore,
+                mockRoomList,
+                [],
+            );
+        });
+
+        it("should set the algorithm if called for a known room", async () => {
+            const room = new Room("!room:id", mockClient, "@my.user:id");
+            await clientStore.storeRoom(room);
+            await crypto.setRoomEncryption("!room:id", { algorithm: "m.megolm.v1.aes-sha2" } as IRoomEncryption);
+            expect(mockRoomList!.setRoomEncryption).toHaveBeenCalledTimes(1);
+            expect(jest.mocked(mockRoomList!.setRoomEncryption).mock.calls[0][0]).toEqual("!room:id");
+        });
+
+        it("should raise if called for an unknown room", async () => {
+            await expect(async () => {
+                await crypto.setRoomEncryption("!room:id", { algorithm: "m.megolm.v1.aes-sha2" } as IRoomEncryption);
+            }).rejects.toThrow(/unknown room/);
+            expect(mockRoomList!.setRoomEncryption).not.toHaveBeenCalled();
         });
     });
 });

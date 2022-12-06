@@ -73,7 +73,7 @@ export enum PolicyScope {
  * our data structures.
  */
 export class IgnoredInvites {
-    constructor(
+    public constructor(
         private readonly client: MatrixClient,
     ) {
     }
@@ -99,7 +99,7 @@ export class IgnoredInvites {
     /**
      * Remove a rule.
      */
-    public async removeRule(event: MatrixEvent) {
+    public async removeRule(event: MatrixEvent): Promise<void> {
         await this.client.redactEvent(event.getRoomId()!, event.getId()!);
     }
 
@@ -314,7 +314,7 @@ export class IgnoredInvites {
     /**
      * Modify in place the `IGNORE_INVITES_POLICIES` object from account data.
      */
-    private async withIgnoreInvitesPolicies(cb: (ignoreInvitesPolicies: {[key: string]: any}) => void) {
+    private async withIgnoreInvitesPolicies(cb: (ignoreInvitesPolicies: {[key: string]: any}) => void): Promise<void> {
         const { policies, ignoreInvitesPolicies } = this.getPoliciesAndIgnoreInvitesPolicies();
         cb(ignoreInvitesPolicies);
         policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name] = ignoreInvitesPolicies;

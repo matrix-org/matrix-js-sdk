@@ -76,7 +76,7 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
      * @prop {Object} events The events describing this user.
      * @prop {MatrixEvent} events.presence The m.presence event for this user.
      */
-    constructor(public readonly userId: string) {
+    public constructor(public readonly userId: string) {
         super();
         this.displayName = userId;
         this.rawDisplayName = userId;

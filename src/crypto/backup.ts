@@ -120,7 +120,7 @@ export class BackupManager {
     private sendingBackups: boolean; // Are we currently sending backups?
     private sessionLastCheckAttemptedTime: Record<string, number> = {}; // When did we last try to check the server for a given session id?
 
-    constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
+    public constructor(private readonly baseApis: MatrixClient, public readonly getKey: GetKey) {
         this.checkedForBackup = false;
         this.sendingBackups = false;
     }
@@ -609,7 +609,7 @@ export class BackupManager {
 export class Curve25519 implements BackupAlgorithm {
     public static algorithmName = "m.megolm_backup.v1.curve25519-aes-sha2";
 
-    constructor(
+    public constructor(
         public authData: ICurve25519AuthData,
         private publicKey: any, // FIXME: PkEncryption
         private getKey: () => Promise<Uint8Array>,
@@ -661,7 +661,7 @@ export class Curve25519 implements BackupAlgorithm {
         }
     }
 
-    public get untrusted() { return true; }
+    public get untrusted(): boolean { return true; }
 
     public async encryptSession(data: Record<string, any>): Promise<any> {
         const plainText: Record<string, any> = Object.assign({}, data);
@@ -735,7 +735,7 @@ const UNSTABLE_MSC3270_NAME = new UnstableValue(
 export class Aes256 implements BackupAlgorithm {
     public static algorithmName = UNSTABLE_MSC3270_NAME.name;
 
-    constructor(
+    public constructor(
         public readonly authData: IAes256AuthData,
         private readonly key: Uint8Array,
     ) {}
@@ -786,7 +786,7 @@ export class Aes256 implements BackupAlgorithm {
         }
     }
 
-    public get untrusted() { return false; }
+    public get untrusted(): boolean { return false; }
 
     public encryptSession(data: Record<string, any>): Promise<any> {
         const plainText: Record<string, any> = Object.assign({}, data);

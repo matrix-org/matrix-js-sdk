@@ -27,6 +27,10 @@ import { HTTPError } from "./http-api";
 // to determine the max time we're willing to wait.
 const BUFFER_PERIOD_MS = 10 * 1000;
 
+export const MSC3575_WILDCARD = "*";
+export const MSC3575_STATE_KEY_ME = "$ME";
+export const MSC3575_STATE_KEY_LAZY = "$LAZY";
+
 /**
  * Represents a subscription to a room or set of rooms. Controls which events are returned.
  */
@@ -165,7 +169,7 @@ class SlidingList {
      * Construct a new sliding list.
      * @param {MSC3575List} list The range, sort and filter values to use for this list.
      */
-    constructor(list: MSC3575List) {
+    public constructor(list: MSC3575List) {
         this.replaceList(list);
     }
 
@@ -353,6 +357,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private desiredRoomSubscriptions = new Set<string>(); // the *desired* room subscriptions
     private confirmedRoomSubscriptions = new Set<string>();
 
+    // map of custom subscription name to the subscription
+    private customSubscriptions: Map<string, MSC3575RoomSubscription> = new Map();
+    // map of room ID to custom subscription name
+    private roomIdToCustomSubscription: Map<string, string> = new Map();
+
     private pendingReq?: Promise<MSC3575SlidingSyncResponse>;
     private abortController?: AbortController;
 
@@ -364,7 +373,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param {MatrixClient} client The client to use for /sync calls.
      * @param {number} timeoutMS The number of milliseconds to wait for a response.
      */
-    constructor(
+    public constructor(
         private readonly proxyBaseUrl: string,
         lists: MSC3575List[],
         private roomSubscriptionInfo: MSC3575RoomSubscription,
@@ -373,6 +382,30 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     ) {
         super();
         this.lists = lists.map((l) => new SlidingList(l));
+    }
+
+    /**
+     * Add a custom room subscription, referred to by an arbitrary name. If a subscription with this
+     * name already exists, it is replaced. No requests are sent by calling this method.
+     * @param name The name of the subscription. Only used to reference this subscription in
+     * useCustomSubscription.
+     * @param sub The subscription information.
+     */
+    public addCustomSubscription(name: string, sub: MSC3575RoomSubscription): void {
+        this.customSubscriptions.set(name, sub);
+    }
+
+    /**
+     * Use a custom subscription previously added via addCustomSubscription. No requests are sent
+     * by calling this method. Use modifyRoomSubscriptions to resend subscription information.
+     * @param roomId The room to use the subscription in.
+     * @param name The name of the subscription. If this name is unknown, the default subscription
+     * will be used.
+     */
+    public useCustomSubscription(roomId: string, name: string): void {
+        this.roomIdToCustomSubscription.set(roomId, name);
+        // unconfirm this subscription so a resend() will send it up afresh.
+        this.confirmedRoomSubscriptions.delete(roomId);
     }
 
     /**
@@ -541,7 +574,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         this.emit(SlidingSyncEvent.Lifecycle, state, resp, err);
     }
 
-    private shiftRight(listIndex: number, hi: number, low: number) {
+    private shiftRight(listIndex: number, hi: number, low: number): void {
         //     l   h
         // 0,1,2,3,4 <- before
         // 0,1,2,2,3 <- after, hi is deleted and low is duplicated
@@ -555,7 +588,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         }
     }
 
-    private shiftLeft(listIndex: number, hi: number, low: number) {
+    private shiftLeft(listIndex: number, hi: number, low: number): void {
         //     l   h
         // 0,1,2,3,4 <- before
         // 0,1,3,4,4 <- after, low is deleted and hi is duplicated
@@ -569,7 +602,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         }
     }
 
-    private removeEntry(listIndex: number, index: number) {
+    private removeEntry(listIndex: number, index: number): void {
         // work out the max index
         let max = -1;
         for (const n in this.lists[listIndex].roomIndexToRoomId) {
@@ -585,7 +618,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         delete this.lists[listIndex].roomIndexToRoomId[max];
     }
 
-    private addEntry(listIndex: number, index: number) {
+    private addEntry(listIndex: number, index: number): void {
         // work out the max index
         let max = -1;
         for (const n in this.lists[listIndex].roomIndexToRoomId) {
@@ -714,7 +747,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         return d.promise;
     }
 
-    private resolveTransactionDefers(txnId?: string) {
+    private resolveTransactionDefers(txnId?: string): void {
         if (!txnId) {
             return;
         }
@@ -778,7 +811,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     /**
      * Start syncing with the server. Blocks until stopped.
      */
-    public async start() {
+    public async start(): Promise<void> {
         this.abortController = new AbortController();
 
         let currentPos: string | undefined;
@@ -806,7 +839,12 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 if (newSubscriptions.size > 0) {
                     reqBody.room_subscriptions = {};
                     for (const roomId of newSubscriptions) {
-                        reqBody.room_subscriptions[roomId] = this.roomSubscriptionInfo;
+                        const customSubName = this.roomIdToCustomSubscription.get(roomId);
+                        let sub = this.roomSubscriptionInfo;
+                        if (customSubName && this.customSubscriptions.has(customSubName)) {
+                            sub = this.customSubscriptions.get(customSubName)!;
+                        }
+                        reqBody.room_subscriptions[roomId] = sub;
                     }
                 }
                 if (this.txnId) {
