@@ -338,20 +338,20 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     }
 
     public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
-        const sessionsNeedingBackup
-              = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+        const sessionsNeedingBackup = getJsonItem<{
+            [senderKeySessionId: string]: string;
+        }>(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         for (const session of sessions) {
             delete sessionsNeedingBackup[session.senderKey + '/' + session.sessionId];
         }
-        setJsonItem(
-            this.store, KEY_SESSIONS_NEEDING_BACKUP, sessionsNeedingBackup,
-        );
+        setJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP, sessionsNeedingBackup);
         return Promise.resolve();
     }
 
     public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
-        const sessionsNeedingBackup
-              = getJsonItem(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
+        const sessionsNeedingBackup = getJsonItem<{
+            [senderKeySessionId: string]: boolean;
+        }>(this.store, KEY_SESSIONS_NEEDING_BACKUP) || {};
         for (const session of sessions) {
             sessionsNeedingBackup[session.senderKey + '/' + session.sessionId] = true;
         }

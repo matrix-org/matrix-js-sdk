@@ -30,13 +30,13 @@ import {
     registerAlgorithm,
 } from "./base";
 import { Room } from '../../models/room';
-import { MatrixEvent } from "../../models/event";
-import { IEventDecryptionResult } from "../index";
+import { IContent, MatrixEvent } from "../../models/event";
+import { IEncryptedContent, IEventDecryptionResult, IOlmEncryptedContent } from "../index";
 import { IInboundSession } from "../OlmDevice";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
-interface IMessage {
+export interface IMessage {
     type: number;
     body: string;
 }
@@ -91,7 +91,7 @@ class OlmEncryption extends EncryptionAlgorithm {
      *
      * @return {Promise} Promise which resolves to the new event body
      */
-    public async encryptMessage(room: Room, eventType: string, content: object): Promise<object> {
+    public async encryptMessage(room: Room, eventType: string, content: IContent): Promise<IOlmEncryptedContent> {
         // pick the list of recipients based on the membership list.
         //
         // TODO: there is a race condition here! What if a new user turns up
@@ -111,9 +111,9 @@ class OlmEncryption extends EncryptionAlgorithm {
             content: content,
         };
 
-        const encryptedContent = {
+        const encryptedContent: IEncryptedContent = {
             algorithm: olmlib.OLM_ALGORITHM,
-            sender_key: this.olmDevice.deviceCurve25519Key,
+            sender_key: this.olmDevice.deviceCurve25519Key!,
             ciphertext: {},
         };
 

@@ -183,7 +183,7 @@ export class TestClient {
         this.httpBackend.when('POST', '/keys/query').respond<IDownloadKeyResult>(
             200, (_path, content) => {
                 Object.keys(response.device_keys).forEach((userId) => {
-                    expect(content.device_keys![userId]).toEqual([]);
+                    expect((content.device_keys! as Record<string, any>)[userId]).toEqual([]);
                 });
                 return response;
             });

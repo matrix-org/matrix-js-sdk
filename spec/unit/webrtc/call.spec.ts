@@ -933,7 +933,7 @@ describe('Call', function() {
             await fakeIncomingCall(client, call, "1");
         });
 
-        const untilEventSent = async (...args) => {
+        const untilEventSent = async (...args: any[]) => {
             const maxTries = 20;
 
             for (let tries = 0; tries < maxTries; ++tries) {
@@ -971,7 +971,7 @@ describe('Call', function() {
         });
 
         describe("ICE candidate sending", () => {
-            let mockPeerConn;
+            let mockPeerConn: MockRTCPeerConnection;
             const fakeCandidateString = "here is a fake candidate!";
             const fakeCandidateEvent = {
                 candidate: {
@@ -1086,7 +1086,7 @@ describe('Call', function() {
     });
 
     describe("Screen sharing", () => {
-        const waitNegotiateFunc = resolve => {
+        const waitNegotiateFunc = (resolve: Function): void => {
             mockSendEvent.mockImplementationOnce(() => {
                 // Note that the peer connection here is a dummy one and always returns
                 // dummy SDP, so there's not much point returning the content: the SDP will

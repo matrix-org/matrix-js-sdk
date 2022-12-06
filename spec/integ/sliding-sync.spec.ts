@@ -18,7 +18,15 @@ limitations under the License.
 import EventEmitter from "events";
 import MockHttpBackend from "matrix-mock-request";
 
-import { SlidingSync, SlidingSyncState, ExtensionState, SlidingSyncEvent } from "../../src/sliding-sync";
+import {
+    SlidingSync,
+    SlidingSyncState,
+    ExtensionState,
+    SlidingSyncEvent,
+    Extension,
+    SlidingSyncEventHandlerMap,
+    MSC3575RoomData,
+} from "../../src/sliding-sync";
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
 import { MatrixClient } from "../../src";
@@ -94,7 +102,7 @@ describe("SlidingSync", () => {
                     is_dm: true,
                 },
             };
-            const ext = {
+            const ext: Extension<any, any> = {
                 name: () => "custom_extension",
                 onRequest: (initial) => { return { initial: initial }; },
                 onResponse: (res) => { return {}; },
@@ -107,7 +115,7 @@ describe("SlidingSync", () => {
             slidingSync.start();
 
             // expect everything to be sent
-            let txnId;
+            let txnId: string | undefined;
             httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
@@ -390,8 +398,8 @@ describe("SlidingSync", () => {
                 }],
                 rooms: rooms,
             });
-            const listenerData = {};
-            const dataListener = (roomId, roomData) => {
+            const listenerData: Record<string, MSC3575RoomData> = {};
+            const dataListener: SlidingSyncEventHandlerMap[SlidingSyncEvent.RoomData] = (roomId, roomData) => {
                 expect(listenerData[roomId]).toBeFalsy();
                 listenerData[roomId] = roomData;
             };
@@ -912,7 +920,7 @@ describe("SlidingSync", () => {
             slidingSync = new SlidingSync(proxyBaseUrl, [], roomSubInfo, client!, 1);
             // modification before SlidingSync.start()
             const subscribePromise = slidingSync.modifyRoomSubscriptions(new Set([roomId]));
-            let txnId;
+            let txnId: string | undefined;
             httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
@@ -944,7 +952,7 @@ describe("SlidingSync", () => {
                 ranges: [[0, 20]],
             };
             const promise = slidingSync.setList(0, newList);
-            let txnId;
+            let txnId: string | undefined;
             httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
@@ -966,7 +974,7 @@ describe("SlidingSync", () => {
         });
         it("should resolve setListRanges during a connection", async () => {
             const promise = slidingSync.setListRanges(0, [[20, 40]]);
-            let txnId;
+            let txnId: string | undefined;
             httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
@@ -992,7 +1000,7 @@ describe("SlidingSync", () => {
             const promise = slidingSync.modifyRoomSubscriptionInfo({
                 timeline_limit: 99,
             });
-            let txnId;
+            let txnId: string | undefined;
             httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
@@ -1016,7 +1024,7 @@ describe("SlidingSync", () => {
         it("should reject earlier pending promises if a later transaction is acknowledged", async () => {
             // i.e if we have [A,B,C] and see txn_id=C then A,B should be rejected.
             const gotTxnIds: any[] = [];
-            const pushTxn = function(req) {
+            const pushTxn = function(req: MockHttpBackend["requests"][0]) {
                 gotTxnIds.push(req.data.txn_id);
             };
             const failPromise = slidingSync.setListRanges(0, [[20, 40]]);
@@ -1032,7 +1040,7 @@ describe("SlidingSync", () => {
             expect(failPromise2).rejects.toEqual(gotTxnIds[1]);
 
             const okPromise = slidingSync.setListRanges(0, [[0, 20]]);
-            let txnId;
+            let txnId: string | undefined;
             httpBackend!.when("POST", syncUrl).check((req) => {
                 txnId = req.data.txn_id;
             }).respond(200, () => {
@@ -1050,7 +1058,7 @@ describe("SlidingSync", () => {
         it("should not reject later pending promises if an earlier transaction is acknowledged", async () => {
             // i.e if we have [A,B,C] and see txn_id=B then C should not be rejected but A should.
             const gotTxnIds: any[] = [];
-            const pushTxn = function(req) {
+            const pushTxn = function(req: MockHttpBackend["requests"][0]) {
                 gotTxnIds.push(req.data?.txn_id);
             };
             const A = slidingSync.setListRanges(0, [[20, 40]]);
@@ -1087,7 +1095,7 @@ describe("SlidingSync", () => {
             promise.finally(() => {
                 pending = false;
             });
-            let txnId;
+            let txnId: string | undefined;
             httpBackend!.when("POST", syncUrl).check(function(req) {
                 const body = req.data;
                 logger.debug("got ", body);
@@ -1275,21 +1283,21 @@ describe("SlidingSync", () => {
 
         // Pre-extensions get called BEFORE processing the sync response
         const preExtName = "foobar";
-        let onPreExtensionRequest;
-        let onPreExtensionResponse;
+        let onPreExtensionRequest: Extension<any, any>["onRequest"];
+        let onPreExtensionResponse: Extension<any, any>["onResponse"];
 
         // Post-extensions get called AFTER processing the sync response
         const postExtName = "foobar2";
-        let onPostExtensionRequest;
-        let onPostExtensionResponse;
+        let onPostExtensionRequest: Extension<any, any>["onRequest"];
+        let onPostExtensionResponse: Extension<any, any>["onResponse"];
 
-        const extPre = {
+        const extPre: Extension<any, any> = {
             name: () => preExtName,
             onRequest: (initial) => { return onPreExtensionRequest(initial); },
             onResponse: (res) => { return onPreExtensionResponse(res); },
             when: () => ExtensionState.PreProcess,
         };
-        const extPost = {
+        const extPost: Extension<any, any> = {
             name: () => postExtName,
             onRequest: (initial) => { return onPostExtensionRequest(initial); },
             onResponse: (res) => { return onPostExtensionResponse(res); },
@@ -1421,7 +1429,7 @@ describe("SlidingSync", () => {
 });
 
 function timeout(delayMs: number, reason: string): { promise: Promise<never>, cancel: () => void } {
-    let timeoutId;
+    let timeoutId: NodeJS.Timeout;
     return {
         promise: new Promise((resolve, reject) => {
             timeoutId = setTimeout(() => {
@@ -1454,7 +1462,7 @@ function listenUntil<T>(
     const trace = new Error().stack?.split(`\n`)[2];
     const t = timeout(timeoutMs, "timed out waiting for event " + eventName + " " + trace);
     return Promise.race([new Promise<T>((resolve, reject) => {
-        const wrapper = (...args) => {
+        const wrapper = (...args: any[]) => {
             try {
                 const data = callback(...args);
                 if (data) {

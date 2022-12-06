@@ -148,17 +148,17 @@ export class FilterComponent {
             "types": function(v: string): boolean {
                 return matchesWildcard(eventType, v);
             },
-        };
+        } as const;
 
         for (const name in literalKeys) {
-            const matchFunc = literalKeys[name];
+            const matchFunc = literalKeys[<keyof typeof literalKeys>name];
             const notName = "not_" + name;
-            const disallowedValues: string[] = this.filterJson[notName];
+            const disallowedValues = this.filterJson[<`not_${keyof typeof literalKeys}`>notName];
             if (disallowedValues?.some(matchFunc)) {
                 return false;
             }
 
-            const allowedValues: string[] = this.filterJson[name];
+            const allowedValues = this.filterJson[name as keyof typeof literalKeys];
             if (allowedValues && !allowedValues.some(matchFunc)) {
                 return false;
             }

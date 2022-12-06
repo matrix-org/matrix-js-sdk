@@ -27,7 +27,7 @@ import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from '../logger';
 import * as utils from '../utils';
-import { MatrixEvent } from '../models/event';
+import { IContent, MatrixEvent } from '../models/event';
 import { EventType, ToDeviceMessageId } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
@@ -1101,7 +1101,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.terminate(CallParty.Local, reason, !suppressEvent);
         // We don't want to send hangup here if we didn't even get to sending an invite
         if ([CallState.Fledgling, CallState.WaitLocalMedia].includes(this.state)) return;
-        const content = {};
+        const content: IContent = {};
         // Don't send UserHangup reason to older clients
         if ((this.opponentVersion && this.opponentVersion !== 0) || reason !== CallErrorCode.UserHangup) {
             content["reason"] = reason;

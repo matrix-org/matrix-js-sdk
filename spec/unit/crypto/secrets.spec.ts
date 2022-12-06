@@ -16,6 +16,7 @@ limitations under the License.
 
 import '../../olm-loader';
 import * as olmlib from "../../../src/crypto/olmlib";
+import { IObject } from "../../../src/crypto/olmlib";
 import { SECRET_STORAGE_ALGORITHM_V1_AES } from "../../../src/crypto/SecretStorage";
 import { MatrixEvent } from "../../../src/models/event";
 import { TestClient } from '../../TestClient';
@@ -23,9 +24,11 @@ import { makeTestClients } from './verification/util';
 import { encryptAES } from "../../../src/crypto/aes";
 import { createSecretStorageKey, resetCrossSigningKeys } from "./crypto-utils";
 import { logger } from '../../../src/logger';
-import { ClientEvent, ICreateClientOpts } from '../../../src/client';
+import { ClientEvent, ICreateClientOpts, ICrossSigningKey, MatrixClient } from '../../../src/client';
 import { ISecretStorageKeyInfo } from '../../../src/crypto/api';
 import { DeviceInfo } from '../../../src/crypto/deviceinfo';
+import { ISignatures } from "../../../src/@types/signed";
+import { ICurve25519AuthData } from "../../../src/crypto/keybackup";
 
 async function makeTestClient(userInfo: { userId: string, deviceId: string}, options: Partial<ICreateClientOpts> = {}) {
     const client = (new TestClient(
@@ -48,9 +51,15 @@ async function makeTestClient(userInfo: { userId: string, deviceId: string}, opt
 
 // Wrapper around pkSign to return a signed object. pkSign returns the
 // signature, rather than the signed object.
-function sign(obj, key, userId) {
+function sign<T extends IObject | ICurve25519AuthData>(obj: T, key: Uint8Array, userId: string): T & {
+    signatures: ISignatures;
+    unsigned?: object;
+} {
     olmlib.pkSign(obj, key, userId, '');
-    return obj;
+    return obj as T & {
+        signatures: ISignatures;
+        unsigned?: object;
+    };
 }
 
 describe("Secrets", function() {
@@ -169,12 +178,12 @@ describe("Secrets", function() {
             return [newKeyId, key];
         });
 
-        let keys = {};
+        let keys: Record<string, Uint8Array> = {};
         const alice = await makeTestClient(
             { userId: "@alice:example.com", deviceId: "Osborne2" },
             {
                 cryptoCallbacks: {
-                    getCrossSigningKey: t => keys[t],
+                    getCrossSigningKey: t => Promise.resolve(keys[t]),
                     saveCrossSigningKeys: k => keys = k,
                     getSecretStorageKey: getKey,
                 },
@@ -227,7 +236,7 @@ describe("Secrets", function() {
                 cryptoCallbacks: {
                     onSecretRequested: (userId, deviceId, requestId, secretName, deviceTrust) => {
                         expect(secretName).toBe("foo");
-                        return "bar";
+                        return Promise.resolve("bar");
                     },
                 },
             },
@@ -354,7 +363,7 @@ describe("Secrets", function() {
             const storagePublicKey = decryption.generate_key();
             const storagePrivateKey = decryption.get_private_key();
 
-            const bob = await makeTestClient(
+            const bob: MatrixClient = await makeTestClient(
                 {
                     userId: "@bob:example.com",
                     deviceId: "bob1",
@@ -364,15 +373,15 @@ describe("Secrets", function() {
                         getSecretStorageKey: async request => {
                             const defaultKeyId = await bob.getDefaultSecretStorageKeyId();
                             expect(Object.keys(request.keys)).toEqual([defaultKeyId]);
-                            return [defaultKeyId, storagePrivateKey];
+                            return [defaultKeyId!, storagePrivateKey];
                         },
                     },
                 },
             );
 
-            bob.uploadDeviceSigningKeys = async () => {};
-            bob.uploadKeySignatures = async () => {};
-            bob.setAccountData = async function(eventType, contents, callback) {
+            bob.uploadDeviceSigningKeys = async () => ({});
+            bob.uploadKeySignatures = async () => ({ failures: {} });
+            bob.setAccountData = async function(eventType, contents) {
                 const event = new MatrixEvent({
                     type: eventType,
                     content: contents,
@@ -380,16 +389,19 @@ describe("Secrets", function() {
                 this.store.storeAccountDataEvents([
                     event,
                 ]);
-                this.emit("accountData", event);
+                this.emit(ClientEvent.AccountData, event);
+                return {};
             };
-            bob.crypto.backupManager.checkKeyBackup = async () => {};
+            bob.crypto!.backupManager.checkKeyBackup = async () => null;
 
-            const crossSigning = bob.crypto.crossSigningInfo;
-            const secretStorage = bob.crypto.secretStorage;
+            const crossSigning = bob.crypto!.crossSigningInfo;
+            const secretStorage = bob.crypto!.secretStorage;
 
             // Set up cross-signing keys from scratch with specific storage key
             await bob.bootstrapCrossSigning({
-                authUploadDeviceSigningKeys: async func => await func({}),
+                authUploadDeviceSigningKeys: async func => {
+                    await func({});
+                },
             });
             await bob.bootstrapSecretStorage({
                 createSecretStorageKey: async () => ({
@@ -400,13 +412,15 @@ describe("Secrets", function() {
             });
 
             // Clear local cross-signing keys and read from secret storage
-            bob.crypto.deviceList.storeCrossSigningForUser(
+            bob.crypto!.deviceList.storeCrossSigningForUser(
                 "@bob:example.com",
                 crossSigning.toStorage(),
             );
             crossSigning.keys = {};
             await bob.bootstrapCrossSigning({
-                authUploadDeviceSigningKeys: async func => await func({}),
+                authUploadDeviceSigningKeys: async func => {
+                    await func({});
+                },
             });
 
             expect(crossSigning.getId()).toBeTruthy();
@@ -422,7 +436,7 @@ describe("Secrets", function() {
                 user_signing: USK,
                 self_signing: SSK,
             };
-            const secretStorageKeys = {
+            const secretStorageKeys: Record<string, Uint8Array> = {
                 key_id: SSSSKey,
             };
             const alice = await makeTestClient(
@@ -498,14 +512,14 @@ describe("Secrets", function() {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: sign({
+                    self_signing: sign<ICrossSigningKey>({
                         user_id: "@alice:example.com",
                         usage: ["self_signing"],
                         keys: {
                             [`ed25519:${SSPubKey}`]: SSPubKey,
                         },
                     }, XSK, "@alice:example.com"),
-                    user_signing: sign({
+                    user_signing: sign<ICrossSigningKey>({
                         user_id: "@alice:example.com",
                         usage: ["user_signing"],
                         keys: {
@@ -557,7 +571,7 @@ describe("Secrets", function() {
                 user_signing: USK,
                 self_signing: SSK,
             };
-            const secretStorageKeys = {
+            const secretStorageKeys: Record<string, Uint8Array> = {
                 key_id: SSSSKey,
             };
             const alice = await makeTestClient(
@@ -642,14 +656,14 @@ describe("Secrets", function() {
                             [`ed25519:${XSPubKey}`]: XSPubKey,
                         },
                     },
-                    self_signing: sign({
+                    self_signing: sign<ICrossSigningKey>({
                         user_id: "@alice:example.com",
                         usage: ["self_signing"],
                         keys: {
                             [`ed25519:${SSPubKey}`]: SSPubKey,
                         },
                     }, XSK, "@alice:example.com"),
-                    user_signing: sign({
+                    user_signing: sign<ICrossSigningKey>({
                         user_id: "@alice:example.com",
                         usage: ["user_signing"],
                         keys: {

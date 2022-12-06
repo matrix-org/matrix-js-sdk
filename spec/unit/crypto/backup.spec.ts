@@ -15,8 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from "jest-mock";
-
 import '../../olm-loader';
 import { logger } from "../../../src/logger";
 import * as olmlib from "../../../src/crypto/olmlib";
@@ -30,7 +28,10 @@ import { Crypto } from "../../../src/crypto";
 import { resetCrossSigningKeys } from "./crypto-utils";
 import { BackupManager } from "../../../src/crypto/backup";
 import { StubStore } from "../../../src/store/stub";
-import { MatrixScheduler } from '../../../src';
+import { IndexedDBCryptoStore, MatrixScheduler } from '../../../src';
+import { CryptoStore } from "../../../src/crypto/store/base";
+import { MegolmDecryption as MegolmDecryptionClass } from "../../../src/crypto/algorithms/megolm";
+import { IKeyBackupInfo } from "../../../src/crypto/keybackup";
 
 const Olm = global.Olm;
 
@@ -102,29 +103,36 @@ const CURVE25519_BACKUP_INFO = {
     },
 };
 
-const AES256_BACKUP_INFO = {
+const AES256_BACKUP_INFO: IKeyBackupInfo = {
     algorithm: "org.matrix.msc3270.v1.aes-hmac-sha2",
     version: '1',
-    auth_data: {
-        // FIXME: add iv and mac
-    },
+    auth_data: {} as IKeyBackupInfo["auth_data"],
 };
 
-const keys = {};
+const keys: Record<string, Uint8Array> = {};
 
-function getCrossSigningKey(type) {
-    return keys[type];
+function getCrossSigningKey(type: string) {
+    return Promise.resolve(keys[type]);
 }
 
-function saveCrossSigningKeys(k) {
+function saveCrossSigningKeys(k: Record<string, Uint8Array>) {
     Object.assign(keys, k);
 }
 
-function makeTestClient(cryptoStore) {
-    const scheduler = [
-        "getQueueForEvent", "queueEvent", "removeEventFromQueue",
+function makeTestScheduler(): MatrixScheduler {
+    return ([
+        "getQueueForEvent",
+        "queueEvent",
+        "removeEventFromQueue",
         "setProcessFunction",
-    ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {}) as MockedObject<MatrixScheduler>;
+    ] as const).reduce((r, k) => {
+        r[k] = jest.fn();
+        return r;
+    }, {} as MatrixScheduler);
+}
+
+function makeTestClient(cryptoStore: CryptoStore) {
+    const scheduler = makeTestScheduler();
     const store = new StubStore();
 
     return new MatrixClient({
@@ -151,36 +159,33 @@ describe("MegolmBackup", function() {
         return Olm.init();
     });
 
-    let olmDevice;
-    let mockOlmLib;
-    let mockCrypto;
-    let cryptoStore;
-    let megolmDecryption;
+    let olmDevice: OlmDevice;
+    let mockOlmLib: typeof olmlib;
+    let mockCrypto: Crypto;
+    let cryptoStore: CryptoStore;
+    let megolmDecryption: MegolmDecryptionClass;
     beforeEach(async function() {
         mockCrypto = testUtils.mock(Crypto, 'Crypto');
+        // @ts-ignore making mock
         mockCrypto.backupManager = testUtils.mock(BackupManager, "BackupManager");
-        mockCrypto.backupKey = new Olm.PkEncryption();
-        mockCrypto.backupKey.set_recipient_key(
-            "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
-        );
-        mockCrypto.backupInfo = CURVE25519_BACKUP_INFO;
+        mockCrypto.backupManager.backupInfo = CURVE25519_BACKUP_INFO;
 
         cryptoStore = new MemoryCryptoStore();
 
         olmDevice = new OlmDevice(cryptoStore);
 
         // we stub out the olm encryption bits
-        mockOlmLib = {};
+        mockOlmLib = {} as unknown as typeof olmlib;
         mockOlmLib.ensureOlmSessionsForDevices = jest.fn();
         mockOlmLib.encryptMessageForDevice =
             jest.fn().mockResolvedValue(undefined);
     });
 
     describe("backup", function() {
-        let mockBaseApis;
+        let mockBaseApis: MatrixClient;
 
         beforeEach(function() {
-            mockBaseApis = {};
+            mockBaseApis = {} as unknown as MatrixClient;
 
             megolmDecryption = new MegolmDecryption({
                 userId: '@user:id',
@@ -188,8 +193,9 @@ describe("MegolmBackup", function() {
                 olmDevice: olmDevice,
                 baseApis: mockBaseApis,
                 roomId: ROOM_ID,
-            });
+            }) as MegolmDecryptionClass;
 
+            // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
             // clobber the setTimeout function to run 100x faster.
@@ -239,6 +245,7 @@ describe("MegolmBackup", function() {
             };
             mockCrypto.cancelRoomKeyRequest = function() {};
 
+            // @ts-ignore readonly field write
             mockCrypto.backupManager = {
                 backupGroupSession: jest.fn(),
             };
@@ -264,21 +271,22 @@ describe("MegolmBackup", function() {
                 olmDevice: olmDevice,
                 baseApis: client,
                 roomId: ROOM_ID,
-            });
+            }) as MegolmDecryptionClass;
 
+            // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
             return client.initCrypto()
                 .then(() => {
                     return cryptoStore.doTxn(
                         "readwrite",
-                        [cryptoStore.STORE_SESSION],
+                        [IndexedDBCryptoStore.STORE_SESSIONS],
                         (txn) => {
                             cryptoStore.addEndToEndInboundGroupSession(
                                 "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                                 groupSession.session_id(),
                                 {
-                                    forwardingCurve25519KeyChain: undefined,
+                                    forwardingCurve25519KeyChain: undefined!,
                                     keysClaimed: {
                                         ed25519: "SENDER_ED25519",
                                     },
@@ -298,25 +306,25 @@ describe("MegolmBackup", function() {
                     });
                     let numCalls = 0;
                     return new Promise<void>((resolve, reject) => {
-                        client.http.authedRequest = function<T>(
+                        client.http.authedRequest = function(
                             method, path, queryParams, data, opts,
-                        ): Promise<T> {
+                        ): any {
                             ++numCalls;
                             expect(numCalls).toBeLessThanOrEqual(1);
                             if (numCalls >= 2) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
-                                return Promise.resolve({} as T);
+                                return Promise.resolve({});
                             }
                             expect(method).toBe("PUT");
                             expect(path).toBe("/room_keys/keys");
-                            expect(queryParams.version).toBe('1');
+                            expect(queryParams?.version).toBe('1');
                             expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toBeDefined();
                             expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toHaveProperty(
                                 groupSession.session_id(),
                             );
                             resolve();
-                            return Promise.resolve({} as T);
+                            return Promise.resolve({});
                         };
                         client.crypto!.backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
@@ -343,8 +351,9 @@ describe("MegolmBackup", function() {
                 olmDevice: olmDevice,
                 baseApis: client,
                 roomId: ROOM_ID,
-            });
+            }) as MegolmDecryptionClass;
 
+            // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
             return client.initCrypto()
@@ -354,13 +363,13 @@ describe("MegolmBackup", function() {
                 .then(() => {
                     return cryptoStore.doTxn(
                         "readwrite",
-                        [cryptoStore.STORE_SESSION],
+                        [IndexedDBCryptoStore.STORE_SESSIONS],
                         (txn) => {
                             cryptoStore.addEndToEndInboundGroupSession(
                                 "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                                 groupSession.session_id(),
                                 {
-                                    forwardingCurve25519KeyChain: undefined,
+                                    forwardingCurve25519KeyChain: undefined!,
                                     keysClaimed: {
                                         ed25519: "SENDER_ED25519",
                                     },
@@ -381,25 +390,25 @@ describe("MegolmBackup", function() {
                     });
                     let numCalls = 0;
                     return new Promise<void>((resolve, reject) => {
-                        client.http.authedRequest = function<T>(
+                        client.http.authedRequest = function(
                             method, path, queryParams, data, opts,
-                        ): Promise<T> {
+                        ): any {
                             ++numCalls;
                             expect(numCalls).toBeLessThanOrEqual(1);
                             if (numCalls >= 2) {
                                 // exit out of retry loop if there's something wrong
                                 reject(new Error("authedRequest called too many timmes"));
-                                return Promise.resolve({} as T);
+                                return Promise.resolve({});
                             }
                             expect(method).toBe("PUT");
                             expect(path).toBe("/room_keys/keys");
-                            expect(queryParams.version).toBe('1');
+                            expect(queryParams?.version).toBe('1');
                             expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toBeDefined();
                             expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toHaveProperty(
                                 groupSession.session_id(),
                             );
                             resolve();
-                            return Promise.resolve({} as T);
+                            return Promise.resolve({});
                         };
                         client.crypto!.backupManager.backupGroupSession(
                             "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
@@ -426,8 +435,9 @@ describe("MegolmBackup", function() {
                 olmDevice: olmDevice,
                 baseApis: client,
                 roomId: ROOM_ID,
-            });
+            }) as MegolmDecryptionClass;
 
+            // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
             await client.initCrypto();
@@ -437,10 +447,10 @@ describe("MegolmBackup", function() {
             let numCalls = 0;
             await Promise.all([
                 new Promise<void>((resolve, reject) => {
-                    let backupInfo;
+                    let backupInfo: Record<string, any> | BodyInit | undefined;
                     client.http.authedRequest = function(
                         method, path, queryParams, data, opts,
-                    ) {
+                    ): any {
                         ++numCalls;
                         expect(numCalls).toBeLessThanOrEqual(2);
                         if (numCalls === 1) {
@@ -486,10 +496,7 @@ describe("MegolmBackup", function() {
             const ibGroupSession = new Olm.InboundGroupSession();
             ibGroupSession.create(groupSession.session_key());
 
-            const scheduler = [
-                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
-                "setProcessFunction",
-            ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {}) as MockedObject<MatrixScheduler>;
+            const scheduler = makeTestScheduler();
             const store = new StubStore();
             const client = new MatrixClient({
                 baseUrl: "https://my.home.server",
@@ -509,20 +516,21 @@ describe("MegolmBackup", function() {
                 olmDevice: olmDevice,
                 baseApis: client,
                 roomId: ROOM_ID,
-            });
+            }) as MegolmDecryptionClass;
 
+            // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
             await client.initCrypto();
             await cryptoStore.doTxn(
                 "readwrite",
-                [cryptoStore.STORE_SESSION],
+                [IndexedDBCryptoStore.STORE_SESSIONS],
                 (txn) => {
                     cryptoStore.addEndToEndInboundGroupSession(
                         "F0Q2NmyJNgUVj9DGsb4ZQt3aVxhVcUQhg7+gvW0oyKI",
                         groupSession.session_id(),
                         {
-                            forwardingCurve25519KeyChain: undefined,
+                            forwardingCurve25519KeyChain: undefined!,
                             keysClaimed: {
                                 ed25519: "SENDER_ED25519",
                             },
@@ -542,26 +550,26 @@ describe("MegolmBackup", function() {
             let numCalls = 0;
 
             await new Promise<void>((resolve, reject) => {
-                client.http.authedRequest = function<T>(
+                client.http.authedRequest = function(
                     method, path, queryParams, data, opts,
-                ): Promise<T> {
+                ): any {
                     ++numCalls;
                     expect(numCalls).toBeLessThanOrEqual(2);
                     if (numCalls >= 3) {
                         // exit out of retry loop if there's something wrong
                         reject(new Error("authedRequest called too many timmes"));
-                        return Promise.resolve({} as T);
+                        return Promise.resolve({});
                     }
                     expect(method).toBe("PUT");
                     expect(path).toBe("/room_keys/keys");
-                    expect(queryParams.version).toBe('1');
+                    expect(queryParams?.version).toBe('1');
                     expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toBeDefined();
                     expect((data as Record<string, any>).rooms[ROOM_ID].sessions).toHaveProperty(
                         groupSession.session_id(),
                     );
                     if (numCalls > 1) {
                         resolve();
-                        return Promise.resolve({} as T);
+                        return Promise.resolve({});
                     } else {
                         return Promise.reject(
                             new Error("this is an expected failure"),
@@ -579,7 +587,7 @@ describe("MegolmBackup", function() {
     });
 
     describe("restore", function() {
-        let client;
+        let client: MatrixClient;
 
         beforeEach(function() {
             client = makeTestClient(cryptoStore);
@@ -590,8 +598,9 @@ describe("MegolmBackup", function() {
                 olmDevice: olmDevice,
                 baseApis: client,
                 roomId: ROOM_ID,
-            });
+            }) as MegolmDecryptionClass;
 
+            // @ts-ignore private field access
             megolmDecryption.olmlib = mockOlmLib;
 
             return client.initCrypto();
@@ -603,7 +612,7 @@ describe("MegolmBackup", function() {
 
         it('can restore from backup (Curve25519 version)', function() {
             client.http.authedRequest = function() {
-                return Promise.resolve(CURVE25519_KEY_BACKUP_DATA);
+                return Promise.resolve<any>(CURVE25519_KEY_BACKUP_DATA);
             };
             return client.restoreKeyBackupWithRecoveryKey(
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
@@ -620,7 +629,7 @@ describe("MegolmBackup", function() {
 
         it('can restore from backup (AES-256 version)', function() {
             client.http.authedRequest = function() {
-                return Promise.resolve(AES256_KEY_BACKUP_DATA);
+                return Promise.resolve<any>(AES256_KEY_BACKUP_DATA);
             };
             return client.restoreKeyBackupWithRecoveryKey(
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
@@ -637,7 +646,7 @@ describe("MegolmBackup", function() {
 
         it('can restore backup by room (Curve25519 version)', function() {
             client.http.authedRequest = function() {
-                return Promise.resolve({
+                return Promise.resolve<any>({
                     rooms: {
                         [ROOM_ID]: {
                             sessions: {
@@ -649,7 +658,7 @@ describe("MegolmBackup", function() {
             };
             return client.restoreKeyBackupWithRecoveryKey(
                 "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
-                null, null, CURVE25519_BACKUP_INFO,
+                null!, null!, CURVE25519_BACKUP_INFO,
             ).then(() => {
                 return megolmDecryption.decryptEvent(ENCRYPTED_EVENT);
             }).then((res) => {
@@ -659,18 +668,18 @@ describe("MegolmBackup", function() {
 
         it('has working cache functions', async function() {
             const key = Uint8Array.from([1, 2, 3, 4, 5, 6, 7, 8]);
-            await client.crypto.storeSessionBackupPrivateKey(key);
-            const result = await client.crypto.getSessionBackupPrivateKey();
-            expect(new Uint8Array(result)).toEqual(key);
+            await client.crypto!.storeSessionBackupPrivateKey(key);
+            const result = await client.crypto!.getSessionBackupPrivateKey();
+            expect(new Uint8Array(result!)).toEqual(key);
         });
 
         it('caches session backup keys as it encounters them', async function() {
-            const cachedNull = await client.crypto.getSessionBackupPrivateKey();
+            const cachedNull = await client.crypto!.getSessionBackupPrivateKey();
             expect(cachedNull).toBeNull();
             client.http.authedRequest = function() {
-                return Promise.resolve(CURVE25519_KEY_BACKUP_DATA);
+                return Promise.resolve<any>(CURVE25519_KEY_BACKUP_DATA);
             };
-            await new Promise((resolve) => {
+            await new Promise<void>((resolve) => {
                 client.restoreKeyBackupWithRecoveryKey(
                     "EsTc LW2K PGiF wKEA 3As5 g5c4 BXwk qeeJ ZJV8 Q9fu gUMN UE4d",
                     ROOM_ID,
@@ -679,7 +688,7 @@ describe("MegolmBackup", function() {
                     { cacheCompleteCallback: resolve },
                 );
             });
-            const cachedKey = await client.crypto.getSessionBackupPrivateKey();
+            const cachedKey = await client.crypto!.getSessionBackupPrivateKey();
             expect(cachedKey).not.toBeNull();
         });
 
@@ -688,7 +697,7 @@ describe("MegolmBackup", function() {
                 algorithm: "this.algorithm.does.not.exist",
             });
             client.http.authedRequest = function() {
-                return Promise.resolve(CURVE25519_KEY_BACKUP_DATA);
+                return Promise.resolve<any>(CURVE25519_KEY_BACKUP_DATA);
             };
 
             await expect(client.restoreKeyBackupWithRecoveryKey(
@@ -702,10 +711,7 @@ describe("MegolmBackup", function() {
 
     describe("flagAllGroupSessionsForBackup", () => {
         it("should return number of sesions needing backup", async () => {
-            const scheduler = [
-                "getQueueForEvent", "queueEvent", "removeEventFromQueue",
-                "setProcessFunction",
-            ].reduce((r, k) => {r[k] = jest.fn(); return r;}, {}) as MockedObject<MatrixScheduler>;
+            const scheduler = makeTestScheduler();
             const store = new StubStore();
             const client = new MatrixClient({
                 baseUrl: "https://my.home.server",
