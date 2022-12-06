@@ -30,9 +30,9 @@ import {
     RoomEvent,
 } from "../../src/matrix";
 import { logger } from "../../src/logger";
-import { encodeUri } from "../../src/utils";
+import { encodeParams, encodeUri, QueryDict, replaceParam } from "../../src/utils";
 import { TestClient } from "../TestClient";
-import { FeatureSupport, Thread, THREAD_RELATION_TYPE } from "../../src/models/thread";
+import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { emitPromise } from "../test-utils/test-utils";
 
 const userId = "@alice:localhost";
@@ -160,6 +160,18 @@ SYNC_THREAD_ROOT.unsigned = {
         },
     },
 };
+
+/**
+ * Our httpBackend only allows matching calls if we have the exact same query, in the exact same order
+ * This method allows building queries with the exact same parameter order as the fetchRelations method in client
+ * @param params query parameters
+ */
+function buildRelationPaginationQuery(params: QueryDict): string {
+    if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
+        params = replaceParam("dir", "org.matrix.msc3715.dir", params);
+    }
+    return "?" + encodeParams(params).toString();
+}
 
 type HttpBackend = TestClient["httpBackend"];
 type ExpectedHttpRequest = ReturnType<HttpBackend["when"]>;
@@ -1645,55 +1657,37 @@ describe("MatrixClient event timelines", function() {
             const thread = room.getThread(THREAD_ROOT.event_id!)!;
             const timelineSet = thread.timelineSet;
 
-            const buildParams = (direction: Direction, token: string): string => {
-                if (Thread.hasServerSideFwdPaginationSupport === FeatureSupport.Experimental) {
-                    return `?from=${token}&org.matrix.msc3715.dir=${direction}`;
-                } else {
-                    return `?dir=${direction}&from=${token}`;
-                }
-            };
-
-            httpBackend.when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, {
-                    start: "start_token",
-                    events_before: [],
-                    event: THREAD_ROOT,
-                    events_after: [],
-                    state: [],
-                    end: "end_token",
-                });
-            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
-                encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function() {
-                    return THREAD_ROOT;
-                });
-            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
-                encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function() {
-                    return THREAD_ROOT;
-                });
-            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
-                encodeURIComponent(THREAD_ROOT.event_id!))
-                .respond(200, function() {
-                    return THREAD_ROOT;
-                });
             httpBackend.when("GET", "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
                 encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
-                encodeURIComponent(THREAD_RELATION_TYPE.name) + buildParams(Direction.Backward, "start_token"))
-                .respond(200, function() {
-                    return {
-                        original_event: THREAD_ROOT,
-                        chunk: [],
-                    };
-                });
-            httpBackend.when("GET", "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
-                encodeURIComponent(THREAD_ROOT.event_id!) + "/" +
-                encodeURIComponent(THREAD_RELATION_TYPE.name) + buildParams(Direction.Forward, "end_token"))
+                encodeURIComponent(THREAD_RELATION_TYPE.name) +
+                buildRelationPaginationQuery({ dir: Direction.Backward, limit: "1" }))
                 .respond(200, function() {
                     return {
                         original_event: THREAD_ROOT,
                         chunk: [THREAD_REPLY],
                     };
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
+                });
+            await flushHttp(emitPromise(thread, ThreadEvent.Update));
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/event/" +
+                encodeURIComponent(THREAD_ROOT.event_id!))
+                .respond(200, function() {
+                    return THREAD_ROOT;
                 });
             const timeline = await flushHttp(client.getEventTimeline(timelineSet, THREAD_ROOT.event_id!));
 
