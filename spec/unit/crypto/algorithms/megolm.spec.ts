@@ -563,7 +563,9 @@ describe("MegolmDecryption", function() {
         const [msgtype, contentMap] = mocked(aliceClient.sendToDevice).mock.calls[0];
         expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
         delete contentMap["@bob:example.com"].bobdevice1.session_id;
+        delete contentMap["@bob:example.com"].bobdevice1["org.matrix.msgid"];
         delete contentMap["@bob:example.com"].bobdevice2.session_id;
+        delete contentMap["@bob:example.com"].bobdevice2["org.matrix.msgid"];
         expect(contentMap).toStrictEqual({
             '@bob:example.com': {
                 bobdevice1: {
@@ -760,6 +762,7 @@ describe("MegolmDecryption", function() {
         expect(aliceClient.sendToDevice).toHaveBeenCalled();
         const [msgtype, contentMap] = mocked(aliceClient.sendToDevice).mock.calls[0];
         expect(msgtype).toMatch(/^(org.matrix|m).room_key.withheld$/);
+        delete contentMap["@bob:example.com"]["bobdevice"]["org.matrix.msgid"];
         expect(contentMap).toStrictEqual({
             '@bob:example.com': {
                 bobdevice: {

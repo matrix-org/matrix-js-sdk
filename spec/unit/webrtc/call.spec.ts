@@ -1392,7 +1392,7 @@ describe('Call', function() {
         it("ends call on onHangupReceived() if state is ringing", async () => {
             expect(call.callHasEnded()).toBe(false);
 
-            call.state = CallState.Ringing;
+            (call as any).state = CallState.Ringing;
             call.onHangupReceived({} as MCallHangupReject);
 
             expect(call.callHasEnded()).toBe(true);
@@ -1424,7 +1424,7 @@ describe('Call', function() {
     )("ends call on onRejectReceived() if in correct state (state=%s)", async (state: CallState) => {
         expect(call.callHasEnded()).toBe(false);
 
-        call.state = state;
+        (call as any).state = state;
         call.onRejectReceived({} as MCallHangupReject);
 
         expect(call.callHasEnded()).toBe(

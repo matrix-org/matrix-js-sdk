@@ -120,6 +120,8 @@ export enum RoomType {
     ElementVideo = "io.element.video",
 }
 
+export const ToDeviceMessageId = "org.matrix.msgid";
+
 /**
  * Identifier for an [MSC3088](https://github.com/matrix-org/matrix-doc/pull/3088)
  * room purpose. Note that this reference is UNSTABLE and subject to breaking changes,

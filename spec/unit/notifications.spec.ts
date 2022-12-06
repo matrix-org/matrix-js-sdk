@@ -114,8 +114,8 @@ describe("fixNotificationCountOnDecryption", () => {
 
         fixNotificationCountOnDecryption(mockClient, event);
 
-        expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(0);
-        expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(0);
+        expect(room.getRoomUnreadNotificationCount(NotificationCountType.Total)).toBe(1);
+        expect(room.getRoomUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
     });
 
     it("changes the thread count to highlight on decryption", () => {

@@ -725,7 +725,7 @@ export class SlidingSyncSdk {
             }
         } */
 
-        this.injectRoomEvents(room, stateEvents, timelineEvents, false);
+        this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -769,17 +769,19 @@ export class SlidingSyncSdk {
      * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
      * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
-     * @param {boolean} fromCache whether the sync response came from cache
      * is earlier in time. Higher index is later.
+     * @param {number} numLive the number of events in timelineEventList which just happened,
+     * supplied from the server.
      */
     public injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
-        fromCache = false,
+        numLive?: number,
     ): void {
         timelineEventList = timelineEventList || [];
         stateEventList = stateEventList || [];
+        numLive = numLive || 0;
 
         // If there are no events in the timeline yet, initialise it with
         // the given state events
@@ -818,13 +820,31 @@ export class SlidingSyncSdk {
             room.currentState.setStateEvents(stateEventList);
         }
 
+        // the timeline is broken into 'live' events which just happened and normal timeline events
+        // which are still to be appended to the end of the live timeline but happened a while ago.
+        // The live events are marked as fromCache=false to ensure that downstream components know
+        // this is a live event, not historical (from a remote server cache).
+
+        let liveTimelineEvents: MatrixEvent[] = [];
+        if (numLive > 0) {
+            // last numLive events are live
+            liveTimelineEvents = timelineEventList.slice(-1 * numLive);
+            // everything else is not live
+            timelineEventList = timelineEventList.slice(0, -1 * liveTimelineEvents.length);
+        }
+
         // execute the timeline events. This will continue to diverge the current state
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
         room.addLiveEvents(timelineEventList, {
-            fromCache: fromCache,
+            fromCache: true,
         });
+        if (liveTimelineEvents.length > 0) {
+            room.addLiveEvents(liveTimelineEvents, {
+                fromCache: false,
+            });
+        }
 
         room.recalculate();
 

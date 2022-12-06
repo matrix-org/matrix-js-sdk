@@ -22,12 +22,13 @@ limitations under the License.
  * @module webrtc/call
  */
 
+import { v4 as uuidv4 } from "uuid";
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from '../logger';
 import * as utils from '../utils';
 import { IContent, MatrixEvent } from '../models/event';
-import { EventType } from '../@types/event';
+import { EventType, ToDeviceMessageId } from '../@types/event';
 import { RoomMember } from '../models/room-member';
 import { randomString } from '../randomstring';
 import {
@@ -334,7 +335,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public roomId?: string;
     public callId: string;
     public invitee?: string;
-    public state = CallState.Fledgling;
     public hangupParty?: CallParty;
     public hangupReason?: string;
     public direction?: CallDirection;
@@ -346,6 +346,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // This should be set by the consumer on incoming & outgoing calls.
     public isPtt = false;
 
+    private _state = CallState.Fledgling;
     private readonly client: MatrixClient;
     private readonly forceTURN?: boolean;
     private readonly turnServers: Array<TurnServer>;
@@ -480,6 +481,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public getRemoteAssertedIdentity(): AssertedIdentity | undefined {
         return this.remoteAssertedIdentity;
+    }
+
+    public get state(): CallState {
+        return this._state;
+    }
+
+    private set state(state: CallState) {
+        const oldState = this._state;
+        this._state = state;
+        this.emit(CallEvent.State, state, oldState);
     }
 
     public get type(): CallType {
@@ -646,6 +657,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.feeds.push(new CallFeed({
             client: this.client,
+            call: this,
             roomId: this.roomId,
             userId,
             deviceId: this.getOpponentDeviceId(),
@@ -689,6 +701,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.feeds.push(new CallFeed({
             client: this.client,
+            call: this,
             roomId: this.roomId,
             audioMuted: false,
             videoMuted: false,
@@ -928,7 +941,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        this.setState(CallState.Ringing);
+        this.state = CallState.Ringing;
 
         if (event.getLocalAge()) {
             // Time out the call if it's ringing for too long
@@ -936,7 +949,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 if (this.state == CallState.Ringing) {
                     logger.debug(`Call ${this.callId} invite has expired. Hanging up.`);
                     this.hangupParty = CallParty.Remote; // effectively
-                    this.setState(CallState.Ended);
+                    this.state = CallState.Ended;
                     this.stopAllMedia();
                     if (this.peerConn!.signalingState != 'closed') {
                         this.peerConn!.close();
@@ -963,7 +976,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // perverse as it may seem, sometimes we want to instantiate a call with a
         // hangup message (because when getting the state of the room on load, events
         // come in reverse order and we want to remember that a call has been hung up)
-        this.setState(CallState.Ended);
+        this.state = CallState.Ended;
     }
 
     private shouldAnswerWithMediaType(
@@ -1004,7 +1017,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const answerWithAudio = this.shouldAnswerWithMediaType(audio, this.hasRemoteUserMediaAudioTrack, "audio");
             const answerWithVideo = this.shouldAnswerWithMediaType(video, this.hasRemoteUserMediaVideoTrack, "video");
 
-            this.setState(CallState.WaitLocalMedia);
+            this.state = CallState.WaitLocalMedia;
             this.waitForLocalAVStream = true;
 
             try {
@@ -1034,7 +1047,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 if (answerWithVideo) {
                     // Try to answer without video
                     logger.warn(`Call ${this.callId} Failed to getUserMedia(), trying to getUserMedia() without video`);
-                    this.setState(prevState);
+                    this.state = prevState;
                     this.waitForLocalAVStream = false;
                     await this.answer(answerWithAudio, false);
                 } else {
@@ -1043,7 +1056,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 }
             }
         } else if (this.waitForLocalAVStream) {
-            this.setState(CallState.WaitLocalMedia);
+            this.state = CallState.WaitLocalMedia;
         }
     }
 
@@ -1495,7 +1508,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             });
         }
 
-        this.setState(CallState.CreateOffer);
+        this.state = CallState.CreateOffer;
 
         logger.debug(`Call ${this.callId} gotUserMediaForInvite`);
         // Now we wait for the negotiationneeded event
@@ -1530,7 +1543,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.inviteOrAnswerSent = true;
         } catch (error) {
             // We've failed to answer: back to the ringing state
-            this.setState(CallState.Ringing);
+            this.state = CallState.Ringing;
             if (error instanceof MatrixError && error.event) this.client.cancelPendingEvent(error.event);
 
             let code = CallErrorCode.SendAnswer;
@@ -1627,7 +1640,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.pushLocalFeed(feed);
         }
 
-        this.setState(CallState.CreateAnswer);
+        this.state = CallState.CreateAnswer;
 
         let answer: RTCSessionDescriptionInit;
         try {
@@ -1645,7 +1658,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             // make sure we're still going
             if (this.callHasEnded()) return;
 
-            this.setState(CallState.Connecting);
+            this.state = CallState.Connecting;
 
             // Allow a short time for initial candidates to be gathered
             await new Promise(resolve => {
@@ -1762,7 +1775,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.chooseOpponent(event);
         await this.addBufferedIceCandidates();
 
-        this.setState(CallState.Connecting);
+        this.state = CallState.Connecting;
 
         const sdpStreamMetadata = content[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
@@ -2034,7 +2047,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.sendCandidateQueue();
         if (this.state === CallState.CreateOffer) {
             this.inviteOrAnswerSent = true;
-            this.setState(CallState.InviteSent);
+            this.state = CallState.InviteSent;
             this.inviteTimeout = setTimeout(() => {
                 this.inviteTimeout = undefined;
                 if (this.state === CallState.InviteSent) {
@@ -2088,7 +2101,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // chrome doesn't implement any of the 'onstarted' events yet
         if (["connected", "completed"].includes(this.peerConn?.iceConnectionState ?? '')) {
             clearTimeout(this.iceDisconnectedTimeout);
-            this.setState(CallState.Connected);
+            this.state = CallState.Connected;
 
             if (!this.callLengthInterval) {
                 this.callLengthInterval = setInterval(() => {
@@ -2112,7 +2125,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.info(`Hanging up call ${this.callId} (ICE disconnected for too long)`);
                 this.hangup(CallErrorCode.IceFailed, false);
             }, 30 * 1000);
-            this.setState(CallState.Connecting);
+            this.state = CallState.Connecting;
         }
 
         // In PTT mode, override feed status to muted when we lose connection to
@@ -2244,12 +2257,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.terminate(CallParty.Remote, CallErrorCode.AnsweredElsewhere, true);
     };
 
-    private setState(state: CallState): void {
-        const oldState = this.state;
-        this.state = state;
-        this.emit(CallEvent.State, state, oldState);
-    }
-
     /**
      * Internal
      * @param {string} eventType
@@ -2272,6 +2279,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 sender_session_id: this.client.getSessionId(),
                 dest_session_id: this.opponentSessionId,
                 seq: toDeviceSeq,
+                [ToDeviceMessageId]: uuidv4(),
             };
 
             this.emit(CallEvent.SendVoipEvent, {
@@ -2444,7 +2452,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         this.hangupParty = hangupParty;
         this.hangupReason = hangupReason;
-        this.setState(CallState.Ended);
+        this.state = CallState.Ended;
 
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
@@ -2578,7 +2586,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!audio) {
             throw new Error("You CANNOT start a call without audio");
         }
-        this.setState(CallState.WaitLocalMedia);
+        this.state = CallState.WaitLocalMedia;
 
         try {
             const stream = await this.client.getMediaHandler().getUserMediaStream(audio, video);

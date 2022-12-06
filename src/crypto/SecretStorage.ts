@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { v4 as uuidv4 } from 'uuid';
+
 import { logger } from '../logger';
 import * as olmlib from './olmlib';
 import { randomString } from '../randomstring';
@@ -24,6 +26,7 @@ import { ClientEvent, ClientEventHandlerMap, MatrixClient } from "../client";
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
 import { TypedEventEmitter } from '../models/typed-event-emitter';
 import { defer, IDeferred } from "../utils";
+import { ToDeviceMessageId } from "../@types/event";
 
 export const SECRET_STORAGE_ALGORITHM_V1_AES = "m.secret_storage.v1.aes-hmac-sha2";
 
@@ -393,6 +396,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
             action: "request",
             requesting_device_id: this.baseApis.deviceId,
             request_id: requestId,
+            [ToDeviceMessageId]: uuidv4(),
         };
         const toDevice: Record<string, typeof requestData> = {};
         for (const device of devices) {
@@ -476,6 +480,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                     algorithm: olmlib.OLM_ALGORITHM,
                     sender_key: this.baseApis.crypto!.olmDevice.deviceCurve25519Key!,
                     ciphertext: {},
+                    [ToDeviceMessageId]: uuidv4(),
                 };
                 await olmlib.ensureOlmSessionsForDevices(
                     this.baseApis.crypto!.olmDevice,
