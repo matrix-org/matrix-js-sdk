@@ -1756,7 +1756,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 algorithm: olmlib.OLM_ALGORITHM,
                 sender_key: this.olmDevice.deviceCurve25519Key,
                 ciphertext: {},
-                [ToDeviceMessageId]: uuidv4,
+                [ToDeviceMessageId]: uuidv4(),
             };
 
             return this.olmlib.encryptMessageForDevice(
