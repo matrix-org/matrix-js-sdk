@@ -382,13 +382,13 @@ describe("MatrixClient crypto", () => {
 
     it("Bob uploads device keys", bobUploadsDeviceKeys);
 
-    it("handles Failures to upload device keys", async() => {
+    it("handles failures to upload device keys", async () => {
         // since device keys are uploaded asynchronously, there's not really much to do here other than fail the
         // upload.
         bobTestClient.httpBackend.when("POST", "/keys/upload")
             .fail(0, new Error("bleh"));
         await bobTestClient.httpBackend.flushAllExpected();
-    })
+    });
 
     it("Ali downloads Bobs device keys", async () => {
         await bobUploadsDeviceKeys();
