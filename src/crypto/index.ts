@@ -22,9 +22,10 @@ limitations under the License.
  */
 
 import anotherjson from "another-json";
+import { v4 as uuidv4 } from "uuid";
 
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
-import { EventType } from "../@types/event";
+import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
@@ -234,6 +235,7 @@ export interface IEncryptedContent {
     algorithm: string;
     sender_key: string;
     ciphertext: Record<string, string>;
+    [ToDeviceMessageId]: string;
 }
 /* eslint-enable camelcase */
 
@@ -3173,6 +3175,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     algorithm: olmlib.OLM_ALGORITHM,
                     sender_key: this.olmDevice.deviceCurve25519Key!,
                     ciphertext: {},
+                    [ToDeviceMessageId]: uuidv4(),
                 };
 
                 toDeviceBatch.batch.push({
@@ -3232,8 +3235,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
         try {
-            logger.log(`received to_device ${event.getType()} from: ` +
-                `${event.getSender()} id: ${event.getId()}`);
+            logger.log(`received to-device ${event.getType()} from: ` +
+                `${event.getSender()} id: ${event.getContent()[ToDeviceMessageId]}`);
 
             if (event.getType() == "m.room_key"
                 || event.getType() == "m.forwarded_room_key") {
@@ -3516,6 +3519,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             algorithm: olmlib.OLM_ALGORITHM,
             sender_key: this.olmDevice.deviceCurve25519Key,
             ciphertext: {},
+            [ToDeviceMessageId]: uuidv4(),
         };
         await olmlib.encryptMessageForDevice(
             encryptedContent.ciphertext,
