@@ -28,7 +28,7 @@ export interface RendezvousChannel<T> {
 
     /**
      * Send a payload via the channel.
-     * @param data payload to send
+     * @param data - payload to send
      */
     send(data: T): Promise<void>;
 

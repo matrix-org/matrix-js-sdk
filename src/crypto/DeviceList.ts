@@ -15,8 +15,6 @@ limitations under the License.
 */
 
 /**
- * @module crypto/DeviceList
- *
  * Manages the list of other users' devices
  */
 
@@ -64,9 +62,6 @@ export type DeviceInfoMap = Record<string, Record<string, DeviceInfo>>;
 
 type EmittedEvents = CryptoEvent.WillUpdateDevices | CryptoEvent.DevicesUpdated | CryptoEvent.UserCrossSigningUpdated;
 
-/**
- * @alias module:crypto/DeviceList
- */
 export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHandlerMap> {
     private devices: { [userId: string]: { [deviceId: string]: IDevice } } = {};
 
@@ -163,11 +158,11 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * The actual save will be delayed by a short amount of time to
      * aggregate multiple writes to the database.
      *
-     * @param {number} delay Time in ms before which the save actually happens.
+     * @param delay - Time in ms before which the save actually happens.
      *     By default, the save is delayed for a short period in order to batch
      *     multiple writes, but this behaviour can be disabled by passing 0.
      *
-     * @return {Promise<boolean>} true if the data was saved, false if
+     * @returns true if the data was saved, false if
      *     it was not (eg. because no changes were pending). The promise
      *     will only resolve once the data is saved, so may take some time
      *     to resolve.
@@ -236,7 +231,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Gets the sync token last set with setSyncToken
      *
-     * @return {string} The sync token
+     * @returns The sync token
      */
     public getSyncToken(): string | null {
         return this.syncToken;
@@ -250,7 +245,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * those changed will not be synced from the server if a new client starts
      * up with that data.
      *
-     * @param {string} st The sync token
+     * @param st - The sync token
      */
     public setSyncToken(st: string | null): void {
         this.syncToken = st;
@@ -260,11 +255,10 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * Ensures up to date keys for a list of users are stored in the session store,
      * downloading and storing them if they're not (or if forceDownload is
      * true).
-     * @param {Array} userIds The users to fetch.
-     * @param {boolean} forceDownload Always download the keys even if cached.
+     * @param userIds - The users to fetch.
+     * @param forceDownload - Always download the keys even if cached.
      *
-     * @return {Promise} A promise which resolves to a map userId->deviceId->{@link
-     * module:crypto/deviceinfo|DeviceInfo}.
+     * @returns A promise which resolves to a map userId-\>deviceId-\>{@link DeviceInfo}.
      */
     public downloadKeys(userIds: string[], forceDownload: boolean): Promise<DeviceInfoMap> {
         const usersToDownload: string[] = [];
@@ -303,9 +297,9 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Get the stored device keys for a list of user ids
      *
-     * @param {string[]} userIds the list of users to list keys for.
+     * @param userIds - the list of users to list keys for.
      *
-     * @return {Object} userId->deviceId->{@link module:crypto/deviceinfo|DeviceInfo}.
+     * @returns userId-\>deviceId-\>{@link DeviceInfo}.
      */
     private getDevicesFromStore(userIds: string[]): DeviceInfoMap {
         const stored: DeviceInfoMap = {};
@@ -322,7 +316,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Returns a list of all user IDs the DeviceList knows about
      *
-     * @return {array} All known user IDs
+     * @returns All known user IDs
      */
     public getKnownUserIds(): string[] {
         return Object.keys(this.devices);
@@ -331,9 +325,9 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Get the stored device keys for a user id
      *
-     * @param {string} userId the user to list keys for.
+     * @param userId - the user to list keys for.
      *
-     * @return {module:crypto/deviceinfo[]|null} list of devices, or null if we haven't
+     * @returns list of devices, or null if we haven't
      * managed to get a list of devices for this user yet.
      */
     public getStoredDevicesForUser(userId: string): DeviceInfo[] | null {
@@ -353,9 +347,9 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Get the stored device data for a user, in raw object form
      *
-     * @param {string} userId the user to get data for
+     * @param userId - the user to get data for
      *
-     * @return {Object} deviceId->{object} devices, or undefined if
+     * @returns `deviceId->{object}` devices, or undefined if
      * there is no data for this user.
      */
     public getRawStoredDevicesForUser(userId: string): Record<string, IDevice> {
@@ -376,10 +370,8 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Get the stored keys for a single device
      *
-     * @param {string} userId
-     * @param {string} deviceId
      *
-     * @return {module:crypto/deviceinfo?} device, or undefined
+     * @returns device, or undefined
      * if we don't know about this device
      */
     public getStoredDevice(userId: string, deviceId: string): DeviceInfo | undefined {
@@ -393,10 +385,10 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Get a user ID by one of their device's curve25519 identity key
      *
-     * @param {string} algorithm  encryption algorithm
-     * @param {string} senderKey  curve25519 key to match
+     * @param algorithm -  encryption algorithm
+     * @param senderKey -  curve25519 key to match
      *
-     * @return {string} user ID
+     * @returns user ID
      */
     public getUserByIdentityKey(algorithm: string, senderKey: string): string | null {
         if (algorithm !== olmlib.OLM_ALGORITHM && algorithm !== olmlib.MEGOLM_ALGORITHM) {
@@ -410,10 +402,8 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Find a device by curve25519 identity key
      *
-     * @param {string} algorithm  encryption algorithm
-     * @param {string} senderKey  curve25519 key to match
-     *
-     * @return {module:crypto/deviceinfo?}
+     * @param algorithm -  encryption algorithm
+     * @param senderKey -  curve25519 key to match
      */
     public getDeviceByIdentityKey(algorithm: string, senderKey: string): DeviceInfo | null {
         const userId = this.getUserByIdentityKey(algorithm, senderKey);
@@ -453,8 +443,8 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Replaces the list of devices for a user with the given device list
      *
-     * @param {string} userId The user ID
-     * @param {Object} devices New device info for user
+     * @param userId - The user ID
+     * @param devices - New device info for user
      */
     public storeDevicesForUser(userId: string, devices: Record<string, IDevice>): void {
         this.setRawStoredDevicesForUser(userId, devices);
@@ -468,7 +458,6 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * will download the device list for the user, and that subsequent calls to
      * invalidateUserDeviceList will trigger more updates.
      *
-     * @param {String} userId
      */
     public startTrackingDeviceList(userId: string): void {
         // sanity-check the userId. This is mostly paranoia, but if synapse
@@ -497,7 +486,6 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * complete; it will just mean that we don't think that we have an up-to-date
      * list for future calls to downloadKeys.
      *
-     * @param {String} userId
      */
     public stopTrackingDeviceList(userId: string): void {
         if (this.deviceTrackingStatus[userId]) {
@@ -532,7 +520,6 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * This doesn't actually set off an update, so that several users can be
      * batched together. Call refreshOutdatedDeviceLists() for that.
      *
-     * @param {String} userId
      */
     public invalidateUserDeviceList(userId: string): void {
         if (this.deviceTrackingStatus[userId]) {
@@ -548,7 +535,7 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * If we have users who have outdated device lists, start key downloads for them
      *
-     * @returns {Promise} which completes when the download completes; normally there
+     * @returns which completes when the download completes; normally there
      *    is no need to wait for this (it's mostly for the unit tests).
      */
     public refreshOutdatedDeviceLists(): Promise<void> {
@@ -569,9 +556,9 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * Set the stored device data for a user, in raw object form
      * Used only by internal class DeviceListUpdateSerialiser
      *
-     * @param {string} userId the user to get data for
+     * @param userId - the user to get data for
      *
-     * @param {Object} devices deviceId->{object} the new devices
+     * @param devices - `deviceId->{object}` the new devices
      */
     public setRawStoredDevicesForUser(userId: string, devices: Record<string, IDevice>): void {
         // remove old devices from userByIdentityKey
@@ -602,9 +589,9 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * device list tracking status for them, and the
      * keyDownloadsInProgressByUser map for them.
      *
-     * @param {String[]} users  list of userIds
+     * @param users -  list of userIds
      *
-     * @return {Promise} resolves when all the users listed have
+     * @returns resolves when all the users listed have
      *     been updated. rejects if there was a problem updating any of the
      *     users.
      */
@@ -689,9 +676,9 @@ class DeviceListUpdateSerialiser {
     private syncToken?: string; // The sync token we send with the requests
 
     /*
-     * @param {object} baseApis Base API object
-     * @param {object} olmDevice The Olm Device
-     * @param {object} deviceList The device list object, the device list to be updated
+     * @param baseApis - Base API object
+     * @param olmDevice - The Olm Device
+     * @param deviceList - The device list object, the device list to be updated
      */
     public constructor(
         private readonly baseApis: MatrixClient,
@@ -702,12 +689,12 @@ class DeviceListUpdateSerialiser {
     /**
      * Make a key query request for the given users
      *
-     * @param {String[]} users list of user ids
+     * @param users - list of user ids
      *
-     * @param {String} syncToken sync token to pass in the query request, to
+     * @param syncToken - sync token to pass in the query request, to
      *     help the HS give the most recent results
      *
-     * @return {Promise} resolves when all the users listed have
+     * @returns resolves when all the users listed have
      *     been updated. rejects if there was a problem updating any of the
      *     users.
      */

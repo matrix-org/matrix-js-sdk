@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * Short Authentication String (SAS) verification.
- * @module crypto/verification/SAS
  */
 
 import anotherjson from 'another-json';
@@ -232,10 +231,6 @@ type EventHandlerMap = {
     [SasEvent.ShowSas]: (sas: ISasEvent) => void;
 } & VerificationEventHandlerMap;
 
-/**
- * @alias module:crypto/verification/SAS
- * @extends {module:crypto/verification/Base}
- */
 export class SAS extends Base<SasEvent, EventHandlerMap> {
     private waitingForAccept?: boolean;
     public ourSASPubKey?: string;

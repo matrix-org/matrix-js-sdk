@@ -41,7 +41,7 @@ export interface RendezvousTransport<T> {
 
   /**
    * Send data via the transport.
-   * @param data the data itself
+   * @param data - the data itself
    */
   send(data: T): Promise<void>;
 
@@ -52,7 +52,7 @@ export interface RendezvousTransport<T> {
 
   /**
    * Cancel the rendezvous. This will call `onCancelled()` if it is set.
-   * @param reason the reason for the cancellation/failure
+   * @param reason - the reason for the cancellation/failure
    */
   cancel(reason: RendezvousFailureReason): Promise<void>;
 }

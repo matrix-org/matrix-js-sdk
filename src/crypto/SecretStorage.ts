@@ -66,7 +66,6 @@ interface ISecretInfo {
 
 /**
  * Implements Secure Secret Storage and Sharing (MSC1946)
- * @module crypto/SecretStorage
  */
 export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     private requests = new Map<string, ISecretRequestInternal>();
@@ -119,15 +118,15 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Add a key for encrypting secrets.
      *
-     * @param {string} algorithm the algorithm used by the key.
-     * @param {object} opts the options for the algorithm.  The properties used
+     * @param algorithm - the algorithm used by the key.
+     * @param opts - the options for the algorithm.  The properties used
      *     depend on the algorithm given.
-     * @param {string} [keyId] the ID of the key.  If not given, a random
+     * @param keyId - the ID of the key.  If not given, a random
      *     ID will be generated.
      *
-     * @return {object} An object with:
-     *     keyId: {string} the ID of the key
-     *     keyInfo: {object} details about the key (iv, mac, passphrase)
+     * @returns An object with:
+     *     keyId: the ID of the key
+     *     keyInfo: details about the key (iv, mac, passphrase)
      */
     public async addKey(
         algorithm: string,
@@ -176,9 +175,9 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Get the key information for a given ID.
      *
-     * @param {string} [keyId = default key's ID] The ID of the key to check
+     * @param keyId - The ID of the key to check
      *     for. Defaults to the default key ID if not provided.
-     * @returns {Array?} If the key was found, the return value is an array of
+     * @returns If the key was found, the return value is an array of
      *     the form [keyId, keyInfo].  Otherwise, null is returned.
      *     XXX: why is this an array when addKey returns an object?
      */
@@ -199,9 +198,9 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Check whether we have a key with a given ID.
      *
-     * @param {string} [keyId = default key's ID] The ID of the key to check
+     * @param keyId - The ID of the key to check
      *     for. Defaults to the default key ID if not provided.
-     * @return {boolean} Whether we have the key.
+     * @returns Whether we have the key.
      */
     public async hasKey(keyId?: string): Promise<boolean> {
         return Boolean(await this.getKey(keyId));
@@ -210,10 +209,10 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Check whether a key matches what we expect based on the key info
      *
-     * @param {Uint8Array} key the key to check
-     * @param {object} info the key info
+     * @param key - the key to check
+     * @param info - the key info
      *
-     * @return {boolean} whether or not the key matches
+     * @returns whether or not the key matches
      */
     public async checkKey(key: Uint8Array, info: ISecretStorageKeyInfo): Promise<boolean> {
         if (info.algorithm === SECRET_STORAGE_ALGORITHM_V1_AES) {
@@ -232,9 +231,9 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Store an encrypted secret on the server
      *
-     * @param {string} name The name of the secret
-     * @param {string} secret The secret contents.
-     * @param {Array} keys The IDs of the keys to use to encrypt the secret
+     * @param name - The name of the secret
+     * @param secret - The secret contents.
+     * @param keys - The IDs of the keys to use to encrypt the secret
      *     or null/undefined to use the default key.
      */
     public async store(name: string, secret: string, keys?: string[] | null): Promise<void> {
@@ -280,9 +279,9 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Get a secret from storage.
      *
-     * @param {string} name the name of the secret
+     * @param name - the name of the secret
      *
-     * @return {string} the contents of the secret
+     * @returns the contents of the secret
      */
     public async get(name: string): Promise<string | undefined> {
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
@@ -326,9 +325,9 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Check if a secret is stored on the server.
      *
-     * @param {string} name the name of the secret
+     * @param name - the name of the secret
      *
-     * @return {object?} map of key name to key info the secret is encrypted
+     * @returns map of key name to key info the secret is encrypted
      *     with, or null if it is not present or not encrypted with a trusted
      *     key
      */
@@ -361,8 +360,8 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
     /**
      * Request a secret from another device
      *
-     * @param {string} name the name of the secret to request
-     * @param {string[]} devices the devices to request the secret from
+     * @param name - the name of the secret to request
+     * @param devices - the devices to request the secret from
      */
     public request(this: SecretStorage<MatrixClient>, name: string, devices: string[]): ISecretRequest {
         const requestId = this.baseApis.makeTxnId();

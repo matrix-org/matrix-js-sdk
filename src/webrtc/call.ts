@@ -19,7 +19,6 @@ limitations under the License.
 
 /**
  * This is an internal module. See {@link createNewMatrixCall} for the public API.
- * @module webrtc/call
  */
 
 import { v4 as uuidv4 } from "uuid";
@@ -54,29 +53,19 @@ import { GroupCallUnknownDeviceError } from './groupCall';
 import { IScreensharingOpts } from "./mediaHandler";
 import { MatrixError } from "../http-api";
 
-// events: hangup, error(err), replaced(call), state(state, oldState)
-
-/**
- * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
- * <p>
- * The error given will have a code equal to either `MatrixCall.ERR_LOCAL_OFFER_FAILED` or
- * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
- * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
- * to their audio/video hardware.
- *
- * @event module:webrtc/call~MatrixCall#"error"
- * @param {Error} err The error raised by MatrixCall.
- * @example
- * matrixCall.on("error", function(err){
- *   console.error(err.code, err);
- * });
- */
-
 interface CallOpts {
+    // The room ID for this call.
     roomId?: string;
     invitee?: string;
+    // The Matrix Client instance to send events to.
     client: MatrixClient;
+    /**
+     * Whether relay through TURN should be forced.
+     * @deprecated use opts.forceTURN when creating the matrix client
+     * since it's only possible to set this option on outbound calls.
+     */
     forceTURN?: boolean;
+    // A list of TURN servers.
     turnServers?: Array<TurnServer>;
     opponentDeviceId?: string;
     opponentSessionId?: string;
@@ -320,17 +309,6 @@ function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: TransceiverK
     return purpose + ':' + kind;
 }
 
-/**
- * Construct a new Matrix Call.
- * @constructor
- * @param {Object} opts Config options.
- * @param {string} opts.roomId The room ID for this call.
- * @param {Object} opts.webRtc The WebRTC globals from the browser.
- * @param {boolean} opts.forceTURN whether relay through TURN should be forced.
- * @param {Object} opts.URL The URL global.
- * @param {Array<Object>} opts.turnServers Optional. A list of TURN servers.
- * @param {MatrixClient} opts.client The Matrix Client instance to send events to.
- */
 export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
     public roomId?: string;
     public callId: string;
@@ -405,6 +383,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentSessionId?: string;
     public groupCallId?: string;
 
+    /**
+     * Construct a new Matrix Call.
+     * @param opts - Config options.
+     */
     public constructor(opts: CallOpts) {
         super();
 
@@ -450,8 +432,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Create a datachannel using this call's peer connection.
-     * @param label A human readable label for this datachannel
-     * @param options An object providing configuration options for the data channel.
+     * @param label - A human readable label for this datachannel
+     * @param options - An object providing configuration options for the data channel.
      */
     public createDataChannel(label: string, options: RTCDataChannelInit | undefined): RTCDataChannel {
         const dataChannel = this.peerConn!.createDataChannel(label, options);
@@ -557,7 +539,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Returns an array of all CallFeeds
-     * @returns {Array<CallFeed>} CallFeeds
+     * @returns CallFeeds
      */
     public getFeeds(): Array<CallFeed> {
         return this.feeds;
@@ -565,7 +547,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Returns an array of all local CallFeeds
-     * @returns {Array<CallFeed>} local CallFeeds
+     * @returns local CallFeeds
      */
     public getLocalFeeds(): Array<CallFeed> {
         return this.feeds.filter((feed) => feed.isLocal());
@@ -573,7 +555,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Returns an array of all remote CallFeeds
-     * @returns {Array<CallFeed>} remote CallFeeds
+     * @returns remote CallFeeds
      */
     public getRemoteFeeds(): Array<CallFeed> {
         return this.feeds.filter((feed) => !feed.isLocal());
@@ -605,7 +587,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Generates and returns localSDPStreamMetadata
-     * @returns {SDPStreamMetadata} localSDPStreamMetadata
+     * @returns localSDPStreamMetadata
      */
     private getLocalSDPStreamMetadata(updateStreamIds = false): SDPStreamMetadata {
         const metadata: SDPStreamMetadata = {};
@@ -626,7 +608,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     /**
      * Returns true if there are no incoming feeds,
      * otherwise returns false
-     * @returns {boolean} no incoming feeds
+     * @returns no incoming feeds
      */
     public noIncomingFeeds(): boolean {
         return !this.feeds.some((feed) => !feed.isLocal());
@@ -747,8 +729,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Pushes supplied feed to the call
-     * @param {CallFeed} callFeed to push
-     * @param {boolean} addToPeerConnection whether to add the tracks to the peer connection
+     * @param callFeed - to push
+     * @param addToPeerConnection - whether to add the tracks to the peer connection
      */
     public pushLocalFeed(callFeed: CallFeed, addToPeerConnection = true): void {
         if (this.feeds.some((feed) => callFeed.stream.id === feed.stream.id)) {
@@ -820,7 +802,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     /**
      * Removes local call feed from the call and its tracks from the peer
      * connection
-     * @param callFeed to remove
+     * @param callFeed - to remove
      */
     public removeLocalFeed(callFeed: CallFeed): void {
         const audioTransceiverKey = getTransceiverKey(callFeed.purpose, "audio");
@@ -894,7 +876,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Configure this call from an invite event. Used by MatrixClient.
-     * @param {MatrixEvent} event The m.call.invite event
+     * @param event - The m.call.invite event
      */
     public async initWithInvite(event: MatrixEvent): Promise<void> {
         const invite = event.getContent<MCallInviteNegotiate>();
@@ -970,7 +952,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Configure this call from a hangup or reject event. Used by MatrixClient.
-     * @param {MatrixEvent} event The m.call.hangup event
+     * @param event - The m.call.hangup event
      */
     public initWithHangup(event: MatrixEvent): void {
         // perverse as it may seem, sometimes we want to instantiate a call with a
@@ -1069,7 +1051,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     /**
      * Replace this call with a new call, e.g. for glare resolution. Used by
      * MatrixClient.
-     * @param {MatrixCall} newCall The new call.
+     * @param newCall - The new call.
      */
     public replacedBy(newCall: MatrixCall): void {
         logger.debug(`Call ${this.callId} replaced by ${newCall.callId}`);
@@ -1091,8 +1073,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Hangup a call.
-     * @param {string} reason The reason why the call is being hung up.
-     * @param {boolean} suppressEvent True to suppress emitting an event.
+     * @param reason - The reason why the call is being hung up.
+     * @param suppressEvent - True to suppress emitting an event.
      */
     public hangup(reason: CallErrorCode, suppressEvent: boolean): void {
         if (this.callHasEnded()) return;
@@ -1135,8 +1117,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Adds an audio and/or video track - upgrades the call
-     * @param {boolean} audio should add an audio track
-     * @param {boolean} video should add an video track
+     * @param audio - should add an audio track
+     * @param video - should add an video track
      */
     private async upgradeCall(
         audio: boolean, video: boolean,
@@ -1164,7 +1146,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Returns true if this.remoteSDPStreamMetadata is defined, otherwise returns false
-     * @returns {boolean} can screenshare
+     * @returns can screenshare
      */
     public opponentSupportsSDPStreamMetadata(): boolean {
         return Boolean(this.remoteSDPStreamMetadata);
@@ -1172,7 +1154,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * If there is a screensharing stream returns true, otherwise returns false
-     * @returns {boolean} is screensharing
+     * @returns is screensharing
      */
     public isScreensharing(): boolean {
         return Boolean(this.localScreensharingStream);
@@ -1180,9 +1162,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Starts/stops screensharing
-     * @param enabled the desired screensharing state
-     * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
-     * @returns {boolean} new screensharing state
+     * @param enabled - the desired screensharing state
+     * @param desktopCapturerSourceId - optional id of the desktop capturer source to use
+     * @returns new screensharing state
      */
     public async setScreensharingEnabled(enabled: boolean, opts?: IScreensharingOpts): Promise<boolean> {
         // Skip if there is nothing to do
@@ -1233,9 +1215,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     /**
      * Starts/stops screensharing
      * Should be used ONLY if the opponent doesn't support SDPStreamMetadata
-     * @param enabled the desired screensharing state
-     * @param {string} desktopCapturerSourceId optional id of the desktop capturer source to use
-     * @returns {boolean} new screensharing state
+     * @param enabled - the desired screensharing state
+     * @param desktopCapturerSourceId - optional id of the desktop capturer source to use
+     * @returns new screensharing state
      */
     private async setScreensharingEnabledWithoutMetadataSupport(
         enabled: boolean, opts?: IScreensharingOpts,
@@ -1277,7 +1259,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Replaces/adds the tracks from the passed stream to the localUsermediaStream
-     * @param {MediaStream} stream to use a replacement for the local usermedia stream
+     * @param stream - to use a replacement for the local usermedia stream
      */
     public async updateLocalUsermediaStream(
         stream: MediaStream, forceAudio = false, forceVideo = false,
@@ -1346,7 +1328,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Set whether our outbound video should be muted or not.
-     * @param {boolean} muted True to mute the outbound video.
+     * @param muted - True to mute the outbound video.
      * @returns the new mute state
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
@@ -1371,7 +1353,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * If there are multiple video tracks, <i>all</i> of the tracks need to be muted
      * for this to return true. This means if there are no video tracks, this will
      * return true.
-     * @return {Boolean} True if the local preview video is muted, else false
+     * @returns True if the local preview video is muted, else false
      * (including if the call is not set up yet).
      */
     public isLocalVideoMuted(): boolean {
@@ -1380,7 +1362,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Set whether the microphone should be muted or not.
-     * @param {boolean} muted True to mute the mic.
+     * @param muted - True to mute the mic.
      * @returns the new mute state
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
@@ -1405,7 +1387,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * If there are multiple audio tracks, <i>all</i> of the tracks need to be muted
      * for this to return true. This means if there are no audio tracks, this will
      * return true.
-     * @return {Boolean} True if the mic is muted, else false (including if the call
+     * @returns True if the mic is muted, else false (including if the call
      * is not set up yet).
      */
     public isMicrophoneMuted(): boolean {
@@ -1459,7 +1441,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Sends a DTMF digit to the other party
-     * @param digit The digit (nb. string - '#' and '*' are dtmf too)
+     * @param digit - The digit (nb. string - '#' and '*' are dtmf too)
      */
     public sendDtmfDigit(digit: string): void {
         for (const sender of this.peerConn!.getSenders()) {
@@ -1678,7 +1660,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Internal
-     * @param {Object} event
      */
     private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent): void => {
         if (event.candidate) {
@@ -1752,7 +1733,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Used by MatrixClient.
-     * @param {Object} msg
      */
     public async onAnswerReceived(event: MatrixEvent): Promise<void> {
         const content = event.getContent<MCallAnswer>();
@@ -2258,10 +2238,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     };
 
     /**
-     * Internal
-     * @param {string} eventType
-     * @param {Object} content
-     * @return {Promise}
+     * @internal
      */
     private async sendVoipEvent(eventType: string, content: object): Promise<void> {
         const realContent = Object.assign({}, content, {
@@ -2321,7 +2298,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Queue a candidate to be sent
-     * @param content The candidate to queue up, or null if candidates have finished being generated
+     * @param content - The candidate to queue up, or null if candidates have finished being generated
      *                and end-of-candidates should be signalled
      */
     private queueCandidate(content: RTCIceCandidate | null): void {
@@ -2615,7 +2592,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Place a call to this room with call feed.
-     * @param {CallFeed[]} callFeeds to use
+     * @param callFeeds - to use
      * @throws if you have not specified a listener for 'error' events.
      * @throws if have passed audio=false.
      */
@@ -2772,13 +2749,10 @@ export function supportsMatrixCall(): boolean {
  * Use client.createCall()
  *
  * Create a new Matrix call for the browser.
- * @param {MatrixClient} client The client instance to use.
- * @param {string} roomId The room the call is in.
- * @param {Object?} options DEPRECATED optional options map.
- * @param {boolean} options.forceTURN DEPRECATED whether relay through TURN should be
- * forced. This option is deprecated - use opts.forceTURN when creating the matrix client
- * since it's only possible to set this option on outbound calls.
- * @return {MatrixCall} the call or null if the browser doesn't support calling.
+ * @param client - The client instance to use.
+ * @param roomId - The room the call is in.
+ * @param options - DEPRECATED optional options map.
+ * @returns the call or null if the browser doesn't support calling.
  */
 export function createNewMatrixCall(
     client: MatrixClient,

@@ -32,17 +32,14 @@ export class RelationsContainer {
     /**
      * Get a collection of child events to a given event in this timeline set.
      *
-     * @param {String} eventId
-     * The ID of the event that you'd like to access child events for.
+     * @param eventId - The ID of the event that you'd like to access child events for.
      * For example, with annotations, this would be the ID of the event being annotated.
-     * @param {String} relationType
-     * The type of relationship involved, such as "m.annotation", "m.reference", "m.replace", etc.
-     * @param {String} eventType
-     * The relation event's type, such as "m.reaction", etc.
-     * @throws If <code>eventId</code>, <code>relationType</code> or <code>eventType</code>
+     * @param relationType - The type of relationship involved, such as "m.annotation", "m.reference", "m.replace", etc.
+     * @param eventType - The relation event's type, such as "m.reaction", etc.
+     * @throws If `eventId</code>, <code>relationType</code> or <code>eventType`
      * are not valid.
      *
-     * @returns {?Relations}
+     * @returns
      * A container for relation events or undefined if there are no relation events for
      * the relationType.
      */
@@ -71,7 +68,7 @@ export class RelationsContainer {
      * Child events can point to other child events as their parent, so this method may be
      * called for events which are also logically child events.
      *
-     * @param {MatrixEvent} event The event to check as relation target.
+     * @param event - The event to check as relation target.
      */
     public aggregateParentEvent(event: MatrixEvent): void {
         const relationsForEvent = this.relations.get(event.getId()!);
@@ -87,8 +84,8 @@ export class RelationsContainer {
     /**
      * Add relation events to the relevant relation collection.
      *
-     * @param {MatrixEvent} event The new child event to be aggregated.
-     * @param {EventTimelineSet} timelineSet The event timeline set within which to search for the related event if any.
+     * @param event - The new child event to be aggregated.
+     * @param timelineSet - The event timeline set within which to search for the related event if any.
      */
     public aggregateChildEvent(event: MatrixEvent, timelineSet?: EventTimelineSet): void {
         if (event.isRedacted() || event.status === EventStatus.CANCELLED) {

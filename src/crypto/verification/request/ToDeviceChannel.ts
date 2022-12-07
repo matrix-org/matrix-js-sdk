@@ -69,8 +69,8 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Extract the transaction id used by a given key verification event, if any
-     * @param {MatrixEvent} event the event
-     * @returns {string} the transaction id
+     * @param event - the event
+     * @returns the transaction id
      */
     public static getTransactionId(event: MatrixEvent): string {
         const content = event.getContent();
@@ -79,8 +79,8 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Checks whether the given event type should be allowed to initiate a new VerificationRequest over this channel
-     * @param {string} type the event type to check
-     * @returns {boolean} boolean flag
+     * @param type - the event type to check
+     * @returns boolean flag
      */
     public static canCreateRequest(type: string): boolean {
         return type === REQUEST_TYPE || type === START_TYPE;
@@ -95,9 +95,9 @@ export class ToDeviceChannel implements IVerificationChannel {
      * This only does checks that don't rely on the current state of a potentially already channel
      * so we can prevent channels being created by invalid events.
      * `handleEvent` can do more checks and choose to ignore invalid events.
-     * @param {MatrixEvent} event the event to validate
-     * @param {MatrixClient} client the client to get the current user and device id from
-     * @returns {boolean} whether the event is valid and should be passed to handleEvent
+     * @param event - the event to validate
+     * @param client - the client to get the current user and device id from
+     * @returns whether the event is valid and should be passed to handleEvent
      */
     public static validateEvent(event: MatrixEvent, client: MatrixClient): boolean {
         if (event.isCancelled()) {
@@ -137,8 +137,8 @@ export class ToDeviceChannel implements IVerificationChannel {
     }
 
     /**
-     * @param {MatrixEvent} event the event to get the timestamp of
-     * @return {number} the timestamp when the event was sent
+     * @param event - the event to get the timestamp of
+     * @returns the timestamp when the event was sent
      */
     public getTimestamp(event: MatrixEvent): number {
         const content = event.getContent();
@@ -147,10 +147,10 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Changes the state of the channel, request, and verifier in response to a key verification event.
-     * @param {MatrixEvent} event to handle
-     * @param {VerificationRequest} request the request to forward handling to
-     * @param {boolean} isLiveEvent whether this is an even received through sync or not
-     * @returns {Promise} a promise that resolves when any requests as an answer to the passed-in event are sent.
+     * @param event - to handle
+     * @param request - the request to forward handling to
+     * @param isLiveEvent - whether this is an even received through sync or not
+     * @returns a promise that resolves when any requests as an answer to the passed-in event are sent.
      */
     public async handleEvent(event: MatrixEvent, request: Request, isLiveEvent = false): Promise<void> {
         const type = event.getType();
@@ -196,9 +196,9 @@ export class ToDeviceChannel implements IVerificationChannel {
     }
 
     /**
-     * See {InRoomChannel.completedContentFromEvent} why this is needed.
-     * @param {MatrixEvent} event the received event
-     * @returns {Object} the content object
+     * See {@link InRoomChannel#completedContentFromEvent} for why this is needed.
+     * @param event - the received event
+     * @returns the content object
      */
     public completedContentFromEvent(event: MatrixEvent): Record<string, any> {
         return event.getContent();
@@ -209,9 +209,9 @@ export class ToDeviceChannel implements IVerificationChannel {
      * This is public so verification methods (SAS uses this) can get the exact
      * content that will be sent independent of the used channel,
      * as they need to calculate the hash of it.
-     * @param {string} type the event type
-     * @param {object} content the (incomplete) content
-     * @returns {object} the complete content, as it will be sent.
+     * @param type - the event type
+     * @param content - the (incomplete) content
+     * @returns the complete content, as it will be sent.
      */
     public completeContent(type: string, content: Record<string, any>): Record<string, any> {
         // make a copy
@@ -230,9 +230,9 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Send an event over the channel with the content not having gone through `completeContent`.
-     * @param {string} type the event type
-     * @param {object} uncompletedContent the (incomplete) content
-     * @returns {Promise} the promise of the request
+     * @param type - the event type
+     * @param uncompletedContent - the (incomplete) content
+     * @returns the promise of the request
      */
     public send(type: string, uncompletedContent: Record<string, any> = {}): Promise<void> {
         // create transaction id when sending request
@@ -245,9 +245,8 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Send an event over the channel with the content having gone through `completeContent` already.
-     * @param {string} type the event type
-     * @param {object} content
-     * @returns {Promise} the promise of the request
+     * @param type - the event type
+     * @returns the promise of the request
      */
     public async sendCompleted(type: string, content: Record<string, any>): Promise<void> {
         let result;
@@ -286,7 +285,7 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Allow Crypto module to create and know the transaction id before the .start event gets sent.
-     * @returns {string} the transaction id
+     * @returns the transaction id
      */
     public static makeTransactionId(): string {
         return randomString(32);

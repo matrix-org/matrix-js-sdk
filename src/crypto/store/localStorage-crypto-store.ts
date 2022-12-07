@@ -28,8 +28,6 @@ import { InboundGroupSessionData } from "../OlmDevice";
  * some things backed by localStorage. It exists because indexedDB
  * is broken in Firefox private mode or set to, "will not remember
  * history".
- *
- * @module
  */
 
 const E2E_PREFIX = "crypto.";
@@ -62,9 +60,6 @@ function keyEndToEndRoomsPrefix(roomId: string): string {
     return KEY_ROOMS_PREFIX + roomId;
 }
 
-/**
- * @implements {module:crypto/store/base~CryptoStore}
- */
 export class LocalStorageCryptoStore extends MemoryCryptoStore {
     public static exists(store: Storage): boolean {
         const length = store.length;
@@ -364,7 +359,7 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore {
     /**
      * Delete all data from this store.
      *
-     * @returns {Promise} Promise which resolves when the store has been cleared.
+     * @returns Promise which resolves when the store has been cleared.
      */
     public deleteAllData(): Promise<void> {
         this.store.removeItem(KEY_END_TO_END_ACCOUNT);

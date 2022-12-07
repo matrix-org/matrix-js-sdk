@@ -171,17 +171,21 @@ export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.m
  * eventual removal.
  *
  * Schema (TypeScript):
+ * ```
  * {
  *   service_members?: string[]
  * }
+ * ```
  *
- * Example:
+ * @example
+ * ```
  * {
  *   "service_members": [
  *     "@helperbot:localhost",
  *     "@reminderbot:alice.tdl"
  *   ]
  * }
+ * ```
  */
 export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members",

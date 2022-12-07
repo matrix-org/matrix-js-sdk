@@ -32,6 +32,16 @@ export enum CallEventHandlerEvent {
 }
 
 export type CallEventHandlerEventHandlerMap = {
+    /**
+     * Fires whenever an incoming call arrives.
+     * @param call - The incoming call.
+     * @example
+     * ```
+     * matrixClient.on("Call.incoming", function(call){
+     *   call.answer(); // auto-answer
+     * });
+     * ```
+     */
     [CallEventHandlerEvent.Incoming]: (call: MatrixCall) => void;
 };
 

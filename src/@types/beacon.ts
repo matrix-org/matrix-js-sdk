@@ -35,7 +35,8 @@ import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
  * To achieve an arbitrary number of only owner-writable state events
  * we introduce a variable suffix to the event type
  *
- * Eg
+ * @example
+ * ```
  * {
  *      "type": "m.beacon_info.@matthew:matrix.org.1",
  *      "state_key": "@matthew:matrix.org",
@@ -58,6 +59,7 @@ import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
  *          // more content as described below
  *      }
  * }
+ * ```
  */
 
 /**
@@ -78,20 +80,23 @@ export type MBeaconInfoContent = {
 /**
  * m.beacon_info Event example from the spec
  * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
+ * @example
+ * ```
  * {
-    "type": "m.beacon_info",
-    "state_key": "@matthew:matrix.org",
-    "content": {
-        "m.beacon_info": {
-            "description": "The Matthew Tracker", // same as an `m.location` description
-            "timeout": 86400000, // how long from the last event until we consider the beacon inactive in milliseconds
-        },
-        "m.ts": 1436829458432, // creation timestamp of the beacon on the client
-        "m.asset": {
-            "type": "m.self" // the type of asset being tracked as per MSC3488
-        }
-    }
-}
+ *   "type": "m.beacon_info",
+ *   "state_key": "@matthew:matrix.org",
+ *   "content": {
+ *     "m.beacon_info": {
+ *       "description": "The Matthew Tracker", // same as an `m.location` description
+ *       "timeout": 86400000, // how long from the last event until we consider the beacon inactive in milliseconds
+ *     },
+ *     "m.ts": 1436829458432, // creation timestamp of the beacon on the client
+ *     "m.asset": {
+ *       "type": "m.self" // the type of asset being tracked as per MSC3488
+ *     }
+ *   }
+ * }
+ * ```
  */
 
 /**
@@ -107,22 +112,24 @@ export type MBeaconInfoEventContent = &
 /**
  * m.beacon event example
  * https://github.com/matrix-org/matrix-spec-proposals/pull/3672
- *
+ * @example
+ * ```
  * {
-    "type": "m.beacon",
-    "sender": "@matthew:matrix.org",
-    "content": {
-        "m.relates_to": { // from MSC2674: https://github.com/matrix-org/matrix-doc/pull/2674
-            "rel_type": "m.reference", // from MSC3267: https://github.com/matrix-org/matrix-doc/pull/3267
-            "event_id": "$beacon_info"
-        },
-        "m.location": {
-            "uri": "geo:51.5008,0.1247;u=35",
-            "description": "Arbitrary beacon information"
-        },
-        "m.ts": 1636829458432,
-    }
-}
+ *   "type": "m.beacon",
+ *   "sender": "@matthew:matrix.org",
+ *   "content": {
+ *       "m.relates_to": { // from MSC2674: https://github.com/matrix-org/matrix-doc/pull/2674
+ *           "rel_type": "m.reference", // from MSC3267: https://github.com/matrix-org/matrix-doc/pull/3267
+ *           "event_id": "$beacon_info"
+ *       },
+ *       "m.location": {
+ *           "uri": "geo:51.5008,0.1247;u=35",
+ *           "description": "Arbitrary beacon information"
+ *       },
+ *       "m.ts": 1636829458432,
+ *   }
+ * }
+ * ```
 */
 
 /**

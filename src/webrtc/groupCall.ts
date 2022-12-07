@@ -63,6 +63,21 @@ export type GroupCallEventHandlerMap = {
     ) => void;
     [GroupCallEvent.LocalMuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [GroupCallEvent.ParticipantsChanged]: (participants: Map<RoomMember, Map<string, ParticipantState>>) => void;
+    /**
+     * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
+     * <p>
+     * The error given will have a code equal to either `MatrixCall.ERR_LOCAL_OFFER_FAILED` or
+     * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
+     * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
+     * to their audio/video hardware.
+     * @param err - The error raised by MatrixCall.
+     * @example
+     * ```
+     * matrixCall.on("error", function(err){
+     *   console.error(err.code, err);
+     * });
+     * ```
+     */
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
 };
 
@@ -302,7 +317,7 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Executes the given callback on all calls in this group call.
-     * @param f The callback.
+     * @param f - The callback.
      */
     public forEachCall(f: (call: MatrixCall) => void): void {
         for (const deviceMap of this.calls.values()) {
@@ -512,8 +527,8 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Sets the mute state of the local participants's microphone.
-     * @param {boolean} muted Whether to mute the microphone
-     * @returns {Promise<boolean>} Whether muting/unmuting was successful
+     * @param muted - Whether to mute the microphone
+     * @returns Whether muting/unmuting was successful
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
         // hasAudioDevice can block indefinitely if the window has lost focus,
@@ -575,8 +590,8 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Sets the mute state of the local participants's video.
-     * @param {boolean} muted Whether to mute the video
-     * @returns {Promise<boolean>} Whether muting/unmuting was successful
+     * @param muted - Whether to mute the video
+     * @returns Whether muting/unmuting was successful
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
         // hasAudioDevice can block indefinitely if the window has lost focus,
@@ -733,8 +748,8 @@ export class GroupCall extends TypedEventEmitter<
     /**
      * Determines whether a given participant expects us to call them (versus
      * them calling us).
-     * @param userId The participant's user ID.
-     * @param deviceId The participant's device ID.
+     * @param userId - The participant's user ID.
+     * @param deviceId - The participant's device ID.
      * @returns Whether we need to place an outgoing call to the participant.
      */
     private wantsOutgoingCall(userId: string, deviceId: string): boolean {
@@ -1249,9 +1264,9 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Updates the local user's member state with the devices returned by the given function.
-     * @param fn A function from the current devices to the new devices. If it
+     * @param fn - A function from the current devices to the new devices. If it
      *   returns null, the update will be skipped.
-     * @param keepAlive Whether the request should outlive the window.
+     * @param keepAlive - Whether the request should outlive the window.
      */
     private async updateDevices(
         fn: (devices: IGroupCallRoomMemberDevice[]) => IGroupCallRoomMemberDevice[] | null,

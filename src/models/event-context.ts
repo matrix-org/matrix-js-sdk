@@ -17,9 +17,6 @@ limitations under the License.
 import { MatrixEvent } from "./event";
 import { Direction } from "./event-timeline";
 
-/**
- * @module models/event-context
- */
 export class EventContext {
     private timeline: MatrixEvent[];
     private ourEventIndex = 0;
@@ -38,9 +35,7 @@ export class EventContext {
      * It also stores pagination tokens for going backwards and forwards in the
      * timeline.
      *
-     * @param {MatrixEvent} ourEvent  the event at the centre of this context
-     *
-     * @constructor
+     * @param ourEvent - the event at the centre of this context
      */
     public constructor(public readonly ourEvent: MatrixEvent) {
         this.timeline = [ourEvent];
@@ -51,7 +46,7 @@ export class EventContext {
      *
      * This is a convenience function for getTimeline()[getOurEventIndex()].
      *
-     * @return {MatrixEvent} The event at the centre of this context.
+     * @returns The event at the centre of this context.
      */
     public getEvent(): MatrixEvent {
         return this.timeline[this.ourEventIndex];
@@ -60,7 +55,7 @@ export class EventContext {
     /**
      * Get the list of events in this context
      *
-     * @return {Array} An array of MatrixEvents
+     * @returns An array of MatrixEvents
      */
     public getTimeline(): MatrixEvent[] {
         return this.timeline;
@@ -68,8 +63,6 @@ export class EventContext {
 
     /**
      * Get the index in the timeline of our event
-     *
-     * @return {Number}
      */
     public getOurEventIndex(): number {
         return this.ourEventIndex;
@@ -78,9 +71,7 @@ export class EventContext {
     /**
      * Get a pagination token.
      *
-     * @param {boolean} backwards   true to get the pagination token for going
-     *                                  backwards in time
-     * @return {string}
+     * @param backwards -   true to get the pagination token for going
      */
     public getPaginateToken(backwards = false): string | null {
         return this.paginateTokens[backwards ? Direction.Backward : Direction.Forward];
@@ -91,8 +82,8 @@ export class EventContext {
      *
      * Generally this will be used only by the matrix js sdk.
      *
-     * @param {string} token        pagination token
-     * @param {boolean} backwards   true to set the pagination token for going
+     * @param token -        pagination token
+     * @param backwards -   true to set the pagination token for going
      *                                   backwards in time
      */
     public setPaginateToken(token?: string, backwards = false): void {
@@ -102,8 +93,8 @@ export class EventContext {
     /**
      * Add more events to the timeline
      *
-     * @param {Array} events      new events, in timeline order
-     * @param {boolean} atStart   true to insert new events at the start
+     * @param events -      new events, in timeline order
+     * @param atStart -   true to insert new events at the start
      */
     public addEvents(events: MatrixEvent[], atStart = false): void {
         // TODO: should we share logic with Room.addEventsToTimeline?

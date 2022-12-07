@@ -16,8 +16,6 @@ limitations under the License.
 
 /**
  * Defines m.olm encryption/decryption
- *
- * @module crypto/algorithms/olm
  */
 
 import { logger } from '../../logger';
@@ -44,21 +42,17 @@ export interface IMessage {
 /**
  * Olm encryption implementation
  *
- * @constructor
- * @extends {module:crypto/algorithms/EncryptionAlgorithm}
- *
- * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/EncryptionAlgorithm}
+ * @param params - parameters, as per {@link EncryptionAlgorithm}
  */
 class OlmEncryption extends EncryptionAlgorithm {
     private sessionPrepared = false;
     private prepPromise: Promise<void> | null = null;
 
     /**
-     * @private
+     * @internal
 
-     * @param {string[]} roomMembers list of currently-joined users in the room
-     * @return {Promise} Promise which resolves when setup is complete
+     * @param roomMembers - list of currently-joined users in the room
+     * @returns Promise which resolves when setup is complete
      */
     private ensureSession(roomMembers: string[]): Promise<void> {
         if (this.prepPromise) {
@@ -83,13 +77,9 @@ class OlmEncryption extends EncryptionAlgorithm {
     }
 
     /**
-     * @inheritdoc
+     * @param content - plaintext event content
      *
-     * @param {module:models/room} room
-     * @param {string} eventType
-     * @param {object} content plaintext event content
-     *
-     * @return {Promise} Promise which resolves to the new event body
+     * @returns Promise which resolves to the new event body
      */
     public async encryptMessage(room: Room, eventType: string, content: IContent): Promise<IOlmEncryptedContent> {
         // pick the list of recipients based on the membership list.
@@ -150,19 +140,12 @@ class OlmEncryption extends EncryptionAlgorithm {
 /**
  * Olm decryption implementation
  *
- * @constructor
- * @extends {module:crypto/algorithms/DecryptionAlgorithm}
- * @param {object} params parameters, as per
- *     {@link module:crypto/algorithms/DecryptionAlgorithm}
+ * @param params - parameters, as per {@link DecryptionAlgorithm}
  */
 class OlmDecryption extends DecryptionAlgorithm {
     /**
-     * @inheritdoc
-     *
-     * @param {MatrixEvent} event
-     *
      * returns a promise which resolves to a
-     * {@link module:crypto~EventDecryptionResult} once we have finished
+     * {@link EventDecryptionResult} once we have finished
      * decrypting. Rejects with an `algorithms.DecryptionError` if there is a
      * problem decrypting the event.
      */
@@ -275,10 +258,10 @@ class OlmDecryption extends DecryptionAlgorithm {
     /**
      * Attempt to decrypt an Olm message
      *
-     * @param {string} theirDeviceIdentityKey  Curve25519 identity key of the sender
-     * @param {object} message  message object, with 'type' and 'body' fields
+     * @param theirDeviceIdentityKey -  Curve25519 identity key of the sender
+     * @param message -  message object, with 'type' and 'body' fields
      *
-     * @return {string} payload, if decrypted successfully.
+     * @returns payload, if decrypted successfully.
      */
     private decryptMessage(theirDeviceIdentityKey: string, message: IMessage): Promise<string> {
         // This is a wrapper that serialises decryptions of prekey messages, because
