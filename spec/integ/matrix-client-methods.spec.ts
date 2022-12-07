@@ -511,7 +511,12 @@ describe("MatrixClient", function() {
         }
 
         beforeEach(function() {
-            return client!.initCrypto();
+            // running initCrypto should trigger a key upload
+            httpBackend!.when("POST", "/keys/upload").respond(200, {});
+            return Promise.all([
+                client!.initCrypto(),
+                httpBackend!.flush("/keys/upload", 1),
+            ]);
         });
 
         afterEach(() => {
@@ -1369,6 +1374,13 @@ describe("MatrixClient", function() {
             const prom = client!.setPowerLevel("!room_id:server", userId, 100, event);
             await httpBackend!.flushAllExpected();
             await prom;
+        });
+    });
+
+    describe("uploadKeys", () => {
+        // uploadKeys() is a no-op nowadays, so there's not much to test here.
+        it("should complete successfully", async () => {
+            await client!.uploadKeys();
         });
     });
 });

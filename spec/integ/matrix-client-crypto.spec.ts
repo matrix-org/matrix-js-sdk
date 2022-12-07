@@ -53,10 +53,7 @@ type OlmPayload = ReturnType<Session["encrypt"]>;
 
 async function bobUploadsDeviceKeys(): Promise<void> {
     bobTestClient.expectDeviceKeyUpload();
-    await Promise.all([
-        bobTestClient.client.uploadKeys(),
-        bobTestClient.httpBackend.flushAllExpected(),
-    ]);
+    await bobTestClient.httpBackend.flushAllExpected();
     expect(Object.keys(bobTestClient.deviceKeys!).length).not.toEqual(0);
 }
 
@@ -382,6 +379,14 @@ describe("MatrixClient crypto", () => {
     });
 
     it("Bob uploads device keys", bobUploadsDeviceKeys);
+
+    it("handles failures to upload device keys", async () => {
+        // since device keys are uploaded asynchronously, there's not really much to do here other than fail the
+        // upload.
+        bobTestClient.httpBackend.when("POST", "/keys/upload")
+            .fail(0, new Error("bleh"));
+        await bobTestClient.httpBackend.flushAllExpected();
+    });
 
     it("Ali downloads Bobs device keys", async () => {
         await bobUploadsDeviceKeys();
