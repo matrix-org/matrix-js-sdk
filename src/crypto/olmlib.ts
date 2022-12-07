@@ -143,7 +143,7 @@ interface IExistingOlmSession {
  *
  *
  *
- *    map from userid to list of devices to ensure sessions for
+ * @param devicesByUser - map from userid to list of devices to ensure sessions for
  *
  * @returns resolves to an array.  The first element of the array is a
  *    a map of user IDs to arrays of deviceInfo, representing the devices that

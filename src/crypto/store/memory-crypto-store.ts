@@ -116,7 +116,7 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
      * @returns resolves to the matching
      *    {@link OutgoingRoomKeyRequest}, or null if
@@ -131,7 +131,7 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * @internal
      *
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
      * @returns
      *    the matching request, or null if not found

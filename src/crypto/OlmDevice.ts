@@ -1010,7 +1010,7 @@ export class OlmDevice {
      * @param roomId - The room ID to extract the session for, or null to fetch
      *     sessions for any room.
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
-     *   function to call.
+     * @param func - function to call.
      *
      * @internal
      */

@@ -468,7 +468,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param clientStore - the MatrixClient data store.
      *
-     *    storage for the crypto layer.
+     * @param cryptoStore - storage for the crypto layer.
      *
      * @param roomList - An initialised RoomList object
      *
@@ -3086,7 +3086,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Cancel any earlier room key request
      *
-     *    parameters to match for cancellation
+     * @param requestBody - parameters to match for cancellation
      */
     public cancelRoomKeyRequest(requestBody: IRoomKeyRequestBody): void {
         this.outgoingRoomKeyRequestManager.cancelRoomKeyRequest(requestBody)

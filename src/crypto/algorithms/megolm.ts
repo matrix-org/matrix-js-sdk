@@ -586,7 +586,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      *
      * @param chainIndex - current chain index
      *
-     *   mapping from userId to deviceInfo
+     * @param userDeviceMap - mapping from userId to deviceInfo
      *
      * @param payload - fields to include in the encrypted payload
      *
@@ -779,9 +779,9 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      *
      * @param payload - the base to-device message payload for sharing keys
      *
-     *    map from userid to list of devices
+     * @param devicesByUser - map from userid to list of devices
      *
-     *    array that will be populated with the devices that we can't get an
+     * @param errorDevices - array that will be populated with the devices that we can't get an
      *    olm session for
      *
      * @param otkTimeout - The timeout in milliseconds when requesting
@@ -902,7 +902,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      * Notify blocked devices that they have been blocked.
      *
      *
-     *    map from userid to device ID to blocked data
+     * @param devicesByUser - map from userid to device ID to blocked data
      */
     private async notifyBlockedDevices(
         session: OutboundSessionInfo,

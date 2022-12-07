@@ -214,7 +214,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
      * @returns resolves to the matching
      *    {@link OutgoingRoomKeyRequest}, or null if

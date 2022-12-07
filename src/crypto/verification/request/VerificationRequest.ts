@@ -461,8 +461,8 @@ export class VerificationRequest<
 
     /**
      * Cancels the request, sending a cancellation to the other party
-     * @param error -.reason the error reason to send the cancellation with
-     * @param error -.code the error code to send the cancellation with
+     * @param reason - the error reason to send the cancellation with
+     * @param code - the error code to send the cancellation with
      * @returns resolves when the event has been sent.
      */
     public async cancel({ reason = "User declined", code = "m.user" } = {}): Promise<void> {

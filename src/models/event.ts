@@ -149,8 +149,11 @@ interface IKeyRequestRecipient {
 }
 
 export interface IDecryptOptions {
+    // Emits "event.decrypted" if set to true
     emit?: boolean;
+    // True if this is a retry (enables more logging)
     isRetry?: boolean;
+    // whether the message should be re-decrypted if it was previously successfully decrypted with an untrusted key
     forceRedecryptIfUntrusted?: boolean;
 }
 
@@ -712,10 +715,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @internal
      *
      * @param crypto - crypto module
-     * @param options -.isRetry True if this is a retry (enables more logging)
-     * @param options -.emit Emits "event.decrypted" if set to true
-     * @param options -.forceRedecryptIfUntrusted whether the message should be
-     *     re-decrypted if it was previously successfully decrypted with an untrusted key
      *
      * @returns promise which resolves (to undefined) when the decryption
      * attempt is completed.
@@ -918,7 +917,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @internal
      *
-     *     the decryption result, including the plaintext and some key info
+     * @param decryptionResult - the decryption result, including the plaintext and some key info
      *
      * @remarks
      * Fires {@link MatrixEventEvent.Decrypted}
@@ -1102,7 +1101,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
-     *     event causing the redaction
+     * @param redactionEvent - event causing the redaction
      */
     public makeRedacted(redactionEvent: MatrixEvent): void {
         // quick sanity-check

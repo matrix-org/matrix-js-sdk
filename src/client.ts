@@ -2891,10 +2891,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Encrypts and sends a given object via Olm to-device messages to a given
      * set of devices.
      *
-     *   mapping from userId to deviceInfo
+     * @param userDeviceMap - mapping from userId to deviceInfo
      *
      * @param payload - fields to include in the encrypted payload
-     *      *
+     *
      * @returns Promise which
      *     resolves once the message has been encrypted and sent to the given
      *     userDeviceMap, and returns the `{ contentMap, deviceInfoByDeviceId }`
@@ -5367,11 +5367,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return promise;
     }
 
-    /**
-     * @param options -.preventReEmit don't re-emit events emitted on an event mapped by this mapper on the client
-     * @param options -.decrypt decrypt event proactively
-     * @param options -.toDevice the event is a to_device event
-     */
     public getEventMapper(options?: MapperOpts): EventMapper {
         return eventMapperFor(this, options || {});
     }
@@ -7207,8 +7202,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Attempts to decrypt an event
      * @param event - The event to decrypt
      * @returns A decryption promise
-     * @param options -.isRetry True if this is a retry (enables more logging)
-     * @param options -.emit Emits "event.decrypted" if set to true
      */
     public decryptEventIfNeeded(event: MatrixEvent, options?: IDecryptOptions): Promise<void> {
         if (event.shouldAttemptDecryption() && this.isCryptoEnabled()) {
@@ -7636,12 +7629,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Create a new room.
      * @param options - a list of options to pass to the /createRoom API.
-     * @param options -.room_alias_name The alias localpart to assign to
-     * this room.
-     * @param options -.visibility Either 'public' or 'private'.
-     * @param options -.invite A list of user IDs to invite to this room.
-     * @param options -.name The name to give this room.
-     * @param options -.topic The topic to give this room.
      * @returns Promise which resolves: `{room_id: {string}}`
      * @returns Rejects: with an error response.
      */
@@ -7907,13 +7894,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param options - Options for this request
-     * @param options -.server The remote server to query for the room list.
+     * @param server - The remote server to query for the room list.
      *                                Optional. If unspecified, get the local home
      *                                server's public room list.
-     * @param options -.limit Maximum number of entries to return
-     * @param options -.since Token to paginate from
-     * @param options -.filter Filter parameters
-     * @param options -.filter.generic_search_term String to search for
+     * @param limit - Maximum number of entries to return
+     * @param since - Token to paginate from
      * @returns Promise which resolves: IPublicRoomsResponse
      * @returns Rejects: with an error response.
      */

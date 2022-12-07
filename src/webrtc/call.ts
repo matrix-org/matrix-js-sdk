@@ -59,7 +59,11 @@ interface CallOpts {
     invitee?: string;
     // The Matrix Client instance to send events to.
     client: MatrixClient;
-    // whether relay through TURN should be forced.
+    /**
+     * Whether relay through TURN should be forced.
+     * @deprecated use opts.forceTURN when creating the matrix client
+     * since it's only possible to set this option on outbound calls.
+     */
     forceTURN?: boolean;
     // A list of TURN servers.
     turnServers?: Array<TurnServer>;
@@ -2748,9 +2752,6 @@ export function supportsMatrixCall(): boolean {
  * @param client - The client instance to use.
  * @param roomId - The room the call is in.
  * @param options - DEPRECATED optional options map.
- * @param options -.forceTURN DEPRECATED whether relay through TURN should be
- * forced. This option is deprecated - use opts.forceTURN when creating the matrix client
- * since it's only possible to set this option on outbound calls.
  * @returns the call or null if the browser doesn't support calling.
  */
 export function createNewMatrixCall(

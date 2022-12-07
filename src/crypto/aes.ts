@@ -22,8 +22,11 @@ const zeroSalt = new Uint8Array(8);
 
 export interface IEncryptedPayload {
     [key: string]: any; // extensible
+    // the initialization vector in base64
     iv: string;
+    // the ciphertext in base64
     ciphertext: string;
+    // the HMAC in base64
     mac: string;
 }
 
@@ -84,9 +87,6 @@ export async function encryptAES(
  * decrypt a string
  *
  * @param data - the encrypted data
- * @param data -.ciphertext the ciphertext in base64
- * @param data -.iv the initialization vector in base64
- * @param data -.mac the HMAC in base64
  * @param key - the encryption key to use
  * @param name - the name of the secret
  */

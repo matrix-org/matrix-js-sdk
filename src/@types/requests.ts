@@ -108,9 +108,13 @@ export interface ICreateRoomStateEvent {
 }
 
 export interface ICreateRoomOpts {
+    // The alias localpart to assign to this room.
     room_alias_name?: string;
+    // Either 'public' or 'private'.
     visibility?: Visibility;
+    // The name to give this room.
     name?: string;
+    // The topic to give this room.
     topic?: string;
     preset?: Preset;
     power_level_content_override?: {
@@ -127,6 +131,7 @@ export interface ICreateRoomOpts {
     };
     creation_content?: object;
     initial_state?: ICreateRoomStateEvent[];
+    // A list of user IDs to invite to this room.
     invite?: string[];
     invite_3pid?: IInvite3PID[];
     is_direct?: boolean;
@@ -137,7 +142,10 @@ export interface IRoomDirectoryOptions {
     server?: string;
     limit?: number;
     since?: string;
+
+    // Filter parameters
     filter?: {
+        // String to search for
         generic_search_term?: string;
         room_types?: Array<RoomType | null>;
     };
