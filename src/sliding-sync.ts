@@ -139,7 +139,7 @@ export interface MSC3575SlidingSyncResponse {
     txn_id?: string;
     lists: ListResponse[];
     rooms: Record<string, MSC3575RoomData>;
-    extensions: object;
+    extensions: Record<string, object>;
 }
 
 export enum SlidingSyncState {
@@ -265,7 +265,7 @@ export enum ExtensionState {
 /**
  * An interface that must be satisfied to register extensions
  */
-export interface Extension {
+export interface Extension<Req extends {}, Res extends {}> {
     /**
      * The extension name to go under 'extensions' in the request body.
      * @returns The JSON key.
@@ -277,12 +277,12 @@ export interface Extension {
      * @param isInitial True when this is part of the initial request (send sticky params)
      * @returns The request JSON to send.
      */
-    onRequest(isInitial: boolean): object | undefined;
+    onRequest(isInitial: boolean): Req | undefined;
     /**
      * A function which is called when there is response JSON under this extension.
      * @param data The response JSON under the extension name.
      */
-    onResponse(data: object);
+    onResponse(data: Res): void;
     /**
      * Controls when onResponse should be called.
      * @returns The state when it should be called.
@@ -353,7 +353,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     // a defer to resolve/reject depending on whether they were successfully sent or not.
     private txnIdDefers: (IDeferred<string> & { txnId: string})[] = [];
     // map of extension name to req/resp handler
-    private extensions: Record<string, Extension> = {};
+    private extensions: Record<string, Extension<any, any>> = {};
 
     private desiredRoomSubscriptions = new Set<string>(); // the *desired* room subscriptions
     private confirmedRoomSubscriptions = new Set<string>();
@@ -519,22 +519,22 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * Register an extension to send with the /sync request.
      * @param ext The extension to register.
      */
-    public registerExtension(ext: Extension): void {
+    public registerExtension(ext: Extension<any, any>): void {
         if (this.extensions[ext.name()]) {
             throw new Error(`registerExtension: ${ext.name()} already exists as an extension`);
         }
         this.extensions[ext.name()] = ext;
     }
 
-    private getExtensionRequest(isInitial: boolean): object {
-        const ext = {};
+    private getExtensionRequest(isInitial: boolean): Record<string, object | undefined> {
+        const ext: Record<string, object | undefined> = {};
         Object.keys(this.extensions).forEach((extName) => {
             ext[extName] = this.extensions[extName].onRequest(isInitial);
         });
         return ext;
     }
 
-    private onPreExtensionsResponse(ext: object): void {
+    private onPreExtensionsResponse(ext: Record<string, object>): void {
         Object.keys(ext).forEach((extName) => {
             if (this.extensions[extName].when() == ExtensionState.PreProcess) {
                 this.extensions[extName].onResponse(ext[extName]);
@@ -542,7 +542,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         });
     }
 
-    private onPostExtensionsResponse(ext: object): void {
+    private onPostExtensionsResponse(ext: Record<string, object>): void {
         Object.keys(ext).forEach((extName) => {
             if (this.extensions[extName].when() == ExtensionState.PostProcess) {
                 this.extensions[extName].onResponse(ext[extName]);

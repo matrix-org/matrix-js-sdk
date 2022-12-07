@@ -1312,10 +1312,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const joinedCount = summary["m.joined_member_count"];
         const invitedCount = summary["m.invited_member_count"];
         if (Number.isInteger(joinedCount)) {
-            this.currentState.setJoinedMemberCount(joinedCount);
+            this.currentState.setJoinedMemberCount(joinedCount!);
         }
         if (Number.isInteger(invitedCount)) {
-            this.currentState.setInvitedMemberCount(invitedCount);
+            this.currentState.setInvitedMemberCount(invitedCount!);
         }
         if (Array.isArray(heroes)) {
             // be cautious about trusting server values,
@@ -1826,7 +1826,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             timelineSet.getFilter(),
         );
 
-        timelineSet.getLiveTimeline().setPaginationToken(end, Direction.Backward);
+        timelineSet.getLiveTimeline().setPaginationToken(end ?? null, Direction.Backward);
 
         if (!events.length) return;
 

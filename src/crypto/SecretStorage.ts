@@ -18,10 +18,9 @@ import { v4 as uuidv4 } from 'uuid';
 
 import { logger } from '../logger';
 import * as olmlib from './olmlib';
-import { encodeBase64 } from './olmlib';
 import { randomString } from '../randomstring';
 import { calculateKeyCheck, decryptAES, encryptAES, IEncryptedPayload } from './aes';
-import { ICryptoCallbacks } from ".";
+import { ICryptoCallbacks, IEncryptedContent } from ".";
 import { IContent, MatrixEvent } from "../models/event";
 import { ClientEvent, ClientEventHandlerMap, MatrixClient } from "../client";
 import { IAddSecretStorageKeyOpts, ISecretStorageKeyInfo } from './api';
@@ -61,8 +60,7 @@ interface IDecryptors {
 
 interface ISecretInfo {
     encrypted: {
-        // eslint-disable-next-line camelcase
-        key_id: IEncryptedPayload;
+        [keyId: string]: IEncryptedPayload;
     };
 }
 
@@ -318,23 +316,11 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                 `the keys it is encrypted with are for a supported algorithm`);
         }
 
-        let keyId: string;
-        let decryption;
-        try {
-            // fetch private key from app
-            [keyId, decryption] = await this.getSecretStorageKey(keys, name);
+        // fetch private key from app
+        const [keyId, decryption] = await this.getSecretStorageKey(keys, name);
+        const encInfo = secretInfo.encrypted[keyId];
 
-            const encInfo = secretInfo.encrypted[keyId];
-
-            // We don't actually need the decryption object if it's a passthrough
-            // since we just want to return the key itself. It must be base64
-            // encoded, since this is how a key would normally be stored.
-            if (encInfo.passthrough) return encodeBase64(decryption.get_private_key());
-
-            return decryption.decrypt(encInfo);
-        } finally {
-            if (decryption && decryption.free) decryption.free();
-        }
+        return decryption.decrypt(encInfo);
     }
 
     /**
@@ -351,7 +337,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
         const secretInfo = await this.accountDataAdapter.getAccountDataFromServer<ISecretInfo>(name);
         if (!secretInfo?.encrypted) return null;
 
-        const ret = {};
+        const ret: Record<string, ISecretStorageKeyInfo> = {};
 
         // filter secret encryption keys with supported algorithm
         for (const keyId of Object.keys(secretInfo.encrypted)) {
@@ -391,7 +377,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                 requesting_device_id: this.baseApis.deviceId,
                 request_id: requestId,
             };
-            const toDevice = {};
+            const toDevice: Record<string, typeof cancelData> = {};
             for (const device of devices) {
                 toDevice[device] = cancelData;
             }
@@ -412,7 +398,7 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
             request_id: requestId,
             [ToDeviceMessageId]: uuidv4(),
         };
-        const toDevice = {};
+        const toDevice: Record<string, typeof requestData> = {};
         for (const device of devices) {
             toDevice[device] = requestData;
         }
@@ -490,9 +476,9 @@ export class SecretStorage<B extends MatrixClient | undefined = MatrixClient> {
                         secret: secret,
                     },
                 };
-                const encryptedContent = {
+                const encryptedContent: IEncryptedContent = {
                     algorithm: olmlib.OLM_ALGORITHM,
-                    sender_key: this.baseApis.crypto!.olmDevice.deviceCurve25519Key,
+                    sender_key: this.baseApis.crypto!.olmDevice.deviceCurve25519Key!,
                     ciphertext: {},
                     [ToDeviceMessageId]: uuidv4(),
                 };

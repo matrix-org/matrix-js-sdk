@@ -84,6 +84,7 @@ export class CrossSigningInfo {
         const res = new CrossSigningInfo(userId);
         for (const prop in obj) {
             if (obj.hasOwnProperty(prop)) {
+                // @ts-ignore - ts doesn't like this and nor should we
                 res[prop] = obj[prop];
             }
         }

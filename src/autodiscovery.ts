@@ -49,7 +49,7 @@ interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
     error?: IWellKnownConfig["error"] | null;
 }
 
-interface ClientConfig {
+interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
     "m.homeserver": WellKnownConfig;
     "m.identity_server": WellKnownConfig;
 }
@@ -131,7 +131,7 @@ export class AutoDiscovery {
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
-    public static async fromDiscoveryConfig(wellknown: any): Promise<ClientConfig> {
+    public static async fromDiscoveryConfig(wellknown: IClientWellKnown): Promise<ClientConfig> {
         // Step 1 is to get the config, which is provided to us here.
 
         // We default to an error state to make the first few checks easier to
@@ -185,7 +185,7 @@ export class AutoDiscovery {
         const hsVersions = await this.fetchWellKnownObject(
             `${hsUrl}/_matrix/client/versions`,
         );
-        if (!hsVersions || !hsVersions.raw["versions"]) {
+        if (!hsVersions || !hsVersions.raw?.["versions"]) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
 
@@ -219,9 +219,7 @@ export class AutoDiscovery {
 
             // Step 5a: Make sure the URL is valid *looking*. We'll make sure it
             // points to an identity server in Step 5b.
-            isUrl = this.sanitizeWellKnownUrl(
-                wellknown["m.identity_server"]["base_url"],
-            );
+            isUrl = this.sanitizeWellKnownUrl(wellknown["m.identity_server"]["base_url"]);
             if (!isUrl) {
                 logger.error("Invalid base_url for m.identity_server");
                 failingClientConfig["m.identity_server"].error =
@@ -234,7 +232,7 @@ export class AutoDiscovery {
             const isResponse = await this.fetchWellKnownObject(
                 `${isUrl}/_matrix/identity/api/v1`,
             );
-            if (!isResponse || !isResponse.raw || isResponse.action !== AutoDiscoveryAction.SUCCESS) {
+            if (!isResponse?.raw || isResponse.action !== AutoDiscoveryAction.SUCCESS) {
                 logger.error("Invalid /api/v1 response");
                 failingClientConfig["m.identity_server"].error =
                     AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
@@ -259,14 +257,16 @@ export class AutoDiscovery {
 
         // Step 7: Copy any other keys directly into the clientConfig. This is for
         // things like custom configuration of services.
-        Object.keys(wellknown).forEach((k) => {
+        Object.keys(wellknown).forEach((k: keyof IClientWellKnown) => {
             if (k === "m.homeserver" || k === "m.identity_server") {
                 // Only copy selected parts of the config to avoid overwriting
                 // properties computed by the validation logic above.
                 const notProps = ["error", "state", "base_url"];
-                for (const prop of Object.keys(wellknown[k])) {
+                for (const prop of Object.keys(wellknown[k]!)) {
                     if (notProps.includes(prop)) continue;
-                    clientConfig[k][prop] = wellknown[k][prop];
+                    type Prop = Exclude<keyof IWellKnownConfig, "error" | "state" | "base_url">;
+                    // @ts-ignore - ts gets unhappy as we're mixing types here
+                    clientConfig[k][prop as Prop] = wellknown[k]![prop as Prop];
                 }
             } else {
                 // Just copy the whole thing over otherwise
@@ -347,7 +347,7 @@ export class AutoDiscovery {
         }
 
         // Step 2: Validate and parse the config
-        return AutoDiscovery.fromDiscoveryConfig(wellknown.raw);
+        return AutoDiscovery.fromDiscoveryConfig(wellknown.raw!);
     }
 
     /**
@@ -378,7 +378,7 @@ export class AutoDiscovery {
      * @return {string|boolean} The sanitized URL or a falsey value if the URL is invalid.
      * @private
      */
-    private static sanitizeWellKnownUrl(url: string): string | false {
+    private static sanitizeWellKnownUrl(url?: string | null): string | false {
         if (!url) return false;
 
         try {

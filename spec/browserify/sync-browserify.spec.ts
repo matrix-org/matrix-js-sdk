@@ -16,7 +16,7 @@ limitations under the License.
 
 import HttpBackend from "matrix-mock-request";
 
-import "./setupTests";// uses browser-matrix instead of the src
+import "./setupTests"; // uses browser-matrix instead of the src
 import type { MatrixClient } from "../../src";
 
 const USER_ID = "@user:test.server";
@@ -65,15 +65,16 @@ describe("Browserify Test", function() {
         const syncData = {
             next_batch: "batch1",
             rooms: {
-                join: {},
-            },
-        };
-        syncData.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [
-                    event,
-                ],
-                limited: false,
+                join: {
+                    [ROOM_ID]: {
+                        timeline: {
+                            events: [
+                                event,
+                            ],
+                            limited: false,
+                        },
+                    },
+                },
             },
         };
 

@@ -23,8 +23,14 @@ limitations under the License.
 import { MatrixClient } from "../../client";
 import { Room } from "../../models/room";
 import { OlmDevice } from "../OlmDevice";
-import { MatrixEvent, RoomMember } from "../../matrix";
-import { Crypto, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "..";
+import { IContent, MatrixEvent, RoomMember } from "../../matrix";
+import {
+    Crypto,
+    IEncryptedContent,
+    IEventDecryptionResult,
+    IMegolmSessionData,
+    IncomingRoomKeyRequest,
+} from "..";
 import { DeviceInfo } from "../deviceinfo";
 import { IRoomEncryption } from "../RoomList";
 
@@ -108,7 +114,7 @@ export abstract class EncryptionAlgorithm {
      *
      * @return {Promise} Promise which resolves to the new event body
      */
-    public abstract encryptMessage(room: Room, eventType: string, content: object): Promise<object>;
+    public abstract encryptMessage(room: Room, eventType: string, content: IContent): Promise<IEncryptedContent>;
 
     /**
      * Called when the membership of a member of the room changes.

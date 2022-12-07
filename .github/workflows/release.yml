@@ -36,7 +36,7 @@ jobs:
           tag="${{ github.ref_name }}"
           VERSION="${tag#v}"
           [ ! -e "$VERSION" ] || rm -r $VERSION
-          cp -r $RUNNER_TEMP/docs/ $VERSION
+          cp -r $RUNNER_TEMP/_docs/ $VERSION
 
           # Add the new directory to the index if it isn't there already
           if ! grep -q ">Version $VERSION</a>" index.html; then

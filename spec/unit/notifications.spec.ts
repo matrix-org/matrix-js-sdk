@@ -39,7 +39,7 @@ let threadEvent: MatrixEvent;
 const ROOM_ID = "!roomId:example.org";
 let THREAD_ID: string;
 
-function mkPushAction(notify, highlight): IActionsObject {
+function mkPushAction(notify: boolean, highlight: boolean): IActionsObject {
     return {
         notify,
         tweaks: {

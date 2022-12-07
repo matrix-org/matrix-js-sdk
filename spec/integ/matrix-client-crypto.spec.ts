@@ -28,12 +28,14 @@ limitations under the License.
 // load olm before the sdk if possible
 import '../olm-loader';
 
+import type { Session } from "@matrix-org/olm";
 import { logger } from '../../src/logger';
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
-import { CRYPTO_ENABLED, IUploadKeysRequest } from "../../src/client";
+import { CRYPTO_ENABLED, IClaimKeysRequest, IQueryKeysRequest, IUploadKeysRequest } from "../../src/client";
 import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent } from "../../src/matrix";
 import { DeviceInfo } from '../../src/crypto/deviceinfo';
+import { IDeviceKeys, IOneTimeKey } from "../../src/crypto/dehydration";
 
 let aliTestClient: TestClient;
 const roomId = "!room:localhost";
@@ -47,11 +49,7 @@ const bobAccessToken = "fewgfkuesa";
 let aliMessages: IContent[];
 let bobMessages: IContent[];
 
-// IMessage isn't exported by src/crypto/algorithms/olm.ts
-interface OlmPayload {
-    type: number;
-    body: string;
-}
+type OlmPayload = ReturnType<Session["encrypt"]>;
 
 async function bobUploadsDeviceKeys(): Promise<void> {
     bobTestClient.expectDeviceKeyUpload();
@@ -68,12 +66,12 @@ function expectQueryKeys(querier: TestClient, uploader: TestClient): Promise<num
     // can't query keys before bob has uploaded them
     expect(uploader.deviceKeys).toBeTruthy();
 
-    const uploaderKeys = {};
-    uploaderKeys[uploader.deviceId!] = uploader.deviceKeys;
+    const uploaderKeys: Record<string, IDeviceKeys> = {};
+    uploaderKeys[uploader.deviceId!] = uploader.deviceKeys!;
     querier.httpBackend.when("POST", "/keys/query")
-        .respond(200, function(_path, content: IUploadKeysRequest) {
+        .respond(200, function(_path, content: IQueryKeysRequest) {
             expect(content.device_keys![uploader.userId!]).toEqual([]);
-            const result = {};
+            const result: Record<string, Record<string, IDeviceKeys>> = {};
             result[uploader.userId!] = uploaderKeys;
             return { device_keys: result };
         });
@@ -91,7 +89,7 @@ async function expectAliClaimKeys(): Promise<void> {
     const keys = await bobTestClient.awaitOneTimeKeyUpload();
     aliTestClient.httpBackend.when(
         "POST", "/keys/claim",
-    ).respond(200, function(_path, content: IUploadKeysRequest) {
+    ).respond(200, function(_path, content: IClaimKeysRequest) {
         const claimType = content.one_time_keys![bobUserId][bobDeviceId];
         expect(claimType).toEqual("signed_curve25519");
         let keyId = '';
@@ -102,7 +100,7 @@ async function expectAliClaimKeys(): Promise<void> {
                 }
             }
         }
-        const result = {};
+        const result: Record<string, Record<string, Record<string, IOneTimeKey>>> = {};
         result[bobUserId] = {};
         result[bobUserId][bobDeviceId] = {};
         result[bobUserId][bobDeviceId][keyId] = keys[keyId];
@@ -273,20 +271,19 @@ async function recvMessage(
         next_batch: "x",
         rooms: {
             join: {
-
+                [roomId]: {
+                    timeline: {
+                        events: [
+                            testUtils.mkEvent({
+                                type: "m.room.encrypted",
+                                room: roomId,
+                                content: message,
+                                sender: sender,
+                            }),
+                        ],
+                    },
+                },
             },
-        },
-    };
-    syncData.rooms.join[roomId] = {
-        timeline: {
-            events: [
-                testUtils.mkEvent({
-                    type: "m.room.encrypted",
-                    room: roomId,
-                    content: message,
-                    sender: sender,
-                }),
-            ],
         },
     };
     httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -332,24 +329,25 @@ function firstSync(testClient: TestClient): Promise<void> {
     const syncData = {
         next_batch: "x",
         rooms: {
-            join: { },
-        },
-    };
-    syncData.rooms.join[roomId] = {
-        state: {
-            events: [
-                testUtils.mkMembership({
-                    mship: "join",
-                    user: aliUserId,
-                }),
-                testUtils.mkMembership({
-                    mship: "join",
-                    user: bobUserId,
-                }),
-            ],
-        },
-        timeline: {
-            events: [],
+            join: {
+                [roomId]: {
+                    state: {
+                        events: [
+                            testUtils.mkMembership({
+                                mship: "join",
+                                user: aliUserId,
+                            }),
+                            testUtils.mkMembership({
+                                mship: "join",
+                                user: bobUserId,
+                            }),
+                        ],
+                    },
+                    timeline: {
+                        events: [],
+                    },
+                },
+            },
         },
     };
 
@@ -429,7 +427,7 @@ describe("MatrixClient crypto", () => {
             },
         };
 
-        const bobKeys = {};
+        const bobKeys: Record<string, typeof bobDeviceKeys> = {};
         bobKeys[bobDeviceId] = bobDeviceKeys;
         aliTestClient.httpBackend.when(
             "POST", "/keys/query",
@@ -465,7 +463,7 @@ describe("MatrixClient crypto", () => {
             },
         };
 
-        const bobKeys = {};
+        const bobKeys: Record<string, typeof bobDeviceKeys> = {};
         bobKeys[bobDeviceId] = bobDeviceKeys;
         aliTestClient.httpBackend.when(
             "POST", "/keys/query",
@@ -520,20 +518,19 @@ describe("MatrixClient crypto", () => {
             next_batch: "x",
             rooms: {
                 join: {
-
+                    [roomId]: {
+                        timeline: {
+                            events: [
+                                testUtils.mkEvent({
+                                    type: "m.room.encrypted",
+                                    room: roomId,
+                                    content: message,
+                                    sender: "@bogus:sender",
+                                }),
+                            ],
+                        },
+                    },
                 },
-            },
-        };
-        syncData.rooms.join[roomId] = {
-            timeline: {
-                events: [
-                    testUtils.mkEvent({
-                        type: "m.room.encrypted",
-                        room: roomId,
-                        content: message,
-                        sender: "@bogus:sender",
-                    }),
-                ],
             },
         };
         bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -612,20 +609,21 @@ describe("MatrixClient crypto", () => {
         const syncData = {
             next_batch: '2',
             rooms: {
-                join: {},
-            },
-        };
-        syncData.rooms.join[roomId] = {
-            state: {
-                events: [
-                    testUtils.mkEvent({
-                        type: 'm.room.encryption',
-                        skey: '',
-                        content: {
-                            algorithm: 'm.olm.v1.curve25519-aes-sha2',
+                join: {
+                    [roomId]: {
+                        state: {
+                            events: [
+                                testUtils.mkEvent({
+                                    type: 'm.room.encryption',
+                                    skey: '',
+                                    content: {
+                                        algorithm: 'm.olm.v1.curve25519-aes-sha2',
+                                    },
+                                }),
+                            ],
                         },
-                    }),
-                ],
+                    },
+                },
             },
         };
 

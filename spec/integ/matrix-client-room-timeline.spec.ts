@@ -18,7 +18,16 @@ import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
 import { EventStatus } from "../../src/models/event";
-import { MatrixError, ClientEvent, IEvent, MatrixClient, RoomEvent } from "../../src";
+import {
+    MatrixError,
+    ClientEvent,
+    IEvent,
+    MatrixClient,
+    RoomEvent,
+    ISyncResponse,
+    IMinimalEvent,
+    IRoomEvent, Room,
+} from "../../src";
 import { TestClient } from "../TestClient";
 
 describe("MatrixClient room timelines", function() {
@@ -39,7 +48,7 @@ describe("MatrixClient room timelines", function() {
             name: "Old room name",
         },
     });
-    let NEXT_SYNC_DATA;
+    let NEXT_SYNC_DATA: Partial<ISyncResponse>;
     const SYNC_DATA = {
         next_batch: "s_5_3",
         rooms: {
@@ -88,7 +97,7 @@ describe("MatrixClient room timelines", function() {
                     },
                 },
                 leave: {},
-            },
+            } as unknown as ISyncResponse["rooms"],
         };
         events.forEach(function(e) {
             if (e.room_id !== roomId) {
@@ -96,11 +105,11 @@ describe("MatrixClient room timelines", function() {
             }
             if (e.state_key) {
                 // push the current
-                NEXT_SYNC_DATA.rooms.join[roomId].timeline.events.push(e);
+                NEXT_SYNC_DATA.rooms!.join[roomId].timeline.events.push(e as unknown as IRoomEvent);
             } else if (["m.typing", "m.receipt"].indexOf(e.type!) !== -1) {
-                NEXT_SYNC_DATA.rooms.join[roomId].ephemeral.events.push(e);
+                NEXT_SYNC_DATA.rooms!.join[roomId].ephemeral.events.push(e as unknown as IMinimalEvent);
             } else {
-                NEXT_SYNC_DATA.rooms.join[roomId].timeline.events.push(e);
+                NEXT_SYNC_DATA.rooms!.join[roomId].timeline.events.push(e as unknown as IRoomEvent);
             }
         });
     }
@@ -237,7 +246,7 @@ describe("MatrixClient room timelines", function() {
     });
 
     describe("paginated events", function() {
-        let sbEvents;
+        let sbEvents: Partial<IEvent>[];
         const sbEndTok = "pagin_end";
 
         beforeEach(function() {
@@ -559,7 +568,7 @@ describe("MatrixClient room timelines", function() {
                 utils.mkMessage({ user: userId, room: roomId }),
             ];
             setNextSyncData(eventData);
-            NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
+            NEXT_SYNC_DATA.rooms!.join[roomId].timeline.limited = true;
 
             return Promise.all([
                 httpBackend!.flush("/versions", 1),
@@ -593,7 +602,7 @@ describe("MatrixClient room timelines", function() {
                 utils.mkMessage({ user: userId, room: roomId }),
             ];
             setNextSyncData(eventData);
-            NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
+            NEXT_SYNC_DATA.rooms!.join[roomId].timeline.limited = true;
 
             return Promise.all([
                 httpBackend!.flush("/sync", 1),
@@ -638,7 +647,7 @@ describe("MatrixClient room timelines", function() {
             end: "end_token",
         };
 
-        let room;
+        let room: Room;
         beforeEach(async () => {
             setNextSyncData(initialSyncEventData);
 

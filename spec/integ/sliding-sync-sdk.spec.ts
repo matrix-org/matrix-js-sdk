@@ -119,13 +119,13 @@ describe("SlidingSyncSdk", () => {
     };
 
     // find an extension on a SlidingSyncSdk instance
-    const findExtension = (name: string): Extension => {
+    const findExtension = (name: string): Extension<any, any> => {
         expect(mockSlidingSync!.registerExtension).toHaveBeenCalled();
         const mockFn = mockSlidingSync!.registerExtension as jest.Mock;
         // find the extension
         for (let i = 0; i < mockFn.mock.calls.length; i++) {
-            const calledExtension = mockFn.mock.calls[i][0] as Extension;
-            if (calledExtension && calledExtension.name() === name) {
+            const calledExtension = mockFn.mock.calls[i][0] as Extension<any, any>;
+            if (calledExtension?.name() === name) {
                 return calledExtension;
             }
         }
@@ -581,7 +581,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionE2EE", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         beforeAll(async () => {
             await setupClient({
@@ -647,7 +647,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionAccountData", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         beforeAll(async () => {
             await setupClient();
@@ -773,7 +773,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionToDevice", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         beforeAll(async () => {
             await setupClient();
@@ -871,7 +871,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionTyping", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         beforeAll(async () => {
             await setupClient();
@@ -970,7 +970,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionReceipts", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         const generateReceiptResponse = (
             userId: string, roomId: string, eventId: string, recType: string, ts: number,

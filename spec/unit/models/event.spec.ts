@@ -121,7 +121,7 @@ describe('MatrixEvent', () => {
     });
 
     describe(".attemptDecryption", () => {
-        let encryptedEvent;
+        let encryptedEvent: MatrixEvent;
         const eventId = 'test_encrypted_event';
 
         beforeEach(() => {
@@ -155,7 +155,7 @@ describe('MatrixEvent', () => {
                             },
                         });
                     }),
-            };
+            } as unknown as Crypto;
 
             await encryptedEvent.attemptDecryption(crypto);
 
