@@ -2893,7 +2893,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private chooseOpponent(ev: MatrixEvent): void {
         // I choo-choo-choose you
         const msg = ev.getContent<MCallInviteNegotiate | MCallAnswer>();
-        const sender = ev.getSender()!;
 
         logger.debug(`Call ${this.callId} choosing opponent party ID ${msg.party_id}`);
 
@@ -2909,7 +2908,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.opponentPartyId = msg.party_id || null;
         }
         this.opponentCaps = msg.capabilities || {} as CallCapabilities;
-        this.opponentMember = this.client.getRoom(this.roomId!)!.getMember(sender)!;
+        this.opponentMember = this.client.getRoom(this.roomId)!.getMember(ev.getSender()!) ?? undefined;
     }
 
     private async addBufferedIceCandidates(): Promise<void> {
