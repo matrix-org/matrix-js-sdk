@@ -45,19 +45,19 @@ export type DecryptionClassParams<P extends IParams = IParams> = Omit<P, "device
 export const DECRYPTION_CLASSES = new Map<string, new (params: DecryptionClassParams) => DecryptionAlgorithm>();
 
 export interface IParams {
-    // The UserID for the local user
+    /** The UserID for the local user */
     userId: string;
-    // The identifier for this device.
+    /** The identifier for this device. */
     deviceId: string;
-    // crypto core
+    /** crypto core */
     crypto: Crypto;
-    // olm.js wrapper
+    /** olm.js wrapper */
     olmDevice: OlmDevice;
-    // base matrix api interface
+    /** base matrix api interface */
     baseApis: MatrixClient;
-    // The ID of the room we will be sending to
+    /** The ID of the room we will be sending to */
     roomId?: string;
-    // The body of the m.room.encryption event
+    /** The body of the m.room.encryption event */
     config: IRoomEncryption & object;
 }
 

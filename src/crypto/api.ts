@@ -130,7 +130,7 @@ export interface IImportOpts {
 }
 
 export interface IImportRoomKeysOpts {
-    // called with an object that has a "stage" param
+    /** called with an object that has a "stage" param */
     progressCallback?: (stage: IImportOpts) => void;
     untrusted?: boolean;
     source?: string; // TODO: Enum

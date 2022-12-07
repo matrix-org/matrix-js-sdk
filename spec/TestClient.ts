@@ -135,7 +135,7 @@ export class TestClient {
      * set up an expectation that the keys will be uploaded, and wait for
      * that to happen.
      *
-     * @returns for the one-time keys
+     * @returns Promise for the one-time keys
      */
     public awaitOneTimeKeyUpload(): Promise<Record<string, IOneTimeKey>> {
         if (Object.keys(this.oneTimeKeys!).length != 0) {

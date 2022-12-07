@@ -23,7 +23,6 @@ import { UnstableValue } from "../NamespacedValue";
  * https://github.com/matrix-org/matrix-spec-proposals/pull/3765
  *
  * @example
- * E.g.
  * ```
  * {
  *      "type": "m.room.topic,

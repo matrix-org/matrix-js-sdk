@@ -60,16 +60,18 @@ export class DeviceInfo {
         BLOCKED: DeviceVerification.Blocked,
     };
 
-    // list of algorithms supported by this device
+    /** list of algorithms supported by this device */
     public algorithms: string[] = [];
-    // a map from &lt;key type&gt;:&lt;id&gt; -> &lt;base64-encoded key&gt;>
+    /** a map from &lt;key type&gt;:&lt;id&gt; -> &lt;base64-encoded key&gt;> */
     public keys: Record<string, string> = {};
-    // whether the device has been verified/blocked by the user
+    /** whether the device has been verified/blocked by the user */
     public verified = DeviceVerification.Unverified;
-    // whether the user knows of this device's existence
-    // (useful when warning the user that a user has added new devices)
+    /**
+     * whether the user knows of this device's existence
+     * (useful when warning the user that a user has added new devices)
+     */
     public known = false;
-    // additional data from the homeserver
+    /** additional data from the homeserver */
     public unsigned: Record<string, any> = {};
     public signatures: ISignatures = {};
 

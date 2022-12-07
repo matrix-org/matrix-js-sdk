@@ -22,11 +22,11 @@ const zeroSalt = new Uint8Array(8);
 
 export interface IEncryptedPayload {
     [key: string]: any; // extensible
-    // the initialization vector in base64
+    /** the initialization vector in base64 */
     iv: string;
-    // the ciphertext in base64
+    /** the ciphertext in base64 */
     ciphertext: string;
-    // the HMAC in base64
+    /** the HMAC in base64 */
     mac: string;
 }
 

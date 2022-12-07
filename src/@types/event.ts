@@ -170,7 +170,6 @@ export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.m
  * Note that this reference is UNSTABLE and subject to breaking changes, including its
  * eventual removal.
  *
- * @example
  * Schema (TypeScript):
  * ```
  * {
@@ -178,7 +177,7 @@ export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.m
  * }
  * ```
  *
- * Example:
+ * @example
  * ```
  * {
  *   "service_members": [
