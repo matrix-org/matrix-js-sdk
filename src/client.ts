@@ -2142,7 +2142,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns
      *
      * @remarks
-     * Fires {@link CryptoEvent.DeviceVerificationChanged}
+     * Fires {@link CryptoEvent#DeviceVerificationChanged}
      */
     public setDeviceVerified(userId: string, deviceId: string, verified = true): Promise<void> {
         const prom = this.setDeviceVerification(userId, deviceId, verified, null, null);
