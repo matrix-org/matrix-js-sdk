@@ -492,7 +492,7 @@ export class GroupCall extends TypedEventEmitter<
                 this.room.roomId,
                 EventType.GroupCallPrefix,
                 {
-                    ...existingStateEvent.getContent(),
+                    ...existingStateEvent.getContent<IGroupCallRoomState>(),
                     "m.terminated": GroupCallTerminationReason.CallEnded,
                 },
                 this.groupCallId,
