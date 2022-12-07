@@ -21,7 +21,6 @@ import {
     GroupCallIntent,
     GroupCallType,
     IGroupCallDataChannelOptions,
-    IGroupCallRoomState,
 } from "./groupCall";
 import { Room } from "../models/room";
 import { RoomState, RoomStateEvent } from "../models/room-state";
@@ -122,7 +121,7 @@ export class GroupCallEventHandler {
         const sortedCallEvents = callEvents.sort((a, b) => b.getTs() - a.getTs());
 
         for (const callEvent of sortedCallEvents) {
-            const content = callEvent.getContent<IGroupCallRoomState>();
+            const content = callEvent.getContent();
 
             if (content["m.terminated"]) {
                 continue;
@@ -143,7 +142,7 @@ export class GroupCallEventHandler {
 
     private createGroupCallFromRoomStateEvent(event: MatrixEvent): GroupCall | undefined {
         const roomId = event.getRoomId();
-        const content = event.getContent<IGroupCallRoomState>();
+        const content = event.getContent();
 
         const room = this.client.getRoom(roomId);
 
@@ -204,7 +203,7 @@ export class GroupCallEventHandler {
 
         if (eventType === EventType.GroupCallPrefix) {
             const groupCallId = event.getStateKey();
-            const content = event.getContent<IGroupCallRoomState>();
+            const content = event.getContent();
 
             const currentGroupCall = this.groupCalls.get(state.roomId);
 
