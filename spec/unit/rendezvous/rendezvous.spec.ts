@@ -87,7 +87,7 @@ describe("Rendezvous", function() {
     });
 
     let httpBackend: MockHttpBackend;
-    let fetchFn: typeof global.fetchFn;
+    let fetchFn: typeof global.fetch;
     let transports: DummyTransport<any, MSC3903ECDHPayload>[];
 
     beforeEach(function() {

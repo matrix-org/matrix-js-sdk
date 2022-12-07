@@ -47,7 +47,8 @@ export class DeviceInfo {
         const res = new DeviceInfo(deviceId);
         for (const prop in obj) {
             if (obj.hasOwnProperty(prop)) {
-                res[prop] = obj[prop];
+                // @ts-ignore - this is messy and typescript doesn't like it
+                res[prop as keyof IDevice] = obj[prop as keyof IDevice];
             }
         }
         return res;

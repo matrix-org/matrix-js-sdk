@@ -278,21 +278,21 @@ export class QRCodeData {
     private static generateBuffer(qrData: IQrData): Buffer {
         let buf = Buffer.alloc(0); // we'll concat our way through life
 
-        const appendByte = (b): void => {
+        const appendByte = (b: number): void => {
             const tmpBuf = Buffer.from([b]);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendInt = (i): void => {
+        const appendInt = (i: number): void => {
             const tmpBuf = Buffer.alloc(2);
             tmpBuf.writeInt16BE(i, 0);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendStr = (s, enc, withLengthPrefix = true): void => {
+        const appendStr = (s: string, enc: BufferEncoding, withLengthPrefix = true): void => {
             const tmpBuf = Buffer.from(s, enc);
             if (withLengthPrefix) appendInt(tmpBuf.byteLength);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendEncBase64 = (b64): void => {
+        const appendEncBase64 = (b64: string): void => {
             const b = decodeBase64(b64);
             const tmpBuf = Buffer.from(b);
             buf = Buffer.concat([buf, tmpBuf]);
@@ -302,7 +302,7 @@ export class QRCodeData {
         appendStr(qrData.prefix, "ascii", false);
         appendByte(qrData.version);
         appendByte(qrData.mode);
-        appendStr(qrData.transactionId, "utf-8");
+        appendStr(qrData.transactionId!, "utf-8");
         appendEncBase64(qrData.firstKeyB64);
         appendEncBase64(qrData.secondKeyB64);
         appendEncBase64(qrData.secretB64);

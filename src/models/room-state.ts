@@ -18,7 +18,7 @@ import { RoomMember } from "./room-member";
 import { logger } from '../logger';
 import * as utils from "../utils";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
-import { MatrixEvent, MatrixEventEvent } from "./event";
+import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
@@ -47,6 +47,20 @@ enum OobStatus {
     NotStarted,
     InProgress,
     Finished,
+}
+
+export interface IPowerLevelsContent {
+    users?: Record<string, number>;
+    events?: Record<string, number>;
+    // eslint-disable-next-line camelcase
+    users_default?: number;
+    // eslint-disable-next-line camelcase
+    events_default?: number;
+    // eslint-disable-next-line camelcase
+    state_default?: number;
+    ban?: number;
+    kick?: number;
+    redact?: number;
 }
 
 export enum RoomStateEvent {
@@ -541,7 +555,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const beacon = this.beacons.get(beaconIdentifier)!;
 
             if (event.isRedacted()) {
-                if (beacon.beaconInfoId === event.getRedactionEvent()?.['redacts']) {
+                if (beacon.beaconInfoId === (<IEvent>event.getRedactionEvent())?.redacts) {
                     beacon.destroy();
                     this.beacons.delete(beaconIdentifier);
                 }
@@ -766,17 +780,17 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @param powerLevel - The power level of the member
      * @returns true if the given power level is sufficient
      */
-    public hasSufficientPowerLevelFor(action: string, powerLevel: number): boolean {
+    public hasSufficientPowerLevelFor(action: "ban" | "kick" | "redact", powerLevel: number): boolean {
         const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
-        let powerLevels = {};
+        let powerLevels: IPowerLevelsContent = {};
         if (powerLevelsEvent) {
             powerLevels = powerLevelsEvent.getContent();
         }
 
         let requiredLevel = 50;
         if (utils.isNumber(powerLevels[action])) {
-            requiredLevel = powerLevels[action];
+            requiredLevel = powerLevels[action]!;
         }
 
         return powerLevel >= requiredLevel;
@@ -849,8 +863,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     private maySendEventOfType(eventType: EventType | string, userId: string, state: boolean): boolean {
         const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
 
-        let powerLevels;
-        let eventsLevels = {};
+        let powerLevels: IPowerLevelsContent;
+        let eventsLevels: Record<EventType | string, number> = {};
 
         let stateDefault = 0;
         let eventsDefault = 0;
@@ -860,20 +874,20 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             eventsLevels = powerLevels.events || {};
 
             if (Number.isSafeInteger(powerLevels.state_default)) {
-                stateDefault = powerLevels.state_default;
+                stateDefault = powerLevels.state_default!;
             } else {
                 stateDefault = 50;
             }
 
             const userPowerLevel = powerLevels.users && powerLevels.users[userId];
             if (Number.isSafeInteger(userPowerLevel)) {
-                powerLevel = userPowerLevel;
+                powerLevel = userPowerLevel!;
             } else if (Number.isSafeInteger(powerLevels.users_default)) {
-                powerLevel = powerLevels.users_default;
+                powerLevel = powerLevels.users_default!;
             }
 
             if (Number.isSafeInteger(powerLevels.events_default)) {
-                eventsDefault = powerLevels.events_default;
+                eventsDefault = powerLevels.events_default!;
             }
         }
 
@@ -919,7 +933,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     public getJoinRule(): JoinRule {
         const joinRuleEvent = this.getStateEvents(EventType.RoomJoinRules, "");
-        const joinRuleContent = joinRuleEvent?.getContent<IJoinRuleEventContent>() ?? {};
+        const joinRuleContent: Partial<IJoinRuleEventContent> = joinRuleEvent?.getContent() ?? {};
         return joinRuleContent["join_rule"] || JoinRule.Invite;
     }
 

@@ -23,10 +23,18 @@ import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
 import { IMegolmSessionData } from "./index";
 import { OlmGroupSessionExtraData } from "../@types/crypto";
+import { IMessage } from "./algorithms/olm";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
 // reasonable approximation to the biggest plaintext we can encrypt.
 const MAX_PLAINTEXT_LENGTH = 65536 * 3 / 4;
+
+export class PayloadTooLargeError extends Error {
+    public readonly data = {
+        errcode: "M_TOO_LARGE",
+        error: "Payload too large for encrypted message",
+    };
+}
 
 function checkPayloadLength(payloadString: string): void {
     if (payloadString === undefined) {
@@ -40,15 +48,8 @@ function checkPayloadLength(payloadString: string): void {
         // Note that even if we manage to do the encryption, the message send may fail,
         // because by the time we've wrapped the ciphertext in the event object, it may
         // exceed 65K. But at least we won't just fail with "abort()" in that case.
-        const err = new Error("Message too long (" + payloadString.length + " bytes). " +
-                        "The maximum for an encrypted message is " +
-                        MAX_PLAINTEXT_LENGTH + " bytes.");
-        // TODO: [TypeScript] We should have our own error types
-        err["data"] = {
-            errcode: "M_TOO_LARGE",
-            error: "Payload too large for encrypted message",
-        };
-        throw err;
+        throw new PayloadTooLargeError(`Message too long (${payloadString.length} bytes). ` +
+            `The maximum for an encrypted message is ${MAX_PLAINTEXT_LENGTH} bytes.`);
     }
 }
 
@@ -104,6 +105,8 @@ interface IInboundGroupSessionKey {
     untrusted?: boolean;
 }
 /* eslint-enable camelcase */
+
+type OneTimeKeys = { curve25519: { [keyId: string]: string } };
 
 /**
  * Manages the olm cryptography functions. Each OlmDevice has a single
@@ -424,7 +427,7 @@ export class OlmDevice {
      * @returns base64-encoded signature
      */
     public async sign(message: string): Promise<string> {
-        let result;
+        let result: string;
         await this.cryptoStore.doTxn(
             'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
@@ -432,7 +435,7 @@ export class OlmDevice {
                     result = account.sign(message);
                 });
             });
-        return result;
+        return result!;
     }
 
     /**
@@ -442,8 +445,8 @@ export class OlmDevice {
      * <tt>curve25519</tt>, which is itself an object mapping key id to Curve25519
      * key.
      */
-    public async getOneTimeKeys(): Promise<{ curve25519: { [keyId: string]: string } }> {
-        let result;
+    public async getOneTimeKeys(): Promise<OneTimeKeys> {
+        let result: OneTimeKeys;
         await this.cryptoStore.doTxn(
             'readonly', [IndexedDBCryptoStore.STORE_ACCOUNT],
             (txn) => {
@@ -453,7 +456,7 @@ export class OlmDevice {
             },
         );
 
-        return result;
+        return result!;
     }
 
     /**
@@ -791,10 +794,10 @@ export class OlmDevice {
         theirDeviceIdentityKey: string,
         sessionId: string,
         payloadString: string,
-    ): Promise<string> {
+    ): Promise<IMessage> {
         checkPayloadLength(payloadString);
 
-        let res;
+        let res: IMessage;
         await this.cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
@@ -810,7 +813,7 @@ export class OlmDevice {
             },
             logger.withPrefix("[encryptMessage]"),
         );
-        return res;
+        return res!;
     }
 
     /**
@@ -830,7 +833,7 @@ export class OlmDevice {
         messageType: number,
         ciphertext: string,
     ): Promise<string> {
-        let payloadString;
+        let payloadString: string;
         await this.cryptoStore.doTxn(
             'readwrite', [IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
@@ -847,7 +850,7 @@ export class OlmDevice {
             },
             logger.withPrefix("[decryptMessage]"),
         );
-        return payloadString;
+        return payloadString!;
     }
 
     /**
@@ -872,7 +875,7 @@ export class OlmDevice {
             return false;
         }
 
-        let matches;
+        let matches: boolean;
         await this.cryptoStore.doTxn(
             'readonly', [IndexedDBCryptoStore.STORE_SESSIONS],
             (txn) => {
@@ -882,7 +885,7 @@ export class OlmDevice {
             },
             logger.withPrefix("[matchesSession]"),
         );
-        return matches;
+        return matches!;
     }
 
     public async recordSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
@@ -1259,7 +1262,7 @@ export class OlmDevice {
                             result = null;
                             return;
                         }
-                        let res;
+                        let res: ReturnType<InboundGroupSession["decrypt"]>;
                         try {
                             res = session.decrypt(body);
                         } catch (e) {
@@ -1279,8 +1282,8 @@ export class OlmDevice {
 
                         let plaintext: string = res.plaintext;
                         if (plaintext === undefined) {
-                            // Compatibility for older olm versions.
-                            plaintext = res;
+                            // @ts-ignore - Compatibility for older olm versions.
+                            plaintext = res as string;
                         } else {
                             // Check if we have seen this message index before to detect replay attacks.
                             // If the event ID and timestamp are specified, and the match the event ID
@@ -1521,7 +1524,7 @@ export class OlmDevice {
     }
 }
 
-export const WITHHELD_MESSAGES = {
+export const WITHHELD_MESSAGES: Record<string, string> = {
     "m.unverified": "The sender has disabled encrypting to unverified devices.",
     "m.blacklisted": "The sender has blocked you.",
     "m.unauthorised": "You are not authorised to read the message.",

@@ -70,7 +70,7 @@ const roomEvent = utils.mkEvent({
     },
 });
 
-function mockServerSideSupport(client, serverSideSupport: ServerSupport) {
+function mockServerSideSupport(client: MatrixClient, serverSideSupport: ServerSupport) {
     client.canSupport.set(Feature.ThreadUnreadNotifications, serverSideSupport);
 }
 

@@ -139,7 +139,7 @@ function generateEmojiSas(sasBytes: number[]): EmojiMapping[] {
 const sasGenerators = {
     decimal: generateDecimalSas,
     emoji: generateEmojiSas,
-};
+} as const;
 
 export interface IGeneratedSas {
     decimal?: [number, number, number];
@@ -153,11 +153,12 @@ export interface ISasEvent {
     mismatch(): void;
 }
 
-function generateSas(sasBytes: number[], methods: string[]): IGeneratedSas {
+function generateSas(sasBytes: Uint8Array, methods: string[]): IGeneratedSas {
     const sas: IGeneratedSas = {};
     for (const method of methods) {
         if (method in sasGenerators) {
-            sas[method] = sasGenerators[method](sasBytes);
+            // @ts-ignore - ts doesn't like us mixing types like this
+            sas[method] = sasGenerators[method](Array.from(sasBytes));
         }
     }
     return sas;
@@ -167,15 +168,14 @@ const macMethods = {
     "hkdf-hmac-sha256": "calculate_mac",
     "org.matrix.msc3783.hkdf-hmac-sha256": "calculate_mac_fixed_base64",
     "hmac-sha256": "calculate_mac_long_kdf",
-};
+} as const;
 
-type Method = keyof typeof macMethods;
+type MacMethod = keyof typeof macMethods;
 
-function calculateMAC(olmSAS: OlmSAS, method: Method) {
-    return function(...args): string {
-        const macFunction = olmSAS[macMethods[method]];
-        const mac: string = macFunction.apply(olmSAS, args);
-        logger.log("SAS calculateMAC:", method, args, mac);
+function calculateMAC(olmSAS: OlmSAS, method: MacMethod) {
+    return function(input: string, info: string): string {
+        const mac = olmSAS[macMethods[method]](input, info);
+        logger.log("SAS calculateMAC:", method, [input, info], mac);
         return mac;
     };
 }
@@ -201,15 +201,17 @@ const calculateKeyAgreement = {
               + sas.channel.transactionId;
         return olmSAS.generate_bytes(sasInfo, bytes);
     },
-};
+} as const;
+
+type KeyAgreement = keyof typeof calculateKeyAgreement;
 
 /* lists of algorithms/methods that are supported.  The key agreement, hashes,
  * and MAC lists should be sorted in order of preference (most preferred
  * first).
  */
-const KEY_AGREEMENT_LIST = ["curve25519-hkdf-sha256", "curve25519"];
+const KEY_AGREEMENT_LIST: KeyAgreement[] = ["curve25519-hkdf-sha256", "curve25519"];
 const HASHES_LIST = ["sha256"];
-const MAC_LIST: Method[] = ["org.matrix.msc3783.hkdf-hmac-sha256", "hkdf-hmac-sha256", "hmac-sha256"];
+const MAC_LIST: MacMethod[] = ["org.matrix.msc3783.hkdf-hmac-sha256", "hkdf-hmac-sha256", "hmac-sha256"];
 const SAS_LIST = Object.keys(sasGenerators);
 
 const KEY_AGREEMENT_SET = new Set(KEY_AGREEMENT_LIST);
@@ -294,10 +296,10 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
     }
 
     private async verifyAndCheckMAC(
-        keyAgreement: string,
+        keyAgreement: KeyAgreement,
         sasMethods: string[],
         olmSAS: OlmSAS,
-        macMethod: Method,
+        macMethod: MacMethod,
     ): Promise<void> {
         const sasBytes = calculateKeyAgreement[keyAgreement](this, olmSAS, 6);
         const verifySAS = new Promise<void>((resolve, reject) => {
@@ -349,7 +351,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
             throw new SwitchStartEventError(this.startEvent);
         }
 
-        let e;
+        let e: MatrixEvent;
         try {
             e = await this.waitForEvent(EventType.KeyVerificationAccept);
         } finally {
@@ -440,8 +442,8 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         }
     }
 
-    private sendMAC(olmSAS: OlmSAS, method: Method): Promise<void> {
-        const mac = {};
+    private sendMAC(olmSAS: OlmSAS, method: MacMethod): Promise<void> {
+        const mac: Record<string, string> = {};
         const keyList: string[] = [];
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this.baseApis.getUserId() + this.baseApis.deviceId
@@ -450,7 +452,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
 
         const deviceKeyId = `ed25519:${this.baseApis.deviceId}`;
         mac[deviceKeyId] = calculateMAC(olmSAS, method)(
-            this.baseApis.getDeviceEd25519Key(),
+            this.baseApis.getDeviceEd25519Key()!,
             baseInfo + deviceKeyId,
         );
         keyList.push(deviceKeyId);
@@ -472,7 +474,7 @@ export class SAS extends Base<SasEvent, EventHandlerMap> {
         return this.send(EventType.KeyVerificationMac, { mac, keys });
     }
 
-    private async checkMAC(olmSAS: OlmSAS, content: IContent, method: Method): Promise<void> {
+    private async checkMAC(olmSAS: OlmSAS, content: IContent, method: MacMethod): Promise<void> {
         const baseInfo = "MATRIX_KEY_VERIFICATION_MAC"
               + this.userId + this.deviceId
               + this.baseApis.getUserId() + this.baseApis.deviceId

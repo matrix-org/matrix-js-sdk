@@ -125,7 +125,7 @@ describe("self-verifications", () => {
         expect(restoreKeyBackupWithCache).toHaveBeenCalled();
 
         expect(result).toBeInstanceOf(Array);
-        expect(result[0][0]).toBe(testKeyPub);
-        expect(result[1][0]).toBe(testKeyPub);
+        expect(result![0][0]).toBe(testKeyPub);
+        expect(result![1][0]).toBe(testKeyPub);
     });
 });

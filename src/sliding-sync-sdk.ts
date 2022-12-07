@@ -22,7 +22,7 @@ import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } fr
 import { ISyncStateData, SyncState, _createAndReEmitRoom } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
-import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState } from "./sync-accumulator";
+import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator";
 import { MatrixError } from "./http-api";
 import {
     Extension,
@@ -44,7 +44,18 @@ import { RoomMemberEvent } from "./models/room-member";
 // keepAlive is successful but the server /sync fails.
 const FAILED_SYNC_ERROR_THRESHOLD = 3;
 
-class ExtensionE2EE implements Extension {
+type ExtensionE2EERequest = {
+    enabled: boolean;
+};
+
+type ExtensionE2EEResponse = Pick<ISyncResponse,
+    "device_lists" |
+    "device_one_time_keys_count" |
+    "device_unused_fallback_key_types" |
+    "org.matrix.msc2732.device_unused_fallback_key_types"
+>;
+
+class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResponse> {
     public constructor(private readonly crypto: Crypto) {}
 
     public name(): string {
@@ -55,7 +66,7 @@ class ExtensionE2EE implements Extension {
         return ExtensionState.PreProcess;
     }
 
-    public onRequest(isInitial: boolean): object | undefined {
+    public onRequest(isInitial: boolean): ExtensionE2EERequest | undefined {
         if (!isInitial) {
             return undefined;
         }
@@ -64,7 +75,7 @@ class ExtensionE2EE implements Extension {
         };
     }
 
-    public async onResponse(data: object): Promise<void> {
+    public async onResponse(data: ExtensionE2EEResponse): Promise<void> {
         // Handle device list updates
         if (data["device_lists"]) {
             await this.crypto.handleDeviceListChanges({
@@ -92,7 +103,18 @@ class ExtensionE2EE implements Extension {
     }
 }
 
-class ExtensionToDevice implements Extension {
+type ExtensionToDeviceRequest = {
+    since?: string;
+    limit?: number;
+    enabled?: boolean;
+};
+
+type ExtensionToDeviceResponse = {
+    events: Required<ISyncResponse>["to_device"]["events"];
+    next_batch: string | null;
+};
+
+class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, ExtensionToDeviceResponse> {
     private nextBatch: string | null = null;
 
     public constructor(private readonly client: MatrixClient) {}
@@ -105,8 +127,8 @@ class ExtensionToDevice implements Extension {
         return ExtensionState.PreProcess;
     }
 
-    public onRequest(isInitial: boolean): object {
-        const extReq = {
+    public onRequest(isInitial: boolean): ExtensionToDeviceRequest {
+        const extReq: ExtensionToDeviceRequest = {
             since: this.nextBatch !== null ? this.nextBatch : undefined,
         };
         if (isInitial) {
@@ -116,11 +138,10 @@ class ExtensionToDevice implements Extension {
         return extReq;
     }
 
-    public async onResponse(data: object): Promise<void> {
+    public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
         const cancelledKeyVerificationTxns: string[] = [];
-        data["events"] = data["events"] || [];
-        data["events"]
-            .map(this.client.getEventMapper())
+        data.events
+            ?.map(this.client.getEventMapper())
             .map((toDeviceEvent) => { // map is a cheap inline forEach
                 // We want to flag m.key.verification.start events as cancelled
                 // if there's an accompanying m.key.verification.cancel event, so
@@ -165,11 +186,20 @@ class ExtensionToDevice implements Extension {
                 },
             );
 
-        this.nextBatch = data["next_batch"];
+        this.nextBatch = data.next_batch;
     }
 }
 
-class ExtensionAccountData implements Extension {
+type ExtensionAccountDataRequest = {
+    enabled: boolean;
+};
+
+type ExtensionAccountDataResponse = {
+    global: IMinimalEvent[];
+    rooms: Record<string, IMinimalEvent[]>;
+};
+
+class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, ExtensionAccountDataResponse> {
     public constructor(private readonly client: MatrixClient) {}
 
     public name(): string {
@@ -180,7 +210,7 @@ class ExtensionAccountData implements Extension {
         return ExtensionState.PostProcess;
     }
 
-    public onRequest(isInitial: boolean): object | undefined {
+    public onRequest(isInitial: boolean): ExtensionAccountDataRequest | undefined {
         if (!isInitial) {
             return undefined;
         }
@@ -189,7 +219,7 @@ class ExtensionAccountData implements Extension {
         };
     }
 
-    public onResponse(data: {global: object[], rooms: Record<string, object[]>}): void {
+    public onResponse(data: ExtensionAccountDataResponse): void {
         if (data.global && data.global.length > 0) {
             this.processGlobalAccountData(data.global);
         }
@@ -208,9 +238,9 @@ class ExtensionAccountData implements Extension {
         }
     }
 
-    private processGlobalAccountData(globalAccountData: object[]): void {
+    private processGlobalAccountData(globalAccountData: IMinimalEvent[]): void {
         const events = mapEvents(this.client, undefined, globalAccountData);
-        const prevEventsMap = events.reduce((m, c) => {
+        const prevEventsMap = events.reduce<Record<string, MatrixEvent | undefined>>((m, c) => {
             m[c.getType()] = this.client.store.getAccountData(c.getType());
             return m;
         }, {});
@@ -233,7 +263,15 @@ class ExtensionAccountData implements Extension {
     }
 }
 
-class ExtensionTyping implements Extension {
+type ExtensionTypingRequest = {
+    enabled: boolean;
+};
+
+type ExtensionTypingResponse = {
+    rooms: Record<string, IMinimalEvent>;
+};
+
+class ExtensionTyping implements Extension<ExtensionTypingRequest, ExtensionTypingResponse> {
     public constructor(private readonly client: MatrixClient) {}
 
     public name(): string {
@@ -244,7 +282,7 @@ class ExtensionTyping implements Extension {
         return ExtensionState.PostProcess;
     }
 
-    public onRequest(isInitial: boolean): object | undefined {
+    public onRequest(isInitial: boolean): ExtensionTypingRequest | undefined {
         if (!isInitial) {
             return undefined; // don't send a JSON object for subsequent requests, we don't need to.
         }
@@ -253,20 +291,26 @@ class ExtensionTyping implements Extension {
         };
     }
 
-    public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
-        if (!data || !data.rooms) {
+    public onResponse(data: ExtensionTypingResponse): void {
+        if (!data?.rooms) {
             return;
         }
 
         for (const roomId in data.rooms) {
-            processEphemeralEvents(
-                this.client, roomId, [data.rooms[roomId]],
-            );
+            processEphemeralEvents(this.client, roomId, [data.rooms[roomId]]);
         }
     }
 }
 
-class ExtensionReceipts implements Extension {
+type ExtensionReceiptsRequest = {
+    enabled: boolean;
+};
+
+type ExtensionReceiptsResponse = {
+    rooms: Record<string, IMinimalEvent>;
+};
+
+class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, ExtensionReceiptsResponse> {
     public constructor(private readonly client: MatrixClient) {}
 
     public name(): string {
@@ -277,7 +321,7 @@ class ExtensionReceipts implements Extension {
         return ExtensionState.PostProcess;
     }
 
-    public onRequest(isInitial: boolean): object | undefined {
+    public onRequest(isInitial: boolean): ExtensionReceiptsRequest | undefined {
         if (isInitial) {
             return {
                 enabled: true,
@@ -286,8 +330,8 @@ class ExtensionReceipts implements Extension {
         return undefined; // don't send a JSON object for subsequent requests, we don't need to.
     }
 
-    public onResponse(data: {rooms: Record<string, IMinimalEvent>}): void {
-        if (!data || !data.rooms) {
+    public onResponse(data: ExtensionReceiptsResponse): void {
+        if (!data?.rooms) {
             return;
         }
 
@@ -336,7 +380,7 @@ export class SlidingSyncSdk {
 
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
-        const extensions: Extension[] = [
+        const extensions: Extension<any, any>[] = [
             new ExtensionToDevice(this.client),
             new ExtensionAccountData(this.client),
             new ExtensionTyping(this.client),
@@ -531,7 +575,7 @@ export class SlidingSyncSdk {
         // room::decryptCriticalEvent is in charge of decrypting all the events
         // required for a client to function properly
         let timelineEvents = mapEvents(this.client, room.roomId, roomData.timeline, false);
-        const ephemeralEvents = []; // TODO this.mapSyncEventsFormat(joinObj.ephemeral);
+        const ephemeralEvents: MatrixEvent[] = []; // TODO this.mapSyncEventsFormat(joinObj.ephemeral);
 
         // TODO: handle threaded / beacon events
 
@@ -679,7 +723,7 @@ export class SlidingSyncSdk {
             }
         } */
 
-        this.injectRoomEvents(room, stateEvents, timelineEvents, false);
+        this.injectRoomEvents(room, stateEvents, timelineEvents, roomData.num_live);
 
         // we deliberately don't add ephemeral events to the timeline
         room.addEphemeralEvents(ephemeralEvents);
@@ -723,17 +767,19 @@ export class SlidingSyncSdk {
      * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
      * @param timelineEventList - A list of timeline events. Lower index
-     * @param fromCache - whether the sync response came from cache
      * is earlier in time. Higher index is later.
+     * @param numLive - the number of events in timelineEventList which just happened,
+     * supplied from the server.
      */
     public injectRoomEvents(
         room: Room,
         stateEventList: MatrixEvent[],
         timelineEventList?: MatrixEvent[],
-        fromCache = false,
+        numLive?: number,
     ): void {
         timelineEventList = timelineEventList || [];
         stateEventList = stateEventList || [];
+        numLive = numLive || 0;
 
         // If there are no events in the timeline yet, initialise it with
         // the given state events
@@ -772,13 +818,31 @@ export class SlidingSyncSdk {
             room.currentState.setStateEvents(stateEventList);
         }
 
+        // the timeline is broken into 'live' events which just happened and normal timeline events
+        // which are still to be appended to the end of the live timeline but happened a while ago.
+        // The live events are marked as fromCache=false to ensure that downstream components know
+        // this is a live event, not historical (from a remote server cache).
+
+        let liveTimelineEvents: MatrixEvent[] = [];
+        if (numLive > 0) {
+            // last numLive events are live
+            liveTimelineEvents = timelineEventList.slice(-1 * numLive);
+            // everything else is not live
+            timelineEventList = timelineEventList.slice(0, -1 * liveTimelineEvents.length);
+        }
+
         // execute the timeline events. This will continue to diverge the current state
         // if the timeline has any state events in it.
         // This also needs to be done before running push rules on the events as they need
         // to be decorated with sender etc.
         room.addLiveEvents(timelineEventList, {
-            fromCache: fromCache,
+            fromCache: true,
         });
+        if (liveTimelineEvents.length > 0) {
+            room.addLiveEvents(liveTimelineEvents, {
+                fromCache: false,
+            });
+        }
 
         room.recalculate();
 
@@ -945,12 +1009,14 @@ function ensureNameEvent(client: MatrixClient, roomId: string, roomData: MSC3575
     return roomData;
 }
 
+type TaggedEvent = (IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent) & { room_id?: string };
+
 // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts,
 // just outside the class.
 function mapEvents(client: MatrixClient, roomId: string | undefined, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });
-    return (events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
-        e["room_id"] = roomId;
+    return (events as TaggedEvent[]).map(function(e) {
+        e.room_id = roomId;
         return mapper(e);
     });
 }

@@ -18,12 +18,12 @@ import "../../../olm-loader";
 import { makeTestClients } from './util';
 import { MatrixEvent } from "../../../../src/models/event";
 import { ISasEvent, SAS, SasEvent } from "../../../../src/crypto/verification/SAS";
-import { DeviceInfo } from "../../../../src/crypto/deviceinfo";
+import { DeviceInfo, IDevice } from "../../../../src/crypto/deviceinfo";
 import { CryptoEvent, verificationMethods } from "../../../../src/crypto";
 import * as olmlib from "../../../../src/crypto/olmlib";
 import { logger } from "../../../../src/logger";
 import { resetCrossSigningKeys } from "../crypto-utils";
-import { VerificationBase as Verification, VerificationBase } from "../../../../src/crypto/verification/Base";
+import { VerificationBase } from "../../../../src/crypto/verification/Base";
 import { IVerificationChannel } from "../../../../src/crypto/verification/request/Channel";
 import { MatrixClient } from "../../../../src";
 import { VerificationRequest } from "../../../../src/crypto/verification/request/VerificationRequest";
@@ -31,8 +31,8 @@ import { TestClient } from "../../../TestClient";
 
 const Olm = global.Olm;
 
-let ALICE_DEVICES;
-let BOB_DEVICES;
+let ALICE_DEVICES: Record<string, IDevice>;
+let BOB_DEVICES: Record<string, IDevice>;
 
 describe("SAS verification", function() {
     if (!global.Olm) {
@@ -75,7 +75,7 @@ describe("SAS verification", function() {
         let bob: TestClient;
         let aliceSasEvent: ISasEvent | null;
         let bobSasEvent: ISasEvent | null;
-        let aliceVerifier: Verification<any, any>;
+        let aliceVerifier: SAS;
         let bobPromise: Promise<VerificationBase<any, any>>;
         let clearTestClientTimeouts: () => void;
 
@@ -95,25 +95,25 @@ describe("SAS verification", function() {
 
             ALICE_DEVICES = {
                 Osborne2: {
-                    user_id: "@alice:example.com",
-                    device_id: "Osborne2",
                     algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                     keys: {
-                        "ed25519:Osborne2": aliceDevice.deviceEd25519Key,
-                        "curve25519:Osborne2": aliceDevice.deviceCurve25519Key,
+                        "ed25519:Osborne2": aliceDevice.deviceEd25519Key!,
+                        "curve25519:Osborne2": aliceDevice.deviceCurve25519Key!,
                     },
+                    verified: DeviceInfo.DeviceVerification.UNVERIFIED,
+                    known: false,
                 },
             };
 
             BOB_DEVICES = {
                 Dynabook: {
-                    user_id: "@bob:example.com",
-                    device_id: "Dynabook",
                     algorithms: [olmlib.OLM_ALGORITHM, olmlib.MEGOLM_ALGORITHM],
                     keys: {
-                        "ed25519:Dynabook": bobDevice.deviceEd25519Key,
-                        "curve25519:Dynabook": bobDevice.deviceCurve25519Key,
+                        "ed25519:Dynabook": bobDevice.deviceEd25519Key!,
+                        "curve25519:Dynabook": bobDevice.deviceCurve25519Key!,
                     },
+                    verified: DeviceInfo.DeviceVerification.UNVERIFIED,
+                    known: false,
                 },
             };
 
@@ -136,7 +136,7 @@ describe("SAS verification", function() {
 
             bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
                 bob.client.on(CryptoEvent.VerificationRequest, request => {
-                    request.verifier!.on("show_sas", (e) => {
+                    (<SAS>request.verifier!).on(SasEvent.ShowSas, (e) => {
                         if (!e.sas.emoji || !e.sas.decimal) {
                             e.cancel();
                         } else if (!aliceSasEvent) {
@@ -158,7 +158,7 @@ describe("SAS verification", function() {
 
             aliceVerifier = alice.client.beginKeyVerification(
                 verificationMethods.SAS, bob.client.getUserId()!, bob.deviceId!,
-            );
+            ) as SAS;
             aliceVerifier.on(SasEvent.ShowSas, (e) => {
                 if (!e.sas.emoji || !e.sas.decimal) {
                     e.cancel();
@@ -413,7 +413,7 @@ describe("SAS verification", function() {
 
         const bobPromise = new Promise<VerificationBase<any, any>>((resolve, reject) => {
             bob.client.on(CryptoEvent.VerificationRequest, request => {
-                request.verifier!.on("show_sas", (e) => {
+                (<SAS>request.verifier!).on(SasEvent.ShowSas, (e) => {
                     e.mismatch();
                 });
                 resolve(request.verifier!);
@@ -443,13 +443,13 @@ describe("SAS verification", function() {
     });
 
     describe("verification in DM", function() {
-        let alice;
-        let bob;
-        let aliceSasEvent;
-        let bobSasEvent;
-        let aliceVerifier;
-        let bobPromise;
-        let clearTestClientTimeouts;
+        let alice: TestClient;
+        let bob: TestClient;
+        let aliceSasEvent: ISasEvent | null;
+        let bobSasEvent: ISasEvent | null;
+        let aliceVerifier: SAS;
+        let bobPromise: Promise<void>;
+        let clearTestClientTimeouts: Function;
 
         beforeEach(async function() {
             [[alice, bob], clearTestClientTimeouts] = await makeTestClients(
@@ -477,7 +477,7 @@ describe("SAS verification", function() {
                 );
             };
             alice.client.downloadKeys = () => {
-                return Promise.resolve();
+                return Promise.resolve({});
             };
 
             bob.client.crypto!.setDeviceVerification = jest.fn();
@@ -495,16 +495,16 @@ describe("SAS verification", function() {
                 return "bob+base64+ed25519+key";
             };
             bob.client.downloadKeys = () => {
-                return Promise.resolve();
+                return Promise.resolve({});
             };
 
             aliceSasEvent = null;
             bobSasEvent = null;
 
             bobPromise = new Promise<void>((resolve, reject) => {
-                bob.client.on("crypto.verification.request", async (request) => {
-                    const verifier = request.beginKeyVerification(SAS.NAME);
-                    verifier.on("show_sas", (e) => {
+                bob.client.on(CryptoEvent.VerificationRequest, async (request) => {
+                    const verifier = request.beginKeyVerification(SAS.NAME) as SAS;
+                    verifier.on(SasEvent.ShowSas, (e) => {
                         if (!e.sas.emoji || !e.sas.decimal) {
                             e.cancel();
                         } else if (!aliceSasEvent) {
@@ -525,12 +525,10 @@ describe("SAS verification", function() {
                 });
             });
 
-            const aliceRequest = await alice.client.requestVerificationDM(
-                bob.client.getUserId(), "!room_id",
-            );
+            const aliceRequest = await alice.client.requestVerificationDM(bob.client.getUserId()!, "!room_id");
             await aliceRequest.waitFor(r => r.started);
-            aliceVerifier = aliceRequest.verifier;
-            aliceVerifier.on("show_sas", (e) => {
+            aliceVerifier = aliceRequest.verifier! as SAS;
+            aliceVerifier.on(SasEvent.ShowSas, (e) => {
                 if (!e.sas.emoji || !e.sas.decimal) {
                     e.cancel();
                 } else if (!bobSasEvent) {

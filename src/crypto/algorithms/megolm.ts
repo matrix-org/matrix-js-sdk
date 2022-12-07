@@ -18,6 +18,8 @@ limitations under the License.
  * Defines m.olm encryption/decryption
  */
 
+import { v4 as uuidv4 } from "uuid";
+
 import { logger } from '../../logger';
 import * as olmlib from "../olmlib";
 import {
@@ -34,9 +36,15 @@ import { Room } from '../../models/room';
 import { DeviceInfo } from "../deviceinfo";
 import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
-import { MatrixEvent } from "../../models/event";
-import { EventType, MsgType } from '../../@types/event';
-import { IEncryptedContent, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "../index";
+import { IContent, MatrixEvent } from "../../models/event";
+import { EventType, MsgType, ToDeviceMessageId } from '../../@types/event';
+import {
+    IMegolmEncryptedContent,
+    IEventDecryptionResult,
+    IMegolmSessionData,
+    IncomingRoomKeyRequest,
+    IEncryptedContent,
+} from "../index";
 import { RoomKeyRequestState } from '../OutgoingRoomKeyRequestManager';
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
 import { MatrixError } from "../../http-api";
@@ -210,7 +218,7 @@ class OutboundSessionInfo {
  *
  * @param params - parameters, as per {@link EncryptionAlgorithm}
  */
-class MegolmEncryption extends EncryptionAlgorithm {
+export class MegolmEncryption extends EncryptionAlgorithm {
     // the most recent attempt to set up a session. This is used to serialise
     // the session setups, so that we have a race-free view of which session we
     // are using, and which devices we have shared the keys with. It resolves
@@ -639,9 +647,13 @@ class MegolmEncryption extends EncryptionAlgorithm {
             const deviceInfo = blockedInfo.deviceInfo;
             const deviceId = deviceInfo.deviceId;
 
-            const message = Object.assign({}, payload);
-            message.code = blockedInfo.code;
-            message.reason = blockedInfo.reason;
+            const message = {
+                ...payload,
+                code: blockedInfo.code,
+                reason: blockedInfo.reason,
+                [ToDeviceMessageId]: uuidv4(),
+            };
+
             if (message.code === "m.no_olm") {
                 delete message.room_id;
                 delete message.session_id;
@@ -739,10 +751,11 @@ class MegolmEncryption extends EncryptionAlgorithm {
             },
         };
 
-        const encryptedContent = {
+        const encryptedContent: IEncryptedContent = {
             algorithm: olmlib.OLM_ALGORITHM,
-            sender_key: this.olmDevice.deviceCurve25519Key,
+            sender_key: this.olmDevice.deviceCurve25519Key!,
             ciphertext: {},
+            [ToDeviceMessageId]: uuidv4(),
         };
         await olmlib.encryptMessageForDevice(
             encryptedContent.ciphertext,
@@ -983,7 +996,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
      *
      * @returns Promise which resolves to the new event body
      */
-    public async encryptMessage(room: Room, eventType: string, content: object): Promise<object> {
+    public async encryptMessage(room: Room, eventType: string, content: IContent): Promise<IMegolmEncryptedContent> {
         logger.log(`Starting to encrypt event for ${this.roomId}`);
 
         if (this.encryptionPreparation != null) {
@@ -1018,12 +1031,10 @@ class MegolmEncryption extends EncryptionAlgorithm {
             content: content,
         };
 
-        const ciphertext = this.olmDevice.encryptGroupMessage(
-            session.sessionId, JSON.stringify(payloadJson),
-        );
-        const encryptedContent = {
+        const ciphertext = this.olmDevice.encryptGroupMessage(session.sessionId, JSON.stringify(payloadJson));
+        const encryptedContent: IEncryptedContent = {
             algorithm: olmlib.MEGOLM_ALGORITHM,
-            sender_key: this.olmDevice.deviceCurve25519Key,
+            sender_key: this.olmDevice.deviceCurve25519Key!,
             ciphertext: ciphertext,
             session_id: session.sessionId,
             // Include our device ID so that recipients can send us a
@@ -1037,7 +1048,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
         return encryptedContent;
     }
 
-    private isVerificationEvent(eventType: string, content: object): boolean {
+    private isVerificationEvent(eventType: string, content: IContent): boolean {
         switch (eventType) {
             case EventType.KeyVerificationCancel:
             case EventType.KeyVerificationDone:
@@ -1196,7 +1207,7 @@ class MegolmEncryption extends EncryptionAlgorithm {
  *
  * @param params - parameters, as per {@link DecryptionAlgorithm}
  */
-class MegolmDecryption extends DecryptionAlgorithm {
+export class MegolmDecryption extends DecryptionAlgorithm {
     // events which we couldn't decrypt due to unknown sessions /
     // indexes, or which we could only decrypt with untrusted keys:
     // map from senderKey|sessionId to Set of MatrixEvents
@@ -1628,10 +1639,11 @@ class MegolmDecryption extends DecryptionAlgorithm {
             await olmlib.ensureOlmSessionsForDevices(
                 this.olmDevice, this.baseApis, { [sender]: [device] }, false,
             );
-            const encryptedContent = {
+            const encryptedContent: IEncryptedContent = {
                 algorithm: olmlib.OLM_ALGORITHM,
-                sender_key: this.olmDevice.deviceCurve25519Key,
+                sender_key: this.olmDevice.deviceCurve25519Key!,
                 ciphertext: {},
+                [ToDeviceMessageId]: uuidv4(),
             };
             await olmlib.encryptMessageForDevice(
                 encryptedContent.ciphertext,
@@ -1703,10 +1715,11 @@ class MegolmDecryption extends DecryptionAlgorithm {
                 body.room_id, body.sender_key, body.session_id,
             );
         }).then((payload) => {
-            const encryptedContent = {
+            const encryptedContent: IEncryptedContent = {
                 algorithm: olmlib.OLM_ALGORITHM,
-                sender_key: this.olmDevice.deviceCurve25519Key,
+                sender_key: this.olmDevice.deviceCurve25519Key!,
                 ciphertext: {},
+                [ToDeviceMessageId]: uuidv4(),
             };
 
             return this.olmlib.encryptMessageForDevice(
@@ -1878,6 +1891,7 @@ class MegolmDecryption extends DecryptionAlgorithm {
                         algorithm: olmlib.OLM_ALGORITHM,
                         sender_key: this.olmDevice.deviceCurve25519Key!,
                         ciphertext: {},
+                        [ToDeviceMessageId]: uuidv4(),
                     };
                     contentMap[userId][deviceInfo.deviceId] = encryptedContent;
                     promises.push(

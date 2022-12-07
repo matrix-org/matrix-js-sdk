@@ -120,7 +120,7 @@ export interface IStore {
      * @param token - The token associated with these events.
      * @param toStart - True if these are paginated results.
      */
-    storeEvents(room: Room, events: MatrixEvent[], token: string, toStart: boolean): void;
+    storeEvents(room: Room, events: MatrixEvent[], token: string | null, toStart: boolean): void;
 
     /**
      * Store a filter.

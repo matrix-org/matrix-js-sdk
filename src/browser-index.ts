@@ -16,27 +16,28 @@ limitations under the License.
 
 import * as matrixcs from "./matrix";
 
+type BrowserMatrix = typeof matrixcs;
+declare global {
+    /* eslint-disable no-var, camelcase */
+    var __js_sdk_entrypoint: boolean;
+    var matrixcs: BrowserMatrix;
+    /* eslint-enable no-var */
+}
+
 if (global.__js_sdk_entrypoint) {
     throw new Error("Multiple matrix-js-sdk entrypoints detected!");
 }
 global.__js_sdk_entrypoint = true;
 
-// just *accessing* indexedDB throws an exception in firefox with
-// indexeddb disabled.
-let indexedDB;
+// just *accessing* indexedDB throws an exception in firefox with indexeddb disabled.
+let indexedDB: IDBFactory | undefined;
 try {
     indexedDB = global.indexedDB;
 } catch (e) {}
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {
-    matrixcs.setCryptoStoreFactory(
-        function() {
-            return new matrixcs.IndexedDBCryptoStore(
-                indexedDB, "matrix-js-sdk:crypto",
-            );
-        },
-    );
+    matrixcs.setCryptoStoreFactory(() => new matrixcs.IndexedDBCryptoStore(indexedDB!, "matrix-js-sdk:crypto"));
 }
 
 // We export 3 things to make browserify happy as well as downstream projects.

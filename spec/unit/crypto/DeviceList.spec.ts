@@ -22,6 +22,7 @@ import { MemoryCryptoStore } from "../../../src/crypto/store/memory-crypto-store
 import { DeviceList } from "../../../src/crypto/DeviceList";
 import { IDownloadKeyResult, MatrixClient } from "../../../src";
 import { OlmDevice } from "../../../src/crypto/OlmDevice";
+import { CryptoStore } from "../../../src/crypto/store/base";
 
 const signedDeviceList: IDownloadKeyResult = {
     "failures": {},
@@ -88,8 +89,8 @@ const signedDeviceList2: IDownloadKeyResult = {
 };
 
 describe('DeviceList', function() {
-    let downloadSpy;
-    let cryptoStore;
+    let downloadSpy: jest.Mock;
+    let cryptoStore: CryptoStore;
     let deviceLists: DeviceList[] = [];
 
     beforeEach(function() {
@@ -112,7 +113,7 @@ describe('DeviceList', function() {
             deviceId: 'HGKAWHRVJQ',
         } as unknown as MatrixClient;
         const mockOlm = {
-            verifySignature: function(key, message, signature) {},
+            verifySignature: function(key: string, message: string, signature: string) {},
         } as unknown as OlmDevice;
         const dl = new DeviceList(baseApis, cryptoStore, mockOlm, keyDownloadChunkSize);
         deviceLists.push(dl);

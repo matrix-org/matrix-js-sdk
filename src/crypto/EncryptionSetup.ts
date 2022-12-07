@@ -35,7 +35,7 @@ import { IAccountDataClient } from "./SecretStorage";
 
 interface ICrossSigningKeys {
     authUpload: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"];
-    keys: Record<string, ICrossSigningKey>;
+    keys: Record<"master" | "self_signing" | "user_signing", ICrossSigningKey>;
 }
 
 /**
@@ -200,7 +200,7 @@ export class EncryptionSetupOperation {
         if (this.crossSigningKeys) {
             const keys: Partial<CrossSigningKeys> = {};
             for (const [name, key] of Object.entries(this.crossSigningKeys.keys)) {
-                keys[name + "_key"] = key;
+                keys[((name as keyof ICrossSigningKeys["keys"]) + "_key" as keyof CrossSigningKeys)] = key;
             }
 
             // We must only call `uploadDeviceSigningKeys` from inside this auth

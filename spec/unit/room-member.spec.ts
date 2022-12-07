@@ -373,37 +373,36 @@ describe("RoomMember", function() {
                 expect(member.events.member).toEqual(joinEvent);
             });
 
-        it("should set 'name' based on user_id, displayname and room state",
-            function() {
-                const roomState = {
-                    getStateEvents: function(type) {
-                        if (type !== "m.room.member") {
-                            return [];
-                        }
-                        return [
-                            utils.mkMembership({
-                                event: true, mship: "join", room: roomId,
-                                user: userB,
-                            }),
-                            utils.mkMembership({
-                                event: true, mship: "join", room: roomId,
-                                user: userC, name: "Alice",
-                            }),
-                            joinEvent,
-                        ];
-                    },
-                    getUserIdsWithDisplayName: function(displayName) {
-                        return [userA, userC];
-                    },
-                } as unknown as RoomState;
-                expect(member.name).toEqual(userA); // default = user_id
-                member.setMembershipEvent(joinEvent);
-                expect(member.name).toEqual("Alice"); // prefer displayname
-                member.setMembershipEvent(joinEvent, roomState);
-                expect(member.name).not.toEqual("Alice"); // it should disambig.
-                // user_id should be there somewhere
-                expect(member.name.indexOf(userA)).not.toEqual(-1);
-            });
+        it("should set 'name' based on user_id, displayname and room state", function() {
+            const roomState = {
+                getStateEvents: function(type: string) {
+                    if (type !== "m.room.member") {
+                        return [];
+                    }
+                    return [
+                        utils.mkMembership({
+                            event: true, mship: "join", room: roomId,
+                            user: userB,
+                        }),
+                        utils.mkMembership({
+                            event: true, mship: "join", room: roomId,
+                            user: userC, name: "Alice",
+                        }),
+                        joinEvent,
+                    ];
+                },
+                getUserIdsWithDisplayName: function(displayName: string) {
+                    return [userA, userC];
+                },
+            } as unknown as RoomState;
+            expect(member.name).toEqual(userA); // default = user_id
+            member.setMembershipEvent(joinEvent);
+            expect(member.name).toEqual("Alice"); // prefer displayname
+            member.setMembershipEvent(joinEvent, roomState);
+            expect(member.name).not.toEqual("Alice"); // it should disambig.
+            // user_id should be there somewhere
+            expect(member.name.indexOf(userA)).not.toEqual(-1);
+        });
 
         it("should emit 'RoomMember.membership' if the membership changes", function() {
             let emitCount = 0;
@@ -455,7 +454,7 @@ describe("RoomMember", function() {
             });
 
             const roomState = {
-                getStateEvents: function(type) {
+                getStateEvents: function(type: string) {
                     if (type !== "m.room.member") {
                         return [];
                     }
@@ -467,7 +466,7 @@ describe("RoomMember", function() {
                         joinEvent,
                     ];
                 },
-                getUserIdsWithDisplayName: function(displayName) {
+                getUserIdsWithDisplayName: function(displayName: string) {
                     return [userA, userC];
                 },
             } as unknown as RoomState;

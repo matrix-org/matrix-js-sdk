@@ -315,7 +315,7 @@ export function deepSortedObjectEntries(obj: any): [string, any][] {
  * @param value - the value to test
  * @returns whether or not value is a finite number without type-coercion
  */
-export function isNumber(value: any): boolean {
+export function isNumber(value: any): value is number {
     return typeof value === 'number' && isFinite(value);
 }
 
@@ -426,8 +426,8 @@ export interface IDeferred<T> {
 
 // Returns a Deferred
 export function defer<T = void>(): IDeferred<T> {
-    let resolve;
-    let reject;
+    let resolve!: IDeferred<T>["resolve"];
+    let reject!: IDeferred<T>["reject"];
 
     const promise = new Promise<T>((_resolve, _reject) => {
         resolve = _resolve;
@@ -661,22 +661,22 @@ export function compare(a: string, b: string): number {
  *
  * @returns the target object
  */
-export function recursivelyAssign<T extends {}, S extends {}>(
-    target: T,
-    source: S,
+export function recursivelyAssign<T1 extends T2, T2 extends Record<string, any>>(
+    target: T1,
+    source: T2,
     ignoreNullish = false,
-): T | S {
+): T1 & T2 {
     for (const [sourceKey, sourceValue] of Object.entries(source)) {
-        if (target[sourceKey as keyof T] instanceof Object && sourceValue) {
+        if (target[sourceKey] instanceof Object && sourceValue) {
             recursivelyAssign(target[sourceKey], sourceValue);
             continue;
         }
         if ((sourceValue !== null && sourceValue !== undefined) || !ignoreNullish) {
-            target[sourceKey] = sourceValue;
+            target[sourceKey as keyof T1] = sourceValue;
             continue;
         }
     }
-    return target;
+    return target as T1 & T2;
 }
 
 function getContentTimestampWithFallback(event: MatrixEvent): number {

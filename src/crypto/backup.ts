@@ -91,7 +91,7 @@ interface BackupAlgorithmClass {
 
 interface BackupAlgorithm {
     untrusted: boolean;
-    encryptSession(data: Record<string, any>): Promise<any>;
+    encryptSession(data: Record<string, any>): Promise<Curve25519SessionData | IEncryptedPayload>;
     decryptSessions(ciphertexts: Record<string, IKeyBackupSession>): Promise<IMegolmSessionData[]>;
     authData: AuthData;
     keyMatches(key: ArrayLike<number>): Promise<boolean>;
@@ -653,7 +653,7 @@ export class Curve25519 implements BackupAlgorithm {
 
     public get untrusted(): boolean { return true; }
 
-    public async encryptSession(data: Record<string, any>): Promise<any> {
+    public async encryptSession(data: Record<string, any>): Promise<Curve25519SessionData> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
         delete plainText.room_id;
@@ -778,7 +778,7 @@ export class Aes256 implements BackupAlgorithm {
 
     public get untrusted(): boolean { return false; }
 
-    public encryptSession(data: Record<string, any>): Promise<any> {
+    public encryptSession(data: Record<string, any>): Promise<IEncryptedPayload> {
         const plainText: Record<string, any> = Object.assign({}, data);
         delete plainText.session_id;
         delete plainText.room_id;

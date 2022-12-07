@@ -107,7 +107,7 @@ function getFilterName(userId: string, suffix?: string): string {
 }
 
 /* istanbul ignore next */
-function debuglog(...params): void {
+function debuglog(...params: any[]): void {
     if (!DEBUG) return;
     logger.log(...params);
 }
@@ -1094,7 +1094,7 @@ export class SyncApi {
         // handle non-room account_data
         if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.map(client.getEventMapper());
-            const prevEventsMap = events.reduce((m, c) => {
+            const prevEventsMap = events.reduce<Record<string, MatrixEvent | undefined>>((m, c) => {
                 m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
             }, {});
@@ -1474,12 +1474,13 @@ export class SyncApi {
             this.opts.crypto.updateOneTimeKeyCount(currentCount);
         }
         if (this.opts.crypto &&
-            (data["device_unused_fallback_key_types"] ||
-                data["org.matrix.msc2732.device_unused_fallback_key_types"])) {
+            (data.device_unused_fallback_key_types ||
+                data["org.matrix.msc2732.device_unused_fallback_key_types"])
+        ) {
             // The presence of device_unused_fallback_key_types indicates that the
             // server supports fallback keys. If there's no unused
             // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
+            const unusedFallbackKeys = data.device_unused_fallback_key_types ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.opts.crypto.setNeedsNewFallback(
                 Array.isArray(unusedFallbackKeys) &&
@@ -1598,9 +1599,10 @@ export class SyncApi {
             return [];
         }
         const mapper = this.client.getEventMapper({ decrypt });
-        return (obj.events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
+        type TaggedEvent = (IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent) & { room_id?: string };
+        return (obj.events as TaggedEvent[]).map(function(e) {
             if (room) {
-                e["room_id"] = room.roomId;
+                e.room_id = room.roomId;
             }
             return mapper(e);
         });

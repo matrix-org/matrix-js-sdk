@@ -1,7 +1,7 @@
 import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
-import { MatrixClient } from "../../src/matrix";
+import { ClientEvent, MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
@@ -65,7 +65,7 @@ describe("MatrixClient opts", function() {
     });
 
     describe("without opts.store", function() {
-        let client;
+        let client: MatrixClient;
         beforeEach(function() {
             client = new MatrixClient({
                 fetchFn: httpBackend.fetchFn as typeof global.fetch,
@@ -98,7 +98,7 @@ describe("MatrixClient opts", function() {
                 "m.room.message", "m.room.name", "m.room.member", "m.room.member",
                 "m.room.create",
             ];
-            client.on("event", function(event) {
+            client.on(ClientEvent.Event, function(event) {
                 expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(
                     -1,
                 );
@@ -125,7 +125,7 @@ describe("MatrixClient opts", function() {
     });
 
     describe("without opts.scheduler", function() {
-        let client;
+        let client: MatrixClient;
         beforeEach(function() {
             client = new MatrixClient({
                 fetchFn: httpBackend.fetchFn as typeof global.fetch,

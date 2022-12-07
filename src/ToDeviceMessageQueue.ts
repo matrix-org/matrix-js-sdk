@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { ToDeviceMessageId } from './@types/event';
 import { logger } from "./logger";
 import { MatrixError, MatrixClient } from "./matrix";
 import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage";
@@ -54,12 +55,15 @@ export class ToDeviceMessageQueue {
                 txnId: this.client.makeTxnId(),
             };
             batches.push(batchWithTxnId);
-            const recips = batchWithTxnId.batch.map((msg) => `${msg.userId}:${msg.deviceId}`);
-            logger.info(`Created batch of to-device messages with txn id ${batchWithTxnId.txnId} for ${recips}`);
+            const msgmap = batchWithTxnId.batch.map(
+                (msg) => `${msg.userId}/${msg.deviceId} (msgid ${msg.payload[ToDeviceMessageId]})`,
+            );
+            logger.info(
+                `Enqueuing batch of to-device messages. type=${batch.eventType} txnid=${batchWithTxnId.txnId}`, msgmap,
+            );
         }
 
         await this.client.store.saveToDeviceBatches(batches);
-        logger.info(`Enqueued to-device messages with txn ids ${batches.map((batch) => batch.txnId)}`);
         this.sendQueue();
     }
 

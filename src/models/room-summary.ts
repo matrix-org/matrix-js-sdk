@@ -16,8 +16,8 @@ limitations under the License.
 
 export interface IRoomSummary {
     "m.heroes": string[];
-    "m.joined_member_count": number;
-    "m.invited_member_count": number;
+    "m.joined_member_count"?: number;
+    "m.invited_member_count"?: number;
 }
 
 interface IInfo {

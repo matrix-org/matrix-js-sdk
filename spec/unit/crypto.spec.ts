@@ -3,7 +3,7 @@ import '../olm-loader';
 import { EventEmitter } from "events";
 
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
-import { MatrixClient } from "../../src/client";
+import { IClaimOTKsResult, MatrixClient } from "../../src/client";
 import { Crypto } from "../../src/crypto";
 import { MemoryCryptoStore } from "../../src/crypto/store/memory-crypto-store";
 import { MockStorageApi } from "../MockStorageApi";
@@ -23,16 +23,16 @@ import { IRoomEncryption, RoomList } from "../../src/crypto/RoomList";
 
 const Olm = global.Olm;
 
-function awaitEvent(emitter, event) {
-    return new Promise((resolve, reject) => {
+function awaitEvent(emitter: EventEmitter, event: string): Promise<void> {
+    return new Promise((resolve) => {
         emitter.once(event, (result) => {
             resolve(result);
         });
     });
 }
 
-async function keyshareEventForEvent(client, event, index): Promise<MatrixEvent> {
-    const roomId = event.getRoomId();
+async function keyshareEventForEvent(client: MatrixClient, event: MatrixEvent, index?: number): Promise<MatrixEvent> {
+    const roomId = event.getRoomId()!;
     const eventContent = event.getWireContent();
     const key = await client.crypto!.olmDevice.getInboundGroupSessionKey(
         roomId,
@@ -42,16 +42,16 @@ async function keyshareEventForEvent(client, event, index): Promise<MatrixEvent>
     );
     const ksEvent = new MatrixEvent({
         type: "m.forwarded_room_key",
-        sender: client.getUserId(),
+        sender: client.getUserId()!,
         content: {
             "algorithm": olmlib.MEGOLM_ALGORITHM,
             "room_id": roomId,
             "sender_key": eventContent.sender_key,
-            "sender_claimed_ed25519_key": key.sender_claimed_ed25519_key,
+            "sender_claimed_ed25519_key": key?.sender_claimed_ed25519_key,
             "session_id": eventContent.session_id,
-            "session_key": key.key,
-            "chain_index": key.chain_index,
-            "forwarding_curve25519_key_chain": key.forwarding_curve_key_chain,
+            "session_key": key?.key,
+            "chain_index": key?.chain_index,
+            "forwarding_curve25519_key_chain": key?.forwarding_curve25519_key_chain,
             "org.matrix.msc3061.shared_history": true,
         },
     });
@@ -172,7 +172,8 @@ describe("Crypto", function() {
     });
 
     describe('Session management', function() {
-        const otkResponse = {
+        const otkResponse: IClaimOTKsResult = {
+            failures: {},
             one_time_keys: {
                 '@alice:home.server': {
                     aliceDevice: {
@@ -188,11 +189,12 @@ describe("Crypto", function() {
                 },
             },
         };
-        let crypto;
-        let mockBaseApis;
-        let mockRoomList;
 
-        let fakeEmitter;
+        let crypto: Crypto;
+        let mockBaseApis: MatrixClient;
+        let mockRoomList: RoomList;
+
+        let fakeEmitter: EventEmitter;
 
         beforeEach(async function() {
             const mockStorage = new MockStorageApi() as unknown as Storage;
@@ -219,8 +221,8 @@ describe("Crypto", function() {
                 sendToDevice: jest.fn(),
                 getKeyBackupVersion: jest.fn(),
                 isGuest: jest.fn(),
-            };
-            mockRoomList = {};
+            } as unknown as MatrixClient;
+            mockRoomList = {} as unknown as RoomList;
 
             fakeEmitter = new EventEmitter();
 
@@ -233,7 +235,7 @@ describe("Crypto", function() {
                 mockRoomList,
                 [],
             );
-            crypto.registerEventHandlers(fakeEmitter);
+            crypto.registerEventHandlers(fakeEmitter as any);
             await crypto.init();
         });
 
@@ -245,7 +247,7 @@ describe("Crypto", function() {
             const prom = new Promise<void>((resolve) => {
                 mockBaseApis.claimOneTimeKeys = function() {
                     resolve();
-                    return otkResponse;
+                    return Promise.resolve(otkResponse);
                 };
             });
 
@@ -989,7 +991,7 @@ describe("Crypto", function() {
             ensureOlmSessionsForDevices.mockResolvedValue({});
             encryptMessageForDevice = jest.spyOn(olmlib, "encryptMessageForDevice");
             encryptMessageForDevice.mockImplementation(async (...[result,,,,,, payload]) => {
-                result.plaintext = JSON.stringify(payload);
+                result.plaintext = { type: 0, body: JSON.stringify(payload) };
             });
 
             client = new TestClient("@alice:example.org", "aliceweb");
@@ -998,7 +1000,7 @@ describe("Crypto", function() {
             encryptedPayload = {
                 algorithm: "m.olm.v1.curve25519-aes-sha2",
                 sender_key: client.client.crypto!.olmDevice.deviceCurve25519Key,
-                ciphertext: { plaintext: JSON.stringify(payload) },
+                ciphertext: { plaintext: { type: 0, body: JSON.stringify(payload) } },
             };
         });
 
@@ -1010,18 +1012,24 @@ describe("Crypto", function() {
 
         it("encrypts and sends to devices", async () => {
             client.httpBackend
-                .when("PUT", "/sendToDevice/m.room.encrypted", {
-                    messages: {
-                        "@bob:example.org": {
-                            bobweb: encryptedPayload,
-                            bobmobile: encryptedPayload,
+                .when("PUT", "/sendToDevice/m.room.encrypted")
+                .check((request) => {
+                    const data = request.data;
+                    delete data.messages["@bob:example.org"]["bobweb"]["org.matrix.msgid"];
+                    delete data.messages["@bob:example.org"]["bobmobile"]["org.matrix.msgid"];
+                    delete data.messages["@carol:example.org"]["caroldesktop"]["org.matrix.msgid"];
+                    expect(data).toStrictEqual({
+                        messages: {
+                            "@bob:example.org": {
+                                bobweb: encryptedPayload,
+                                bobmobile: encryptedPayload,
+                            },
+                            "@carol:example.org": {
+                                caroldesktop: encryptedPayload,
+                            },
                         },
-                        "@carol:example.org": {
-                            caroldesktop: encryptedPayload,
-                        },
-                    },
-                })
-                .respond(200, {});
+                    });
+                }).respond(200, {});
 
             await Promise.all([
                 client.client.encryptAndSendToDevices(
@@ -1040,13 +1048,18 @@ describe("Crypto", function() {
             encryptMessageForDevice.mockImplementation(async (...[result,,,, userId, device, payload]) => {
                 // Refuse to encrypt to Carol's desktop device
                 if (userId === "@carol:example.org" && device.deviceId === "caroldesktop") return;
-                result.plaintext = JSON.stringify(payload);
+                result.plaintext = { type: 0, body: JSON.stringify(payload) };
             });
 
             client.httpBackend
-                .when("PUT", "/sendToDevice/m.room.encrypted", {
+                .when("PUT", "/sendToDevice/m.room.encrypted")
+                .check((req) => {
+                    const data = req.data;
+                    delete data.messages["@bob:example.org"]["bobweb"]["org.matrix.msgid"];
                     // Carol is nowhere to be seen
-                    messages: { "@bob:example.org": { bobweb: encryptedPayload } },
+                    expect(data).toStrictEqual({
+                        messages: { "@bob:example.org": { bobweb: encryptedPayload } },
+                    });
                 })
                 .respond(200, {});
 

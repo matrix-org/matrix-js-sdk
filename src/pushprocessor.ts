@@ -512,13 +512,13 @@ export class PushProcessor {
      * @returns The push rule, or null if no such rule was found
      */
     public getPushRuleById(ruleId: string): IPushRule | null {
-        for (const scope of ['global']) {
+        for (const scope of ['global'] as const) {
             if (this.client.pushRules?.[scope] === undefined) continue;
 
             for (const kind of RULEKINDS_IN_ORDER) {
                 if (this.client.pushRules[scope][kind] === undefined) continue;
 
-                for (const rule of this.client.pushRules[scope][kind]) {
+                for (const rule of this.client.pushRules[scope][kind]!) {
                     if (rule.rule_id === ruleId) return rule;
                 }
             }

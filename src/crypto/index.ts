@@ -18,9 +18,10 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
+import { v4 as uuidv4 } from "uuid";
 
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
-import { EventType } from "../@types/event";
+import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from '../ReEmitter';
 import { logger } from '../logger';
 import { IExportedDevice, OlmDevice } from "./OlmDevice";
@@ -83,6 +84,9 @@ import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IContent } from "../models/event";
+import { ISyncResponse } from "../sync-accumulator";
+import { ISignatures } from "../@types/signed";
+import { IMessage } from "./algorithms/olm";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -95,7 +99,7 @@ const defaultVerificationMethods = {
     // to start.
     [SHOW_QR_CODE_METHOD]: IllegalMethod,
     [SCAN_QR_CODE_METHOD]: IllegalMethod,
-};
+} as const;
 
 /**
  * verification method names
@@ -104,7 +108,7 @@ const defaultVerificationMethods = {
 export const verificationMethods = {
     RECIPROCATE_QR_CODE: ReciprocateQRCode.NAME,
     SAS: SASVerification.NAME,
-};
+} as const;
 
 export type VerificationMethod = keyof typeof verificationMethods | string;
 
@@ -207,18 +211,13 @@ interface IUserOlmSession {
     }[];
 }
 
-interface ISyncDeviceLists {
-    changed: string[];
-    left: string[];
-}
-
 export interface IRoomKeyRequestRecipient {
     userId: string;
     deviceId: string;
 }
 
 interface ISignableObject {
-    signatures?: object;
+    signatures?: ISignatures;
     unsigned?: object;
 }
 
@@ -254,12 +253,24 @@ export interface IRequestsMap {
 }
 
 /* eslint-disable camelcase */
-export interface IEncryptedContent {
-    algorithm: string;
+export interface IOlmEncryptedContent {
+    algorithm: typeof olmlib.OLM_ALGORITHM;
     sender_key: string;
-    ciphertext: Record<string, string>;
+    ciphertext: Record<string, IMessage>;
+    [ToDeviceMessageId]?: string;
+}
+
+export interface IMegolmEncryptedContent {
+    algorithm: typeof olmlib.MEGOLM_ALGORITHM;
+    sender_key: string;
+    session_id: string;
+    device_id: string;
+    ciphertext: string;
+    [ToDeviceMessageId]?: string;
 }
 /* eslint-enable camelcase */
+
+export type IEncryptedContent = IOlmEncryptedContent | IMegolmEncryptedContent;
 
 export enum CryptoEvent {
     DeviceVerificationChanged = "deviceVerificationChanged",
@@ -473,7 +484,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         private readonly clientStore: IStore,
         public readonly cryptoStore: CryptoStore,
         private readonly roomList: RoomList,
-        verificationMethods: Array<keyof typeof defaultVerificationMethods | typeof VerificationBase>,
+        verificationMethods: Array<VerificationMethod | (typeof VerificationBase & { NAME: string })>,
     ) {
         super();
         this.reEmitter = new TypedReEmitter(this);
@@ -2361,6 +2372,9 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 await upload({ shouldEmit: true });
                 // XXX: we'll need to wait for the device list to be updated
             }
+
+            // redo key requests after verification
+            this.cancelAndResendAllOutgoingKeyRequests();
         }
 
         const deviceObj = DeviceInfo.fromStorage(dev, deviceId);
@@ -3027,7 +3041,10 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param syncDeviceLists - device_lists field from /sync, or response from
      * /keys/changes
      */
-    public async handleDeviceListChanges(syncData: ISyncStateData, syncDeviceLists: ISyncDeviceLists): Promise<void> {
+    public async handleDeviceListChanges(
+        syncData: ISyncStateData,
+        syncDeviceLists: Required<ISyncResponse>["device_lists"],
+    ): Promise<void> {
         // Initial syncs don't have device change lists. We'll either get the complete list
         // of changes for the interval or will have invalidated everything in willProcessSync
         if (!syncData.oldSyncToken) return;
@@ -3167,15 +3184,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @param deviceLists - device_lists field from /sync, or response from
      * /keys/changes
      */
-    private async evalDeviceListChanges(deviceLists: ISyncDeviceLists): Promise<void> {
-        if (deviceLists.changed && Array.isArray(deviceLists.changed)) {
+    private async evalDeviceListChanges(deviceLists: Required<ISyncResponse>["device_lists"]): Promise<void> {
+        if (Array.isArray(deviceLists?.changed)) {
             deviceLists.changed.forEach((u) => {
                 this.deviceList.invalidateUserDeviceList(u);
             });
         }
 
-        if (deviceLists.left && Array.isArray(deviceLists.left) &&
-            deviceLists.left.length) {
+        if (Array.isArray(deviceLists?.left) && deviceLists.left.length) {
             // Check we really don't share any rooms with these users
             // any more: the server isn't required to give us the
             // exact correct set.
@@ -3255,6 +3271,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     algorithm: olmlib.OLM_ALGORITHM,
                     sender_key: this.olmDevice.deviceCurve25519Key!,
                     ciphertext: {},
+                    [ToDeviceMessageId]: uuidv4(),
                 };
 
                 toDeviceBatch.batch.push({
@@ -3314,8 +3331,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
         try {
-            logger.log(`received to_device ${event.getType()} from: ` +
-                `${event.getSender()} id: ${event.getId()}`);
+            logger.log(`received to-device ${event.getType()} from: ` +
+                `${event.getSender()} id: ${event.getContent()[ToDeviceMessageId]}`);
 
             if (event.getType() == "m.room_key"
                 || event.getType() == "m.forwarded_room_key") {
@@ -3594,10 +3611,11 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         // same order we sent them, the other end will get this first, set up the new session,
         // then get the keyshare request and send the key over this new session (because it
         // is the session it has most recently received a message on).
-        const encryptedContent = {
+        const encryptedContent: IEncryptedContent = {
             algorithm: olmlib.OLM_ALGORITHM,
-            sender_key: this.olmDevice.deviceCurve25519Key,
+            sender_key: this.olmDevice.deviceCurve25519Key!,
             ciphertext: {},
+            [ToDeviceMessageId]: uuidv4(),
         };
         await olmlib.encryptMessageForDevice(
             encryptedContent.ciphertext,
@@ -3917,7 +3935,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param obj -  Object to which we will add a 'signatures' property
      */
-    public async signObject(obj: object & ISignableObject): Promise<void> {
+    public async signObject<T extends ISignableObject & object>(obj: T): Promise<void> {
         const sigs = obj.signatures || {};
         const unsigned = obj.unsigned;
 

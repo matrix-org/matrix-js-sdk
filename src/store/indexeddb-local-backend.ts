@@ -314,10 +314,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
         const minStateKeyProm = reqAsCursorPromise(
             roomIndex.openKeyCursor(roomRange, "next"),
-        ).then((cursor) => cursor && cursor.primaryKey[1]);
+        ).then((cursor) => (<IDBValidKey[]>cursor?.primaryKey)[1]);
         const maxStateKeyProm = reqAsCursorPromise(
             roomIndex.openKeyCursor(roomRange, "prev"),
-        ).then((cursor) => cursor && cursor.primaryKey[1]);
+        ).then((cursor) => (<IDBValidKey[]>cursor?.primaryKey)[1]);
         const [minStateKey, maxStateKey] = await Promise.all(
             [minStateKeyProm, maxStateKeyProm]);
 
