@@ -21,15 +21,15 @@ export interface IRoomSummary {
 }
 
 interface IInfo {
-    // The title of the room (e.g. `m.room.name`)
+    /** The title of the room (e.g. `m.room.name`) */
     title: string;
-    // The description of the room (e.g. `m.room.topic`)
+    /** The description of the room (e.g. `m.room.topic`) */
     desc?: string;
-    // The number of joined users.
+    /** The number of joined users. */
     numMembers?: number;
-    // The list of aliases for this room.
+    /** The list of aliases for this room. */
     aliases?: string[];
-    // The timestamp for this room.
+    /** The timestamp for this room. */
     timestamp?: number;
 }
 

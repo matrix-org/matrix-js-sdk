@@ -124,7 +124,7 @@ interface IInitOpts {
 }
 
 export interface IBootstrapCrossSigningOpts {
-    // Optional. Reset even if keys already exist.
+    /** Optional. Reset even if keys already exist. */
     setupNewCrossSigning?: boolean;
     /**
      * A function that makes the request requiring auth. Receives the auth data as an object.

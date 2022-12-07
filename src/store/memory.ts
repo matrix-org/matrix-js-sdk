@@ -42,7 +42,7 @@ function isValidFilterId(filterId?: string | number | null): boolean {
 }
 
 export interface IOpts {
-    // The local storage instance to persist some forms of data such as tokens. Rooms will NOT be stored.
+    /** The local storage instance to persist some forms of data such as tokens. Rooms will NOT be stored. */
     localStorage?: Storage;
 }
 

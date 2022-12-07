@@ -42,11 +42,11 @@ import { IStoredClientOpts } from "../client";
 const WRITE_DELAY_MS = 1000 * 60 * 5; // once every 5 minutes
 
 interface IOpts extends IBaseOpts {
-    // The Indexed DB interface e.g. `window.indexedDB`
+    /** The Indexed DB interface e.g. `window.indexedDB` */
     indexedDB: IDBFactory;
-    // Optional database name. The same name must be used to open the same database.
+    /** Optional database name. The same name must be used to open the same database. */
     dbName?: string;
-    // Optional factory to spin up a Worker to execute the IDB transactions within.
+    /** Optional factory to spin up a Worker to execute the IDB transactions within. */
     workerFactory?: () => Worker;
 }
 

@@ -124,11 +124,11 @@ interface SharedWithData {
  * @internal
  */
 class OutboundSessionInfo {
-    // number of times this session has been used
+    /** number of times this session has been used */
     public useCount = 0;
-    // when the session was created (ms since the epoch)
+    /** when the session was created (ms since the epoch) */
     public creationTime: number;
-    // devices with which we have shared the session key `userId -> {deviceId -> SharedWithData}`
+    /** devices with which we have shared the session key `userId -> {deviceId -> SharedWithData}` */
     public sharedWithDevices: Record<string, Record<string, SharedWithData>> = {};
     public blockedDevicesNotified: Record<string, Record<string, boolean>> = {};
 

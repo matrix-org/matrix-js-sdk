@@ -166,9 +166,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * It can be mutated by adding state events to it.
      * There are two types of room member associated with a state event:
      * normal member objects (accessed via getMember/getMembers) which mutate
-     * with the state to represent the current state of that room/user,
-     * @example
-     * e.g.
+     * with the state to represent the current state of that room/user, e.g.
      * the object returned by `getMember('@bob:example.com')` will mutate to
      * get a different display name if Bob later changes his display name
      * in the room.

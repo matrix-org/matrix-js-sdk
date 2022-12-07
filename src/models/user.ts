@@ -92,28 +92,59 @@ export type UserEventHandlerMap = {
 export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
     private modified = -1;
 
-    // XXX these should be read-only
-    // The 'displayname' of the user if known.
+    /**
+     * The 'displayname' of the user if known.
+     * @privateRemarks
+     * Should be read-only
+     */
     public displayName?: string;
     public rawDisplayName?: string;
-    // The 'avatar_url' of the user if known.
+    /**
+     * The 'avatar_url' of the user if known.
+     * @privateRemarks
+     * Should be read-only
+     */
     public avatarUrl?: string;
-    // The presence status message if known.
+    /**
+     * The presence status message if known.
+     * @privateRemarks
+     * Should be read-only
+     */
     public presenceStatusMsg?: string;
-    // The presence enum if known.
+    /**
+     * The presence enum if known.
+     * @privateRemarks
+     * Should be read-only
+     */
     public presence = "offline";
     /**
      * Timestamp (ms since the epoch) for when we last received presence data for this user.
      * We can subtract lastActiveAgo from this to approximate an absolute value for when a user was last active.
+     * @privateRemarks
+     * Should be read-only
      */
     public lastActiveAgo = 0;
-    // The time elapsed in ms since the user interacted proactively with the server, or we saw a message from the user
+    /**
+     * The time elapsed in ms since the user interacted proactively with the server,
+     * or we saw a message from the user
+     * @privateRemarks
+     * Should be read-only
+     */
     public lastPresenceTs = 0;
-    // Whether we should consider lastActiveAgo to be an approximation and that the user should be seen as active 'now'
+    /**
+     * Whether we should consider lastActiveAgo to be an approximation
+     * and that the user should be seen as active 'now'
+     * @privateRemarks
+     * Should be read-only
+     */
     public currentlyActive = false;
-    // The events describing this user.
+    /**
+     * The events describing this user.
+     * @privateRemarks
+     * Should be read-only
+     */
     public events: {
-        // The m.presence event for this user.
+        /** The m.presence event for this user. */
         presence?: MatrixEvent;
         profile?: MatrixEvent;
     } = {};

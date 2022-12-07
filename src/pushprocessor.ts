@@ -112,9 +112,9 @@ const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
 ];
 
 export interface IActionsObject {
-    // Whether this event should notify the user or not.
+    /** Whether this event should notify the user or not. */
     notify: boolean;
-    // How this event should be notified.
+    /** How this event should be notified. */
     tweaks: Partial<Record<TweakName, any>>;
 }
 

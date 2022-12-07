@@ -58,17 +58,17 @@ interface IInitOpts {
     pickleKey?: string;
 }
 
-// data stored in the session store about an inbound group session
+/** data stored in the session store about an inbound group session */
 export interface InboundGroupSessionData {
     room_id: string; // eslint-disable-line camelcase
-    // pickled Olm.InboundGroupSession
+    /** pickled Olm.InboundGroupSession */
     session: string;
     keysClaimed: Record<string, string>;
-    // Devices involved in forwarding this session to us (normally empty).
+    /** Devices involved in forwarding this session to us (normally empty). */
     forwardingCurve25519KeyChain: string[];
-    // whether this session is untrusted.
+    /** whether this session is untrusted. */
     untrusted?: boolean;
-    // whether this session exists during the room being set to shared history.
+    /** whether this session exists during the room being set to shared history. */
     sharedHistory?: boolean;
 }
 
@@ -117,10 +117,9 @@ type OneTimeKeys = { curve25519: { [keyId: string]: string } };
 export class OlmDevice {
     public pickleKey = "DEFAULT_KEY"; // set by consumers
 
-    // don't know these until we load the account from storage in init()
-    // Curve25519 key for the account
+    /** Curve25519 key for the account, unknown until we load the account from storage in init() */
     public deviceCurve25519Key: string | null = null;
-    // Ed25519 key for the account
+    /** Ed25519 key for the account, unknown until we load the account from storage in init() */
     public deviceEd25519Key: string | null = null;
     private maxOneTimeKeys: number | null = null;
 
@@ -1211,7 +1210,7 @@ export class OlmDevice {
      * @param eventId -   ID of the event being decrypted
      * @param timestamp - timestamp of the event being decrypted
      *
-     * @returns the sessionId is unknown
+     * @returns null if the sessionId is unknown
      */
     public async decryptGroupMessage(
         roomId: string,
@@ -1377,9 +1376,6 @@ export class OlmDevice {
      *     If omitted, export at the first index we know about.
      *
      * @returns
-     *
-     *
-     *
      *    details of the session key. The key is a base64-encoded megolm key in
      *    export format.
      *

@@ -279,25 +279,32 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public localTimestamp: number;
 
-    // XXX: these should be read-only
     /**
      * The room member who sent this event, or null e.g.
      * this is a presence event. This is only guaranteed to be set for events that
      * appear in a timeline, ie. do not guarantee that it will be set on state
      * events.
+     * @privateRemarks
+     * Should be read-only
      */
     public sender: RoomMember | null = null;
     /**
      * The room member who is the target of this event, e.g.
      * the invitee, the person being banned, etc.
+     * @privateRemarks
+     * Should be read-only
      */
     public target: RoomMember | null = null;
     /**
      * The sending status of the event.
+     * @privateRemarks
+     * Should be read-only
      */
     public status: EventStatus | null = null;
     /**
      * most recent error associated with sending the event, if any
+     * @privateRemarks
+     * Should be read-only
      */
     public error: MatrixError | null = null;
     /**
@@ -305,6 +312,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * that getDirectionalContent() will return event.content and not event.prev_content.
      * Only state events may be backwards looking
      * Default: true. <strong>This property is experimental and may change.</strong>
+     * @privateRemarks
+     * Should be read-only
      */
     public forwardLooking = true;
 
