@@ -106,9 +106,17 @@ export interface IGroupCallDataChannelOptions {
     protocol: string;
 }
 
+export interface IGroupCallRoomState {
+    "m.intent": GroupCallIntent;
+    "m.type": GroupCallType;
+    "io.element.ptt"?: boolean;
+    // TODO: Specify data-channels
+    "dataChannelsEnabled"?: boolean;
+    "dataChannelOptions"?: IGroupCallDataChannelOptions;
+}
+
 export interface IGroupCallRoomMemberFeed {
     purpose: SDPStreamMetadataPurpose;
-    // TODO: Sources for adaptive bitrate
 }
 
 export interface IGroupCallRoomMemberDevice {
@@ -213,17 +221,19 @@ export class GroupCall extends TypedEventEmitter<
         this.client.groupCallEventHandler!.groupCalls.set(this.room.roomId, this);
         this.client.emit(GroupCallEventHandlerEvent.Outgoing, this);
 
+        const groupCallState: IGroupCallRoomState = {
+            "m.intent": this.intent,
+            "m.type": this.type,
+            "io.element.ptt": this.isPtt,
+            // TODO: Specify data-channels better
+            "dataChannelsEnabled": this.dataChannelsEnabled,
+            "dataChannelOptions": this.dataChannelsEnabled ? this.dataChannelOptions : undefined,
+        };
+
         await this.client.sendStateEvent(
             this.room.roomId,
             EventType.GroupCallPrefix,
-            {
-                "m.intent": this.intent,
-                "m.type": this.type,
-                "io.element.ptt": this.isPtt,
-                // TODO: Specify datachannels
-                "dataChannelsEnabled": this.dataChannelsEnabled,
-                "dataChannelOptions": this.dataChannelOptions,
-            },
+            groupCallState,
             this.groupCallId,
         );
 
