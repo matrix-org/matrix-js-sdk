@@ -995,7 +995,13 @@ describe("Crypto", function() {
             });
 
             client = new TestClient("@alice:example.org", "aliceweb");
-            await client.client.initCrypto();
+
+            // running initCrypto should trigger a key upload
+            client.httpBackend.when("POST", "/keys/upload").respond(200, {});
+            await Promise.all([
+                client.client.initCrypto(),
+                client.httpBackend.flush("/keys/upload", 1),
+            ]);
 
             encryptedPayload = {
                 algorithm: "m.olm.v1.curve25519-aes-sha2",
