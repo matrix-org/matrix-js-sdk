@@ -370,7 +370,7 @@ To build a browser version from scratch when developing::
  $ yarn build
 ```
 
-To run tests (Jasmine)::
+To run tests (Jest)::
 ```
  $ yarn test
 ```
