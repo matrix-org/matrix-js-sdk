@@ -196,7 +196,7 @@ export class ToDeviceChannel implements IVerificationChannel {
     }
 
     /**
-     * See {@link InRoomChannel.completedContentFromEvent} why this is needed.
+     * See {@link InRoomChannel#completedContentFromEvent} for why this is needed.
      * @param event - the received event
      * @returns the content object
      */
