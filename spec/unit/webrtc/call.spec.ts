@@ -1477,4 +1477,31 @@ describe('Call', function() {
             expect(lengthChangedListener).toBeCalledWith(hasAdvancedBy);
         }
     });
+
+    describe("ICE disconnected timeout", () => {
+        let mockPeerConn: MockRTCPeerConnection;
+
+        beforeEach(async () => {
+            jest.useFakeTimers();
+            jest.spyOn(call, "hangup");
+
+            await fakeIncomingCall(client, call, "1");
+
+            mockPeerConn = (call.peerConn as unknown as MockRTCPeerConnection);
+            mockPeerConn.iceConnectionState = "disconnected";
+            mockPeerConn.iceConnectionStateChangeListener!();
+        });
+
+        it("should hang up after being disconnected for 30 seconds", () => {
+            jest.advanceTimersByTime(31 * 1000);
+            expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
+        });
+
+        it("should not hangup if we've managed to re-connect", () => {
+            mockPeerConn.iceConnectionState = "connected";
+            mockPeerConn.iceConnectionStateChangeListener!();
+            jest.advanceTimersByTime(31 * 1000);
+            expect(call.hangup).not.toHaveBeenCalled();
+        });
+    });
 });
