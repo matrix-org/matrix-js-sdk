@@ -35,6 +35,7 @@ import { MatrixError } from "../http-api";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
 import { DecryptionError } from "../crypto/algorithms";
+import { CryptoBackend } from "../common-crypto/CryptoBackend";
 
 export { EventStatus } from "./event-status";
 
@@ -726,7 +727,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns promise which resolves (to undefined) when the decryption
      * attempt is completed.
      */
-    public async attemptDecryption(crypto: Crypto, options: IDecryptOptions = {}): Promise<void> {
+    public async attemptDecryption(crypto: CryptoBackend, options: IDecryptOptions = {}): Promise<void> {
         // start with a couple of sanity checks.
         if (!this.isEncrypted()) {
             throw new Error("Attempt to decrypt event which isn't encrypted");
@@ -804,7 +805,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return recipients;
     }
 
-    private async decryptionLoop(crypto: Crypto, options: IDecryptOptions = {}): Promise<void> {
+    private async decryptionLoop(crypto: CryptoBackend, options: IDecryptOptions = {}): Promise<void> {
         // make sure that this method never runs completely synchronously.
         // (doing so would mean that we would clear decryptionPromise *before*
         // it is set in attemptDecryption - and hence end up with a stuck
