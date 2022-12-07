@@ -1097,7 +1097,8 @@ export type ClientEventHandlerMap = {
      * ```
      */
     [ClientEvent.DeleteRoom]: (roomId: string) => void;
-    [ClientEvent.SyncUnexpectedError]: (error: Error) => void;/**
+    [ClientEvent.SyncUnexpectedError]: (error: Error) => void;
+    /**
      * Fires when the client .well-known info is fetched.
      *
      * @param data - The JSON object returned by the server
