@@ -370,10 +370,13 @@ To build a browser version from scratch when developing::
  $ yarn build
 ```
 
-To run tests (Jest)::
+To run tests (Jest):
 ```
  $ yarn test
 ```
+
+> **Note**
+> The `sync-browserify.spec.ts` requires a browser build (`yarn build`) in order to pass
 
 To run linting:
 ```
