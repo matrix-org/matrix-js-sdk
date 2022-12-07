@@ -1813,7 +1813,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Get an existing group call for the provided room.
-     * @param roomId -
      * @returns The group call or null if it doesn't already exist.
      */
     public getGroupCallForRoom(roomId: string): GroupCall | null {
@@ -1909,7 +1908,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Set the global notification EventTimelineSet
      *
-     * @param set -
      */
     public setNotifTimelineSet(set: EventTimelineSet): void {
         this.notifTimelineSet = set;
@@ -2619,7 +2617,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * - migrates Secure Secret Storage to use the latest algorithm, if an outdated
      *   algorithm is found
      *
-     * @param opts -
      */
     public bootstrapSecretStorage(opts: ICreateSecretStorageOpts): Promise<void> {
         if (!this.crypto) {
@@ -2894,7 +2891,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Encrypts and sends a given object via Olm to-device messages to a given
      * set of devices.
      *
-     * @param userDeviceInfoArr -
      *   mapping from userId to deviceInfo
      *
      * @param payload - fields to include in the encrypted payload
@@ -3891,8 +3887,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param name -
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
@@ -3901,8 +3895,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param topic -
      * @param htmlTopic - Optional.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
@@ -3917,7 +3909,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
      * @returns Promise which resolves: to an object keyed by tagId with objects containing a numeric order field.
      * @returns Rejects: with an error response.
      */
@@ -3930,7 +3921,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
      * @param tagName - name of room tag to be set
      * @param metadata - associated with that tag to be stored
      * @returns Promise which resolves: to an empty object
@@ -3946,7 +3936,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
      * @param tagName - name of room tag to be removed
      * @returns Promise which resolves: to an empty object
      * @returns Rejects: with an error response.
@@ -3961,7 +3950,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
      * @param eventType - event type to be set
      * @param content - event content
      * @returns Promise which resolves: to an empty object `{}`
@@ -3982,10 +3970,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Set a power level to one or multiple users.
-     * @param roomId -
-     * @param userId -
-     * @param powerLevel -
-     * @param event -
      * @returns Promise which resolves: to an ISendEventResponse object
      * @returns Rejects: with an error response.
      */
@@ -4018,8 +4002,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Create an m.beacon_info event
-     * @param roomId -
-     * @param beaconInfoContent -
      * @returns
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -4034,7 +4016,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Upsert a live beacon event
      * using a specific m.beacon_info.* event variable type
      * @param roomId - string
-     * @param beaconInfoContent -
      * @returns
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -4106,8 +4087,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param threadId -
      * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
      * @param txnId - Optional.
      * @returns Promise which resolves: to an empty object `{}`
@@ -4181,8 +4160,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * encrypts the event if necessary; adds the event to the queue, or sends it; marks the event as sent/unsent
-     * @param room -
-     * @param event -
      * @returns returns a promise which resolves with the result of the send request
      */
     protected encryptAndSendEvent(room: Room | null, event: MatrixEvent): Promise<ISendEventResponse> {
@@ -4897,9 +4874,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param isTyping -
-     * @param timeoutMs -
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
@@ -5000,8 +4974,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param userId -
      * @param reason - Optional.
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
@@ -5062,7 +5034,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
@@ -5118,8 +5089,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param userId -
      * @param reason - Optional.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
@@ -5129,7 +5098,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
      * @param deleteRoom - True to delete the room from the store on success.
      * Default: true.
      * @returns Promise which resolves: `{}` an empty object.
@@ -5148,8 +5116,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param userId -
      * @returns Promise which resolves: Object (currently empty)
      * @returns Rejects: with an error response.
      */
@@ -5169,8 +5135,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param userId -
      * @param reason - Optional.
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
@@ -5237,7 +5201,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param name -
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
@@ -5253,7 +5216,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param url -
      * @returns Promise which resolves: `{}` an empty object.
      * @returns Rejects: with an error response.
      */
@@ -5406,7 +5368,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param options -
      * @param options -.preventReEmit don't re-emit events emitted on an event mapped by this mapper on the client
      * @param options -.decrypt decrypt event proactively
      * @param options -.toDevice the event is a to_device event
@@ -5776,8 +5737,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * XXX: if we do get rid of scrollback (as it's not used at the moment),
      * we could inline this method again in paginateEventTimeline as that would
      * then be the only call-site
-     * @param roomId -
-     * @param fromToken -
      * @param limit - the maximum amount of events the retrieve
      * @param dir - 'f' or 'b'
      * @param timelineFilter - the timeline filter to pass
@@ -6551,8 +6510,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * helper for searchRoomEvents and backPaginateRoomEventsSearch. Processes the
      * response from the API call and updates the searchResults
      *
-     * @param searchResults -
-     * @param response -
      * @returns searchResults
      * @internal
      */
@@ -6669,8 +6626,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param filterName -
-     * @param filter -
      * @returns Filter ID
      */
     public async getOrCreateFilter(filterName: string, filter: Filter): Promise<string> {
@@ -6824,7 +6779,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * WebRTC connection if the homeserver doesn't provide any servers. Defaults to
      * false.
      *
-     * @param allow -
      */
     public setFallbackICEServerAllowed(allow: boolean): void {
         this.fallbackICEServerAllowed = allow;
@@ -7253,7 +7207,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Attempts to decrypt an event
      * @param event - The event to decrypt
      * @returns A decryption promise
-     * @param options -
      * @param options -.isRetry True if this is a retry (enables more logging)
      * @param options -.emit Emits "event.decrypted" if set to true
      */
@@ -7361,15 +7314,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param username -
-     * @param password -
-     * @param sessionId -
-     * @param auth -
      * @param bindThreepids - Set key 'email' to true to bind any email
      *     threepid uses during registration in the identity server. Set 'msisdn' to
      *     true to bind msisdn.
-     * @param guestAccessToken -
-     * @param inhibitLogin -
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
@@ -7500,8 +7447,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param loginType -
-     * @param data -
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
@@ -7528,8 +7473,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param user -
-     * @param password -
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
@@ -7773,7 +7716,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
@@ -7784,8 +7726,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Get an event in a room by its event id.
-     * @param roomId -
-     * @param eventId -
      *
      * @returns Promise which resolves to an object containing the event.
      * @returns Rejects: with an error response.
@@ -7801,7 +7741,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
      * @param includeMembership - the membership type to include in the response
      * @param excludeMembership - the membership type to exclude from the response
      * @param atEventId - the id of the event for which moment in the timeline the members should be returned for
@@ -7834,7 +7773,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Upgrades a room to a new protocol version
-     * @param roomId -
      * @param newVersion - The target version to upgrade to
      * @returns Promise which resolves: Object with key 'replacement_room'
      * @returns Rejects: with an error response.
@@ -7849,9 +7787,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Retrieve a state event.
-     * @param roomId -
-     * @param eventType -
-     * @param stateKey -
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
@@ -7873,10 +7808,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param eventType -
-     * @param content -
-     * @param stateKey -
      * @param opts - Options for the request function.
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
@@ -7901,8 +7832,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomId -
-     * @param limit -
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
@@ -8060,7 +7989,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param roomAlias -
      * @returns Promise which resolves: Object with room_id and servers.
      * @returns Rejects: with an error response.
      */
@@ -8073,7 +8001,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Get the visibility of a room in the current HS's room directory
-     * @param roomId -
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
@@ -8086,7 +8013,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Set the visbility of a room in the current HS's room directory
-     * @param roomId -
      * @param visibility - "public" to make the room visible
      *                 in the public directory, or "private" to make
      *                 it invisible.
@@ -8105,7 +8031,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * the current HS's room directory.
      * @param networkId - the network ID of the 3rd party
      *                 instance under which this room is published under.
-     * @param roomId -
      * @param visibility - "public" to make the room visible
      *                 in the public directory, or "private" to make
      *                 it invisible.
@@ -8182,7 +8107,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param userId -
      * @param info - The kind of info to retrieve (e.g. 'displayname',
      * 'avatar_url').
      * @returns Promise which resolves: TODO
@@ -8216,8 +8140,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * This API is deprecated, and you should instead use `addThreePidOnly`
      * for homeservers that support it.
      *
-     * @param creds -
-     * @param bind -
      * @returns Promise which resolves: on success
      * @returns Rejects: with an error response.
      */
@@ -8313,7 +8235,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Make a request to change your password.
-     * @param authDict -
      * @param newPassword - The new desired password.
      * @param logoutDevices - Should all sessions be logged out after the password change. Defaults to true.
      * @returns Promise which resolves: to an empty object `{}`
@@ -8451,8 +8372,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Persists local notification settings
-     * @param deviceId -
-     * @param notificationSettings -
      * @returns Promise which resolves: an empty object
      * @returns Rejects: with an error response.
      */
@@ -8476,10 +8395,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param scope -
-     * @param kind -
-     * @param ruleId -
-     * @param body -
      * @returns Promise which resolves: an empty object `{}`
      * @returns Rejects: with an error response.
      */
@@ -8498,9 +8413,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param scope -
-     * @param kind -
-     * @param ruleId -
      * @returns Promise which resolves: an empty object `{}`
      * @returns Rejects: with an error response.
      */
@@ -8519,10 +8431,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Enable or disable a push notification rule.
-     * @param scope -
-     * @param kind -
-     * @param ruleId -
-     * @param enabled -
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
@@ -8541,10 +8449,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Set the actions for a push notification rule.
-     * @param scope -
-     * @param kind -
-     * @param ruleId -
-     * @param actions -
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
@@ -8673,8 +8577,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Ask the server for a list of users who have changed their device lists
      * between a pair of sync tokens
      *
-     * @param oldToken -
-     * @param newToken -
      *
      * @returns Promise which resolves: result object. Rejects: with
      *     an error response ({@link MatrixError}).
@@ -8706,7 +8608,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Note that the `/account/register` endpoint (as well as IS authentication in
      * general) was added as part of the v2 API version.
      *
-     * @param hsOpenIdToken -
      * @returns Promise which resolves: with object containing an Identity
      * Server access token.
      * @returns Rejects: with an error response.
@@ -9086,7 +8987,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * queueToDevice() which is a higher level API.
      *
      * @param eventType -  type of event to send
-     * @param contentMap -
      *    content to send. Map from user_id to device_id to content object.
      * @param txnId -     transaction id. One will be made up if not
      *    supplied.

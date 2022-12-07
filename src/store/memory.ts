@@ -109,9 +109,6 @@ export class MemoryStore implements IStore {
     /**
      * Called when a room member in a room being tracked by this store has been
      * updated.
-     * @param event -
-     * @param state -
-     * @param member -
      */
     private onRoomMember = (event: MatrixEvent | null, state: RoomState, member: RoomMember): void => {
         if (member.membership === "invite") {
@@ -152,7 +149,6 @@ export class MemoryStore implements IStore {
 
     /**
      * Permanently delete a room.
-     * @param roomId -
      */
     public removeRoom(roomId: string): void {
         if (this.rooms[roomId]) {
@@ -220,7 +216,6 @@ export class MemoryStore implements IStore {
 
     /**
      * Store a filter.
-     * @param filter -
      */
     public storeFilter(filter: Filter): void {
         if (!filter?.userId || !filter?.filterId) return;
@@ -232,8 +227,6 @@ export class MemoryStore implements IStore {
 
     /**
      * Retrieve a filter.
-     * @param userId -
-     * @param filterId -
      * @returns A filter or null.
      */
     public getFilter(userId: string, filterId: string): Filter | null {
@@ -269,8 +262,6 @@ export class MemoryStore implements IStore {
 
     /**
      * Set a filter name to ID mapping.
-     * @param filterName -
-     * @param filterId -
      */
     public setFilterIdByName(filterName: string, filterId?: string): void {
         if (!this.localStorage) {
@@ -384,7 +375,6 @@ export class MemoryStore implements IStore {
     /**
      * Returns the out-of-band membership events for this room that
      * were previously loaded.
-     * @param roomId -
      * @returns the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns in case the members for this room haven't been stored yet
      */
@@ -396,7 +386,6 @@ export class MemoryStore implements IStore {
      * Stores the out-of-band membership events for this room. Note that
      * it still makes sense to store an empty array as the OOB status for the room is
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
-     * @param roomId -
      * @param membershipEvents - the membership events to store
      * @returns when all members have been stored
      */

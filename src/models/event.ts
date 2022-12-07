@@ -712,7 +712,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @internal
      *
      * @param crypto - crypto module
-     * @param options -
      * @param options -.isRetry True if this is a retry (enables more logging)
      * @param options -.emit Emits "event.decrypted" if set to true
      * @param options -.forceRedecryptIfUntrusted whether the message should be
@@ -919,7 +918,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @internal
      *
-     * @param decryptionResult -
      *     the decryption result, including the plaintext and some key info
      *
      * @remarks
@@ -1104,7 +1102,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * Update the content of an event in the same way it would be by the server
      * if it were redacted before it was sent to us
      *
-     * @param redactionEvent -
      *     event causing the redaction
      */
     public makeRedacted(redactionEvent: MatrixEvent): void {

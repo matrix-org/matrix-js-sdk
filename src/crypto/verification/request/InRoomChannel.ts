@@ -288,7 +288,6 @@ export class InRoomChannel implements IVerificationChannel {
     /**
      * Send an event over the channel with the content having gone through `completeContent` already.
      * @param type - the event type
-     * @param content -
      * @returns the promise of the request
      */
     public async sendCompleted(type: string, content: Record<string, any>): Promise<void> {

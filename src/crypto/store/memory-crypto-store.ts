@@ -80,7 +80,6 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing outgoing room key request, and if none is found,
      * add a new one
      *
-     * @param request -
      *
      * @returns resolves to
      *    {@link OutgoingRoomKeyRequest}: either the
@@ -117,7 +116,6 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     * @param requestBody -
      *    existing request to look for
      *
      * @returns resolves to the matching
@@ -133,7 +131,6 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * @internal
      *
-     * @param requestBody -
      *    existing request to look for
      *
      * @returns
@@ -171,7 +168,6 @@ export class MemoryCryptoStore implements CryptoStore {
 
     /**
      *
-     * @param wantedState -
      * @returns All OutgoingRoomKeyRequests in state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {

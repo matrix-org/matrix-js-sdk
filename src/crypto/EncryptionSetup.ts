@@ -99,7 +99,6 @@ export class EncryptionSetupBuilder {
      *
      * Used after fixing the format of the key
      *
-     * @param privateKey -
      */
     public addSessionBackupPrivateKeyToCache(privateKey: Uint8Array): void {
         this.sessionBackupPrivateKey = privateKey;
@@ -109,9 +108,6 @@ export class EncryptionSetupBuilder {
      * Add signatures from a given user and device/x-sign key
      * Used to sign the new cross-signing key with the device key
      *
-     * @param userId -
-     * @param deviceId -
-     * @param signature -
      */
     public addKeySignature(userId: string, deviceId: string, signature: ISignedKey): void {
         if (!this.keySignatures) {
@@ -178,10 +174,6 @@ export class EncryptionSetupBuilder {
  */
 export class EncryptionSetupOperation {
     /**
-     * @param accountData -
-     * @param crossSigningKeys -
-     * @param keyBackupInfo -
-     * @param keySignatures -
      */
     public constructor(
         private readonly accountData: Map<string, object>,
@@ -192,7 +184,6 @@ export class EncryptionSetupOperation {
 
     /**
      * Runs the (remaining part of, in the future) operation by sending requests to the server.
-     * @param crypto -
      */
     public async apply(crypto: Crypto): Promise<void> {
         const baseApis = crypto.baseApis;
@@ -268,7 +259,6 @@ class AccountDataClientAdapter
     }
 
     /**
-     * @param type -
      * @returns the content of the account data
      */
     public getAccountDataFromServer<T extends {[k: string]: any}>(type: string): Promise<T> {
@@ -276,7 +266,6 @@ class AccountDataClientAdapter
     }
 
     /**
-     * @param type -
      * @returns the content of the account data
      */
     public getAccountData(type: string): IContent | null {

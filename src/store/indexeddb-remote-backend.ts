@@ -93,7 +93,6 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     /**
      * Returns the out-of-band membership events for this room that
      * were previously loaded.
-     * @param roomId -
      * @returns the events, potentially an empty array if OOB loading didn't yield any new members
      * @returns in case the members for this room haven't been stored yet
      */
@@ -105,7 +104,6 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * Stores the out-of-band membership events for this room. Note that
      * it still makes sense to store an empty array as the OOB status for the room is
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
-     * @param roomId -
      * @param membershipEvents - the membership events to store
      * @returns when all members have been stored
      */

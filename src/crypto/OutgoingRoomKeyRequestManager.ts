@@ -130,8 +130,6 @@ export class OutgoingRoomKeyRequestManager {
      * Otherwise, a request is added to the pending list, and a job is started
      * in the background to send it.
      *
-     * @param requestBody -
-     * @param recipients -
      * @param resend - whether to resend the key request if there is
      *    already one
      *
@@ -235,7 +233,6 @@ export class OutgoingRoomKeyRequestManager {
     /**
      * Cancel room key requests, if any match the given requestBody
      *
-     * @param requestBody -
      *
      * @returns resolves when the request has been updated in our
      *    pending list.

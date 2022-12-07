@@ -615,7 +615,6 @@ export class InteractiveAuth {
      * Get the first uncompleted stage in the given flow
      *
      * @internal
-     * @param flow -
      * @returns login type
      */
     private firstUncompletedStage(flow: IFlow): AuthType | undefined {

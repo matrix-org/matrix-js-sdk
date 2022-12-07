@@ -32,12 +32,9 @@ export class RelationsContainer {
     /**
      * Get a collection of child events to a given event in this timeline set.
      *
-     * @param eventId -
      * The ID of the event that you'd like to access child events for.
      * For example, with annotations, this would be the ID of the event being annotated.
-     * @param relationType -
      * The type of relationship involved, such as "m.annotation", "m.reference", "m.replace", etc.
-     * @param eventType -
      * The relation event's type, such as "m.reaction", etc.
      * @throws If `eventId</code>, <code>relationType</code> or <code>eventType`
      * are not valid.

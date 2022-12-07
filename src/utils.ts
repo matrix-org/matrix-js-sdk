@@ -78,9 +78,6 @@ export type QueryDict = Record<string, string[] | string | number | boolean | un
 
 /**
  * Replace a stable parameter with the unstable naming for params
- * @param stable -
- * @param unstable -
- * @param dict -
  */
 export function replaceParam(
     stable: string,

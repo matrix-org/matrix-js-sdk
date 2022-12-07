@@ -1656,7 +1656,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Internal
-     * @param event -
      */
     private gotLocalIceCandidate = (event: RTCPeerConnectionIceEvent): void => {
         if (event.candidate) {
@@ -1730,7 +1729,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Used by MatrixClient.
-     * @param msg -
      */
     public async onAnswerReceived(event: MatrixEvent): Promise<void> {
         const content = event.getContent<MCallAnswer>();

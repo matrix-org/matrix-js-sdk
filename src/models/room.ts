@@ -703,7 +703,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Removes a pending event for this room
      *
-     * @param eventId -
      * @returns True if an element was removed.
      */
     public removePendingEvent(eventId: string): boolean {
@@ -1811,8 +1810,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Takes the given thread root events and creates threads for them.
-     * @param events -
-     * @param toStartOfTimeline -
      */
     public processThreadRoots(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         for (const rootEvent of events) {
@@ -1906,7 +1903,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Fetch a single page of threadlist messages for the specific thread filter
-     * @param filter -
      * @internal
      */
     private async fetchRoomThreadList(filter?: ThreadFilterType): Promise<void> {

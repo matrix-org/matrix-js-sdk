@@ -324,7 +324,6 @@ async function recvMessage(
  * Send an initial sync response to the client (which just includes the member
  * list for our test room).
  *
- * @param testClient -
  * @returns which resolves when the sync has been flushed.
  */
 function firstSync(testClient: TestClient): Promise<void> {

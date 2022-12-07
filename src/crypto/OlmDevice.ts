@@ -278,7 +278,6 @@ export class OlmDevice {
      * and therefore may only be called in a doTxn() callback.
      *
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
-     * @param func -
      * @internal
      */
     private getAccount(txn: unknown, func: (account: Account) => void): void {
@@ -345,10 +344,7 @@ export class OlmDevice {
      * function and will be freed as soon the callback returns. It is *not*
      * usable for the rest of the lifetime of the transaction.
      *
-     * @param deviceKey -
-     * @param sessionId -
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
-     * @param func -
      * @internal
      */
     private getSession(
@@ -369,8 +365,6 @@ export class OlmDevice {
      * function with it. The session object is destroyed once the function
      * returns.
      *
-     * @param sessionInfo -
-     * @param func -
      * @internal
      */
     private unpickleSession(
@@ -391,7 +385,6 @@ export class OlmDevice {
     /**
      * store our OlmSession in the session store
      *
-     * @param deviceKey -
      * @param sessionInfo - `{session: OlmSession, lastReceivedMessageTs: int}`
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
      * @internal
@@ -407,7 +400,6 @@ export class OlmDevice {
     /**
      * get an OlmUtility and call the given function
      *
-     * @param func -
      * @returns result of func
      * @internal
      */
@@ -907,7 +899,6 @@ export class OlmDevice {
     /**
      * store an OutboundGroupSession in outboundGroupSessionStore
      *
-     * @param session -
      * @internal
      */
     private saveOutboundGroupSession(session: OutboundGroupSession): void {
@@ -918,8 +909,6 @@ export class OlmDevice {
      * extract an OutboundGroupSession from outboundGroupSessionStore and call the
      * given function
      *
-     * @param sessionId -
-     * @param func -
      * @returns result of func
      * @internal
      */
@@ -1020,10 +1009,7 @@ export class OlmDevice {
      *
      * @param roomId - The room ID to extract the session for, or null to fetch
      *     sessions for any room.
-     * @param senderKey -
-     * @param sessionId -
      * @param txn - Opaque transaction object from cryptoStore.doTxn()
-     * @param func -
      *   function to call.
      *
      * @internal

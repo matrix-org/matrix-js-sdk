@@ -51,7 +51,6 @@ export class StubStore implements IStore {
 
     /**
      * Set the sync token.
-     * @param token -
      */
     public setSyncToken(token: string): void {
         this.fromToken = token;
@@ -59,7 +58,6 @@ export class StubStore implements IStore {
 
     /**
      * No-op.
-     * @param room -
      */
     public storeRoom(room: Room): void {}
 
@@ -80,7 +78,6 @@ export class StubStore implements IStore {
 
     /**
      * Permanently delete a room.
-     * @param roomId -
      */
     public removeRoom(roomId: string): void {
         return;
@@ -96,7 +93,6 @@ export class StubStore implements IStore {
 
     /**
      * No-op.
-     * @param user -
      */
     public storeUser(user: User): void {}
 
@@ -132,14 +128,11 @@ export class StubStore implements IStore {
 
     /**
      * Store a filter.
-     * @param filter -
      */
     public storeFilter(filter: Filter): void {}
 
     /**
      * Retrieve a filter.
-     * @param userId -
-     * @param filterId -
      * @returns A filter or null.
      */
     public getFilter(userId: string, filterId: string): Filter | null {
@@ -157,8 +150,6 @@ export class StubStore implements IStore {
 
     /**
      * Set a filter name to ID mapping.
-     * @param filterName -
-     * @param filterId -
      */
     public setFilterIdByName(filterName: string, filterId?: string): void {}
 

@@ -52,12 +52,9 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     private readonly client: MatrixClient;
 
     /**
-     * @param relationType -
      * The type of relation involved, such as "m.annotation", "m.reference",
      * "m.replace", etc.
-     * @param eventType -
      * The relation event's type, such as "m.reaction", etc.
-     * @param client -
      * The client which created this instance. For backwards compatibility also accepts a Room.
      */
     public constructor(
@@ -72,7 +69,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     /**
      * Add relation events to this collection.
      *
-     * @param event -
      * The new relation event to be added.
      */
     public async addEvent(event: MatrixEvent): Promise<void> {
@@ -120,7 +116,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     /**
      * Remove relation event from this collection.
      *
-     * @param event -
      * The relation event to remove.
      */
     private async removeEvent(event: MatrixEvent): Promise<void> {
@@ -245,7 +240,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *   - after the server accepted the redaction and remote echoed back to us
      *   - before the original event has been marked redacted in the client
      *
-     * @param redactedEvent -
      * The original relation event that is about to be redacted.
      */
     private onBeforeRedaction = async (redactedEvent: MatrixEvent): Promise<void> => {

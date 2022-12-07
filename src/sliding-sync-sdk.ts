@@ -763,7 +763,6 @@ export class SlidingSyncSdk {
 
     /**
      * Injects events into a room's model.
-     * @param room -
      * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
      * @param timelineEventList - A list of timeline events. Lower index

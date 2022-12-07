@@ -370,8 +370,6 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
     /**
      * Get the stored keys for a single device
      *
-     * @param userId -
-     * @param deviceId -
      *
      * @returns device, or undefined
      * if we don't know about this device
@@ -460,7 +458,6 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * will download the device list for the user, and that subsequent calls to
      * invalidateUserDeviceList will trigger more updates.
      *
-     * @param userId -
      */
     public startTrackingDeviceList(userId: string): void {
         // sanity-check the userId. This is mostly paranoia, but if synapse
@@ -489,7 +486,6 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * complete; it will just mean that we don't think that we have an up-to-date
      * list for future calls to downloadKeys.
      *
-     * @param userId -
      */
     public stopTrackingDeviceList(userId: string): void {
         if (this.deviceTrackingStatus[userId]) {
@@ -524,7 +520,6 @@ export class DeviceList extends TypedEventEmitter<EmittedEvents, CryptoEventHand
      * This doesn't actually set off an update, so that several users can be
      * batched together. Call refreshOutdatedDeviceLists() for that.
      *
-     * @param userId -
      */
     public invalidateUserDeviceList(userId: string): void {
         if (this.deviceTrackingStatus[userId]) {

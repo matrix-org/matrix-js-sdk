@@ -361,7 +361,6 @@ export class MockStorageApi implements Storage {
 /**
  * If an event is being decrypted, wait for it to finish being decrypted.
  *
- * @param event -
  * @returns promise which resolves (to `event`) when the event has been decrypted
  */
 export async function awaitDecryption(

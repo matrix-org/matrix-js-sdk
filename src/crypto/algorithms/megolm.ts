@@ -251,7 +251,6 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @internal
      *
-     * @param room -
      * @param devicesInRoom - The devices in this room, indexed by user ID
      * @param blocked - The devices that are blocked, indexed by user ID
      * @param singleOlmCreationPhase - Only perform one round of olm
@@ -474,7 +473,6 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @internal
      *
-     * @param sharedHistory -
      *
      * @returns session
      */
@@ -585,11 +583,9 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @internal
      *
-     * @param session -
      *
      * @param chainIndex - current chain index
      *
-     * @param userDeviceMap -
      *   mapping from userId to deviceInfo
      *
      * @param payload - fields to include in the encrypted payload
@@ -625,7 +621,6 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @internal
      *
-     * @param session -
      *
      * @param userDeviceMap - list of blocked devices to notify
      *
@@ -778,17 +773,14 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * @internal
      *
-     * @param session -
      *
      * @param key - the session key as returned by
      *    OlmDevice.getOutboundGroupSessionKey
      *
      * @param payload - the base to-device message payload for sharing keys
      *
-     * @param devicesByUser -
      *    map from userid to list of devices
      *
-     * @param errorDevices -
      *    array that will be populated with the devices that we can't get an
      *    olm session for
      *
@@ -850,9 +842,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * Notify devices that we weren't able to create olm sessions.
      *
-     * @param session -
      *
-     * @param key -
      *
      * @param failedDevices - the devices that we were unable to
      *     create olm sessions for, as returned by shareKeyWithDevices
@@ -911,9 +901,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * Notify blocked devices that they have been blocked.
      *
-     * @param session -
      *
-     * @param devicesByUser -
      *    map from userid to device ID to blocked data
      */
     private async notifyBlockedDevices(
@@ -1133,7 +1121,6 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     /**
      * Get the list of unblocked devices for all users in the room
      *
-     * @param room -
      * @param forceDistributeToUnverified - if set to true will include the unverified devices
      * even if setting is set to block them (useful for verification)
      *
@@ -1368,7 +1355,6 @@ export class MegolmDecryption extends DecryptionAlgorithm {
      *
      * @internal
      *
-     * @param event -
      */
     private addEventToPendingList(event: MatrixEvent): void {
         const content = event.getWireContent();
@@ -1389,7 +1375,6 @@ export class MegolmDecryption extends DecryptionAlgorithm {
      *
      * @internal
      *
-     * @param event -
      */
     private removeEventFromPendingList(event: MatrixEvent): void {
         const content = event.getWireContent();
@@ -1811,8 +1796,6 @@ export class MegolmDecryption extends DecryptionAlgorithm {
      * decryption has been re-attempted on all events.
      *
      * @internal
-     * @param senderKey -
-     * @param sessionId -
      * @param forceRedecryptIfUntrusted - whether messages that were already
      *     successfully decrypted using untrusted keys should be re-decrypted
      *

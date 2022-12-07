@@ -65,11 +65,7 @@ export interface IOlmSessionResult {
  * @param resultsObject -  The `ciphertext` property
  *   of the m.room.encrypted event to which to add our result
  *
- * @param ourUserId -
- * @param ourDeviceId -
  * @param olmDevice - olm.js wrapper
- * @param recipientUserId -
- * @param recipientDevice -
  * @param payloadFields - fields to include in the encrypted payload
  *
  * Returns a promise which resolves (to undefined) when the payload
@@ -145,11 +141,8 @@ interface IExistingOlmSession {
  * Get the existing olm sessions for the given devices, and the devices that
  * don't have olm sessions.
  *
- * @param olmDevice -
  *
- * @param baseApis -
  *
- * @param devicesByUser -
  *    map from userid to list of devices to ensure sessions for
  *
  * @returns resolves to an array.  The first element of the array is a

@@ -202,7 +202,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Look for an existing outgoing room key request, and if none is found,
      * add a new one
      *
-     * @param request -
      *
      * @returns resolves to
      *    {@link OutgoingRoomKeyRequest}: either the
@@ -215,7 +214,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     * @param requestBody -
      *    existing request to look for
      *
      * @returns resolves to the matching
@@ -244,7 +242,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Look for room key requests by state –
      * unlike above, return a list of all entries in one state.
      *
-     * @param wantedState -
      * @returns Returns an array of requests in the given state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
@@ -564,7 +561,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * These all need to be written out in full each time such that the snapshot
      * is always consistent, so they are stored in one object.
      *
-     * @param deviceData -
      * @param txn - An active transaction. See doTxn().
      */
     public storeEndToEndDeviceData(deviceData: IDeviceData, txn: IDBTransaction): void {

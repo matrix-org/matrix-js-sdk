@@ -23,9 +23,6 @@ import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
 /**
- * @param obj -
- * @param keyNesting -
- * @param val -
  */
 function setProp(obj: Record<string, any>, keyNesting: string, val: any): void {
     const nestedKeys = keyNesting.split(".") as [keyof typeof obj];
@@ -218,7 +215,6 @@ export class Filter {
 
     /**
      * Enable threads unread notification
-     * @param enabled -
      */
     public setUnreadThreadNotifications(enabled: boolean): void {
         this.definition = {

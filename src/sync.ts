@@ -436,7 +436,6 @@ export class SyncApi {
 
     /**
      * Do a peek room poll.
-     * @param peekRoom -
      * @param token - from= token
      */
     private peekPoll(peekRoom: Room, token?: string): void {
@@ -1609,7 +1608,6 @@ export class SyncApi {
     }
 
     /**
-     * @param room -
      */
     private resolveInvites(room: Room): void {
         if (!room || !this.opts.resolveInvitesToProfiles) {
@@ -1653,7 +1651,6 @@ export class SyncApi {
 
     /**
      * Injects events into a room's model.
-     * @param room -
      * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
      * @param timelineEventList - A list of timeline events, including threaded. Lower index
@@ -1734,7 +1731,6 @@ export class SyncApi {
      * as appropriate.
      * This must be called after the room the events belong to has been stored.
      *
-     * @param room -
      * @param timelineEventList - A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
      */

@@ -468,7 +468,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param clientStore - the MatrixClient data store.
      *
-     * @param cryptoStore -
      *    storage for the crypto layer.
      *
      * @param roomList - An initialised RoomList object
@@ -2172,8 +2171,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Get the stored keys for a single device
      *
-     * @param userId -
-     * @param deviceId -
      *
      * @returns device, or undefined
      * if we don't know about this device
@@ -3002,7 +2999,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Decrypt a received event
      *
-     * @param event -
      *
      * @returns resolves once we have
      *  finished decrypting. Rejects with an `algorithms.DecryptionError` if there
@@ -3063,8 +3059,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Send a request for some room keys, if we have not already done so
      *
-     * @param requestBody -
-     * @param recipients -
      * @param resend - whether to resend the key request if there is
      *    already one
      *
@@ -3092,7 +3086,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Cancel any earlier room key request
      *
-     * @param requestBody -
      *    parameters to match for cancellation
      */
     public cancelRoomKeyRequest(requestBody: IRoomKeyRequestBody): void {
@@ -3754,7 +3747,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Helper for processReceivedRoomKeyRequests
      *
-     * @param req -
      */
     private async processReceivedRoomKeyRequest(req: IncomingRoomKeyRequest): Promise<void> {
         const userId = req.userId;
@@ -3844,7 +3836,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Helper for processReceivedRoomKeyRequests
      *
-     * @param cancellation -
      */
     private async processReceivedRoomKeyRequestCancellation(
         cancellation: IncomingRoomKeyRequestCancellation,
