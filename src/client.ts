@@ -2795,7 +2795,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param event - event to be checked
      *
      * @returns true if the sender of this event has been verified using
-     * {@link #setDeviceVerified}.
+     * {@link MatrixClient#setDeviceVerified}.
      */
     public async isEventSenderVerified(event: MatrixEvent): Promise<boolean> {
         const device = await this.getEventSenderDeviceInfo(event);

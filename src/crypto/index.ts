@@ -930,8 +930,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param createSecretStorageKey - Optional. Function
      * called to await a secret storage key creation flow.
-     * Resolves:
-     *     Object with public key metadata, encoded private
+     *     Returns a Promise which resolves to an object with public key metadata, encoded private
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      * @param keyBackupInfo - The current key backup object. If passed,
@@ -1292,7 +1291,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     /**
      * Stores the session backup key to the cache
      * @param key - the private key
-     * @returns so you can catch failures
+     * @returns a promise so you can catch failures
      */
     public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
         if (!(key instanceof Uint8Array)) {
@@ -3964,11 +3963,11 @@ export function fixBackupKey(key?: string): string | null {
  * Represents a received m.room_key_request event
  */
 export class IncomingRoomKeyRequest {
-    // user requesting the key
+    /** user requesting the key */
     public readonly userId: string;
-    // device requesting the key
+    /** device requesting the key */
     public readonly deviceId: string;
-    // unique id for the request
+    /** unique id for the request */
     public readonly requestId: string;
     public readonly requestBody: IRoomKeyRequestBody;
     /**
@@ -3995,11 +3994,11 @@ export class IncomingRoomKeyRequest {
  * Represents a received m.room_key_request cancellation
  */
 class IncomingRoomKeyRequestCancellation {
-    // user requesting the cancellation
+    /** user requesting the cancellation */
     public readonly userId: string;
-    // device requesting the cancellation
+    /** device requesting the cancellation */
     public readonly deviceId: string;
-    // unique id for the request to be cancelled
+    /** unique id for the request to be cancelled */
     public readonly requestId: string;
 
     public constructor(event: MatrixEvent) {

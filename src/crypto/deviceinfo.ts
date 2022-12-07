@@ -62,7 +62,7 @@ export class DeviceInfo {
 
     /** list of algorithms supported by this device */
     public algorithms: string[] = [];
-    /** a map from &lt;key type&gt;:&lt;id&gt; -> &lt;base64-encoded key&gt;> */
+    /** a map from `<key type>:<id> -> <base64-encoded key>` */
     public keys: Record<string, string> = {};
     /** whether the device has been verified/blocked by the user */
     public verified = DeviceVerification.Unverified;

@@ -33,9 +33,11 @@ import { EventType, ToDeviceMessageId } from "../@types/event";
 // allow for (a) it turning up anyway, (b) grouping requests together
 const SEND_KEY_REQUESTS_DELAY_MS = 500;
 
-/* possible states for a room key request
+/**
+ *  possible states for a room key request
  *
  * The state machine looks like:
+ * ```
  *
  *     |         (cancellation sent)
  *     | .-------------------------------------------------.
@@ -58,6 +60,7 @@ const SEND_KEY_REQUESTS_DELAY_MS = 500;
  *     | (cancellation sent)              |
  *     V                                  |
  * (deleted)  <---------------------------+
+ * ```
  */
 export enum RoomKeyRequestState {
     /** request not yet sent */
