@@ -263,7 +263,11 @@ const VOIP_PROTO_VERSION = "1";
 const FALLBACK_ICE_SERVER = 'stun:turn.matrix.org';
 
 /** The length of time a call can be ringing for. */
-const CALL_TIMEOUT_MS = 60000;
+const CALL_TIMEOUT_MS = 60 * 1000; // ms
+/** The time after which we increment callLength */
+const CALL_LENGTH_INTERVAL = 1000; // ms
+/** The time after which we end the call, if ICE got disconnected */
+const ICE_DISCONNECTED_TIMEOUT = 30 * 1000; // ms
 
 export class CallError extends Error {
     public readonly code: string;
@@ -2106,7 +2110,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.callLengthInterval = setInterval(() => {
                     this.callLength++;
                     this.emit(CallEvent.LengthChanged, this.callLength);
-                }, 1000);
+                }, CALL_LENGTH_INTERVAL);
             }
         } else if (this.peerConn?.iceConnectionState == 'failed') {
             // Firefox for Android does not yet have support for restartIce()
@@ -2123,7 +2127,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.iceDisconnectedTimeout = setTimeout(() => {
                 logger.info(`Hanging up call ${this.callId} (ICE disconnected for too long)`);
                 this.hangup(CallErrorCode.IceFailed, false);
-            }, 30 * 1000);
+            }, ICE_DISCONNECTED_TIMEOUT);
             this.state = CallState.Connecting;
         }
 
