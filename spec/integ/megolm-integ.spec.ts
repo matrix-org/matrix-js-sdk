@@ -650,6 +650,70 @@ describe("megolm", () => {
         ]);
     });
 
+    describe("get|setGlobalBlacklistUnverifiedDevices", () => {
+        it("should raise an error if crypto is disabled", () => {
+            aliceTestClient.client["cryptoBackend"] = undefined;
+            expect(() => aliceTestClient.client.setGlobalBlacklistUnverifiedDevices(true)).toThrowError(
+                "encryption disabled",
+            );
+            expect(() => aliceTestClient.client.getGlobalBlacklistUnverifiedDevices()).toThrowError(
+                "encryption disabled",
+            );
+        });
+
+        it("should disable sending to unverified devices", async () => {
+            aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await aliceTestClient.start();
+            const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
+
+            // tell alice we share a room with bob
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
+            await aliceTestClient.flushSync();
+
+            logger.log("Forcing alice to download our device keys");
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+
+            await Promise.all([
+                aliceTestClient.client.downloadKeys(["@bob:xyz"]),
+                aliceTestClient.httpBackend.flush("/keys/query", 2),
+            ]);
+
+            logger.log("Telling alice to block messages to unverified devices");
+            expect(aliceTestClient.client.getGlobalBlacklistUnverifiedDevices()).toBeFalsy();
+            aliceTestClient.client.setGlobalBlacklistUnverifiedDevices(true);
+            expect(aliceTestClient.client.getGlobalBlacklistUnverifiedDevices()).toBeTruthy();
+
+            logger.log("Telling alice to send a megolm message");
+            aliceTestClient.httpBackend.when("PUT", "/send/").respond(200, { event_id: "$event_id" });
+            aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key.withheld/").respond(200, {});
+
+            await Promise.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, "test"),
+                aliceTestClient.httpBackend.flushAllExpected({ timeout: 1000 }),
+            ]);
+
+            // Now, let's mark the device as verified, and check that keys are sent to it.
+
+            logger.log("Marking the device as verified");
+            // XXX: this is an integration test; we really ought to do this via the cross-signing dance
+            const d = aliceTestClient.client.crypto!.deviceList.getStoredDevice("@bob:xyz", "DEVICE_ID")!;
+            d.verified = DeviceInfo.DeviceVerification.VERIFIED;
+            aliceTestClient.client.crypto?.deviceList.storeDevicesForUser("@bob:xyz", { DEVICE_ID: d });
+
+            logger.log("Asking alice to re-send");
+            await Promise.all([
+                expectSendKeyAndMessage(aliceTestClient.httpBackend, "@bob:xyz", testOlmAccount, p2pSession).then(
+                    (decrypted) => {
+                        expect(decrypted.type).toEqual("m.room.message");
+                        expect(decrypted.content!.body).toEqual("test");
+                    },
+                ),
+                aliceTestClient.client.sendTextMessage(ROOM_ID, "test"),
+            ]);
+        });
+    });
+
     it("We should start a new megolm session when a device is blocked", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
