@@ -401,7 +401,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private remoteSDPStreamMetadata?: SDPStreamMetadata;
 
     private callLengthInterval?: ReturnType<typeof setInterval>;
-    private callLength = 0;
+    private callLStartTime?: number;
 
     private opponentDeviceId?: string;
     private opponentDeviceInfo?: DeviceInfo;
@@ -2106,10 +2106,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             clearTimeout(this.iceDisconnectedTimeout);
             this.state = CallState.Connected;
 
-            if (!this.callLengthInterval) {
+            if (!this.callLengthInterval && !this.callLStartTime) {
+                this.callLStartTime = Date.now();
+
                 this.callLengthInterval = setInterval(() => {
-                    this.callLength++;
-                    this.emit(CallEvent.LengthChanged, this.callLength);
+                    this.emit(CallEvent.LengthChanged, Math.round((Date.now() - this.callLStartTime!) / 1000));
                 }, CALL_LENGTH_INTERVAL);
             }
         } else if (this.peerConn?.iceConnectionState == 'failed') {
