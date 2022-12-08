@@ -311,6 +311,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
+    public readonly cachedThreadReadReceipts = new Map<string, { event: MatrixEvent, synthetic: boolean }[]>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -2146,6 +2147,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.updateThreadRootEvents(thread, toStartOfTimeline, false);
         }
 
+        // Pulling all the cached thread read receipts we've discovered when we
+        // did an initial sync, and applying them to the thread now that it exists
+        // on the client side
+        if (this.cachedThreadReadReceipts.has(threadId)) {
+            for (const { event, synthetic } of this.cachedThreadReadReceipts.get(threadId)!) {
+                this.addReceipt(event, synthetic);
+            }
+            this.cachedThreadReadReceipts.delete(threadId);
+        }
+
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);
 
         return thread;
@@ -2727,13 +2738,24 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     const receiptDestination: Thread | this | undefined = receiptForMainTimeline
                         ? this
                         : this.threads.get(receipt.thread_id ?? "");
-                    receiptDestination?.addReceiptToStructure(
-                        eventId,
-                        receiptType as ReceiptType,
-                        userId,
-                        receipt,
-                        synthetic,
-                    );
+
+                    if (receiptDestination) {
+                        receiptDestination.addReceiptToStructure(
+                            eventId,
+                            receiptType as ReceiptType,
+                            userId,
+                            receipt,
+                            synthetic,
+                        );
+                    } else {
+                        // The thread does not exist locally, keep the read receipt
+                        // in a cache locally, and re-apply  the `addReceipt` logic
+                        // when the thread is created
+                        this.cachedThreadReadReceipts.set(receipt.thread_id!, [
+                            ...(this.cachedThreadReadReceipts.get(receipt.thread_id!) ?? []),
+                            { event, synthetic },
+                        ]);
+                    }
                 });
             });
         });

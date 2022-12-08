@@ -33,8 +33,9 @@ import {
     IJoinedRoom,
     IStateEvent,
     IMinimalEvent,
-    NotificationCountType, IEphemeral,
+    NotificationCountType, IEphemeral, Room,
 } from "../../src";
+import { ReceiptType } from '../../src/@types/read_receipts';
 import { UNREAD_THREAD_NOTIFICATIONS } from '../../src/@types/sync';
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
@@ -1312,7 +1313,8 @@ describe("MatrixClient syncing", () => {
                 join: {
                     [roomOne]: {
                         ephemeral: {
-                            events: [],
+                            events: [
+                            ],
                         } as IEphemeral,
                         timeline: {
                             events: [
@@ -1397,6 +1399,9 @@ describe("MatrixClient syncing", () => {
             rooms: {
                 join: {
                     [roomOne]: {
+                        ephemeral: {
+                            events: [],
+                        },
                         timeline: {
                             events: [
                                 utils.mkMessage({
@@ -1453,6 +1458,50 @@ describe("MatrixClient syncing", () => {
 
                 expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(5);
                 expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(2);
+            });
+        });
+
+        it("caches unknown threads receipts and replay them when the thread is created", async () => {
+            const THREAD_ID = "$unknownthread:localhost";
+
+            const receipt = {
+                type: "m.receipt",
+                room_id: "!foo:bar",
+                content: {
+                    "$event1:localhost": {
+                        [ReceiptType.Read]: {
+                            "@alice:localhost": { ts: 666, thread_id: THREAD_ID },
+                        },
+                    },
+                },
+            };
+            syncData.rooms.join[roomOne].ephemeral.events = [receipt];
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+            client!.startClient();
+
+            return Promise.all([
+                httpBackend!.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(() => {
+                const room = client?.getRoom(roomOne);
+                expect(room).toBeInstanceOf(Room);
+
+                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(true);
+
+                const thread = room!.createThread(THREAD_ID, undefined, [], true);
+
+                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(false);
+
+                const receipt = thread.getReadReceiptForUserId("@alice:localhost");
+
+                expect(receipt).toStrictEqual({
+                    "data": {
+                        "thread_id": "$unknownthread:localhost",
+                        "ts": 666,
+                    },
+                    "eventId": "$event1:localhost",
+                });
             });
         });
     });
