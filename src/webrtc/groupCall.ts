@@ -669,8 +669,6 @@ export class GroupCall extends TypedEventEmitter<
 
         if (!sendUpdatesBefore) await sendUpdates();
 
-        this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
-        this.updateMemberState();
         return true;
     }
 
@@ -702,7 +700,6 @@ export class GroupCall extends TypedEventEmitter<
         await Promise.all(updates);
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, this.isMicrophoneMuted(), muted);
-        this.updateMemberState();
 
         return true;
     }
