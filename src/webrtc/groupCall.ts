@@ -1075,7 +1075,7 @@ export class GroupCall extends TypedEventEmitter<
         }
     }
 
-    private onCallFeedsChanged = (call: MatrixCall) => {
+    private onCallFeedsChanged = (call: MatrixCall): void => {
         this.updateMemberState();
 
         // Find removed feeds

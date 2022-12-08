@@ -2044,8 +2044,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private async waitForDatachannelToBeOpen(): Promise<void> {
         if (this.dataChannel?.readyState === 'connecting') {
             const p = new Promise<void>(resolve => {
-                this.dataChannel!.onopen = () => resolve();
-                this.dataChannel!.onclose = () => resolve();
+                this.dataChannel!.onopen = (): void => resolve();
+                this.dataChannel!.onclose = (): void => resolve();
             });
             await p;
         }
