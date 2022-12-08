@@ -58,16 +58,6 @@ jest.mock("../../src/webrtc/call", () => ({
     supportsMatrixCall: jest.fn(() => false),
 }));
 
-enum AnsiColorCode {
-    Red = 31,
-    Green = 32,
-    Yellow = 33,
-}
-// Add color to text in the terminal output
-function decorateStringWithAnsiColor(inputString: string, decorationColor: AnsiColorCode): string {
-    return `\x1b[${decorationColor}m${inputString}\x1b[0m`;
-}
-
 // Utility function to ease the transition from our QueryDict type to a string record
 // which we can use to stringify with URLSearchParams
 function convertQueryDictToStringRecord(queryDict?: QueryDict): Record<string, string> {
@@ -209,21 +199,15 @@ describe("MatrixClient", function() {
         const receivedRequestQueryString = new URLSearchParams(
             convertQueryDictToStringRecord(queryParams),
         ).toString();
-        const receivedRequest = decorateStringWithAnsiColor(
-            `${method} ${prefix}${path}${receivedRequestQueryString}`,
-            AnsiColorCode.Red,
-        );
+        const receivedRequestDebugString = `${method} ${prefix}${path}${receivedRequestQueryString}`;
         const expectedQueryString = new URLSearchParams(
             convertQueryDictToStringRecord(next.expectQueryParams),
         ).toString();
-        const expectedRequest = decorateStringWithAnsiColor(
-            `${next.method} ${next.prefix ?? ''}${next.path}${expectedQueryString}`,
-            AnsiColorCode.Green,
-        );
+        const expectedRequestDebugString = `${next.method} ${next.prefix ?? ''}${next.path}${expectedQueryString}`;
         // If you're seeing this then you forgot to handle at least 1 pending request.
         throw new Error(
-            `A pending request was not handled: ${receivedRequest} ` +
-            `(next request expected was ${expectedRequest})\n` +
+            `A pending request was not handled: ${receivedRequestDebugString} ` +
+            `(next request expected was ${expectedRequestDebugString})\n` +
             `Check your tests to ensure your number of expectations lines up with your number of requests ` +
             `made, and that those requests match your expectations.`,
         );
