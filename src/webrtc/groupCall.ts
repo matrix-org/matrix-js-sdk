@@ -436,8 +436,6 @@ export class GroupCall extends TypedEventEmitter<
 
         this.activeSpeaker = undefined;
 
-        this.state = GroupCallState.Entered;
-
         logger.log(`Entered group call ${this.groupCallId}`);
         this.state = GroupCallState.Entered;
 
