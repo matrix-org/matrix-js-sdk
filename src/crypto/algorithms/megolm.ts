@@ -265,7 +265,9 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      * Using `>>=` to represent the promise chaining operation, it does the
      * following:
      *
+     * ```
      * setupPromise = previousSetupPromise >>= setup >>= discardErrors
+     * ```
      *
      * The initial value for the `setupPromise` is a promise that resolves to
      * `null`. The forceDiscardSession() resets setupPromise to this initial
