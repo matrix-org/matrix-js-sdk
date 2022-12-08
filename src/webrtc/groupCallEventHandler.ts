@@ -21,7 +21,6 @@ import {
     GroupCallIntent,
     GroupCallType,
     IGroupCallDataChannelOptions,
-    IGroupCallRoomState,
 } from "./groupCall";
 import { Room } from "../models/room";
 import { RoomState, RoomStateEvent } from "../models/room-state";
@@ -143,7 +142,7 @@ export class GroupCallEventHandler {
 
     private createGroupCallFromRoomStateEvent(event: MatrixEvent): GroupCall | undefined {
         const roomId = event.getRoomId();
-        const content = event.getContent<IGroupCallRoomState>();
+        const content = event.getContent();
 
         const room = this.client.getRoom(roomId);
 
