@@ -421,10 +421,6 @@ export class GroupCall extends TypedEventEmitter<
             throw new Error(`Cannot enter call in the "${this.state}" state`);
         }
 
-        if (this.state === GroupCallState.LocalCallFeedUninitialized) {
-            await this.initLocalCallFeed();
-        }
-
         // TODO: Call preferred foci
 
         // This needs to be done before we set the state to entered. With the
