@@ -15,8 +15,6 @@ limitations under the License.
 */
 
 /**
- * @module olmlib
- *
  * Utilities common to olm encryption algorithms
  */
 
@@ -31,6 +29,7 @@ import { IClaimOTKsResult, MatrixClient } from "../client";
 import { ISignatures } from "../@types/signed";
 import { MatrixEvent } from "../models/event";
 import { EventType } from "../@types/event";
+import { IMessage } from "./algorithms/olm";
 
 enum Algorithm {
     Olm = "m.olm.v1.curve25519-aes-sha2",
@@ -54,28 +53,26 @@ export const MEGOLM_ALGORITHM = Algorithm.Megolm;
 export const MEGOLM_BACKUP_ALGORITHM = Algorithm.MegolmBackup;
 
 export interface IOlmSessionResult {
+    /** device info */
     device: DeviceInfo;
+    /** base64 olm session id; null if no session could be established */
     sessionId: string | null;
 }
 
 /**
  * Encrypt an event payload for an Olm device
  *
- * @param {Object<string, string>} resultsObject  The `ciphertext` property
+ * @param resultsObject -  The `ciphertext` property
  *   of the m.room.encrypted event to which to add our result
  *
- * @param {string} ourUserId
- * @param {string} ourDeviceId
- * @param {module:crypto/OlmDevice} olmDevice olm.js wrapper
- * @param {string} recipientUserId
- * @param {module:crypto/deviceinfo} recipientDevice
- * @param {object} payloadFields fields to include in the encrypted payload
+ * @param olmDevice - olm.js wrapper
+ * @param payloadFields - fields to include in the encrypted payload
  *
  * Returns a promise which resolves (to undefined) when the payload
  *    has been encrypted into `resultsObject`
  */
 export async function encryptMessageForDevice(
-    resultsObject: Record<string, string>,
+    resultsObject: Record<string, IMessage>,
     ourUserId: string,
     ourDeviceId: string | undefined,
     olmDevice: OlmDevice,
@@ -124,6 +121,7 @@ export async function encryptMessageForDevice(
         recipient_keys: {
             "ed25519": recipientDevice.getFingerprint(),
         },
+        ...payloadFields,
     };
 
     // TODO: technically, a bunch of that stuff only needs to be included for
@@ -131,11 +129,7 @@ export async function encryptMessageForDevice(
     // involved in the session. If we're looking to reduce data transfer in the
     // future, we could elide them for subsequent messages.
 
-    Object.assign(payload, payloadFields);
-
-    resultsObject[deviceKey] = await olmDevice.encryptMessage(
-        deviceKey, sessionId, JSON.stringify(payload),
-    );
+    resultsObject[deviceKey] = await olmDevice.encryptMessage(deviceKey, sessionId, JSON.stringify(payload));
 }
 
 interface IExistingOlmSession {
@@ -147,17 +141,14 @@ interface IExistingOlmSession {
  * Get the existing olm sessions for the given devices, and the devices that
  * don't have olm sessions.
  *
- * @param {module:crypto/OlmDevice} olmDevice
  *
- * @param {MatrixClient} baseApis
  *
- * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
- *    map from userid to list of devices to ensure sessions for
+ * @param devicesByUser - map from userid to list of devices to ensure sessions for
  *
- * @return {Promise} resolves to an array.  The first element of the array is a
+ * @returns resolves to an array.  The first element of the array is a
  *    a map of user IDs to arrays of deviceInfo, representing the devices that
  *    don't have established olm sessions.  The second element of the array is
- *    a map from userId to deviceId to {@link module:crypto~OlmSessionResult}
+ *    a map from userId to deviceId to {@link OlmSessionResult}
  */
 export async function getExistingOlmSessions(
     olmDevice: OlmDevice,
@@ -199,27 +190,22 @@ export async function getExistingOlmSessions(
 /**
  * Try to make sure we have established olm sessions for the given devices.
  *
- * @param {module:crypto/OlmDevice} olmDevice
+ * @param devicesByUser - map from userid to list of devices to ensure sessions for
  *
- * @param {MatrixClient} baseApis
- *
- * @param {object<string, module:crypto/deviceinfo[]>} devicesByUser
- *    map from userid to list of devices to ensure sessions for
- *
- * @param {boolean} [force=false] If true, establish a new session even if one
+ * @param force - If true, establish a new session even if one
  *     already exists.
  *
- * @param {Number} [otkTimeout] The timeout in milliseconds when requesting
+ * @param otkTimeout - The timeout in milliseconds when requesting
  *     one-time keys for establishing new olm sessions.
  *
- * @param {Array} [failedServers] An array to fill with remote servers that
+ * @param failedServers - An array to fill with remote servers that
  *     failed to respond to one-time-key requests.
  *
- * @param {Logger} [log] A possibly customised log
+ * @param log - A possibly customised log
  *
- * @return {Promise} resolves once the sessions are complete, to
+ * @returns resolves once the sessions are complete, to
  *    an Object mapping from userId to deviceId to
- *    {@link module:crypto~OlmSessionResult}
+ *    {@link OlmSessionResult}
  */
 export async function ensureOlmSessionsForDevices(
     olmDevice: OlmDevice,
@@ -444,15 +430,15 @@ export interface IObject {
 /**
  * Verify the signature on an object
  *
- * @param {module:crypto/OlmDevice} olmDevice olm wrapper to use for verify op
+ * @param olmDevice - olm wrapper to use for verify op
  *
- * @param {Object} obj object to check signature on.
+ * @param obj - object to check signature on.
  *
- * @param {string} signingUserId  ID of the user whose signature should be checked
+ * @param signingUserId -  ID of the user whose signature should be checked
  *
- * @param {string} signingDeviceId  ID of the device whose signature should be checked
+ * @param signingDeviceId -  ID of the device whose signature should be checked
  *
- * @param {string} signingKey   base64-ed ed25519 public key
+ * @param signingKey -   base64-ed ed25519 public key
  *
  * Returns a promise which resolves (to undefined) if the the signature is good,
  * or rejects with an Error if it is bad.
@@ -487,15 +473,15 @@ export async function verifySignature(
 
 /**
  * Sign a JSON object using public key cryptography
- * @param {Object} obj Object to sign.  The object will be modified to include
+ * @param obj - Object to sign.  The object will be modified to include
  *     the new signature
- * @param {Olm.PkSigning|Uint8Array} key the signing object or the private key
+ * @param key - the signing object or the private key
  * seed
- * @param {string} userId The user ID who owns the signing key
- * @param {string} pubKey The public key (ignored if key is a seed)
- * @returns {string} the signature for the object
+ * @param userId - The user ID who owns the signing key
+ * @param pubKey - The public key (ignored if key is a seed)
+ * @returns the signature for the object
  */
-export function pkSign(obj: IObject, key: PkSigning, userId: string, pubKey: string): string {
+export function pkSign(obj: object & IObject, key: Uint8Array | PkSigning, userId: string, pubKey: string): string {
     let createdKey = false;
     if (key instanceof Uint8Array) {
         const keyObj = new global.Olm.PkSigning();
@@ -523,9 +509,9 @@ export function pkSign(obj: IObject, key: PkSigning, userId: string, pubKey: str
 
 /**
  * Verify a signed JSON object
- * @param {Object} obj Object to verify
- * @param {string} pubKey The public key to use to verify
- * @param {string} userId The user ID who signed the object
+ * @param obj - Object to verify
+ * @param pubKey - The public key to use to verify
+ * @param userId - The user ID who signed the object
  */
 export function pkVerify(obj: IObject, pubKey: string, userId: string): void {
     const keyId = "ed25519:" + pubKey;
@@ -565,8 +551,8 @@ export function isOlmEncrypted(event: MatrixEvent): boolean {
 
 /**
  * Encode a typed array of uint8 as base64.
- * @param {Uint8Array} uint8Array The data to encode.
- * @return {string} The base64.
+ * @param uint8Array - The data to encode.
+ * @returns The base64.
  */
 export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return Buffer.from(uint8Array).toString("base64");
@@ -574,8 +560,8 @@ export function encodeBase64(uint8Array: ArrayBuffer | Uint8Array): string {
 
 /**
  * Encode a typed array of uint8 as unpadded base64.
- * @param {Uint8Array} uint8Array The data to encode.
- * @return {string} The unpadded base64.
+ * @param uint8Array - The data to encode.
+ * @returns The unpadded base64.
  */
 export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): string {
     return encodeBase64(uint8Array).replace(/=+$/g, '');
@@ -583,8 +569,8 @@ export function encodeUnpaddedBase64(uint8Array: ArrayBuffer | Uint8Array): stri
 
 /**
  * Decode a base64 string to a typed array of uint8.
- * @param {string} base64 The base64 to decode.
- * @return {Uint8Array} The decoded data.
+ * @param base64 - The base64 to decode.
+ * @returns The decoded data.
  */
 export function decodeBase64(base64: string): Uint8Array {
     return Buffer.from(base64, "base64");

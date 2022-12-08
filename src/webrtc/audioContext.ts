@@ -22,7 +22,7 @@ let refCount = 0;
  * It's highly recommended to reuse this AudioContext rather than creating your
  * own, because multiple AudioContexts can be problematic in some browsers.
  * Make sure to call releaseContext when you're done using it.
- * @returns {AudioContext} The shared AudioContext
+ * @returns The shared AudioContext
  */
 export const acquireContext = (): AudioContext => {
     if (audioContext === null) audioContext = new AudioContext();

@@ -1,18 +1,19 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
-import { defer } from '../../src/utils';
+import { defer, IDeferred } from '../../src/utils';
 import { MatrixError } from "../../src/http-api";
 import { MatrixScheduler } from "../../src/scheduler";
 import * as utils from "../test-utils/test-utils";
+import { MatrixEvent } from "../../src";
 
 jest.useFakeTimers();
 
 describe("MatrixScheduler", function() {
-    let scheduler;
-    let retryFn;
-    let queueFn;
-    let deferred;
+    let scheduler: MatrixScheduler<Record<string, boolean>>;
+    let retryFn: Function | null;
+    let queueFn: ((event: MatrixEvent) => string | null) | null;
+    let deferred: IDeferred<Record<string, boolean>>;
     const roomId = "!foo:bar";
     const eventA = utils.mkMessage({
         user: "@alice:bar", room: roomId, event: true,
@@ -65,8 +66,8 @@ describe("MatrixScheduler", function() {
         deferB.resolve({ b: true });
         deferA.resolve({ a: true });
         const [a, b] = await abPromise;
-        expect(a.a).toEqual(true);
-        expect(b.b).toEqual(true);
+        expect(a!.a).toEqual(true);
+        expect(b!.b).toEqual(true);
     });
 
     it("should invoke the retryFn on failure and wait the amount of time specified",
@@ -92,6 +93,7 @@ describe("MatrixScheduler", function() {
                     return new Promise(() => {});
                 }
                 expect(procCount).toBeLessThan(3);
+                return new Promise(() => {});
             });
 
             scheduler.queueEvent(eventA);
@@ -119,8 +121,8 @@ describe("MatrixScheduler", function() {
                 return "yep";
             };
 
-            const deferA = defer();
-            const deferB = defer();
+            const deferA = defer<Record<string, boolean>>();
+            const deferB = defer<Record<string, boolean>>();
             let procCount = 0;
             scheduler.setProcessFunction(function(ev) {
                 procCount += 1;
@@ -132,6 +134,7 @@ describe("MatrixScheduler", function() {
                     return deferB.promise;
                 }
                 expect(procCount).toBeLessThan(3);
+                return new Promise<Record<string, boolean>>(() => {});
             });
 
             const globalA = scheduler.queueEvent(eventA);
@@ -159,7 +162,7 @@ describe("MatrixScheduler", function() {
         const eventC = utils.mkMessage({ user: "@a:bar", room: roomId, event: true });
         const eventD = utils.mkMessage({ user: "@b:bar", room: roomId, event: true });
 
-        const buckets = {};
+        const buckets: Record<string, string> = {};
         buckets[eventA.getId()!] = "queue_A";
         buckets[eventD.getId()!] = "queue_A";
         buckets[eventB.getId()!] = "queue_B";
@@ -169,13 +172,13 @@ describe("MatrixScheduler", function() {
             return 0;
         };
         queueFn = function(event) {
-            return buckets[event.getId()];
+            return buckets[event.getId()!];
         };
 
         const expectOrder = [
             eventA.getId(), eventB.getId(), eventD.getId(),
         ];
-        const deferA = defer<void>();
+        const deferA = defer<Record<string, boolean>>();
         scheduler.setProcessFunction(function(event) {
             const id = expectOrder.shift();
             expect(id).toEqual(event.getId());
@@ -191,7 +194,7 @@ describe("MatrixScheduler", function() {
 
         // wait a bit then resolve A and we should get D (not C) next.
         setTimeout(function() {
-            deferA.resolve();
+            deferA.resolve({});
         }, 1000);
         jest.advanceTimersByTime(1000);
     });
@@ -210,7 +213,7 @@ describe("MatrixScheduler", function() {
             };
             const prom = scheduler.queueEvent(eventA);
             expect(prom).toBeTruthy();
-            expect(prom.then).toBeTruthy();
+            expect(prom!.then).toBeTruthy();
         });
     });
 
@@ -237,15 +240,15 @@ describe("MatrixScheduler", function() {
             scheduler.queueEvent(eventA);
             scheduler.queueEvent(eventB);
             const queue = scheduler.getQueueForEvent(eventA);
-            expect(queue.length).toEqual(2);
+            expect(queue).toHaveLength(2);
             expect(queue).toEqual([eventA, eventB]);
             // modify the queue
             const eventC = utils.mkMessage(
                 { user: "@a:bar", room: roomId, event: true },
             );
-            queue.push(eventC);
+            queue!.push(eventC);
             const queueAgain = scheduler.getQueueForEvent(eventA);
-            expect(queueAgain.length).toEqual(2);
+            expect(queueAgain).toHaveLength(2);
         });
 
         it("should return a list of events in the queue and modifications to" +
@@ -255,10 +258,10 @@ describe("MatrixScheduler", function() {
             };
             scheduler.queueEvent(eventA);
             scheduler.queueEvent(eventB);
-            const queue = scheduler.getQueueForEvent(eventA);
-            queue[1].event.content.body = "foo";
-            const queueAgain = scheduler.getQueueForEvent(eventA);
-            expect(queueAgain[1].event.content.body).toEqual("foo");
+            const queue = scheduler.getQueueForEvent(eventA)!;
+            queue[1].event.content!.body = "foo";
+            const queueAgain = scheduler.getQueueForEvent(eventA)!;
+            expect(queueAgain[1].event.content?.body).toEqual("foo");
         });
     });
 

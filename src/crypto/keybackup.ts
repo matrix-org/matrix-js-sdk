@@ -59,6 +59,10 @@ export interface IKeyBackupInfo {
 /* eslint-enable camelcase */
 
 export interface IKeyBackupPrepareOpts {
+    /**
+     * Whether to use Secure Secret Storage to store the key encrypting key backups.
+     * Optional, defaults to false.
+     */
     secureSecretStorage: boolean;
 }
 

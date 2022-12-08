@@ -258,7 +258,7 @@ export class DehydrationManager {
             }
 
             logger.log("Preparing fallback keys");
-            const fallbackKeys = {};
+            const fallbackKeys: Record<string, IOneTimeKey> = {};
             for (const [keyId, key] of Object.entries(fallbacks.curve25519)) {
                 const k: IOneTimeKey = { key, fallback: true };
                 const signature = account.sign(anotherjson.stringify(k));

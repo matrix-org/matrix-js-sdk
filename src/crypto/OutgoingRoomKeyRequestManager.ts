@@ -14,28 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { v4 as uuidv4 } from "uuid";
+
 import { logger } from '../logger';
 import { MatrixClient } from "../client";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "./index";
 import { CryptoStore, OutgoingRoomKeyRequest } from './store/base';
-import { EventType } from "../@types/event";
+import { EventType, ToDeviceMessageId } from "../@types/event";
 
 /**
  * Internal module. Management of outgoing room key requests.
  *
  * See https://docs.google.com/document/d/1m4gQkcnJkxNuBmb5NoFCIadIY-DyqqNAS3lloE73BlQ
  * for draft documentation on what we're supposed to be implementing here.
- *
- * @module
  */
 
 // delay between deciding we want some keys, and sending out the request, to
 // allow for (a) it turning up anyway, (b) grouping requests together
 const SEND_KEY_REQUESTS_DELAY_MS = 500;
 
-/** possible states for a room key request
+/**
+ *  possible states for a room key request
  *
  * The state machine looks like:
+ * ```
  *
  *     |         (cancellation sent)
  *     | .-------------------------------------------------.
@@ -58,8 +60,7 @@ const SEND_KEY_REQUESTS_DELAY_MS = 500;
  *     | (cancellation sent)              |
  *     V                                  |
  * (deleted)  <---------------------------+
- *
- * @enum {number}
+ * ```
  */
 export enum RoomKeyRequestState {
     /** request not yet sent */
@@ -132,12 +133,10 @@ export class OutgoingRoomKeyRequestManager {
      * Otherwise, a request is added to the pending list, and a job is started
      * in the background to send it.
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     * @param {Array<{userId: string, deviceId: string}>} recipients
-     * @param {boolean} resend whether to resend the key request if there is
+     * @param resend - whether to resend the key request if there is
      *    already one
      *
-     * @returns {Promise} resolves when the request has been added to the
+     * @returns resolves when the request has been added to the
      *    pending list (or we have established that a similar request already
      *    exists)
      */
@@ -237,9 +236,8 @@ export class OutgoingRoomKeyRequestManager {
     /**
      * Cancel room key requests, if any match the given requestBody
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
      *
-     * @returns {Promise} resolves when the request has been updated in our
+     * @returns resolves when the request has been updated in our
      *    pending list.
      */
     public cancelRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<unknown> {
@@ -322,11 +320,10 @@ export class OutgoingRoomKeyRequestManager {
     /**
      * Look for room key requests by target device and state
      *
-     * @param {string} userId Target user ID
-     * @param {string} deviceId Target device ID
+     * @param userId - Target user ID
+     * @param deviceId - Target device ID
      *
-     * @return {Promise} resolves to a list of all the
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     * @returns resolves to a list of all the {@link OutgoingRoomKeyRequest}
      */
     public getOutgoingSentRoomKeyRequest(userId: string, deviceId: string): Promise<OutgoingRoomKeyRequest[]> {
         return this.cryptoStore.getOutgoingRoomKeyRequestsByTarget(userId, deviceId, [RoomKeyRequestState.Sent]);
@@ -337,7 +334,7 @@ export class OutgoingRoomKeyRequestManager {
      * This is intended for situations where something substantial has changed, and we
      * don't really expect the other end to even care about the cancellation.
      * For example, after initialization or self-verification.
-     * @return {Promise} An array of `queueRoomKeyRequest` outputs.
+     * @returns An array of `queueRoomKeyRequest` outputs.
      */
     public async cancelAndResendAllOutgoingRequests(): Promise<void[]> {
         const outgoings = await this.cryptoStore.getAllOutgoingRoomKeyRequestsByState(RoomKeyRequestState.Sent);
@@ -483,7 +480,10 @@ export class OutgoingRoomKeyRequestManager {
             if (!contentMap[recip.userId]) {
                 contentMap[recip.userId] = {};
             }
-            contentMap[recip.userId][recip.deviceId] = message;
+            contentMap[recip.userId][recip.deviceId] = {
+                ...message,
+                [ToDeviceMessageId]: uuidv4(),
+            };
         }
 
         return this.baseApis.sendToDevice(EventType.RoomKeyRequest, contentMap, txnId);

@@ -16,7 +16,8 @@ limitations under the License.
 */
 
 import { ReceiptType } from "../../src/@types/read_receipts";
-import { SyncAccumulator } from "../../src/sync-accumulator";
+import { IJoinedRoom, ISyncResponse, SyncAccumulator } from "../../src/sync-accumulator";
+import { IRoomSummary } from "../../src";
 
 // The event body & unsigned object get frozen to assert that they don't get altered
 // by the impl
@@ -55,10 +56,10 @@ const RES_WITH_AGE = {
             },
         },
     },
-};
+} as unknown as ISyncResponse;
 
 describe("SyncAccumulator", function() {
-    let sa;
+    let sa: SyncAccumulator;
 
     beforeEach(function() {
         sa = new SyncAccumulator({
@@ -98,7 +99,7 @@ describe("SyncAccumulator", function() {
                     },
                 },
             },
-        };
+        } as unknown as ISyncResponse;
         sa.accumulate(res);
         const output = sa.getJSON();
         expect(output.nextBatch).toEqual(res.next_batch);
@@ -223,7 +224,6 @@ describe("SyncAccumulator", function() {
                     content: {
                         user_ids: ["@alice:localhost"],
                     },
-                    room_id: "!foo:bar",
                 }],
             },
         });
@@ -281,12 +281,12 @@ describe("SyncAccumulator", function() {
             account_data: {
                 events: [acc1],
             },
-        });
+        } as unknown as ISyncResponse);
         sa.accumulate({
             account_data: {
                 events: [acc2],
             },
-        });
+        } as unknown as ISyncResponse);
         expect(
             sa.getJSON().accountData.length,
         ).toEqual(1);
@@ -422,7 +422,7 @@ describe("SyncAccumulator", function() {
     });
 
     describe("summary field", function() {
-        function createSyncResponseWithSummary(summary) {
+        function createSyncResponseWithSummary(summary: IRoomSummary): ISyncResponse {
             return {
                 next_batch: "abc",
                 rooms: {
@@ -444,7 +444,7 @@ describe("SyncAccumulator", function() {
                         },
                     },
                 },
-            };
+            } as unknown as ISyncResponse;
         }
 
         afterEach(() => {
@@ -487,8 +487,8 @@ describe("SyncAccumulator", function() {
             jest.spyOn(global.Date, 'now').mockReturnValue(startingTs + delta);
 
             const output = sa.getJSON();
-            expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned.age).toEqual(
-                RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0].unsigned.age + delta,
+            expect(output.roomsData.join["!foo:bar"].timeline.events[0].unsigned?.age).toEqual(
+                RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0].unsigned!.age! + delta,
             );
             expect(Object.keys(output.roomsData.join["!foo:bar"].timeline.events[0])).toEqual(
                 Object.keys(RES_WITH_AGE.rooms.join["!foo:bar"].timeline.events[0]),
@@ -507,12 +507,12 @@ describe("SyncAccumulator", function() {
             sa.accumulate(RES_WITH_AGE);
             const output = sa.getJSON();
             expect(output.roomsData.join["!foo:bar"]
-                .unread_thread_notifications["$143273582443PhrSn:example.org"]).not.toBeUndefined();
+                .unread_thread_notifications!["$143273582443PhrSn:example.org"]).not.toBeUndefined();
         });
     });
 });
 
-function syncSkeleton(joinObj) {
+function syncSkeleton(joinObj: Partial<IJoinedRoom>): ISyncResponse {
     joinObj = joinObj || {};
     return {
         next_batch: "abc",
@@ -521,11 +521,12 @@ function syncSkeleton(joinObj) {
                 "!foo:bar": joinObj,
             },
         },
-    };
+    } as unknown as ISyncResponse;
 }
 
-function msg(localpart, text) {
+function msg(localpart: string, text: string) {
     return {
+        event_id: "$" + Math.random(),
         content: {
             body: text,
         },
@@ -535,8 +536,9 @@ function msg(localpart, text) {
     };
 }
 
-function member(localpart, membership) {
+function member(localpart: string, membership: string) {
     return {
+        event_id: "$" + Math.random(),
         content: {
             membership: membership,
         },

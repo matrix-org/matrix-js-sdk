@@ -31,15 +31,19 @@ function makeOlmDevice() {
     return olmDevice;
 }
 
-async function setupSession(initiator, opponent) {
+async function setupSession(initiator: OlmDevice, opponent: OlmDevice) {
     await opponent.generateOneTimeKeys(1);
     const keys = await opponent.getOneTimeKeys();
     const firstKey = Object.values(keys['curve25519'])[0];
 
-    const sid = await initiator.createOutboundSession(
-        opponent.deviceCurve25519Key, firstKey,
-    );
+    const sid = await initiator.createOutboundSession(opponent.deviceCurve25519Key!, firstKey);
     return sid;
+}
+
+function alwaysSucceed<T>(promise: Promise<T>): Promise<T | void> {
+    // swallow any exception thrown by a promise, so that
+    // Promise.all doesn't abort
+    return promise.catch(() => {});
 }
 
 describe("OlmDevice", function() {
@@ -159,11 +163,6 @@ describe("OlmDevice", function() {
                     }, "ABCDEFG"),
                 ],
             };
-            function alwaysSucceed(promise) {
-                // swallow any exception thrown by a promise, so that
-                // Promise.all doesn't abort
-                return promise.catch(() => {});
-            }
 
             // start two tasks that try to ensure that there's an olm session
             const promises = Promise.all([
@@ -234,12 +233,6 @@ describe("OlmDevice", function() {
                     deviceBobA,
                 ],
             };
-
-            function alwaysSucceed(promise) {
-                // swallow any exception thrown by a promise, so that
-                // Promise.all doesn't abort
-                return promise.catch(() => {});
-            }
 
             const task1 = alwaysSucceed(olmlib.ensureOlmSessionsForDevices(
                 aliceOlmDevice, baseApis, devicesByUserAB,

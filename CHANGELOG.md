@@ -1,3 +1,28 @@
+Changes in [22.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v22.0.0) (2022-12-06)
+==================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Enable users to join group calls from multiple devices ([\#2902](https://github.com/matrix-org/matrix-js-sdk/pull/2902)).
+
+## 🦖 Deprecations
+ * Deprecate a function containing a typo ([\#2904](https://github.com/matrix-org/matrix-js-sdk/pull/2904)).
+
+## ✨ Features
+ * sliding sync: add receipts extension ([\#2912](https://github.com/matrix-org/matrix-js-sdk/pull/2912)).
+ * Define a spec support policy for the js-sdk ([\#2882](https://github.com/matrix-org/matrix-js-sdk/pull/2882)).
+ * Further improvements to e2ee logging ([\#2900](https://github.com/matrix-org/matrix-js-sdk/pull/2900)).
+ * sliding sync: add support for typing extension ([\#2893](https://github.com/matrix-org/matrix-js-sdk/pull/2893)).
+ * Improve logging on Olm session errors ([\#2885](https://github.com/matrix-org/matrix-js-sdk/pull/2885)).
+ * Improve logging of e2ee messages ([\#2884](https://github.com/matrix-org/matrix-js-sdk/pull/2884)).
+
+## 🐛 Bug Fixes
+ * Fix 3pid invite acceptance not working due to mxid being sent in body ([\#2907](https://github.com/matrix-org/matrix-js-sdk/pull/2907)). Fixes vector-im/element-web#23823.
+ * Don't hang up calls that haven't started yet ([\#2898](https://github.com/matrix-org/matrix-js-sdk/pull/2898)).
+ * Read receipt accumulation for threads ([\#2881](https://github.com/matrix-org/matrix-js-sdk/pull/2881)).
+ * Make GroupCall work better with widgets ([\#2935](https://github.com/matrix-org/matrix-js-sdk/pull/2935)).
+ * Fix highlight notifications increasing when total notification is zero ([\#2937](https://github.com/matrix-org/matrix-js-sdk/pull/2937)). Fixes vector-im/element-web#23885.
+ * Fix synthesizeReceipt ([\#2916](https://github.com/matrix-org/matrix-js-sdk/pull/2916)). Fixes vector-im/element-web#23827 vector-im/element-web#23754 and vector-im/element-web#23847.
+
 Changes in [21.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v21.2.0) (2022-11-22)
 ==================================================================================================
 

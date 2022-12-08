@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * This is an internal module. See {@link SyncAccumulator} for the public class.
- * @module sync-accumulator
  */
 
 import { logger } from './logger';
@@ -28,6 +27,13 @@ import { MAIN_ROOM_TIMELINE, ReceiptContent, ReceiptType } from "./@types/read_r
 import { UNREAD_THREAD_NOTIFICATIONS } from './@types/sync';
 
 interface IOpts {
+    /**
+     * The ideal maximum number of timeline entries to keep in the sync response.
+     * This is best-effort, as clients do not always have a back-pagination token for each event,
+     * so it's possible there may be slightly *less* than this value. There will never be more.
+     * This cannot be 0 or else it makes it impossible to scroll back in a room.
+     * Default: 50.
+     */
     maxTimelineEntries?: number;
 }
 
@@ -116,7 +122,7 @@ interface IAccountData {
     events: IMinimalEvent[];
 }
 
-interface IToDeviceEvent {
+export interface IToDeviceEvent {
     content: IContent;
     sender: string;
     type: string;
@@ -127,8 +133,8 @@ interface IToDevice {
 }
 
 interface IDeviceLists {
-    changed: string[];
-    left: string[];
+    changed?: string[];
+    left?: string[];
 }
 
 export interface ISyncResponse {
@@ -139,6 +145,9 @@ export interface ISyncResponse {
     to_device?: IToDevice;
     device_lists?: IDeviceLists;
     device_one_time_keys_count?: Record<string, number>;
+
+    device_unused_fallback_key_types?: string[];
+    "org.matrix.msc2732.device_unused_fallback_key_types"?: string[];
 }
 /* eslint-enable camelcase */
 
@@ -182,6 +191,12 @@ export interface ISyncData {
     roomsData: IRooms;
 }
 
+type TaggedEvent = IRoomEvent & { _localTs?: number };
+
+function isTaggedEvent(event: IRoomEvent): event is TaggedEvent {
+    return "_localTs" in event && event["_localTs"] !== undefined;
+}
+
 /**
  * The purpose of this class is to accumulate /sync responses such that a
  * complete "initial" JSON response can be returned which accurately represents
@@ -202,15 +217,6 @@ export class SyncAccumulator {
     // streaming from without losing events.
     private nextBatch: string | null = null;
 
-    /**
-     * @param {Object} opts
-     * @param {Number=} opts.maxTimelineEntries The ideal maximum number of
-     * timeline entries to keep in the sync response. This is best-effort, as
-     * clients do not always have a back-pagination token for each event, so
-     * it's possible there may be slightly *less* than this value. There will
-     * never be more. This cannot be 0 or else it makes it impossible to scroll
-     * back in a room. Default: 50.
-     */
     public constructor(private readonly opts: IOpts = {}) {
         this.opts.maxTimelineEntries = this.opts.maxTimelineEntries || 50;
     }
@@ -233,8 +239,8 @@ export class SyncAccumulator {
 
     /**
      * Accumulate incremental /sync room data.
-     * @param {Object} syncResponse the complete /sync JSON
-     * @param {boolean} fromDatabase True if the sync response is one saved to the database
+     * @param syncResponse - the complete /sync JSON
+     * @param fromDatabase - True if the sync response is one saved to the database
      */
     private accumulateRooms(syncResponse: ISyncResponse, fromDatabase = false): void {
         if (!syncResponse.rooms) {
@@ -473,35 +479,31 @@ export class SyncAccumulator {
         // - existing state which didn't come down /sync.
         // - State events under the 'state' key.
         // - State events in the 'timeline'.
-        if (data.state && data.state.events) {
-            data.state.events.forEach((e) => {
-                setState(currentData._currentState, e);
-            });
-        }
-        if (data.timeline && data.timeline.events) {
-            data.timeline.events.forEach((e, index) => {
-                // this nops if 'e' isn't a state event
-                setState(currentData._currentState, e);
-                // append the event to the timeline. The back-pagination token
-                // corresponds to the first event in the timeline
-                let transformedEvent: IRoomEvent & { _localTs?: number };
-                if (!fromDatabase) {
-                    transformedEvent = Object.assign({}, e);
-                    if (transformedEvent.unsigned !== undefined) {
-                        transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
-                    }
-                    const age = e.unsigned ? e.unsigned.age : e.age;
-                    if (age !== undefined) transformedEvent._localTs = Date.now() - age;
-                } else {
-                    transformedEvent = e;
+        data.state?.events?.forEach((e) => {
+            setState(currentData._currentState, e);
+        });
+        data.timeline?.events?.forEach((e, index) => {
+            // this nops if 'e' isn't a state event
+            setState(currentData._currentState, e);
+            // append the event to the timeline. The back-pagination token
+            // corresponds to the first event in the timeline
+            let transformedEvent: TaggedEvent;
+            if (!fromDatabase) {
+                transformedEvent = Object.assign({}, e);
+                if (transformedEvent.unsigned !== undefined) {
+                    transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
                 }
+                const age = e.unsigned ? e.unsigned.age : e.age;
+                if (age !== undefined) transformedEvent._localTs = Date.now() - age;
+            } else {
+                transformedEvent = e;
+            }
 
-                currentData._timeline.push({
-                    event: transformedEvent,
-                    token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
-                });
+            currentData._timeline.push({
+                event: transformedEvent,
+                token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
             });
-        }
+        });
 
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.
@@ -526,8 +528,8 @@ export class SyncAccumulator {
      * represents all room data that should be stored. This should be paired
      * with the sync token which represents the most recent /sync response
      * provided to accumulate().
-     * @param {boolean} forDatabase True to generate a sync to be saved to storage
-     * @return {Object} An object with a "nextBatch", "roomsData" and "accountData"
+     * @param forDatabase - True to generate a sync to be saved to storage
+     * @returns An object with a "nextBatch", "roomsData" and "accountData"
      * keys.
      * The "nextBatch" key is a string which represents at what point in the
      * /sync stream the accumulator reached. This token should be used when
@@ -581,7 +583,7 @@ export class SyncAccumulator {
                 room_id: roomId,
                 content: {
                     // $event_id: { "m.read": { $user_id: $json } }
-                },
+                } as IContent,
             };
 
             for (const [userId, receiptData] of Object.entries(roomData._readReceipts)) {
@@ -626,8 +628,8 @@ export class SyncAccumulator {
                 }
 
                 let transformedEvent: (IRoomEvent | IStateEvent) & { _localTs?: number };
-                if (!forDatabase && msgData.event["_localTs"]) {
-                    // This means we have to copy each event so we can fix it up to
+                if (!forDatabase && isTaggedEvent(msgData.event)) {
+                    // This means we have to copy each event, so we can fix it up to
                     // set a correct 'age' parameter whilst keeping the local timestamp
                     // on our stored event. If this turns out to be a bottleneck, it could
                     // be optimised either by doing this in the main process after the data
@@ -641,7 +643,7 @@ export class SyncAccumulator {
                     }
                     delete transformedEvent._localTs;
                     transformedEvent.unsigned = transformedEvent.unsigned || {};
-                    transformedEvent.unsigned.age = Date.now() - msgData.event["_localTs"];
+                    transformedEvent.unsigned.age = Date.now() - msgData.event._localTs!;
                 } else {
                     transformedEvent = msgData.event;
                 }

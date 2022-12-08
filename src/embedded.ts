@@ -85,7 +85,7 @@ export interface ICapabilities {
 
     /**
      * Whether this client needs access to TURN servers.
-     * @default false
+     * @defaultValue false
      */
     turnServers?: boolean;
 }

@@ -105,7 +105,7 @@ export class TestClient {
 
     /**
      * stop the client
-     * @return {Promise} Resolves once the mock http backend has finished all pending flushes
+     * @returns Promise which resolves once the mock http backend has finished all pending flushes
      */
     public async stop(): Promise<void> {
         this.client.stopClient();
@@ -135,7 +135,7 @@ export class TestClient {
      * set up an expectation that the keys will be uploaded, and wait for
      * that to happen.
      *
-     * @returns {Promise} for the one-time keys
+     * @returns Promise for the one-time keys
      */
     public awaitOneTimeKeyUpload(): Promise<Record<string, IOneTimeKey>> {
         if (Object.keys(this.oneTimeKeys!).length != 0) {
@@ -177,13 +177,13 @@ export class TestClient {
      *
      * We check that the query contains each of the users in `response`.
      *
-     * @param {Object} response   response to the query.
+     * @param response -   response to the query.
      */
     public expectKeyQuery(response: IDownloadKeyResult) {
         this.httpBackend.when('POST', '/keys/query').respond<IDownloadKeyResult>(
             200, (_path, content) => {
                 Object.keys(response.device_keys).forEach((userId) => {
-                    expect(content.device_keys![userId]).toEqual([]);
+                    expect((content.device_keys! as Record<string, any>)[userId]).toEqual([]);
                 });
                 return response;
             });
@@ -202,7 +202,7 @@ export class TestClient {
     /**
      * get the uploaded curve25519 device key
      *
-     * @return {string} base64 device key
+     * @returns base64 device key
      */
     public getDeviceKey(): string {
         const keyId = 'curve25519:' + this.deviceId;
@@ -212,7 +212,7 @@ export class TestClient {
     /**
      * get the uploaded ed25519 device key
      *
-     * @return {string} base64 device key
+     * @returns base64 device key
      */
     public getSigningKey(): string {
         const keyId = 'ed25519:' + this.deviceId;

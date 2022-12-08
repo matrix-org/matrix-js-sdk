@@ -232,7 +232,7 @@ describe.each([
         return store;
     }],
 ])("CrossSigning > createCryptoStoreCacheCallbacks [%s]", function(name, dbFactory) {
-    let store;
+    let store: IndexedDBCryptoStore;
 
     beforeAll(() => {
         store = dbFactory();

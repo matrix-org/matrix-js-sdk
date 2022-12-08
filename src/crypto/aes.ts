@@ -22,18 +22,21 @@ const zeroSalt = new Uint8Array(8);
 
 export interface IEncryptedPayload {
     [key: string]: any; // extensible
+    /** the initialization vector in base64 */
     iv: string;
+    /** the ciphertext in base64 */
     ciphertext: string;
+    /** the HMAC in base64 */
     mac: string;
 }
 
 /**
  * encrypt a string
  *
- * @param {string} data the plaintext to encrypt
- * @param {Uint8Array} key the encryption key to use
- * @param {string} name the name of the secret
- * @param {string} ivStr the initialization vector to use
+ * @param data - the plaintext to encrypt
+ * @param key - the encryption key to use
+ * @param name - the name of the secret
+ * @param ivStr - the initialization vector to use
  */
 export async function encryptAES(
     data: string,
@@ -83,12 +86,9 @@ export async function encryptAES(
 /**
  * decrypt a string
  *
- * @param {object} data the encrypted data
- * @param {string} data.ciphertext the ciphertext in base64
- * @param {string} data.iv the initialization vector in base64
- * @param {string} data.mac the HMAC in base64
- * @param {Uint8Array} key the encryption key to use
- * @param {string} name the name of the secret
+ * @param data - the encrypted data
+ * @param key - the encryption key to use
+ * @param name - the name of the secret
  */
 export async function decryptAES(data: IEncryptedPayload, key: Uint8Array, name: string): Promise<string> {
     const [aesKey, hmacKey] = await deriveKeys(key, name);
@@ -168,10 +168,10 @@ const ZERO_STR = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0
 
 /** Calculate the MAC for checking the key.
  *
- * @param {Uint8Array} key the key to use
- * @param {string} [iv] The initialization vector as a base64-encoded string.
+ * @param key - the key to use
+ * @param iv - The initialization vector as a base64-encoded string.
  *     If omitted, a random initialization vector will be created.
- * @return {Promise<object>} An object that contains, `mac` and `iv` properties.
+ * @returns An object that contains, `mac` and `iv` properties.
  */
 export function calculateKeyCheck(key: Uint8Array, iv?: string): Promise<IEncryptedPayload> {
     return encryptAES(ZERO_STR, key, "", iv);

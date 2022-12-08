@@ -936,7 +936,7 @@ describe('Call', function() {
             await fakeIncomingCall(client, call, "1");
         });
 
-        const untilEventSent = async (...args) => {
+        const untilEventSent = async (...args: any[]) => {
             const maxTries = 20;
 
             for (let tries = 0; tries < maxTries; ++tries) {
@@ -974,7 +974,7 @@ describe('Call', function() {
         });
 
         describe("ICE candidate sending", () => {
-            let mockPeerConn;
+            let mockPeerConn: MockRTCPeerConnection;
             const fakeCandidateString = "here is a fake candidate!";
             const fakeCandidateEvent = {
                 candidate: {
@@ -1089,7 +1089,7 @@ describe('Call', function() {
     });
 
     describe("Screen sharing", () => {
-        const waitNegotiateFunc = resolve => {
+        const waitNegotiateFunc = (resolve: Function): void => {
             mockSendEvent.mockImplementationOnce(() => {
                 // Note that the peer connection here is a dummy one and always returns
                 // dummy SDP, so there's not much point returning the content: the SDP will
@@ -1459,6 +1459,52 @@ describe('Call', function() {
         it("hasPeerConnection() returns true if there is a peer connection", async () => {
             await call.placeVoiceCall();
             expect(call.hasPeerConnection).toBe(true);
+        });
+    });
+
+    it("should correctly emit LengthChanged", async () => {
+        const advanceByArray = [2, 3, 5];
+        const lengthChangedListener = jest.fn();
+
+        jest.useFakeTimers();
+        call.addListener(CallEvent.LengthChanged, lengthChangedListener);
+        await fakeIncomingCall(client, call, "1");
+        (call.peerConn as unknown as MockRTCPeerConnection).iceConnectionStateChangeListener!();
+
+        let hasAdvancedBy = 0;
+        for (const advanceBy of advanceByArray) {
+            jest.advanceTimersByTime(advanceBy * 1000);
+            hasAdvancedBy += advanceBy;
+
+            expect(lengthChangedListener).toHaveBeenCalledTimes(hasAdvancedBy);
+            expect(lengthChangedListener).toBeCalledWith(hasAdvancedBy);
+        }
+    });
+
+    describe("ICE disconnected timeout", () => {
+        let mockPeerConn: MockRTCPeerConnection;
+
+        beforeEach(async () => {
+            jest.useFakeTimers();
+            jest.spyOn(call, "hangup");
+
+            await fakeIncomingCall(client, call, "1");
+
+            mockPeerConn = (call.peerConn as unknown as MockRTCPeerConnection);
+            mockPeerConn.iceConnectionState = "disconnected";
+            mockPeerConn.iceConnectionStateChangeListener!();
+        });
+
+        it("should hang up after being disconnected for 30 seconds", () => {
+            jest.advanceTimersByTime(31 * 1000);
+            expect(call.hangup).toHaveBeenCalledWith(CallErrorCode.IceFailed, false);
+        });
+
+        it("should not hangup if we've managed to re-connect", () => {
+            mockPeerConn.iceConnectionState = "connected";
+            mockPeerConn.iceConnectionStateChangeListener!();
+            jest.advanceTimersByTime(31 * 1000);
+            expect(call.hangup).not.toHaveBeenCalled();
         });
     });
 });

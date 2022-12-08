@@ -511,7 +511,12 @@ describe("MatrixClient", function() {
         }
 
         beforeEach(function() {
-            return client!.initCrypto();
+            // running initCrypto should trigger a key upload
+            httpBackend!.when("POST", "/keys/upload").respond(200, {});
+            return Promise.all([
+                client!.initCrypto(),
+                httpBackend!.flush("/keys/upload", 1),
+            ]);
         });
 
         afterEach(() => {
@@ -618,13 +623,13 @@ describe("MatrixClient", function() {
     });
 
     describe("partitionThreadedEvents", function() {
-        let room;
+        let room: Room;
         beforeEach(() => {
             room = new Room("!STrMRsukXHtqQdSeHa:matrix.org", client!, userId);
         });
 
         it("returns empty arrays when given an empty arrays", function() {
-            const events = [];
+            const events: MatrixEvent[] = [];
             const [timeline, threaded] = room.partitionThreadedEvents(events);
             expect(timeline).toEqual([]);
             expect(threaded).toEqual([]);
@@ -1371,6 +1376,13 @@ describe("MatrixClient", function() {
             await prom;
         });
     });
+
+    describe("uploadKeys", () => {
+        // uploadKeys() is a no-op nowadays, so there's not much to test here.
+        it("should complete successfully", async () => {
+            await client!.uploadKeys();
+        });
+    });
 });
 
 function withThreadId(event: MatrixEvent, newThreadId: string): MatrixEvent {
@@ -1645,7 +1657,7 @@ const buildEventCreate = () => new MatrixEvent({
     "user_id": "@andybalaam-test1:matrix.org",
 });
 
-function assertObjectContains(obj: object, expected: any): void {
+function assertObjectContains(obj: Record<string, any>, expected: any): void {
     for (const k in expected) {
         if (expected.hasOwnProperty(k)) {
             expect(obj[k]).toEqual(expected[k]);

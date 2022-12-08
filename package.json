@@ -1,6 +1,6 @@
 {
   "name": "matrix-js-sdk",
-  "version": "21.2.0",
+  "version": "22.0.0",
   "description": "Matrix Client-Server SDK for Javascript",
   "engines": {
     "node": ">=16.0.0"
@@ -14,7 +14,7 @@
     "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types",
     "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
     "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
-    "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.js -p [ tsify -p ./tsconfig-build.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
+    "build:compile-browser": "mkdirp dist && browserify -d src/browser-index.ts -p [ tsify -p ./tsconfig-build.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
     "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
     "gendoc": "typedoc",
     "lint": "yarn lint:types && yarn lint:js",
@@ -33,9 +33,9 @@
     "matrix-org"
   ],
   "main": "./src/index.ts",
-  "browser": "./lib/browser-index.js",
+  "browser": "./lib/browser-index.ts",
   "matrix_src_main": "./src/index.ts",
-  "matrix_src_browser": "./src/browser-index.js",
+  "matrix_src_browser": "./src/browser-index.ts",
   "matrix_lib_main": "./lib/index.js",
   "matrix_lib_typings": "./lib/index.d.ts",
   "author": "matrix.org",
@@ -63,7 +63,8 @@
     "p-retry": "4",
     "qs": "^6.9.6",
     "sdp-transform": "^2.14.1",
-    "unhomoglyph": "^1.0.6"
+    "unhomoglyph": "^1.0.6",
+    "uuid": "7"
   },
   "devDependencies": {
     "@babel/cli": "^7.12.10",
@@ -79,15 +80,16 @@
     "@babel/preset-typescript": "^7.12.7",
     "@babel/register": "^7.12.10",
     "@casualbot/jest-sonar-reporter": "^2.2.5",
-    "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.13.tgz",
+    "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.14.tgz",
     "@types/bs58": "^4.0.1",
     "@types/content-type": "^1.1.5",
     "@types/domexception": "^4.0.0",
     "@types/jest": "^29.0.0",
     "@types/node": "18",
     "@types/sdp-transform": "^2.4.5",
-    "@typescript-eslint/eslint-plugin": "^5.6.0",
-    "@typescript-eslint/parser": "^5.6.0",
+    "@types/uuid": "7",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
     "allchange": "^1.0.6",
     "babel-jest": "^29.0.0",
     "babelify": "^10.0.0",
@@ -99,7 +101,9 @@
     "eslint-config-google": "^0.14.0",
     "eslint-import-resolver-typescript": "^3.5.1",
     "eslint-plugin-import": "^2.26.0",
+    "eslint-plugin-jsdoc": "^39.6.4",
     "eslint-plugin-matrix-org": "^0.8.0",
+    "eslint-plugin-tsdoc": "^0.2.17",
     "eslint-plugin-unicorn": "^45.0.0",
     "exorcist": "^2.0.0",
     "fake-indexeddb": "^4.0.0",

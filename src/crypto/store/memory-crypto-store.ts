@@ -35,13 +35,8 @@ import { InboundGroupSessionData } from "../OlmDevice";
 
 /**
  * Internal module. in-memory storage for e2e.
- *
- * @module
  */
 
-/**
- * @implements {module:crypto/store/base~CryptoStore}
- */
 export class MemoryCryptoStore implements CryptoStore {
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string | null = null;
@@ -65,7 +60,7 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * This must be called before the store can be used.
      *
-     * @return {Promise} resolves to the store.
+     * @returns resolves to the store.
      */
     public async startup(): Promise<CryptoStore> {
         // No startup work to do for the memory store.
@@ -75,7 +70,7 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Delete all data from this store.
      *
-     * @returns {Promise} Promise which resolves when the store has been cleared.
+     * @returns Promise which resolves when the store has been cleared.
      */
     public deleteAllData(): Promise<void> {
         return Promise.resolve();
@@ -85,10 +80,9 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing outgoing room key request, and if none is found,
      * add a new one
      *
-     * @param {module:crypto/store/base~OutgoingRoomKeyRequest} request
      *
-     * @returns {Promise} resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     * @returns resolves to
+     *    {@link OutgoingRoomKeyRequest}: either the
      *    same instance as passed in, or the existing one.
      */
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
@@ -122,11 +116,10 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
-     * @return {Promise} resolves to the matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     * @returns resolves to the matching
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found
      */
     public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
@@ -138,10 +131,9 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * @internal
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
-     * @return {module:crypto/store/base~OutgoingRoomKeyRequest?}
+     * @returns
      *    the matching request, or null if not found
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -157,10 +149,10 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for room key requests by state
      *
-     * @param {Array<Number>} wantedStates list of acceptable states
+     * @param wantedStates - list of acceptable states
      *
-     * @return {Promise} resolves to the a
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     * @returns resolves to the a
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states
      */
     public getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null> {
@@ -176,8 +168,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     /**
      *
-     * @param {Number} wantedState
-     * @return {Promise<Array<*>>} All OutgoingRoomKeyRequests in state
+     * @returns All OutgoingRoomKeyRequests in state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
         return Promise.resolve(
@@ -210,12 +201,12 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing room key request by id and state, and update it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
-     * @param {Object} updates        name/value map of updates to apply
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
+     * @param updates -        name/value map of updates to apply
      *
-     * @returns {Promise} resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     * @returns resolves to
+     *    {@link OutgoingRoomKeyRequest}
      *    updated request, or null if no matching row was found
      */
     public updateOutgoingRoomKeyRequest(
@@ -246,10 +237,10 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing room key request by id and state, and delete it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
      *
-     * @returns {Promise} resolves once the operation is completed
+     * @returns resolves once the operation is completed
      */
     public deleteOutgoingRoomKeyRequest(
         requestId: string,

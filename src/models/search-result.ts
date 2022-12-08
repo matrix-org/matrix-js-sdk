@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/search-result
- */
-
 import { EventContext } from "./event-context";
 import { EventMapper } from "../event-mapper";
 import { IResultContext, ISearchResult } from "../@types/search";
@@ -25,10 +21,6 @@ import { IResultContext, ISearchResult } from "../@types/search";
 export class SearchResult {
     /**
      * Create a SearchResponse from the response to /search
-     * @static
-     * @param {Object} jsonObj
-     * @param {function} eventMapper
-     * @return {SearchResult}
      */
 
     public static fromJson(jsonObj: ISearchResult, eventMapper: EventMapper): SearchResult {
@@ -54,11 +46,9 @@ export class SearchResult {
     /**
      * Construct a new SearchResult
      *
-     * @param {number} rank   where this SearchResult ranks in the results
-     * @param {event-context.EventContext} context  the matching event and its
+     * @param rank -   where this SearchResult ranks in the results
+     * @param context -  the matching event and its
      *    context
-     *
-     * @constructor
      */
     public constructor(public readonly rank: number, public readonly context: EventContext) {}
 }

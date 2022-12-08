@@ -26,11 +26,9 @@ const ROOM_ID = "!room:id";
  * get a /sync response which contains a single e2e room (ROOM_ID), with the
  * members given
  *
- * @param {string[]} roomMembers
- *
- * @return {object} sync response
+ * @returns sync response
  */
-function getSyncResponse(roomMembers) {
+function getSyncResponse(roomMembers: string[]) {
     const stateEvents = [
         testUtils.mkEvent({
             type: 'm.room.encryption',
@@ -43,12 +41,10 @@ function getSyncResponse(roomMembers) {
 
     Array.prototype.push.apply(
         stateEvents,
-        roomMembers.map(
-            (m) => testUtils.mkMembership({
-                mship: 'join',
-                sender: m,
-            }),
-        ),
+        roomMembers.map((m) => testUtils.mkMembership({
+            mship: 'join',
+            sender: m,
+        })),
     );
 
     const syncResponse = {
@@ -73,8 +69,8 @@ describe("DeviceList management:", function() {
         return;
     }
 
-    let sessionStoreBackend;
-    let aliceTestClient;
+    let aliceTestClient: TestClient;
+    let sessionStoreBackend: Storage;
 
     async function createTestClient() {
         const testClient = new TestClient(
@@ -97,7 +93,10 @@ describe("DeviceList management:", function() {
     });
 
     it("Alice shouldn't do a second /query for non-e2e-capable devices", function() {
-        aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
+        aliceTestClient.expectKeyQuery({
+            device_keys: { '@alice:localhost': {} },
+            failures: {},
+        });
         return aliceTestClient.start().then(function() {
             const syncResponse = getSyncResponse(['@bob:xyz']);
             aliceTestClient.httpBackend.when('GET', '/sync').respond(200, syncResponse);
@@ -138,7 +137,10 @@ describe("DeviceList management:", function() {
 
     it.skip("We should not get confused by out-of-order device query responses", () => {
         // https://github.com/vector-im/element-web/issues/3126
-        aliceTestClient.expectKeyQuery({ device_keys: { '@alice:localhost': {} } });
+        aliceTestClient.expectKeyQuery({
+            device_keys: { '@alice:localhost': {} },
+            failures: {},
+        });
         return aliceTestClient.start().then(() => {
             aliceTestClient.httpBackend.when('GET', '/sync').respond(
                 200, getSyncResponse(['@bob:xyz', '@chris:abc']));
@@ -164,11 +166,12 @@ describe("DeviceList management:", function() {
                 aliceTestClient.httpBackend.flush('/keys/query', 1).then(
                     () => aliceTestClient.httpBackend.flush('/send/', 1),
                 ),
-                aliceTestClient.client.crypto.deviceList.saveIfDirty(),
+                aliceTestClient.client.crypto!.deviceList.saveIfDirty(),
             ]);
         }).then(() => {
-            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-                expect(data.syncToken).toEqual(1);
+            // @ts-ignore accessing a protected field
+            aliceTestClient.client.cryptoStore!.getEndToEndDeviceData(null, (data) => {
+                expect(data!.syncToken).toEqual(1);
             });
 
             // invalidate bob's and chris's device lists in separate syncs
@@ -201,15 +204,16 @@ describe("DeviceList management:", function() {
             return aliceTestClient.httpBackend.flush('/keys/query', 1);
         }).then((flushed) => {
             expect(flushed).toEqual(0);
-            return aliceTestClient.client.crypto.deviceList.saveIfDirty();
+            return aliceTestClient.client.crypto!.deviceList.saveIfDirty();
         }).then(() => {
-            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-                const bobStat = data.trackingStatus['@bob:xyz'];
+            // @ts-ignore accessing a protected field
+            aliceTestClient.client.cryptoStore!.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data!.trackingStatus['@bob:xyz'];
                 if (bobStat != 1 && bobStat != 2) {
                     throw new Error('Unexpected status for bob: wanted 1 or 2, got ' +
                         bobStat);
                 }
-                const chrisStat = data.trackingStatus['@chris:abc'];
+                const chrisStat = data!.trackingStatus['@chris:abc'];
                 if (chrisStat != 1 && chrisStat != 2) {
                     throw new Error(
                         'Unexpected status for chris: wanted 1 or 2, got ' + chrisStat,
@@ -234,12 +238,13 @@ describe("DeviceList management:", function() {
             // wait for the client to stop processing the response
             return aliceTestClient.client.downloadKeys(['@bob:xyz']);
         }).then(() => {
-            return aliceTestClient.client.crypto.deviceList.saveIfDirty();
+            return aliceTestClient.client.crypto!.deviceList.saveIfDirty();
         }).then(() => {
-            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-                const bobStat = data.trackingStatus['@bob:xyz'];
+            // @ts-ignore accessing a protected field
+            aliceTestClient.client.cryptoStore!.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data!.trackingStatus['@bob:xyz'];
                 expect(bobStat).toEqual(3);
-                const chrisStat = data.trackingStatus['@chris:abc'];
+                const chrisStat = data!.trackingStatus['@chris:abc'];
                 if (chrisStat != 1 && chrisStat != 2) {
                     throw new Error(
                         'Unexpected status for chris: wanted 1 or 2, got ' + bobStat,
@@ -255,15 +260,16 @@ describe("DeviceList management:", function() {
             // wait for the client to stop processing the response
             return aliceTestClient.client.downloadKeys(['@chris:abc']);
         }).then(() => {
-            return aliceTestClient.client.crypto.deviceList.saveIfDirty();
+            return aliceTestClient.client.crypto!.deviceList.saveIfDirty();
         }).then(() => {
-            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-                const bobStat = data.trackingStatus['@bob:xyz'];
-                const chrisStat = data.trackingStatus['@bob:xyz'];
+            // @ts-ignore accessing a protected field
+            aliceTestClient.client.cryptoStore!.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data!.trackingStatus['@bob:xyz'];
+                const chrisStat = data!.trackingStatus['@bob:xyz'];
 
                 expect(bobStat).toEqual(3);
                 expect(chrisStat).toEqual(3);
-                expect(data.syncToken).toEqual(3);
+                expect(data!.syncToken).toEqual(3);
             });
         });
     });
@@ -285,10 +291,11 @@ describe("DeviceList management:", function() {
                 },
             );
             await aliceTestClient.httpBackend.flush('/keys/query', 1);
-            await aliceTestClient.client.crypto.deviceList.saveIfDirty();
+            await aliceTestClient.client.crypto!.deviceList.saveIfDirty();
 
-            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-                const bobStat = data.trackingStatus['@bob:xyz'];
+            // @ts-ignore accessing a protected field
+            aliceTestClient.client.cryptoStore!.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data!.trackingStatus['@bob:xyz'];
 
                 // Alice should be tracking bob's device list
                 expect(bobStat).toBeGreaterThan(
@@ -322,10 +329,11 @@ describe("DeviceList management:", function() {
             );
 
             await aliceTestClient.flushSync();
-            await aliceTestClient.client.crypto.deviceList.saveIfDirty();
+            await aliceTestClient.client.crypto!.deviceList.saveIfDirty();
 
-            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-                const bobStat = data.trackingStatus['@bob:xyz'];
+            // @ts-ignore accessing a protected field
+            aliceTestClient.client.cryptoStore!.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data!.trackingStatus['@bob:xyz'];
 
                 // Alice should have marked bob's device list as untracked
                 expect(bobStat).toEqual(
@@ -359,15 +367,14 @@ describe("DeviceList management:", function() {
             );
 
             await aliceTestClient.flushSync();
-            await aliceTestClient.client.crypto.deviceList.saveIfDirty();
+            await aliceTestClient.client.crypto!.deviceList.saveIfDirty();
 
-            aliceTestClient.client.cryptoStore.getEndToEndDeviceData(null, (data) => {
-                const bobStat = data.trackingStatus['@bob:xyz'];
+            // @ts-ignore accessing a protected field
+            aliceTestClient.client.cryptoStore!.getEndToEndDeviceData(null, (data) => {
+                const bobStat = data!.trackingStatus['@bob:xyz'];
 
                 // Alice should have marked bob's device list as untracked
-                expect(bobStat).toEqual(
-                    0,
-                );
+                expect(bobStat).toEqual(0);
             });
         });
 
@@ -388,9 +395,7 @@ describe("DeviceList management:", function() {
                     const bobStat = data!.trackingStatus['@bob:xyz'];
 
                     // Alice should have marked bob's device list as untracked
-                    expect(bobStat).toEqual(
-                        0,
-                    );
+                    expect(bobStat).toEqual(0);
                 });
             } finally {
                 anotherTestClient.stop();

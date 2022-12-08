@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/event-timeline
- */
-
 import { logger } from '../logger';
 import { IMarkerFoundOptions, RoomState } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
@@ -63,9 +59,9 @@ export class EventTimeline {
     /**
      * Static helper method to set sender and target properties
      *
-     * @param {MatrixEvent} event   the event whose metadata is to be set
-     * @param {RoomState} stateContext  the room state to be queried
-     * @param {boolean} toStartOfTimeline  if true the event's forwardLooking flag is set false
+     * @param event -   the event whose metadata is to be set
+     * @param stateContext -  the room state to be queried
+     * @param toStartOfTimeline -  if true the event's forwardLooking flag is set false
      */
     public static setEventMetadata(event: MatrixEvent, stateContext: RoomState, toStartOfTimeline: boolean): void {
         // When we try to generate a sentinel member before we have that member
@@ -127,8 +123,7 @@ export class EventTimeline {
      * <p>Once a timeline joins up with its neighbour, they are linked together into a
      * doubly-linked list.
      *
-     * @param {EventTimelineSet} eventTimelineSet the set of timelines this is part of
-     * @constructor
+     * @param eventTimelineSet - the set of timelines this is part of
      */
     public constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
@@ -148,9 +143,9 @@ export class EventTimeline {
      *
      * <p>This can only be called before any events are added.
      *
-     * @param {MatrixEvent[]} stateEvents list of state events to initialise the
+     * @param stateEvents - list of state events to initialise the
      * state with.
-     * @throws {Error} if an attempt is made to call this after addEvent is called.
+     * @throws Error if an attempt is made to call this after addEvent is called.
      */
     public initialiseState(stateEvents: MatrixEvent[], { timelineWasEmpty }: IInitialiseStateOptions = {}): void {
         if (this.events.length > 0) {
@@ -167,11 +162,11 @@ export class EventTimeline {
      * The end state of this timeline gets replaced with an independent copy of the current RoomState,
      * and will need a new pagination token if it ever needs to paginate forwards.
 
-     * @param {string} direction   EventTimeline.BACKWARDS to get the state at the
+     * @param direction -   EventTimeline.BACKWARDS to get the state at the
      *   start of the timeline; EventTimeline.FORWARDS to get the state at the end
      *   of the timeline.
      *
-     * @return {EventTimeline} the new timeline
+     * @returns the new timeline
      */
     public forkLive(direction: Direction): EventTimeline {
         const forkState = this.getState(direction);
@@ -191,11 +186,11 @@ export class EventTimeline {
     /**
      * Creates an independent timeline, inheriting the directional state from this timeline.
      *
-     * @param {string} direction   EventTimeline.BACKWARDS to get the state at the
+     * @param direction -   EventTimeline.BACKWARDS to get the state at the
      *   start of the timeline; EventTimeline.FORWARDS to get the state at the end
      *   of the timeline.
      *
-     * @return {EventTimeline} the new timeline
+     * @returns the new timeline
      */
     public fork(direction: Direction): EventTimeline {
         const forkState = this.getState(direction);
@@ -207,7 +202,7 @@ export class EventTimeline {
 
     /**
      * Get the ID of the room for this timeline
-     * @return {string} room ID
+     * @returns room ID
      */
     public getRoomId(): string | null {
         return this.roomId;
@@ -215,7 +210,7 @@ export class EventTimeline {
 
     /**
      * Get the filter for this timeline's timelineSet (if any)
-     * @return {Filter} filter
+     * @returns filter
      */
     public getFilter(): Filter | undefined {
         return this.eventTimelineSet.getFilter();
@@ -223,7 +218,7 @@ export class EventTimeline {
 
     /**
      * Get the timelineSet for this timeline
-     * @return {EventTimelineSet} timelineSet
+     * @returns timelineSet
      */
     public getTimelineSet(): EventTimelineSet {
         return this.eventTimelineSet;
@@ -237,8 +232,6 @@ export class EventTimeline {
      * relative to the base index (although note that a given event's index may
      * well be less than the base index, thus giving that event a negative relative
      * index).
-     *
-     * @return {number}
      */
     public getBaseIndex(): number {
         return this.baseIndex;
@@ -247,7 +240,7 @@ export class EventTimeline {
     /**
      * Get the list of events in this context
      *
-     * @return {MatrixEvent[]} An array of MatrixEvents
+     * @returns An array of MatrixEvents
      */
     public getEvents(): MatrixEvent[] {
         return this.events;
@@ -256,11 +249,11 @@ export class EventTimeline {
     /**
      * Get the room state at the start/end of the timeline
      *
-     * @param {string} direction   EventTimeline.BACKWARDS to get the state at the
+     * @param direction -   EventTimeline.BACKWARDS to get the state at the
      *   start of the timeline; EventTimeline.FORWARDS to get the state at the end
      *   of the timeline.
      *
-     * @return {RoomState} state at the start/end of the timeline
+     * @returns state at the start/end of the timeline
      */
     public getState(direction: Direction): RoomState | undefined {
         if (direction == EventTimeline.BACKWARDS) {
@@ -275,11 +268,11 @@ export class EventTimeline {
     /**
      * Get a pagination token
      *
-     * @param {string} direction   EventTimeline.BACKWARDS to get the pagination
+     * @param direction -   EventTimeline.BACKWARDS to get the pagination
      *   token for going backwards in time; EventTimeline.FORWARDS to get the
      *   pagination token for going forwards in time.
      *
-     * @return {?string} pagination token
+     * @returns pagination token
      */
     public getPaginationToken(direction: Direction): string | null {
         if (this.roomId) {
@@ -294,9 +287,9 @@ export class EventTimeline {
     /**
      * Set a pagination token
      *
-     * @param {?string} token       pagination token
+     * @param token -       pagination token
      *
-     * @param {string} direction    EventTimeline.BACKWARDS to set the pagination
+     * @param direction -    EventTimeline.BACKWARDS to set the pagination
      *   token for going backwards in time; EventTimeline.FORWARDS to set the
      *   pagination token for going forwards in time.
      */
@@ -313,10 +306,10 @@ export class EventTimeline {
     /**
      * Get the next timeline in the series
      *
-     * @param {string} direction EventTimeline.BACKWARDS to get the previous
+     * @param direction - EventTimeline.BACKWARDS to get the previous
      *   timeline; EventTimeline.FORWARDS to get the next timeline.
      *
-     * @return {?EventTimeline} previous or following timeline, if they have been
+     * @returns previous or following timeline, if they have been
      * joined up.
      */
     public getNeighbouringTimeline(direction: Direction): EventTimeline | null {
@@ -332,12 +325,12 @@ export class EventTimeline {
     /**
      * Set the next timeline in the series
      *
-     * @param {EventTimeline} neighbour previous/following timeline
+     * @param neighbour - previous/following timeline
      *
-     * @param {string} direction EventTimeline.BACKWARDS to set the previous
+     * @param direction - EventTimeline.BACKWARDS to set the previous
      *   timeline; EventTimeline.FORWARDS to set the next timeline.
      *
-     * @throws {Error} if an attempt is made to set the neighbouring timeline when
+     * @throws Error if an attempt is made to set the neighbouring timeline when
      * it is already set.
      */
     public setNeighbouringTimeline(neighbour: EventTimeline, direction: Direction): void {
@@ -361,8 +354,8 @@ export class EventTimeline {
     /**
      * Add a new event to the timeline, and update the state
      *
-     * @param {MatrixEvent} event   new event
-     * @param {IAddEventOptions} options addEvent options
+     * @param event - new event
+     * @param options - addEvent options
      */
     public addEvent(
         event: MatrixEvent,
@@ -447,8 +440,8 @@ export class EventTimeline {
     /**
      * Remove an event from the timeline
      *
-     * @param {string} eventId  ID of event to be removed
-     * @return {?MatrixEvent} removed event, or null if not found
+     * @param eventId -  ID of event to be removed
+     * @returns removed event, or null if not found
      */
     public removeEvent(eventId: string): MatrixEvent | null {
         for (let i = this.events.length - 1; i >= 0; i--) {
@@ -467,7 +460,7 @@ export class EventTimeline {
     /**
      * Return a string to identify this timeline, for debugging
      *
-     * @return {string} name for this timeline
+     * @returns name for this timeline
      */
     public toString(): string {
         return this.name;

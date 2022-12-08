@@ -33,8 +33,9 @@ import {
     IJoinedRoom,
     IStateEvent,
     IMinimalEvent,
-    NotificationCountType,
+    NotificationCountType, IEphemeral, Room,
 } from "../../src";
+import { ReceiptType } from '../../src/@types/read_receipts';
 import { UNREAD_THREAD_NOTIFICATIONS } from '../../src/@types/sync';
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
@@ -524,102 +525,98 @@ describe("MatrixClient syncing", () => {
         const syncData = {
             rooms: {
                 join: {
-
+                    [roomOne]: {
+                        timeline: {
+                            events: [
+                                utils.mkMessage({
+                                    room: roomOne, user: otherUserId, msg: "hello",
+                                }),
+                            ],
+                        },
+                        state: {
+                            events: [
+                                utils.mkEvent({
+                                    type: "m.room.name", room: roomOne, user: otherUserId,
+                                    content: {
+                                        name: "Old room name",
+                                    },
+                                }),
+                                utils.mkMembership({
+                                    room: roomOne, mship: "join", user: otherUserId,
+                                }),
+                                utils.mkMembership({
+                                    room: roomOne, mship: "join", user: selfUserId,
+                                }),
+                                utils.mkEvent({
+                                    type: "m.room.create", room: roomOne, user: selfUserId,
+                                    content: {
+                                        creator: selfUserId,
+                                    },
+                                }),
+                            ],
+                        },
+                    },
+                    [roomTwo]: {
+                        timeline: {
+                            events: [
+                                utils.mkMessage({
+                                    room: roomTwo, user: otherUserId, msg: "hiii",
+                                }),
+                            ],
+                        },
+                        state: {
+                            events: [
+                                utils.mkMembership({
+                                    room: roomTwo, mship: "join", user: otherUserId,
+                                    name: otherDisplayName,
+                                }),
+                                utils.mkMembership({
+                                    room: roomTwo, mship: "join", user: selfUserId,
+                                }),
+                                utils.mkEvent({
+                                    type: "m.room.create", room: roomTwo, user: selfUserId,
+                                    content: {
+                                        creator: selfUserId,
+                                    },
+                                }),
+                            ],
+                        },
+                    },
                 },
-            },
-        };
-        syncData.rooms.join[roomOne] = {
-            timeline: {
-                events: [
-                    utils.mkMessage({
-                        room: roomOne, user: otherUserId, msg: "hello",
-                    }),
-                ],
-            },
-            state: {
-                events: [
-                    utils.mkEvent({
-                        type: "m.room.name", room: roomOne, user: otherUserId,
-                        content: {
-                            name: "Old room name",
-                        },
-                    }),
-                    utils.mkMembership({
-                        room: roomOne, mship: "join", user: otherUserId,
-                    }),
-                    utils.mkMembership({
-                        room: roomOne, mship: "join", user: selfUserId,
-                    }),
-                    utils.mkEvent({
-                        type: "m.room.create", room: roomOne, user: selfUserId,
-                        content: {
-                            creator: selfUserId,
-                        },
-                    }),
-                ],
-            },
-        };
-        syncData.rooms.join[roomTwo] = {
-            timeline: {
-                events: [
-                    utils.mkMessage({
-                        room: roomTwo, user: otherUserId, msg: "hiii",
-                    }),
-                ],
-            },
-            state: {
-                events: [
-                    utils.mkMembership({
-                        room: roomTwo, mship: "join", user: otherUserId,
-                        name: otherDisplayName,
-                    }),
-                    utils.mkMembership({
-                        room: roomTwo, mship: "join", user: selfUserId,
-                    }),
-                    utils.mkEvent({
-                        type: "m.room.create", room: roomTwo, user: selfUserId,
-                        content: {
-                            creator: selfUserId,
-                        },
-                    }),
-                ],
             },
         };
 
         const nextSyncData = {
             rooms: {
                 join: {
-
+                    [roomOne]: {
+                        state: {
+                            events: [
+                                utils.mkEvent({
+                                    type: "m.room.name", room: roomOne, user: selfUserId,
+                                    content: { name: "A new room name" },
+                                }),
+                            ],
+                        },
+                    },
+                    [roomTwo]: {
+                        timeline: {
+                            events: [
+                                utils.mkMessage({
+                                    room: roomTwo, user: otherUserId, msg: msgText,
+                                }),
+                            ],
+                        },
+                        ephemeral: {
+                            events: [
+                                utils.mkEvent({
+                                    type: "m.typing", room: roomTwo,
+                                    content: { user_ids: [otherUserId] },
+                                }),
+                            ],
+                        },
+                    },
                 },
-            },
-        };
-
-        nextSyncData.rooms.join[roomOne] = {
-            state: {
-                events: [
-                    utils.mkEvent({
-                        type: "m.room.name", room: roomOne, user: selfUserId,
-                        content: { name: "A new room name" },
-                    }),
-                ],
-            },
-        };
-
-        nextSyncData.rooms.join[roomTwo] = {
-            timeline: {
-                events: [
-                    utils.mkMessage({
-                        room: roomTwo, user: otherUserId, msg: msgText,
-                    }),
-                ],
-            },
-            ephemeral: {
-                events: [
-                    utils.mkEvent({
-                        type: "m.typing", room: roomTwo,
-                        content: { user_ids: [otherUserId] },
-                    }),
-                ],
             },
         };
 
@@ -635,9 +632,7 @@ describe("MatrixClient syncing", () => {
             ]).then(() => {
                 const room = client!.getRoom(roomOne)!;
                 // should have clobbered the name to the one from /events
-                expect(room.name).toEqual(
-                    nextSyncData.rooms.join[roomOne].state.events[0].content.name,
-                );
+                expect(room.name).toEqual(nextSyncData.rooms.join[roomOne].state.events[0].content?.name);
             });
         });
 
@@ -742,46 +737,48 @@ describe("MatrixClient syncing", () => {
                 const normalFirstSync = {
                     next_batch: "batch_token",
                     rooms: {
-                        join: {},
-                    },
-                };
-                normalFirstSync.rooms.join[roomOne] = {
-                    timeline: {
-                        events: [normalMessageEvent],
-                        prev_batch: "pagTok",
-                    },
-                    state: {
-                        events: [roomCreateEvent],
+                        join: {
+                            [roomOne]: {
+                                timeline: {
+                                    events: [normalMessageEvent],
+                                    prev_batch: "pagTok",
+                                },
+                                state: {
+                                    events: [roomCreateEvent],
+                                },
+                            },
+                        },
                     },
                 };
 
                 const nextSyncData = {
                     next_batch: "batch_token",
                     rooms: {
-                        join: {},
-                    },
-                };
-                nextSyncData.rooms.join[roomOne] = {
-                    timeline: {
-                        events: [
-                            // In subsequent syncs, a marker event in timeline
-                            // range should normally trigger
-                            // `timelineNeedsRefresh=true` but this marker isn't
-                            // being sent by the room creator so it has no
-                            // special meaning in existing room versions.
-                            utils.mkEvent({
-                                type: UNSTABLE_MSC2716_MARKER.name,
-                                room: roomOne,
-                                // The important part we're testing is here!
-                                // `userC` is not the room creator.
-                                user: userC,
-                                skey: "",
-                                content: {
-                                    "m.insertion_id": "$abc",
+                        join: {
+                            [roomOne]: {
+                                timeline: {
+                                    events: [
+                                        // In subsequent syncs, a marker event in timeline
+                                        // range should normally trigger
+                                        // `timelineNeedsRefresh=true` but this marker isn't
+                                        // being sent by the room creator so it has no
+                                        // special meaning in existing room versions.
+                                        utils.mkEvent({
+                                            type: UNSTABLE_MSC2716_MARKER.name,
+                                            room: roomOne,
+                                            // The important part we're testing is here!
+                                            // `userC` is not the room creator.
+                                            user: userC,
+                                            skey: "",
+                                            content: {
+                                                "m.insertion_id": "$abc",
+                                            },
+                                        }),
+                                    ],
+                                    prev_batch: "pagTok",
                                 },
-                            }),
-                        ],
-                        prev_batch: "pagTok",
+                            },
+                        },
                     },
                 };
 
@@ -831,16 +828,17 @@ describe("MatrixClient syncing", () => {
                     const normalFirstSync = {
                         next_batch: "batch_token",
                         rooms: {
-                            join: {},
-                        },
-                    };
-                    normalFirstSync.rooms.join[roomOne] = {
-                        timeline: {
-                            events: [normalMessageEvent],
-                            prev_batch: "pagTok",
-                        },
-                        state: {
-                            events: [roomCreateEvent],
+                            join: {
+                                [roomOne]: {
+                                    timeline: {
+                                        events: [normalMessageEvent],
+                                        prev_batch: "pagTok",
+                                    },
+                                    state: {
+                                        events: [roomCreateEvent],
+                                    },
+                                },
+                            },
                         },
                     };
 
@@ -849,16 +847,17 @@ describe("MatrixClient syncing", () => {
                         const syncData = {
                             next_batch: "batch_token",
                             rooms: {
-                                join: {},
-                            },
-                        };
-                        syncData.rooms.join[roomOne] = {
-                            timeline: {
-                                events: [normalMessageEvent],
-                                prev_batch: "pagTok",
-                            },
-                            state: {
-                                events: [roomCreateEvent],
+                                join: {
+                                    [roomOne]: {
+                                        timeline: {
+                                            events: [normalMessageEvent],
+                                            prev_batch: "pagTok",
+                                        },
+                                        state: {
+                                            events: [roomCreateEvent],
+                                        },
+                                    },
+                                },
                             },
                         };
 
@@ -879,16 +878,17 @@ describe("MatrixClient syncing", () => {
                         const syncData = {
                             next_batch: "batch_token",
                             rooms: {
-                                join: {},
-                            },
-                        };
-                        syncData.rooms.join[roomOne] = {
-                            timeline: {
-                                events: [markerEventFromRoomCreator],
-                                prev_batch: "pagTok",
-                            },
-                            state: {
-                                events: [roomCreateEvent],
+                                join: {
+                                    [roomOne]: {
+                                        timeline: {
+                                            events: [markerEventFromRoomCreator],
+                                            prev_batch: "pagTok",
+                                        },
+                                        state: {
+                                            events: [roomCreateEvent],
+                                        },
+                                    },
+                                },
                             },
                         };
 
@@ -909,19 +909,20 @@ describe("MatrixClient syncing", () => {
                         const syncData = {
                             next_batch: "batch_token",
                             rooms: {
-                                join: {},
-                            },
-                        };
-                        syncData.rooms.join[roomOne] = {
-                            timeline: {
-                                events: [normalMessageEvent],
-                                prev_batch: "pagTok",
-                            },
-                            state: {
-                                events: [
-                                    roomCreateEvent,
-                                    markerEventFromRoomCreator,
-                                ],
+                                join: {
+                                    [roomOne]: {
+                                        timeline: {
+                                            events: [normalMessageEvent],
+                                            prev_batch: "pagTok",
+                                        },
+                                        state: {
+                                            events: [
+                                                roomCreateEvent,
+                                                markerEventFromRoomCreator,
+                                            ],
+                                        },
+                                    },
+                                },
                             },
                         };
 
@@ -942,17 +943,18 @@ describe("MatrixClient syncing", () => {
                         const nextSyncData = {
                             next_batch: "batch_token",
                             rooms: {
-                                join: {},
-                            },
-                        };
-                        nextSyncData.rooms.join[roomOne] = {
-                            timeline: {
-                                events: [
-                                    // In subsequent syncs, a marker event in timeline
-                                    // range should trigger `timelineNeedsRefresh=true`
-                                    markerEventFromRoomCreator,
-                                ],
-                                prev_batch: "pagTok",
+                                join: {
+                                    [roomOne]: {
+                                        timeline: {
+                                            events: [
+                                                // In subsequent syncs, a marker event in timeline
+                                                // range should trigger `timelineNeedsRefresh=true`
+                                                markerEventFromRoomCreator,
+                                            ],
+                                            prev_batch: "pagTok",
+                                        },
+                                    },
+                                },
                             },
                         };
 
@@ -993,24 +995,25 @@ describe("MatrixClient syncing", () => {
                         const nextSyncData = {
                             next_batch: "batch_token",
                             rooms: {
-                                join: {},
-                            },
-                        };
-                        nextSyncData.rooms.join[roomOne] = {
-                            timeline: {
-                                events: [
-                                    utils.mkMessage({
-                                        room: roomOne, user: otherUserId, msg: "hello again",
-                                    }),
-                                ],
-                                prev_batch: "pagTok",
-                            },
-                            state: {
-                                events: [
-                                    // In subsequent syncs, a marker event in state
-                                    // should trigger `timelineNeedsRefresh=true`
-                                    markerEventFromRoomCreator,
-                                ],
+                                join: {
+                                    [roomOne]: {
+                                        timeline: {
+                                            events: [
+                                                utils.mkMessage({
+                                                    room: roomOne, user: otherUserId, msg: "hello again",
+                                                }),
+                                            ],
+                                            prev_batch: "pagTok",
+                                        },
+                                        state: {
+                                            events: [
+                                                // In subsequent syncs, a marker event in state
+                                                // should trigger `timelineNeedsRefresh=true`
+                                                markerEventFromRoomCreator,
+                                            ],
+                                        },
+                                    },
+                                },
                             },
                         };
 
@@ -1095,19 +1098,20 @@ describe("MatrixClient syncing", () => {
                 const limitedSyncData = {
                     next_batch: "batch_token",
                     rooms: {
-                        join: {},
-                    },
-                };
-                limitedSyncData.rooms.join[roomOne] = {
-                    timeline: {
-                        events: [
-                            utils.mkMessage({
-                                room: roomOne, user: otherUserId, msg: "world",
-                            }),
-                        ],
-                        // The important part, make the sync `limited`
-                        limited: true,
-                        prev_batch: "newerTok",
+                        join: {
+                            [roomOne]: {
+                                timeline: {
+                                    events: [
+                                        utils.mkMessage({
+                                            room: roomOne, user: otherUserId, msg: "world",
+                                        }),
+                                    ],
+                                    // The important part, make the sync `limited`
+                                    limited: true,
+                                    prev_batch: "newerTok",
+                                },
+                            },
+                        },
                     },
                 };
                 httpBackend!.when("GET", "/sync").respond(200, limitedSyncData);
@@ -1167,7 +1171,7 @@ describe("MatrixClient syncing", () => {
 
                 const eventsInRoom = syncData.rooms.join[roomOne].timeline.events;
                 const contextUrl = `/rooms/${encodeURIComponent(roomOne)}/context/` +
-                    `${encodeURIComponent(eventsInRoom[0].event_id)}`;
+                    `${encodeURIComponent(eventsInRoom[0].event_id!)}`;
                 httpBackend!.when("GET", contextUrl)
                     .respond(200, () => {
                         return {
@@ -1202,17 +1206,18 @@ describe("MatrixClient syncing", () => {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
-                    join: {},
-                },
-            };
-            syncData.rooms.join[roomOne] = {
-                timeline: {
-                    events: [
-                        utils.mkMessage({
-                            room: roomOne, user: otherUserId, msg: "hello",
-                        }),
-                    ],
-                    prev_batch: "pagTok",
+                    join: {
+                        [roomOne]: {
+                            timeline: {
+                                events: [
+                                    utils.mkMessage({
+                                        room: roomOne, user: otherUserId, msg: "hello",
+                                    }),
+                                ],
+                                prev_batch: "pagTok",
+                            },
+                        },
+                    },
                 },
             };
 
@@ -1229,17 +1234,18 @@ describe("MatrixClient syncing", () => {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
-                    join: {},
-                },
-            };
-            syncData.rooms.join[roomTwo] = {
-                timeline: {
-                    events: [
-                        utils.mkMessage({
-                            room: roomTwo, user: otherUserId, msg: "roomtwo",
-                        }),
-                    ],
-                    prev_batch: "roomtwotok",
+                    join: {
+                        [roomTwo]: {
+                            timeline: {
+                                events: [
+                                    utils.mkMessage({
+                                        room: roomTwo, user: otherUserId, msg: "roomtwo",
+                                    }),
+                                ],
+                                prev_batch: "roomtwotok",
+                            },
+                        },
+                    },
                 },
             };
 
@@ -1261,18 +1267,19 @@ describe("MatrixClient syncing", () => {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
-                    join: {},
-                },
-            };
-            syncData.rooms.join[roomOne] = {
-                timeline: {
-                    events: [
-                        utils.mkMessage({
-                            room: roomOne, user: otherUserId, msg: "world",
-                        }),
-                    ],
-                    limited: true,
-                    prev_batch: "newerTok",
+                    join: {
+                        [roomOne]: {
+                            timeline: {
+                                events: [
+                                    utils.mkMessage({
+                                        room: roomOne, user: otherUserId, msg: "world",
+                                    }),
+                                ],
+                                limited: true,
+                                prev_batch: "newerTok",
+                            },
+                        },
+                    },
                 },
             };
             httpBackend!.when("GET", "/sync").respond(200, syncData);
@@ -1304,42 +1311,45 @@ describe("MatrixClient syncing", () => {
         const syncData = {
             rooms: {
                 join: {
-
+                    [roomOne]: {
+                        ephemeral: {
+                            events: [
+                            ],
+                        } as IEphemeral,
+                        timeline: {
+                            events: [
+                                utils.mkMessage({
+                                    room: roomOne, user: otherUserId, msg: "hello",
+                                }),
+                                utils.mkMessage({
+                                    room: roomOne, user: otherUserId, msg: "world",
+                                }),
+                            ],
+                        },
+                        state: {
+                            events: [
+                                utils.mkEvent({
+                                    type: "m.room.name", room: roomOne, user: otherUserId,
+                                    content: {
+                                        name: "Old room name",
+                                    },
+                                }),
+                                utils.mkMembership({
+                                    room: roomOne, mship: "join", user: otherUserId,
+                                }),
+                                utils.mkMembership({
+                                    room: roomOne, mship: "join", user: selfUserId,
+                                }),
+                                utils.mkEvent({
+                                    type: "m.room.create", room: roomOne, user: selfUserId,
+                                    content: {
+                                        creator: selfUserId,
+                                    },
+                                }),
+                            ],
+                        } as Partial<IJoinedRoom>,
+                    },
                 },
-            },
-        };
-        syncData.rooms.join[roomOne] = {
-            timeline: {
-                events: [
-                    utils.mkMessage({
-                        room: roomOne, user: otherUserId, msg: "hello",
-                    }),
-                    utils.mkMessage({
-                        room: roomOne, user: otherUserId, msg: "world",
-                    }),
-                ],
-            },
-            state: {
-                events: [
-                    utils.mkEvent({
-                        type: "m.room.name", room: roomOne, user: otherUserId,
-                        content: {
-                            name: "Old room name",
-                        },
-                    }),
-                    utils.mkMembership({
-                        room: roomOne, mship: "join", user: otherUserId,
-                    }),
-                    utils.mkMembership({
-                        room: roomOne, mship: "join", user: selfUserId,
-                    }),
-                    utils.mkEvent({
-                        type: "m.room.create", room: roomOne, user: selfUserId,
-                        content: {
-                            creator: selfUserId,
-                        },
-                    }),
-                ],
             },
         };
 
@@ -1351,16 +1361,15 @@ describe("MatrixClient syncing", () => {
 
         it("should sync receipts from /sync.", () => {
             const ackEvent = syncData.rooms.join[roomOne].timeline.events[0];
-            const receipt = {};
-            receipt[ackEvent.event_id] = {
+            const receipt: Record<string, any> = {};
+            receipt[ackEvent.event_id!] = {
                 "m.read": {},
             };
-            receipt[ackEvent.event_id]["m.read"][userC] = {
+            receipt[ackEvent.event_id!]["m.read"][userC] = {
                 ts: 176592842636,
             };
             syncData.rooms.join[roomOne].ephemeral.events = [{
                 content: receipt,
-                room_id: roomOne,
                 type: "m.receipt",
             }];
             httpBackend!.when("GET", "/sync").respond(200, syncData);
@@ -1390,6 +1399,9 @@ describe("MatrixClient syncing", () => {
             rooms: {
                 join: {
                     [roomOne]: {
+                        ephemeral: {
+                            events: [],
+                        },
                         timeline: {
                             events: [
                                 utils.mkMessage({
@@ -1425,7 +1437,7 @@ describe("MatrixClient syncing", () => {
                     },
                 },
             },
-        };
+        } as unknown as ISyncResponse;
         it("should sync unread notifications.", () => {
             syncData.rooms.join[roomOne][UNREAD_THREAD_NOTIFICATIONS.name] = {
                 [THREAD_ID]: {
@@ -1446,6 +1458,50 @@ describe("MatrixClient syncing", () => {
 
                 expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(5);
                 expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(2);
+            });
+        });
+
+        it("caches unknown threads receipts and replay them when the thread is created", async () => {
+            const THREAD_ID = "$unknownthread:localhost";
+
+            const receipt = {
+                type: "m.receipt",
+                room_id: "!foo:bar",
+                content: {
+                    "$event1:localhost": {
+                        [ReceiptType.Read]: {
+                            "@alice:localhost": { ts: 666, thread_id: THREAD_ID },
+                        },
+                    },
+                },
+            };
+            syncData.rooms.join[roomOne].ephemeral.events = [receipt];
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+            client!.startClient();
+
+            return Promise.all([
+                httpBackend!.flushAllExpected(),
+                awaitSyncEvent(),
+            ]).then(() => {
+                const room = client?.getRoom(roomOne);
+                expect(room).toBeInstanceOf(Room);
+
+                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(true);
+
+                const thread = room!.createThread(THREAD_ID, undefined, [], true);
+
+                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(false);
+
+                const receipt = thread.getReadReceiptForUserId("@alice:localhost");
+
+                expect(receipt).toStrictEqual({
+                    "data": {
+                        "thread_id": "$unknownthread:localhost",
+                        "ts": 666,
+                    },
+                    "eventId": "$event1:localhost",
+                });
             });
         });
     });
@@ -1509,18 +1565,18 @@ describe("MatrixClient syncing", () => {
             const syncData = {
                 next_batch: "batch_token",
                 rooms: {
-                    leave: {},
-                },
-            };
-
-            syncData.rooms.leave[roomTwo] = {
-                timeline: {
-                    events: [
-                        utils.mkMessage({
-                            room: roomTwo, user: otherUserId, msg: "hello",
-                        }),
-                    ],
-                    prev_batch: "pagTok",
+                    leave: {
+                        [roomTwo]: {
+                            timeline: {
+                                events: [
+                                    utils.mkMessage({
+                                        room: roomTwo, user: otherUserId, msg: "hello",
+                                    }),
+                                ],
+                                prev_batch: "pagTok",
+                            },
+                        },
+                    },
                 },
             };
 
@@ -1651,8 +1707,8 @@ describe("MatrixClient syncing", () => {
     /**
      * waits for the MatrixClient to emit one or more 'sync' events.
      *
-     * @param {Number?} numSyncs number of syncs to wait for
-     * @returns {Promise} promise which resolves after the sync events have happened
+     * @param numSyncs - number of syncs to wait for
+     * @returns promise which resolves after the sync events have happened
      */
     function awaitSyncEvent(numSyncs?: number) {
         return utils.syncPromise(client!, numSyncs);

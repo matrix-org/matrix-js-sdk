@@ -17,7 +17,7 @@ limitations under the License.
 import { mocked } from "jest-mock";
 
 import { logger } from "../../src/logger";
-import { MatrixClient, ClientEvent } from "../../src/client";
+import { ClientEvent, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
 import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
@@ -36,7 +36,16 @@ import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
-import { ContentHelpers, EventTimeline, MatrixError, Room } from "../../src";
+import {
+    ContentHelpers,
+    EventTimeline, ICreateRoomOpts,
+    IRequestOpts,
+    MatrixError,
+    MatrixHttpApi,
+    MatrixScheduler,
+    Method,
+    Room,
+} from "../../src";
 import { supportsMatrixCall } from "../../src/webrtc/call";
 import { makeBeaconEvent } from "../test-utils/beacon";
 import {
@@ -44,6 +53,9 @@ import {
     POLICIES_ACCOUNT_EVENT_TYPE,
     PolicyScope,
 } from "../../src/models/invites-ignorer";
+import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
+import { QueryDict } from "../../src/utils";
+import { SyncState } from "../../src/sync";
 
 jest.useFakeTimers();
 
@@ -52,17 +64,36 @@ jest.mock("../../src/webrtc/call", () => ({
     supportsMatrixCall: jest.fn(() => false),
 }));
 
+type HttpLookup = {
+    method: string;
+    path: string;
+    data?: Record<string, any>;
+    error?: object;
+    expectBody?: Record<string, any>;
+    expectQueryParams?: QueryDict;
+    thenCall?: Function;
+};
+
+interface Options extends ICreateRoomOpts {
+    _roomId?: string;
+}
+
+type WrappedRoom = Room & {
+    _options: Options;
+    _state: Map<string, any>;
+};
+
 describe("MatrixClient", function() {
     const userId = "@alice:bar";
     const identityServerUrl = "https://identity.server";
     const identityServerDomain = "identity.server";
-    let client;
-    let store;
-    let scheduler;
+    let client: MatrixClient;
+    let store: Store;
+    let scheduler: MatrixScheduler;
 
     const KEEP_ALIVE_PATH = "/_matrix/client/versions";
 
-    const PUSH_RULES_RESPONSE = {
+    const PUSH_RULES_RESPONSE: HttpLookup = {
         method: "GET",
         path: "/pushrules/",
         data: {},
@@ -70,7 +101,7 @@ describe("MatrixClient", function() {
 
     const FILTER_PATH = "/user/" + encodeURIComponent(userId) + "/filter";
 
-    const FILTER_RESPONSE = {
+    const FILTER_RESPONSE: HttpLookup = {
         method: "POST",
         path: FILTER_PATH,
         data: { filter_id: "f1lt3r" },
@@ -82,29 +113,21 @@ describe("MatrixClient", function() {
         rooms: {},
     };
 
-    const SYNC_RESPONSE = {
+    const SYNC_RESPONSE: HttpLookup = {
         method: "GET",
         path: "/sync",
         data: SYNC_DATA,
     };
 
     // items are popped off when processed and block if no items left.
-    let httpLookups: {
-        method: string;
-        path: string;
-        data?: object;
-        error?: object;
-        expectBody?: object;
-        expectQueryParams?: object;
-        thenCall?: Function;
-    }[] = [];
+    let httpLookups: HttpLookup[] = [];
     let acceptKeepalives: boolean;
     let pendingLookup: {
         promise: Promise<any>;
         method: string;
         path: string;
     } | null = null;
-    function httpReq(method, path, qp, data, prefix) {
+    function httpReq(method: Method, path: string, qp?: QueryDict, data?: BodyInit, opts?: IRequestOpts) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
                 unstable_features: {
@@ -145,7 +168,7 @@ describe("MatrixClient", function() {
             }
             if (next.expectQueryParams) {
                 Object.keys(next.expectQueryParams).forEach(function(k) {
-                    expect(qp[k]).toEqual(next.expectQueryParams![k]);
+                    expect(qp?.[k]).toEqual(next.expectQueryParams![k]);
                 });
             }
 
@@ -184,24 +207,38 @@ describe("MatrixClient", function() {
             userId: userId,
         });
         // FIXME: We shouldn't be yanking http like this.
-        client.http = [
-            "authedRequest", "getContentUri", "request", "uploadContent",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
-        client.http.authedRequest.mockImplementation(httpReq);
-        client.http.request.mockImplementation(httpReq);
+        client.http = ([
+            "authedRequest",
+            "getContentUri",
+            "request",
+            "uploadContent",
+        ] as const).reduce((r, k) => {
+            r[k] = jest.fn();
+            return r;
+        }, {} as MatrixHttpApi<any>);
+        mocked(client.http.authedRequest).mockImplementation(httpReq);
+        mocked(client.http.request).mockImplementation(httpReq);
     }
 
     beforeEach(function() {
-        scheduler = [
-            "getQueueForEvent", "queueEvent", "removeEventFromQueue",
+        scheduler = ([
+            "getQueueForEvent",
+            "queueEvent",
+            "removeEventFromQueue",
             "setProcessFunction",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
-        store = [
+        ] as const).reduce((r, k) => {
+            r[k] = jest.fn();
+            return r;
+        }, {} as MatrixScheduler);
+        store = ([
             "getRoom", "getRooms", "getUser", "getSyncToken", "scrollback",
             "save", "wantsSave", "setSyncToken", "storeEvents", "storeRoom", "storeUser",
             "getFilterIdByName", "setFilterIdByName", "getFilter", "storeFilter",
-            "getSyncAccumulator", "startup", "deleteAllData",
-        ].reduce((r, k) => { r[k] = jest.fn(); return r; }, {});
+            "startup", "deleteAllData",
+        ] as const).reduce((r, k) => {
+            r[k] = jest.fn();
+            return r;
+        }, {} as Store);
         store.getSavedSync = jest.fn().mockReturnValue(Promise.resolve(null));
         store.getSavedSyncToken = jest.fn().mockReturnValue(Promise.resolve(null));
         store.setSyncData = jest.fn().mockReturnValue(Promise.resolve(null));
@@ -225,7 +262,7 @@ describe("MatrixClient", function() {
         // means they may call /events and then fail an expect() which will fail
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
-        client.http.authedRequest.mockImplementation(function() {
+        mocked(client.http.authedRequest).mockImplementation(function() {
             return new Promise(() => {});
         });
         client.stopClient();
@@ -289,7 +326,7 @@ describe("MatrixClient", function() {
             const txnId = client.makeTxnId();
 
             const room = new Room(roomId, client, userId);
-            store.getRoom.mockReturnValue(room);
+            mocked(store.getRoom).mockReturnValue(room);
 
             const rootEvent = new MatrixEvent({ event_id: threadId });
             room.createThread(threadId, rootEvent, [rootEvent], false);
@@ -329,7 +366,7 @@ describe("MatrixClient", function() {
             };
 
             const room = new Room(roomId, client, userId);
-            store.getRoom.mockReturnValue(room);
+            mocked(store.getRoom).mockReturnValue(room);
 
             const rootEvent = new MatrixEvent({ event_id: threadId });
             room.createThread(threadId, rootEvent, [rootEvent], false);
@@ -359,7 +396,7 @@ describe("MatrixClient", function() {
         const userId = "@test:example.org";
         const roomId = "!room:example.org";
         const roomName = "Test Tree";
-        const mockRoom = {};
+        const mockRoom = {} as unknown as Room;
         const fn = jest.fn().mockImplementation((opts) => {
             expect(opts).toMatchObject({
                 name: roomName,
@@ -431,23 +468,23 @@ describe("MatrixClient", function() {
                         throw new Error("Unexpected event type or state key");
                     }
                 },
-            },
-        };
+            } as Room["currentState"],
+        } as unknown as Room;
         client.getRoom = (getRoomId) => {
             expect(getRoomId).toEqual(roomId);
             return mockRoom;
         };
         const tree = client.unstableGetFileTreeSpace(roomId);
         expect(tree).toBeDefined();
-        expect(tree.roomId).toEqual(roomId);
-        expect(tree.room).toBe(mockRoom);
+        expect(tree!.roomId).toEqual(roomId);
+        expect(tree!.room).toBe(mockRoom);
     });
 
     it("should not get (unstable) file trees if not joined", async () => {
         const roomId = "!room:example.org";
         const mockRoom = {
             getMyMembership: () => "leave", // "not join"
-        };
+        } as unknown as Room;
         client.getRoom = (getRoomId) => {
             expect(getRoomId).toEqual(roomId);
             return mockRoom;
@@ -491,8 +528,8 @@ describe("MatrixClient", function() {
                         throw new Error("Unexpected event type or state key");
                     }
                 },
-            },
-        };
+            } as Room["currentState"],
+        } as unknown as Room;
         client.getRoom = (getRoomId) => {
             expect(getRoomId).toEqual(roomId);
             return mockRoom;
@@ -525,8 +562,8 @@ describe("MatrixClient", function() {
                         throw new Error("Unexpected event type or state key");
                     }
                 },
-            },
-        };
+            } as Room["currentState"],
+        } as unknown as Room;
         client.getRoom = (getRoomId) => {
             expect(getRoomId).toEqual(roomId);
             return mockRoom;
@@ -541,15 +578,15 @@ describe("MatrixClient", function() {
             SYNC_RESPONSE,
         ];
         const filterId = "ehfewf";
-        store.getFilterIdByName.mockReturnValue(filterId);
+        mocked(store.getFilterIdByName).mockReturnValue(filterId);
         const filter = new Filter("0", filterId);
         filter.setDefinition({ "room": { "timeline": { "limit": 8 } } });
-        store.getFilter.mockReturnValue(filter);
+        mocked(store.getFilter).mockReturnValue(filter);
         const syncPromise = new Promise<void>((resolve, reject) => {
-            client.on("sync", function syncListener(state) {
+            client.on(ClientEvent.Sync, function syncListener(state) {
                 if (state === "SYNCING") {
                     expect(httpLookups.length).toEqual(0);
-                    client.removeListener("sync", syncListener);
+                    client.removeListener(ClientEvent.Sync, syncListener);
                     resolve();
                 } else if (state === "ERROR") {
                     reject(new Error("sync error"));
@@ -567,10 +604,10 @@ describe("MatrixClient", function() {
 
         it("should return the same sync state as emitted sync events", async function() {
             const syncingPromise = new Promise<void>((resolve) => {
-                client.on("sync", function syncListener(state) {
+                client.on(ClientEvent.Sync, function syncListener(state) {
                     expect(state).toEqual(client.getSyncState());
                     if (state === "SYNCING") {
-                        client.removeListener("sync", syncListener);
+                        client.removeListener(ClientEvent.Sync, syncListener);
                         resolve();
                     }
                 });
@@ -586,7 +623,7 @@ describe("MatrixClient", function() {
         it("should use an existing filter if id is present in localStorage", function() {
         });
         it("should handle localStorage filterId missing from the server", function(done) {
-            function getFilterName(userId, suffix?: string) {
+            function getFilterName(userId: string, suffix?: string) {
                 // scope this on the user ID because people may login on many accounts
                 // and they all need to be stored!
                 return "FILTER_SYNC_" + userId + (suffix ? "_" + suffix : "");
@@ -605,14 +642,14 @@ describe("MatrixClient", function() {
                 },
             });
             httpLookups.push(FILTER_RESPONSE);
-            store.getFilterIdByName.mockReturnValue(invalidFilterId);
+            mocked(store.getFilterIdByName).mockReturnValue(invalidFilterId);
 
-            const filterName = getFilterName(client.credentials.userId);
+            const filterName = getFilterName(client.credentials.userId!);
             client.store.setFilterIdByName(filterName, invalidFilterId);
             const filter = new Filter(client.credentials.userId);
 
             client.getOrCreateFilter(filterName, filter).then(function(filterId) {
-                expect(filterId).toEqual(FILTER_RESPONSE.data.filter_id);
+                expect(filterId).toEqual(FILTER_RESPONSE.data?.filter_id);
                 done();
             });
         });
@@ -634,13 +671,13 @@ describe("MatrixClient", function() {
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
 
-            client.on("sync", function syncListener(state) {
+            client.on(ClientEvent.Sync, function syncListener(state) {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(2);
                     expect(client.retryImmediately()).toBe(true);
                     jest.advanceTimersByTime(1);
                 } else if (state === "PREPARED" && httpLookups.length === 0) {
-                    client.removeListener("sync", syncListener);
+                    client.removeListener(ClientEvent.Sync, syncListener);
                     done();
                 } else {
                     // unexpected state transition!
@@ -658,7 +695,7 @@ describe("MatrixClient", function() {
                 method: "GET", path: "/sync", data: SYNC_DATA,
             });
 
-            client.on("sync", function syncListener(state) {
+            client.on(ClientEvent.Sync, function syncListener(state) {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(1);
                     expect(client.retryImmediately()).toBe(
@@ -668,7 +705,7 @@ describe("MatrixClient", function() {
                 } else if (state === "RECONNECTING" && httpLookups.length > 0) {
                     jest.advanceTimersByTime(10000);
                 } else if (state === "SYNCING" && httpLookups.length === 0) {
-                    client.removeListener("sync", syncListener);
+                    client.removeListener(ClientEvent.Sync, syncListener);
                     done();
                 }
             });
@@ -684,13 +721,13 @@ describe("MatrixClient", function() {
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
 
-            client.on("sync", function syncListener(state) {
+            client.on(ClientEvent.Sync, function syncListener(state) {
                 if (state === "ERROR" && httpLookups.length > 0) {
                     expect(httpLookups.length).toEqual(3);
                     expect(client.retryImmediately()).toBe(true);
                     jest.advanceTimersByTime(1);
                 } else if (state === "PREPARED" && httpLookups.length === 0) {
-                    client.removeListener("sync", syncListener);
+                    client.removeListener(ClientEvent.Sync, syncListener);
                     done();
                 } else {
                     // unexpected state transition!
@@ -702,8 +739,8 @@ describe("MatrixClient", function() {
     });
 
     describe("emitted sync events", function() {
-        function syncChecker(expectedStates, done) {
-            return function syncListener(state, old) {
+        function syncChecker(expectedStates: [string, string | null][], done: Function) {
+            return function syncListener(state: SyncState, old: SyncState | null) {
                 const expected = expectedStates.shift();
                 logger.log(
                     "'sync' curr=%s old=%s EXPECT=%s", state, old, expected,
@@ -715,7 +752,7 @@ describe("MatrixClient", function() {
                 expect(state).toEqual(expected[0]);
                 expect(old).toEqual(expected[1]);
                 if (expectedStates.length === 0) {
-                    client.removeListener("sync", syncListener);
+                    client.removeListener(ClientEvent.Sync, syncListener);
                     done();
                 }
                 // standard retry time is 5 to 10 seconds
@@ -726,7 +763,7 @@ describe("MatrixClient", function() {
         it("should transition null -> PREPARED after the first /sync", function(done) {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
-            client.on("sync", syncChecker(expectedStates, done));
+            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
             client.startClient();
         });
 
@@ -738,7 +775,7 @@ describe("MatrixClient", function() {
                 method: "POST", path: FILTER_PATH, error: { errcode: "NOPE_NOPE_NOPE" },
             });
             expectedStates.push(["ERROR", null]);
-            client.on("sync", syncChecker(expectedStates, done));
+            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
             client.startClient();
         });
 
@@ -768,7 +805,7 @@ describe("MatrixClient", function() {
             expectedStates.push(["RECONNECTING", null]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["CATCHUP", "ERROR"]);
-            client.on("sync", syncChecker(expectedStates, done));
+            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
             client.startClient();
         });
 
@@ -776,7 +813,7 @@ describe("MatrixClient", function() {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            client.on("sync", syncChecker(expectedStates, done));
+            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
             client.startClient();
         });
 
@@ -795,7 +832,7 @@ describe("MatrixClient", function() {
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
-            client.on("sync", syncChecker(expectedStates, done));
+            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
             client.startClient();
         });
 
@@ -809,7 +846,7 @@ describe("MatrixClient", function() {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["ERROR", "SYNCING"]);
-            client.on("sync", syncChecker(expectedStates, done));
+            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
             client.startClient();
         });
 
@@ -821,7 +858,7 @@ describe("MatrixClient", function() {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["SYNCING", "SYNCING"]);
-            client.on("sync", syncChecker(expectedStates, done));
+            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
             client.startClient();
         });
 
@@ -845,7 +882,7 @@ describe("MatrixClient", function() {
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["ERROR", "ERROR"]);
-            client.on("sync", syncChecker(expectedStates, done));
+            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
             client.startClient();
         });
     });
@@ -914,14 +951,14 @@ describe("MatrixClient", function() {
                         throw new Error("Unexpected event type or state key");
                     }
                 },
-            },
+            } as Room["currentState"],
             getThread: jest.fn(),
             addPendingEvent: jest.fn(),
             updatePendingEvent: jest.fn(),
             reEmitter: {
                 reEmit: jest.fn(),
             },
-        };
+        } as unknown as Room;
 
         beforeEach(() => {
             client.getRoom = (getRoomId) => {
@@ -987,7 +1024,7 @@ describe("MatrixClient", function() {
 
         const mockRoom = {
             getMyMembership: () => "join",
-            updatePendingEvent: (event, status) => event.setStatus(status),
+            updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
                     if (eventType === EventType.RoomCreate) {
@@ -1004,15 +1041,14 @@ describe("MatrixClient", function() {
                         throw new Error("Unexpected event type or state key");
                     }
                 },
-            },
-        };
+            } as Room["currentState"],
+        } as unknown as Room;
 
-        let event;
+        let event: MatrixEvent;
         beforeEach(async () => {
             event = new MatrixEvent({
                 event_id: "~" + roomId + ":" + txnId,
-                user_id: client.credentials.userId,
-                sender: client.credentials.userId,
+                sender: client.credentials.userId!,
                 room_id: roomId,
                 origin_server_ts: new Date().getTime(),
             });
@@ -1023,25 +1059,26 @@ describe("MatrixClient", function() {
                 return mockRoom;
             };
             client.crypto = { // mock crypto
-                encryptEvent: (event, room) => new Promise(() => {}),
+                encryptEvent: () => new Promise(() => {}),
                 stop: jest.fn(),
-            };
+            } as unknown as Crypto;
         });
 
         function assertCancelled() {
             expect(event.status).toBe(EventStatus.CANCELLED);
-            expect(client.scheduler.removeEventFromQueue(event)).toBeFalsy();
+            expect(client.scheduler?.removeEventFromQueue(event)).toBeFalsy();
             expect(httpLookups.filter(h => h.path.includes("/send/")).length).toBe(0);
         }
 
         it("should cancel an event which is queued", () => {
             event.setStatus(EventStatus.QUEUED);
-            client.scheduler.queueEvent(event);
+            client.scheduler?.queueEvent(event);
             client.cancelPendingEvent(event);
             assertCancelled();
         });
 
         it("should cancel an event which is encrypting", async () => {
+            // @ts-ignore protected method access
             client.encryptAndSendEvent(null, event);
             await testUtils.emitPromise(event, "Event.status");
             client.cancelPendingEvent(event);
@@ -1103,7 +1140,7 @@ describe("MatrixClient", function() {
             const room = {
                 hasPendingEvent: jest.fn().mockReturnValue(false),
                 addLocalEchoReceipt: jest.fn(),
-            };
+            } as unknown as Room;
             const rrEvent = new MatrixEvent({ event_id: "read_event_id" });
             const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
             client.getRoom = () => room;
@@ -1142,7 +1179,7 @@ describe("MatrixClient", function() {
         const content = makeBeaconInfoContent(100, true);
 
         beforeEach(() => {
-            client.http.authedRequest.mockClear().mockResolvedValue({});
+            mocked(client.http.authedRequest).mockClear().mockResolvedValue({});
         });
 
         it("creates new beacon info", async () => {
@@ -1150,7 +1187,7 @@ describe("MatrixClient", function() {
 
             // event type combined
             const expectedEventType = M_BEACON_INFO.name;
-            const [method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
+            const [method, path, queryParams, requestContent] = mocked(client.http.authedRequest).mock.calls[0];
             expect(method).toBe('PUT');
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
@@ -1164,7 +1201,7 @@ describe("MatrixClient", function() {
             await client.unstable_setLiveBeacon(roomId, content);
 
             // event type combined
-            const [, path, , requestContent] = client.http.authedRequest.mock.calls[0];
+            const [, path, , requestContent] = mocked(client.http.authedRequest).mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
                 `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
@@ -1242,7 +1279,7 @@ describe("MatrixClient", function() {
         const newPassword = 'newpassword';
 
         const passwordTest = (expectedRequestContent: any) => {
-            const [method, path, queryParams, requestContent] = client.http.authedRequest.mock.calls[0];
+            const [method, path, queryParams, requestContent] = mocked(client.http.authedRequest).mock.calls[0];
             expect(method).toBe('POST');
             expect(path).toEqual('/account/password');
             expect(queryParams).toBeFalsy();
@@ -1250,7 +1287,7 @@ describe("MatrixClient", function() {
         };
 
         beforeEach(() => {
-            client.http.authedRequest.mockClear().mockResolvedValue({});
+            mocked(client.http.authedRequest).mockClear().mockResolvedValue({});
         });
 
         it("no logout_devices specified", async () => {
@@ -1289,13 +1326,13 @@ describe("MatrixClient", function() {
             const response = {
                 aliases: ["#woop:example.org", "#another:example.org"],
             };
-            client.http.authedRequest.mockClear().mockResolvedValue(response);
+            mocked(client.http.authedRequest).mockClear().mockResolvedValue(response);
 
             const roomId = "!whatever:example.org";
             const result = await client.getLocalAliases(roomId);
 
             // Current version of the endpoint we support is v3
-            const [method, path, queryParams, data, opts] = client.http.authedRequest.mock.calls[0];
+            const [method, path, queryParams, data, opts] = mocked(client.http.authedRequest).mock.calls[0];
             expect(data).toBeFalsy();
             expect(method).toBe('GET');
             expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
@@ -1352,11 +1389,11 @@ describe("MatrixClient", function() {
                 ],
                 username: "1443779631:@user:example.com",
                 password: "JlKfBy1QwLrO20385QyAtEyIv0=",
-            };
+            } as unknown as ITurnServerResponse;
             jest.spyOn(client, "turnServer").mockResolvedValue(turnServer);
 
             const events: any[][] = [];
-            const onTurnServers = (...args) => events.push(args);
+            const onTurnServers = (...args: any[]) => events.push(args);
             client.on(ClientEvent.TurnServers, onTurnServers);
             expect(await client.checkTurnServers()).toBe(true);
             client.off(ClientEvent.TurnServers, onTurnServers);
@@ -1372,7 +1409,7 @@ describe("MatrixClient", function() {
             jest.spyOn(client, "turnServer").mockRejectedValue(error);
 
             const events: any[][] = [];
-            const onTurnServersError = (...args) => events.push(args);
+            const onTurnServersError = (...args: any[]) => events.push(args);
             client.on(ClientEvent.TurnServersError, onTurnServersError);
             expect(await client.checkTurnServers()).toBe(false);
             client.off(ClientEvent.TurnServersError, onTurnServersError);
@@ -1384,7 +1421,7 @@ describe("MatrixClient", function() {
             jest.spyOn(client, "turnServer").mockRejectedValue(error);
 
             const events: any[][] = [];
-            const onTurnServersError = (...args) => events.push(args);
+            const onTurnServersError = (...args: any[]) => events.push(args);
             client.on(ClientEvent.TurnServersError, onTurnServersError);
             expect(await client.checkTurnServers()).toBe(false);
             client.off(ClientEvent.TurnServersError, onTurnServersError);
@@ -1400,7 +1437,7 @@ describe("MatrixClient", function() {
 
         it("is an alias for the crypto method", async () => {
             client.crypto = testUtils.mock(Crypto, "Crypto");
-            const deviceInfos = [];
+            const deviceInfos: IOlmDevice[] = [];
             const payload = {};
             await client.encryptAndSendToDevices(deviceInfos, payload);
             expect(client.crypto.encryptAndSendToDevices).toHaveBeenLastCalledWith(deviceInfos, payload);
@@ -1413,7 +1450,7 @@ describe("MatrixClient", function() {
             const dataStore = new Map();
             client.setAccountData = function(eventType, content) {
                 dataStore.set(eventType, content);
-                return Promise.resolve();
+                return Promise.resolve({});
             };
             client.getAccountData = function(eventType) {
                 const data = dataStore.get(eventType);
@@ -1424,9 +1461,9 @@ describe("MatrixClient", function() {
 
             // Mockup `createRoom`/`getRoom`/`joinRoom`, including state.
             const rooms = new Map();
-            client.createRoom = function(options = {}) {
+            client.createRoom = function(options: Options = {}) {
                 const roomId = options["_roomId"] || `!room-${rooms.size}:example.org`;
-                const state = new Map();
+                const state = new Map<string, any>();
                 const room = {
                     roomId,
                     _options: options,
@@ -1444,24 +1481,24 @@ describe("MatrixClient", function() {
                                             },
                                         };
                                     },
-                                };
+                                } as EventTimeline;
                             },
                         };
                     },
-                };
+                } as unknown as WrappedRoom;
                 rooms.set(roomId, room);
                 return Promise.resolve({ room_id: roomId });
             };
             client.getRoom = function(roomId) {
                 return rooms.get(roomId);
             };
-            client.joinRoom = function(roomId) {
-                return this.getRoom(roomId) || this.createRoom({ _roomId: roomId });
+            client.joinRoom = async function(roomId) {
+                return this.getRoom(roomId)! || this.createRoom({ _roomId: roomId } as ICreateRoomOpts);
             };
 
             // Mockup state events
             client.sendStateEvent = function(roomId, type, content) {
-                const room = this.getRoom(roomId);
+                const room = this.getRoom(roomId) as WrappedRoom;
                 const state: Map<string, any> = room._state;
                 let store = state.get(type);
                 if (!store) {
@@ -1480,14 +1517,15 @@ describe("MatrixClient", function() {
                         return content;
                     },
                 };
-                return { event_id: eventId };
+                return Promise.resolve({ event_id: eventId });
             };
             client.redactEvent = function(roomId, eventId) {
-                const room = this.getRoom(roomId);
+                const room = this.getRoom(roomId) as WrappedRoom;
                 const state: Map<string, any> = room._state;
                 for (const store of state.values()) {
-                    delete store[eventId];
+                    delete store[eventId!];
                 }
+                return Promise.resolve({ event_id: "$" + eventId + "-" + Math.random() });
             };
         });
 
@@ -1523,7 +1561,7 @@ describe("MatrixClient", function() {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -1552,7 +1590,7 @@ describe("MatrixClient", function() {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleSenderMatch).toBeTruthy();
-            expect(ruleSenderMatch.getContent()).toMatchObject({
+            expect(ruleSenderMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -1562,7 +1600,7 @@ describe("MatrixClient", function() {
                 roomId: "!snafu:example.org",
             });
             expect(ruleRoomMatch).toBeTruthy();
-            expect(ruleRoomMatch.getContent()).toMatchObject({
+            expect(ruleRoomMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -1587,7 +1625,7 @@ describe("MatrixClient", function() {
                 roomId: BAD_ROOM_ID,
             });
             expect(ruleSenderMatch).toBeTruthy();
-            expect(ruleSenderMatch.getContent()).toMatchObject({
+            expect(ruleSenderMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -1621,7 +1659,7 @@ describe("MatrixClient", function() {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -1649,13 +1687,13 @@ describe("MatrixClient", function() {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch.getContent()).toMatchObject({
+            expect(ruleMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
 
             // After removing the invite, we shouldn't reject it anymore.
-            await client.ignoredInvites.removeRule(ruleMatch);
+            await client.ignoredInvites.removeRule(ruleMatch as MatrixEvent);
             const ruleMatch2 = await client.ignoredInvites.getRuleForInvite({
                 sender: "@foobar:example.org",
                 roomId: "!snafu:somewhere.org",
@@ -1669,10 +1707,10 @@ describe("MatrixClient", function() {
             // Make sure that everything is initialized.
             await client.ignoredInvites.getOrCreateSourceRooms();
             await client.joinRoom(NEW_SOURCE_ROOM_ID);
-            const newSourceRoom = client.getRoom(NEW_SOURCE_ROOM_ID);
+            const newSourceRoom = client.getRoom(NEW_SOURCE_ROOM_ID) as WrappedRoom;
 
             // Fetch the list of sources and check that we do not have the new room yet.
-            const policies = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name).getContent();
+            const policies = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
             expect(policies).toBeTruthy();
             const ignoreInvites = policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites).toBeTruthy();
@@ -1686,7 +1724,7 @@ describe("MatrixClient", function() {
             expect(added2).toBe(false);
 
             // Fetch the list of sources and check that we have added the new room.
-            const policies2 = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name).getContent();
+            const policies2 = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
             expect(policies2).toBeTruthy();
             const ignoreInvites2 = policies2[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites2).toBeTruthy();
@@ -1698,7 +1736,7 @@ describe("MatrixClient", function() {
 
             // Check where it shows up.
             const targetRoomId = ignoreInvites2.target;
-            const targetRoom = client.getRoom(targetRoomId);
+            const targetRoom = client.getRoom(targetRoomId) as WrappedRoom;
             expect(targetRoom._state.get(PolicyScope.User)[eventId]).toBeTruthy();
             expect(newSourceRoom._state.get(PolicyScope.User)?.[eventId]).toBeFalsy();
         });

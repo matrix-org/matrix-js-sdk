@@ -17,7 +17,7 @@ limitations under the License.
 import { UnstableValue } from "matrix-events-sdk";
 
 import { MatrixClient } from "../client";
-import { MatrixEvent } from "./event";
+import { IContent, MatrixEvent } from "./event";
 import { EventTimeline } from "./event-timeline";
 import { Preset } from "../@types/partials";
 import { globToRegexp } from "../utils";
@@ -81,10 +81,10 @@ export class IgnoredInvites {
     /**
      * Add a new rule.
      *
-     * @param scope The scope for this rule.
-     * @param entity The entity covered by this rule. Globs are supported.
-     * @param reason A human-readable reason for introducing this new rule.
-     * @return The event id for the new rule.
+     * @param scope - The scope for this rule.
+     * @param entity - The entity covered by this rule. Globs are supported.
+     * @param reason - A human-readable reason for introducing this new rule.
+     * @returns The event id for the new rule.
      */
     public async addRule(scope: PolicyScope, entity: string, reason: string): Promise<string> {
         const target = await this.getOrCreateTargetRoom();
@@ -107,9 +107,9 @@ export class IgnoredInvites {
      * Add a new room to the list of sources. If the user isn't a member of the
      * room, attempt to join it.
      *
-     * @param roomId A valid room id. If this room is already in the list
+     * @param roomId - A valid room id. If this room is already in the list
      * of sources, it will not be duplicated.
-     * @return `true` if the source was added, `false` if it was already present.
+     * @returns `true` if the source was added, `false` if it was already present.
      * @throws If `roomId` isn't the id of a room that the current user is already
      * member of or can join.
      *
@@ -142,8 +142,8 @@ export class IgnoredInvites {
     /**
      * Find out whether an invite should be ignored.
      *
-     * @param sender The user id for the user who issued the invite.
-     * @param roomId The room to which the user is invited.
+     * @param sender - The user id for the user who issued the invite.
+     * @param roomId - The room to which the user is invited.
      * @returns A rule matching the entity, if any was found, `null` otherwise.
      */
     public async getRuleForInvite({ sender, roomId }: {
@@ -262,7 +262,7 @@ export class IgnoredInvites {
      */
     public async getOrCreateSourceRooms(): Promise<Room[]> {
         const ignoreInvitesPolicies = this.getIgnoreInvitesPolicies();
-        let sources = ignoreInvitesPolicies.sources;
+        let sources: string[] = ignoreInvitesPolicies.sources;
 
         // Validate `sources`. If it is invalid, trash out the current `sources`
         // and create a new list of sources from `target`.
@@ -272,11 +272,11 @@ export class IgnoredInvites {
             hasChanges = true;
             sources = [];
         }
-        let sourceRooms: Room[] = sources
+        let sourceRooms = sources
             // `sources` could contain non-string / invalid room ids
             .filter(roomId => typeof roomId === "string")
             .map(roomId => this.client.getRoom(roomId))
-            .filter(room => !!room);
+            .filter(room => !!room) as Room[];
         if (sourceRooms.length != sources.length) {
             hasChanges = true;
         }
@@ -327,7 +327,7 @@ export class IgnoredInvites {
      */
     private getPoliciesAndIgnoreInvitesPolicies():
         {policies: {[key: string]: any}, ignoreInvitesPolicies: {[key: string]: any}} {
-        let policies = {};
+        let policies: IContent = {};
         for (const key of [POLICIES_ACCOUNT_EVENT_TYPE.name, POLICIES_ACCOUNT_EVENT_TYPE.altName]) {
             if (!key) {
                 continue;
