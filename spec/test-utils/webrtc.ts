@@ -115,12 +115,14 @@ export class MockRTCPeerConnection {
 
     private negotiationNeededListener?: () => void;
     public iceCandidateListener?: (e: RTCPeerConnectionIceEvent) => void;
+    public iceConnectionStateChangeListener?: () => void;
     public onTrackListener?: (e: RTCTrackEvent) => void;
     public needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
     private onReadyToNegotiate?: () => void;
     public localDescription: RTCSessionDescription;
     public signalingState: RTCSignalingState = "stable";
+    public iceConnectionState: RTCIceConnectionState = "connected";
     public transceivers: MockRTCRtpTransceiver[] = [];
 
     public static triggerAllNegotiations(): void {
@@ -156,6 +158,8 @@ export class MockRTCPeerConnection {
             this.negotiationNeededListener = listener;
         } else if (type == 'icecandidate') {
             this.iceCandidateListener = listener;
+        } else if (type === 'iceconnectionstatechange') {
+            this.iceConnectionStateChangeListener = listener;
         } else if (type == 'track') {
             this.onTrackListener = listener;
         }
