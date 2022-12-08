@@ -1080,24 +1080,6 @@ export class GroupCall extends TypedEventEmitter<
 
         // Find removed feeds
         [...this.userMediaFeeds, ...this.screenshareFeeds].filter((gf) => gf.disposed).forEach((feed) => {
-            // Only remove the participant if the other feed array doesn't have a feed
-            // from the given participant
-            if (
-                !(feed.purpose === SDPStreamMetadataPurpose.Usermedia
-                    ? this.screenshareFeeds
-                    : this.userMediaFeeds).some((f) =>
-                    (
-                        f.userId === feed.userId
-                        && f.deviceId === feed.deviceId
-                    ),
-                )
-            ) {
-                this.participants.get(feed.getMember()!)?.delete(feed.deviceId!);
-                if (this.participants.get(feed.getMember()!)?.size === 0) {
-                    this.participants.delete(feed.getMember()!);
-                }
-            }
-
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
             else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.removeScreenshareFeed(feed);
         });
@@ -1106,28 +1088,6 @@ export class GroupCall extends TypedEventEmitter<
         call.getRemoteFeeds().filter((cf) => {
             return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
         }).forEach((feed) => {
-            const participant = this.participants.get(feed.getMember()!);
-            if (participant) {
-                participant.set(
-                    feed.deviceId!,
-                    {
-                        sessionId: call.getOpponentSessionId()!,
-                        screensharing: false,
-                    },
-                );
-            } else {
-                this.participants.set(
-                    feed.getMember()!,
-                    new Map([[
-                        feed.deviceId!,
-                        {
-                            sessionId: call.getOpponentSessionId()!,
-                            screensharing: false,
-                        },
-                    ]]),
-                );
-            }
-
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
             else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.addScreenshareFeed(feed);
         });
