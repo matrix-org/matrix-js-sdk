@@ -274,7 +274,7 @@ describe("MatrixClient", function() {
     describe('timestampToEvent', () => {
         const roomId = '!room:server.org';
         const eventId = "$eventId:example.org";
-        const unstableMsc3030Prefix = "/_matrix/client/unstable/org.matrix.msc3030";
+        const unstableMSC3030Prefix = "/_matrix/client/unstable/org.matrix.msc3030";
 
         it('should call stable endpoint', async () => {
             httpLookups = [{
@@ -318,7 +318,7 @@ describe("MatrixClient", function() {
             }, {
                 method: "GET",
                 path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-                prefix: unstableMsc3030Prefix,
+                prefix: unstableMSC3030Prefix,
                 data: { event_id: eventId },
                 expectQueryParams: {
                     ts: '0',
@@ -354,7 +354,7 @@ describe("MatrixClient", function() {
                 { prefix: unstablePrefix },
             ] = client.http.authedRequest.mock.calls[1];
             expect(unstableMethod).toStrictEqual('GET');
-            expect(unstablePrefix).toStrictEqual(unstableMsc3030Prefix);
+            expect(unstablePrefix).toStrictEqual(unstableMSC3030Prefix);
             expect(unstablePath).toStrictEqual(
                 `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
             );
