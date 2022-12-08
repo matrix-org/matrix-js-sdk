@@ -23,7 +23,7 @@ import HttpBackend from "matrix-mock-request";
 import * as olmlib from "../../../src/crypto/olmlib";
 import { MatrixError } from '../../../src/http-api';
 import { logger } from '../../../src/logger';
-import { ICrossSigningKey, ICreateClientOpts, ISignedKey } from '../../../src/client';
+import { ICrossSigningKey, ICreateClientOpts, ISignedKey, MatrixClient } from '../../../src/client';
 import { CryptoEvent, IBootstrapCrossSigningOpts } from '../../../src/crypto';
 import { IDevice } from '../../../src/crypto/deviceinfo';
 import { TestClient } from '../../TestClient';
@@ -1135,5 +1135,69 @@ describe("Cross Signing", function() {
         const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         expect(alice.checkIfOwnDeviceCrossSigned("notadevice")).toBeFalsy();
         alice.stopClient();
+    });
+});
+
+describe("userHasCrossSigningKeys", function() {
+    if (!global.Olm) {
+        return;
+    }
+
+    beforeAll(() => {
+        return global.Olm.init();
+    });
+
+    let aliceClient: MatrixClient;
+    let httpBackend: HttpBackend;
+    beforeEach(async () => {
+        const testClient = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        aliceClient = testClient.client;
+        httpBackend = testClient.httpBackend;
+    });
+
+    afterEach(() => {
+        aliceClient.stopClient();
+    });
+
+    it("should download devices and return true if one is a cross-signing key", async () => {
+        httpBackend
+            .when("POST", "/keys/query")
+            .respond(200, {
+                "master_keys": {
+                    "@alice:example.com": {
+                        user_id: "@alice:example.com",
+                        usage: ["master"],
+                        keys: {
+                            "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
+                            "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+                        },
+                    },
+                },
+            });
+
+        let result: boolean;
+        await Promise.all([
+            httpBackend.flush("/keys/query"),
+            aliceClient.userHasCrossSigningKeys().then((res) => {result = res;}),
+        ]);
+        expect(result!).toBeTruthy();
+    });
+
+    it("should download devices and return false if there is no cross-signing key", async () => {
+        httpBackend
+            .when("POST", "/keys/query")
+            .respond(200, {});
+
+        let result: boolean;
+        await Promise.all([
+            httpBackend.flush("/keys/query"),
+            aliceClient.userHasCrossSigningKeys().then((res) => {result = res;}),
+        ]);
+        expect(result!).toBeFalsy();
+    });
+
+    it("throws an error if crypto is disabled", () => {
+        aliceClient.crypto = undefined;
+        expect(() => aliceClient.userHasCrossSigningKeys()).toThrowError("encryption disabled");
     });
 });

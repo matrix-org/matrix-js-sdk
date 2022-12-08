@@ -719,6 +719,19 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
     }
 
     /**
+     * Checks if the user has previously published cross-signing keys
+     *
+     * This means downloading the devicelist for the user and checking if the list includes
+     * the cross-signing pseudo-device.
+     *
+     * @internal
+     */
+    public async userHasCrossSigningKeys(): Promise<boolean> {
+        await this.downloadKeys([this.userId]);
+        return this.deviceList.getStoredCrossSigningForUser(this.userId) !== null;
+    }
+
+    /**
      * Checks whether cross signing:
      * - is enabled on this account and trusted by this device
      * - has private keys either cached locally or stored in secret storage
