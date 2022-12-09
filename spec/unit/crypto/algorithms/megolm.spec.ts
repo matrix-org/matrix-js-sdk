@@ -491,7 +491,7 @@ describe("MegolmDecryption", function () {
                 expect(mockBaseApis.queueToDevice).not.toHaveBeenCalled();
             });
 
-            it("sholdn't wedge the setup promise if sharing a room key fails", async () => {
+            it("shouldn't wedge the setup promise if sharing a room key fails", async () => {
                 // @ts-ignore - private field access
                 const initialSetupPromise = await megolmEncryption.setupPromise;
                 expect(initialSetupPromise).toBe(null);
