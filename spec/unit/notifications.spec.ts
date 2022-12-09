@@ -138,6 +138,29 @@ describe("fixNotificationCountOnDecryption", () => {
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
     });
 
+    it("does not calculate for threads unknown to the room", () => {
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
+
+        const unknownThreadEvent = mkEvent({
+            type: EventType.RoomMessage,
+            content: {
+                "m.relates_to": {
+                    rel_type: RelationType.Thread,
+                    event_id: "$unknownthread",
+                },
+                "msgtype": MsgType.Text,
+                "body": "Thread reply",
+            },
+            event: true,
+        });
+
+        fixNotificationCountOnDecryption(mockClient, unknownThreadEvent);
+
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
+    });
+
     it("emits events", () => {
         const cb = jest.fn();
         room.on(RoomEvent.UnreadNotifications, cb);
