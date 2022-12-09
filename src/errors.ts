@@ -22,7 +22,8 @@ export class InvalidStoreError extends Error {
     public static TOGGLED_LAZY_LOADING = InvalidStoreState.ToggledLazyLoading;
 
     public constructor(public readonly reason: InvalidStoreState, public readonly value: any) {
-        const message = `Store is invalid because ${reason}, ` +
+        const message =
+            `Store is invalid because ${reason}, ` +
             `please stop the client, delete all data and start the client again`;
         super(message);
         this.name = "InvalidStoreError";
@@ -37,10 +38,11 @@ export class InvalidCryptoStoreError extends Error {
     public static TOO_NEW = InvalidCryptoStoreState.TooNew;
 
     public constructor(public readonly reason: InvalidCryptoStoreState) {
-        const message = `Crypto store is invalid because ${reason}, ` +
+        const message =
+            `Crypto store is invalid because ${reason}, ` +
             `please stop the client, delete all data and start the client again`;
         super(message);
-        this.name = 'InvalidCryptoStoreError';
+        this.name = "InvalidCryptoStoreError";
     }
 }
 

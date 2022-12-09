@@ -23,4 +23,5 @@ import { ServerControlledNamespacedValue } from "../NamespacedValue";
  */
 export const UNREAD_THREAD_NOTIFICATIONS = new ServerControlledNamespacedValue(
     "unread_thread_notifications",
-    "org.matrix.msc3773.unread_thread_notifications");
+    "org.matrix.msc3773.unread_thread_notifications",
+);

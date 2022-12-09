@@ -44,9 +44,7 @@ describe("InteractiveAuth", () => {
             requestEmailToken: jest.fn(),
             authData: {
                 session: "sessionId",
-                flows: [
-                    { stages: [AuthType.Password] },
-                ],
+                flows: [{ stages: [AuthType.Password] }],
                 params: {
                     [AuthType.Password]: { param: "aa" },
                 },
@@ -60,7 +58,7 @@ describe("InteractiveAuth", () => {
 
         // first we expect a call here
         stateUpdated.mockImplementation((stage) => {
-            logger.log('aaaa');
+            logger.log("aaaa");
             expect(stage).toEqual(AuthType.Password);
             ia.submitAuthDict({
                 type: AuthType.Password,
@@ -68,9 +66,9 @@ describe("InteractiveAuth", () => {
         });
 
         // .. which should trigger a call here
-        const requestRes = { "a": "b" };
+        const requestRes = { a: "b" };
         doRequest.mockImplementation(async (authData) => {
-            logger.log('cccc');
+            logger.log("cccc");
             expect(authData).toEqual({
                 session: "sessionId",
                 type: AuthType.Password,
@@ -95,9 +93,7 @@ describe("InteractiveAuth", () => {
             requestEmailToken: jest.fn(),
             authData: {
                 session: "sessionId",
-                flows: [
-                    { stages: [AuthType.Password] },
-                ],
+                flows: [{ stages: [AuthType.Password] }],
                 errcode: "MockError0",
                 params: {
                     [AuthType.Password]: { param: "aa" },
@@ -112,7 +108,7 @@ describe("InteractiveAuth", () => {
 
         // first we expect a call here
         stateUpdated.mockImplementation((stage) => {
-            logger.log('aaaa');
+            logger.log("aaaa");
             expect(stage).toEqual(AuthType.Password);
             ia.submitAuthDict({
                 type: AuthType.Password,
@@ -120,9 +116,9 @@ describe("InteractiveAuth", () => {
         });
 
         // .. which should trigger a call here
-        const requestRes = { "a": "b" };
+        const requestRes = { a: "b" };
         doRequest.mockImplementation(async (authData) => {
-            logger.log('cccc');
+            logger.log("cccc");
             expect(authData).toEqual({
                 session: "sessionId",
                 type: AuthType.Password,
@@ -146,12 +142,10 @@ describe("InteractiveAuth", () => {
             stateUpdated,
             requestEmailToken,
             matrixClient: getFakeClient(),
-            emailSid: 'myEmailSid',
+            emailSid: "myEmailSid",
             authData: {
                 session: "sessionId",
-                flows: [
-                    { stages: [AuthType.Email, AuthType.Password] },
-                ],
+                flows: [{ stages: [AuthType.Email, AuthType.Password] }],
                 params: {
                     [AuthType.Email]: { param: "aa" },
                     [AuthType.Password]: { param: "bb" },
@@ -166,7 +160,7 @@ describe("InteractiveAuth", () => {
 
         // first we expect a call here
         stateUpdated.mockImplementation((stage) => {
-            logger.log('husky');
+            logger.log("husky");
             expect(stage).toEqual(AuthType.Email);
             ia.submitAuthDict({
                 type: AuthType.Email,
@@ -174,9 +168,9 @@ describe("InteractiveAuth", () => {
         });
 
         // .. which should trigger a call here
-        const requestRes = { "a": "b" };
+        const requestRes = { a: "b" };
         doRequest.mockImplementation(async (authData) => {
-            logger.log('barfoo');
+            logger.log("barfoo");
             expect(authData).toEqual({
                 session: "sessionId",
                 type: AuthType.Email,
@@ -211,20 +205,21 @@ describe("InteractiveAuth", () => {
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual(null); // first request should be null
-            const err = new MatrixError({
-                session: "sessionId",
-                flows: [
-                    { stages: [AuthType.Password] },
-                ],
-                params: {
-                    [AuthType.Password]: { param: "aa" },
+            const err = new MatrixError(
+                {
+                    session: "sessionId",
+                    flows: [{ stages: [AuthType.Password] }],
+                    params: {
+                        [AuthType.Password]: { param: "aa" },
+                    },
                 },
-            }, 401);
+                401,
+            );
             throw err;
         });
 
         // .. which should be followed by a call to stateUpdated
-        const requestRes = { "a": "b" };
+        const requestRes = { a: "b" };
         stateUpdated.mockImplementation((stage) => {
             expect(stage).toEqual(AuthType.Password);
             expect(ia.getSessionId()).toEqual("sessionId");
@@ -272,20 +267,21 @@ describe("InteractiveAuth", () => {
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual(null); // first request should be null
-            const err = new MatrixError({
-                session: "sessionId",
-                flows: [
-                    { stages: [AuthType.Password] },
-                ],
-                params: {
-                    [AuthType.Password]: { param: "aa" },
+            const err = new MatrixError(
+                {
+                    session: "sessionId",
+                    flows: [{ stages: [AuthType.Password] }],
+                    params: {
+                        [AuthType.Password]: { param: "aa" },
+                    },
                 },
-            }, 401);
+                401,
+            );
             throw err;
         });
 
         // .. which should be followed by a call to stateUpdated
-        const requestRes = { "a": "b" };
+        const requestRes = { a: "b" };
         stateUpdated.mockImplementation((stage) => {
             expect(stage).toEqual(AuthType.Password);
             expect(ia.getSessionId()).toEqual("sessionId");
@@ -329,19 +325,20 @@ describe("InteractiveAuth", () => {
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual(null); // first request should be null
-            const err = new MatrixError({
-                session: "sessionId",
-                flows: [],
-                params: {
-                    [AuthType.Password]: { param: "aa" },
+            const err = new MatrixError(
+                {
+                    session: "sessionId",
+                    flows: [],
+                    params: {
+                        [AuthType.Password]: { param: "aa" },
+                    },
                 },
-            }, 401);
+                401,
+            );
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
-            new Error('No appropriate authentication flow found'),
-        );
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("No appropriate authentication flow found"));
     });
 
     it("should start an auth stage and reject if no auth flow but has session", async () => {
@@ -354,29 +351,29 @@ describe("InteractiveAuth", () => {
             doRequest,
             stateUpdated,
             requestEmailToken,
-            authData: {
-            },
+            authData: {},
             sessionId: "sessionId",
         });
 
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
-            expect(authData).toEqual({ "session": "sessionId" }); // has existing sessionId
-            const err = new MatrixError({
-                session: "sessionId",
-                flows: [],
-                params: {
-                    [AuthType.Password]: { param: "aa" },
+            expect(authData).toEqual({ session: "sessionId" }); // has existing sessionId
+            const err = new MatrixError(
+                {
+                    session: "sessionId",
+                    flows: [],
+                    params: {
+                        [AuthType.Password]: { param: "aa" },
+                    },
+                    error: "Mock Error 1",
+                    errcode: "MOCKERR1",
                 },
-                error: "Mock Error 1",
-                errcode: "MOCKERR1",
-            }, 401);
+                401,
+            );
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
-            new Error('No appropriate authentication flow found'),
-        );
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("No appropriate authentication flow found"));
     });
 
     it("should handle unexpected error types without data propery set", async () => {
@@ -396,14 +393,12 @@ describe("InteractiveAuth", () => {
 
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
-            expect(authData).toEqual({ "session": "sessionId" }); // has existing sessionId
-            const err = new HTTPError('myerror', 401);
+            expect(authData).toEqual({ session: "sessionId" }); // has existing sessionId
+            const err = new HTTPError("myerror", 401);
             throw err;
         });
 
-        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(
-            new Error("myerror"),
-        );
+        await expect(ia.attemptAuth.bind(ia)).rejects.toThrow(new Error("myerror"));
     });
 
     it("should allow dummy auth", async () => {
@@ -417,15 +412,13 @@ describe("InteractiveAuth", () => {
             stateUpdated,
             requestEmailToken,
             authData: {
-                session: 'sessionId',
-                flows: [
-                    { stages: [AuthType.Dummy] },
-                ],
+                session: "sessionId",
+                flows: [{ stages: [AuthType.Dummy] }],
                 params: {},
             },
         });
 
-        const requestRes = { "a": "b" };
+        const requestRes = { a: "b" };
         doRequest.mockImplementation((authData) => {
             logger.log("request1", authData);
             expect(authData).toEqual({
@@ -450,7 +443,9 @@ describe("InteractiveAuth", () => {
 
             const ia = new InteractiveAuth({
                 matrixClient: getFakeClient(),
-                doRequest, stateUpdated, requestEmailToken,
+                doRequest,
+                stateUpdated,
+                requestEmailToken,
             });
 
             await ia.requestEmailToken();
@@ -477,7 +472,9 @@ describe("InteractiveAuth", () => {
 
             const ia = new InteractiveAuth({
                 matrixClient: getFakeClient(),
-                doRequest, stateUpdated, requestEmailToken,
+                doRequest,
+                stateUpdated,
+                requestEmailToken,
             });
 
             await ia.requestEmailToken();
@@ -506,7 +503,9 @@ describe("InteractiveAuth", () => {
 
             const ia = new InteractiveAuth({
                 matrixClient: getFakeClient(),
-                doRequest, stateUpdated, requestEmailToken,
+                doRequest,
+                stateUpdated,
+                requestEmailToken,
             });
 
             await expect(ia.requestEmailToken.bind(ia)).rejects.toThrowError("unspecific network error");
@@ -520,7 +519,9 @@ describe("InteractiveAuth", () => {
 
             const ia = new InteractiveAuth({
                 matrixClient: getFakeClient(),
-                doRequest, stateUpdated, requestEmailToken,
+                doRequest,
+                stateUpdated,
+                requestEmailToken,
             });
 
             await Promise.all([ia.requestEmailToken(), ia.requestEmailToken(), ia.requestEmailToken()]);
@@ -536,7 +537,9 @@ describe("InteractiveAuth", () => {
 
             const ia = new InteractiveAuth({
                 matrixClient: getFakeClient(),
-                doRequest, stateUpdated, requestEmailToken,
+                doRequest,
+                stateUpdated,
+                requestEmailToken,
             });
 
             await ia.requestEmailToken();

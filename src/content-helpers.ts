@@ -123,16 +123,10 @@ export const getTextForLocationEvent = (
     description?: string | null,
 ): string => {
     const date = `at ${new Date(timestamp!).toISOString()}`;
-    const assetName = assetType === LocationAssetType.Self ? 'User' : undefined;
+    const assetName = assetType === LocationAssetType.Self ? "User" : undefined;
     const quotedDescription = description ? `"${description}"` : undefined;
 
-    return [
-        assetName,
-        'Location',
-        quotedDescription,
-        uri,
-        date,
-    ].filter(Boolean).join(' ');
+    return [assetName, "Location", quotedDescription, uri, date].filter(Boolean).join(" ");
 };
 
 /**
@@ -152,8 +146,8 @@ export const makeLocationContent = (
     description?: string | null,
     assetType?: LocationAssetType,
 ): LegacyLocationEventContent & MLocationEventContent => {
-    const defaultedText = text ??
-        getTextForLocationEvent(uri, assetType || LocationAssetType.Self, timestamp, description);
+    const defaultedText =
+        text ?? getTextForLocationEvent(uri, assetType || LocationAssetType.Self, timestamp, description);
     const timestampEvent = timestamp ? { [M_TIMESTAMP.name]: timestamp } : {};
     return {
         msgtype: MsgType.Location,
@@ -192,10 +186,7 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
 /**
  * Topic event helpers
  */
-export type MakeTopicContent = (
-    topic: string,
-    htmlTopic?: string,
-) => MRoomTopicEventContent;
+export type MakeTopicContent = (topic: string, htmlTopic?: string) => MRoomTopicEventContent;
 
 export const makeTopicContent: MakeTopicContent = (topic, htmlTopic) => {
     const renderings = [{ body: topic, mimetype: "text/plain" }];
@@ -212,8 +203,8 @@ export type TopicState = {
 
 export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
     const mtopic = M_TOPIC.findIn<MTopicContent>(content);
-    const text = mtopic?.find(r => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic;
-    const html = mtopic?.find(r => r.mimetype === "text/html")?.body;
+    const text = mtopic?.find((r) => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic;
+    const html = mtopic?.find((r) => r.mimetype === "text/html")?.body;
     return { text, html };
 };
 
@@ -225,16 +216,10 @@ export type MakeBeaconInfoContent = (
     isLive?: boolean,
     description?: string,
     assetType?: LocationAssetType,
-    timestamp?: number
+    timestamp?: number,
 ) => MBeaconInfoEventContent;
 
-export const makeBeaconInfoContent: MakeBeaconInfoContent = (
-    timeout,
-    isLive,
-    description,
-    assetType,
-    timestamp,
-) => ({
+export const makeBeaconInfoContent: MakeBeaconInfoContent = (timeout, isLive, description, assetType, timestamp) => ({
     description,
     timeout,
     live: isLive,
@@ -272,12 +257,7 @@ export type MakeBeaconContent = (
     description?: string,
 ) => MBeaconEventContent;
 
-export const makeBeaconContent: MakeBeaconContent = (
-    uri,
-    timestamp,
-    beaconInfoEventId,
-    description,
-) => ({
+export const makeBeaconContent: MakeBeaconContent = (uri, timestamp, beaconInfoEventId, description) => ({
     [M_LOCATION.name]: {
         description,
         uri,

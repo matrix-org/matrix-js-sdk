@@ -33,7 +33,7 @@ import { IEncryptedPayload } from "../aes";
  */
 
 export interface SecretStorePrivateKeys {
-    dehydration: {
+    "dehydration": {
         keyInfo: DehydrationManager["keyInfo"];
         key: IEncryptedPayload;
         deviceDisplayName: string;
@@ -106,10 +106,7 @@ export interface CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void;
-    getAllEndToEndInboundGroupSessions(
-        txn: unknown,
-        func: (session: ISession | null) => void,
-    ): void;
+    getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void;
     addEndToEndInboundGroupSession(
         senderCurve25519Key: string,
         sessionId: string,
@@ -167,12 +164,12 @@ export interface ISessionInfo {
 
 export interface IDeviceData {
     devices: {
-        [ userId: string ]: {
-            [ deviceId: string ]: IDevice;
+        [userId: string]: {
+            [deviceId: string]: IDevice;
         };
     };
     trackingStatus: {
-        [ userId: string ]: TrackingStatus;
+        [userId: string]: TrackingStatus;
     };
     crossSigningInfo?: Record<string, ICrossSigningInfo>;
     syncToken?: string;

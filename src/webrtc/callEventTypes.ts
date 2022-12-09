@@ -31,8 +31,8 @@ export interface SDPStreamMetadata {
 }
 
 export interface CallCapabilities {
-    'm.call.transferee': boolean;
-    'm.call.dtmf': boolean;
+    "m.call.transferee": boolean;
+    "m.call.dtmf": boolean;
 }
 
 export interface CallReplacesTarget {

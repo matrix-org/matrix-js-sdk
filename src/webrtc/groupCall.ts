@@ -59,7 +59,9 @@ export type GroupCallEventHandlerMap = {
     [GroupCallEvent.UserMediaFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.ScreenshareFeedsChanged]: (feeds: CallFeed[]) => void;
     [GroupCallEvent.LocalScreenshareStateChanged]: (
-        isScreensharing: boolean, feed?: CallFeed, sourceId?: string,
+        isScreensharing: boolean,
+        feed?: CallFeed,
+        sourceId?: string,
     ) => void;
     [GroupCallEvent.LocalMuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [GroupCallEvent.ParticipantsChanged]: (participants: Map<RoomMember, Map<string, ParticipantState>>) => void;
@@ -84,7 +86,7 @@ export type GroupCallEventHandlerMap = {
 export enum GroupCallErrorCode {
     NoUserMedia = "no_user_media",
     UnknownDevice = "unknown_device",
-    PlaceCallFailed = "place_call_failed"
+    PlaceCallFailed = "place_call_failed",
 }
 
 export class GroupCallError extends Error {
@@ -222,9 +224,8 @@ export class GroupCall extends TypedEventEmitter<
         super();
         this.reEmitter = new ReEmitter(this);
         this.groupCallId = groupCallId ?? genCallID();
-        this.creationTs = room.currentState.getStateEvents(
-            EventType.GroupCallPrefix, this.groupCallId,
-        )?.getTs() ?? null;
+        this.creationTs =
+            room.currentState.getStateEvents(EventType.GroupCallPrefix, this.groupCallId)?.getTs() ?? null;
         this.updateParticipants();
 
         room.on(RoomStateEvent.Update, this.onRoomState);
@@ -247,12 +248,7 @@ export class GroupCall extends TypedEventEmitter<
             "dataChannelOptions": this.dataChannelsEnabled ? this.dataChannelOptions : undefined,
         };
 
-        await this.client.sendStateEvent(
-            this.room.roomId,
-            EventType.GroupCallPrefix,
-            groupCallState,
-            this.groupCallId,
-        );
+        await this.client.sendStateEvent(this.room.roomId, EventType.GroupCallPrefix, groupCallState, this.groupCallId);
 
         return this;
     }
@@ -356,9 +352,10 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     public hasLocalParticipant(): boolean {
-        return this.participants.get(
-            this.room.getMember(this.client.getUserId()!)!,
-        )?.has(this.client.getDeviceId()!) ?? false;
+        return (
+            this.participants.get(this.room.getMember(this.client.getUserId()!)!)?.has(this.client.getDeviceId()!) ??
+            false
+        );
     }
 
     public async initLocalCallFeed(): Promise<CallFeed> {
@@ -420,9 +417,9 @@ export class GroupCall extends TypedEventEmitter<
             this.localCallFeed.setNewStream(stream);
             const micShouldBeMuted = this.localCallFeed.isAudioMuted();
             const vidShouldBeMuted = this.localCallFeed.isVideoMuted();
-            logger.log(`groupCall ${this.groupCallId} updateLocalUsermediaStream oldStream ${
-                oldStream.id} newStream ${stream.id} micShouldBeMuted ${
-                micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`);
+            logger.log(
+                `groupCall ${this.groupCallId} updateLocalUsermediaStream oldStream ${oldStream.id} newStream ${stream.id} micShouldBeMuted ${micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`,
+            );
             setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
             setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
             this.client.getMediaHandler().stopUserMediaStream(oldStream);
@@ -562,7 +559,7 @@ export class GroupCall extends TypedEventEmitter<
             return;
         }
 
-        this.forEachCall(call => this.disposeCall(call, CallErrorCode.UserHangup));
+        this.forEachCall((call) => this.disposeCall(call, CallErrorCode.UserHangup));
         this.calls.clear();
 
         this.activeSpeaker = undefined;
@@ -589,7 +586,8 @@ export class GroupCall extends TypedEventEmitter<
 
         if (emitStateEvent) {
             const existingStateEvent = this.room.currentState.getStateEvents(
-                EventType.GroupCallPrefix, this.groupCallId,
+                EventType.GroupCallPrefix,
+                this.groupCallId,
             )!;
 
             await this.client.sendStateEvent(
@@ -633,7 +631,7 @@ export class GroupCall extends TypedEventEmitter<
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through
-        if (!muted && !await this.client.getMediaHandler().hasAudioDevice()) {
+        if (!muted && !(await this.client.getMediaHandler().hasAudioDevice())) {
             return false;
         }
 
@@ -652,22 +650,21 @@ export class GroupCall extends TypedEventEmitter<
             }
         }
 
-        this.forEachCall(call => call.localUsermediaFeed?.setAudioVideoMuted(muted, null));
+        this.forEachCall((call) => call.localUsermediaFeed?.setAudioVideoMuted(muted, null));
 
         const sendUpdates = async (): Promise<void> => {
             const updates: Promise<void>[] = [];
-            this.forEachCall(call => updates.push(call.sendMetadataUpdate()));
+            this.forEachCall((call) => updates.push(call.sendMetadataUpdate()));
 
-            await Promise.all(updates).catch(
-                e => logger.info("Failed to send some metadata updates", e),
-            );
+            await Promise.all(updates).catch((e) => logger.info("Failed to send some metadata updates", e));
         };
 
         if (sendUpdatesBefore) await sendUpdates();
 
         if (this.localCallFeed) {
-            logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted stream ${
-                this.localCallFeed.stream.id} muted ${muted}`);
+            logger.log(
+                `groupCall ${this.groupCallId} setMicrophoneMuted stream ${this.localCallFeed.stream.id} muted ${muted}`,
+            );
             this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
             // are the one on the groupcall's own CallFeed and are cloned before being
@@ -679,7 +676,7 @@ export class GroupCall extends TypedEventEmitter<
             this.initWithAudioMuted = muted;
         }
 
-        this.forEachCall(call => setTracksEnabled(call.localUsermediaFeed!.stream.getAudioTracks(), !muted));
+        this.forEachCall((call) => setTracksEnabled(call.localUsermediaFeed!.stream.getAudioTracks(), !muted));
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
@@ -696,13 +693,14 @@ export class GroupCall extends TypedEventEmitter<
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through
-        if (!muted && !await this.client.getMediaHandler().hasVideoDevice()) {
+        if (!muted && !(await this.client.getMediaHandler().hasVideoDevice())) {
             return false;
         }
 
         if (this.localCallFeed) {
-            logger.log(`groupCall ${this.groupCallId} setLocalVideoMuted stream ${
-                this.localCallFeed.stream.id} muted ${muted}`);
+            logger.log(
+                `groupCall ${this.groupCallId} setLocalVideoMuted stream ${this.localCallFeed.stream.id} muted ${muted}`,
+            );
             this.localCallFeed.setAudioVideoMuted(null, muted);
             setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
         } else {
@@ -711,7 +709,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         const updates: Promise<unknown>[] = [];
-        this.forEachCall(call => updates.push(call.setLocalVideoMuted(muted)));
+        this.forEachCall((call) => updates.push(call.setLocalVideoMuted(muted)));
         await Promise.all(updates);
 
         this.emit(GroupCallEvent.LocalMuteStateChanged, this.isMicrophoneMuted(), muted);
@@ -719,9 +717,7 @@ export class GroupCall extends TypedEventEmitter<
         return true;
     }
 
-    public async setScreensharingEnabled(
-        enabled: boolean, opts: IScreensharingOpts = {},
-    ): Promise<boolean> {
+    public async setScreensharingEnabled(enabled: boolean, opts: IScreensharingOpts = {}): Promise<boolean> {
         if (enabled === this.isScreensharing()) {
             return enabled;
         }
@@ -772,16 +768,18 @@ export class GroupCall extends TypedEventEmitter<
             } catch (error) {
                 if (opts.throwOnFail) throw error;
                 logger.error("Enabling screensharing error", error);
-                this.emit(GroupCallEvent.Error,
+                this.emit(
+                    GroupCallEvent.Error,
                     new GroupCallError(
                         GroupCallErrorCode.NoUserMedia,
-                        "Failed to get screen-sharing stream: ", error as Error,
+                        "Failed to get screen-sharing stream: ",
+                        error as Error,
                     ),
                 );
                 return false;
             }
         } else {
-            this.forEachCall(call => {
+            this.forEachCall((call) => {
                 if (call.localScreensharingFeed) call.removeLocalFeed(call.localScreensharingFeed);
             });
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed!.stream);
@@ -822,8 +820,9 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         if (!newCall.groupCallId || newCall.groupCallId !== this.groupCallId) {
-            logger.log(`Incoming call with groupCallId ${
-                newCall.groupCallId} ignored because it doesn't match the current group call`);
+            logger.log(
+                `Incoming call with groupCallId ${newCall.groupCallId} ignored because it doesn't match the current group call`,
+            );
             newCall.reject();
             return;
         }
@@ -863,9 +862,9 @@ export class GroupCall extends TypedEventEmitter<
         const localDeviceId = this.client.getDeviceId()!;
         return (
             // If a user's ID is less than our own, they'll call us
-            userId >= localUserId
+            userId >= localUserId &&
             // If this is another one of our devices, compare device IDs to tell whether it'll call us
-            && (userId !== localUserId || deviceId > localDeviceId)
+            (userId !== localUserId || deviceId > localDeviceId)
         );
     }
 
@@ -884,8 +883,8 @@ export class GroupCall extends TypedEventEmitter<
                 const prevCall = callMap.get(deviceId);
 
                 if (
-                    prevCall?.getOpponentSessionId() !== participant.sessionId
-                    && this.wantsOutgoingCall(member.userId, deviceId)
+                    prevCall?.getOpponentSessionId() !== participant.sessionId &&
+                    this.wantsOutgoingCall(member.userId, deviceId)
                 ) {
                     callsChanged = true;
 
@@ -894,16 +893,12 @@ export class GroupCall extends TypedEventEmitter<
                         this.disposeCall(prevCall, CallErrorCode.NewSession);
                     }
 
-                    const newCall = createNewMatrixCall(
-                        this.client,
-                        this.room.roomId,
-                        {
-                            invitee: member.userId,
-                            opponentDeviceId: deviceId,
-                            opponentSessionId: participant.sessionId,
-                            groupCallId: this.groupCallId,
-                        },
-                    );
+                    const newCall = createNewMatrixCall(this.client, this.room.roomId, {
+                        invitee: member.userId,
+                        opponentDeviceId: deviceId,
+                        opponentSessionId: participant.sessionId,
+                        groupCallId: this.groupCallId,
+                    });
 
                     if (newCall === null) {
                         logger.error(`Failed to create call with ${member.userId} ${deviceId}`);
@@ -912,35 +907,36 @@ export class GroupCall extends TypedEventEmitter<
                         this.initCall(newCall);
                         callMap.set(deviceId, newCall);
 
-                        logger.debug(
-                            `Placing call to ${member.userId} ${deviceId} (session ${participant.sessionId})`,
-                        );
+                        logger.debug(`Placing call to ${member.userId} ${deviceId} (session ${participant.sessionId})`);
 
-                        newCall.placeCallWithCallFeeds(
-                            this.getLocalFeeds().map(feed => feed.clone()),
-                            participant.screensharing,
-                        ).then(() => {
-                            if (this.dataChannelsEnabled) {
-                                newCall.createDataChannel("datachannel", this.dataChannelOptions);
-                            }
-                        }).catch(e => {
-                            logger.warn(`Failed to place call to ${member.userId}`, e);
+                        newCall
+                            .placeCallWithCallFeeds(
+                                this.getLocalFeeds().map((feed) => feed.clone()),
+                                participant.screensharing,
+                            )
+                            .then(() => {
+                                if (this.dataChannelsEnabled) {
+                                    newCall.createDataChannel("datachannel", this.dataChannelOptions);
+                                }
+                            })
+                            .catch((e) => {
+                                logger.warn(`Failed to place call to ${member.userId}`, e);
 
-                            if (e instanceof CallError && e.code === GroupCallErrorCode.UnknownDevice) {
-                                this.emit(GroupCallEvent.Error, e);
-                            } else {
-                                this.emit(
-                                    GroupCallEvent.Error,
-                                    new GroupCallError(
-                                        GroupCallErrorCode.PlaceCallFailed,
-                                        `Failed to place call to ${member.userId}`,
-                                    ),
-                                );
-                            }
+                                if (e instanceof CallError && e.code === GroupCallErrorCode.UnknownDevice) {
+                                    this.emit(GroupCallEvent.Error, e);
+                                } else {
+                                    this.emit(
+                                        GroupCallEvent.Error,
+                                        new GroupCallError(
+                                            GroupCallErrorCode.PlaceCallFailed,
+                                            `Failed to place call to ${member.userId}`,
+                                        ),
+                                    );
+                                }
 
-                            this.disposeCall(newCall, CallErrorCode.SignallingFailed);
-                            if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
-                        });
+                                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
+                                if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
+                            });
                     }
                 }
             }
@@ -979,9 +975,9 @@ export class GroupCall extends TypedEventEmitter<
                 const retries = retriesMap?.get(deviceId) ?? 0;
 
                 if (
-                    call?.getOpponentSessionId() !== participant.sessionId
-                    && this.wantsOutgoingCall(member.userId, deviceId)
-                    && retries < 3
+                    call?.getOpponentSessionId() !== participant.sessionId &&
+                    this.wantsOutgoingCall(member.userId, deviceId) &&
+                    retries < 3
                 ) {
                     if (retriesMap === undefined) {
                         retriesMap = new Map();
@@ -1004,10 +1000,8 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         const onCallFeedsChanged = (): void => this.onCallFeedsChanged(call);
-        const onCallStateChanged = (
-            state: CallState,
-            oldState?: CallState,
-        ): void => this.onCallStateChanged(call, state, oldState);
+        const onCallStateChanged = (state: CallState, oldState?: CallState): void =>
+            this.onCallStateChanged(call, state, oldState);
         const onCallHangup = this.onCallHangup;
         const onCallReplaced = (newCall: MatrixCall): void => this.onCallReplaced(call, newCall);
 
@@ -1045,12 +1039,8 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         const deviceMap = this.callHandlers.get(opponentMemberId)!;
-        const {
-            onCallFeedsChanged,
-            onCallStateChanged,
-            onCallHangup,
-            onCallReplaced,
-        } = deviceMap.get(opponentDeviceId)!;
+        const { onCallFeedsChanged, onCallStateChanged, onCallHangup, onCallReplaced } =
+            deviceMap.get(opponentDeviceId)!;
 
         call.removeListener(CallEvent.FeedsChanged, onCallFeedsChanged);
         call.removeListener(CallEvent.State, onCallStateChanged);
@@ -1102,19 +1092,13 @@ export class GroupCall extends TypedEventEmitter<
     private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState | undefined): void => {
         const audioMuted = this.localCallFeed!.isAudioMuted();
 
-        if (
-            call.localUsermediaStream &&
-            call.isMicrophoneMuted() !== audioMuted
-        ) {
+        if (call.localUsermediaStream && call.isMicrophoneMuted() !== audioMuted) {
             call.setMicrophoneMuted(audioMuted);
         }
 
         const videoMuted = this.localCallFeed!.isVideoMuted();
 
-        if (
-            call.localUsermediaStream &&
-            call.isLocalVideoMuted() !== videoMuted
-        ) {
+        if (call.localUsermediaStream && call.isLocalVideoMuted() !== videoMuted) {
             call.setLocalVideoMuted(videoMuted);
         }
 
@@ -1166,7 +1150,7 @@ export class GroupCall extends TypedEventEmitter<
      */
 
     public getUserMediaFeed(userId: string, deviceId: string): CallFeed | undefined {
-        return this.userMediaFeeds.find(f => f.userId === userId && f.deviceId! === deviceId);
+        return this.userMediaFeeds.find((f) => f.userId === userId && f.deviceId! === deviceId);
     }
 
     private addUserMediaFeed(callFeed: CallFeed): void {
@@ -1177,7 +1161,7 @@ export class GroupCall extends TypedEventEmitter<
 
     private removeUserMediaFeed(callFeed: CallFeed): void {
         const feedIndex = this.userMediaFeeds.findIndex(
-            f => f.userId === callFeed.userId && f.deviceId! === callFeed.deviceId,
+            (f) => f.userId === callFeed.userId && f.deviceId! === callFeed.deviceId,
         );
 
         if (feedIndex === -1) {
@@ -1224,7 +1208,7 @@ export class GroupCall extends TypedEventEmitter<
      */
 
     public getScreenshareFeed(userId: string, deviceId: string): CallFeed | undefined {
-        return this.screenshareFeeds.find(f => f.userId === userId && f.deviceId! === deviceId);
+        return this.screenshareFeeds.find((f) => f.userId === userId && f.deviceId! === deviceId);
     }
 
     private addScreenshareFeed(callFeed: CallFeed): void {
@@ -1234,7 +1218,7 @@ export class GroupCall extends TypedEventEmitter<
 
     private removeScreenshareFeed(callFeed: CallFeed): void {
         const feedIndex = this.screenshareFeeds.findIndex(
-            f => f.userId === callFeed.userId && f.deviceId! === callFeed.deviceId,
+            (f) => f.userId === callFeed.userId && f.deviceId! === callFeed.deviceId,
         );
 
         if (feedIndex === -1) {
@@ -1270,21 +1254,22 @@ export class GroupCall extends TypedEventEmitter<
             const member = this.room.getMember(e.getStateKey()!);
             const content = e.getContent<Record<any, unknown>>();
             const calls: Record<any, unknown>[] = Array.isArray(content["m.calls"]) ? content["m.calls"] : [];
-            const call = calls.find(call => call["m.call_id"] === this.groupCallId);
+            const call = calls.find((call) => call["m.call_id"] === this.groupCallId);
             const devices: Record<any, unknown>[] = Array.isArray(call?.["m.devices"]) ? call!["m.devices"] : [];
 
             // Filter out invalid and expired devices
-            let validDevices = devices.filter(d => (
-                typeof d.device_id === "string"
-                && typeof d.session_id === "string"
-                && typeof d.expires_ts === "number"
-                && d.expires_ts > now
-                && Array.isArray(d.feeds)
-            )) as unknown as IGroupCallRoomMemberDevice[];
+            let validDevices = devices.filter(
+                (d) =>
+                    typeof d.device_id === "string" &&
+                    typeof d.session_id === "string" &&
+                    typeof d.expires_ts === "number" &&
+                    d.expires_ts > now &&
+                    Array.isArray(d.feeds),
+            ) as unknown as IGroupCallRoomMemberDevice[];
 
             // Apply local echo for the unentered case
             if (!entered && member?.userId === this.client.getUserId()!) {
-                validDevices = validDevices.filter(d => d.device_id !== this.client.getDeviceId()!);
+                validDevices = validDevices.filter((d) => d.device_id !== this.client.getDeviceId()!);
             }
 
             // Must have a connected device and be joined to the room
@@ -1295,7 +1280,7 @@ export class GroupCall extends TypedEventEmitter<
                 for (const d of validDevices) {
                     deviceMap.set(d.device_id, {
                         sessionId: d.session_id,
-                        screensharing: d.feeds.some(f => f.purpose === SDPStreamMetadataPurpose.Screenshare),
+                        screensharing: d.feeds.some((f) => f.purpose === SDPStreamMetadataPurpose.Screenshare),
                     });
                     if (d.expires_ts < nextExpiration) nextExpiration = d.expires_ts;
                 }
@@ -1314,7 +1299,7 @@ export class GroupCall extends TypedEventEmitter<
             if (!deviceMap.has(this.client.getDeviceId()!)) {
                 deviceMap.set(this.client.getDeviceId()!, {
                     sessionId: this.client.getSessionId(),
-                    screensharing: this.getLocalFeeds().some(f => f.purpose === SDPStreamMetadataPurpose.Screenshare),
+                    screensharing: this.getLocalFeeds().some((f) => f.purpose === SDPStreamMetadataPurpose.Screenshare),
                 });
             }
         }
@@ -1356,18 +1341,19 @@ export class GroupCall extends TypedEventEmitter<
         const devices: Record<any, unknown>[] = Array.isArray(call["m.devices"]) ? call["m.devices"] : [];
 
         // Filter out invalid and expired devices
-        const validDevices = devices.filter(d => (
-            typeof d.device_id === "string"
-            && typeof d.session_id === "string"
-            && typeof d.expires_ts === "number"
-            && d.expires_ts > now
-            && Array.isArray(d.feeds)
-        )) as unknown as IGroupCallRoomMemberDevice[];
+        const validDevices = devices.filter(
+            (d) =>
+                typeof d.device_id === "string" &&
+                typeof d.session_id === "string" &&
+                typeof d.expires_ts === "number" &&
+                d.expires_ts > now &&
+                Array.isArray(d.feeds),
+        ) as unknown as IGroupCallRoomMemberDevice[];
 
         const newDevices = fn(validDevices);
         if (newDevices === null) return;
 
-        const newCalls = [...otherCalls as unknown as IGroupCallRoomMemberCallState[]];
+        const newCalls = [...(otherCalls as unknown as IGroupCallRoomMemberCallState[])];
         if (newDevices.length > 0) {
             newCalls.push({
                 ...call,
@@ -1378,14 +1364,14 @@ export class GroupCall extends TypedEventEmitter<
 
         const newContent: IGroupCallRoomMemberState = { "m.calls": newCalls };
 
-        await this.client.sendStateEvent(
-            this.room.roomId, EventType.GroupCallMemberPrefix, newContent, localUserId, { keepAlive },
-        );
+        await this.client.sendStateEvent(this.room.roomId, EventType.GroupCallMemberPrefix, newContent, localUserId, {
+            keepAlive,
+        });
     }
 
     private async addDeviceToMemberState(): Promise<void> {
-        await this.updateDevices(devices => [
-            ...devices.filter(d => d.device_id !== this.client.getDeviceId()!),
+        await this.updateDevices((devices) => [
+            ...devices.filter((d) => d.device_id !== this.client.getDeviceId()!),
             {
                 "device_id": this.client.getDeviceId()!,
                 "session_id": this.client.getSessionId(),
@@ -1417,11 +1403,11 @@ export class GroupCall extends TypedEventEmitter<
                 } catch (e) {
                     logger.error("Failed to resend call member state", e);
                 }
-            }, DEVICE_TIMEOUT * 3 / 4);
+            }, (DEVICE_TIMEOUT * 3) / 4);
         } else {
             // Remove the local device
             await this.updateDevices(
-                devices => devices.filter(d => d.device_id !== this.client.getDeviceId()!),
+                (devices) => devices.filter((d) => d.device_id !== this.client.getDeviceId()!),
                 true,
             );
         }
@@ -1433,16 +1419,19 @@ export class GroupCall extends TypedEventEmitter<
      */
     public async cleanMemberState(): Promise<void> {
         const { devices: myDevices } = await this.client.getDevices();
-        const deviceMap = new Map<string, IMyDevice>(myDevices.map(d => [d.device_id, d]));
+        const deviceMap = new Map<string, IMyDevice>(myDevices.map((d) => [d.device_id, d]));
 
         // updateDevices takes care of filtering out inactive devices for us
-        await this.updateDevices(devices => {
-            const newDevices = devices.filter(d => {
+        await this.updateDevices((devices) => {
+            const newDevices = devices.filter((d) => {
                 const device = deviceMap.get(d.device_id);
-                return device?.last_seen_ts !== undefined && !(
-                    d.device_id === this.client.getDeviceId()!
-                    && this.state !== GroupCallState.Entered
-                    && !this.enteredViaAnotherSession
+                return (
+                    device?.last_seen_ts !== undefined &&
+                    !(
+                        d.device_id === this.client.getDeviceId()! &&
+                        this.state !== GroupCallState.Entered &&
+                        !this.enteredViaAnotherSession
+                    )
                 );
             });
 
@@ -1459,19 +1448,19 @@ export class GroupCall extends TypedEventEmitter<
 
     private onStateChanged = (newState: GroupCallState, oldState: GroupCallState): void => {
         if (
-            newState === GroupCallState.Entered
-            || oldState === GroupCallState.Entered
-            || newState === GroupCallState.Ended
+            newState === GroupCallState.Entered ||
+            oldState === GroupCallState.Entered ||
+            newState === GroupCallState.Ended
         ) {
             // We either entered, left, or ended the call
             this.updateParticipants();
-            this.updateMemberState().catch(e => logger.error("Failed to update member state devices", e));
+            this.updateMemberState().catch((e) => logger.error("Failed to update member state devices", e));
         }
     };
 
     private onLocalFeedsChanged = (): void => {
         if (this.state === GroupCallState.Entered) {
-            this.updateMemberState().catch(e => logger.error("Failed to update member state feeds", e));
+            this.updateMemberState().catch((e) => logger.error("Failed to update member state feeds", e));
         }
     };
 }

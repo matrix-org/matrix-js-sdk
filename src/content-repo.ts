@@ -39,13 +39,13 @@ export function getHttpUriForMxc(
     allowDirectLinks = false,
 ): string {
     if (typeof mxc !== "string" || !mxc) {
-        return '';
+        return "";
     }
     if (mxc.indexOf("mxc://") !== 0) {
         if (allowDirectLinks) {
             return mxc;
         } else {
-            return '';
+            return "";
         }
     }
     let serverAndMediaId = mxc.slice(6); // strips mxc://
@@ -74,6 +74,6 @@ export function getHttpUriForMxc(
         serverAndMediaId = serverAndMediaId.slice(0, fragmentOffset);
     }
 
-    const urlParams = (Object.keys(params).length === 0 ? "" : ("?" + utils.encodeParams(params)));
+    const urlParams = Object.keys(params).length === 0 ? "" : "?" + utils.encodeParams(params);
     return baseUrl + prefix + serverAndMediaId + urlParams + fragment;
 }

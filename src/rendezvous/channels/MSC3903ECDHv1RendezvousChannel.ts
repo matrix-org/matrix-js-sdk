@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { SAS } from '@matrix-org/olm';
+import { SAS } from "@matrix-org/olm";
 
 import {
     RendezvousError,
@@ -24,11 +24,11 @@ import {
     RendezvousTransportDetails,
     RendezvousTransport,
     RendezvousFailureReason,
-} from '..';
-import { encodeBase64, decodeBase64 } from '../../crypto/olmlib';
-import { crypto, subtleCrypto, TextEncoder } from '../../crypto/crypto';
-import { generateDecimalSas } from '../../crypto/verification/SASDecimal';
-import { UnstableValue } from '../../NamespacedValue';
+} from "..";
+import { encodeBase64, decodeBase64 } from "../../crypto/olmlib";
+import { crypto, subtleCrypto, TextEncoder } from "../../crypto/crypto";
+import { generateDecimalSas } from "../../crypto/verification/SASDecimal";
+import { UnstableValue } from "../../NamespacedValue";
 
 const ECDH_V1 = new UnstableValue(
     "m.rendezvous.v1.curve25519-aes-sha256",
@@ -57,16 +57,10 @@ export interface EncryptedPayload {
 
 async function importKey(key: Uint8Array): Promise<CryptoKey> {
     if (!subtleCrypto) {
-        throw new Error('Web Crypto is not available');
+        throw new Error("Web Crypto is not available");
     }
 
-    const imported = subtleCrypto.importKey(
-        'raw',
-        key,
-        { name: 'AES-GCM' },
-        false,
-        ['encrypt', 'decrypt'],
-    );
+    const imported = subtleCrypto.importKey("raw", key, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]);
 
     return imported;
 }
@@ -93,13 +87,13 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
 
     public async generateCode(intent: RendezvousIntent): Promise<ECDHv1RendezvousCode> {
         if (this.transport.ready) {
-            throw new Error('Code already generated');
+            throw new Error("Code already generated");
         }
 
         await this.transport.send({ algorithm: ECDH_V1.name });
 
         const rendezvous: ECDHv1RendezvousCode = {
-            "rendezvous": {
+            rendezvous: {
                 algorithm: ECDH_V1.name,
                 key: encodeBase64(this.ourPublicKey),
                 transport: await this.transport.details(),
@@ -112,11 +106,11 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
 
     public async connect(): Promise<string> {
         if (this.connected) {
-            throw new Error('Channel already connected');
+            throw new Error("Channel already connected");
         }
 
         if (!this.olmSAS) {
-            throw new Error('Channel closed');
+            throw new Error("Channel closed");
         }
 
         const isInitiator = !this.theirPublicKey;
@@ -125,13 +119,13 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
             // wait for the other side to send us their public key
             const rawRes = await this.transport.receive();
             if (!rawRes) {
-                throw new Error('No response from other device');
+                throw new Error("No response from other device");
             }
             const res = rawRes as Partial<PlainTextPayload>;
             const { key, algorithm } = res;
             if (!algorithm || !ECDH_V1.matches(algorithm) || !key) {
                 throw new RendezvousError(
-                    'Unsupported algorithm: ' + algorithm,
+                    "Unsupported algorithm: " + algorithm,
                     RendezvousFailureReason.UnsupportedAlgorithm,
                 );
             }
@@ -163,12 +157,12 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
         aesKeyBytes.fill(0);
 
         const rawChecksum = this.olmSAS.generate_bytes(aesInfo, 5);
-        return generateDecimalSas(Array.from(rawChecksum)).join('-');
+        return generateDecimalSas(Array.from(rawChecksum)).join("-");
     }
 
     private async encrypt(data: T): Promise<MSC3903ECDHPayload> {
         if (!subtleCrypto) {
-            throw new Error('Web Crypto is not available');
+            throw new Error("Web Crypto is not available");
         }
 
         const iv = new Uint8Array(32);
@@ -194,25 +188,25 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
 
     public async send(payload: T): Promise<void> {
         if (!this.olmSAS) {
-            throw new Error('Channel closed');
+            throw new Error("Channel closed");
         }
 
         if (!this.aesKey) {
-            throw new Error('Shared secret not set up');
+            throw new Error("Shared secret not set up");
         }
 
-        return this.transport.send((await this.encrypt(payload)));
+        return this.transport.send(await this.encrypt(payload));
     }
 
     private async decrypt({ iv, ciphertext }: EncryptedPayload): Promise<Partial<T>> {
         if (!ciphertext || !iv) {
-            throw new Error('Missing ciphertext and/or iv');
+            throw new Error("Missing ciphertext and/or iv");
         }
 
         const ciphertextBytes = decodeBase64(ciphertext);
 
         if (!subtleCrypto) {
-            throw new Error('Web Crypto is not available');
+            throw new Error("Web Crypto is not available");
         }
 
         const plaintext = await subtleCrypto.decrypt(
@@ -230,10 +224,10 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
 
     public async receive(): Promise<Partial<T> | undefined> {
         if (!this.olmSAS) {
-            throw new Error('Channel closed');
+            throw new Error("Channel closed");
         }
         if (!this.aesKey) {
-            throw new Error('Shared secret not set up');
+            throw new Error("Shared secret not set up");
         }
 
         const rawData = await this.transport.receive();
@@ -245,7 +239,7 @@ export class MSC3903ECDHv1RendezvousChannel<T> implements RendezvousChannel<T> {
             return this.decrypt(data as EncryptedPayload);
         }
 
-        throw new Error('Data received but no ciphertext');
+        throw new Error("Data received but no ciphertext");
     }
 
     public async close(): Promise<void> {

@@ -182,16 +182,16 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
         if (event.getContent().presence !== this.presence || firstFire) {
             eventsToFire.push(UserEvent.Presence);
         }
-        if (event.getContent().avatar_url &&
-            event.getContent().avatar_url !== this.avatarUrl) {
+        if (event.getContent().avatar_url && event.getContent().avatar_url !== this.avatarUrl) {
             eventsToFire.push(UserEvent.AvatarUrl);
         }
-        if (event.getContent().displayname &&
-            event.getContent().displayname !== this.displayName) {
+        if (event.getContent().displayname && event.getContent().displayname !== this.displayName) {
             eventsToFire.push(UserEvent.DisplayName);
         }
-        if (event.getContent().currently_active !== undefined &&
-            event.getContent().currently_active !== this.currentlyActive) {
+        if (
+            event.getContent().currently_active !== undefined &&
+            event.getContent().currently_active !== this.currentlyActive
+        ) {
             eventsToFire.push(UserEvent.CurrentlyActive);
         }
 

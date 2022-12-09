@@ -23,13 +23,7 @@ limitations under the License.
 // eslint-disable-next-line no-restricted-imports
 import { EventEmitter } from "events";
 import { MockedObject } from "jest-mock";
-import {
-    WidgetApi,
-    WidgetApiToWidgetAction,
-    MatrixCapabilities,
-    ITurnServer,
-    IRoomEvent,
-} from "matrix-widget-api";
+import { WidgetApi, WidgetApiToWidgetAction, MatrixCapabilities, ITurnServer, IRoomEvent } from "matrix-widget-api";
 
 import { createRoomWidgetClient, MsgType } from "../../src/matrix";
 import { MatrixClient, ClientEvent, ITurnServer as IClientTurnServer } from "../../src/client";
@@ -88,7 +82,9 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityToSendEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
             await client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 });
             expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
-                "org.matrix.rageshake_request", { request_id: 123 }, "!1:example.org",
+                "org.matrix.rageshake_request",
+                { request_id: 123 },
+                "!1:example.org",
             );
         });
 
@@ -105,8 +101,8 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
             expect(widgetApi.requestCapabilityToReceiveEvent).toHaveBeenCalledWith("org.matrix.rageshake_request");
 
-            const emittedEvent = new Promise<MatrixEvent>(resolve => client.once(ClientEvent.Event, resolve));
-            const emittedSync = new Promise<SyncState>(resolve => client.once(ClientEvent.Sync, resolve));
+            const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.Event, resolve));
+            const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
             widgetApi.emit(
                 `action:${WidgetApiToWidgetAction.SendEvent}`,
                 new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
@@ -118,7 +114,12 @@ describe("RoomWidgetClient", () => {
             // It should've also inserted the event into the room object
             const room = client.getRoom("!1:example.org");
             expect(room).not.toBeNull();
-            expect(room!.getLiveTimeline().getEvents().map(e => e.getEffectiveEvent())).toEqual([event]);
+            expect(
+                room!
+                    .getLiveTimeline()
+                    .getEvents()
+                    .map((e) => e.getEffectiveEvent()),
+            ).toEqual([event]);
         });
     });
 
@@ -157,7 +158,10 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityToSendState).toHaveBeenCalledWith("org.example.foo", "bar");
             await client.sendStateEvent("!1:example.org", "org.example.foo", { hello: "world" }, "bar");
             expect(widgetApi.sendStateEvent).toHaveBeenCalledWith(
-                "org.example.foo", "bar", { hello: "world" }, "!1:example.org",
+                "org.example.foo",
+                "bar",
+                { hello: "world" },
+                "!1:example.org",
             );
         });
 
@@ -166,8 +170,8 @@ describe("RoomWidgetClient", () => {
             expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
             expect(widgetApi.requestCapabilityToReceiveState).toHaveBeenCalledWith("org.example.foo", "bar");
 
-            const emittedEvent = new Promise<MatrixEvent>(resolve => client.once(ClientEvent.Event, resolve));
-            const emittedSync = new Promise<SyncState>(resolve => client.once(ClientEvent.Sync, resolve));
+            const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.Event, resolve));
+            const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
             widgetApi.emit(
                 `action:${WidgetApiToWidgetAction.SendEvent}`,
                 new CustomEvent(`action:${WidgetApiToWidgetAction.SendEvent}`, { detail: { data: event } }),
@@ -260,8 +264,8 @@ describe("RoomWidgetClient", () => {
                 content: { hello: "world" },
             };
 
-            const emittedEvent = new Promise<MatrixEvent>(resolve => client.once(ClientEvent.ToDeviceEvent, resolve));
-            const emittedSync = new Promise<SyncState>(resolve => client.once(ClientEvent.Sync, resolve));
+            const emittedEvent = new Promise<MatrixEvent>((resolve) => client.once(ClientEvent.ToDeviceEvent, resolve));
+            const emittedSync = new Promise<SyncState>((resolve) => client.once(ClientEvent.Sync, resolve));
             widgetApi.emit(
                 `action:${WidgetApiToWidgetAction.SendToDevice}`,
                 new CustomEvent(`action:${WidgetApiToWidgetAction.SendToDevice}`, { detail: { data: event } }),
@@ -308,7 +312,7 @@ describe("RoomWidgetClient", () => {
         };
 
         let emitServer2: () => void;
-        const getServer2 = new Promise<ITurnServer>(resolve => emitServer2 = () => resolve(server2));
+        const getServer2 = new Promise<ITurnServer>((resolve) => (emitServer2 = () => resolve(server2)));
         widgetApi.getTurnServers.mockImplementation(async function* () {
             yield server1;
             yield await getServer2;
@@ -321,7 +325,7 @@ describe("RoomWidgetClient", () => {
         expect(client.getTurnServers()).toEqual([clientServer1]);
 
         // Subsequent servers arrive asynchronously and should emit an event
-        const emittedServer = new Promise<IClientTurnServer[]>(resolve =>
+        const emittedServer = new Promise<IClientTurnServer[]>((resolve) =>
             client.once(ClientEvent.TurnServers, resolve),
         );
         emitServer2!();

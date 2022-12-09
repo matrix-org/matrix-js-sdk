@@ -14,18 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { UnstableValue } from 'matrix-events-sdk';
+import { UnstableValue } from "matrix-events-sdk";
 
-import { logger } from '../../logger';
-import { sleep } from '../../utils';
+import { logger } from "../../logger";
+import { sleep } from "../../utils";
 import {
     RendezvousFailureListener,
     RendezvousFailureReason,
     RendezvousTransport,
     RendezvousTransportDetails,
-} from '..';
-import { MatrixClient } from '../../matrix';
-import { ClientPrefix } from '../../http-api';
+} from "..";
+import { MatrixClient } from "../../matrix";
+import { ClientPrefix } from "../../http-api";
 
 const TYPE = new UnstableValue("http.v1", "org.matrix.msc3886.http.v1");
 
@@ -72,7 +72,7 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
 
     public async details(): Promise<MSC3886SimpleHttpRendezvousTransportDetails> {
         if (!this.uri) {
-            throw new Error('Rendezvous not set up');
+            throw new Error("Rendezvous not set up");
         }
 
         return {
@@ -90,11 +90,11 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
 
     private async getPostEndpoint(): Promise<string | undefined> {
         try {
-            if (await this.client.doesServerSupportUnstableFeature('org.matrix.msc3886')) {
+            if (await this.client.doesServerSupportUnstableFeature("org.matrix.msc3886")) {
                 return `${this.client.baseUrl}${ClientPrefix.Unstable}/org.matrix.msc3886/rendezvous`;
             }
         } catch (err) {
-            logger.warn('Failed to get unstable features', err);
+            logger.warn("Failed to get unstable features", err);
         }
 
         return this.fallbackRzServer;
@@ -105,32 +105,29 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
             return;
         }
         const method = this.uri ? "PUT" : "POST";
-        const uri = this.uri ?? await this.getPostEndpoint();
+        const uri = this.uri ?? (await this.getPostEndpoint());
 
         if (!uri) {
-            throw new Error('Invalid rendezvous URI');
+            throw new Error("Invalid rendezvous URI");
         }
 
-        const headers: Record<string, string> = { 'content-type': 'application/json' };
+        const headers: Record<string, string> = { "content-type": "application/json" };
         if (this.etag) {
-            headers['if-match'] = this.etag;
+            headers["if-match"] = this.etag;
         }
 
-        const res = await this.fetch(uri, { method,
-            headers,
-            body: JSON.stringify(data),
-        });
+        const res = await this.fetch(uri, { method, headers, body: JSON.stringify(data) });
         if (res.status === 404) {
             return this.cancel(RendezvousFailureReason.Unknown);
         }
         this.etag = res.headers.get("etag") ?? undefined;
 
-        if (method === 'POST') {
-            const location = res.headers.get('location');
+        if (method === "POST") {
+            const location = res.headers.get("location");
             if (!location) {
-                throw new Error('No rendezvous URI given');
+                throw new Error("No rendezvous URI given");
             }
-            const expires = res.headers.get('expires');
+            const expires = res.headers.get("expires");
             if (expires) {
                 this.expiresAt = new Date(expires);
             }
@@ -138,14 +135,14 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
             // however, if a polyfill based on XHR is used it won't be set, we we use existing URI as fallback
             const baseUrl = res.url ?? uri;
             // resolve location header which could be relative or absolute
-            this.uri = new URL(location, `${baseUrl}${baseUrl.endsWith('/') ? '' : '/'}`).href;
+            this.uri = new URL(location, `${baseUrl}${baseUrl.endsWith("/") ? "" : "/"}`).href;
             this._ready = true;
         }
     }
 
     public async receive(): Promise<Partial<T> | undefined> {
         if (!this.uri) {
-            throw new Error('Rendezvous not set up');
+            throw new Error("Rendezvous not set up");
         }
         // eslint-disable-next-line no-constant-condition
         while (true) {
@@ -155,7 +152,7 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
 
             const headers: Record<string, string> = {};
             if (this.etag) {
-                headers['if-none-match'] = this.etag;
+                headers["if-none-match"] = this.etag;
             }
             const poll = await this.fetch(this.uri, { method: "GET", headers });
 
@@ -166,7 +163,7 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
 
             // rely on server expiring the channel rather than checking ourselves
 
-            if (poll.headers.get('content-type') !== 'application/json') {
+            if (poll.headers.get("content-type") !== "application/json") {
                 this.etag = poll.headers.get("etag") ?? undefined;
             } else if (poll.status === 200) {
                 this.etag = poll.headers.get("etag") ?? undefined;
@@ -177,8 +174,7 @@ export class MSC3886SimpleHttpRendezvousTransport<T extends {}> implements Rende
     }
 
     public async cancel(reason: RendezvousFailureReason): Promise<void> {
-        if (reason === RendezvousFailureReason.Unknown &&
-            this.expiresAt && this.expiresAt.getTime() < Date.now()) {
+        if (reason === RendezvousFailureReason.Unknown && this.expiresAt && this.expiresAt.getTime() < Date.now()) {
             reason = RendezvousFailureReason.Expired;
         }
 
