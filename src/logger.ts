@@ -15,10 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module logger
- */
-
 import log, { Logger } from "loglevel";
 
 // This is to demonstrate, that you can use any namespace you want.
@@ -56,7 +52,7 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
 };
 
 /**
- * Drop-in replacement for <code>console</code> using {@link https://www.npmjs.com/package/loglevel|loglevel}.
+ * Drop-in replacement for `console` using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
  */
 export const logger = log.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;

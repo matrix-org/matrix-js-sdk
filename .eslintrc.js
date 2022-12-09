@@ -2,6 +2,7 @@ module.exports = {
     plugins: [
         "matrix-org",
         "import",
+        "jsdoc",
     ],
     extends: [
         "plugin:matrix-org/babel",
@@ -45,7 +46,7 @@ module.exports = {
         // restrict EventEmitters to force callers to use TypedEventEmitter
         "no-restricted-imports": ["error", {
             name: "events",
-            message: "Please use TypedEventEmitter instead"
+            message: "Please use TypedEventEmitter instead",
         }],
 
         "import/no-restricted-paths": ["error", {
@@ -60,6 +61,9 @@ module.exports = {
     overrides: [{
         files: [
             "**/*.ts",
+        ],
+        plugins: [
+            "eslint-plugin-tsdoc",
         ],
         extends: [
             "plugin:matrix-org/typescript",
@@ -84,6 +88,23 @@ module.exports = {
             "quotes": "off",
             // We use a `logger` intermediary module
             "no-console": "error",
+
+        },
+    }, {
+        // We don't need amazing docs in our spec files
+        files: [
+            "src/**/*.ts",
+        ],
+        rules: {
+            "tsdoc/syntax": "error",
+            // We use some select jsdoc rules as the tsdoc linter has only one rule
+            "jsdoc/no-types": "error",
+            "jsdoc/empty-tags": "error",
+            "jsdoc/check-property-names": "error",
+            "jsdoc/check-values": "error",
+            // These need a bit more work before we can enable
+            // "jsdoc/check-param-names": "error",
+            // "jsdoc/check-indentation": "error",
         },
     }, {
         files: [

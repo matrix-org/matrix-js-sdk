@@ -5,7 +5,6 @@
     "esModuleInterop": true,
     "module": "commonjs",
     "moduleResolution": "node",
-    "noImplicitAny": false,
     "noUnusedLocals": true,
     "noEmit": true,
     "declaration": true,

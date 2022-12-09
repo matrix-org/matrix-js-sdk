@@ -27,12 +27,14 @@ interface ICmd {
  * This class lives in the webworker and drives a LocalIndexedDBStoreBackend
  * controlled by messages from the main process.
  *
+ * @example
  * It should be instantiated by a web worker script provided by the application
  * in a script, for example:
- *
+ * ```
  * import {IndexedDBStoreWorker} from 'matrix-js-sdk/lib/indexeddb-worker.js';
  * const remoteWorker = new IndexedDBStoreWorker(postMessage);
  * onmessage = remoteWorker.onMessage;
+ * ```
  *
  * Note that it is advisable to import this class by referencing the file directly to
  * avoid a dependency on the whole js-sdk.
@@ -42,7 +44,7 @@ export class IndexedDBStoreWorker {
     private backend?: LocalIndexedDBStoreBackend;
 
     /**
-     * @param {function} postMessage The web worker postMessage function that
+     * @param postMessage - The web worker postMessage function that
      * should be used to communicate back to the main script.
      */
     public constructor(private readonly postMessage: InstanceType<typeof Worker>["postMessage"]) {}
@@ -51,7 +53,7 @@ export class IndexedDBStoreWorker {
      * Passes a message event from the main script into the class. This method
      * can be directly assigned to the web worker `onmessage` variable.
      *
-     * @param {Object} ev The message event
+     * @param ev - The message event
      */
     public onMessage = (ev: MessageEvent): void => {
         const msg: ICmd = ev.data;

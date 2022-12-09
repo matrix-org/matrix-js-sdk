@@ -67,9 +67,9 @@ export class MSC3906Rendezvous {
     private _code?: string;
 
     /**
-     * @param channel The secure channel used for communication
-     * @param client The Matrix client in used on the device already logged in
-     * @param onFailure Callback for when the rendezvous fails
+     * @param channel - The secure channel used for communication
+     * @param client - The Matrix client in used on the device already logged in
+     * @param onFailure - Callback for when the rendezvous fails
      */
     public constructor(
         private channel: RendezvousChannel<MSC3906RendezvousPayload>,
@@ -217,7 +217,7 @@ export class MSC3906Rendezvous {
 
     /**
      * Verify the device and cross-sign it.
-     * @param timeout time in milliseconds to wait for device to come online
+     * @param timeout - time in milliseconds to wait for device to come online
      * @returns the new device info if the device was verified
      */
     public async verifyNewDeviceOnExistingDevice(

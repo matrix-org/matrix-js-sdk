@@ -106,7 +106,8 @@ function getFilterName(userId: string, suffix?: string): string {
     return `FILTER_SYNC_${userId}` + (suffix ? "_" + suffix : "");
 }
 
-function debuglog(...params): void {
+/* istanbul ignore next */
+function debuglog(...params: any[]): void {
     if (!DEBUG) return;
     logger.log(...params);
 }
@@ -117,9 +118,27 @@ interface ISyncOptions {
 }
 
 export interface ISyncStateData {
+    /**
+     * The matrix error if `state=ERROR`.
+     */
     error?: Error;
+    /**
+     * The 'since' token passed to /sync.
+     *    `null` for the first successful sync since this client was
+     *    started. Only present if `state=PREPARED` or
+     *    `state=SYNCING`.
+     */
     oldSyncToken?: string;
+    /**
+     * The 'next_batch' result from /sync, which
+     *    will become the 'since' token for the next call to /sync. Only present if
+     *    `state=PREPARED</code> or <code>state=SYNCING`.
+     */
     nextSyncToken?: string;
+    /**
+     * True if we are working our way through a
+     *    backlog of events after connecting. Only present if `state=SYNCING`.
+     */
     catchingUp?: boolean;
     fromCache?: boolean;
 }
@@ -146,21 +165,6 @@ type WrappedRoom<T> = T & {
     isBrandNewRoom: boolean;
 };
 
-/**
- * <b>Internal class - unstable.</b>
- * Construct an entity which is able to sync with a homeserver.
- * @constructor
- * @param {MatrixClient} client The matrix client instance to use.
- * @param {Object} opts Config options
- * @param {module:crypto=} opts.crypto Crypto manager
- * @param {Function=} opts.canResetEntireTimeline A function which is called
- * with a room ID and returns a boolean. It should return 'true' if the SDK can
- * SAFELY remove events from this room. It may not be safe to remove events if
- * there are other references to the timelines for this room.
- * Default: returns false.
- * @param {Boolean=} opts.disablePresence True to perform syncing without automatically
- * updating presence.
- */
 export class SyncApi {
     private _peekRoom: Optional<Room> = null;
     private currentSyncRequest?: Promise<ISyncResponse>;
@@ -175,6 +179,12 @@ export class SyncApi {
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
     private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
 
+    /**
+     * Construct an entity which is able to sync with a homeserver.
+     * @param client - The matrix client instance to use.
+     * @param opts - Config options
+     * @internal
+     */
     public constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
@@ -196,10 +206,6 @@ export class SyncApi {
         }
     }
 
-    /**
-     * @param {string} roomId
-     * @return {Room}
-     */
     public createRoom(roomId: string): Room {
         const room = _createAndReEmitRoom(this.client, roomId, this.opts);
 
@@ -214,9 +220,9 @@ export class SyncApi {
      * new historical messages imported by MSC2716 `/batch_send` somewhere in
      * the room and we need to throw away the timeline to make sure the
      * historical messages are shown when we paginate `/messages` again.
-     * @param {Room} room The room where the marker event was sent
-     * @param {MatrixEvent} markerEvent The new marker event
-     * @param {IMarkerFoundOptions} setStateOptions When `timelineWasEmpty` is set
+     * @param room - The room where the marker event was sent
+     * @param markerEvent - The new marker event
+     * @param setStateOptions - When `timelineWasEmpty` is set
      * as `true`, the given marker event will be ignored
     */
     private onMarkerStateEvent(
@@ -279,7 +285,7 @@ export class SyncApi {
 
     /**
      * Sync rooms the user has left.
-     * @return {Promise} Resolved when they've been added to the store.
+     * @returns Resolved when they've been added to the store.
      */
     public async syncLeftRooms(): Promise<Room[]> {
         const client = this.client;
@@ -350,8 +356,8 @@ export class SyncApi {
     /**
      * Peek into a room. This will result in the room in question being synced so it
      * is accessible via getRooms(). Live updates for the room will be provided.
-     * @param {string} roomId The room ID to peek into.
-     * @return {Promise} A promise which resolves once the room has been added to the
+     * @param roomId - The room ID to peek into.
+     * @returns A promise which resolves once the room has been added to the
      * store.
      */
     public peek(roomId: string): Promise<Room> {
@@ -430,8 +436,7 @@ export class SyncApi {
 
     /**
      * Do a peek room poll.
-     * @param {Room} peekRoom
-     * @param {string?} token from= token
+     * @param token - from= token
      */
     private peekPoll(peekRoom: Room, token?: string): void {
         if (this._peekRoom !== peekRoom) {
@@ -494,8 +499,7 @@ export class SyncApi {
 
     /**
      * Returns the current state of this sync object
-     * @see module:client~MatrixClient#event:"sync"
-     * @return {?String}
+     * @see MatrixClient#event:"sync"
      */
     public getSyncState(): SyncState | null {
         return this.syncState;
@@ -507,7 +511,6 @@ export class SyncApi {
      * such data.
      * Sync errors, if available, are put in the 'error' key of
      * this object.
-     * @return {?Object}
      */
     public getSyncStateData(): ISyncStateData | null {
         return this.syncStateData ?? null;
@@ -526,8 +529,8 @@ export class SyncApi {
 
     /**
      * Is the lazy loading option different than in previous session?
-     * @param {boolean} lazyLoadMembers current options for lazy loading
-     * @return {boolean} whether or not the option has changed compared to the previous session */
+     * @param lazyLoadMembers - current options for lazy loading
+     * @returns whether or not the option has changed compared to the previous session */
     private async wasLazyLoadingToggled(lazyLoadMembers = false): Promise<boolean> {
         // assume it was turned off before
         // if we don't know any better
@@ -758,7 +761,7 @@ export class SyncApi {
     /**
      * Retry a backed off syncing request immediately. This should only be used when
      * the user <b>explicitly</b> attempts to retry their lost connection.
-     * @return {boolean} True if this resulted in a request being retried.
+     * @returns True if this resulted in a request being retried.
      */
     public retryImmediately(): boolean {
         if (!this.connectionReturnedDefer) {
@@ -769,7 +772,7 @@ export class SyncApi {
     }
     /**
      * Process a single set of cached sync data.
-     * @param {Object} savedSync a saved sync that was persisted by a store. This
+     * @param savedSync - a saved sync that was persisted by a store. This
      * should have been acquired via client.store.getSavedSync().
      */
     private async syncFromCache(savedSync: ISavedSync): Promise<void> {
@@ -811,9 +814,6 @@ export class SyncApi {
 
     /**
      * Invoke me to do /sync calls
-     * @param {Object} syncOptions
-     * @param {string} syncOptions.filterId
-     * @param {boolean} syncOptions.hasSyncedBefore
      */
     private async doSync(syncOptions: ISyncOptions): Promise<void> {
         while (this.running) {
@@ -1023,8 +1023,8 @@ export class SyncApi {
      * Process data returned from a sync response and propagate it
      * into the model objects
      *
-     * @param {Object} syncEventData Object containing sync tokens associated with this sync
-     * @param {Object} data The response from /sync
+     * @param syncEventData - Object containing sync tokens associated with this sync
+     * @param data - The response from /sync
      */
     private async processSyncResponse(syncEventData: ISyncStateData, data: ISyncResponse): Promise<void> {
         const client = this.client;
@@ -1093,7 +1093,7 @@ export class SyncApi {
         // handle non-room account_data
         if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.map(client.getEventMapper());
-            const prevEventsMap = events.reduce((m, c) => {
+            const prevEventsMap = events.reduce<Record<string, MatrixEvent | undefined>>((m, c) => {
                 m[c.getType()!] = client.store.getAccountData(c.getType());
                 return m;
             }, {});
@@ -1362,6 +1362,18 @@ export class SyncApi {
                 }
             }
 
+            // process any crypto events *before* emitting the RoomStateEvent events. This
+            // avoids a race condition if the application tries to send a message after the
+            // state event is processed, but before crypto is enabled, which then causes the
+            // crypto layer to complain.
+            if (this.opts.crypto) {
+                for (const e of stateEvents.concat(events)) {
+                    if (e.isState() && e.getType() === EventType.RoomEncryption && e.getStateKey() === "") {
+                        await this.opts.crypto.onCryptoEvent(room, e);
+                    }
+                }
+            }
+
             try {
                 await this.injectRoomEvents(room, stateEvents, events, syncEventData.fromCache);
             } catch (e) {
@@ -1389,21 +1401,11 @@ export class SyncApi {
 
             this.processEventsForNotifs(room, events);
 
-            const processRoomEvent = async (e): Promise<void> => {
-                client.emit(ClientEvent.Event, e);
-                if (e.isState() && e.getType() == "m.room.encryption" && this.opts.crypto) {
-                    await this.opts.crypto.onCryptoEvent(e);
-                }
-            };
-
-            await utils.promiseMapSeries(stateEvents, processRoomEvent);
-            await utils.promiseMapSeries(events, processRoomEvent);
-            ephemeralEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
-            accountDataEvents.forEach(function(e) {
-                client.emit(ClientEvent.Event, e);
-            });
+            const emitEvent = (e: MatrixEvent): boolean => client.emit(ClientEvent.Event, e);
+            stateEvents.forEach(emitEvent);
+            events.forEach(emitEvent);
+            ephemeralEvents.forEach(emitEvent);
+            accountDataEvents.forEach(emitEvent);
 
             // Decrypt only the last message in all rooms to make sure we can generate a preview
             // And decrypt all events after the recorded read receipt to ensure an accurate
@@ -1471,12 +1473,13 @@ export class SyncApi {
             this.opts.crypto.updateOneTimeKeyCount(currentCount);
         }
         if (this.opts.crypto &&
-            (data["device_unused_fallback_key_types"] ||
-                data["org.matrix.msc2732.device_unused_fallback_key_types"])) {
+            (data.device_unused_fallback_key_types ||
+                data["org.matrix.msc2732.device_unused_fallback_key_types"])
+        ) {
             // The presence of device_unused_fallback_key_types indicates that the
             // server supports fallback keys. If there's no unused
             // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
+            const unusedFallbackKeys = data.device_unused_fallback_key_types ||
                 data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.opts.crypto.setNeedsNewFallback(
                 Array.isArray(unusedFallbackKeys) &&
@@ -1487,10 +1490,10 @@ export class SyncApi {
 
     /**
      * Starts polling the connectivity check endpoint
-     * @param {number} delay How long to delay until the first poll.
+     * @param delay - How long to delay until the first poll.
      *        defaults to a short, randomised interval (to prevent
      *        tight-looping if /versions succeeds but /sync etc. fail).
-     * @return {promise} which resolves once the connection returns
+     * @returns which resolves once the connection returns
      */
     private startKeepAlives(delay?: number): Promise<boolean> {
         if (delay === undefined) {
@@ -1518,7 +1521,7 @@ export class SyncApi {
      * On failure, schedules a call back to itself. On success, resolves
      * this.connectionReturnedDefer.
      *
-     * @param {boolean} connDidFail True if a connectivity failure has been detected. Optional.
+     * @param connDidFail - True if a connectivity failure has been detected. Optional.
      */
     private pokeKeepAlive(connDidFail = false): void {
         const success = (): void => {
@@ -1565,10 +1568,6 @@ export class SyncApi {
         });
     }
 
-    /**
-     * @param {Object} obj
-     * @return {Object[]}
-     */
     private mapSyncResponseToRoomArray<T extends ILeftRoom | IJoinedRoom | IInvitedRoom>(
         obj: Record<string, T>,
     ): Array<WrappedRoom<T>> {
@@ -1590,12 +1589,6 @@ export class SyncApi {
         });
     }
 
-    /**
-     * @param {Object} obj
-     * @param {Room} room
-     * @param {boolean} decrypt
-     * @return {MatrixEvent[]}
-     */
     private mapSyncEventsFormat(
         obj: IInviteState | ITimeline | IEphemeral,
         room?: Room,
@@ -1605,16 +1598,16 @@ export class SyncApi {
             return [];
         }
         const mapper = this.client.getEventMapper({ decrypt });
-        return (obj.events as Array<IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent>).map(function(e) {
+        type TaggedEvent = (IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent) & { room_id?: string };
+        return (obj.events as TaggedEvent[]).map(function(e) {
             if (room) {
-                e["room_id"] = room.roomId;
+                e.room_id = room.roomId;
             }
             return mapper(e);
         });
     }
 
     /**
-     * @param {Room} room
      */
     private resolveInvites(room: Room): void {
         if (!room || !this.opts.resolveInvitesToProfiles) {
@@ -1658,12 +1651,11 @@ export class SyncApi {
 
     /**
      * Injects events into a room's model.
-     * @param {Room} room
-     * @param {MatrixEvent[]} stateEventList A list of state events. This is the state
+     * @param stateEventList - A list of state events. This is the state
      * at the *START* of the timeline list if it is supplied.
-     * @param {MatrixEvent[]} [timelineEventList] A list of timeline events, including threaded. Lower index
+     * @param timelineEventList - A list of timeline events, including threaded. Lower index
      * is earlier in time. Higher index is later.
-     * @param {boolean} fromCache whether the sync response came from cache
+     * @param fromCache - whether the sync response came from cache
      */
     public async injectRoomEvents(
         room: Room,
@@ -1739,8 +1731,7 @@ export class SyncApi {
      * as appropriate.
      * This must be called after the room the events belong to has been stored.
      *
-     * @param {Room} room
-     * @param {MatrixEvent[]} [timelineEventList] A list of timeline events. Lower index
+     * @param timelineEventList - A list of timeline events. Lower index
      * is earlier in time. Higher index is later.
      */
     private processEventsForNotifs(room: Room, timelineEventList: MatrixEvent[]): void {
@@ -1755,9 +1746,6 @@ export class SyncApi {
         }
     }
 
-    /**
-     * @return {string}
-     */
     private getGuestFilter(): string {
         // Dev note: This used to be conditional to return a filter of 20 events maximum, but
         // the condition never went to the other branch. This is now hardcoded.
@@ -1766,8 +1754,8 @@ export class SyncApi {
 
     /**
      * Sets the sync state and emits an event to say so
-     * @param {String} newState The new state string
-     * @param {Object} data Object of additional data to emit in the event
+     * @param newState - The new state string
+     * @param data - Object of additional data to emit in the event
      */
     private updateSyncState(newState: SyncState, data?: ISyncStateData): void {
         const old = this.syncState;

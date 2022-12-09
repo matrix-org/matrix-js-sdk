@@ -20,8 +20,11 @@ import { IEvent, MatrixEvent, MatrixEventEvent } from "./models/event";
 export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 
 export interface MapperOpts {
+    // don't re-emit events emitted on an event mapped by this mapper on the client
     preventReEmit?: boolean;
+    // decrypt event proactively
     decrypt?: boolean;
+    // the event is a to_device event
     toDevice?: boolean;
 }
 

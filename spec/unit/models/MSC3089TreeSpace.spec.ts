@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient } from "../../../src";
+import { IContent, MatrixClient } from "../../../src";
 import { Room } from "../../../src/models/room";
 import { MatrixEvent } from "../../../src/models/event";
 import { EventType, MsgType, UNSTABLE_MSC3089_BRANCH, UNSTABLE_MSC3089_LEAF } from "../../../src/@types/event";
@@ -33,7 +33,7 @@ describe("MSC3089TreeSpace", () => {
     const roomId = "!tree:localhost";
     const targetUser = "@target:example.org";
 
-    let powerLevels;
+    let powerLevels: MatrixEvent;
 
     beforeEach(() => {
         // TODO: Use utility functions to create test rooms and clients
@@ -480,7 +480,7 @@ describe("MSC3089TreeSpace", () => {
         const staticDomain = "static.example.org";
 
         function addSubspace(roomId: string, createTs?: number, order?: string) {
-            const content = {
+            const content: IContent = {
                 via: [staticDomain],
             };
             if (order) content['order'] = order;

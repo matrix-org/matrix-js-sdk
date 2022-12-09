@@ -54,17 +54,31 @@ export interface ISendEventResponse {
 }
 
 export interface IPresenceOpts {
+    // One of "online", "offline" or "unavailable"
     presence: "online" | "offline" | "unavailable";
+    // The status message to attach.
     status_msg?: string;
 }
 
 export interface IPaginateOpts {
+    // true to fill backwards, false to go forwards
     backwards?: boolean;
+    // number of events to request
     limit?: number;
 }
 
 export interface IGuestAccessOpts {
+    /**
+     * True to allow guests to join this room. This
+     * implicitly gives guests write access. If false or not given, guests are
+     * explicitly forbidden from joining the room.
+     */
     allowJoin: boolean;
+    /**
+     * True to set history visibility to
+     * be world_readable. This gives guests read access *from this point forward*.
+     * If false or not given, history visibility is not modified.
+     */
     allowRead: boolean;
 }
 
@@ -74,7 +88,9 @@ export interface ISearchOpts {
 }
 
 export interface IEventSearchOpts {
+    // a JSON filter object to pass in the request
     filter?: IRoomEventFilter;
+    // the term to search for
     term: string;
 }
 
@@ -92,9 +108,13 @@ export interface ICreateRoomStateEvent {
 }
 
 export interface ICreateRoomOpts {
+    // The alias localpart to assign to this room.
     room_alias_name?: string;
+    // Either 'public' or 'private'.
     visibility?: Visibility;
+    // The name to give this room.
     name?: string;
+    // The topic to give this room.
     topic?: string;
     preset?: Preset;
     power_level_content_override?: {
@@ -111,6 +131,7 @@ export interface ICreateRoomOpts {
     };
     creation_content?: object;
     initial_state?: ICreateRoomStateEvent[];
+    // A list of user IDs to invite to this room.
     invite?: string[];
     invite_3pid?: IInvite3PID[];
     is_direct?: boolean;
@@ -121,7 +142,10 @@ export interface IRoomDirectoryOptions {
     server?: string;
     limit?: number;
     since?: string;
+
+    // Filter parameters
     filter?: {
+        // String to search for
         generic_search_term?: string;
         room_types?: Array<RoomType | null>;
     };
@@ -153,7 +177,6 @@ export interface IRelationsRequestOpts {
 }
 
 export interface IRelationsResponse {
-    original_event: IEvent;
     chunk: IEvent[];
     next_batch?: string;
     prev_batch?: string;

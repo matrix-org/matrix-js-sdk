@@ -6,7 +6,7 @@
 [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=matrix-js-sdk&metric=bugs)](https://sonarcloud.io/summary/new_code?id=matrix-js-sdk)
 
-Matrix Javascript SDK
+Matrix JavaScript SDK
 =====================
 
 This is the [Matrix](https://matrix.org) Client-Server SDK for JavaScript and TypeScript. This SDK can be run in a
@@ -370,10 +370,13 @@ To build a browser version from scratch when developing::
  $ yarn build
 ```
 
-To run tests (Jasmine)::
+To run tests (Jest):
 ```
  $ yarn test
 ```
+
+> **Note**
+> The `sync-browserify.spec.ts` requires a browser build (`yarn build`) in order to pass
 
 To run linting:
 ```

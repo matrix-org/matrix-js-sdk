@@ -20,6 +20,7 @@ import { MAIN_ROOM_TIMELINE, ReceiptType } from '../../src/@types/read_receipts'
 import { MatrixClient } from "../../src/client";
 import { Feature, ServerSupport } from '../../src/feature';
 import { EventType } from '../../src/matrix';
+import { synthesizeReceipt } from '../../src/models/read-receipt';
 import { encodeUri } from '../../src/utils';
 import * as utils from "../test-utils/test-utils";
 
@@ -69,7 +70,7 @@ const roomEvent = utils.mkEvent({
     },
 });
 
-function mockServerSideSupport(client, serverSideSupport: ServerSupport) {
+function mockServerSideSupport(client: MatrixClient, serverSideSupport: ServerSupport) {
     client.canSupport.set(Feature.ThreadUnreadNotifications, serverSideSupport);
 }
 
@@ -173,6 +174,22 @@ describe("Read receipt", () => {
 
             await httpBackend.flushAllExpected();
             await flushPromises();
+        });
+    });
+
+    describe("synthesizeReceipt", () => {
+        it.each([
+            { event: roomEvent, destinationId: MAIN_ROOM_TIMELINE },
+            { event: threadEvent, destinationId: threadEvent.threadRootId! },
+        ])("adds the receipt to $destinationId", ({ event, destinationId }) => {
+            const userId = "@bob:example.org";
+            const receiptType = ReceiptType.Read;
+
+            const fakeReadReceipt = synthesizeReceipt(userId, event, receiptType);
+
+            const content = fakeReadReceipt.getContent()[event.getId()!][receiptType][userId];
+
+            expect(content.thread_id).toEqual(destinationId);
         });
     });
 });

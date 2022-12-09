@@ -20,7 +20,7 @@ let wallTime = 1234567890;
 jest.useFakeTimers().setSystemTime(wallTime);
 
 describe("realtime-callbacks", function() {
-    function tick(millis) {
+    function tick(millis: number): void {
         wallTime += millis;
         jest.advanceTimersByTime(millis);
     }

@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/event-timeline-set
- */
-
 import { EventTimeline, IAddEventOptions } from "./event-timeline";
 import { MatrixEvent } from "./event";
 import { logger } from '../logger';
@@ -31,16 +27,20 @@ import { Thread, ThreadFilterType } from "./thread";
 
 const DEBUG = true;
 
+/* istanbul ignore next */
 let debuglog: (...args: any[]) => void;
 if (DEBUG) {
     // using bind means that we get to keep useful line numbers in the console
     debuglog = logger.log.bind(logger);
 } else {
+    /* istanbul ignore next */
     debuglog = function(): void {};
 }
 
 interface IOpts {
+    // Set to true to enable improved timeline support.
     timelineSupport?: boolean;
+    // The filter object, if any, for this timelineSet.
     filter?: Filter;
     pendingEvents?: boolean;
 }
@@ -51,7 +51,9 @@ export enum DuplicateStrategy {
 }
 
 export interface IRoomTimelineData {
+    // the timeline the event was added to/removed from
     timeline: EventTimeline;
+    // true if the event was a real-time event added to the end of the live timeline
     liveEvent?: boolean;
 }
 
@@ -75,6 +77,26 @@ export interface IAddLiveEventOptions
 type EmittedEvents = RoomEvent.Timeline | RoomEvent.TimelineReset;
 
 export type EventTimelineSetHandlerMap = {
+    /**
+     * Fires whenever the timeline in a room is updated.
+     * @param event - The matrix event which caused this event to fire.
+     * @param room - The room, if any, whose timeline was updated.
+     * @param toStartOfTimeline - True if this event was added to the start
+     * @param removed - True if this event has just been removed from the timeline
+     * (beginning; oldest) of the timeline e.g. due to pagination.
+     *
+     * @param data - more data about the event
+     *
+     * @example
+     * ```
+     * matrixClient.on("Room.timeline",
+     *                 function(event, room, toStartOfTimeline, removed, data) {
+     *   if (!toStartOfTimeline && data.liveEvent) {
+     *     var messageToAppend = room.timeline.[room.timeline.length - 1];
+     *   }
+     * });
+     * ```
+     */
     [RoomEvent.Timeline]: (
         event: MatrixEvent,
         room: Room | undefined,
@@ -82,6 +104,18 @@ export type EventTimelineSetHandlerMap = {
         removed: boolean,
         data: IRoomTimelineData,
     ) => void;
+    /**
+     * Fires whenever the live timeline in a room is reset.
+     *
+     * When we get a 'limited' sync (for example, after a network outage), we reset
+     * the live timeline to be empty before adding the recent events to the new
+     * timeline. This event is fired after the timeline is reset, and before the
+     * new events are added.
+     *
+     * @param room - The room whose live timeline was reset, if any
+     * @param timelineSet - timelineSet room whose live timeline was reset
+     * @param resetAllTimelines - True if all timelines were reset.
+     */
     [RoomEvent.TimelineReset]: (
         room: Room | undefined,
         eventTimelineSet: EventTimelineSet,
@@ -119,20 +153,13 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * <p>In order that we can find events from their ids later, we also maintain a
      * map from event_id to timeline and index.
      *
-     * @constructor
-     * @param {Room=} room
-     * Room for this timelineSet. May be null for non-room cases, such as the
+     * @param room - Room for this timelineSet. May be null for non-room cases, such as the
      * notification timeline.
-     * @param {Object} opts Options inherited from Room.
-     *
-     * @param {boolean} [opts.timelineSupport = false]
-     * Set to true to enable improved timeline support.
-     * @param {Object} [opts.filter = null]
-     * The filter object, if any, for this timelineSet.
-     * @param {MatrixClient=} client the Matrix client which owns this EventTimelineSet,
+     * @param opts - Options inherited from Room.
+     * @param client - the Matrix client which owns this EventTimelineSet,
      * can be omitted if room is specified.
-     * @param {Thread=} thread the thread to which this timeline set relates.
-     * @param {boolean} isThreadTimeline Whether this timeline set relates to a thread list timeline
+     * @param thread - the thread to which this timeline set relates.
+     * @param isThreadTimeline - Whether this timeline set relates to a thread list timeline
      * (e.g., All threads or My threads)
      */
     public constructor(
@@ -159,7 +186,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
     /**
      * Get all the timelines in this set
-     * @return {module:models/event-timeline~EventTimeline[]} the timelines in this set
+     * @returns the timelines in this set
      */
     public getTimelines(): EventTimeline[] {
         return this.timelines;
@@ -167,7 +194,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
     /**
      * Get the filter object this timeline set is filtered on, if any
-     * @return {?Filter} the optional filter for this timelineSet
+     * @returns the optional filter for this timelineSet
      */
     public getFilter(): Filter | undefined {
         return this.filter;
@@ -176,7 +203,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Set the filter object this timeline set is filtered on
      * (passed to the server when paginating via /messages).
-     * @param {Filter} filter the filter for this timelineSet
+     * @param filter - the filter for this timelineSet
      */
     public setFilter(filter?: Filter): void {
         this.filter = filter;
@@ -186,10 +213,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Get the list of pending sent events for this timelineSet's room, filtered
      * by the timelineSet's filter if appropriate.
      *
-     * @return {module:models/event.MatrixEvent[]} A list of the sent events
+     * @returns A list of the sent events
      * waiting for remote echo.
      *
-     * @throws If <code>opts.pendingEventOrdering</code> was not 'detached'
+     * @throws If `opts.pendingEventOrdering` was not 'detached'
      */
     public getPendingEvents(): MatrixEvent[] {
         if (!this.room || !this.displayPendingEvents) {
@@ -201,7 +228,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Get the live timeline for this room.
      *
-     * @return {module:models/event-timeline~EventTimeline} live timeline
+     * @returns live timeline
      */
     public getLiveTimeline(): EventTimeline {
         return this.liveTimeline;
@@ -210,7 +237,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Set the live timeline for this room.
      *
-     * @return {module:models/event-timeline~EventTimeline} live timeline
+     * @returns live timeline
      */
     public setLiveTimeline(timeline: EventTimeline): void {
         this.liveTimeline = timeline;
@@ -218,8 +245,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
     /**
      * Return the timeline (if any) this event is in.
-     * @param {String} eventId the eventId being sought
-     * @return {module:models/event-timeline~EventTimeline} timeline
+     * @param eventId - the eventId being sought
+     * @returns timeline
      */
     public eventIdToTimeline(eventId: string): EventTimeline | undefined {
         return this._eventIdToTimeline.get(eventId);
@@ -228,8 +255,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Track a new event as if it were in the same timeline as an old event,
      * replacing it.
-     * @param {String} oldEventId  event ID of the original event
-     * @param {String} newEventId  event ID of the replacement event
+     * @param oldEventId -  event ID of the original event
+     * @param newEventId -  event ID of the replacement event
      */
     public replaceEventId(oldEventId: string, newEventId: string): void {
         const existingTimeline = this._eventIdToTimeline.get(oldEventId);
@@ -244,11 +271,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * <p>This is used when /sync returns a 'limited' timeline.
      *
-     * @param {string=} backPaginationToken   token for back-paginating the new timeline
-     * @param {string=} forwardPaginationToken token for forward-paginating the old live timeline,
+     * @param backPaginationToken -   token for back-paginating the new timeline
+     * @param forwardPaginationToken - token for forward-paginating the old live timeline,
      * if absent or null, all timelines are reset.
      *
-     * @fires module:client~MatrixClient#event:"Room.timelineReset"
+     * @remarks
+     * Fires {@link RoomEvent.TimelineReset}
      */
     public resetLiveTimeline(backPaginationToken?: string, forwardPaginationToken?: string): void {
         // Each EventTimeline has RoomState objects tracking the state at the start
@@ -293,8 +321,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Get the timeline which contains the given event, if any
      *
-     * @param {string} eventId  event ID to look for
-     * @return {?module:models/event-timeline~EventTimeline} timeline containing
+     * @param eventId -  event ID to look for
+     * @returns timeline containing
      * the given event, or null if unknown
      */
     public getTimelineForEvent(eventId?: string): EventTimeline | null {
@@ -306,8 +334,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Get an event which is stored in our timelines
      *
-     * @param {string} eventId  event ID to look for
-     * @return {?module:models/event~MatrixEvent} the given event, or undefined if unknown
+     * @param eventId -  event ID to look for
+     * @returns the given event, or undefined if unknown
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
         const tl = this.getTimelineForEvent(eventId);
@@ -322,7 +350,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Add a new timeline to this timeline list
      *
-     * @return {module:models/event-timeline~EventTimeline} newly-created timeline
+     * @returns newly-created timeline
      */
     public addTimeline(): EventTimeline {
         if (!this.timelineSupport) {
@@ -341,18 +369,19 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * <p>Will fire "Room.timeline" for each event added.
      *
-     * @param {MatrixEvent[]} events A list of events to add.
+     * @param events - A list of events to add.
      *
-     * @param {boolean} toStartOfTimeline   True to add these events to the start
+     * @param toStartOfTimeline -   True to add these events to the start
      * (oldest) instead of the end (newest) of the timeline. If true, the oldest
      * event will be the <b>last</b> element of 'events'.
      *
-     * @param {module:models/event-timeline~EventTimeline} timeline   timeline to
+     * @param timeline -   timeline to
      *    add events to.
      *
-     * @param {string=} paginationToken   token for the next batch of events
+     * @param paginationToken -   token for the next batch of events
      *
-     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
      *
      */
     public addEventsToTimeline(
@@ -557,8 +586,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Add an event to the end of this live timeline.
      *
-     * @param {MatrixEvent} event Event to be added
-     * @param {IAddLiveEventOptions} options addLiveEvent options
+     * @param event - Event to be added
+     * @param options - addLiveEvent options
      */
     public addLiveEvent(
         event: MatrixEvent,
@@ -653,11 +682,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * Will fire "Room.timeline" for each event added.
      *
-     * @param {MatrixEvent} event
-     * @param {EventTimeline} timeline
-     * @param {IAddEventToTimelineOptions} options addEventToTimeline options
+     * @param options - addEventToTimeline options
      *
-     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
      */
     public addEventToTimeline(
         event: MatrixEvent,
@@ -745,11 +773,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Replaces event with ID oldEventId with one with newEventId, if oldEventId is
      * recognised.  Otherwise, add to the live timeline.  Used to handle remote echos.
      *
-     * @param {MatrixEvent} localEvent     the new event to be added to the timeline
-     * @param {String} oldEventId          the ID of the original event
-     * @param {boolean} newEventId         the ID of the replacement event
+     * @param localEvent -     the new event to be added to the timeline
+     * @param oldEventId -          the ID of the original event
+     * @param newEventId -         the ID of the replacement event
      *
-     * @fires module:client~MatrixClient#event:"Room.timeline"
+     * @remarks
+     * Fires {@link RoomEvent.Timeline}
      */
     public handleRemoteEcho(
         localEvent: MatrixEvent,
@@ -771,9 +800,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Removes a single event from this room.
      *
-     * @param {String} eventId  The id of the event to remove
+     * @param eventId -  The id of the event to remove
      *
-     * @return {?MatrixEvent} the removed event, or null if the event was not found
+     * @returns the removed event, or null if the event was not found
      * in this room.
      */
     public removeEvent(eventId: string): MatrixEvent | null {
@@ -796,10 +825,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     /**
      * Determine where two events appear in the timeline relative to one another
      *
-     * @param {string} eventId1   The id of the first event
-     * @param {string} eventId2   The id of the second event
+     * @param eventId1 -   The id of the first event
+     * @param eventId2 -   The id of the second event
 
-     * @return {?number} a number less than zero if eventId1 precedes eventId2, and
+     * @returns a number less than zero if eventId1 precedes eventId2, and
      *    greater than zero if eventId1 succeeds eventId2. zero if they are the
      *    same event; null if we can't tell (either because we don't know about one
      *    of the events, or because they are in separate timelines which don't join
@@ -873,9 +902,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * for events which should be shown in the main room timeline.
      * Requires the `room` property to have been set at EventTimelineSet construction time.
      *
-     * @param event {MatrixEvent} the event to check whether it belongs to this timeline set.
-     * @throws {Error} if `room` was not set when constructing this timeline set.
-     * @return {boolean} whether the event belongs to this timeline set.
+     * @param event - the event to check whether it belongs to this timeline set.
+     * @throws Error if `room` was not set when constructing this timeline set.
+     * @returns whether the event belongs to this timeline set.
      */
     public canContain(event: MatrixEvent): boolean {
         if (!this.room) {
@@ -891,43 +920,3 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         return shouldLiveInRoom;
     }
 }
-
-/**
- * Fires whenever the timeline in a room is updated.
- * @event module:client~MatrixClient#"Room.timeline"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {?Room} room The room, if any, whose timeline was updated.
- * @param {boolean} toStartOfTimeline True if this event was added to the start
- * @param {boolean} removed True if this event has just been removed from the timeline
- * (beginning; oldest) of the timeline e.g. due to pagination.
- *
- * @param {object} data  more data about the event
- *
- * @param {module:models/event-timeline.EventTimeline} data.timeline the timeline the
- * event was added to/removed from
- *
- * @param {boolean} data.liveEvent true if the event was a real-time event
- * added to the end of the live timeline
- *
- * @example
- * matrixClient.on("Room.timeline",
- *                 function(event, room, toStartOfTimeline, removed, data) {
- *   if (!toStartOfTimeline && data.liveEvent) {
- *     var messageToAppend = room.timeline.[room.timeline.length - 1];
- *   }
- * });
- */
-
-/**
- * Fires whenever the live timeline in a room is reset.
- *
- * When we get a 'limited' sync (for example, after a network outage), we reset
- * the live timeline to be empty before adding the recent events to the new
- * timeline. This event is fired after the timeline is reset, and before the
- * new events are added.
- *
- * @event module:client~MatrixClient#"Room.timelineReset"
- * @param {Room} room The room whose live timeline was reset, if any
- * @param {EventTimelineSet} timelineSet timelineSet room whose live timeline was reset
- * @param {boolean} resetAllTimelines True if all timelines were reset.
- */

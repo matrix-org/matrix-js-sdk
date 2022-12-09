@@ -16,13 +16,21 @@ limitations under the License.
 */
 
 import { TestClient } from '../../../TestClient';
-import { MatrixEvent } from "../../../../src/models/event";
+import { IContent, MatrixEvent } from "../../../../src/models/event";
 import { IRoomTimelineData } from "../../../../src/models/event-timeline-set";
 import { Room, RoomEvent } from "../../../../src/models/room";
 import { logger } from '../../../../src/logger';
-import { MatrixClient, ClientEvent } from '../../../../src/client';
+import { MatrixClient, ClientEvent, ICreateClientOpts } from '../../../../src/client';
 
-export async function makeTestClients(userInfos, options): Promise<[TestClient[], () => void]> {
+interface UserInfo {
+    userId: string;
+    deviceId: string;
+}
+
+export async function makeTestClients(
+    userInfos: UserInfo[],
+    options: Partial<ICreateClientOpts>,
+): Promise<[TestClient[], () => void]> {
     const clients: TestClient[] = [];
     const timeouts: ReturnType<typeof setTimeout>[] = [];
     const clientMap: Record<string, Record<string, MatrixClient>> = {};
@@ -51,7 +59,7 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
         }
         return {};
     };
-    const makeSendEvent = (matrixClient: MatrixClient) => (room, type, content) => {
+    const makeSendEvent = (matrixClient: MatrixClient) => (room: string, type: string, content: IContent) => {
         // make up a unique ID as the event ID
         const eventId = "$" + matrixClient.makeTxnId();
         const rawEvent = {
@@ -88,11 +96,12 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
     };
 
     for (const userInfo of userInfos) {
-        let keys = {};
+        let keys: Record<string, Uint8Array> = {};
         if (!options) options = {};
         if (!options.cryptoCallbacks) options.cryptoCallbacks = {};
         if (!options.cryptoCallbacks.saveCrossSigningKeys) {
             options.cryptoCallbacks.saveCrossSigningKeys = k => { keys = k; };
+            // @ts-ignore tsc getting confused by overloads
             options.cryptoCallbacks.getCrossSigningKey = typ => keys[typ];
         }
         const testClient = new TestClient(
@@ -104,6 +113,7 @@ export async function makeTestClients(userInfos, options): Promise<[TestClient[]
         }
         clientMap[userInfo.userId][userInfo.deviceId] = testClient.client;
         testClient.client.sendToDevice = makeSendToDevice(testClient.client);
+        // @ts-ignore tsc getting confused by overloads
         testClient.client.sendEvent = makeSendEvent(testClient.client);
         clients.push(testClient);
     }

@@ -120,6 +120,8 @@ export enum RoomType {
     ElementVideo = "io.element.video",
 }
 
+export const ToDeviceMessageId = "org.matrix.msgid";
+
 /**
  * Identifier for an [MSC3088](https://github.com/matrix-org/matrix-doc/pull/3088)
  * room purpose. Note that this reference is UNSTABLE and subject to breaking changes,
@@ -169,17 +171,21 @@ export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.m
  * eventual removal.
  *
  * Schema (TypeScript):
+ * ```
  * {
  *   service_members?: string[]
  * }
+ * ```
  *
- * Example:
+ * @example
+ * ```
  * {
  *   "service_members": [
  *     "@helperbot:localhost",
  *     "@reminderbot:alice.tdl"
  *   ]
  * }
+ * ```
  */
 export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members",

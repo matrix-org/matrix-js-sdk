@@ -28,12 +28,14 @@ limitations under the License.
 // load olm before the sdk if possible
 import '../olm-loader';
 
+import type { Session } from "@matrix-org/olm";
 import { logger } from '../../src/logger';
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
-import { CRYPTO_ENABLED, IUploadKeysRequest } from "../../src/client";
+import { CRYPTO_ENABLED, IClaimKeysRequest, IQueryKeysRequest, IUploadKeysRequest } from "../../src/client";
 import { ClientEvent, IContent, ISendEventResponse, MatrixClient, MatrixEvent } from "../../src/matrix";
 import { DeviceInfo } from '../../src/crypto/deviceinfo';
+import { IDeviceKeys, IOneTimeKey } from "../../src/crypto/dehydration";
 
 let aliTestClient: TestClient;
 const roomId = "!room:localhost";
@@ -47,36 +49,29 @@ const bobAccessToken = "fewgfkuesa";
 let aliMessages: IContent[];
 let bobMessages: IContent[];
 
-// IMessage isn't exported by src/crypto/algorithms/olm.ts
-interface OlmPayload {
-    type: number;
-    body: string;
-}
+type OlmPayload = ReturnType<Session["encrypt"]>;
 
 async function bobUploadsDeviceKeys(): Promise<void> {
     bobTestClient.expectDeviceKeyUpload();
-    await Promise.all([
-        bobTestClient.client.uploadKeys(),
-        bobTestClient.httpBackend.flushAllExpected(),
-    ]);
+    await bobTestClient.httpBackend.flushAllExpected();
     expect(Object.keys(bobTestClient.deviceKeys!).length).not.toEqual(0);
 }
 
 /**
  * Set an expectation that querier will query uploader's keys; then flush the http request.
  *
- * @return {promise} resolves once the http request has completed.
+ * @returns resolves once the http request has completed.
  */
 function expectQueryKeys(querier: TestClient, uploader: TestClient): Promise<number> {
     // can't query keys before bob has uploaded them
     expect(uploader.deviceKeys).toBeTruthy();
 
-    const uploaderKeys = {};
-    uploaderKeys[uploader.deviceId!] = uploader.deviceKeys;
+    const uploaderKeys: Record<string, IDeviceKeys> = {};
+    uploaderKeys[uploader.deviceId!] = uploader.deviceKeys!;
     querier.httpBackend.when("POST", "/keys/query")
-        .respond(200, function(_path, content: IUploadKeysRequest) {
+        .respond(200, function(_path, content: IQueryKeysRequest) {
             expect(content.device_keys![uploader.userId!]).toEqual([]);
-            const result = {};
+            const result: Record<string, Record<string, IDeviceKeys>> = {};
             result[uploader.userId!] = uploaderKeys;
             return { device_keys: result };
         });
@@ -88,13 +83,13 @@ const expectBobQueryKeys = () => expectQueryKeys(bobTestClient, aliTestClient);
 /**
  * Set an expectation that ali will claim one of bob's keys; then flush the http request.
  *
- * @return {promise} resolves once the http request has completed.
+ * @returns resolves once the http request has completed.
  */
 async function expectAliClaimKeys(): Promise<void> {
     const keys = await bobTestClient.awaitOneTimeKeyUpload();
     aliTestClient.httpBackend.when(
         "POST", "/keys/claim",
-    ).respond(200, function(_path, content: IUploadKeysRequest) {
+    ).respond(200, function(_path, content: IClaimKeysRequest) {
         const claimType = content.one_time_keys![bobUserId][bobDeviceId];
         expect(claimType).toEqual("signed_curve25519");
         let keyId = '';
@@ -105,7 +100,7 @@ async function expectAliClaimKeys(): Promise<void> {
                 }
             }
         }
-        const result = {};
+        const result: Record<string, Record<string, Record<string, IOneTimeKey>>> = {};
         result[bobUserId] = {};
         result[bobUserId][bobDeviceId] = {};
         result[bobUserId][bobDeviceId][keyId] = keys[keyId];
@@ -156,7 +151,7 @@ const bobEnablesEncryption = () => clientEnablesEncryption(bobTestClient.client)
  * Ali sends a message, first claiming e2e keys. Set the expectations and
  * check the results.
  *
- * @return {promise} which resolves to the ciphertext for Bob's device.
+ * @returns which resolves to the ciphertext for Bob's device.
  */
 async function aliSendsFirstMessage(): Promise<OlmPayload> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -173,7 +168,7 @@ async function aliSendsFirstMessage(): Promise<OlmPayload> {
  * Ali sends a message without first claiming e2e keys. Set the expectations
  * and check the results.
  *
- * @return {promise} which resolves to the ciphertext for Bob's device.
+ * @returns which resolves to the ciphertext for Bob's device.
  */
 async function aliSendsMessage(): Promise<OlmPayload> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -188,7 +183,7 @@ async function aliSendsMessage(): Promise<OlmPayload> {
  * Bob sends a message, first querying (but not claiming) e2e keys. Set the
  * expectations and check the results.
  *
- * @return {promise} which resolves to the ciphertext for Ali's device.
+ * @returns which resolves to the ciphertext for Ali's device.
  */
 async function bobSendsReplyMessage(): Promise<OlmPayload> {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -203,7 +198,7 @@ async function bobSendsReplyMessage(): Promise<OlmPayload> {
 /**
  * Set an expectation that Ali will send a message, and flush the request
  *
- * @return {promise} which resolves to the ciphertext for Bob's device.
+ * @returns which resolves to the ciphertext for Bob's device.
  */
 async function expectAliSendMessageRequest(): Promise<OlmPayload> {
     const content = await expectSendMessageRequest(aliTestClient.httpBackend);
@@ -217,7 +212,7 @@ async function expectAliSendMessageRequest(): Promise<OlmPayload> {
 /**
  * Set an expectation that Bob will send a message, and flush the request
  *
- * @return {promise} which resolves to the ciphertext for Bob's device.
+ * @returns which resolves to the ciphertext for Bob's device.
  */
 async function expectBobSendMessageRequest(): Promise<OlmPayload> {
     const content = await expectSendMessageRequest(bobTestClient.httpBackend);
@@ -276,20 +271,19 @@ async function recvMessage(
         next_batch: "x",
         rooms: {
             join: {
-
+                [roomId]: {
+                    timeline: {
+                        events: [
+                            testUtils.mkEvent({
+                                type: "m.room.encrypted",
+                                room: roomId,
+                                content: message,
+                                sender: sender,
+                            }),
+                        ],
+                    },
+                },
             },
-        },
-    };
-    syncData.rooms.join[roomId] = {
-        timeline: {
-            events: [
-                testUtils.mkEvent({
-                    type: "m.room.encrypted",
-                    room: roomId,
-                    content: message,
-                    sender: sender,
-                }),
-            ],
         },
     };
     httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -327,32 +321,32 @@ async function recvMessage(
  * Send an initial sync response to the client (which just includes the member
  * list for our test room).
  *
- * @param {TestClient} testClient
- * @returns {Promise} which resolves when the sync has been flushed.
+ * @returns which resolves when the sync has been flushed.
  */
 function firstSync(testClient: TestClient): Promise<void> {
     // send a sync response including our test room.
     const syncData = {
         next_batch: "x",
         rooms: {
-            join: { },
-        },
-    };
-    syncData.rooms.join[roomId] = {
-        state: {
-            events: [
-                testUtils.mkMembership({
-                    mship: "join",
-                    user: aliUserId,
-                }),
-                testUtils.mkMembership({
-                    mship: "join",
-                    user: bobUserId,
-                }),
-            ],
-        },
-        timeline: {
-            events: [],
+            join: {
+                [roomId]: {
+                    state: {
+                        events: [
+                            testUtils.mkMembership({
+                                mship: "join",
+                                user: aliUserId,
+                            }),
+                            testUtils.mkMembership({
+                                mship: "join",
+                                user: bobUserId,
+                            }),
+                        ],
+                    },
+                    timeline: {
+                        events: [],
+                    },
+                },
+            },
         },
     };
 
@@ -384,6 +378,14 @@ describe("MatrixClient crypto", () => {
     });
 
     it("Bob uploads device keys", bobUploadsDeviceKeys);
+
+    it("handles failures to upload device keys", async () => {
+        // since device keys are uploaded asynchronously, there's not really much to do here other than fail the
+        // upload.
+        bobTestClient.httpBackend.when("POST", "/keys/upload")
+            .fail(0, new Error("bleh"));
+        await bobTestClient.httpBackend.flushAllExpected();
+    });
 
     it("Ali downloads Bobs device keys", async () => {
         await bobUploadsDeviceKeys();
@@ -424,7 +426,7 @@ describe("MatrixClient crypto", () => {
             },
         };
 
-        const bobKeys = {};
+        const bobKeys: Record<string, typeof bobDeviceKeys> = {};
         bobKeys[bobDeviceId] = bobDeviceKeys;
         aliTestClient.httpBackend.when(
             "POST", "/keys/query",
@@ -460,7 +462,7 @@ describe("MatrixClient crypto", () => {
             },
         };
 
-        const bobKeys = {};
+        const bobKeys: Record<string, typeof bobDeviceKeys> = {};
         bobKeys[bobDeviceId] = bobDeviceKeys;
         aliTestClient.httpBackend.when(
             "POST", "/keys/query",
@@ -515,20 +517,19 @@ describe("MatrixClient crypto", () => {
             next_batch: "x",
             rooms: {
                 join: {
-
+                    [roomId]: {
+                        timeline: {
+                            events: [
+                                testUtils.mkEvent({
+                                    type: "m.room.encrypted",
+                                    room: roomId,
+                                    content: message,
+                                    sender: "@bogus:sender",
+                                }),
+                            ],
+                        },
+                    },
                 },
-            },
-        };
-        syncData.rooms.join[roomId] = {
-            timeline: {
-                events: [
-                    testUtils.mkEvent({
-                        type: "m.room.encrypted",
-                        room: roomId,
-                        content: message,
-                        sender: "@bogus:sender",
-                    }),
-                ],
             },
         };
         bobTestClient.httpBackend.when("GET", "/sync").respond(200, syncData);
@@ -607,20 +608,21 @@ describe("MatrixClient crypto", () => {
         const syncData = {
             next_batch: '2',
             rooms: {
-                join: {},
-            },
-        };
-        syncData.rooms.join[roomId] = {
-            state: {
-                events: [
-                    testUtils.mkEvent({
-                        type: 'm.room.encryption',
-                        skey: '',
-                        content: {
-                            algorithm: 'm.olm.v1.curve25519-aes-sha2',
+                join: {
+                    [roomId]: {
+                        state: {
+                            events: [
+                                testUtils.mkEvent({
+                                    type: 'm.room.encryption',
+                                    skey: '',
+                                    content: {
+                                        algorithm: 'm.olm.v1.curve25519-aes-sha2',
+                                    },
+                                }),
+                            ],
                         },
-                    }),
-                ],
+                    },
+                },
             },
         };
 
@@ -678,5 +680,46 @@ describe("MatrixClient crypto", () => {
                 };
             });
         await httpBackend.flushAllExpected();
+    });
+
+    it("Checks for outgoing room key requests for a given event's session", async () => {
+        const eventA0 = new MatrixEvent({
+            sender: "@bob:example.com",
+            room_id: "!someroom",
+            content: {
+                algorithm: 'm.megolm.v1.aes-sha2',
+                session_id: "sessionid",
+                sender_key: "senderkey",
+            },
+        });
+        const eventA1 = new MatrixEvent({
+            sender: "@bob:example.com",
+            room_id: "!someroom",
+            content: {
+                algorithm: 'm.megolm.v1.aes-sha2',
+                session_id: "sessionid",
+                sender_key: "senderkey",
+            },
+        });
+        const eventB = new MatrixEvent({
+            sender: "@bob:example.com",
+            room_id: "!someroom",
+            content: {
+                algorithm: 'm.megolm.v1.aes-sha2',
+                session_id: "othersessionid",
+                sender_key: "senderkey",
+            },
+        });
+        const nonEncryptedEvent = new MatrixEvent({
+            sender: "@bob:example.com",
+            room_id: "!someroom",
+            content: {},
+        });
+
+        aliTestClient.client.crypto?.onSyncCompleted({});
+        await aliTestClient.client.cancelAndResendEventRoomKeyRequest(eventA0);
+        expect(await aliTestClient.client.getOutgoingRoomKeyRequest(eventA1)).not.toBeNull();
+        expect(await aliTestClient.client.getOutgoingRoomKeyRequest(eventB)).toBeNull();
+        expect(await aliTestClient.client.getOutgoingRoomKeyRequest(nonEncryptedEvent)).toBeNull();
     });
 });

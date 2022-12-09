@@ -42,7 +42,7 @@ jobs:
     if: github.event.action == 'opened'
     steps:
       - name: Check membership
-        uses: tspascoal/get-user-teams-membership@v1
+        uses: tspascoal/get-user-teams-membership@v2
         id: teams
         with:
           username: ${{ github.event.pull_request.user.login }}

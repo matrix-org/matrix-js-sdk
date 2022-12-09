@@ -63,6 +63,21 @@ export type GroupCallEventHandlerMap = {
     ) => void;
     [GroupCallEvent.LocalMuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [GroupCallEvent.ParticipantsChanged]: (participants: Map<RoomMember, Map<string, ParticipantState>>) => void;
+    /**
+     * Fires whenever an error occurs when call.js encounters an issue with setting up the call.
+     * <p>
+     * The error given will have a code equal to either `MatrixCall.ERR_LOCAL_OFFER_FAILED` or
+     * `MatrixCall.ERR_NO_USER_MEDIA`. `ERR_LOCAL_OFFER_FAILED` is emitted when the local client
+     * fails to create an offer. `ERR_NO_USER_MEDIA` is emitted when the user has denied access
+     * to their audio/video hardware.
+     * @param err - The error raised by MatrixCall.
+     * @example
+     * ```
+     * matrixCall.on("error", function(err){
+     *   console.error(err.code, err);
+     * });
+     * ```
+     */
     [GroupCallEvent.Error]: (error: GroupCallError) => void;
 };
 
@@ -106,9 +121,17 @@ export interface IGroupCallDataChannelOptions {
     protocol: string;
 }
 
+export interface IGroupCallRoomState {
+    "m.intent": GroupCallIntent;
+    "m.type": GroupCallType;
+    "io.element.ptt"?: boolean;
+    // TODO: Specify data-channels
+    "dataChannelsEnabled"?: boolean;
+    "dataChannelOptions"?: IGroupCallDataChannelOptions;
+}
+
 export interface IGroupCallRoomMemberFeed {
     purpose: SDPStreamMetadataPurpose;
-    // TODO: Sources for adaptive bitrate
 }
 
 export interface IGroupCallRoomMemberDevice {
@@ -168,11 +191,11 @@ export class GroupCall extends TypedEventEmitter<
     public localCallFeed?: CallFeed;
     public localScreenshareFeed?: CallFeed;
     public localDesktopCapturerSourceId?: string;
-    public readonly calls = new Map<RoomMember, Map<string, MatrixCall>>();
     public readonly userMediaFeeds: CallFeed[] = [];
     public readonly screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
 
+    private readonly calls = new Map<RoomMember, Map<string, MatrixCall>>(); // RoomMember -> device ID -> MatrixCall
     private callHandlers = new Map<string, Map<string, ICallHandlers>>(); // User ID -> device ID -> handlers
     private activeSpeakerLoopInterval?: ReturnType<typeof setTimeout>;
     private retryCallLoopInterval?: ReturnType<typeof setTimeout>;
@@ -213,17 +236,19 @@ export class GroupCall extends TypedEventEmitter<
         this.client.groupCallEventHandler!.groupCalls.set(this.room.roomId, this);
         this.client.emit(GroupCallEventHandlerEvent.Outgoing, this);
 
+        const groupCallState: IGroupCallRoomState = {
+            "m.intent": this.intent,
+            "m.type": this.type,
+            "io.element.ptt": this.isPtt,
+            // TODO: Specify data-channels better
+            "dataChannelsEnabled": this.dataChannelsEnabled,
+            "dataChannelOptions": this.dataChannelsEnabled ? this.dataChannelOptions : undefined,
+        };
+
         await this.client.sendStateEvent(
             this.room.roomId,
             EventType.GroupCallPrefix,
-            {
-                "m.intent": this.intent,
-                "m.type": this.type,
-                "io.element.ptt": this.isPtt,
-                // TODO: Specify datachannels
-                "dataChannelsEnabled": this.dataChannelsEnabled,
-                "dataChannelOptions": this.dataChannelOptions,
-            },
+            groupCallState,
             this.groupCallId,
         );
 
@@ -285,9 +310,24 @@ export class GroupCall extends TypedEventEmitter<
         this._creationTs = value;
     }
 
+    private _enteredViaAnotherSession = false;
+
+    /**
+     * Whether the local device has entered this call via another session, such
+     * as a widget.
+     */
+    public get enteredViaAnotherSession(): boolean {
+        return this._enteredViaAnotherSession;
+    }
+
+    public set enteredViaAnotherSession(value: boolean) {
+        this._enteredViaAnotherSession = value;
+        this.updateParticipants();
+    }
+
     /**
      * Executes the given callback on all calls in this group call.
-     * @param f The callback.
+     * @param f - The callback.
      */
     public forEachCall(f: (call: MatrixCall) => void): void {
         for (const deviceMap of this.calls.values()) {
@@ -497,8 +537,8 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Sets the mute state of the local participants's microphone.
-     * @param {boolean} muted Whether to mute the microphone
-     * @returns {Promise<boolean>} Whether muting/unmuting was successful
+     * @param muted - Whether to mute the microphone
+     * @returns Whether muting/unmuting was successful
      */
     public async setMicrophoneMuted(muted: boolean): Promise<boolean> {
         // hasAudioDevice can block indefinitely if the window has lost focus,
@@ -560,8 +600,8 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Sets the mute state of the local participants's video.
-     * @param {boolean} muted Whether to mute the video
-     * @returns {Promise<boolean>} Whether muting/unmuting was successful
+     * @param muted - Whether to mute the video
+     * @returns Whether muting/unmuting was successful
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
         // hasAudioDevice can block indefinitely if the window has lost focus,
@@ -718,8 +758,8 @@ export class GroupCall extends TypedEventEmitter<
     /**
      * Determines whether a given participant expects us to call them (versus
      * them calling us).
-     * @param userId The participant's user ID.
-     * @param deviceId The participant's device ID.
+     * @param userId - The participant's user ID.
+     * @param deviceId - The participant's device ID.
      * @returns Whether we need to place an outgoing call to the participant.
      */
     private wantsOutgoingCall(userId: string, deviceId: string): boolean {
@@ -1170,7 +1210,7 @@ export class GroupCall extends TypedEventEmitter<
 
         const participants = new Map<RoomMember, Map<string, ParticipantState>>();
         const now = Date.now();
-        const entered = this.state === GroupCallState.Entered;
+        const entered = this.state === GroupCallState.Entered || this.enteredViaAnotherSession;
         let nextExpiration = Infinity;
 
         for (const e of this.getMemberStateEvents()) {
@@ -1234,9 +1274,9 @@ export class GroupCall extends TypedEventEmitter<
 
     /**
      * Updates the local user's member state with the devices returned by the given function.
-     * @param fn A function from the current devices to the new devices. If it
+     * @param fn - A function from the current devices to the new devices. If it
      *   returns null, the update will be skipped.
-     * @param keepAlive Whether the request should outlive the window.
+     * @param keepAlive - Whether the request should outlive the window.
      */
     private async updateDevices(
         fn: (devices: IGroupCallRoomMemberDevice[]) => IGroupCallRoomMemberDevice[] | null,
@@ -1344,8 +1384,11 @@ export class GroupCall extends TypedEventEmitter<
         await this.updateDevices(devices => {
             const newDevices = devices.filter(d => {
                 const device = deviceMap.get(d.device_id);
-                return device?.last_seen_ts !== undefined
-                    && !(d.device_id === this.client.getDeviceId()! && this.state !== GroupCallState.Entered);
+                return device?.last_seen_ts !== undefined && !(
+                    d.device_id === this.client.getDeviceId()!
+                    && this.state !== GroupCallState.Entered
+                    && !this.enteredViaAnotherSession
+                );
             });
 
             // Skip the update if the devices are unchanged

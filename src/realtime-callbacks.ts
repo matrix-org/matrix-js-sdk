@@ -48,16 +48,17 @@ type Callback = {
 const callbackList: Callback[] = [];
 
 // var debuglog = logger.log.bind(logger);
+/* istanbul ignore next */
 const debuglog = function(...params: any[]): void {};
 
 /**
  * reimplementation of window.setTimeout, which will call the callback if
  * the wallclock time goes past the deadline.
  *
- * @param {function} func   callback to be called after a delay
- * @param {Number} delayMs  number of milliseconds to delay by
+ * @param func -   callback to be called after a delay
+ * @param delayMs -  number of milliseconds to delay by
  *
- * @return {Number} an identifier for this callback, which may be passed into
+ * @returns an identifier for this callback, which may be passed into
  *                   clearTimeout later.
  */
 export function setTimeout(func: (...params: any[]) => void, delayMs: number, ...params: any[]): number {
@@ -93,7 +94,7 @@ export function setTimeout(func: (...params: any[]) => void, delayMs: number, ..
 /**
  * reimplementation of window.clearTimeout, which mirrors setTimeout
  *
- * @param {Number} key   result from an earlier setTimeout call
+ * @param key -   result from an earlier setTimeout call
  */
 export function clearTimeout(key: number): void {
     if (callbackList.length === 0) {

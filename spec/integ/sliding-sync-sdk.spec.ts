@@ -23,7 +23,7 @@ import { TestClient } from "../TestClient";
 import { IRoomEvent, IStateEvent } from "../../src/sync-accumulator";
 import {
     MatrixClient, MatrixEvent, NotificationCountType, JoinRule, MatrixError,
-    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent, RoomMemberEvent,
+    EventType, IPushRules, PushRuleKind, TweakName, ClientEvent, RoomMemberEvent, RoomEvent, Room, IRoomTimelineData,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
 import { SyncState } from "../../src/sync";
@@ -119,13 +119,13 @@ describe("SlidingSyncSdk", () => {
     };
 
     // find an extension on a SlidingSyncSdk instance
-    const findExtension = (name: string): Extension => {
+    const findExtension = (name: string): Extension<any, any> => {
         expect(mockSlidingSync!.registerExtension).toHaveBeenCalled();
         const mockFn = mockSlidingSync!.registerExtension as jest.Mock;
         // find the extension
         for (let i = 0; i < mockFn.mock.calls.length; i++) {
-            const calledExtension = mockFn.mock.calls[i][0] as Extension;
-            if (calledExtension && calledExtension.name() === name) {
+            const calledExtension = mockFn.mock.calls[i][0] as Extension<any, any>;
+            if (calledExtension?.name() === name) {
                 return calledExtension;
             }
         }
@@ -170,6 +170,7 @@ describe("SlidingSyncSdk", () => {
             const roomE = "!e_with_invite:localhost";
             const roomF = "!f_calc_room_name:localhost";
             const roomG = "!g_join_invite_counts:localhost";
+            const roomH = "!g_num_live:localhost";
             const data: Record<string, MSC3575RoomData> = {
                 [roomA]: {
                     name: "A",
@@ -275,6 +276,18 @@ describe("SlidingSyncSdk", () => {
                     invited_count: 2,
                     initial: true,
                 },
+                [roomH]: {
+                    name: "H",
+                    required_state: [],
+                    timeline: [
+                        mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }, ""),
+                        mkOwnStateEvent(EventType.RoomMember, { membership: "join" }, selfUserId),
+                        mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                        mkOwnEvent(EventType.RoomMessage, { body: "live event" }),
+                    ],
+                    initial: true,
+                    num_live: 1,
+                },
             };
 
             it("can be created with required_state and timeline", () => {
@@ -324,6 +337,33 @@ describe("SlidingSyncSdk", () => {
                 if (gotRoom == null) { return; }
                 expect(gotRoom.getInvitedMemberCount()).toEqual(data[roomG].invited_count);
                 expect(gotRoom.getJoinedMemberCount()).toEqual(data[roomG].joined_count);
+            });
+
+            it("can be created with live events", () => {
+                let seenLiveEvent = false;
+                const listener = (
+                    ev: MatrixEvent,
+                    room?: Room,
+                    toStartOfTimeline?: boolean,
+                    deleted?: boolean,
+                    timelineData?: IRoomTimelineData,
+                ) => {
+                    if (timelineData?.liveEvent) {
+                        assertTimelineEvents([ev], data[roomH].timeline.slice(-1));
+                        seenLiveEvent = true;
+                    }
+                };
+                client!.on(RoomEvent.Timeline, listener);
+                mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomH, data[roomH]);
+                client!.off(RoomEvent.Timeline, listener);
+                const gotRoom = client!.getRoom(roomH);
+                expect(gotRoom).toBeDefined();
+                if (gotRoom == null) { return; }
+                expect(gotRoom.name).toEqual(data[roomH].name);
+                expect(gotRoom.getMyMembership()).toEqual("join");
+                // check the entire timeline is correct
+                assertTimelineEvents(gotRoom.getLiveTimeline().getEvents(), data[roomH].timeline);
+                expect(seenLiveEvent).toBe(true);
             });
 
             it("can be created with invite_state", () => {
@@ -541,7 +581,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionE2EE", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         beforeAll(async () => {
             await setupClient({
@@ -607,7 +647,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionAccountData", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         beforeAll(async () => {
             await setupClient();
@@ -733,7 +773,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionToDevice", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         beforeAll(async () => {
             await setupClient();
@@ -831,7 +871,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionTyping", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         beforeAll(async () => {
             await setupClient();
@@ -930,7 +970,7 @@ describe("SlidingSyncSdk", () => {
     });
 
     describe("ExtensionReceipts", () => {
-        let ext: Extension;
+        let ext: Extension<any, any>;
 
         const generateReceiptResponse = (
             userId: string, roomId: string, eventId: string, recType: string, ts: number,

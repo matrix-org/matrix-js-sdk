@@ -126,12 +126,13 @@ describe("megolm key backups", function() {
         const syncResponse = {
             next_batch: 1,
             rooms: {
-                join: {},
-            },
-        };
-        syncResponse.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [ENCRYPTED_EVENT],
+                join: {
+                    [ROOM_ID]: {
+                        timeline: {
+                            events: [ENCRYPTED_EVENT],
+                        },
+                    },
+                },
             },
         };
 
