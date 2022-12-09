@@ -9297,9 +9297,21 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     if (oldHighlight !== newHighlight || currentCount > 0) {
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
-        const hasReadEvent = isThreadEvent
-            ? room.getThread(event.threadRootId)?.hasUserReadEvent(cli.getUserId()!, event.getId()!)
-            : room.hasUserReadEvent(cli.getUserId()!, event.getId()!);
+        let hasReadEvent;
+        if (isThreadEvent) {
+            const thread = room.getThread(event.threadRootId);
+            hasReadEvent = thread
+                ? thread.hasUserReadEvent(cli.getUserId()!, event.getId()!)
+                // If the thread object does not exist in the room yet, we don't
+                // want to calculate notification for this event yet. We have not
+                // restored the read receipts yet and can't accurately calculate
+                // highlight notifications at this stage.
+                //
+                // This issue can likely go away when MSC3874 is implemented
+                : true;
+        } else {
+            hasReadEvent = room.hasUserReadEvent(cli.getUserId()!, event.getId()!);
+        }
 
         if (!hasReadEvent) {
             let newCount = currentCount;
