@@ -2837,8 +2837,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             algorithm: wireContent.algorithm,
             room_id: event.getRoomId()!,
         };
-        if (!requestBody.session_id || !requestBody.sender_key || !requestBody.algorithm || !requestBody.room_id)
+        if (!requestBody.session_id || !requestBody.sender_key || !requestBody.algorithm || !requestBody.room_id) {
             return Promise.resolve(null);
+        }
         return this.crypto.cryptoStore.getOutgoingRoomKeyRequest(requestBody);
     }
 
@@ -6837,8 +6838,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves to a set of rooms
      * @returns Rejects: with an error response.
      */
+    // eslint-disable-next-line
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
-        // eslint-disable-line
         const sharedRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666");
         const mutualRoomsSupport = await this.doesServerSupportUnstableFeature("uk.half-shot.msc2666.mutual_rooms");
 

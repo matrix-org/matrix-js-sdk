@@ -207,7 +207,7 @@ export type RoomEventHandlerMap = {
      * });
      * ```
      */
-    [RoomEvent.Receipt]: (event: MatrixEvent, room: Room) => void
+    [RoomEvent.Receipt]: (event: MatrixEvent, room: Room) => void;
     /**
      * Fires whenever the name of a room is updated.
      * @param room - The room whose Room.name was updated.
@@ -217,7 +217,7 @@ export type RoomEventHandlerMap = {
      *   var newName = room.name;
      * });
      * ```
-     */;
+     */
     [RoomEvent.Name]: (room: Room) => void;
     /**
      * Fires when an event we had previously received is redacted.

@@ -338,10 +338,10 @@ export type CryptoEventHandlerMap = {
         failures: IUploadKeySignaturesResponse["failures"],
         source: "checkOwnCrossSigningTrust" | "afterCrossSigningLocalKeyChange" | "setDeviceVerification",
         upload: (opts: { shouldEmit: boolean }) => Promise<void>,
-    ) => void
+    ) => void;
     /**
      * Fires when a key verification is requested.
-     */;
+     */
     [CryptoEvent.VerificationRequest]: (request: VerificationRequest<any>) => void;
     /**
      * Fires when the app may wish to warn the user about something related

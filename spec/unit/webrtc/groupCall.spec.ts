@@ -843,6 +843,7 @@ describe("Group Call", function () {
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
+                    // @ts-ignore Mock
                     new MockMediaStream("stream", [
                         new MockMediaStreamTrack("audio_track", "audio"),
                         new MockMediaStreamTrack("video_track", "video"),
@@ -869,6 +870,7 @@ describe("Group Call", function () {
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
+                    // @ts-ignore Mock
                     new MockMediaStream("stream", [
                         new MockMediaStreamTrack("audio_track", "audio"),
                         new MockMediaStreamTrack("video_track", "video"),
@@ -1054,6 +1056,7 @@ describe("Group Call", function () {
             } as MatrixEvent);
             // @ts-ignore Mock
             call.pushRemoteFeed(
+                // @ts-ignore Mock
                 new MockMediaStream("screensharing_stream", [new MockMediaStreamTrack("video_track", "video")]),
             );
 

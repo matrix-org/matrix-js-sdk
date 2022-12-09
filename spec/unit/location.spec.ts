@@ -43,9 +43,9 @@ describe("Location", function () {
     const modernEventContent = { ...modernProperties };
 
     const legacyEventContent = {
-        // eslint-disable-next-line camelcase
         body,
         msgtype,
+        // eslint-disable-next-line camelcase
         geo_uri,
     } as LocationEventWireContent;
 
