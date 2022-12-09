@@ -50,7 +50,7 @@ interface IThreadOpts {
     room: Room;
     client: MatrixClient;
     pendingEventOrdering?: PendingEventOrdering;
-    receipts?: { event: MatrixEvent, synthetic: boolean }[];
+    receipts?: { event: MatrixEvent; synthetic: boolean }[];
 }
 
 export enum FeatureSupport {
@@ -291,22 +291,16 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * Processes the receipts that were caught during initial sync
      * When clients become aware of a thread, they try to retrieve those read receipts
      * and apply them to the current thread
-     * @param receipts A collection of the receipts cached from initial sync
+     * @param receipts - A collection of the receipts cached from initial sync
      */
-    private processReceipts(receipts: { event: MatrixEvent, synthetic: boolean }[] = []): void {
+    private processReceipts(receipts: { event: MatrixEvent; synthetic: boolean }[] = []): void {
         for (const { event, synthetic } of receipts) {
             const content = event.getContent<ReceiptContent>();
             Object.keys(content).forEach((eventId: string) => {
                 Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
                     Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
                         const receipt = content[eventId][receiptType][userId] as Receipt;
-                        this.addReceiptToStructure(
-                            eventId,
-                            receiptType as ReceiptType,
-                            userId,
-                            receipt,
-                            synthetic,
-                        );
+                        this.addReceiptToStructure(eventId, receiptType as ReceiptType, userId, receipt, synthetic);
                     });
                 });
             });

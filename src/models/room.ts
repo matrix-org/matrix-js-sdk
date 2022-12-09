@@ -2079,7 +2079,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             room: this,
             client: this.client,
             pendingEventOrdering: this.opts.pendingEventOrdering,
-            receipts: this.cachedThreadReadReceipts.get(threadId) ?? []
+            receipts: this.cachedThreadReadReceipts.get(threadId) ?? [],
         });
 
         // All read receipts should now come down from sync, we do not need to keep
