@@ -30,17 +30,15 @@ const DEFAULT_NAMESPACE = "matrix";
 // to avoid the issue, we override the methodFactory of loglevel that binds to the
 // console methods at initialization time by a factory that looks up the console methods
 // when logging so we always get the current value of console methods.
-log.methodFactory = function(methodName, logLevel, loggerName) {
-    return function(this: PrefixedLogger, ...args): void {
+log.methodFactory = function (methodName, logLevel, loggerName) {
+    return function (this: PrefixedLogger, ...args): void {
         /* eslint-disable @typescript-eslint/no-invalid-this */
         if (this.prefix) {
             args.unshift(this.prefix);
         }
         /* eslint-enable @typescript-eslint/no-invalid-this */
-        const supportedByConsole = methodName === "error" ||
-            methodName === "warn" ||
-            methodName === "trace" ||
-            methodName === "info";
+        const supportedByConsole =
+            methodName === "error" || methodName === "warn" || methodName === "trace" || methodName === "info";
         /* eslint-disable no-console */
         if (supportedByConsole) {
             return console[methodName](...args);
@@ -64,7 +62,7 @@ export interface PrefixedLogger extends Logger {
 }
 
 function extendLogger(logger: Logger): void {
-    (<PrefixedLogger>logger).withPrefix = function(prefix: string): PrefixedLogger {
+    (<PrefixedLogger>logger).withPrefix = function (prefix: string): PrefixedLogger {
         const existingPrefix = this.prefix || "";
         return getPrefixedLogger(existingPrefix + prefix);
     };

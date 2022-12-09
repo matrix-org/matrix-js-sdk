@@ -22,7 +22,7 @@ import { TestClient } from "../../TestClient";
 import { emitPromise, mkMessage } from "../../test-utils/test-utils";
 import { EventStatus } from "../../../src";
 
-describe('Thread', () => {
+describe("Thread", () => {
     describe("constructor", () => {
         it("should explode for element-web#22141 logging", () => {
             // Logging/debugging for https://github.com/vector-im/element-web/issues/22141
@@ -34,13 +34,7 @@ describe('Thread', () => {
 
     it("includes pending events in replyCount", async () => {
         const myUserId = "@bob:example.org";
-        const testClient = new TestClient(
-            myUserId,
-            "DEVICE",
-            "ACCESS_TOKEN",
-            undefined,
-            { timelineSupport: false },
-        );
+        const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, { timelineSupport: false });
         const client = testClient.client;
         const room = new Room("123", client, myUserId, {
             pendingEventOrdering: PendingEventOrdering.Detached,
@@ -82,13 +76,9 @@ describe('Thread', () => {
         let room: Room;
 
         beforeEach(() => {
-            const testClient = new TestClient(
-                myUserId,
-                "DEVICE",
-                "ACCESS_TOKEN",
-                undefined,
-                { timelineSupport: false },
-            );
+            const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
+                timelineSupport: false,
+            });
             client = testClient.client;
             room = new Room("123", client, myUserId);
 

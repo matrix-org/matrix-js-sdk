@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from './logger';
+import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { defer, IDeferred } from "./utils";
 import { MatrixError } from "./http-api";
@@ -240,9 +240,7 @@ export class InteractiveAuth {
         if (!this.data?.flows) {
             this.busyChangedCallback?.(true);
             // use the existing sessionId, if one is present.
-            const auth = this.data.session
-                ? { session: this.data.session }
-                : null;
+            const auth = this.data.session ? { session: this.data.session } : null;
             this.doRequest(auth).finally(() => {
                 this.busyChangedCallback?.(false);
             });
@@ -355,8 +353,7 @@ export class InteractiveAuth {
         while (this.submitPromise) {
             try {
                 await this.submitPromise;
-            } catch (e) {
-            }
+            } catch (e) {}
         }
 
         // use the sessionid from the last request, if one is present.
@@ -472,7 +469,8 @@ export class InteractiveAuth {
             // any UI auth data (eg. when polling for email validation, if the email
             // has not yet been validated). This appears to be a Synapse bug, which
             // we workaround here.
-            if (!(<MatrixError>error).data.flows &&
+            if (
+                !(<MatrixError>error).data.flows &&
                 !(<MatrixError>error).data.completed &&
                 !(<MatrixError>error).data.session
             ) {
@@ -527,7 +525,7 @@ export class InteractiveAuth {
 
         if (nextStage === AuthType.Dummy) {
             this.submitAuthDict({
-                type: 'm.login.dummy',
+                type: "m.login.dummy",
             });
             return;
         }
@@ -540,9 +538,7 @@ export class InteractiveAuth {
             return;
         }
 
-        this.stateUpdatedCallback(nextStage, nextStage === EMAIL_STAGE_TYPE
-            ? { emailSid: this.emailSid }
-            : {});
+        this.stateUpdatedCallback(nextStage, nextStage === EMAIL_STAGE_TYPE ? { emailSid: this.emailSid } : {});
     }
 
     /**
@@ -582,10 +578,7 @@ export class InteractiveAuth {
 
         // we've been given an email or we've already done an email part
         const haveEmail = Boolean(this.inputs.emailAddress) || Boolean(this.emailSid);
-        const haveMsisdn = (
-            Boolean(this.inputs.phoneCountry) &&
-            Boolean(this.inputs.phoneNumber)
-        );
+        const haveMsisdn = Boolean(this.inputs.phoneCountry) && Boolean(this.inputs.phoneNumber);
 
         for (const flow of flows) {
             let flowHasEmail = false;
@@ -619,6 +612,6 @@ export class InteractiveAuth {
      */
     private firstUncompletedStage(flow: IFlow): AuthType | undefined {
         const completed = this.data.completed || [];
-        return flow.stages.find(stageType => !completed.includes(stageType));
+        return flow.stages.find((stageType) => !completed.includes(stageType));
     }
 }

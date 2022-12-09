@@ -49,7 +49,7 @@ export class ReEmitter {
                 // later by a different part of the code where 'emit' throwing because the app hasn't
                 // added an error handler isn't terribly helpful. (A better fix in retrospect may
                 // have been to just avoid using the event name 'error', but backwards compat...)
-                if (eventName === 'error' && this.target.listenerCount('error') === 0) return;
+                if (eventName === "error" && this.target.listenerCount("error") === 0) return;
                 this.target.emit(eventName, ...args, source);
             };
             source.on(eventName, forSource);
@@ -70,10 +70,7 @@ export class ReEmitter {
     }
 }
 
-export class TypedReEmitter<
-    Events extends string,
-    Arguments extends ListenerMap<Events>,
-> extends ReEmitter {
+export class TypedReEmitter<Events extends string, Arguments extends ListenerMap<Events>> extends ReEmitter {
     public constructor(target: TypedEventEmitter<Events, Arguments>) {
         super(target);
     }

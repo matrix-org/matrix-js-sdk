@@ -32,10 +32,11 @@ interface TypedResponse<T> extends Response {
     json(): Promise<T>;
 }
 
-export type ResponseType<T, O extends IHttpOpts> =
-    O extends undefined ? T :
-        O extends { onlyData: true } ? T :
-            TypedResponse<T>;
+export type ResponseType<T, O extends IHttpOpts> = O extends undefined
+    ? T
+    : O extends { onlyData: true }
+    ? T
+    : TypedResponse<T>;
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
@@ -155,9 +156,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
         const requestPromise = this.request<T>(method, path, queryParams, body, opts);
 
         requestPromise.catch((err: MatrixError) => {
-            if (err.errcode == 'M_UNKNOWN_TOKEN' && !opts?.inhibitLogoutEmit) {
+            if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
-            } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
+            } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
                 this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
         });
@@ -241,9 +242,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
         const timeout = opts.localTimeoutMs ?? this.opts.localTimeoutMs;
         const keepAlive = opts.keepAlive ?? false;
-        const signals = [
-            this.abortController.signal,
-        ];
+        const signals = [this.abortController.signal];
         if (timeout !== undefined) {
             signals.push(timeoutSignal(timeout));
         }
@@ -302,12 +301,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @param baseUrl - The baseUrl to use e.g. "https://matrix.org/", defaulting to this.opts.baseUrl.
      * @returns URL
      */
-    public getUrl(
-        path: string,
-        queryParams?: QueryDict,
-        prefix?: string,
-        baseUrl?: string,
-    ): URL {
+    public getUrl(path: string, queryParams?: QueryDict, prefix?: string, baseUrl?: string): URL {
         const url = new URL((baseUrl ?? this.opts.baseUrl) + (prefix ?? this.opts.prefix) + path);
         if (queryParams) {
             utils.encodeParams(queryParams, url.searchParams);

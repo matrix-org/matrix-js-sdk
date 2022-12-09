@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from './logger';
+import { logger } from "./logger";
 import { MatrixClient } from "./client";
 import { IRoomEvent, IStateEvent } from "./sync-accumulator";
 import { TypedEventEmitter } from "./models/typed-event-emitter";
@@ -328,10 +328,14 @@ export enum SlidingSyncEvent {
 export type SlidingSyncEventHandlerMap = {
     [SlidingSyncEvent.RoomData]: (roomId: string, roomData: MSC3575RoomData) => void;
     [SlidingSyncEvent.Lifecycle]: (
-        state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error,
+        state: SlidingSyncState,
+        resp: MSC3575SlidingSyncResponse | null,
+        err?: Error,
     ) => void;
     [SlidingSyncEvent.List]: (
-        listIndex: number, joinedCount: number, roomIndexToRoomId: Record<number, string>,
+        listIndex: number,
+        joinedCount: number,
+        roomIndexToRoomId: Record<number, string>,
     ) => void;
 };
 
@@ -351,7 +355,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     private txnId: string | null = null;
     // a list (in chronological order of when they were sent) of objects containing the txn ID and
     // a defer to resolve/reject depending on whether they were successfully sent or not.
-    private txnIdDefers: (IDeferred<string> & { txnId: string})[] = [];
+    private txnIdDefers: (IDeferred<string> & { txnId: string })[] = [];
     // map of extension name to req/resp handler
     private extensions: Record<string, Extension<any, any>> = {};
 
@@ -422,7 +426,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param index - The list index
      * @returns The list data which contains the rooms in this list
      */
-    public getListData(index: number): {joinedCount: number, roomIndexToRoomId: Record<number, string>} | null {
+    public getListData(index: number): { joinedCount: number; roomIndexToRoomId: Record<number, string> } | null {
         if (!this.lists[index]) {
             return null;
         }
@@ -556,8 +560,12 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param roomData - The raw sliding sync response JSON.
      */
     private invokeRoomDataListeners(roomId: string, roomData: MSC3575RoomData): void {
-        if (!roomData.required_state) { roomData.required_state = []; }
-        if (!roomData.timeline) { roomData.timeline = []; }
+        if (!roomData.required_state) {
+            roomData.required_state = [];
+        }
+        if (!roomData.timeline) {
+            roomData.timeline = [];
+        }
         this.emit(SlidingSyncEvent.RoomData, roomId, roomData);
     }
 
@@ -581,10 +589,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         // 0,1,2,2,3 <- after, hi is deleted and low is duplicated
         for (let i = hi; i > low; i--) {
             if (this.lists[listIndex].isIndexInRange(i)) {
-                this.lists[listIndex].roomIndexToRoomId[i] =
-                    this.lists[listIndex].roomIndexToRoomId[
-                        i - 1
-                    ];
+                this.lists[listIndex].roomIndexToRoomId[i] = this.lists[listIndex].roomIndexToRoomId[i - 1];
             }
         }
     }
@@ -595,10 +600,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         // 0,1,3,4,4 <- after, low is deleted and hi is duplicated
         for (let i = low; i < hi; i++) {
             if (this.lists[listIndex].isIndexInRange(i)) {
-                this.lists[listIndex].roomIndexToRoomId[i] =
-                    this.lists[listIndex].roomIndexToRoomId[
-                        i + 1
-                    ];
+                this.lists[listIndex].roomIndexToRoomId[i] = this.lists[listIndex].roomIndexToRoomId[i + 1];
             }
         }
     }
@@ -631,7 +633,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             return;
         }
         // Everything higher than the gap needs to be shifted right, +1 so we don't delete the highest element
-        this.shiftRight(listIndex, max+1, index);
+        this.shiftRight(listIndex, max + 1, index);
     }
 
     private processListOps(list: ListResponse, listIndex: number): void {
@@ -649,13 +651,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     break;
                 }
                 case "INSERT": {
-                    logger.debug(
-                        "INSERT",
-                        listIndex,
-                        op.index,
-                        op.room_id,
-                        ";",
-                    );
+                    logger.debug("INSERT", listIndex, op.index, op.room_id, ";");
                     if (this.lists[listIndex].roomIndexToRoomId[op.index]) {
                         // something is in this space, shift items out of the way
                         if (gapIndex < 0) {
@@ -689,13 +685,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     for (let i = startIndex; i <= op.range[1]; i++) {
                         delete this.lists[listIndex].roomIndexToRoomId[i];
                     }
-                    logger.debug(
-                        "INVALIDATE",
-                        listIndex,
-                        op.range[0],
-                        op.range[1],
-                        ";",
-                    );
+                    logger.debug("INVALIDATE", listIndex, op.range[0], op.range[1], ";");
                     break;
                 }
                 case "SYNC": {
@@ -707,14 +697,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                         }
                         this.lists[listIndex].roomIndexToRoomId[i] = roomId;
                     }
-                    logger.debug(
-                        "SYNC",
-                        listIndex,
-                        op.range[0],
-                        op.range[1],
-                        (op.room_ids || []).join(" "),
-                        ";",
-                    );
+                    logger.debug("SYNC", listIndex, op.range[0], op.range[1], (op.room_ids || []).join(" "), ";");
                     break;
                 }
             }
@@ -734,7 +717,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     public resend(): Promise<string> {
         if (this.needsResend && this.txnIdDefers.length > 0) {
             // we already have a resend queued, so just return the same promise
-            return this.txnIdDefers[this.txnIdDefers.length-1].promise;
+            return this.txnIdDefers[this.txnIdDefers.length - 1].promise;
         }
         this.needsResend = true;
         this.txnId = this.client.makeTxnId();
@@ -773,7 +756,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
         }
         this.txnIdDefers[txnIndex].resolve(txnId);
         // clear out settled promises, including the one we resolved.
-        this.txnIdDefers = this.txnIdDefers.slice(txnIndex+1);
+        this.txnIdDefers = this.txnIdDefers.slice(txnIndex + 1);
     }
 
     /**
@@ -880,17 +863,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 resp.lists.forEach((val, i) => {
                     this.lists[i].joinedCount = val.count;
                 });
-                this.invokeLifecycleListeners(
-                    SlidingSyncState.RequestFinished,
-                    resp,
-                );
+                this.invokeLifecycleListeners(SlidingSyncState.RequestFinished, resp);
             } catch (err) {
                 if ((<HTTPError>err).httpStatus) {
-                    this.invokeLifecycleListeners(
-                        SlidingSyncState.RequestFinished,
-                        null,
-                        <Error>err,
-                    );
+                    this.invokeLifecycleListeners(SlidingSyncState.RequestFinished, null, <Error>err);
                     if ((<HTTPError>err).httpStatus === 400) {
                         // session probably expired TODO: assign an errcode
                         // so drop state and re-request
@@ -911,10 +887,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             this.onPreExtensionsResponse(resp.extensions);
 
             Object.keys(resp.rooms).forEach((roomId) => {
-                this.invokeRoomDataListeners(
-                    roomId,
-                    resp!.rooms[roomId],
-                );
+                this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
             });
 
             const listIndexesWithUpdates: Set<number> = new Set();
@@ -932,7 +905,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             listIndexesWithUpdates.forEach((i) => {
                 this.emit(
                     SlidingSyncEvent.List,
-                    i, this.lists[i].joinedCount, Object.assign({}, this.lists[i].roomIndexToRoomId),
+                    i,
+                    this.lists[i].joinedCount,
+                    Object.assign({}, this.lists[i].roomIndexToRoomId),
                 );
             });
 

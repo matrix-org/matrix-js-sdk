@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
-import { logger } from './logger';
+import { logger } from "./logger";
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
@@ -48,11 +48,12 @@ type ExtensionE2EERequest = {
     enabled: boolean;
 };
 
-type ExtensionE2EEResponse = Pick<ISyncResponse,
-    "device_lists" |
-    "device_one_time_keys_count" |
-    "device_unused_fallback_key_types" |
-    "org.matrix.msc2732.device_unused_fallback_key_types"
+type ExtensionE2EEResponse = Pick<
+    ISyncResponse,
+    | "device_lists"
+    | "device_one_time_keys_count"
+    | "device_unused_fallback_key_types"
+    | "org.matrix.msc2732.device_unused_fallback_key_types"
 >;
 
 class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResponse> {
@@ -78,9 +79,12 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
     public async onResponse(data: ExtensionE2EEResponse): Promise<void> {
         // Handle device list updates
         if (data["device_lists"]) {
-            await this.crypto.handleDeviceListChanges({
-                oldSyncToken: "yep", // XXX need to do this so the device list changes get processed :(
-            }, data["device_lists"]);
+            await this.crypto.handleDeviceListChanges(
+                {
+                    oldSyncToken: "yep", // XXX need to do this so the device list changes get processed :(
+                },
+                data["device_lists"],
+            );
         }
 
         // Handle one_time_keys_count
@@ -88,16 +92,14 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
             const currentCount = data["device_one_time_keys_count"].signed_curve25519 || 0;
             this.crypto.updateOneTimeKeyCount(currentCount);
         }
-        if (data["device_unused_fallback_key_types"] ||
-                data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
+        if (data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"]) {
             // The presence of device_unused_fallback_key_types indicates that the
             // server supports fallback keys. If there's no unused
             // signed_curve25519 fallback key we need a new one.
-            const unusedFallbackKeys = data["device_unused_fallback_key_types"] ||
-                data["org.matrix.msc2732.device_unused_fallback_key_types"];
+            const unusedFallbackKeys =
+                data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"];
             this.crypto.setNeedsNewFallback(
-                Array.isArray(unusedFallbackKeys) &&
-                !unusedFallbackKeys.includes("signed_curve25519"),
+                Array.isArray(unusedFallbackKeys) && !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
     }
@@ -142,14 +144,15 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
         const cancelledKeyVerificationTxns: string[] = [];
         data.events
             ?.map(this.client.getEventMapper())
-            .map((toDeviceEvent) => { // map is a cheap inline forEach
+            .map((toDeviceEvent) => {
+                // map is a cheap inline forEach
                 // We want to flag m.key.verification.start events as cancelled
                 // if there's an accompanying m.key.verification.cancel event, so
                 // we pull out the transaction IDs from the cancellation events
                 // so we can flag the verification events as cancelled in the loop
                 // below.
                 if (toDeviceEvent.getType() === "m.key.verification.cancel") {
-                    const txnId: string | undefined = toDeviceEvent.getContent()['transaction_id'];
+                    const txnId: string | undefined = toDeviceEvent.getContent()["transaction_id"];
                     if (txnId) {
                         cancelledKeyVerificationTxns.push(txnId);
                     }
@@ -159,32 +162,26 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
                 // the unmodified event.
                 return toDeviceEvent;
             })
-            .forEach(
-                (toDeviceEvent) => {
-                    const content = toDeviceEvent.getContent();
-                    if (
-                        toDeviceEvent.getType() == "m.room.message" &&
-                        content.msgtype == "m.bad.encrypted"
-                    ) {
-                        // the mapper already logged a warning.
-                        logger.log(
-                            'Ignoring undecryptable to-device event from ' +
-                            toDeviceEvent.getSender(),
-                        );
-                        return;
-                    }
+            .forEach((toDeviceEvent) => {
+                const content = toDeviceEvent.getContent();
+                if (toDeviceEvent.getType() == "m.room.message" && content.msgtype == "m.bad.encrypted") {
+                    // the mapper already logged a warning.
+                    logger.log("Ignoring undecryptable to-device event from " + toDeviceEvent.getSender());
+                    return;
+                }
 
-                    if (toDeviceEvent.getType() === "m.key.verification.start"
-                        || toDeviceEvent.getType() === "m.key.verification.request") {
-                        const txnId = content['transaction_id'];
-                        if (cancelledKeyVerificationTxns.includes(txnId)) {
-                            toDeviceEvent.flagCancelled();
-                        }
+                if (
+                    toDeviceEvent.getType() === "m.key.verification.start" ||
+                    toDeviceEvent.getType() === "m.key.verification.request"
+                ) {
+                    const txnId = content["transaction_id"];
+                    if (cancelledKeyVerificationTxns.includes(txnId)) {
+                        toDeviceEvent.flagCancelled();
                     }
+                }
 
-                    this.client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
-                },
-            );
+                this.client.emit(ClientEvent.ToDeviceEvent, toDeviceEvent);
+            });
 
         this.nextBatch = data.next_batch;
     }
@@ -245,21 +242,19 @@ class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, Ext
             return m;
         }, {});
         this.client.store.storeAccountDataEvents(events);
-        events.forEach(
-            (accountDataEvent) => {
-                // Honour push rules that come down the sync stream but also
-                // honour push rules that were previously cached. Base rules
-                // will be updated when we receive push rules via getPushRules
-                // (see sync) before syncing over the network.
-                if (accountDataEvent.getType() === EventType.PushRules) {
-                    const rules = accountDataEvent.getContent<IPushRules>();
-                    this.client.pushRules = PushProcessor.rewriteDefaultRules(rules);
-                }
-                const prevEvent = prevEventsMap[accountDataEvent.getType()];
-                this.client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
-                return accountDataEvent;
-            },
-        );
+        events.forEach((accountDataEvent) => {
+            // Honour push rules that come down the sync stream but also
+            // honour push rules that were previously cached. Base rules
+            // will be updated when we receive push rules via getPushRules
+            // (see sync) before syncing over the network.
+            if (accountDataEvent.getType() === EventType.PushRules) {
+                const rules = accountDataEvent.getContent<IPushRules>();
+                this.client.pushRules = PushProcessor.rewriteDefaultRules(rules);
+            }
+            const prevEvent = prevEventsMap[accountDataEvent.getType()];
+            this.client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
+            return accountDataEvent;
+        });
     }
 }
 
@@ -336,9 +331,7 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
         }
 
         for (const roomId in data.rooms) {
-            processEphemeralEvents(
-                this.client, roomId, [data.rooms[roomId]],
-            );
+            processEphemeralEvents(this.client, roomId, [data.rooms[roomId]]);
         }
     }
 }
@@ -361,7 +354,7 @@ export class SlidingSyncSdk {
     ) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
-        this.opts.pollTimeout = this.opts.pollTimeout || (30 * 1000);
+        this.opts.pollTimeout = this.opts.pollTimeout || 30 * 1000;
         this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
         this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
@@ -372,10 +365,7 @@ export class SlidingSyncSdk {
         }
 
         if (client.getNotifTimelineSet()) {
-            client.reEmitter.reEmit(client.getNotifTimelineSet()!, [
-                RoomEvent.Timeline,
-                RoomEvent.TimelineReset,
-            ]);
+            client.reEmitter.reEmit(client.getNotifTimelineSet()!, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
         }
 
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
@@ -387,9 +377,7 @@ export class SlidingSyncSdk {
             new ExtensionReceipts(this.client),
         ];
         if (this.opts.crypto) {
-            extensions.push(
-                new ExtensionE2EE(this.opts.crypto),
-            );
+            extensions.push(new ExtensionE2EE(this.opts.crypto));
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);
@@ -504,7 +492,8 @@ export class SlidingSyncSdk {
 
     // Helper functions which set up JS SDK structs are below and are identical to the sync v2 counterparts
 
-    public createRoom(roomId: string): Room { // XXX cargoculted from sync.ts
+    public createRoom(roomId: string): Room {
+        // XXX cargoculted from sync.ts
         const { timelineSupport } = this.client;
         const room = new Room(roomId, this.client, this.client.getUserId()!, {
             lazyLoadMembers: this.opts.lazyLoadMembers,
@@ -527,7 +516,8 @@ export class SlidingSyncSdk {
         return room;
     }
 
-    private registerStateListeners(room: Room): void { // XXX cargoculted from sync.ts
+    private registerStateListeners(room: Room): void {
+        // XXX cargoculted from sync.ts
         // we need to also re-emit room state and room member events, so hook it up
         // to the client now. We need to add a listener for RoomState.members in
         // order to hook them correctly.
@@ -584,9 +574,11 @@ export class SlidingSyncSdk {
             // If we do, then we've effectively done scrollback (e.g requesting timeline_limit: 1 for
             // this room, then timeline_limit: 50).
             const knownEvents = new Set<string>();
-            room.getLiveTimeline().getEvents().forEach((e) => {
-                knownEvents.add(e.getId()!);
-            });
+            room.getLiveTimeline()
+                .getEvents()
+                .forEach((e) => {
+                    knownEvents.add(e.getId()!);
+                });
             // all unknown events BEFORE a known event must be scrollback e.g:
             //       D E   <-- what we know
             // A B C D E F <-- what we just received
@@ -598,7 +590,7 @@ export class SlidingSyncSdk {
             const oldEvents: MatrixEvent[] = [];
             const newEvents: MatrixEvent[] = [];
             let seenKnownEvent = false;
-            for (let i = timelineEvents.length-1; i >= 0; i--) {
+            for (let i = timelineEvents.length - 1; i >= 0; i--) {
                 const recvEvent = timelineEvents[i];
                 if (knownEvents.has(recvEvent.getId()!)) {
                     seenKnownEvent = true;
@@ -622,10 +614,7 @@ export class SlidingSyncSdk {
         const encrypted = this.client.isRoomEncrypted(room.roomId);
         // we do this first so it's correct when any of the events fire
         if (roomData.notification_count != null) {
-            room.setUnreadNotificationCount(
-                NotificationCountType.Total,
-                roomData.notification_count,
-            );
+            room.setUnreadNotificationCount(NotificationCountType.Total, roomData.notification_count);
         }
 
         if (roomData.highlight_count != null) {
@@ -633,12 +622,8 @@ export class SlidingSyncSdk {
             // bother setting it here. We trust our calculations better than the
             // server's for this case, and therefore will assume that our non-zero
             // count is accurate.
-            if (!encrypted
-                || (encrypted && room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0)) {
-                room.setUnreadNotificationCount(
-                    NotificationCountType.Highlight,
-                    roomData.highlight_count,
-                );
+            if (!encrypted || (encrypted && room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0)) {
+                room.setUnreadNotificationCount(NotificationCountType.Highlight, roomData.highlight_count);
             }
         }
 
@@ -751,7 +736,7 @@ export class SlidingSyncSdk {
 
         await utils.promiseMapSeries(stateEvents, processRoomEvent);
         await utils.promiseMapSeries(timelineEvents, processRoomEvent);
-        ephemeralEvents.forEach(function(e) {
+        ephemeralEvents.forEach(function (e) {
             client.emit(ClientEvent.Event, e);
         });
 
@@ -856,7 +841,7 @@ export class SlidingSyncSdk {
         const client = this.client;
         // For each invited room member we want to give them a displayname/avatar url
         // if they have one (the m.room.member invites don't contain this).
-        room.getMembersWithMembership("invite").forEach(function(member) {
+        room.getMembersWithMembership("invite").forEach(function (member) {
             if (member.requestedProfileInfo) return;
             member.requestedProfileInfo = true;
             // try to get a cached copy first.
@@ -870,22 +855,25 @@ export class SlidingSyncSdk {
             } else {
                 promise = client.getProfileInfo(member.userId);
             }
-            promise.then(function(info) {
-                // slightly naughty by doctoring the invite event but this means all
-                // the code paths remain the same between invite/join display name stuff
-                // which is a worthy trade-off for some minor pollution.
-                const inviteEvent = member.events.member!;
-                if (inviteEvent.getContent().membership !== "invite") {
-                    // between resolving and now they have since joined, so don't clobber
-                    return;
-                }
-                inviteEvent.getContent().avatar_url = info.avatar_url;
-                inviteEvent.getContent().displayname = info.displayname;
-                // fire listeners
-                member.setMembershipEvent(inviteEvent, room.currentState);
-            }, function(_err) {
-                // OH WELL.
-            });
+            promise.then(
+                function (info) {
+                    // slightly naughty by doctoring the invite event but this means all
+                    // the code paths remain the same between invite/join display name stuff
+                    // which is a worthy trade-off for some minor pollution.
+                    const inviteEvent = member.events.member!;
+                    if (inviteEvent.getContent().membership !== "invite") {
+                        // between resolving and now they have since joined, so don't clobber
+                        return;
+                    }
+                    inviteEvent.getContent().avatar_url = info.avatar_url;
+                    inviteEvent.getContent().displayname = info.displayname;
+                    // fire listeners
+                    member.setMembershipEvent(inviteEvent, room.currentState);
+                },
+                function (_err) {
+                    // OH WELL.
+                },
+            );
         });
     }
 
@@ -955,8 +943,7 @@ export class SlidingSyncSdk {
         }
         for (const timelineEvent of timelineEventList) {
             const pushActions = this.client.getPushActionsForEvent(timelineEvent);
-            if (pushActions && pushActions.notify &&
-                pushActions.tweaks && pushActions.tweaks.highlight) {
+            if (pushActions && pushActions.notify && pushActions.tweaks && pushActions.tweaks.highlight) {
                 this.notifEvents.push(timelineEvent);
             }
         }
@@ -970,7 +957,7 @@ export class SlidingSyncSdk {
      * room B appearing earlier in the notifications timeline, even though it has the higher origin_server_ts.
      */
     private purgeNotifications(): void {
-        this.notifEvents.sort(function(a, b) {
+        this.notifEvents.sort(function (a, b) {
             return a.getTs() - b.getTs();
         });
         this.notifEvents.forEach((event) => {
@@ -1014,7 +1001,7 @@ type TaggedEvent = (IStrippedState | IRoomEvent | IStateEvent | IMinimalEvent) &
 // just outside the class.
 function mapEvents(client: MatrixClient, roomId: string | undefined, events: object[], decrypt = true): MatrixEvent[] {
     const mapper = client.getEventMapper({ decrypt });
-    return (events as TaggedEvent[]).map(function(e) {
+    return (events as TaggedEvent[]).map(function (e) {
         e.room_id = roomId;
         return mapper(e);
     });

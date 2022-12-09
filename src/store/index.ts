@@ -233,15 +233,15 @@ export interface IStore {
     /**
      * Stores batches of outgoing to-device messages
      */
-     saveToDeviceBatches(batch: ToDeviceBatchWithTxnId[]): Promise<void>;
+    saveToDeviceBatches(batch: ToDeviceBatchWithTxnId[]): Promise<void>;
 
-     /**
-      * Fetches the oldest batch of to-device messages in the queue
-      */
-     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
+    /**
+     * Fetches the oldest batch of to-device messages in the queue
+     */
+    getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
 
-     /**
-      * Removes a specific batch of to-device messages from the queue
-      */
-     removeToDeviceBatch(id: number): Promise<void>;
+    /**
+     * Removes a specific batch of to-device messages from the queue
+     */
+    removeToDeviceBatch(id: number): Promise<void>;
 }

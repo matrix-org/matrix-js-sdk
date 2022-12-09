@@ -38,16 +38,14 @@ const FAKE_SESSION_ID = "session1";
 const FAKE_ROOM_ID = "!roomid:test.dummy";
 const FAKE_GROUP_CALL_ID = "fakegroupcallid";
 
-describe('Group Call Event Handler', function() {
+describe("Group Call Event Handler", function () {
     let groupCallEventHandler: GroupCallEventHandler;
     let mockClient: MockCallMatrixClient;
     let mockRoom: Room;
     let mockMember: RoomMember;
 
     beforeEach(() => {
-        mockClient = new MockCallMatrixClient(
-            FAKE_USER_ID, FAKE_DEVICE_ID, FAKE_SESSION_ID,
-        );
+        mockClient = new MockCallMatrixClient(FAKE_USER_ID, FAKE_DEVICE_ID, FAKE_SESSION_ID);
         groupCallEventHandler = new GroupCallEventHandler(mockClient.typed());
 
         mockMember = {
@@ -70,7 +68,7 @@ describe('Group Call Event Handler', function() {
                     }
                 }),
             },
-            getMember: (userId: string) => userId === FAKE_USER_ID ? mockMember : null,
+            getMember: (userId: string) => (userId === FAKE_USER_ID ? mockMember : null),
         } as unknown as Room;
 
         (mockClient as any).getRoom = jest.fn().mockReturnValue(mockRoom);
@@ -79,23 +77,20 @@ describe('Group Call Event Handler', function() {
     describe("reacts to state changes", () => {
         it("terminates call", async () => {
             await groupCallEventHandler.start();
-            mockClient.emitRoomState(
-                makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID),
-                { roomId: FAKE_ROOM_ID } as unknown as RoomState,
-            );
+            mockClient.emitRoomState(makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID), {
+                roomId: FAKE_ROOM_ID,
+            } as unknown as RoomState);
 
             const groupCall = groupCallEventHandler.groupCalls.get(FAKE_ROOM_ID)!;
 
             expect(groupCall.state).toBe(GroupCallState.LocalCallFeedUninitialized);
 
             mockClient.emitRoomState(
-                makeMockGroupCallStateEvent(
-                    FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, {
-                        "m.type": GroupCallType.Video,
-                        "m.intent": GroupCallIntent.Prompt,
-                        "m.terminated": GroupCallTerminationReason.CallEnded,
-                    },
-                ),
+                makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, {
+                    "m.type": GroupCallType.Video,
+                    "m.intent": GroupCallIntent.Prompt,
+                    "m.terminated": GroupCallTerminationReason.CallEnded,
+                }),
                 {
                     roomId: FAKE_ROOM_ID,
                 } as unknown as RoomState,
@@ -131,7 +126,7 @@ describe('Group Call Event Handler', function() {
     });
 
     it("finds existing group calls when started", async () => {
-        const mockClientEmit = mockClient.emit = jest.fn();
+        const mockClientEmit = (mockClient.emit = jest.fn());
 
         mockClient.getRooms.mockReturnValue([mockRoom]);
         await groupCallEventHandler.start();
@@ -171,18 +166,15 @@ describe('Group Call Event Handler', function() {
         mockClient.on(GroupCallEventHandlerEvent.Incoming, onIncomingGroupCall);
         await groupCallEventHandler.start();
 
-        mockClient.emitRoomState(
-            makeMockGroupCallStateEvent(
-                FAKE_ROOM_ID, FAKE_GROUP_CALL_ID,
-            ),
-            {
-                roomId: FAKE_ROOM_ID,
-            } as unknown as RoomState,
-        );
+        mockClient.emitRoomState(makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID), {
+            roomId: FAKE_ROOM_ID,
+        } as unknown as RoomState);
 
-        expect(onIncomingGroupCall).toHaveBeenCalledWith(expect.objectContaining({
-            groupCallId: FAKE_GROUP_CALL_ID,
-        }));
+        expect(onIncomingGroupCall).toHaveBeenCalledWith(
+            expect.objectContaining({
+                groupCallId: FAKE_GROUP_CALL_ID,
+            }),
+        );
 
         mockClient.off(GroupCallEventHandlerEvent.Incoming, onIncomingGroupCall);
     });
@@ -191,23 +183,19 @@ describe('Group Call Event Handler', function() {
         await groupCallEventHandler.start();
 
         const dataChannelOptions = {
-            "maxPacketLifeTime": "life_time",
-            "maxRetransmits": "retransmits",
-            "ordered": "ordered",
-            "protocol": "protocol",
+            maxPacketLifeTime: "life_time",
+            maxRetransmits: "retransmits",
+            ordered: "ordered",
+            protocol: "protocol",
         };
 
         mockClient.emitRoomState(
-            makeMockGroupCallStateEvent(
-                FAKE_ROOM_ID,
-                FAKE_GROUP_CALL_ID,
-                {
-                    "m.type": GroupCallType.Video,
-                    "m.intent": GroupCallIntent.Prompt,
-                    "dataChannelsEnabled": true,
-                    dataChannelOptions,
-                },
-            ),
+            makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, {
+                "m.type": GroupCallType.Video,
+                "m.intent": GroupCallIntent.Prompt,
+                "dataChannelsEnabled": true,
+                dataChannelOptions,
+            }),
             {
                 roomId: FAKE_ROOM_ID,
             } as unknown as RoomState,
@@ -236,11 +224,7 @@ describe('Group Call Event Handler', function() {
 
         const setupCallAndStart = async (content?: IContent) => {
             mocked(mockRoom.currentState.getStateEvents).mockReturnValue([
-                makeMockGroupCallStateEvent(
-                    FAKE_ROOM_ID,
-                    FAKE_GROUP_CALL_ID,
-                    content,
-                ),
+                makeMockGroupCallStateEvent(FAKE_ROOM_ID, FAKE_GROUP_CALL_ID, content),
             ] as unknown as MatrixEvent);
             mockClient.getRooms.mockReturnValue([mockRoom]);
             await groupCallEventHandler.start();

@@ -21,7 +21,7 @@ import {
     RendezvousTransport,
     RendezvousTransportDetails,
 } from "../../../src/rendezvous";
-import { sleep } from '../../../src/utils';
+import { sleep } from "../../../src/utils";
 
 export class DummyTransport<D extends RendezvousTransportDetails, T> implements RendezvousTransport<T> {
     otherParty?: DummyTransport<D, T>;
@@ -41,8 +41,9 @@ export class DummyTransport<D extends RendezvousTransportDetails, T> implements 
 
     async send(data: T): Promise<void> {
         logger.info(
-            `[${this.name}] => [${this.otherParty?.name}] Attempting to send data: ${
-                JSON.stringify(data)} where etag matches ${this.etag}`,
+            `[${this.name}] => [${this.otherParty?.name}] Attempting to send data: ${JSON.stringify(
+                data,
+            )} where etag matches ${this.etag}`,
         );
         // eslint-disable-next-line no-constant-condition
         while (!this.cancelled) {
@@ -68,12 +69,13 @@ export class DummyTransport<D extends RendezvousTransportDetails, T> implements 
                 this.lastEtagReceived = this.etag;
                 logger.info(
                     `[${this.otherParty?.name}] => [${this.name}] Received data: ` +
-                    `${JSON.stringify(this.data)} with etag ${this.etag}`,
+                        `${JSON.stringify(this.data)} with etag ${this.etag}`,
                 );
                 return this.data;
             }
-            logger.info(`[${this.name}] Sleeping to retry receive after etag ${
-                this.lastEtagReceived} as remote is ${this.etag}`);
+            logger.info(
+                `[${this.name}] Sleeping to retry receive after etag ${this.lastEtagReceived} as remote is ${this.etag}`,
+            );
             await sleep(250);
         }
 

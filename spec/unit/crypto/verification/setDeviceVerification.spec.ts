@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import '../../../olm-loader';
+import "../../../olm-loader";
 
 import { CRYPTO_ENABLED, MatrixClient } from "../../../../src/client";
 import { TestClient } from "../../../TestClient";
@@ -35,7 +35,7 @@ describe("crypto.setDeviceVerification", () => {
     });
 
     beforeEach(async () => {
-        client = (new TestClient(userId, deviceId1)).client;
+        client = new TestClient(userId, deviceId1).client;
         await client.initCrypto();
     });
 
@@ -46,11 +46,7 @@ describe("crypto.setDeviceVerification", () => {
     describe("when setting an own device as verified", () => {
         beforeEach(async () => {
             jest.spyOn(client.crypto!, "cancelAndResendAllOutgoingKeyRequests");
-            await client.crypto!.setDeviceVerification(
-                userId,
-                deviceId1,
-                true,
-            );
+            await client.crypto!.setDeviceVerification(userId, deviceId1, true);
         });
 
         it("cancelAndResendAllOutgoingKeyRequests should be called", () => {

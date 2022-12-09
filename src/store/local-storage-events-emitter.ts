@@ -17,12 +17,12 @@ limitations under the License.
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 
 export enum LocalStorageErrors {
-    Global = 'Global',
-    SetItemError = 'setItem',
-    GetItemError = 'getItem',
-    RemoveItemError = 'removeItem',
-    ClearError = 'clear',
-    QuotaExceededError = 'QuotaExceededError'
+    Global = "Global",
+    SetItemError = "setItem",
+    GetItemError = "getItem",
+    RemoveItemError = "removeItem",
+    ClearError = "clear",
+    QuotaExceededError = "QuotaExceededError",
 }
 
 type EventHandlerMap = {

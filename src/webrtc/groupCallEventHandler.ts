@@ -14,20 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from '../models/event';
-import { MatrixClient, ClientEvent } from '../client';
-import {
-    GroupCall,
-    GroupCallIntent,
-    GroupCallType,
-    IGroupCallDataChannelOptions,
-} from "./groupCall";
+import { MatrixEvent } from "../models/event";
+import { MatrixClient, ClientEvent } from "../client";
+import { GroupCall, GroupCallIntent, GroupCallType, IGroupCallDataChannelOptions } from "./groupCall";
 import { Room } from "../models/room";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 import { RoomMember } from "../models/room-member";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { EventType } from "../@types/event";
-import { SyncState } from '../sync';
+import { SyncState } from "../sync";
 
 export enum GroupCallEventHandlerEvent {
     Incoming = "GroupCall.incoming",
@@ -57,7 +52,7 @@ export class GroupCallEventHandler {
     // and get
     private roomDeferreds = new Map<string, RoomDeferred>();
 
-    public constructor(private client: MatrixClient) { }
+    public constructor(private client: MatrixClient) {}
 
     public async start(): Promise<void> {
         // We wait until the client has started syncing for real.
@@ -67,7 +62,7 @@ export class GroupCallEventHandler {
         // the group call we create is really the latest one.
         if (this.client.getSyncState() !== SyncState.Syncing) {
             logger.debug("Waiting for client to start syncing...");
-            await new Promise<void>(resolve => {
+            await new Promise<void>((resolve) => {
                 const onSync = (): void => {
                     if (this.client.getSyncState() === SyncState.Syncing) {
                         this.client.off(ClientEvent.Sync, onSync);
@@ -97,7 +92,7 @@ export class GroupCallEventHandler {
         if (deferred === undefined) {
             let resolveFunc: () => void;
             deferred = {
-                prom: new Promise<void>(resolve => {
+                prom: new Promise<void>((resolve) => {
                     resolveFunc = resolve;
                 }),
             };
@@ -129,7 +124,7 @@ export class GroupCallEventHandler {
 
             logger.debug(
                 `Choosing group call ${callEvent.getStateKey()} with TS ` +
-                `${callEvent.getTs()} for room ${room.roomId} from ${callEvents.length} possible calls.`,
+                    `${callEvent.getTs()} for room ${room.roomId} from ${callEvents.length} possible calls.`,
             );
 
             this.createGroupCallFromRoomStateEvent(callEvent);
@@ -214,13 +209,15 @@ export class GroupCallEventHandler {
                     currentGroupCall.terminate(false);
                 } else if (content["m.type"] !== currentGroupCall.type) {
                     // TODO: Handle the callType changing when the room state changes
-                    logger.warn(`The group call type changed for room: ${
-                        state.roomId}. Changing the group call type is currently unsupported.`);
+                    logger.warn(
+                        `The group call type changed for room: ${state.roomId}. Changing the group call type is currently unsupported.`,
+                    );
                 }
             } else if (currentGroupCall && currentGroupCall.groupCallId !== groupCallId) {
                 // TODO: Handle new group calls and multiple group calls
-                logger.warn(`Multiple group calls detected for room: ${
-                    state.roomId}. Multiple group calls are currently unsupported.`);
+                logger.warn(
+                    `Multiple group calls detected for room: ${state.roomId}. Multiple group calls are currently unsupported.`,
+                );
             }
         }
     };

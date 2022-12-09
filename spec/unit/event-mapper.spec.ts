@@ -18,7 +18,7 @@ import { MatrixClient, MatrixEvent, MatrixEventEvent, MatrixScheduler, Room } fr
 import { eventMapperFor } from "../../src/event-mapper";
 import { IStore } from "../../src/store";
 
-describe("eventMapperFor", function() {
+describe("eventMapperFor", function () {
     let rooms: Room[] = [];
 
     const userId = "@test:example.org";
@@ -29,10 +29,10 @@ describe("eventMapperFor", function() {
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             accessToken: "my.access.token",
-            fetchFn: function() {} as any, // NOP
+            fetchFn: function () {} as any, // NOP
             store: {
                 getRoom(roomId: string): Room | null {
-                    return rooms.find(r => r.roomId === roomId) ?? null;
+                    return rooms.find((r) => r.roomId === roomId) ?? null;
                 },
             } as IStore,
             scheduler: {

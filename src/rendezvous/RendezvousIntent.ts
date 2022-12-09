@@ -15,6 +15,6 @@ limitations under the License.
 */
 
 export enum RendezvousIntent {
-  LOGIN_ON_NEW_DEVICE = "login.start",
-  RECIPROCATE_LOGIN_ON_EXISTING_DEVICE = "login.reciprocate",
+    LOGIN_ON_NEW_DEVICE = "login.start",
+    RECIPROCATE_LOGIN_ON_EXISTING_DEVICE = "login.reciprocate",
 }
