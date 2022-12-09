@@ -1072,8 +1072,6 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onCallFeedsChanged = (call: MatrixCall): void => {
-        this.updateMemberState();
-
         // Find removed feeds
         [...this.userMediaFeeds, ...this.screenshareFeeds].filter((gf) => gf.disposed).forEach((feed) => {
             if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
