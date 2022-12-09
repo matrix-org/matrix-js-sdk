@@ -9311,9 +9311,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Find the event_id closest to the given timestamp in the given direction.
-     * @return Resolves: A promise of an object containing the event_id and
+     * @returns Resolves: A promise of an object containing the event_id and
      *    origin_server_ts of the closest event to the timestamp in the given direction
-     * @return Rejects: when the request fails (module:http-api.MatrixError)
+     * @returns Rejects: when the request fails (module:http-api.MatrixError)
      */
     public async timestampToEvent(
         roomId: string,
