@@ -3387,7 +3387,7 @@ eslint-plugin-jsdoc@^39.6.4:
 
 "eslint-plugin-matrix-org@https://github.com/matrix-org/eslint-plugin-matrix-org.git#weeman1337/prettier":
   version "0.8.0"
-  resolved "https://github.com/matrix-org/eslint-plugin-matrix-org.git#4c5e82dc6daa70b5d71ca8f8a55ff2e2cb6f802e"
+  resolved "https://github.com/matrix-org/eslint-plugin-matrix-org.git#e5b593c4e1f32e7597ba4e417239aaba9b96da8e"
 
 eslint-plugin-tsdoc@^0.2.17:
   version "0.2.17"
