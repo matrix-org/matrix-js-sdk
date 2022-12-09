@@ -1,6 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2019-2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
+import MockHttpBackend from "matrix-mock-request";
 
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
@@ -487,41 +488,12 @@ describe("megolm", () => {
         // mark the device as known, and resend.
         aliceTestClient.client.setDeviceKnown("@bob:xyz", "DEVICE_ID");
 
-        let inboundGroupSession: Olm.InboundGroupSession;
-        aliceTestClient.httpBackend
-            .when("PUT", "/sendToDevice/m.room.encrypted/")
-            .respond(200, function (_path, content: any) {
-                const m = content.messages["@bob:xyz"].DEVICE_ID;
-                const ct = m.ciphertext[testSenderKey];
-                const decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
-
-                expect(decrypted.type).toEqual("m.room_key");
-                inboundGroupSession = new Olm.InboundGroupSession();
-                inboundGroupSession.create(decrypted.content.session_key);
-                return {};
-            });
-
-        aliceTestClient.httpBackend.when("PUT", "/send/").respond(200, (_path, content: IContent) => {
-            const ct = content.ciphertext;
-            const r: any = inboundGroupSession.decrypt(ct);
-            logger.log("Decrypted received megolm message", r);
-
-            expect(r.message_index).toEqual(0);
-            const decrypted = JSON.parse(r.plaintext);
-            expect(decrypted.type).toEqual("m.room.message");
-            expect(decrypted.content.body).toEqual("test");
-
-            return { event_id: "$event_id" };
-        });
-
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const pendingMsg = room.getPendingEvents()[0];
 
         await Promise.all([
             aliceTestClient.client.resendEvent(pendingMsg, room),
-
-            // the crypto stuff can take a while, so give the requests a whole second.
-            aliceTestClient.httpBackend.flushAllExpected({ timeout: 1000 }),
+            expectSendKeyAndMessage(aliceTestClient.httpBackend, "@bob:xyz", testOlmAccount, p2pSession),
         ]);
     });
 
@@ -582,33 +554,19 @@ describe("megolm", () => {
         logger.log("Telling alice to send a megolm message");
 
         let megolmSessionId: string;
-        aliceTestClient.httpBackend
-            .when("PUT", "/sendToDevice/m.room.encrypted/")
-            .respond(200, function (_path, content: any) {
-                logger.log("sendToDevice: ", content);
-                const m = content.messages["@bob:xyz"].DEVICE_ID;
-                const ct = m.ciphertext[testSenderKey];
-                expect(ct.type).toEqual(1); // normal message
-                const decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
-                logger.log("decrypted sendToDevice:", decrypted);
-                expect(decrypted.type).toEqual("m.room_key");
-                megolmSessionId = decrypted.content.session_id;
-                return {};
-            });
-
-        aliceTestClient.httpBackend.when("PUT", "/send/").respond(200, function (_path, content) {
-            logger.log("/send:", content);
-            expect(content.session_id).toEqual(megolmSessionId);
-            return {
-                event_id: "$event_id",
-            };
+        const inboundGroupSessionPromise = expectSendRoomKey(
+            aliceTestClient.httpBackend,
+            "@bob:xyz",
+            testOlmAccount,
+            p2pSession,
+        );
+        inboundGroupSessionPromise.then((igs) => {
+            megolmSessionId = igs.session_id();
         });
 
         await Promise.all([
             aliceTestClient.client.sendTextMessage(ROOM_ID, "test"),
-
-            // the crypto stuff can take a while, so give the requests a whole second.
-            aliceTestClient.httpBackend.flushAllExpected({ timeout: 1000 }),
+            expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise),
         ]);
 
         logger.log("Telling alice to block our device");
@@ -617,6 +575,7 @@ describe("megolm", () => {
         logger.log("Telling alice to send another megolm message");
         aliceTestClient.httpBackend.when("PUT", "/send/").respond(200, function (_path, content) {
             logger.log("/send:", content);
+            // make sure that a new session is used
             expect(content.session_id).not.toEqual(megolmSessionId);
             return {
                 event_id: "$event_id",
@@ -686,43 +645,13 @@ describe("megolm", () => {
                 return getTestKeysClaimResponse(aliceTestClient.userId!);
             });
 
-        let p2pSession: Olm.Session;
-        let inboundGroupSession: Olm.InboundGroupSession;
-        aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room.encrypted/").respond(
-            200,
-            function (
-                _path,
-                content: {
-                    messages: { [userId: string]: { [deviceId: string]: Record<string, any> } };
-                },
-            ) {
-                logger.log("sendToDevice: ", content);
-                const m = content.messages[aliceTestClient.userId!].DEVICE_ID;
-                const ct = m.ciphertext[testSenderKey];
-                expect(ct.type).toEqual(0); // pre-key message
-
-                p2pSession = new Olm.Session();
-                p2pSession.create_inbound(testOlmAccount, ct.body);
-                const decrypted = JSON.parse(p2pSession.decrypt(ct.type, ct.body));
-
-                expect(decrypted.type).toEqual("m.room_key");
-                inboundGroupSession = new Olm.InboundGroupSession();
-                inboundGroupSession.create(decrypted.content.session_key);
-                return {};
-            },
+        const inboundGroupSessionPromise = expectSendRoomKey(
+            aliceTestClient.httpBackend,
+            aliceTestClient.userId!,
+            testOlmAccount,
         );
 
         let decrypted: Partial<IEvent> = {};
-        aliceTestClient.httpBackend.when("PUT", "/send/").respond(200, function (_path, content: IContent) {
-            const ct = content.ciphertext;
-            const r: any = inboundGroupSession.decrypt(ct);
-            logger.log("Decrypted received megolm message", r);
-            decrypted = JSON.parse(r.plaintext);
-
-            return {
-                event_id: "$event_id",
-            };
-        });
 
         // Grab the event that we'll need to resend
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
@@ -731,12 +660,11 @@ describe("megolm", () => {
         const unsentEvent = pendingEvents[0];
 
         await Promise.all([
-            aliceTestClient.client.resendEvent(unsentEvent, room),
-
-            // the crypto stuff can take a while, so give the requests a whole second.
-            aliceTestClient.httpBackend.flushAllExpected({
-                timeout: 1000,
+            aliceTestClient.httpBackend.flush("/keys/claim", 1, 1000),
+            expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise).then((d) => {
+                decrypted = d;
             }),
+            aliceTestClient.client.resendEvent(unsentEvent, room),
         ]);
 
         expect(decrypted.type).toEqual("m.room.message");
@@ -1441,4 +1369,121 @@ async function establishOlmSession(aliceTestClient: TestClient, bobOlmAccount: O
     });
     await aliceTestClient.flushSync();
     return p2pSession;
+}
+
+/**
+ * Expect that the client shares keys with the given recipient, and sends a room message which is decryptable.
+ *
+ * The sender is expected to send a message in the test room, and to share the room keys with `recipientUserID`'s
+ * device called DEVICE_ID.
+ *
+ * @param senderMockHttpBackend - MockHttpBackend for the sender
+ *
+ * @param recipientUserID - the user id of the expected recipient
+ *
+ * @param recipientOlmAccount - Olm.Account for the recipient
+ *
+ * @param recipientOlmSession - an Olm.Session for the recipient, which must already have exchanged pre-key
+ *    messages with the sender. Alternatively, null, in which case we will expect a pre-key message.
+ *
+ * @returns The content of the successfully-decrypted event
+ */
+async function expectSendKeyAndMessage(
+    senderMockHttpBackend: MockHttpBackend,
+    recipientUserID: string,
+    recipientOlmAccount: Olm.Account,
+    recipientOlmSession: Olm.Session | null = null,
+): Promise<Partial<IEvent>> {
+    const inboundGroupSessionPromise = expectSendRoomKey(
+        senderMockHttpBackend,
+        recipientUserID,
+        recipientOlmAccount,
+        recipientOlmSession,
+    );
+    return await expectSendMegolmMessage(senderMockHttpBackend, inboundGroupSessionPromise);
+}
+
+/**
+ * Expect that the client shares keys with the given recipient
+ *
+ * Waits for an HTTP request to send the encrypted m.room_key to-device message; decrypts it and uses it
+ * to establish an Olm InboundGroupSession.
+ *
+ * @param senderMockHttpBackend - MockHttpBackend for the sender
+ *
+ * @param recipientUserID - the user id of the expected recipient
+ *
+ * @param recipientOlmAccount - Olm.Account for the recipient
+ *
+ * @param recipientOlmSession - an Olm.Session for the recipient, which must already have exchanged pre-key
+ *    messages with the sender. Alternatively, null, in which case we will expect a pre-key message.
+ *
+ * @returns the established inbound group session
+ */
+async function expectSendRoomKey(
+    senderMockHttpBackend: MockHttpBackend,
+    recipientUserID: string,
+    recipientOlmAccount: Olm.Account,
+    recipientOlmSession: Olm.Session | null = null,
+): Promise<Olm.InboundGroupSession> {
+    const Olm = global.Olm;
+    const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
+
+    let inboundGroupSession: Olm.InboundGroupSession;
+
+    senderMockHttpBackend.when("PUT", "/sendToDevice/m.room.encrypted/").respond(200, (_path, content: any) => {
+        const m = content.messages[recipientUserID].DEVICE_ID;
+        const ct = m.ciphertext[testRecipientKey];
+
+        if (!recipientOlmSession) {
+            expect(ct.type).toEqual(0); // pre-key message
+            recipientOlmSession = new Olm.Session();
+            recipientOlmSession.create_inbound(recipientOlmAccount, ct.body);
+        } else {
+            expect(ct.type).toEqual(1); // regular message
+        }
+
+        const decrypted = JSON.parse(recipientOlmSession.decrypt(ct.type, ct.body));
+        expect(decrypted.type).toEqual("m.room_key");
+        inboundGroupSession = new Olm.InboundGroupSession();
+        inboundGroupSession.create(decrypted.content.session_key);
+        return {};
+    });
+
+    expect(await senderMockHttpBackend.flush("/sendToDevice/m.room.encrypted/", 1, 1000)).toEqual(1);
+    return inboundGroupSession!;
+}
+
+/**
+ * Expect that the client sends an encrypted event
+ *
+ * Waits for an HTTP request to send an encrypted message in the test room.
+ *
+ * @param senderMockHttpBackend - MockHttpBackend for the sender
+ *
+ * @param inboundGroupSessionPromise - a promise for an Olm InboundGroupSession, which will
+ *    be used to decrypt the event. We will wait for this to resolve once the HTTP request has been processed.
+ *
+ * @returns The content of the successfully-decrypted event
+ */
+async function expectSendMegolmMessage(
+    senderMockHttpBackend: MockHttpBackend,
+    inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
+): Promise<Partial<IEvent>> {
+    let encryptedMessageContent: IContent | null = null;
+    senderMockHttpBackend.when("PUT", "/send/m.room.encrypted/").respond(200, function (_path, content: IContent) {
+        encryptedMessageContent = content;
+        return {
+            event_id: "$event_id",
+        };
+    });
+
+    expect(await senderMockHttpBackend.flush("/send/m.room.encrypted/", 1, 1000)).toEqual(1);
+
+    // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
+    const inboundGroupSession = await inboundGroupSessionPromise;
+
+    const r: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
+    logger.log("Decrypted received megolm message", r);
+    return JSON.parse(r.plaintext);
 }
