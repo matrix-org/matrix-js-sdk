@@ -2079,7 +2079,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             room: this,
             client: this.client,
             pendingEventOrdering: this.opts.pendingEventOrdering,
+            receipts: this.cachedThreadReadReceipts.get(threadId) ?? [],
         });
+
+        // All read receipts should now come down from sync, we do not need to keep
+        // a reference to the cached receipts anymore.
+        this.cachedThreadReadReceipts.delete(threadId);
 
         // This is necessary to be able to jump to events in threads:
         // If we jump to an event in a thread where neither the event, nor the root,
@@ -2110,17 +2115,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (this.threadsReady) {
             this.updateThreadRootEvents(thread, toStartOfTimeline, false);
         }
-
-        // Pulling all the cached thread read receipts we've discovered when we
-        // did an initial sync, and applying them to the thread now that it exists
-        // on the client side
-        if (this.cachedThreadReadReceipts.has(threadId)) {
-            for (const { event, synthetic } of this.cachedThreadReadReceipts.get(threadId)!) {
-                this.addReceipt(event, synthetic);
-            }
-            this.cachedThreadReadReceipts.delete(threadId);
-        }
-
         this.emit(ThreadEvent.New, thread, toStartOfTimeline);
 
         return thread;

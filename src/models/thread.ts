@@ -27,7 +27,7 @@ import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
-import { ReceiptType } from "../@types/read_receipts";
+import { Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -50,6 +50,7 @@ interface IThreadOpts {
     room: Room;
     client: MatrixClient;
     pendingEventOrdering?: PendingEventOrdering;
+    receipts?: { event: MatrixEvent; synthetic: boolean }[];
 }
 
 export enum FeatureSupport {
@@ -126,6 +127,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.room.on(RoomEvent.Redaction, this.onRedaction);
         this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
         this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
+
+        this.processReceipts(opts.receipts);
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
@@ -282,6 +285,26 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             await this.fetchEditsWhereNeeded(event);
         }
         this.timeline = this.events;
+    }
+
+    /**
+     * Processes the receipts that were caught during initial sync
+     * When clients become aware of a thread, they try to retrieve those read receipts
+     * and apply them to the current thread
+     * @param receipts - A collection of the receipts cached from initial sync
+     */
+    private processReceipts(receipts: { event: MatrixEvent; synthetic: boolean }[] = []): void {
+        for (const { event, synthetic } of receipts) {
+            const content = event.getContent<ReceiptContent>();
+            Object.keys(content).forEach((eventId: string) => {
+                Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
+                    Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
+                        const receipt = content[eventId][receiptType][userId] as Receipt;
+                        this.addReceiptToStructure(eventId, receiptType as ReceiptType, userId, receipt, synthetic);
+                    });
+                });
+            });
+        }
     }
 
     private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {
