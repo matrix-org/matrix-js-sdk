@@ -922,6 +922,200 @@ describe("MatrixClient event timelines", function() {
         });
     });
 
+    describe("fetchLatestLiveTimeline", function() {
+        beforeEach(() => {
+            // @ts-ignore
+            client.clientOpts.experimentalThreadSupport = true;
+        });
+
+        it("timeline support must be enabled to work", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: false },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+            await startClient(httpBackend, client);
+
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0]!;
+            await expect(client.fetchLatestLiveTimeline(timelineSet)).rejects.toBeTruthy();
+        });
+
+        it("timeline support works when enabled", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+
+            return startClient(httpBackend, client).then(() => {
+                const room = client.getRoom(roomId)!;
+                const timelineSet = room.getTimelineSets()[0];
+                expect(client.fetchLatestLiveTimeline(timelineSet)).rejects.toBeFalsy();
+            });
+        });
+
+        it("only works with room timelines", async function() {
+            await client.stopClient();
+
+            const testClient = new TestClient(
+                userId,
+                "DEVICE",
+                accessToken,
+                undefined,
+                { timelineSupport: true },
+            );
+            client = testClient.client;
+            httpBackend = testClient.httpBackend;
+            await startClient(httpBackend, client);
+
+            const timelineSet = new EventTimelineSet(undefined);
+            await expect(client.fetchLatestLiveTimeline(timelineSet)).rejects.toBeTruthy();
+        });
+
+        it("should create a new timeline for new events", function() {
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0];
+
+            const latestMessageId = EVENTS[2].event_id!;
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, function() {
+                    return {
+                        chunk: [{
+                            event_id: latestMessageId,
+                        }],
+                    };
+                });
+
+            httpBackend.when("GET", `/rooms/!foo%3Abar/context/${encodeURIComponent(latestMessageId)}`)
+                .respond(200, function() {
+                    return {
+                        start: "start_token",
+                        events_before: [EVENTS[1], EVENTS[0]],
+                        event: EVENTS[2],
+                        events_after: [EVENTS[3]],
+                        state: [
+                            ROOM_NAME_EVENT,
+                            USER_MEMBERSHIP_EVENT,
+                        ],
+                        end: "end_token",
+                    };
+                });
+
+            return Promise.all([
+                client.fetchLatestLiveTimeline(timelineSet).then(function(tl) {
+                    // Instead of this assertion logic, we could just add a spy
+                    // for `getEventTimeline` and make sure it's called with the
+                    // correct parameters. This doesn't feel too bad to make sure
+                    // `fetchLatestLiveTimeline` is doing the right thing though.
+                    expect(tl!.getEvents().length).toEqual(4);
+                    for (let i = 0; i < 4; i++) {
+                        expect(tl!.getEvents()[i].event).toEqual(EVENTS[i]);
+                        expect(tl!.getEvents()[i]?.sender?.name).toEqual(userName);
+                    }
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
+                        .toEqual("start_token");
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS))
+                        .toEqual("end_token");
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should successfully create a new timeline even when the latest event is a threaded reply", function() {
+            const room = client.getRoom(roomId);
+            const timelineSet = room!.getTimelineSets()[0];
+            expect(timelineSet.thread).toBeUndefined();
+
+            const latestMessageId = THREAD_REPLY.event_id;
+            if (!latestMessageId) {
+                throw new Error('Expected THREAD_REPLY to have an event_id to reference in the test');
+            }
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, function() {
+                    return {
+                        chunk: [{
+                            event_id: latestMessageId,
+                        }],
+                    };
+                });
+
+            httpBackend.when("GET", `/rooms/!foo%3Abar/context/${encodeURIComponent(latestMessageId)}`)
+                .respond(200, function() {
+                    return {
+                        start: "start_token",
+                        events_before: [THREAD_ROOT, EVENTS[0]],
+                        event: THREAD_REPLY,
+                        events_after: [],
+                        state: [
+                            ROOM_NAME_EVENT,
+                            USER_MEMBERSHIP_EVENT,
+                        ],
+                        end: "end_token",
+                    };
+                });
+
+            // Make it easy to debug when there is a mismatch of events. We care
+            // about the event ID for direct comparison and the content for a
+            // human readable description.
+            const eventPropertiesToCompare = (event) => {
+                return {
+                    eventId: event.event_id || event.getId(),
+                    contentBody: event.content?.body || event.getContent()?.body,
+                };
+            };
+            return Promise.all([
+                client.fetchLatestLiveTimeline(timelineSet).then(function(tl) {
+                    const events = tl!.getEvents();
+                    const expectedEvents = [EVENTS[0], THREAD_ROOT];
+                    expect(events.map(event => eventPropertiesToCompare(event)))
+                        .toEqual(expectedEvents.map(event => eventPropertiesToCompare(event)));
+                    // Sanity check: The threaded reply should not be in the timeline
+                    expect(events.find(e => e.getId() === THREAD_REPLY.event_id)).toBeFalsy();
+
+                    expect(tl!.getPaginationToken(EventTimeline.BACKWARDS))
+                        .toEqual("start_token");
+                    expect(tl!.getPaginationToken(EventTimeline.FORWARDS))
+                        .toEqual("end_token");
+                }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should throw error when /messages does not return a message", () => {
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend.when("GET", "/rooms/!foo%3Abar/messages")
+                .respond(200, () => {
+                    return {
+                        chunk: [
+                            // No messages to return
+                        ],
+                    };
+                });
+
+            return Promise.all([
+                expect(client.fetchLatestLiveTimeline(timelineSet)).rejects.toThrow(),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
     describe("paginateEventTimeline", function() {
         it("should allow you to paginate backwards", function() {
             const room = client.getRoom(roomId)!;
