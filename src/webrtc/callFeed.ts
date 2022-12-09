@@ -192,8 +192,10 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      * @returns is local?
      */
     public isLocal(): boolean {
-        return this.userId === this.client.getUserId()
-            && (this.deviceId === undefined || this.deviceId === this.client.getDeviceId());
+        return (
+            this.userId === this.client.getUserId() &&
+            (this.deviceId === undefined || this.deviceId === this.client.getDeviceId())
+        );
     }
 
     /**

@@ -57,9 +57,9 @@ describe("fixNotificationCountOnDecryption", () => {
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
             supportsExperimentalThreads: jest.fn().mockReturnValue(true),
         });
-        mockClient.reEmitter = mock(ReEmitter, 'ReEmitter');
+        mockClient.reEmitter = mock(ReEmitter, "ReEmitter");
         mockClient.canSupport = new Map();
-        Object.keys(Feature).forEach(feature => {
+        Object.keys(Feature).forEach((feature) => {
             mockClient.canSupport.set(feature as Feature, ServerSupport.Stable);
         });
 
@@ -67,14 +67,17 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setUnreadNotificationCount(NotificationCountType.Total, 1);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
-        event = mkEvent({
-            type: EventType.RoomMessage,
-            content: {
-                msgtype: MsgType.Text,
-                body: "Hello world!",
+        event = mkEvent(
+            {
+                type: EventType.RoomMessage,
+                content: {
+                    msgtype: MsgType.Text,
+                    body: "Hello world!",
+                },
+                event: true,
             },
-            event: true,
-        }, mockClient);
+            mockClient,
+        );
 
         THREAD_ID = event.getId()!;
         threadEvent = mkEvent({

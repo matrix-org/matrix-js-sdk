@@ -22,7 +22,7 @@ limitations under the License.
 // and avoids assuming anything about the app's behaviour.
 const realSetTimeout = setTimeout;
 export function flushPromises() {
-    return new Promise(r => {
+    return new Promise((r) => {
         realSetTimeout(r, 1);
     });
 }

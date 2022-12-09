@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from '../../../randomstring';
-import { logger } from '../../../logger';
+import { randomString } from "../../../randomstring";
+import { logger } from "../../../logger";
 import {
     CANCEL_TYPE,
     PHASE_STARTED,
@@ -30,7 +30,7 @@ import { errorFromEvent, newUnexpectedMessageError } from "../Error";
 import { MatrixEvent } from "../../../models/event";
 import { IVerificationChannel } from "./Channel";
 import { MatrixClient } from "../../../client";
-import { IRequestsMap } from '../..';
+import { IRequestsMap } from "../..";
 
 export type Request = VerificationRequest<ToDeviceChannel>;
 
@@ -101,8 +101,7 @@ export class ToDeviceChannel implements IVerificationChannel {
      */
     public static validateEvent(event: MatrixEvent, client: MatrixClient): boolean {
         if (event.isCancelled()) {
-            logger.warn("Ignoring flagged verification request from "
-                 + event.getSender());
+            logger.warn("Ignoring flagged verification request from " + event.getSender());
             return false;
         }
         const content = event.getContent();
@@ -123,9 +122,7 @@ export class ToDeviceChannel implements IVerificationChannel {
                 logger.warn("ToDeviceChannel.validateEvent: invalid: no timestamp");
                 return false;
             }
-            if (event.getSender() === client.getUserId() &&
-                    content.from_device == client.getDeviceId()
-            ) {
+            if (event.getSender() === client.getUserId() && content.from_device == client.getDeviceId()) {
                 // ignore requests from ourselves, because it doesn't make sense for a
                 // device to verify itself
                 logger.warn("ToDeviceChannel.validateEvent: invalid: from own device");
@@ -182,9 +179,7 @@ export class ToDeviceChannel implements IVerificationChannel {
         const isAcceptingEvent = type === START_TYPE || type === READY_TYPE;
         // the request has picked a ready or start event, tell the other devices about it
         if (isAcceptingEvent && !wasStarted && isStarted && this.deviceId) {
-            const nonChosenDevices = this.devices.filter(
-                d => d !== this.deviceId && d !== this.client.getDeviceId(),
-            );
+            const nonChosenDevices = this.devices.filter((d) => d !== this.deviceId && d !== this.client.getDeviceId());
             if (nonChosenDevices.length) {
                 const message = this.completeContent(CANCEL_TYPE, {
                     code: "m.accepted",
@@ -265,9 +260,9 @@ export class ToDeviceChannel implements IVerificationChannel {
         await this.request!.handleEvent(
             type,
             remoteEchoEvent,
-            /*isLiveEvent=*/true,
-            /*isRemoteEcho=*/true,
-            /*isSentByUs=*/true,
+            /*isLiveEvent=*/ true,
+            /*isRemoteEcho=*/ true,
+            /*isSentByUs=*/ true,
         );
         return result;
     }
@@ -296,10 +291,7 @@ export class ToDeviceRequests implements IRequestsMap {
     private requestsByUserId = new Map<string, Map<string, Request>>();
 
     public getRequest(event: MatrixEvent): Request | undefined {
-        return this.getRequestBySenderAndTxnId(
-            event.getSender()!,
-            ToDeviceChannel.getTransactionId(event),
-        );
+        return this.getRequestBySenderAndTxnId(event.getSender()!, ToDeviceChannel.getTransactionId(event));
     }
 
     public getRequestByChannel(channel: ToDeviceChannel): Request | undefined {
@@ -355,7 +347,7 @@ export class ToDeviceRequests implements IRequestsMap {
     public getRequestsInProgress(userId: string): Request[] {
         const requestsByTxnId = this.requestsByUserId.get(userId);
         if (requestsByTxnId) {
-            return Array.from(requestsByTxnId.values()).filter(r => r.pending);
+            return Array.from(requestsByTxnId.values()).filter((r) => r.pending);
         }
         return [];
     }

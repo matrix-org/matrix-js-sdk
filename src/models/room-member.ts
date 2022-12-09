@@ -194,7 +194,8 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             logger.trace(
                 `membership event with membership undefined (forwardLooking: ${event.forwardLooking})!`,
                 event.getContent(),
-                `prevcontent is `, event.getPrevContent(),
+                `prevcontent is `,
+                event.getPrevContent(),
             );
         }
 
@@ -309,9 +310,11 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 
     public isKicked(): boolean {
-        return this.membership === "leave"
-            && this.events.member !== undefined
-            && this.events.member.getSender() !== this.events.member.getStateKey();
+        return (
+            this.membership === "leave" &&
+            this.events.member !== undefined &&
+            this.events.member.getSender() !== this.events.member.getStateKey()
+        );
     }
 
     /**
@@ -426,11 +429,7 @@ function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?
     return false;
 }
 
-function calculateDisplayName(
-    selfUserId: string,
-    displayName: string | undefined,
-    disambiguate: boolean,
-): string {
+function calculateDisplayName(selfUserId: string, displayName: string | undefined, disambiguate: boolean): string {
     if (!displayName || displayName === selfUserId) return selfUserId;
 
     if (disambiguate) return utils.removeDirectionOverrideChars(displayName) + " (" + selfUserId + ")";

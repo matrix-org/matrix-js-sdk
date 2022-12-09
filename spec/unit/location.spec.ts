@@ -25,13 +25,13 @@ import {
 import { TEXT_NODE_TYPE } from "../../src/@types/extensible_events";
 import { MsgType } from "../../src/@types/event";
 
-describe("Location", function() {
+describe("Location", function () {
     const defaultContent = {
-        "body": "Location geo:-36.24484561954707,175.46884959563613;u=10 at 2022-03-09T11:01:52.443Z",
-        "msgtype": "m.location",
-        "geo_uri": "geo:-36.24484561954707,175.46884959563613;u=10",
-        [M_LOCATION.name]: { "uri": "geo:-36.24484561954707,175.46884959563613;u=10", "description": null },
-        [M_ASSET.name]: { "type": "m.self" },
+        body: "Location geo:-36.24484561954707,175.46884959563613;u=10 at 2022-03-09T11:01:52.443Z",
+        msgtype: "m.location",
+        geo_uri: "geo:-36.24484561954707,175.46884959563613;u=10",
+        [M_LOCATION.name]: { uri: "geo:-36.24484561954707,175.46884959563613;u=10", description: null },
+        [M_ASSET.name]: { type: "m.self" },
         [TEXT_NODE_TYPE.name]: "Location geo:-36.24484561954707,175.46884959563613;u=10 at 2022-03-09T11:01:52.443Z",
         [M_TIMESTAMP.name]: 1646823712443,
     } as any;
@@ -43,13 +43,15 @@ describe("Location", function() {
     const modernEventContent = { ...modernProperties };
 
     const legacyEventContent = {
+        body,
+        msgtype,
         // eslint-disable-next-line camelcase
-        body, msgtype, geo_uri,
+        geo_uri,
     } as LocationEventWireContent;
 
-    it("should create a valid location with defaults", function() {
+    it("should create a valid location with defaults", function () {
         const loc = makeLocationContent(undefined, "geo:foo", 134235435);
-        expect(loc.body).toEqual('User Location geo:foo at 1970-01-02T13:17:15.435Z');
+        expect(loc.body).toEqual("User Location geo:foo at 1970-01-02T13:17:15.435Z");
         expect(loc.msgtype).toEqual(MsgType.Location);
         expect(loc.geo_uri).toEqual("geo:foo");
         expect(M_LOCATION.findIn(loc)).toEqual({
@@ -57,13 +59,12 @@ describe("Location", function() {
             description: undefined,
         });
         expect(M_ASSET.findIn(loc)).toEqual({ type: LocationAssetType.Self });
-        expect(TEXT_NODE_TYPE.findIn(loc)).toEqual('User Location geo:foo at 1970-01-02T13:17:15.435Z');
+        expect(TEXT_NODE_TYPE.findIn(loc)).toEqual("User Location geo:foo at 1970-01-02T13:17:15.435Z");
         expect(M_TIMESTAMP.findIn(loc)).toEqual(134235435);
     });
 
-    it("should create a valid location with explicit properties", function() {
-        const loc = makeLocationContent(
-            undefined, "geo:bar", 134235436, "desc", LocationAssetType.Pin);
+    it("should create a valid location with explicit properties", function () {
+        const loc = makeLocationContent(undefined, "geo:bar", 134235436, "desc", LocationAssetType.Pin);
 
         expect(loc.body).toEqual('Location "desc" geo:bar at 1970-01-02T13:17:15.436Z');
         expect(loc.msgtype).toEqual(MsgType.Location);
@@ -77,19 +78,19 @@ describe("Location", function() {
         expect(M_TIMESTAMP.findIn(loc)).toEqual(134235436);
     });
 
-    it('parses backwards compatible event correctly', () => {
+    it("parses backwards compatible event correctly", () => {
         const eventContent = parseLocationEvent(backwardsCompatibleEventContent);
 
         expect(eventContent).toEqual(backwardsCompatibleEventContent);
     });
 
-    it('parses modern correctly', () => {
+    it("parses modern correctly", () => {
         const eventContent = parseLocationEvent(modernEventContent);
 
         expect(eventContent).toEqual(backwardsCompatibleEventContent);
     });
 
-    it('parses legacy event correctly', () => {
+    it("parses legacy event correctly", () => {
         const eventContent = parseLocationEvent(legacyEventContent);
 
         const {

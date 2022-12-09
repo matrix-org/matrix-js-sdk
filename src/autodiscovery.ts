@@ -16,7 +16,7 @@ limitations under the License.
 */
 
 import { IClientWellKnown, IWellKnownConfig } from "./client";
-import { logger } from './logger';
+import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
 
 // Dev note: Auto discovery is part of the spec.
@@ -162,9 +162,7 @@ export class AutoDiscovery {
 
         // Step 2: Make sure the homeserver URL is valid *looking*. We'll make
         // sure it points to a homeserver in Step 3.
-        const hsUrl = this.sanitizeWellKnownUrl(
-            wellknown["m.homeserver"]["base_url"],
-        );
+        const hsUrl = this.sanitizeWellKnownUrl(wellknown["m.homeserver"]["base_url"]);
         if (!hsUrl) {
             logger.error("Invalid base_url for m.homeserver");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HS_BASE_URL;
@@ -172,9 +170,7 @@ export class AutoDiscovery {
         }
 
         // Step 3: Make sure the homeserver URL points to a homeserver.
-        const hsVersions = await this.fetchWellKnownObject(
-            `${hsUrl}/_matrix/client/versions`,
-        );
+        const hsVersions = await this.fetchWellKnownObject(`${hsUrl}/_matrix/client/versions`);
         if (!hsVersions || !hsVersions.raw?.["versions"]) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
@@ -212,20 +208,16 @@ export class AutoDiscovery {
             isUrl = this.sanitizeWellKnownUrl(wellknown["m.identity_server"]["base_url"]);
             if (!isUrl) {
                 logger.error("Invalid base_url for m.identity_server");
-                failingClientConfig["m.identity_server"].error =
-                    AutoDiscovery.ERROR_INVALID_IS_BASE_URL;
+                failingClientConfig["m.identity_server"].error = AutoDiscovery.ERROR_INVALID_IS_BASE_URL;
                 return Promise.resolve(failingClientConfig);
             }
 
             // Step 5b: Verify there is an identity server listening on the provided
             // URL.
-            const isResponse = await this.fetchWellKnownObject(
-                `${isUrl}/_matrix/identity/api/v1`,
-            );
+            const isResponse = await this.fetchWellKnownObject(`${isUrl}/_matrix/identity/api/v1`);
             if (!isResponse?.raw || isResponse.action !== AutoDiscoveryAction.SUCCESS) {
                 logger.error("Invalid /api/v1 response");
-                failingClientConfig["m.identity_server"].error =
-                    AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
+                failingClientConfig["m.identity_server"].error = AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
 
                 // Supply the base_url to the caller because they may be ignoring
                 // liveliness errors, like this one.
@@ -281,7 +273,7 @@ export class AutoDiscovery {
      * failure, not when discovery fails.
      */
     public static async findClientConfig(domain: string): Promise<ClientConfig> {
-        if (!domain || typeof(domain) !== "string" || domain.length === 0) {
+        if (!domain || typeof domain !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
 
@@ -316,9 +308,7 @@ export class AutoDiscovery {
 
         // Step 1: Actually request the .well-known JSON file and make sure it
         // at least has a homeserver definition.
-        const wellknown = await this.fetchWellKnownObject(
-            `https://${domain}/.well-known/matrix/client`,
-        );
+        const wellknown = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
         if (!wellknown || wellknown.action !== AutoDiscoveryAction.SUCCESS) {
             logger.error("No response or error when parsing .well-known");
             if (wellknown.reason) logger.error(wellknown.reason);
@@ -349,13 +339,11 @@ export class AutoDiscovery {
      * be an empty object.
      */
     public static async getRawClientConfig(domain?: string): Promise<IClientWellKnown> {
-        if (!domain || typeof(domain) !== "string" || domain.length === 0) {
+        if (!domain || typeof domain !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
 
-        const response = await this.fetchWellKnownObject(
-            `https://${domain}/.well-known/matrix/client`,
-        );
+        const response = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
         if (!response) return {};
         return response.raw || {};
     }
@@ -474,9 +462,10 @@ export class AutoDiscovery {
                 error,
                 raw: {},
                 action: AutoDiscoveryAction.FAIL_PROMPT,
-                reason: (error as MatrixError)?.name === "SyntaxError"
-                    ? AutoDiscovery.ERROR_INVALID_JSON
-                    : AutoDiscovery.ERROR_INVALID,
+                reason:
+                    (error as MatrixError)?.name === "SyntaxError"
+                        ? AutoDiscovery.ERROR_INVALID_JSON
+                        : AutoDiscovery.ERROR_INVALID,
             };
         }
     }

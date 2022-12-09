@@ -62,9 +62,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
 
         if (event.isEncrypted()) {
             if (!preventReEmit) {
-                client.reEmitter.reEmit(event, [
-                    MatrixEventEvent.Decrypted,
-                ]);
+                client.reEmitter.reEmit(event, [MatrixEventEvent.Decrypted]);
             }
             if (decrypt) {
                 client.decryptEventIfNeeded(event);
@@ -72,13 +70,8 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
         }
 
         if (!preventReEmit) {
-            client.reEmitter.reEmit(event, [
-                MatrixEventEvent.Replaced,
-                MatrixEventEvent.VisibilityChange,
-            ]);
-            room?.reEmitter.reEmit(event, [
-                MatrixEventEvent.BeforeRedaction,
-            ]);
+            client.reEmitter.reEmit(event, [MatrixEventEvent.Replaced, MatrixEventEvent.VisibilityChange]);
+            room?.reEmitter.reEmit(event, [MatrixEventEvent.BeforeRedaction]);
         }
         return event;
     }

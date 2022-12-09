@@ -28,12 +28,10 @@ export type ListenerMap<E extends string> = { [eventName in E]: AnyListener };
 type EventEmitterEventListener = (eventName: string, listener: AnyListener) => void;
 type EventEmitterErrorListener = (error: Error) => void;
 
-export type Listener<
-    E extends string,
-    A extends ListenerMap<E>,
-    T extends E | EventEmitterEvents,
-> = T extends E ? A[T]
-    : T extends EventEmitterEvents ? EventEmitterErrorListener
+export type Listener<E extends string, A extends ListenerMap<E>, T extends E | EventEmitterEvents> = T extends E
+    ? A[T]
+    : T extends EventEmitterEvents
+    ? EventEmitterErrorListener
     : EventEmitterEventListener;
 
 /**
@@ -73,24 +71,15 @@ export class TypedEventEmitter<
         return super.listeners(event);
     }
 
-    public off<T extends Events | EventEmitterEvents>(
-        event: T,
-        listener: Listener<Events, Arguments, T>,
-    ): this {
+    public off<T extends Events | EventEmitterEvents>(event: T, listener: Listener<Events, Arguments, T>): this {
         return super.off(event, listener);
     }
 
-    public on<T extends Events | EventEmitterEvents>(
-        event: T,
-        listener: Listener<Events, Arguments, T>,
-    ): this {
+    public on<T extends Events | EventEmitterEvents>(event: T, listener: Listener<Events, Arguments, T>): this {
         return super.on(event, listener);
     }
 
-    public once<T extends Events | EventEmitterEvents>(
-        event: T,
-        listener: Listener<Events, Arguments, T>,
-    ): this {
+    public once<T extends Events | EventEmitterEvents>(event: T, listener: Listener<Events, Arguments, T>): this {
         return super.once(event, listener);
     }
 

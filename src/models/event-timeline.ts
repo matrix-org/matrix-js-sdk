@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { IMarkerFoundOptions, RoomState } from "./room-state";
 import { EventTimelineSet } from "./event-timeline-set";
 import { MatrixEvent } from "./event";
 import { Filter } from "../filter";
 import { EventType } from "../@types/event";
 
-export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, 'timelineWasEmpty'> {
+export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, "timelineWasEmpty"> {
     // This is a separate interface without any extra stuff currently added on
     // top of `IMarkerFoundOptions` just because it feels like they have
     // different concerns. One shouldn't necessarily look to add to
@@ -29,7 +29,7 @@ export interface IInitialiseStateOptions extends Pick<IMarkerFoundOptions, 'time
     // `initialiseState`.
 }
 
-export interface IAddEventOptions extends Pick<IMarkerFoundOptions, 'timelineWasEmpty'> {
+export interface IAddEventOptions extends Pick<IMarkerFoundOptions, "timelineWasEmpty"> {
     /** Whether to insert the new event at the start of the timeline where the
      * oldest events are (timeline is in chronological order, oldest to most
      * recent) */
@@ -133,7 +133,7 @@ export class EventTimeline {
         }
 
         // this is used by client.js
-        this.paginationRequests = { 'b': null, 'f': null };
+        this.paginationRequests = { b: null, f: null };
 
         this.name = this.roomId + ":" + new Date().toISOString();
     }
@@ -335,8 +335,12 @@ export class EventTimeline {
      */
     public setNeighbouringTimeline(neighbour: EventTimeline, direction: Direction): void {
         if (this.getNeighbouringTimeline(direction)) {
-            throw new Error("timeline already has a neighbouring timeline - " +
-                "cannot reset neighbour (direction: " + direction + ")");
+            throw new Error(
+                "timeline already has a neighbouring timeline - " +
+                    "cannot reset neighbour (direction: " +
+                    direction +
+                    ")",
+            );
         }
 
         if (direction == EventTimeline.BACKWARDS) {
@@ -357,22 +361,11 @@ export class EventTimeline {
      * @param event - new event
      * @param options - addEvent options
      */
-    public addEvent(
-        event: MatrixEvent,
-        {
-            toStartOfTimeline,
-            roomState,
-            timelineWasEmpty,
-        }: IAddEventOptions,
-    ): void;
+    public addEvent(event: MatrixEvent, { toStartOfTimeline, roomState, timelineWasEmpty }: IAddEventOptions): void;
     /**
      * @deprecated In favor of the overload with `IAddEventOptions`
      */
-    public addEvent(
-        event: MatrixEvent,
-        toStartOfTimeline: boolean,
-        roomState?: RoomState
-    ): void;
+    public addEvent(event: MatrixEvent, toStartOfTimeline: boolean, roomState?: RoomState): void;
     public addEvent(
         event: MatrixEvent,
         toStartOfTimelineOrOpts: boolean | IAddEventOptions,
@@ -380,15 +373,15 @@ export class EventTimeline {
     ): void {
         let toStartOfTimeline = !!toStartOfTimelineOrOpts;
         let timelineWasEmpty: boolean | undefined;
-        if (typeof (toStartOfTimelineOrOpts) === 'object') {
+        if (typeof toStartOfTimelineOrOpts === "object") {
             ({ toStartOfTimeline, roomState, timelineWasEmpty } = toStartOfTimelineOrOpts);
         } else if (toStartOfTimelineOrOpts !== undefined) {
             // Deprecation warning
             // FIXME: Remove after 2023-06-01 (technical debt)
             logger.warn(
-                'Overload deprecated: ' +
-                '`EventTimeline.addEvent(event, toStartOfTimeline, roomState?)` ' +
-                'is deprecated in favor of the overload with `EventTimeline.addEvent(event, IAddEventOptions)`',
+                "Overload deprecated: " +
+                    "`EventTimeline.addEvent(event, toStartOfTimeline, roomState?)` " +
+                    "is deprecated in favor of the overload with `EventTimeline.addEvent(event, IAddEventOptions)`",
             );
         }
 
@@ -402,10 +395,7 @@ export class EventTimeline {
             EventTimeline.setEventMetadata(event, roomState!, toStartOfTimeline);
 
             // modify state but only on unfiltered timelineSets
-            if (
-                event.isState() &&
-                timelineSet.room.getUnfilteredTimelineSet() === timelineSet
-            ) {
+            if (event.isState() && timelineSet.room.getUnfilteredTimelineSet() === timelineSet) {
                 roomState?.setStateEvents([event], { timelineWasEmpty });
                 // it is possible that the act of setting the state event means we
                 // can set more metadata (specifically sender/target props), so try
