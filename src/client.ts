@@ -9302,13 +9302,13 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
             const thread = room.getThread(event.threadRootId);
             hasReadEvent = thread
                 ? thread.hasUserReadEvent(cli.getUserId()!, event.getId()!)
-                // If the thread object does not exist in the room yet, we don't
-                // want to calculate notification for this event yet. We have not
-                // restored the read receipts yet and can't accurately calculate
-                // highlight notifications at this stage.
-                //
-                // This issue can likely go away when MSC3874 is implemented
-                : true;
+                : // If the thread object does not exist in the room yet, we don't
+                  // want to calculate notification for this event yet. We have not
+                  // restored the read receipts yet and can't accurately calculate
+                  // highlight notifications at this stage.
+                  //
+                  // This issue can likely go away when MSC3874 is implemented
+                  true;
         } else {
             hasReadEvent = room.hasUserReadEvent(cli.getUserId()!, event.getId()!);
         }
