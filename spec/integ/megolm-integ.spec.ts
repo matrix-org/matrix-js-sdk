@@ -650,6 +650,55 @@ describe("megolm", () => {
         ]);
     });
 
+    describe("get|setGlobalErrorOnUnknownDevices", () => {
+        it("should raise an error if crypto is disabled", () => {
+            aliceTestClient.client["cryptoBackend"] = undefined;
+            expect(() => aliceTestClient.client.setGlobalErrorOnUnknownDevices(true)).toThrowError(
+                "encryption disabled",
+            );
+            expect(() => aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toThrowError("encryption disabled");
+        });
+
+        it("should permit sending to unknown devices", async () => {
+            expect(aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toBeTruthy();
+
+            aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await aliceTestClient.start();
+            const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
+
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
+            await aliceTestClient.flushSync();
+
+            // start out with the device unknown - the send should be rejected.
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+
+            await Promise.all([
+                aliceTestClient.client.sendTextMessage(ROOM_ID, "test").then(
+                    () => {
+                        throw new Error("sendTextMessage failed on an unknown device");
+                    },
+                    (e) => {
+                        expect(e.name).toEqual("UnknownDeviceError");
+                    },
+                ),
+                aliceTestClient.httpBackend.flushAllExpected(),
+            ]);
+
+            // enable sending to unknown devices, and resend
+            aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
+            expect(aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toBeFalsy();
+
+            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+            const pendingMsg = room.getPendingEvents()[0];
+
+            await Promise.all([
+                aliceTestClient.client.resendEvent(pendingMsg, room),
+                expectSendKeyAndMessage(aliceTestClient.httpBackend, "@bob:xyz", testOlmAccount, p2pSession),
+            ]);
+        });
+    });
+
     describe("get|setGlobalBlacklistUnverifiedDevices", () => {
         it("should raise an error if crypto is disabled", () => {
             aliceTestClient.client["cryptoBackend"] = undefined;
