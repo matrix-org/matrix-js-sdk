@@ -463,20 +463,9 @@ describe("megolm", () => {
     it("Alice sends a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
-        // establish an olm session with alice
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+        const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
-        const syncResponse = getSyncResponse(["@bob:xyz"]);
-
-        const olmEvent = encryptOlmEvent({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-        });
-
-        syncResponse.to_device = { events: [olmEvent] };
-
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
         await aliceTestClient.flushSync();
 
         // start out with the device unknown - the send should be rejected.
@@ -539,19 +528,9 @@ describe("megolm", () => {
     it("We shouldn't attempt to send to blocked devices", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
-        // establish an olm session with alice
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
-        const syncResponse = getSyncResponse(["@bob:xyz"]);
+        await establishOlmSession(aliceTestClient, testOlmAccount);
 
-        const olmEvent = encryptOlmEvent({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-        });
-
-        syncResponse.to_device = { events: [olmEvent] };
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
         await aliceTestClient.flushSync();
 
         logger.log("Forcing alice to download our device keys");
@@ -584,20 +563,9 @@ describe("megolm", () => {
     it("We should start a new megolm session when a device is blocked", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
-        // establish an olm session with alice
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+        const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
-        const syncResponse = getSyncResponse(["@bob:xyz"]);
-
-        const olmEvent = encryptOlmEvent({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-        });
-
-        syncResponse.to_device = { events: [olmEvent] };
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
         await aliceTestClient.flushSync();
 
         logger.log("Fetching bob's devices and marking known");
@@ -778,20 +746,9 @@ describe("megolm", () => {
     it("Alice should wait for device list to complete when sending a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
-        // establish an olm session with alice
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+        await establishOlmSession(aliceTestClient, testOlmAccount);
 
-        const syncResponse = getSyncResponse(["@bob:xyz"]);
-
-        const olmEvent = encryptOlmEvent({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-        });
-
-        syncResponse.to_device = { events: [olmEvent] };
-
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
         await aliceTestClient.flushSync();
 
         // this will block
@@ -1463,3 +1420,25 @@ describe("megolm", () => {
         ]);
     });
 });
+
+/**
+ * Establish an Olm Session with the test user
+ *
+ * Waits for the test user to upload their keys, then sends a /sync response with a to-device message which will
+ * establish an Olm session.
+ */
+async function establishOlmSession(aliceTestClient: TestClient, bobOlmAccount: Olm.Account): Promise<Olm.Session> {
+    const bobE2eKeys = JSON.parse(bobOlmAccount.identity_keys());
+    const p2pSession = await createOlmSession(bobOlmAccount, aliceTestClient);
+    const olmEvent = encryptOlmEvent({
+        senderKey: bobE2eKeys.curve25519,
+        recipient: aliceTestClient,
+        p2pSession: p2pSession,
+    });
+    aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        next_batch: 1,
+        to_device: { events: [olmEvent] },
+    });
+    await aliceTestClient.flushSync();
+    return p2pSession;
+}
