@@ -277,19 +277,12 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         // takes the previous OutboundSessionInfo, and considers whether to create
         // a new one. Also shares the key with any (new) devices in the room.
         //
-        // Returns the successful session whether keyshare succeeds or not.
-        //
         // returns a promise which resolves once the keyshare is successful.
         const setup = async (oldSession: OutboundSessionInfo | null): Promise<OutboundSessionInfo> => {
             const sharedHistory = isRoomSharedHistory(room);
-
             const session = await this.prepareSession(devicesInRoom, sharedHistory, oldSession);
 
-            try {
-                await this.shareSession(devicesInRoom, sharedHistory, singleOlmCreationPhase, blocked, session);
-            } catch (e) {
-                logger.error(`Failed to ensure outbound session in ${this.roomId}`, e);
-            }
+            await this.shareSession(devicesInRoom, sharedHistory, singleOlmCreationPhase, blocked, session);
 
             return session;
         };
