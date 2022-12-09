@@ -36,8 +36,6 @@ module.exports = {
         }],
         "arrow-parens": "off",
         "prefer-promise-reject-errors": "off",
-        "quotes": "off",
-        "indent": "off",
         "no-constant-condition": "off",
         "no-async-promise-executor": "off",
         // We use a `logger` intermediary module
