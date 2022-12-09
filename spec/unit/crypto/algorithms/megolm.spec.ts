@@ -499,21 +499,17 @@ describe("MegolmDecryption", function () {
                 // @ts-ignore - private field access
                 megolmEncryption.shareSession = () => {
                     throw new Error("Can't share session");
-                }
-
-                // @ts-ignore - private field access
-                const room = new Room(megolmEncryption.roomId);
+                };
 
                 await expect(() =>
                     // @ts-ignore - private field access
-                    megolmEncryption.ensureOutboundSession(mockRoom, {}, {}, true)
+                    megolmEncryption.ensureOutboundSession(mockRoom, {}, {}, true),
                 ).rejects.toThrow();
 
                 // @ts-ignore - private field access
                 const finalSetupPromise = await megolmEncryption.setupPromise;
                 expect(finalSetupPromise).toBe(null);
             });
-
         });
     });
 
