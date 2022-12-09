@@ -14,25 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import '../../olm-loader';
+import "../../olm-loader";
 import { RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
-import { MSC3903ECDHPayload, MSC3903ECDHv1RendezvousChannel } from '../../../src/rendezvous/channels';
-import { decodeBase64 } from '../../../src/crypto/olmlib';
-import { DummyTransport } from './DummyTransport';
+import { MSC3903ECDHPayload, MSC3903ECDHv1RendezvousChannel } from "../../../src/rendezvous/channels";
+import { decodeBase64 } from "../../../src/crypto/olmlib";
+import { DummyTransport } from "./DummyTransport";
 
 function makeTransport(name: string) {
-    return new DummyTransport<any, MSC3903ECDHPayload>(name, { type: 'dummy' });
+    return new DummyTransport<any, MSC3903ECDHPayload>(name, { type: "dummy" });
 }
 
-describe('ECDHv1', function() {
-    beforeAll(async function() {
+describe("ECDHv1", function () {
+    beforeAll(async function () {
         await global.Olm.init();
     });
 
-    describe('with crypto', () => {
-        it("initiator wants to sign in", async function() {
-            const aliceTransport = makeTransport('Alice');
-            const bobTransport = makeTransport('Bob');
+    describe("with crypto", () => {
+        it("initiator wants to sign in", async function () {
+            const aliceTransport = makeTransport("Alice");
+            const bobTransport = makeTransport("Bob");
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -55,9 +55,9 @@ describe('ECDHv1', function() {
             await bob.cancel(RendezvousFailureReason.Unknown);
         });
 
-        it("initiator wants to reciprocate", async function() {
-            const aliceTransport = makeTransport('Alice');
-            const bobTransport = makeTransport('Bob');
+        it("initiator wants to reciprocate", async function () {
+            const aliceTransport = makeTransport("Alice");
+            const bobTransport = makeTransport("Bob");
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -80,9 +80,9 @@ describe('ECDHv1', function() {
             await bob.cancel(RendezvousFailureReason.Unknown);
         });
 
-        it("double connect", async function() {
-            const aliceTransport = makeTransport('Alice');
-            const bobTransport = makeTransport('Bob');
+        it("double connect", async function () {
+            const aliceTransport = makeTransport("Alice");
+            const bobTransport = makeTransport("Bob");
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -102,9 +102,9 @@ describe('ECDHv1', function() {
             await bob.cancel(RendezvousFailureReason.Unknown);
         });
 
-        it("closed", async function() {
-            const aliceTransport = makeTransport('Alice');
-            const bobTransport = makeTransport('Bob');
+        it("closed", async function () {
+            const aliceTransport = makeTransport("Alice");
+            const bobTransport = makeTransport("Bob");
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -128,9 +128,9 @@ describe('ECDHv1', function() {
             await bob.cancel(RendezvousFailureReason.Unknown);
         });
 
-        it("require ciphertext", async function() {
-            const aliceTransport = makeTransport('Alice');
-            const bobTransport = makeTransport('Bob');
+        it("require ciphertext", async function () {
+            const aliceTransport = makeTransport("Alice");
+            const bobTransport = makeTransport("Bob");
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 
@@ -152,9 +152,9 @@ describe('ECDHv1', function() {
             await bob.cancel(RendezvousFailureReason.Unknown);
         });
 
-        it("ciphertext before set up", async function() {
-            const aliceTransport = makeTransport('Alice');
-            const bobTransport = makeTransport('Bob');
+        it("ciphertext before set up", async function () {
+            const aliceTransport = makeTransport("Alice");
+            const bobTransport = makeTransport("Bob");
             aliceTransport.otherParty = bobTransport;
             bobTransport.otherParty = aliceTransport;
 

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TestClient } from '../../TestClient';
+import { TestClient } from "../../TestClient";
 import {
     ClientEvent,
     EventTimeline,
@@ -166,14 +166,20 @@ describe("CallEventHandler", () => {
         const room = new Room("!room:id", client, "@user:id");
         const timelineData: IRoomTimelineData = { timeline: new EventTimeline(new EventTimelineSet(room, {})) };
 
-        client.emit(RoomEvent.Timeline, new MatrixEvent({
-            type: EventType.RoomMessage,
-            room_id: "!room:id",
-            content: {
-                text: "hello",
-
-            },
-        }), room, false, false, timelineData);
+        client.emit(
+            RoomEvent.Timeline,
+            new MatrixEvent({
+                type: EventType.RoomMessage,
+                room_id: "!room:id",
+                content: {
+                    text: "hello",
+                },
+            }),
+            room,
+            false,
+            false,
+            timelineData,
+        );
         await sync();
 
         // @ts-ignore Mock handleCallEvent is private
@@ -202,13 +208,20 @@ describe("CallEventHandler", () => {
         });
 
         it("should create a call when receiving an invite", async () => {
-            client.emit(RoomEvent.Timeline, new MatrixEvent({
-                type: EventType.CallInvite,
-                room_id: "!room:id",
-                content: {
-                    call_id: "123",
-                },
-            }), room, false, false, timelineData);
+            client.emit(
+                RoomEvent.Timeline,
+                new MatrixEvent({
+                    type: EventType.CallInvite,
+                    room_id: "!room:id",
+                    content: {
+                        call_id: "123",
+                    },
+                }),
+                room,
+                false,
+                false,
+                timelineData,
+            );
             await sync();
 
             expect(incomingCallListener).toHaveBeenCalled();
@@ -226,23 +239,30 @@ describe("CallEventHandler", () => {
             const GROUP_CALL_ID = "group_call_id";
             const DEVICE_ID = "device_id";
 
-            incomingCallListener.mockImplementation((c) => call = c);
+            incomingCallListener.mockImplementation((c) => (call = c));
             jest.spyOn(client.groupCallEventHandler!, "getGroupCallById").mockReturnValue(groupCall);
             // @ts-ignore Mock onIncomingCall is private
             jest.spyOn(groupCall, "onIncomingCall");
 
             await groupCall.enter();
-            client.emit(RoomEvent.Timeline, new MatrixEvent({
-                type: EventType.CallInvite,
-                room_id: "!room:id",
-                content: {
-                    call_id: "123",
-                    conf_id: GROUP_CALL_ID,
-                    device_id: DEVICE_ID,
-                    sender_session_id: SESSION_ID,
-                    dest_session_id: client.getSessionId(),
-                },
-            }), room, false, false, timelineData);
+            client.emit(
+                RoomEvent.Timeline,
+                new MatrixEvent({
+                    type: EventType.CallInvite,
+                    room_id: "!room:id",
+                    content: {
+                        call_id: "123",
+                        conf_id: GROUP_CALL_ID,
+                        device_id: DEVICE_ID,
+                        sender_session_id: SESSION_ID,
+                        dest_session_id: client.getSessionId(),
+                    },
+                }),
+                room,
+                false,
+                false,
+                timelineData,
+            );
             await sync();
 
             expect(incomingCallListener).toHaveBeenCalled();
@@ -257,14 +277,21 @@ describe("CallEventHandler", () => {
         });
 
         it("ignores a call with a different invitee than us", async () => {
-            client.emit(RoomEvent.Timeline, new MatrixEvent({
-                type: EventType.CallInvite,
-                room_id: "!room:id",
-                content: {
-                    call_id: "123",
-                    invitee: "@bob:bar",
-                },
-            }), room, false, false, timelineData);
+            client.emit(
+                RoomEvent.Timeline,
+                new MatrixEvent({
+                    type: EventType.CallInvite,
+                    room_id: "!room:id",
+                    content: {
+                        call_id: "123",
+                        invitee: "@bob:bar",
+                    },
+                }),
+                room,
+                false,
+                false,
+                timelineData,
+            );
             await sync();
 
             expect(incomingCallListener).not.toHaveBeenCalled();

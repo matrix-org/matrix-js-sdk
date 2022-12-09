@@ -19,17 +19,17 @@ import { Filter, IFilterDefinition } from "../../src/filter";
 import { mkEvent } from "../test-utils/test-utils";
 import { EventType } from "../../src";
 
-describe("Filter", function() {
+describe("Filter", function () {
     const filterId = "f1lt3ring15g00d4ursoul";
     const userId = "@sir_arthur_david:humming.tiger";
     let filter: Filter;
 
-    beforeEach(function() {
+    beforeEach(function () {
         filter = new Filter(userId);
     });
 
-    describe("fromJson", function() {
-        it("create a new Filter from the provided values", function() {
+    describe("fromJson", function () {
+        it("create a new Filter from the provided values", function () {
             const definition = {
                 event_fields: ["type", "content"],
             };
@@ -40,8 +40,8 @@ describe("Filter", function() {
         });
     });
 
-    describe("setTimelineLimit", function() {
-        it("should set room.timeline.limit of the filter definition", function() {
+    describe("setTimelineLimit", function () {
+        it("should set room.timeline.limit of the filter definition", function () {
             filter.setTimelineLimit(10);
             expect(filter.getDefinition()).toEqual({
                 room: {
@@ -53,18 +53,18 @@ describe("Filter", function() {
         });
     });
 
-    describe("setDefinition/getDefinition", function() {
-        it("should set and get the filter body", function() {
+    describe("setDefinition/getDefinition", function () {
+        it("should set and get the filter body", function () {
             const definition = {
-                event_format: "client" as IFilterDefinition['event_format'],
+                event_format: "client" as IFilterDefinition["event_format"],
             };
             filter.setDefinition(definition);
             expect(filter.getDefinition()).toEqual(definition);
         });
     });
 
-    describe("setUnreadThreadNotifications", function() {
-        it("setUnreadThreadNotifications", function() {
+    describe("setUnreadThreadNotifications", function () {
+        it("setUnreadThreadNotifications", function () {
             filter.setUnreadThreadNotifications(true);
             expect(filter.getDefinition()).toEqual({
                 room: {

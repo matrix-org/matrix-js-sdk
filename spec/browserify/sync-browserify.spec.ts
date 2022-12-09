@@ -24,7 +24,7 @@ const DEVICE_ID = "device_id";
 const ACCESS_TOKEN = "access_token";
 const ROOM_ID = "!room_id:server.test";
 
-describe("Browserify Test", function() {
+describe("Browserify Test", function () {
     let client: MatrixClient;
     let httpBackend: HttpBackend;
 
@@ -68,9 +68,7 @@ describe("Browserify Test", function() {
                 join: {
                     [ROOM_ID]: {
                         timeline: {
-                            events: [
-                                event,
-                            ],
+                            events: [event],
                             limited: false,
                         },
                     },
@@ -81,7 +79,7 @@ describe("Browserify Test", function() {
         httpBackend.when("GET", "/sync").respond(200, syncData);
         httpBackend.when("GET", "/sync").respond(200, syncData);
 
-        const syncPromise = new Promise(r => client.once(global.matrixcs.ClientEvent.Sync, r));
+        const syncPromise = new Promise((r) => client.once(global.matrixcs.ClientEvent.Sync, r));
         const unexpectedErrorFn = jest.fn();
         client.once(global.matrixcs.ClientEvent.SyncUnexpectedError, unexpectedErrorFn);
 

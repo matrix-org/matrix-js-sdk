@@ -47,25 +47,20 @@ export * from "./store/indexeddb";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
-export * from './@types/event';
-export * from './@types/PushRules';
-export * from './@types/partials';
-export * from './@types/requests';
-export * from './@types/search';
-export * from './models/room-summary';
+export * from "./@types/event";
+export * from "./@types/PushRules";
+export * from "./@types/partials";
+export * from "./@types/requests";
+export * from "./@types/search";
+export * from "./models/room-summary";
 export * as ContentHelpers from "./content-helpers";
 export type { ICryptoCallbacks } from "./crypto"; // used to be located here
 export { createNewMatrixCall } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
-export {
-    GroupCallEvent,
-    GroupCallIntent,
-    GroupCallState,
-    GroupCallType,
-} from "./webrtc/groupCall";
+export { GroupCallEvent, GroupCallIntent, GroupCallState, GroupCallType } from "./webrtc/groupCall";
 export type { GroupCall } from "./webrtc/groupCall";
 
-let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore;
+let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 
 /**
  * Configure a different factory to be used for creating crypto stores
@@ -77,9 +72,11 @@ export function setCryptoStoreFactory(fac: () => CryptoStore): void {
 }
 
 function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
-    opts.store = opts.store ?? new MemoryStore({
-        localStorage: global.localStorage,
-    });
+    opts.store =
+        opts.store ??
+        new MemoryStore({
+            localStorage: global.localStorage,
+        });
     opts.scheduler = opts.scheduler ?? new MatrixScheduler();
     opts.cryptoStore = opts.cryptoStore ?? cryptoStoreFactory();
 

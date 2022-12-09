@@ -58,11 +58,11 @@ export const getMockClientWithEventEmitter = (
     });
  * ```
  */
-export const mockClientMethodsUser = (userId = '@alice:domain') => ({
+export const mockClientMethodsUser = (userId = "@alice:domain") => ({
     getUserId: jest.fn().mockReturnValue(userId),
     getUser: jest.fn().mockReturnValue(new User(userId)),
     isGuest: jest.fn().mockReturnValue(false),
-    mxcUrlToHttp: jest.fn().mockReturnValue('mock-mxcUrlToHttp'),
+    mxcUrlToHttp: jest.fn().mockReturnValue("mock-mxcUrlToHttp"),
     credentials: { userId },
     getThreePids: jest.fn().mockResolvedValue({ threepids: [] }),
     getAccessToken: jest.fn(),
@@ -91,4 +91,3 @@ export const mockClientMethodsServer = (): Partial<Record<MethodLikeKeys<MatrixC
     getCapabilities: jest.fn().mockReturnValue({}),
     doesServerSupportUnstableFeature: jest.fn().mockResolvedValue(false),
 });
-

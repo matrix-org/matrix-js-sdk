@@ -19,13 +19,13 @@ import { logger } from "../../../../src/logger";
 
 const Olm = global.Olm;
 
-describe("QR code verification", function() {
+describe("QR code verification", function () {
     if (!global.Olm) {
-        logger.warn('Not running device verification tests: libolm not present');
+        logger.warn("Not running device verification tests: libolm not present");
         return;
     }
 
-    beforeAll(function() {
+    beforeAll(function () {
         return Olm.init();
     });
 

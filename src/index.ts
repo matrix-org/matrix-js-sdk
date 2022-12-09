@@ -23,4 +23,3 @@ global.__js_sdk_entrypoint = true;
 
 export * from "./matrix";
 export default matrixcs;
-

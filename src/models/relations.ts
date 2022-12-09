@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvent } from './event';
-import { logger } from '../logger';
+import { EventStatus, IAggregatedRelation, MatrixEvent, MatrixEventEvent } from "./event";
+import { logger } from "../logger";
 import { RelationType } from "../@types/event";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { MatrixClient } from "../client";

@@ -38,8 +38,7 @@ export const M_TIMESTAMP = new UnstableValue("m.ts", "org.matrix.msc3488.ts");
  */
 export type MTimestampEvent = EitherAnd<{ [M_TIMESTAMP.name]: number }, { [M_TIMESTAMP.altName]: number }>;
 
-export const M_LOCATION = new UnstableValue(
-    "m.location", "org.matrix.msc3488.location");
+export const M_LOCATION = new UnstableValue("m.location", "org.matrix.msc3488.location");
 
 export type MLocationContent = {
     uri: string;
@@ -76,12 +75,8 @@ export type MTextEvent = EitherAnd<{ [TEXT_NODE_TYPE.name]: string }, { [TEXT_NO
 type OptionalTimestampEvent = MTimestampEvent | undefined;
 /**
  * The content for an m.location event
-*/
-export type MLocationEventContent = &
-    MLocationEvent &
-    MAssetEvent &
-    MTextEvent &
-    OptionalTimestampEvent;
+ */
+export type MLocationEventContent = MLocationEvent & MAssetEvent & MTextEvent & OptionalTimestampEvent;
 
 export type LegacyLocationEventContent = {
     body: string;

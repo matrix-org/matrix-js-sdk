@@ -17,7 +17,8 @@ limitations under the License.
 export interface IImageInfo {
     size?: number;
     mimetype?: string;
-    thumbnail_info?: { // eslint-disable-line camelcase
+    thumbnail_info?: {
+        // eslint-disable-line camelcase
         w?: number;
         h?: number;
         size?: number;

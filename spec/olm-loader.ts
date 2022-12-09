@@ -15,13 +15,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../src/logger';
+import { logger } from "../src/logger";
 
 // try to load the olm library.
 try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    global.Olm = require('@matrix-org/olm');
-    logger.log('loaded libolm');
+    global.Olm = require("@matrix-org/olm");
+    logger.log("loaded libolm");
 } catch (e) {
     logger.warn("unable to run crypto tests: libolm not available");
 }

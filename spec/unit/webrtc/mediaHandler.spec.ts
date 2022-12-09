@@ -22,7 +22,7 @@ const FAKE_AUDIO_INPUT_ID = "aaaaaaaa";
 const FAKE_VIDEO_INPUT_ID = "vvvvvvvv";
 const FAKE_DESKTOP_SOURCE_ID = "ddddddd";
 
-describe('Media Handler', function() {
+describe("Media Handler", function () {
     let mockMediaDevices: MockMediaDevices;
     let mediaHandler: MediaHandler;
     let calls: Map<string, MatrixCall>;
@@ -58,25 +58,29 @@ describe('Media Handler', function() {
         mediaHandler.restoreMediaSettings(FAKE_AUDIO_INPUT_ID, FAKE_VIDEO_INPUT_ID);
 
         await mediaHandler.getUserMediaStream(true, true);
-        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
-            audio: expect.objectContaining({
-                deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
+            expect.objectContaining({
+                audio: expect.objectContaining({
+                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                }),
+                video: expect.objectContaining({
+                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                }),
             }),
-            video: expect.objectContaining({
-                deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
-            }),
-        }));
+        );
     });
 
     it("sets audio device ID", async () => {
         await mediaHandler.setAudioInput(FAKE_AUDIO_INPUT_ID);
 
         await mediaHandler.getUserMediaStream(true, false);
-        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
-            audio: expect.objectContaining({
-                deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
+            expect.objectContaining({
+                audio: expect.objectContaining({
+                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                }),
             }),
-        }));
+        );
     });
 
     it("sets audio settings", async () => {
@@ -87,38 +91,44 @@ describe('Media Handler', function() {
         });
 
         await mediaHandler.getUserMediaStream(true, false);
-        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
-            audio: expect.objectContaining({
-                autoGainControl: { ideal: false },
-                echoCancellation: { ideal: true },
-                noiseSuppression: { ideal: false },
+        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
+            expect.objectContaining({
+                audio: expect.objectContaining({
+                    autoGainControl: { ideal: false },
+                    echoCancellation: { ideal: true },
+                    noiseSuppression: { ideal: false },
+                }),
             }),
-        }));
+        );
     });
 
     it("sets video device ID", async () => {
         await mediaHandler.setVideoInput(FAKE_VIDEO_INPUT_ID);
 
         await mediaHandler.getUserMediaStream(false, true);
-        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
-            video: expect.objectContaining({
-                deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
+            expect.objectContaining({
+                video: expect.objectContaining({
+                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                }),
             }),
-        }));
+        );
     });
 
     it("sets media inputs", async () => {
         await mediaHandler.setMediaInputs(FAKE_AUDIO_INPUT_ID, FAKE_VIDEO_INPUT_ID);
 
         await mediaHandler.getUserMediaStream(true, true);
-        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
-            audio: expect.objectContaining({
-                deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+        expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
+            expect.objectContaining({
+                audio: expect.objectContaining({
+                    deviceId: { ideal: FAKE_AUDIO_INPUT_ID },
+                }),
+                video: expect.objectContaining({
+                    deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
+                }),
             }),
-            video: expect.objectContaining({
-                deviceId: { ideal: FAKE_VIDEO_INPUT_ID },
-            }),
-        }));
+        );
     });
 
     describe("updateLocalUsermediaStreams", () => {
@@ -153,9 +163,11 @@ describe('Media Handler', function() {
 
                 mediaHandler.userMediaStreams = [
                     {
-                        getTracks: () => [{
-                            stop: stopTrack,
-                        } as unknown as MediaStreamTrack],
+                        getTracks: () => [
+                            {
+                                stop: stopTrack,
+                            } as unknown as MediaStreamTrack,
+                        ],
                     } as unknown as MediaStream,
                 ];
 
@@ -225,9 +237,9 @@ describe('Media Handler', function() {
         });
 
         it("returns false if the system has no audio inputs", async () => {
-            mockMediaDevices.enumerateDevices.mockReturnValue(Promise.resolve([
-                new MockMediaDeviceInfo("videoinput").typed(),
-            ]));
+            mockMediaDevices.enumerateDevices.mockReturnValue(
+                Promise.resolve([new MockMediaDeviceInfo("videoinput").typed()]),
+            );
             expect(await mediaHandler.hasAudioDevice()).toEqual(false);
         });
     });
@@ -238,9 +250,9 @@ describe('Media Handler', function() {
         });
 
         it("returns false if the system has no video inputs", async () => {
-            mockMediaDevices.enumerateDevices.mockReturnValue(Promise.resolve([
-                new MockMediaDeviceInfo("audioinput").typed(),
-            ]));
+            mockMediaDevices.enumerateDevices.mockReturnValue(
+                Promise.resolve([new MockMediaDeviceInfo("audioinput").typed()]),
+            );
             expect(await mediaHandler.hasVideoDevice()).toEqual(false);
         });
     });
@@ -270,35 +282,35 @@ describe('Media Handler', function() {
 
         it("returns the same stream for reusable streams", async () => {
             const stream1 = await mediaHandler.getUserMediaStream(true, false);
-            const stream2 = await mediaHandler.getUserMediaStream(true, false) as unknown as MockMediaStream;
+            const stream2 = (await mediaHandler.getUserMediaStream(true, false)) as unknown as MockMediaStream;
 
             expect(stream2.isCloneOf(stream1)).toEqual(true);
         });
 
         it("doesn't re-use stream if reusable is false", async () => {
             const stream1 = await mediaHandler.getUserMediaStream(true, false, false);
-            const stream2 = await mediaHandler.getUserMediaStream(true, false) as unknown as MockMediaStream;
+            const stream2 = (await mediaHandler.getUserMediaStream(true, false)) as unknown as MockMediaStream;
 
             expect(stream2.isCloneOf(stream1)).toEqual(false);
         });
 
         it("doesn't re-use stream if existing stream lacks audio", async () => {
             const stream1 = await mediaHandler.getUserMediaStream(false, true);
-            const stream2 = await mediaHandler.getUserMediaStream(true, false) as unknown as MockMediaStream;
+            const stream2 = (await mediaHandler.getUserMediaStream(true, false)) as unknown as MockMediaStream;
 
             expect(stream2.isCloneOf(stream1)).toEqual(false);
         });
 
         it("doesn't re-use stream if existing stream lacks video", async () => {
             const stream1 = await mediaHandler.getUserMediaStream(true, false);
-            const stream2 = await mediaHandler.getUserMediaStream(false, true) as unknown as MockMediaStream;
+            const stream2 = (await mediaHandler.getUserMediaStream(false, true)) as unknown as MockMediaStream;
 
             expect(stream2.isCloneOf(stream1)).toEqual(false);
         });
 
         it("strips unwanted audio tracks from re-used stream", async () => {
             const stream1 = await mediaHandler.getUserMediaStream(true, true);
-            const stream2 = await mediaHandler.getUserMediaStream(false, true) as unknown as MockMediaStream;
+            const stream2 = (await mediaHandler.getUserMediaStream(false, true)) as unknown as MockMediaStream;
 
             expect(stream2.isCloneOf(stream1)).toEqual(true);
             expect(stream2.getAudioTracks().length).toEqual(0);
@@ -306,7 +318,7 @@ describe('Media Handler', function() {
 
         it("strips unwanted video tracks from re-used stream", async () => {
             const stream1 = await mediaHandler.getUserMediaStream(true, true);
-            const stream2 = await mediaHandler.getUserMediaStream(true, false) as unknown as MockMediaStream;
+            const stream2 = (await mediaHandler.getUserMediaStream(true, false)) as unknown as MockMediaStream;
 
             expect(stream2.isCloneOf(stream1)).toEqual(true);
             expect(stream2.getVideoTracks().length).toEqual(0);
@@ -326,7 +338,7 @@ describe('Media Handler', function() {
             expect(mockMediaDevices.getDisplayMedia).toHaveBeenCalled();
             mockMediaDevices.getDisplayMedia.mockClear();
 
-            const stream2 = await mediaHandler.getScreensharingStream() as unknown as MockMediaStream;
+            const stream2 = (await mediaHandler.getScreensharingStream()) as unknown as MockMediaStream;
 
             expect(mockMediaDevices.getDisplayMedia).not.toHaveBeenCalled();
 
@@ -338,14 +350,16 @@ describe('Media Handler', function() {
                 desktopCapturerSourceId: FAKE_DESKTOP_SOURCE_ID,
             });
 
-            expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(expect.objectContaining({
-                video: {
-                    mandatory: expect.objectContaining({
-                        chromeMediaSource: "desktop",
-                        chromeMediaSourceId: FAKE_DESKTOP_SOURCE_ID,
-                    }),
-                },
-            }));
+            expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    video: {
+                        mandatory: expect.objectContaining({
+                            chromeMediaSource: "desktop",
+                            chromeMediaSourceId: FAKE_DESKTOP_SOURCE_ID,
+                        }),
+                    },
+                }),
+            );
         });
 
         it("emits LocalStreamsChanged", async () => {
