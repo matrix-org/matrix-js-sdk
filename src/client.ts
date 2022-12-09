@@ -1657,6 +1657,38 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.cryptoStore) {
             promises.push(this.cryptoStore.deleteAllData());
         }
+
+        // delete the stores used by the rust matrix-sdk-crypto, in case they were used
+        const deleteRustSdkStore = async (): Promise<void> => {
+            let indexedDB: IDBFactory;
+            try {
+                indexedDB = global.indexedDB;
+            } catch (e) {
+                // No indexeddb support
+                return;
+            }
+            for (const dbname of ["matrix-js-sdk::matrix-sdk-crypto", "matrix-js-sdk::matrix-sdk-crypto-meta"]) {
+                const prom = new Promise((resolve, reject) => {
+                    logger.info(`Removing IndexedDB instance ${dbname}`);
+                    const req = indexedDB.deleteDatabase(dbname);
+                    req.onsuccess = (_): void => {
+                        logger.info(`Removed IndexedDB instance ${dbname}`);
+                        resolve(0);
+                    };
+                    req.onerror = (e): void => {
+                        logger.error(`Failed to remove IndexedDB instance ${dbname}: ${e}`);
+                        reject(new Error(`Error clearing storage: ${e}`));
+                    };
+                    req.onblocked = (e): void => {
+                        logger.info(`cannot yet remove IndexedDB instance ${dbname}`);
+                        //reject(new Error(`Error clearing storage: ${e}`));
+                    };
+                });
+                await prom;
+            }
+        };
+        promises.push(deleteRustSdkStore());
+
         return Promise.all(promises).then(); // .then to fix types
     }
 
@@ -2049,6 +2081,41 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // TODO: throwing away this error is a really bad idea.
             logger.error("Error uploading device keys", e);
         });
+    }
+
+    /**
+     * Initialise support for end-to-end encryption in this client, using the rust matrix-sdk-crypto.
+     *
+     * An alternative to initCrypto.
+     *
+     * It will return a Promise which will resolve when the crypto layer has been
+     * successfully initialised.
+     */
+    public async initRustCrypto(): Promise<void> {
+        if (this.cryptoBackend) {
+            logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
+            return;
+        }
+
+        const userId = this.getUserId();
+        if (userId === null) {
+            throw new Error(
+                `Cannot enable encryption on MatrixClient with unknown userId: ` +
+                    `ensure userId is passed in createClient().`,
+            );
+        }
+        const deviceId = this.getDeviceId();
+        if (deviceId === null) {
+            throw new Error(
+                `Cannot enable encryption on MatrixClient with unknown deviceId: ` +
+                    `ensure deviceId is passed in createClient().`,
+            );
+        }
+
+        // importing rust-crypto will download the webassembly, so we delay it until we know it will be
+        // needed.
+        const RustCrypto = await import("./rust-crypto");
+        this.cryptoBackend = await RustCrypto.initRustCrypto(userId, deviceId);
     }
 
     /**
