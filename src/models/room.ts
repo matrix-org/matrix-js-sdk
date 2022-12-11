@@ -1905,9 +1905,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     private onThreadDelete(thread: Thread): void {
         this.threads.delete(thread.id);
-
-        const timeline = this.getTimelineForEvent(thread.id);
-        const roomEvent = timeline?.getEvents()?.find((it) => it.getId() === thread.id);
+        const roomEvent = this.getUnfilteredTimelineSet().findEventById(thread.id);
         if (roomEvent) {
             thread.clearEventMetadata(roomEvent);
         } else {
@@ -2034,6 +2032,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.updateThreadRootEvent(this.threadsTimelineSets?.[0], thread, toStartOfTimeline, recreateEvent);
             if (thread.hasCurrentUserParticipated) {
                 this.updateThreadRootEvent(this.threadsTimelineSets?.[1], thread, toStartOfTimeline, recreateEvent);
+            } else {
+                this.threadsTimelineSets?.[1]?.removeEvent(thread.id);
             }
         }
     };
