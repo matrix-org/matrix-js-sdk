@@ -20,7 +20,7 @@ import { MatrixClient, PendingEventOrdering } from "../client";
 import { TypedReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
 import { EventStatus, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
-import { EventTimeline } from "./event-timeline";
+import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set";
 import { NotificationCountType, Room, RoomEvent } from "./room";
 import { RoomState } from "./room-state";
@@ -358,7 +358,15 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             try {
                 // if the thread has regular events, this will just load the last reply.
                 // if the thread is newly created, this will load the root event.
-                await this.client.paginateEventTimeline(this.liveTimeline, { backwards: true, limit: 1 });
+                if (this.replyCount === 0 && this.rootEvent) {
+                    this.timelineSet.addEventsToTimeline([this.rootEvent], true, this.liveTimeline, null);
+                    this.liveTimeline.setPaginationToken(null, Direction.Backward);
+                } else {
+                    await this.client.paginateEventTimeline(this.liveTimeline, {
+                        backwards: true,
+                        limit: Math.max(1, this.length),
+                    });
+                }
                 // just to make sure that, if we've created a timeline window for this thread before the thread itself
                 // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
                 this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
