@@ -1,5 +1,5 @@
 /*
-Copyright 2021 The Matrix.org Foundation C.I.C.
+Copyright 2021-2022 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import { Optional } from "matrix-events-sdk";
 import { MatrixClient, PendingEventOrdering } from "../client";
 import { TypedReEmitter } from "../ReEmitter";
 import { RelationType } from "../@types/event";
-import { EventStatus, IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
+import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set";
 import { NotificationCountType, Room, RoomEvent } from "./room";
@@ -174,6 +174,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             !redaction.status // only respect it when it succeeds
         ) {
             this.replyCount--;
+            this.updatePendingReplyCount();
             this.emit(ThreadEvent.Update, this);
         }
     };
@@ -326,25 +327,28 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                 ...bundledRelationship.latest_event,
                 room_id: this.roomId,
             });
+            this.updatePendingReplyCount();
             await this.processEvent(this.lastEvent);
         }
+    }
 
-        let pendingEvents: MatrixEvent[];
-        if (this.pendingEventOrdering === PendingEventOrdering.Detached) {
-            pendingEvents = this.room
-                .getPendingEvents()
-                .filter((ev) => ev.isRelation(THREAD_RELATION_TYPE.name) && this.id === ev.threadRootId);
-            await Promise.all(pendingEvents.map((ev) => this.processEvent(ev)));
-        } else {
-            pendingEvents = this.events
-                .filter((ev) => ev.isRelation(THREAD_RELATION_TYPE.name))
-                .filter((ev) => ev.status !== EventStatus.SENT && ev.status !== EventStatus.CANCELLED);
-        }
+    private updatePendingReplyCount(): void {
+        const unfilteredPendingEvents =
+            this.pendingEventOrdering === PendingEventOrdering.Detached ? this.room.getPendingEvents() : this.events;
+        const pendingEvents = unfilteredPendingEvents.filter(
+            (ev) =>
+                ev.threadRootId === this.id &&
+                ev.isRelation(THREAD_RELATION_TYPE.name) &&
+                ev.status !== null &&
+                ev.getId() !== this.lastEvent?.getId(),
+        );
         this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;
         this.pendingReplyCount = pendingEvents.length;
     }
 
     private async updateThreadMetadata(): Promise<void> {
+        this.updatePendingReplyCount();
+
         if (Thread.hasServerSideSupport) {
             // Ensure we show *something* as soon as possible, we'll update it as soon as we get better data, but we
             // don't want the thread preview to be empty if we can avoid it
