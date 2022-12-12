@@ -322,8 +322,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
+            const mapper = this.client.getEventMapper();
             // re-insert roomId
-            this.lastEvent = new MatrixEvent({
+            this.lastEvent = mapper({
                 ...bundledRelationship.latest_event,
                 room_id: this.roomId,
             });
