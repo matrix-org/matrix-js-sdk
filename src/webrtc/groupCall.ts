@@ -335,9 +335,11 @@ export class GroupCall extends TypedEventEmitter<
 
     private getPreferredFoci(): IFocusInfo[] {
         const preferredFoci = this.client.getFoci();
-        const isUsingPreferredFocus = Boolean(preferredFoci.find((pf) => (
-            this.foci.find((f) => pf.user_id === f.user_id && pf.device_id === pf.device_id)
-        )));
+        const isUsingPreferredFocus = Boolean(
+            preferredFoci.find((pf) =>
+                this.foci.find((f) => pf.user_id === f.user_id && pf.device_id === pf.device_id),
+            ),
+        );
 
         return isUsingPreferredFocus ? [] : preferredFoci;
     }
@@ -457,17 +459,14 @@ export class GroupCall extends TypedEventEmitter<
 
         this.activeSpeaker = undefined;
         this.onActiveSpeakerLoop();
-        this.activeSpeakerLoopInterval = setInterval(
-            this.onActiveSpeakerLoop,
-            this.activeSpeakerInterval,
-        );
+        this.activeSpeakerLoopInterval = setInterval(this.onActiveSpeakerLoop, this.activeSpeakerInterval);
 
         if (this.foci[0]) {
             const opponentDevice = {
-                "device_id": this.foci[0].device_id,
+                device_id: this.foci[0].device_id,
                 // XXX: What if an SFU gets restarted?
-                "session_id": "sfu",
-                "feeds": [],
+                session_id: "sfu",
+                feeds: [],
             };
 
             const onError = (e?: unknown): void => {
@@ -481,17 +480,13 @@ export class GroupCall extends TypedEventEmitter<
                 );
             };
 
-            const sfuCall = createNewMatrixCall(
-                this.client,
-                this.room.roomId,
-                {
-                    invitee: this.foci[0].user_id,
-                    opponentDeviceId: opponentDevice.device_id,
-                    opponentSessionId: opponentDevice.session_id,
-                    groupCallId: this.groupCallId,
-                    isFocus: true,
-                },
-            );
+            const sfuCall = createNewMatrixCall(this.client, this.room.roomId, {
+                invitee: this.foci[0].user_id,
+                opponentDeviceId: opponentDevice.device_id,
+                opponentSessionId: opponentDevice.session_id,
+                groupCallId: this.groupCallId,
+                isFocus: true,
+            });
             if (!sfuCall) {
                 onError();
                 return;
@@ -517,10 +512,10 @@ export class GroupCall extends TypedEventEmitter<
         // Try to find a focus of another user to use
         let focusOfAnotherMember: IFocusInfo | undefined;
         for (const event of this.getMemberStateEvents()) {
-            const focus = event.getContent<IGroupCallRoomMemberState>()
-                ?.["m.calls"] ?.[0]
-                ?.["m.devices"]?.[0]
-                ?.["m.foci.active"]?.[0];
+            const focus =
+                event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.[
+                    "m.foci.active"
+                ]?.[0];
             if (focus) {
                 focusOfAnotherMember = focus;
                 break;
@@ -759,10 +754,9 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 // TODO: handle errors
-                this.forEachCall((call) => call.pushLocalFeed(call.isFocus
-                    ? this.localScreenshareFeed!
-                    : this.localScreenshareFeed!.clone(),
-                ));
+                this.forEachCall((call) =>
+                    call.pushLocalFeed(call.isFocus ? this.localScreenshareFeed! : this.localScreenshareFeed!.clone()),
+                );
 
                 return true;
             } catch (error) {
@@ -1073,18 +1067,22 @@ export class GroupCall extends TypedEventEmitter<
 
     private onCallFeedsChanged = (call: MatrixCall): void => {
         // Find removed feeds
-        [...this.userMediaFeeds, ...this.screenshareFeeds].filter((gf) => gf.disposed).forEach((feed) => {
-            if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
-            else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.removeScreenshareFeed(feed);
-        });
+        [...this.userMediaFeeds, ...this.screenshareFeeds]
+            .filter((gf) => gf.disposed)
+            .forEach((feed) => {
+                if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
+                else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.removeScreenshareFeed(feed);
+            });
 
         // Find new feeds
-        call.getRemoteFeeds().filter((cf) => {
-            return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
-        }).forEach((feed) => {
-            if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
-            else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.addScreenshareFeed(feed);
-        });
+        call.getRemoteFeeds()
+            .filter((cf) => {
+                return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
+            })
+            .forEach((feed) => {
+                if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
+                else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.addScreenshareFeed(feed);
+            });
     };
 
     private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState | undefined): void => {

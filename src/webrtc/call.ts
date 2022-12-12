@@ -52,11 +52,11 @@ import {
     FocusEvent,
     SDPStreamMetadataKeyStable,
     FocusEventBaseContent,
-} from './callEventTypes';
-import { CallFeed } from './callFeed';
+} from "./callEventTypes";
+import { CallFeed } from "./callFeed";
 import { MatrixClient } from "../client";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
-import { DeviceInfo } from '../crypto/deviceinfo';
+import { DeviceInfo } from "../crypto/deviceinfo";
 import { IScreensharingOpts } from "./mediaHandler";
 import { GroupCallUnknownDeviceError } from "./groupCall";
 import { MatrixError } from "../http-api";
@@ -695,11 +695,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         logger.info(
             `Call ${this.callId} Pushed remote stream (` +
-            `id="${stream.id}" ` +
-            `active="${stream.active}" ` +
-            `purpose=${purpose} ` +
-            `userId=${userId}` +
-            `)`,
+                `id="${stream.id}" ` +
+                `active="${stream.active}" ` +
+                `purpose=${purpose} ` +
+                `userId=${userId}` +
+                `)`,
         );
     }
 
@@ -718,7 +718,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // If we already have a stream, check this stream has the same id
         if (oldRemoteStream && stream.id !== oldRemoteStream.id) {
             logger.warn(
-                `Call ${this.callId} Ignoring new stream ID ${stream.id}: `+`we already have stream ID ${oldRemoteStream.id}`,
+                `Call ${this.callId} Ignoring new stream ID ${stream.id}: ` +
+                    `we already have stream ID ${oldRemoteStream.id}`,
             );
             return;
         }
@@ -951,8 +952,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else if (!this.isFocus) {
-            logger.debug(`Call ${
-                this.callId} did not get any SDPStreamMetadata! Can not send/receive multiple streams`);
+            logger.debug(
+                `Call ${this.callId} did not get any SDPStreamMetadata! Can not send/receive multiple streams`,
+            );
         }
 
         this.peerConn = this.createPeerConnection();
@@ -2272,7 +2274,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     this.emit(CallEvent.LengthChanged, Math.round((Date.now() - this.callStartTime!) / 1000));
                 }, CALL_LENGTH_INTERVAL);
             }
-        } else if (this.peerConn?.iceConnectionState == 'failed') {
+        } else if (this.peerConn?.iceConnectionState == "failed") {
             // Firefox for Android does not yet have support for restartIce()
             // (the types say it's always defined though, so we have to cast
             // to prevent typescript from warning).
