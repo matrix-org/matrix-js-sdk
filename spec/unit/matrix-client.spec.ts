@@ -28,6 +28,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { Crypto } from "../../src/crypto";
@@ -1092,7 +1093,7 @@ describe("MatrixClient", function () {
                 );
             });
 
-            describe("and the server supports relation based redactions", () => {
+            describe("and the server supports relation based redactions (unstable)", () => {
                 beforeEach(async () => {
                     unstableFeatures["org.matrix.msc3912"] = true;
                     // load supported features
@@ -1110,7 +1111,7 @@ describe("MatrixClient", function () {
                                 `/${encodeURIComponent(txnId)}`,
                             expectBody: {
                                 reason: "redaction test",
-                                with_relations: [RelationType.Reference],
+                                [MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: [RelationType.Reference],
                             },
                             data: { event_id: eventId },
                         },

@@ -154,6 +154,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "./@types/event";
 import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
@@ -4376,13 +4377,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         }
 
+        const withRelations = opts?.with_relations
+            ? {
+                  [this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
+                      ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
+                      : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: opts?.with_relations,
+              }
+            : {};
+
         return this.sendCompleteEvent(
             roomId,
             threadId,
             {
                 type: EventType.RoomRedaction,
                 content: {
-                    ...(opts?.with_relations ? { with_relations: opts?.with_relations } : {}),
+                    ...withRelations,
                     reason,
                 },
                 redacts: eventId,
