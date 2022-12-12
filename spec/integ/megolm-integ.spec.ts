@@ -209,20 +209,24 @@ function getSyncResponse(roomMembers: string[]): ISyncResponse {
  *
  * Waits for the test user to upload their keys, then sends a /sync response with a to-device message which will
  * establish an Olm session.
+ *
+ * @param testClient: a TestClient for the user under test, which we expect to upload account keys, and to make a
+ *    /sync request which we will respond to.
+ * @param peerOlmAccount: an OlmAccount which will be used to initiate the Olm session.
  */
-async function establishOlmSession(aliceTestClient: TestClient, bobOlmAccount: Olm.Account): Promise<Olm.Session> {
-    const bobE2eKeys = JSON.parse(bobOlmAccount.identity_keys());
-    const p2pSession = await createOlmSession(bobOlmAccount, aliceTestClient);
+async function establishOlmSession(testClient: TestClient, peerOlmAccount: Olm.Account): Promise<Olm.Session> {
+    const peerE2EKeys = JSON.parse(peerOlmAccount.identity_keys());
+    const p2pSession = await createOlmSession(peerOlmAccount, testClient);
     const olmEvent = encryptOlmEvent({
-        senderKey: bobE2eKeys.curve25519,
-        recipient: aliceTestClient,
+        senderKey: peerE2EKeys.curve25519,
+        recipient: testClient,
         p2pSession: p2pSession,
     });
-    aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+    testClient.httpBackend.when("GET", "/sync").respond(200, {
         next_batch: 1,
         to_device: { events: [olmEvent] },
     });
-    await aliceTestClient.flushSync();
+    await testClient.flushSync();
     return p2pSession;
 }
 
