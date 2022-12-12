@@ -2318,6 +2318,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (!this.removeTrackListeners.has(stream)) {
             const onRemoveTrack = (): void => {
                 if (stream.getTracks().length === 0) {
+                    // FIXME: We should really be doing this per-track. Šimon
+                    // leaves this for when we switch to mids for signalling
+                    const getIndex = (): number => this.subscribedTracks.findIndex((t) => t.stream_id === stream.id);
+                    let indexOfTrackToRemove = getIndex();
+                    while (indexOfTrackToRemove !== -1) {
+                        this.subscribedTracks.splice(indexOfTrackToRemove, 1);
+                        indexOfTrackToRemove = getIndex();
+                    }
+
                     logger.info(`Call ${this.callId} removing track streamId: ${stream.id}`);
                     this.deleteFeedByStream(stream);
                     stream.removeEventListener("removetrack", onRemoveTrack);
