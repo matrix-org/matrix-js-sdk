@@ -335,8 +335,8 @@ export class GroupCall extends TypedEventEmitter<
 
     private getPreferredFoci(): IFocusInfo[] {
         const preferredFoci = this.client.getFoci();
-        const isUsingPreferredFocus = Boolean(preferredFoci.find(pf => (
-            this.foci.find(f => pf.user_id === f.user_id && pf.device_id === pf.device_id)
+        const isUsingPreferredFocus = Boolean(preferredFoci.find((pf) => (
+            this.foci.find((f) => pf.user_id === f.user_id && pf.device_id === pf.device_id)
         )));
 
         return isUsingPreferredFocus ? [] : preferredFoci;
@@ -759,7 +759,7 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 // TODO: handle errors
-                this.forEachCall(call => call.pushLocalFeed(call.isFocus
+                this.forEachCall((call) => call.pushLocalFeed(call.isFocus
                     ? this.localScreenshareFeed!
                     : this.localScreenshareFeed!.clone(),
                 ));
@@ -1374,7 +1374,7 @@ export class GroupCall extends TypedEventEmitter<
                 "device_id": this.client.getDeviceId()!,
                 "session_id": this.client.getSessionId(),
                 "expires_ts": Date.now() + DEVICE_TIMEOUT,
-                "feeds": this.getLocalFeeds().map(feed => ({ purpose: feed.purpose })),
+                "feeds": this.getLocalFeeds().map((feed) => ({ purpose: feed.purpose })),
                 "m.foci.active": this.foci,
                 "m.foci.preferred": this.getPreferredFoci(),
                 // TODO: Add data channels
