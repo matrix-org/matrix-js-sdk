@@ -46,6 +46,7 @@ import { TestClient } from "../TestClient";
 import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { Crypto } from "../../src/crypto";
+import { mkThread } from "../test-utils/thread";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -2436,6 +2437,23 @@ describe("Room", function () {
             });
 
             expect(() => room.createThread(rootEvent.getId()!, rootEvent, [], false)).not.toThrow();
+        });
+
+        it("returns the same model when creating a thread twice", () => {
+
+            const { thread, rootEvent } = mkThread({
+                room,
+                client: new TestClient().client,
+                authorId: "@bob:example.org",
+                participantUserIds: ["@bob:example.org"],
+            });
+
+            expect(thread).toBeInstanceOf(Thread);
+
+            const duplicateThread = room.createThread(rootEvent.getId()!, rootEvent, [], false);
+
+            expect(duplicateThread).toBe(thread);
+
         });
 
         it("creating thread from edited event should not conflate old versions of the event", () => {
