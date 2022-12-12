@@ -16,7 +16,7 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
-import { IEventDecryptionResult } from "../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import { MatrixEvent } from "../models/event";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
 
@@ -56,5 +56,10 @@ export class RustCrypto implements CryptoBackend {
     public async userHasCrossSigningKeys(): Promise<boolean> {
         // TODO
         return false;
+    }
+
+    public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
+        // TODO
+        return [];
     }
 }

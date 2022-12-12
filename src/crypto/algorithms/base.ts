@@ -18,11 +18,12 @@ limitations under the License.
  * Internal module. Defines the base classes of the encryption implementations
  */
 
+import type { IMegolmSessionData } from "../../@types/crypto";
 import { MatrixClient } from "../../client";
 import { Room } from "../../models/room";
 import { OlmDevice } from "../OlmDevice";
 import { IContent, MatrixEvent, RoomMember } from "../../matrix";
-import { Crypto, IEncryptedContent, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "..";
+import { Crypto, IEncryptedContent, IEventDecryptionResult, IncomingRoomKeyRequest } from "..";
 import { DeviceInfo } from "../deviceinfo";
 import { IRoomEncryption } from "../RoomList";
 

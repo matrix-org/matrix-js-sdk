@@ -20,6 +20,7 @@ limitations under the License.
 
 import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent, Optional } from "matrix-events-sdk";
 
+import type { IMegolmSessionData } from "./@types/crypto";
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import {
     EventStatus,
@@ -74,7 +75,6 @@ import {
     ICryptoCallbacks,
     IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
-    IMegolmSessionData,
     isCryptoAvailable,
     VerificationMethod,
     IRoomKeyRequestBody,
@@ -3033,10 +3033,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    session export objects
      */
     public exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             return Promise.reject(new Error("End-to-end encryption disabled"));
         }
-        return this.crypto.exportRoomKeys();
+        return this.cryptoBackend.exportRoomKeys();
     }
 
     /**
