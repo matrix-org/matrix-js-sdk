@@ -125,7 +125,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
         this.room.on(RoomEvent.Redaction, this.onRedaction);
-        this.room.on(RoomEvent.LocalEchoUpdated, this.onEcho);
+        this.room.on(RoomEvent.LocalEchoUpdated, this.onLocalEcho);
         this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
 
         this.processReceipts(opts.receipts);
@@ -201,15 +201,19 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         if (!toStartOfTimeline) {
             room!.addLocalEchoReceipt(event.getSender()!, event, ReceiptType.Read);
         }
-        this.onEcho(event);
+        this.onEcho(event, toStartOfTimeline ?? false);
     };
 
-    private onEcho = async (event: MatrixEvent): Promise<void> => {
-        if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
-        if (this.lastEvent === event) return;
-        if (!event.isRelation(THREAD_RELATION_TYPE.name)) return;
+    private onLocalEcho = (event: MatrixEvent): void => {
+        this.onEcho(event, false);
+    };
 
+    private onEcho = async (event: MatrixEvent, toStartOfTimeline: boolean): Promise<void> => {
+        if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
+        if (this.lastEvent === event) return; // ignore duplicate events
         await this.updateThreadMetadata();
+        if (!event.isRelation(THREAD_RELATION_TYPE.name)) return; // don't send a new reply event for reactions or edits
+        if (toStartOfTimeline) return; // ignore messages added to the start of the timeline
         this.emit(ThreadEvent.NewReply, this, event);
     };
 
@@ -257,9 +261,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.addEventToTimeline(event, toStartOfTimeline);
 
             this.client.decryptEventIfNeeded(event, {});
-        } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
-            await this.fetchEditsWhereNeeded(event);
+        } else if (!toStartOfTimeline && isNewestReply) {
             this.addEventToTimeline(event, false);
+            this.fetchEditsWhereNeeded(event);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
             // Apply annotations and replace relations to the relations of the timeline only
             this.timelineSet.relations?.aggregateParentEvent(event);
@@ -317,9 +321,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
-            const mapper = this.client.getEventMapper();
             // re-insert roomId
-            this.lastEvent = mapper({
+            this.lastEvent = new MatrixEvent({
                 ...bundledRelationship.latest_event,
                 room_id: this.roomId,
             });
@@ -420,11 +423,6 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * Finds an event by ID in the current thread
      */
     public findEventById(eventId: string): MatrixEvent | undefined {
-        // Check the lastEvent as it may have been created based on a bundled relationship and not in a timeline
-        if (this.lastEvent?.getId() === eventId) {
-            return this.lastEvent;
-        }
-
         return this.timelineSet.findEventById(eventId);
     }
 
@@ -455,7 +453,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     }
 
     /**
-     * A getter for the last event added to the thread, if known.
+     * A getter for the last event of the thread.
+     * This might be a synthesized event, if so, it will not emit any events to listeners.
      */
     public get replyToEvent(): Optional<MatrixEvent> {
         return this.lastPendingEvent ?? this.lastEvent ?? this.lastReply();
