@@ -20,6 +20,8 @@ describe("MemoryStore", () => {
     const event1 = new MatrixEvent({ type: "event1-type", content: { test: 1 } });
     const event2 = new MatrixEvent({ type: "event2-type", content: { test: 1 } });
     const event3 = new MatrixEvent({ type: "event3-type", content: { test: 1 } });
+    const event4 = new MatrixEvent({ type: "event4-type", content: { test: 1 } });
+    const event4Updated = new MatrixEvent({ type: "event4-type", content: { test: 2 } });
     const event1Empty = new MatrixEvent({ type: "event1-type", content: {} });
 
     describe("account data", () => {
@@ -38,15 +40,17 @@ describe("MemoryStore", () => {
         it("updates account data events correctly", () => {
             const store = new MemoryStore();
             // init store with event1, event2
-            store.storeAccountDataEvents([event1, event2]);
+            store.storeAccountDataEvents([event1, event2, event4]);
             // remove event1, add event3
-            store.storeAccountDataEvents([event1Empty, event3]);
-            // updated to new version
-            expect(store.getAccountData(event1.getType())).toEqual(event1Empty);
+            store.storeAccountDataEvents([event1Empty, event3, event4Updated]);
+            // removed
+            expect(store.getAccountData(event1.getType())).toEqual(undefined);
             // not removed
             expect(store.getAccountData(event2.getType())).toEqual(event2);
             // added
             expect(store.getAccountData(event3.getType())).toEqual(event3);
+            // updated
+            expect(store.getAccountData(event4.getType())).toEqual(event4Updated);
         });
 
         it("removes all account data from state on deleteAllData", async () => {

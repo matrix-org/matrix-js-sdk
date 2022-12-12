@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { IServerVersions } from "./client";
+
 export enum ServerSupport {
     Stable,
     Unstable,
@@ -49,7 +51,7 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     },
 };
 
-export async function buildFeatureSupportMap(versions: IServer3391Versions): Promise<Map<Feature, ServerSupport>> {
+export async function buildFeatureSupportMap(versions: IServerVersions): Promise<Map<Feature, ServerSupport>> {
     const supportMap = new Map<Feature, ServerSupport>();
     for (const [feature, supportCondition] of Object.entries(featureSupportResolver)) {
         const supportMatrixVersion = versions.versions?.includes(supportCondition.matrixVersion || "") ?? false;
