@@ -491,9 +491,16 @@ describe("megolm", () => {
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const pendingMsg = room.getPendingEvents()[0];
 
+        const inboundGroupSessionPromise = expectSendRoomKey(
+            aliceTestClient.httpBackend,
+            "@bob:xyz",
+            testOlmAccount,
+            p2pSession,
+        );
+
         await Promise.all([
             aliceTestClient.client.resendEvent(pendingMsg, room),
-            expectSendKeyAndMessage(aliceTestClient.httpBackend, "@bob:xyz", testOlmAccount, p2pSession),
+            expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise),
         ]);
     });
 
@@ -1369,38 +1376,6 @@ async function establishOlmSession(aliceTestClient: TestClient, bobOlmAccount: O
     });
     await aliceTestClient.flushSync();
     return p2pSession;
-}
-
-/**
- * Expect that the client shares keys with the given recipient, and sends a room message which is decryptable.
- *
- * The sender is expected to send a message in the test room, and to share the room keys with `recipientUserID`'s
- * device called DEVICE_ID.
- *
- * @param senderMockHttpBackend - MockHttpBackend for the sender
- *
- * @param recipientUserID - the user id of the expected recipient
- *
- * @param recipientOlmAccount - Olm.Account for the recipient
- *
- * @param recipientOlmSession - an Olm.Session for the recipient, which must already have exchanged pre-key
- *    messages with the sender. Alternatively, null, in which case we will expect a pre-key message.
- *
- * @returns The content of the successfully-decrypted event
- */
-async function expectSendKeyAndMessage(
-    senderMockHttpBackend: MockHttpBackend,
-    recipientUserID: string,
-    recipientOlmAccount: Olm.Account,
-    recipientOlmSession: Olm.Session | null = null,
-): Promise<Partial<IEvent>> {
-    const inboundGroupSessionPromise = expectSendRoomKey(
-        senderMockHttpBackend,
-        recipientUserID,
-        recipientOlmAccount,
-        recipientOlmSession,
-    );
-    return await expectSendMegolmMessage(senderMockHttpBackend, inboundGroupSessionPromise);
 }
 
 /**
