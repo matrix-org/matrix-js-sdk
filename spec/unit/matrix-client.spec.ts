@@ -57,6 +57,7 @@ import {
 import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
 import { QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
+import * as featureUtils from "../../src/feature";
 
 jest.useFakeTimers();
 
@@ -1830,7 +1831,10 @@ describe("MatrixClient", function () {
     });
 
     describe("delete account data", () => {
-        it("makes correct request when deletion is supported by server", async () => {
+        afterEach(() => {
+            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockRestore();
+        });
+        it("makes correct request when deletion is supported by server in unstable versions", async () => {
             const eventType = "im.vector.test";
             const versionsResponse = {
                 versions: ["1"],
@@ -1850,6 +1854,23 @@ describe("MatrixClient", function () {
             expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, {
                 prefix: unstablePrefix,
             });
+        });
+
+        it("makes correct request when deletion is supported by server based on matrix version", async () => {
+            const eventType = "im.vector.test";
+            // we don't have a stable version for account data deletion yet to test this code path with
+            // so mock the support map to fake stable support
+            const stableSupportedDeletionMap = new Map();
+            stableSupportedDeletionMap.set(featureUtils.Feature.AccountDataDeletion, featureUtils.ServerSupport.Stable);
+            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(new Map());
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+
+            // populate version support
+            await client.getVersions();
+            await client.deleteAccountData(eventType);
+
+            expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, undefined);
         });
 
         it("makes correct request when deletion is not supported by server", async () => {

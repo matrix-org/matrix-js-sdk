@@ -3765,10 +3765,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public async deleteAccountData(eventType: string): Promise<void> {
-        const supportsMsc3391DeleteAccountData =
-            this.canSupport.get(Feature.AccountDataDeletion) !== ServerSupport.Unsupported;
+        const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
         // if deletion is not supported overwrite with empty content
-        if (!supportsMsc3391DeleteAccountData) {
+        if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
             await this.setAccountData(eventType, {});
             return;
         }
@@ -3776,9 +3775,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $userId: this.credentials.userId!,
             $type: eventType,
         });
-        return await this.http.authedRequest(Method.Delete, path, undefined, undefined, {
-            prefix: "/_matrix/client/unstable/org.matrix.msc3391",
-        });
+        const options =
+            msc3391DeleteAccountDataServerSupport === ServerSupport.Unstable
+                ? { prefix: "/_matrix/client/unstable/org.matrix.msc3391" }
+                : undefined;
+        return await this.http.authedRequest(Method.Delete, path, undefined, undefined, options);
     }
 
     /**
