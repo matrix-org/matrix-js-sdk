@@ -204,6 +204,113 @@ function getSyncResponse(roomMembers: string[]): ISyncResponse {
     };
 }
 
+/**
+ * Establish an Olm Session with the test user
+ *
+ * Waits for the test user to upload their keys, then sends a /sync response with a to-device message which will
+ * establish an Olm session.
+ */
+async function establishOlmSession(aliceTestClient: TestClient, bobOlmAccount: Olm.Account): Promise<Olm.Session> {
+    const bobE2eKeys = JSON.parse(bobOlmAccount.identity_keys());
+    const p2pSession = await createOlmSession(bobOlmAccount, aliceTestClient);
+    const olmEvent = encryptOlmEvent({
+        senderKey: bobE2eKeys.curve25519,
+        recipient: aliceTestClient,
+        p2pSession: p2pSession,
+    });
+    aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        next_batch: 1,
+        to_device: { events: [olmEvent] },
+    });
+    await aliceTestClient.flushSync();
+    return p2pSession;
+}
+
+/**
+ * Expect that the client shares keys with the given recipient
+ *
+ * Waits for an HTTP request to send the encrypted m.room_key to-device message; decrypts it and uses it
+ * to establish an Olm InboundGroupSession.
+ *
+ * @param senderMockHttpBackend - MockHttpBackend for the sender
+ *
+ * @param recipientUserID - the user id of the expected recipient
+ *
+ * @param recipientOlmAccount - Olm.Account for the recipient
+ *
+ * @param recipientOlmSession - an Olm.Session for the recipient, which must already have exchanged pre-key
+ *    messages with the sender. Alternatively, null, in which case we will expect a pre-key message.
+ *
+ * @returns the established inbound group session
+ */
+async function expectSendRoomKey(
+    senderMockHttpBackend: MockHttpBackend,
+    recipientUserID: string,
+    recipientOlmAccount: Olm.Account,
+    recipientOlmSession: Olm.Session | null = null,
+): Promise<Olm.InboundGroupSession> {
+    const Olm = global.Olm;
+    const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
+
+    let inboundGroupSession: Olm.InboundGroupSession;
+
+    senderMockHttpBackend.when("PUT", "/sendToDevice/m.room.encrypted/").respond(200, (_path, content: any) => {
+        const m = content.messages[recipientUserID].DEVICE_ID;
+        const ct = m.ciphertext[testRecipientKey];
+
+        if (!recipientOlmSession) {
+            expect(ct.type).toEqual(0); // pre-key message
+            recipientOlmSession = new Olm.Session();
+            recipientOlmSession.create_inbound(recipientOlmAccount, ct.body);
+        } else {
+            expect(ct.type).toEqual(1); // regular message
+        }
+
+        const decrypted = JSON.parse(recipientOlmSession.decrypt(ct.type, ct.body));
+        expect(decrypted.type).toEqual("m.room_key");
+        inboundGroupSession = new Olm.InboundGroupSession();
+        inboundGroupSession.create(decrypted.content.session_key);
+        return {};
+    });
+
+    expect(await senderMockHttpBackend.flush("/sendToDevice/m.room.encrypted/", 1, 1000)).toEqual(1);
+    return inboundGroupSession!;
+}
+
+/**
+ * Expect that the client sends an encrypted event
+ *
+ * Waits for an HTTP request to send an encrypted message in the test room.
+ *
+ * @param senderMockHttpBackend - MockHttpBackend for the sender
+ *
+ * @param inboundGroupSessionPromise - a promise for an Olm InboundGroupSession, which will
+ *    be used to decrypt the event. We will wait for this to resolve once the HTTP request has been processed.
+ *
+ * @returns The content of the successfully-decrypted event
+ */
+async function expectSendMegolmMessage(
+    senderMockHttpBackend: MockHttpBackend,
+    inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
+): Promise<Partial<IEvent>> {
+    let encryptedMessageContent: IContent | null = null;
+    senderMockHttpBackend.when("PUT", "/send/m.room.encrypted/").respond(200, function (_path, content: IContent) {
+        encryptedMessageContent = content;
+        return {
+            event_id: "$event_id",
+        };
+    });
+
+    expect(await senderMockHttpBackend.flush("/send/m.room.encrypted/", 1, 1000)).toEqual(1);
+
+    // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
+    const inboundGroupSession = await inboundGroupSessionPromise;
+
+    const r: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
+    logger.log("Decrypted received megolm message", r);
+    return JSON.parse(r.plaintext);
+}
+
 describe("megolm", () => {
     if (!global.Olm) {
         logger.warn("not running megolm tests: Olm not present");
@@ -1355,110 +1462,3 @@ describe("megolm", () => {
         ]);
     });
 });
-
-/**
- * Establish an Olm Session with the test user
- *
- * Waits for the test user to upload their keys, then sends a /sync response with a to-device message which will
- * establish an Olm session.
- */
-async function establishOlmSession(aliceTestClient: TestClient, bobOlmAccount: Olm.Account): Promise<Olm.Session> {
-    const bobE2eKeys = JSON.parse(bobOlmAccount.identity_keys());
-    const p2pSession = await createOlmSession(bobOlmAccount, aliceTestClient);
-    const olmEvent = encryptOlmEvent({
-        senderKey: bobE2eKeys.curve25519,
-        recipient: aliceTestClient,
-        p2pSession: p2pSession,
-    });
-    aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
-        next_batch: 1,
-        to_device: { events: [olmEvent] },
-    });
-    await aliceTestClient.flushSync();
-    return p2pSession;
-}
-
-/**
- * Expect that the client shares keys with the given recipient
- *
- * Waits for an HTTP request to send the encrypted m.room_key to-device message; decrypts it and uses it
- * to establish an Olm InboundGroupSession.
- *
- * @param senderMockHttpBackend - MockHttpBackend for the sender
- *
- * @param recipientUserID - the user id of the expected recipient
- *
- * @param recipientOlmAccount - Olm.Account for the recipient
- *
- * @param recipientOlmSession - an Olm.Session for the recipient, which must already have exchanged pre-key
- *    messages with the sender. Alternatively, null, in which case we will expect a pre-key message.
- *
- * @returns the established inbound group session
- */
-async function expectSendRoomKey(
-    senderMockHttpBackend: MockHttpBackend,
-    recipientUserID: string,
-    recipientOlmAccount: Olm.Account,
-    recipientOlmSession: Olm.Session | null = null,
-): Promise<Olm.InboundGroupSession> {
-    const Olm = global.Olm;
-    const testRecipientKey = JSON.parse(recipientOlmAccount.identity_keys())["curve25519"];
-
-    let inboundGroupSession: Olm.InboundGroupSession;
-
-    senderMockHttpBackend.when("PUT", "/sendToDevice/m.room.encrypted/").respond(200, (_path, content: any) => {
-        const m = content.messages[recipientUserID].DEVICE_ID;
-        const ct = m.ciphertext[testRecipientKey];
-
-        if (!recipientOlmSession) {
-            expect(ct.type).toEqual(0); // pre-key message
-            recipientOlmSession = new Olm.Session();
-            recipientOlmSession.create_inbound(recipientOlmAccount, ct.body);
-        } else {
-            expect(ct.type).toEqual(1); // regular message
-        }
-
-        const decrypted = JSON.parse(recipientOlmSession.decrypt(ct.type, ct.body));
-        expect(decrypted.type).toEqual("m.room_key");
-        inboundGroupSession = new Olm.InboundGroupSession();
-        inboundGroupSession.create(decrypted.content.session_key);
-        return {};
-    });
-
-    expect(await senderMockHttpBackend.flush("/sendToDevice/m.room.encrypted/", 1, 1000)).toEqual(1);
-    return inboundGroupSession!;
-}
-
-/**
- * Expect that the client sends an encrypted event
- *
- * Waits for an HTTP request to send an encrypted message in the test room.
- *
- * @param senderMockHttpBackend - MockHttpBackend for the sender
- *
- * @param inboundGroupSessionPromise - a promise for an Olm InboundGroupSession, which will
- *    be used to decrypt the event. We will wait for this to resolve once the HTTP request has been processed.
- *
- * @returns The content of the successfully-decrypted event
- */
-async function expectSendMegolmMessage(
-    senderMockHttpBackend: MockHttpBackend,
-    inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
-): Promise<Partial<IEvent>> {
-    let encryptedMessageContent: IContent | null = null;
-    senderMockHttpBackend.when("PUT", "/send/m.room.encrypted/").respond(200, function (_path, content: IContent) {
-        encryptedMessageContent = content;
-        return {
-            event_id: "$event_id",
-        };
-    });
-
-    expect(await senderMockHttpBackend.flush("/send/m.room.encrypted/", 1, 1000)).toEqual(1);
-
-    // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
-    const inboundGroupSession = await inboundGroupSessionPromise;
-
-    const r: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
-    logger.log("Decrypted received megolm message", r);
-    return JSON.parse(r.plaintext);
-}
