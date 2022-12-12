@@ -1970,32 +1970,32 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                 const negotiate = json.content as FocusNegotiateEvent;
                 this.updateRemoteSDPStreamMetadata(negotiate[SDPStreamMetadataKeyStable]!);
+                
+                if (!["offer", "answer"].includes(negotiate.description.type)) {
+                    throw new Error("Unknown description type - ignoring");
+                }
+
+                try {
+                    await this.peerConn!.setRemoteDescription(negotiate.description);
+                } catch (error) {
+                    logger.debug(`Call ${this.callId} Failed to set remote description`, error);
+                    this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
+                    return;
+                }
 
                 if (negotiate.description.type === "offer") {
                     try {
-                        await this.peerConn!.setRemoteDescription({
-                            "type": "offer",
-                            "sdp": negotiate.description.sdp,
-                        });
-
                         const answer = await this.peerConn!.createAnswer();
                         await this.peerConn!.setLocalDescription(answer);
 
                         this.sendFocusEvent(EventType.CallNegotiate, {
                             description: answer,
                         } as FocusNegotiateEvent);
-                    } catch (e) {
-                        logger.debug(`Call ${this.callId} Failed to set remote description`, e);
-                        this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
+                    } catch (error) {
+                        logger.debug(`Call ${this.callId} Failed to set local description`, error);
+                        this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, false);
                         return;
                     }
-                } else if (negotiate.description.type === "answer") {
-                    await this.peerConn!.setRemoteDescription({
-                        type: "answer",
-                        sdp: negotiate.description.sdp,
-                    });
-                } else {
-                    throw new Error("Unknown description type - ignoring");
                 }
             }
                 break;
