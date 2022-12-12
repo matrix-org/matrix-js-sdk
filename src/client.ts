@@ -2086,10 +2086,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Initialise support for end-to-end encryption in this client, using the rust matrix-sdk-crypto.
      *
-     * An alternative to initCrypto.
+     * An alternative to {@link initCrypto}.
      *
-     * It will return a Promise which will resolve when the crypto layer has been
-     * successfully initialised.
+     * *WARNING*: this API is very experimental and should not yet be used in production code! Eventually
+     *    it will be deprecated and `initCrypto` will do the same thing.
+     *
+     * @returns a Promise which will resolve when the crypto layer has been
+     *    successfully initialised.
      */
     public async initRustCrypto(): Promise<void> {
         if (this.cryptoBackend) {
