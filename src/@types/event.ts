@@ -42,6 +42,7 @@ export enum EventType {
     RoomMessage = "m.room.message",
     RoomMessageEncrypted = "m.room.encrypted",
     Sticker = "m.sticker",
+
     CallInvite = "m.call.invite",
     CallCandidates = "m.call.candidates",
     CallAnswer = "m.call.answer",
@@ -54,6 +55,10 @@ export enum EventType {
     CallReplaces = "m.call.replaces",
     CallAssertedIdentity = "m.call.asserted_identity",
     CallAssertedIdentityPrefix = "org.matrix.call.asserted_identity",
+    CallTrackSubscription = "m.call.track_subscription",
+    CallPing = "m.call.ping",
+    CallPong = "m.call.pong",
+
     KeyVerificationRequest = "m.key.verification.request",
     KeyVerificationStart = "m.key.verification.start",
     KeyVerificationCancel = "m.key.verification.cancel",
