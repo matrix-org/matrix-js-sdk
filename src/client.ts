@@ -3764,6 +3764,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
+    public async deleteAccountData(eventType: string): Promise<void> {
+        const path = utils.encodeUri("/user/$userId/account_data/$type", {
+            $userId: this.credentials.userId!,
+            $type: eventType,
+        });
+        return await this.http.authedRequest(
+            Method.Delete,
+            path,
+            undefined,
+            undefined,
+            {
+                prefix: "/_matrix/client/unstable/org.matrix.msc3391",
+            },
+        );
+    }
+
     /**
      * Gets the users that are ignored by this client
      * @returns The array of users that are ignored (empty if none)

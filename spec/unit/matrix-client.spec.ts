@@ -1828,4 +1828,23 @@ describe("MatrixClient", function () {
             expect(client.getUseE2eForGroupCall()).toBe(false);
         });
     });
+
+    describe('delete account data', () => {
+        it('makes correct request', async () => {
+            const eventType = 'im.vector.test';
+            const requestSpy = jest.spyOn(client.http, 'authedRequest').mockImplementation(() => Promise.resolve());
+            const unstablePrefix = "/_matrix/client/unstable/org.matrix.msc3391";
+            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+
+            await client.deleteAccountData(eventType);
+
+            expect(requestSpy).toHaveBeenCalledWith(
+                Method.Delete,
+                path,
+                undefined,
+                undefined,
+                { prefix: unstablePrefix }
+            );
+        });
+    });
 });
