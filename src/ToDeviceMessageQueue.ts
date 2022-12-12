@@ -16,7 +16,8 @@ limitations under the License.
 
 import { ToDeviceMessageId } from "./@types/event";
 import { logger } from "./logger";
-import { MatrixError, MatrixClient, ClientEvent } from "./matrix";
+import { MatrixClient, ClientEvent } from "./client";
+import { MatrixError } from "./http-api";
 import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage";
 import { MatrixScheduler } from "./scheduler";
 import { SyncState } from "./sync";
