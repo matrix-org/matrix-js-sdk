@@ -692,9 +692,16 @@ describe("megolm", () => {
             const room = aliceTestClient.client.getRoom(ROOM_ID)!;
             const pendingMsg = room.getPendingEvents()[0];
 
+            const inboundGroupSessionPromise = expectSendRoomKey(
+                aliceTestClient.httpBackend,
+                "@bob:xyz",
+                testOlmAccount,
+                p2pSession,
+            );
+
             await Promise.all([
                 aliceTestClient.client.resendEvent(pendingMsg, room),
-                expectSendKeyAndMessage(aliceTestClient.httpBackend, "@bob:xyz", testOlmAccount, p2pSession),
+                expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise),
             ]);
         });
     });
@@ -750,14 +757,19 @@ describe("megolm", () => {
             d.verified = DeviceInfo.DeviceVerification.VERIFIED;
             aliceTestClient.client.crypto?.deviceList.storeDevicesForUser("@bob:xyz", { DEVICE_ID: d });
 
+            const inboundGroupSessionPromise = expectSendRoomKey(
+                aliceTestClient.httpBackend,
+                "@bob:xyz",
+                testOlmAccount,
+                p2pSession,
+            );
+
             logger.log("Asking alice to re-send");
             await Promise.all([
-                expectSendKeyAndMessage(aliceTestClient.httpBackend, "@bob:xyz", testOlmAccount, p2pSession).then(
-                    (decrypted) => {
-                        expect(decrypted.type).toEqual("m.room.message");
-                        expect(decrypted.content!.body).toEqual("test");
-                    },
-                ),
+                expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise).then((decrypted) => {
+                    expect(decrypted.type).toEqual("m.room.message");
+                    expect(decrypted.content!.body).toEqual("test");
+                }),
                 aliceTestClient.client.sendTextMessage(ROOM_ID, "test"),
             ]);
         });
