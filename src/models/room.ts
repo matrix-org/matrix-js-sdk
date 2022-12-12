@@ -2090,9 +2090,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // If we jump to an event in a thread where neither the event, nor the root,
         // nor any thread event are loaded yet, we'll load the event as well as the thread root, create the thread,
         // and pass the event through this.
-        for (const event of events) {
-            thread.setEventMetadata(event);
-        }
+        thread.addEvents(events, false);
 
         // If we managed to create a thread and figure out its `id` then we can use it
         this.threads.set(thread.id, thread);
