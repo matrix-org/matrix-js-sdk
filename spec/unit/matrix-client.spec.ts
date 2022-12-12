@@ -1829,22 +1829,47 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe('delete account data', () => {
-        it('makes correct request', async () => {
-            const eventType = 'im.vector.test';
-            const requestSpy = jest.spyOn(client.http, 'authedRequest').mockImplementation(() => Promise.resolve());
+    describe("delete account data", () => {
+        it("makes correct request when deletion is supported by server", async () => {
+            const eventType = "im.vector.test";
+            const versionsResponse = {
+                versions: ["1"],
+                unstable_features: {
+                    "org.matrix.msc3391": true,
+                },
+            };
+            jest.spyOn(client.http, "request").mockResolvedValue(versionsResponse);
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
             const unstablePrefix = "/_matrix/client/unstable/org.matrix.msc3391";
             const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
 
+            // populate version support
+            await client.getVersions();
             await client.deleteAccountData(eventType);
 
-            expect(requestSpy).toHaveBeenCalledWith(
-                Method.Delete,
-                path,
-                undefined,
-                undefined,
-                { prefix: unstablePrefix }
-            );
+            expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, {
+                prefix: unstablePrefix,
+            });
+        });
+
+        it("makes correct request when deletion is not supported by server", async () => {
+            const eventType = "im.vector.test";
+            const versionsResponse = {
+                versions: ["1"],
+                unstable_features: {
+                    "org.matrix.msc3391": false,
+                },
+            };
+            jest.spyOn(client.http, "request").mockResolvedValue(versionsResponse);
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+
+            // populate version support
+            await client.getVersions();
+            await client.deleteAccountData(eventType);
+
+            // account data updated with empty content
+            expect(requestSpy).toHaveBeenCalledWith(Method.Put, path, undefined, {});
         });
     });
 });
