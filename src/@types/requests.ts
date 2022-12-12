@@ -21,7 +21,7 @@ import { IRoomEventFilter } from "../filter";
 import { Direction } from "../models/event-timeline";
 import { PushRuleAction } from "./PushRules";
 import { IRoomEvent } from "../sync-accumulator";
-import { EventType, RoomType } from "./event";
+import { EventType, RelationType, RoomType } from "./event";
 
 // allow camelcase as these are things that go onto the wire
 /* eslint-disable camelcase */
@@ -47,6 +47,8 @@ export interface IJoinRoomOpts {
 
 export interface IRedactOpts {
     reason?: string;
+    // also delete related events, if the server supports it (MSC3912)
+    with_relations?: Array<RelationType | string>;
 }
 
 export interface ISendEventResponse {
