@@ -336,7 +336,8 @@ describe("MatrixClient", function () {
             await client.timestampToEvent(roomId, 0, Direction.Forward);
 
             expect(mocked(client.http.authedRequest).mock.calls.length).toStrictEqual(1);
-            const [method, path, queryParams, , { prefix }] = mocked(client.http.authedRequest).mock.calls[0];
+            const [method, path, queryParams, , { prefix } = { prefix: undefined }] = mocked(client.http.authedRequest)
+                .mock.calls[0];
             expect(method).toStrictEqual("GET");
             expect(prefix).toStrictEqual(ClientPrefix.V1);
             expect(path).toStrictEqual(`/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`);
@@ -376,9 +377,8 @@ describe("MatrixClient", function () {
             await client.timestampToEvent(roomId, 0, Direction.Forward);
 
             expect(mocked(client.http.authedRequest).mock.calls.length).toStrictEqual(2);
-            const [stableMethod, stablePath, stableQueryParams, , { prefix: stablePrefix }] = mocked(
-                client.http.authedRequest,
-            ).mock.calls[0];
+            const [stableMethod, stablePath, stableQueryParams, , { prefix: stablePrefix } = { prefix: undefined }] =
+                mocked(client.http.authedRequest).mock.calls[0];
             expect(stableMethod).toStrictEqual("GET");
             expect(stablePrefix).toStrictEqual(ClientPrefix.V1);
             expect(stablePath).toStrictEqual(`/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`);
@@ -387,9 +387,13 @@ describe("MatrixClient", function () {
                 dir: "f",
             });
 
-            const [unstableMethod, unstablePath, unstableQueryParams, , { prefix: unstablePrefix }] = mocked(
-                client.http.authedRequest,
-            ).mock.calls[1];
+            const [
+                unstableMethod,
+                unstablePath,
+                unstableQueryParams,
+                ,
+                { prefix: unstablePrefix } = { prefix: undefined },
+            ] = mocked(client.http.authedRequest).mock.calls[1];
             expect(unstableMethod).toStrictEqual("GET");
             expect(unstablePrefix).toStrictEqual(unstableMSC3030Prefix);
             expect(unstablePath).toStrictEqual(`/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`);
@@ -419,7 +423,8 @@ describe("MatrixClient", function () {
             await expect(client.timestampToEvent(roomId, 0, Direction.Forward)).rejects.toBeDefined();
 
             expect(mocked(client.http.authedRequest).mock.calls.length).toStrictEqual(1);
-            const [method, path, queryParams, , { prefix }] = mocked(client.http.authedRequest).mock.calls[0];
+            const [method, path, queryParams, , { prefix } = { prefix: undefined }] = mocked(client.http.authedRequest)
+                .mock.calls[0];
             expect(method).toStrictEqual("GET");
             expect(prefix).toStrictEqual(ClientPrefix.V1);
             expect(path).toStrictEqual(`/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`);
