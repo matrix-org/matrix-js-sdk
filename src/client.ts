@@ -3785,7 +3785,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return;
         }
         const path = utils.encodeUri("/user/$userId/account_data/$type", {
-            $userId: this.credentials.userId!,
+            $userId: this.getSafeUserId(),
             $type: eventType,
         });
         const options =
