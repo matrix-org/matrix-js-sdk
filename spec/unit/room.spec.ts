@@ -2440,7 +2440,6 @@ describe("Room", function () {
         });
 
         it("returns the same model when creating a thread twice", () => {
-
             const { thread, rootEvent } = mkThread({
                 room,
                 client: new TestClient().client,
@@ -2453,7 +2452,6 @@ describe("Room", function () {
             const duplicateThread = room.createThread(rootEvent.getId()!, rootEvent, [], false);
 
             expect(duplicateThread).toBe(thread);
-
         });
 
         it("creating thread from edited event should not conflate old versions of the event", () => {
