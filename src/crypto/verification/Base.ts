@@ -19,10 +19,10 @@ limitations under the License.
  * Base class for verification methods.
  */
 
-import { MatrixEvent } from '../../models/event';
-import { EventType } from '../../@types/event';
-import { logger } from '../../logger';
-import { DeviceInfo } from '../deviceinfo';
+import { MatrixEvent } from "../../models/event";
+import { EventType } from "../../@types/event";
+import { logger } from "../../logger";
+import { DeviceInfo } from "../deviceinfo";
 import { newTimeoutError } from "./Error";
 import { KeysDuringVerification, requestKeysDuringVerification } from "../CrossSigning";
 import { IVerificationChannel } from "./request/Channel";
@@ -108,8 +108,7 @@ export class VerificationBase<
         }
         const sender = this.startEvent.getSender();
         const content = this.startEvent.getContent();
-        return sender === this.baseApis.getUserId() &&
-            content.from_device === this.baseApis.getDeviceId();
+        return sender === this.baseApis.getUserId() && content.from_device === this.baseApis.getDeviceId();
     }
 
     public get hasBeenCancelled(): boolean {
@@ -162,8 +161,7 @@ export class VerificationBase<
 
     public switchStartEvent(event: MatrixEvent): void {
         if (this.canSwitchStartEvent(event)) {
-            logger.log("Verification Base: switching verification start event",
-                { restartingFlow: !!this.rejectEvent });
+            logger.log("Verification Base: switching verification start event", { restartingFlow: !!this.rejectEvent });
             if (this.rejectEvent) {
                 const reject = this.rejectEvent;
                 this.rejectEvent = undefined;
@@ -193,8 +191,7 @@ export class VerificationBase<
             if (reject) {
                 const content = e.getContent();
                 const { reason, code } = content;
-                reject(new Error(`Other side cancelled verification ` +
-                    `because ${reason} (${code})`));
+                reject(new Error(`Other side cancelled verification ` + `because ${reason} (${code})`));
             }
         } else if (this.expectedEvent) {
             // only cancel if there is an event expected.
@@ -202,8 +199,7 @@ export class VerificationBase<
             // and we're just replaying the timeline events when syncing
             // after a refresh when the events haven't been stored in the cache yet.
             const exception = new Error(
-                "Unexpected message: expecting " + this.expectedEvent
-                    + " but got " + e.getType(),
+                "Unexpected message: expecting " + this.expectedEvent + " but got " + e.getType(),
             );
             this.expectedEvent = undefined;
             if (this.rejectEvent) {
@@ -241,8 +237,7 @@ export class VerificationBase<
                         const content = e.getContent();
                         if (e.getType() === EventType.KeyVerificationCancel) {
                             content.code = content.code || "m.unknown";
-                            content.reason = content.reason || content.body
-                                || "Unknown reason";
+                            content.reason = content.reason || content.body || "Unknown reason";
                             this.send(EventType.KeyVerificationCancel, content);
                         } else {
                             this.send(EventType.KeyVerificationCancel, {
@@ -303,7 +298,9 @@ export class VerificationBase<
                     reject(new Error("Device ID is the same as the cross-signing ID"));
                 }
                 resolve();
-            }).then(() => this.doVerification!()).then(this.done.bind(this), this.cancel.bind(this));
+            })
+                .then(() => this.doVerification!())
+                .then(this.done.bind(this), this.cancel.bind(this));
         }
         return this.promise;
     }
@@ -317,7 +314,7 @@ export class VerificationBase<
         const verifiedDevices: [string, string, string][] = [];
 
         for (const [keyId, keyInfo] of Object.entries(keys)) {
-            const deviceId = keyId.split(':', 2)[1];
+            const deviceId = keyId.split(":", 2)[1];
             const device = this.baseApis.getStoredDevice(userId, deviceId);
             if (device) {
                 verifier(keyId, device, keyInfo);
@@ -325,16 +322,21 @@ export class VerificationBase<
             } else {
                 const crossSigningInfo = this.baseApis.crypto!.deviceList.getStoredCrossSigningForUser(userId);
                 if (crossSigningInfo && crossSigningInfo.getId() === deviceId) {
-                    verifier(keyId, DeviceInfo.fromStorage({
-                        keys: {
-                            [keyId]: deviceId,
-                        },
-                    }, deviceId), keyInfo);
+                    verifier(
+                        keyId,
+                        DeviceInfo.fromStorage(
+                            {
+                                keys: {
+                                    [keyId]: deviceId,
+                                },
+                            },
+                            deviceId,
+                        ),
+                        keyInfo,
+                    );
                     verifiedDevices.push([deviceId, keyId, deviceId]);
                 } else {
-                    logger.warn(
-                        `verification: Could not find device ${deviceId} to verify`,
-                    );
+                    logger.warn(`verification: Could not find device ${deviceId} to verify`);
                 }
             }
         }
@@ -345,10 +347,7 @@ export class VerificationBase<
             throw new Error("No devices could be verified");
         }
 
-        logger.info(
-            "Verification completed! Marking devices verified: ",
-            verifiedDevices,
-        );
+        logger.info("Verification completed! Marking devices verified: ", verifiedDevices);
         // TODO: There should probably be a batch version of this, otherwise it's going
         // to upload each signature in a separate API call which is silly because the
         // API supports as many signatures as you like.

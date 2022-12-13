@@ -20,13 +20,17 @@ import type { MatrixClient } from "../../../src";
 import { RendezvousFailureReason } from "../../../src/rendezvous";
 import { MSC3886SimpleHttpRendezvousTransport } from "../../../src/rendezvous/transports";
 
-function makeMockClient(opts: { userId: string, deviceId: string, msc3886Enabled: boolean}): MatrixClient {
+function makeMockClient(opts: { userId: string; deviceId: string; msc3886Enabled: boolean }): MatrixClient {
     return {
         doesServerSupportUnstableFeature(feature: string) {
             return Promise.resolve(opts.msc3886Enabled && feature === "org.matrix.msc3886");
         },
-        getUserId() { return opts.userId; },
-        getDeviceId() { return opts.deviceId; },
+        getUserId() {
+            return opts.userId;
+        },
+        getDeviceId() {
+            return opts.deviceId;
+        },
         requestLoginToken() {
             return Promise.resolve({ login_token: "token" });
         },
@@ -34,11 +38,11 @@ function makeMockClient(opts: { userId: string, deviceId: string, msc3886Enabled
     } as unknown as MatrixClient;
 }
 
-describe("SimpleHttpRendezvousTransport", function() {
+describe("SimpleHttpRendezvousTransport", function () {
     let httpBackend: MockHttpBackend;
     let fetchFn: typeof global.fetch;
 
-    beforeEach(function() {
+    beforeEach(function () {
         httpBackend = new MockHttpBackend();
         fetchFn = httpBackend.fetchFn as typeof global.fetch;
     });
@@ -51,10 +55,11 @@ describe("SimpleHttpRendezvousTransport", function() {
     ) {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ client, fallbackRzServer, fetchFn });
-        { // initial POST
-            const expectedPostLocation = msc3886Enabled ?
-                `${client.baseUrl}/_matrix/client/unstable/org.matrix.msc3886/rendezvous` :
-                fallbackRzServer;
+        {
+            // initial POST
+            const expectedPostLocation = msc3886Enabled
+                ? `${client.baseUrl}/_matrix/client/unstable/org.matrix.msc3886/rendezvous`
+                : fallbackRzServer;
 
             const prom = simpleHttpTransport.send({});
             httpBackend.when("POST", expectedPostLocation).response = {
@@ -66,13 +71,14 @@ describe("SimpleHttpRendezvousTransport", function() {
                     },
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             await prom;
         }
         const details = await simpleHttpTransport.details();
         expect(details.uri).toBe(expectedFinalLocation);
 
-        { // first GET without etag
+        {
+            // first GET without etag
             const prom = simpleHttpTransport.receive();
             httpBackend.when("GET", expectedFinalLocation).response = {
                 body: {},
@@ -83,19 +89,19 @@ describe("SimpleHttpRendezvousTransport", function() {
                     },
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             expect(await prom).toEqual({});
             httpBackend.verifyNoOutstandingRequests();
             httpBackend.verifyNoOutstandingExpectation();
         }
     }
-    it("should throw an error when no server available", function() {
+    it("should throw an error when no server available", function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ client, fetchFn });
         expect(simpleHttpTransport.send({})).rejects.toThrowError("Invalid rendezvous URI");
     });
 
-    it("POST to fallback server", async function() {
+    it("POST to fallback server", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
@@ -112,11 +118,11 @@ describe("SimpleHttpRendezvousTransport", function() {
                 },
             },
         };
-        await httpBackend.flush('');
+        await httpBackend.flush("");
         expect(await prom).toStrictEqual(undefined);
     });
 
-    it("POST with no location", async function() {
+    it("POST with no location", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
@@ -132,19 +138,14 @@ describe("SimpleHttpRendezvousTransport", function() {
                 headers: {},
             },
         };
-        await httpBackend.flush('');
+        await httpBackend.flush("");
     });
 
-    it("POST with absolute path response", async function() {
-        await postAndCheckLocation(
-            false,
-            "https://fallbackserver/rz",
-            "/123",
-            "https://fallbackserver/123",
-        );
+    it("POST with absolute path response", async function () {
+        await postAndCheckLocation(false, "https://fallbackserver/rz", "/123", "https://fallbackserver/123");
     });
 
-    it("POST to built-in MSC3886 implementation", async function() {
+    it("POST to built-in MSC3886 implementation", async function () {
         await postAndCheckLocation(
             true,
             "https://fallbackserver/rz",
@@ -153,7 +154,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         );
     });
 
-    it("POST with relative path response including parent", async function() {
+    it("POST with relative path response including parent", async function () {
         await postAndCheckLocation(
             false,
             "https://fallbackserver/rz/abc",
@@ -162,7 +163,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         );
     });
 
-    it("POST with relative path response including parent", async function() {
+    it("POST with relative path response including parent", async function () {
         await postAndCheckLocation(
             false,
             "https://fallbackserver/rz/abc",
@@ -171,7 +172,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         );
     });
 
-    it("POST to follow 307 to other server", async function() {
+    it("POST to follow 307 to other server", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
@@ -198,18 +199,19 @@ describe("SimpleHttpRendezvousTransport", function() {
                 },
             },
         };
-        await httpBackend.flush('');
+        await httpBackend.flush("");
         expect(await prom).toStrictEqual(undefined);
     });
 
-    it("POST and GET", async function() {
+    it("POST and GET", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        { // initial POST
+        {
+            // initial POST
             const prom = simpleHttpTransport.send({ foo: "baa" });
             httpBackend.when("POST", "https://fallbackserver/rz").check(({ headers, data }) => {
                 expect(headers["content-type"]).toEqual("application/json");
@@ -223,10 +225,11 @@ describe("SimpleHttpRendezvousTransport", function() {
                     },
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(undefined);
         }
-        { // first GET without etag
+        {
+            // first GET without etag
             const prom = simpleHttpTransport.receive();
             httpBackend.when("GET", "https://fallbackserver/rz/123").response = {
                 body: { foo: "baa" },
@@ -238,10 +241,11 @@ describe("SimpleHttpRendezvousTransport", function() {
                     },
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             expect(await prom).toEqual({ foo: "baa" });
         }
-        { // subsequent GET which should have etag from previous request
+        {
+            // subsequent GET which should have etag from previous request
             const prom = simpleHttpTransport.receive();
             httpBackend.when("GET", "https://fallbackserver/rz/123").check(({ headers }) => {
                 expect(headers["if-none-match"]).toEqual("aaa");
@@ -255,19 +259,20 @@ describe("SimpleHttpRendezvousTransport", function() {
                     },
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             expect(await prom).toEqual({ foo: "baa" });
         }
     });
 
-    it("POST and PUTs", async function() {
+    it("POST and PUTs", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        { // initial POST
+        {
+            // initial POST
             const prom = simpleHttpTransport.send({ foo: "baa" });
             httpBackend.when("POST", "https://fallbackserver/rz").check(({ headers, data }) => {
                 expect(headers["content-type"]).toEqual("application/json");
@@ -281,10 +286,11 @@ describe("SimpleHttpRendezvousTransport", function() {
                     },
                 },
             };
-            await httpBackend.flush('', 1);
+            await httpBackend.flush("", 1);
             await prom;
         }
-        { // first PUT without etag
+        {
+            // first PUT without etag
             const prom = simpleHttpTransport.send({ a: "b" });
             httpBackend.when("PUT", "https://fallbackserver/rz/123").check(({ headers, data }) => {
                 expect(headers["if-match"]).toBeUndefined();
@@ -294,14 +300,15 @@ describe("SimpleHttpRendezvousTransport", function() {
                 response: {
                     statusCode: 202,
                     headers: {
-                        "etag": "aaa",
+                        etag: "aaa",
                     },
                 },
             };
-            await httpBackend.flush('', 1);
+            await httpBackend.flush("", 1);
             await prom;
         }
-        { // subsequent PUT which should have etag from previous request
+        {
+            // subsequent PUT which should have etag from previous request
             const prom = simpleHttpTransport.send({ c: "d" });
             httpBackend.when("PUT", "https://fallbackserver/rz/123").check(({ headers }) => {
                 expect(headers["if-match"]).toEqual("aaa");
@@ -310,23 +317,24 @@ describe("SimpleHttpRendezvousTransport", function() {
                 response: {
                     statusCode: 202,
                     headers: {
-                        "etag": "bbb",
+                        etag: "bbb",
                     },
                 },
             };
-            await httpBackend.flush('', 1);
+            await httpBackend.flush("", 1);
             await prom;
         }
     });
 
-    it("POST and DELETE", async function() {
+    it("POST and DELETE", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        { // Create
+        {
+            // Create
             const prom = simpleHttpTransport.send({ foo: "baa" });
             httpBackend.when("POST", "https://fallbackserver/rz").check(({ headers, data }) => {
                 expect(headers["content-type"]).toEqual("application/json");
@@ -340,10 +348,11 @@ describe("SimpleHttpRendezvousTransport", function() {
                     },
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             expect(await prom).toStrictEqual(undefined);
         }
-        { // Cancel
+        {
+            // Cancel
             const prom = simpleHttpTransport.cancel(RendezvousFailureReason.UserDeclined);
             httpBackend.when("DELETE", "https://fallbackserver/rz/123").response = {
                 body: null,
@@ -352,12 +361,12 @@ describe("SimpleHttpRendezvousTransport", function() {
                     headers: {},
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             await prom;
         }
     });
 
-    it("details before ready", async function() {
+    it("details before ready", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
@@ -367,7 +376,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         expect(simpleHttpTransport.details()).rejects.toThrowError();
     });
 
-    it("send after cancelled", async function() {
+    it("send after cancelled", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
@@ -378,7 +387,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         expect(simpleHttpTransport.send({})).resolves.toBeUndefined();
     });
 
-    it("receive before ready", async function() {
+    it("receive before ready", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
             client,
@@ -388,7 +397,7 @@ describe("SimpleHttpRendezvousTransport", function() {
         expect(simpleHttpTransport.receive()).rejects.toThrowError();
     });
 
-    it("404 failure callback", async function() {
+    it("404 failure callback", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const onFailure = jest.fn();
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
@@ -406,11 +415,11 @@ describe("SimpleHttpRendezvousTransport", function() {
                 headers: {},
             },
         };
-        await httpBackend.flush('', 1);
+        await httpBackend.flush("", 1);
         expect(onFailure).toBeCalledWith(RendezvousFailureReason.Unknown);
     });
 
-    it("404 failure callback mapped to expired", async function() {
+    it("404 failure callback mapped to expired", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const onFailure = jest.fn();
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({
@@ -420,7 +429,8 @@ describe("SimpleHttpRendezvousTransport", function() {
             onFailure,
         });
 
-        { // initial POST
+        {
+            // initial POST
             const prom = simpleHttpTransport.send({ foo: "baa" });
             httpBackend.when("POST", "https://fallbackserver/rz").response = {
                 body: null,
@@ -432,10 +442,11 @@ describe("SimpleHttpRendezvousTransport", function() {
                     },
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             await prom;
         }
-        { // GET with 404 to simulate expiry
+        {
+            // GET with 404 to simulate expiry
             expect(simpleHttpTransport.receive()).resolves.toBeUndefined();
             httpBackend.when("GET", "https://fallbackserver/rz/123").response = {
                 body: { foo: "baa" },
@@ -444,7 +455,7 @@ describe("SimpleHttpRendezvousTransport", function() {
                     headers: {},
                 },
             };
-            await httpBackend.flush('');
+            await httpBackend.flush("");
             expect(onFailure).toBeCalledWith(RendezvousFailureReason.Expired);
         }
     });

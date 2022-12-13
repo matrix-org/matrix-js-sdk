@@ -38,18 +38,18 @@ class JestSlowTestReporter {
             if (isTestSuite) {
                 console.log(
                     `Top ${slowestTests.length} slowest test suites (${slowTestTime / 1000} seconds,` +
-              ` ${percentTime.toFixed(1)}% of total time):`,
+                        ` ${percentTime.toFixed(1)}% of total time):`,
                 );
             } else {
                 console.log(
                     `Top ${slowestTests.length} slowest tests (${slowTestTime / 1000} seconds,` +
-              ` ${percentTime.toFixed(1)}% of total time):`,
+                        ` ${percentTime.toFixed(1)}% of total time):`,
                 );
             }
 
             for (let i = 0; i < slowestTests.length; i++) {
                 const duration = slowestTests[i].duration;
-                const filePath = slowestTests[i].filePath.replace(rootPathRegex, '.');
+                const filePath = slowestTests[i].filePath.replace(rootPathRegex, ".");
 
                 if (isTestSuite) {
                     console.log(`  ${duration / 1000} seconds ${filePath}`);

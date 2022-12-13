@@ -106,7 +106,7 @@ export class MSC3089TreeSpace {
         // but is safe for a managed usecase like we offer in the SDK.
         const parentEvents = this.room.currentState.getStateEvents(EventType.SpaceParent);
         if (!parentEvents?.length) return true;
-        return parentEvents.every(e => !e.getContent()?.['via']);
+        return parentEvents.every((e) => !e.getContent()?.["via"]);
     }
 
     /**
@@ -134,7 +134,7 @@ export class MSC3089TreeSpace {
     public async invite(userId: string, andSubspaces = true, shareHistoryKeys = true): Promise<void> {
         const promises: Promise<void>[] = [this.retryInvite(userId)];
         if (andSubspaces) {
-            promises.push(...this.getDirectories().map(d => d.invite(userId, andSubspaces, shareHistoryKeys)));
+            promises.push(...this.getDirectories().map((d) => d.invite(userId, andSubspaces, shareHistoryKeys)));
         }
         return Promise.all(promises).then(() => {
             // Note: key sharing is default on because for file trees it is relatively important that the invite
@@ -150,7 +150,7 @@ export class MSC3089TreeSpace {
 
     private retryInvite(userId: string): Promise<void> {
         return simpleRetryOperation(async () => {
-            await this.client.invite(this.roomId, userId).catch(e => {
+            await this.client.invite(this.roomId, userId).catch((e) => {
                 // We don't want to retry permission errors forever...
                 if (e?.errcode === "M_FORBIDDEN") {
                     throw new promiseRetry.AbortError(e);
@@ -173,11 +173,11 @@ export class MSC3089TreeSpace {
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
         const pls = currentPls?.getContent() || {};
-        const viewLevel = pls['users_default'] || 0;
-        const editLevel = pls['events_default'] || 50;
-        const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;
+        const viewLevel = pls["users_default"] || 0;
+        const editLevel = pls["events_default"] || 50;
+        const adminLevel = pls["events"]?.[EventType.RoomPowerLevels] || 100;
 
-        const users = pls['users'] || {};
+        const users = pls["users"] || {};
         switch (role) {
             case TreePermissions.Viewer:
                 users[userId] = viewLevel;
@@ -191,7 +191,7 @@ export class MSC3089TreeSpace {
             default:
                 throw new Error("Invalid role: " + role);
         }
-        pls['users'] = users;
+        pls["users"] = users;
 
         await this.client.sendStateEvent(this.roomId, EventType.RoomPowerLevels, pls, "");
     }
@@ -208,11 +208,11 @@ export class MSC3089TreeSpace {
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
         const pls = currentPls?.getContent() || {};
-        const viewLevel = pls['users_default'] || 0;
-        const editLevel = pls['events_default'] || 50;
-        const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;
+        const viewLevel = pls["users_default"] || 0;
+        const editLevel = pls["events_default"] || 50;
+        const adminLevel = pls["events"]?.[EventType.RoomPowerLevels] || 100;
 
-        const userLevel = pls['users']?.[userId] || viewLevel;
+        const userLevel = pls["users"]?.[userId] || viewLevel;
         if (userLevel >= adminLevel) return TreePermissions.Owner;
         if (userLevel >= editLevel) return TreePermissions.Editor;
         return TreePermissions.Viewer;
@@ -226,13 +226,23 @@ export class MSC3089TreeSpace {
     public async createDirectory(name: string): Promise<MSC3089TreeSpace> {
         const directory = await this.client.unstableCreateFileTree(name);
 
-        await this.client.sendStateEvent(this.roomId, EventType.SpaceChild, {
-            via: [this.client.getDomain()],
-        }, directory.roomId);
+        await this.client.sendStateEvent(
+            this.roomId,
+            EventType.SpaceChild,
+            {
+                via: [this.client.getDomain()],
+            },
+            directory.roomId,
+        );
 
-        await this.client.sendStateEvent(directory.roomId, EventType.SpaceParent, {
-            via: [this.client.getDomain()],
-        }, this.roomId);
+        await this.client.sendStateEvent(
+            directory.roomId,
+            EventType.SpaceParent,
+            {
+                via: [this.client.getDomain()],
+            },
+            this.roomId,
+        );
 
         return directory;
     }
@@ -265,7 +275,7 @@ export class MSC3089TreeSpace {
      * @returns The directory, or undefined if not found.
      */
     public getDirectory(roomId: string): MSC3089TreeSpace | undefined {
-        return this.getDirectories().find(r => r.roomId === roomId);
+        return this.getDirectories().find((r) => r.roomId === roomId);
     }
 
     /**
@@ -294,10 +304,10 @@ export class MSC3089TreeSpace {
         await this.client.leave(this.roomId);
     }
 
-    private getOrderedChildren(children: MatrixEvent[]): { roomId: string, order: string }[] {
-        const ordered: { roomId: string, order: string }[] = children
-            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()['order'] }))
-            .filter(c => c.roomId) as { roomId: string, order: string }[];
+    private getOrderedChildren(children: MatrixEvent[]): { roomId: string; order: string }[] {
+        const ordered: { roomId: string; order: string }[] = children
+            .map((c) => ({ roomId: c.getStateKey(), order: c.getContent()["order"] }))
+            .filter((c) => c.roomId) as { roomId: string; order: string }[];
         ordered.sort((a, b) => {
             if (a.order && !b.order) {
                 return -1;
@@ -306,7 +316,8 @@ export class MSC3089TreeSpace {
             } else if (!a.order && !b.order) {
                 const roomA = this.client.getRoom(a.roomId);
                 const roomB = this.client.getRoom(b.roomId);
-                if (!roomA || !roomB) { // just don't bother trying to do more partial sorting
+                if (!roomA || !roomB) {
+                    // just don't bother trying to do more partial sorting
                     return lexicographicCompare(a.roomId, b.roomId);
                 }
 
@@ -316,7 +327,8 @@ export class MSC3089TreeSpace {
                     return lexicographicCompare(a.roomId, b.roomId);
                 }
                 return createTsA - createTsB;
-            } else { // both not-null orders
+            } else {
+                // both not-null orders
                 return lexicographicCompare(a.order, b.order);
             }
         });
@@ -350,7 +362,7 @@ export class MSC3089TreeSpace {
         const children = parentRoom.currentState.getStateEvents(EventType.SpaceChild);
         const ordered = this.getOrderedChildren(children);
 
-        return ordered.findIndex(c => c.roomId === this.roomId);
+        return ordered.findIndex((c) => c.roomId === this.roomId);
     }
 
     /**
@@ -371,14 +383,14 @@ export class MSC3089TreeSpace {
 
         const currentIndex = this.getOrder();
         const movingUp = currentIndex < index;
-        if (movingUp && index === (ordered.length - 1)) {
+        if (movingUp && index === ordered.length - 1) {
             index--;
         } else if (!movingUp && index === 0) {
             index++;
         }
 
-        const prev = ordered[movingUp ? index : (index - 1)];
-        const next = ordered[movingUp ? (index + 1) : index];
+        const prev = ordered[movingUp ? index : index - 1];
+        const next = ordered[movingUp ? index + 1 : index];
 
         let newOrder = DEFAULT_ALPHABET[0];
         let ensureBeforeIsSane = false;
@@ -387,7 +399,7 @@ export class MSC3089TreeSpace {
             if (next?.order) {
                 newOrder = prevString(next.order);
             }
-        } else if (index === (ordered.length - 1)) {
+        } else if (index === ordered.length - 1) {
             // Move to back
             if (next?.order) {
                 newOrder = nextString(next.order);
@@ -435,10 +447,15 @@ export class MSC3089TreeSpace {
                     lastOrder = lastOrder ? nextString(lastOrder) : DEFAULT_ALPHABET[0];
                     const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, target.roomId);
                     const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
-                    await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
-                        ...content,
-                        order: lastOrder,
-                    }, target.roomId);
+                    await this.client.sendStateEvent(
+                        parentRoom.roomId,
+                        EventType.SpaceChild,
+                        {
+                            ...content,
+                            order: lastOrder,
+                        },
+                        target.roomId,
+                    );
                 } else {
                     lastOrder = target.order;
                 }
@@ -453,12 +470,17 @@ export class MSC3089TreeSpace {
         // Now we can finally update our own order state
         const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, this.roomId);
         const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
-        await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
-            ...content,
+        await this.client.sendStateEvent(
+            parentRoom.roomId,
+            EventType.SpaceChild,
+            {
+                ...content,
 
-            // TODO: Safely constrain to 50 character limit required by spaces.
-            order: newOrder,
-        }, this.roomId);
+                // TODO: Safely constrain to 50 character limit required by spaces.
+                order: newOrder,
+            },
+            this.roomId,
+        );
     }
 
     /**
@@ -502,10 +524,15 @@ export class MSC3089TreeSpace {
             [UNSTABLE_MSC3089_LEAF.name]: {},
         });
 
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            active: true,
-            name: name,
-        }, res['event_id']);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                active: true,
+                name: name,
+            },
+            res["event_id"],
+        );
 
         return res;
     }
@@ -525,7 +552,7 @@ export class MSC3089TreeSpace {
      * @returns The known files. May be empty, but not null.
      */
     public listFiles(): MSC3089Branch[] {
-        return this.listAllFiles().filter(b => b.isActive);
+        return this.listAllFiles().filter((b) => b.isActive);
     }
 
     /**
@@ -534,6 +561,6 @@ export class MSC3089TreeSpace {
      */
     public listAllFiles(): MSC3089Branch[] {
         const branches = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name) ?? [];
-        return branches.map(e => new MSC3089Branch(this.client, e, this));
+        return branches.map((e) => new MSC3089Branch(this.client, e, this));
     }
 }

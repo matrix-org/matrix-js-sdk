@@ -14,10 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    EventType,
-    RelationType,
-} from "./@types/event";
+import { EventType, RelationType } from "./@types/event";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
@@ -27,7 +24,7 @@ import { MatrixEvent } from "./models/event";
 function setProp(obj: Record<string, any>, keyNesting: string, val: any): void {
     const nestedKeys = keyNesting.split(".") as [keyof typeof obj];
     let currentObj = obj;
-    for (let i = 0; i < (nestedKeys.length - 1); i++) {
+    for (let i = 0; i < nestedKeys.length - 1; i++) {
         if (!currentObj[nestedKeys[i]]) {
             currentObj[nestedKeys[i]] = {};
         }
@@ -46,12 +43,12 @@ export interface IFilterDefinition {
 }
 
 export interface IRoomEventFilter extends IFilterComponent {
-    lazy_load_members?: boolean;
-    include_redundant_members?: boolean;
-    types?: Array<EventType | string>;
-    related_by_senders?: Array<RelationType | string>;
-    related_by_rel_types?: string[];
-    unread_thread_notifications?: boolean;
+    "lazy_load_members"?: boolean;
+    "include_redundant_members"?: boolean;
+    "types"?: Array<EventType | string>;
+    "related_by_senders"?: Array<RelationType | string>;
+    "related_by_rel_types"?: string[];
+    "unread_thread_notifications"?: boolean;
     "org.matrix.msc3773.unread_thread_notifications"?: boolean;
 
     // Unstable values
@@ -63,7 +60,8 @@ interface IStateFilter extends IRoomEventFilter {}
 
 interface IRoomFilter {
     not_rooms?: string[];
-    rooms?: string[];ephemeral?: IRoomEventFilter;
+    rooms?: string[];
+    ephemeral?: IRoomEventFilter;
     include_leave?: boolean;
     state?: IStateFilter;
     timeline?: IRoomEventFilter;

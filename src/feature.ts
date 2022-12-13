@@ -19,7 +19,7 @@ import { IServerVersions } from "./client";
 export enum ServerSupport {
     Stable,
     Unstable,
-    Unsupported
+    Unsupported,
 }
 
 export enum Feature {
@@ -51,9 +51,10 @@ export async function buildFeatureSupportMap(versions: IServerVersions): Promise
     const supportMap = new Map<Feature, ServerSupport>();
     for (const [feature, supportCondition] of Object.entries(featureSupportResolver)) {
         const supportMatrixVersion = versions.versions?.includes(supportCondition.matrixVersion || "") ?? false;
-        const supportUnstablePrefixes = supportCondition.unstablePrefixes?.every(unstablePrefix => {
-            return versions.unstable_features?.[unstablePrefix] === true;
-        }) ?? false;
+        const supportUnstablePrefixes =
+            supportCondition.unstablePrefixes?.every((unstablePrefix) => {
+                return versions.unstable_features?.[unstablePrefix] === true;
+            }) ?? false;
         if (supportMatrixVersion) {
             supportMap.set(feature as Feature, ServerSupport.Stable);
         } else if (supportUnstablePrefixes) {

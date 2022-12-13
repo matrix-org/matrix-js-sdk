@@ -82,8 +82,7 @@ export class NamespacedValue<S extends string, U extends string> {
     }
 }
 
-export class ServerControlledNamespacedValue<S extends string, U extends string>
-    extends NamespacedValue<S, U> {
+export class ServerControlledNamespacedValue<S extends string, U extends string> extends NamespacedValue<S, U> {
     private preferUnstable = false;
 
     public setPreferUnstable(preferUnstable: boolean): void {

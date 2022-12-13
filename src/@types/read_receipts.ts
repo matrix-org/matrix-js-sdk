@@ -38,7 +38,7 @@ export interface CachedReceipt {
     data: Receipt;
 }
 
-export type ReceiptCache = {[eventId: string]: CachedReceipt[]};
+export type ReceiptCache = { [eventId: string]: CachedReceipt[] };
 
 export interface ReceiptContent {
     [eventId: string]: {

@@ -32,8 +32,8 @@ enum DeviceVerification {
 }
 
 /**
-  * Information about a user's device
-  */
+ * Information about a user's device
+ */
 export class DeviceInfo {
     /**
      * rehydrate a DeviceInfo from the session store

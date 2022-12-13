@@ -30,8 +30,8 @@ export function generateDecimalSas(sasBytes: number[]): [number, number, number]
      *         1st number    2nd number     3rd number
      */
     return [
-        (sasBytes[0] << 5 | sasBytes[1] >> 3) + 1000,
-        ((sasBytes[1] & 0x7) << 10 | sasBytes[2] << 2 | sasBytes[3] >> 6) + 1000,
-        ((sasBytes[3] & 0x3f) << 7 | sasBytes[4] >> 1) + 1000,
+        ((sasBytes[0] << 5) | (sasBytes[1] >> 3)) + 1000,
+        (((sasBytes[1] & 0x7) << 10) | (sasBytes[2] << 2) | (sasBytes[3] >> 6)) + 1000,
+        (((sasBytes[3] & 0x3f) << 7) | (sasBytes[4] >> 1)) + 1000,
     ];
 }

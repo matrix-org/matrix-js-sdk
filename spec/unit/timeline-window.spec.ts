@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MockedObject } from 'jest-mock';
+import { MockedObject } from "jest-mock";
 
 import { MatrixClient } from "../../src/client";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
@@ -37,7 +37,7 @@ const mockClient = {
 function createTimeline(numEvents = 3, baseIndex = 1): EventTimeline {
     const room = new Room(ROOM_ID, mockClient, USER_ID);
     const timelineSet = new EventTimelineSet(room);
-    jest.spyOn(room, 'getUnfilteredTimelineSet').mockReturnValue(timelineSet);
+    jest.spyOn(room, "getUnfilteredTimelineSet").mockReturnValue(timelineSet);
 
     const timeline = new EventTimeline(timelineSet);
 
@@ -55,7 +55,8 @@ function addEventsToTimeline(timeline: EventTimeline, numEvents: number, toStart
     for (let i = 0; i < numEvents; i++) {
         timeline.addEvent(
             mkMessage({
-                room: ROOM_ID, user: USER_ID,
+                room: ROOM_ID,
+                user: USER_ID,
                 event: true,
             }),
             { toStartOfTimeline },
@@ -74,42 +75,42 @@ function createLinkedTimelines(): [EventTimeline, EventTimeline] {
     return [tl1, tl2];
 }
 
-describe("TimelineIndex", function() {
+describe("TimelineIndex", function () {
     beforeEach(() => {
         jest.clearAllMocks();
         mockClient.getEventTimeline.mockResolvedValue(undefined);
     });
 
-    describe("minIndex", function() {
-        it("should return the min index relative to BaseIndex", function() {
+    describe("minIndex", function () {
+        it("should return the min index relative to BaseIndex", function () {
             const timelineIndex = new TimelineIndex(createTimeline(), 0);
             expect(timelineIndex.minIndex()).toEqual(-1);
         });
     });
 
-    describe("maxIndex", function() {
-        it("should return the max index relative to BaseIndex", function() {
+    describe("maxIndex", function () {
+        it("should return the max index relative to BaseIndex", function () {
             const timelineIndex = new TimelineIndex(createTimeline(), 0);
             expect(timelineIndex.maxIndex()).toEqual(2);
         });
     });
 
-    describe("advance", function() {
-        it("should advance up to the end of the timeline", function() {
+    describe("advance", function () {
+        it("should advance up to the end of the timeline", function () {
             const timelineIndex = new TimelineIndex(createTimeline(), 0);
             const result = timelineIndex.advance(3);
             expect(result).toEqual(2);
             expect(timelineIndex.index).toEqual(2);
         });
 
-        it("should retreat back to the start of the timeline", function() {
+        it("should retreat back to the start of the timeline", function () {
             const timelineIndex = new TimelineIndex(createTimeline(), 0);
             const result = timelineIndex.advance(-2);
             expect(result).toEqual(-1);
             expect(timelineIndex.index).toEqual(-1);
         });
 
-        it("should advance into the next timeline", function() {
+        it("should advance into the next timeline", function () {
             const timelines = createLinkedTimelines();
             const tl1 = timelines[0];
             const tl2 = timelines[1];
@@ -127,7 +128,7 @@ describe("TimelineIndex", function() {
             expect(timelineIndex.index).toEqual(0);
         });
 
-        it("should retreat into the previous timeline", function() {
+        it("should retreat into the previous timeline", function () {
             const timelines = createLinkedTimelines();
             const tl1 = timelines[0];
             const tl2 = timelines[1];
@@ -143,8 +144,8 @@ describe("TimelineIndex", function() {
         });
     });
 
-    describe("retreat", function() {
-        it("should retreat up to the start of the timeline", function() {
+    describe("retreat", function () {
+        it("should retreat up to the start of the timeline", function () {
             const timelineIndex = new TimelineIndex(createTimeline(), 0);
             const result = timelineIndex.retreat(2);
             expect(result).toEqual(1);
@@ -153,14 +154,17 @@ describe("TimelineIndex", function() {
     });
 });
 
-describe("TimelineWindow", function() {
+describe("TimelineWindow", function () {
     /**
      * create a dummy eventTimelineSet and client, and a TimelineWindow
      * attached to them.
      */
-    function createWindow(timeline: EventTimeline, opts?: {
-        windowLimit?: number;
-    }): [TimelineWindow, EventTimelineSet] {
+    function createWindow(
+        timeline: EventTimeline,
+        opts?: {
+            windowLimit?: number;
+        },
+    ): [TimelineWindow, EventTimelineSet] {
         const timelineSet = { getTimelineForEvent: () => null } as unknown as EventTimelineSet;
         mockClient.getEventTimeline.mockResolvedValue(timeline);
 
@@ -173,12 +177,12 @@ describe("TimelineWindow", function() {
         mockClient.paginateEventTimeline.mockResolvedValue(false);
     });
 
-    describe("load", function() {
-        it("should initialise from the live timeline", async function() {
+    describe("load", function () {
+        it("should initialise from the live timeline", async function () {
             const liveTimeline = createTimeline();
             const room = new Room(ROOM_ID, mockClient, USER_ID);
             const timelineSet = new EventTimelineSet(room);
-            jest.spyOn(timelineSet, 'getLiveTimeline').mockReturnValue(liveTimeline);
+            jest.spyOn(timelineSet, "getLiveTimeline").mockReturnValue(liveTimeline);
 
             const timelineWindow = new TimelineWindow(mockClient, timelineSet);
             await timelineWindow.load(undefined, 2);
@@ -189,7 +193,7 @@ describe("TimelineWindow", function() {
             expect(timelineWindow.getEvents()).toEqual(expectedEvents);
         });
 
-        it("should initialise from a specific event", async function() {
+        it("should initialise from a specific event", async function () {
             const timeline = createTimeline();
             const eventId = timeline.getEvents()[1].getId();
 
@@ -203,7 +207,7 @@ describe("TimelineWindow", function() {
             expect(timelineWindow.getEvents()).toEqual(expectedEvents);
         });
 
-        it("canPaginate should return false until load has returned", async function() {
+        it("canPaginate should return false until load has returned", async function () {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok1", EventTimeline.BACKWARDS);
             timeline.setPaginationToken("toktok2", EventTimeline.FORWARDS);
@@ -227,15 +231,13 @@ describe("TimelineWindow", function() {
             expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
             // can paginate now
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(true);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(true);
         });
     });
 
-    describe("pagination", function() {
-        it("should be able to advance across the initial timeline", async function() {
+    describe("pagination", function () {
+        it("should be able to advance across the initial timeline", async function () {
             const timeline = createTimeline();
             const eventId = timeline.getEvents()[1].getId();
             const [timelineWindow] = createWindow(timeline);
@@ -245,19 +247,15 @@ describe("TimelineWindow", function() {
             const expectedEvents = [timeline.getEvents()[1]];
             expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(true);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(true);
 
             expect(await timelineWindow.paginate(EventTimeline.FORWARDS, 2)).toBe(true);
             const expectedEventsAfterPagination = timeline.getEvents().slice(1);
             expect(timelineWindow.getEvents()).toEqual(expectedEventsAfterPagination);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(true);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(false);
 
             // cant paginate forward anymore
             expect(await timelineWindow.paginate(EventTimeline.FORWARDS, 2)).toBe(false);
@@ -268,14 +266,12 @@ describe("TimelineWindow", function() {
             const expectedEvents3 = timeline.getEvents();
             expect(timelineWindow.getEvents()).toEqual(expectedEvents3);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(false);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(false);
             expect(await timelineWindow.paginate(EventTimeline.BACKWARDS, 2)).toBe(false);
         });
 
-        it("should advance into next timeline", async function() {
+        it("should advance into next timeline", async function () {
             const tls = createLinkedTimelines();
             const eventId = tls[0].getEvents()[1].getId();
             const [timelineWindow] = createWindow(tls[0], { windowLimit: 5 });
@@ -284,37 +280,29 @@ describe("TimelineWindow", function() {
             const expectedEvents = tls[0].getEvents();
             expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(false);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(true);
 
             expect(await timelineWindow.paginate(EventTimeline.FORWARDS, 2)).toBe(true);
-            const expectedEvents2 = tls[0].getEvents()
-                .concat(tls[1].getEvents().slice(0, 2));
+            const expectedEvents2 = tls[0].getEvents().concat(tls[1].getEvents().slice(0, 2));
             expect(timelineWindow.getEvents()).toEqual(expectedEvents2);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(false);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(true);
 
             expect(await timelineWindow.paginate(EventTimeline.FORWARDS, 2)).toBe(true);
 
             // the windowLimit should have made us drop an event from
             // tls[0]
-            const expectedEvents3 = tls[0].getEvents().slice(1)
-                .concat(tls[1].getEvents());
+            const expectedEvents3 = tls[0].getEvents().slice(1).concat(tls[1].getEvents());
             expect(timelineWindow.getEvents()).toEqual(expectedEvents3);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(true);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(false);
             expect(await timelineWindow.paginate(EventTimeline.FORWARDS, 2)).toBe(false);
         });
 
-        it("should retreat into previous timeline", async function() {
+        it("should retreat into previous timeline", async function () {
             const tls = createLinkedTimelines();
             const eventId = tls[1].getEvents()[1].getId();
             const [timelineWindow] = createWindow(tls[1], { windowLimit: 5 });
@@ -324,36 +312,28 @@ describe("TimelineWindow", function() {
             const expectedEvents = tls[1].getEvents();
             expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(true);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(false);
 
             expect(await timelineWindow.paginate(EventTimeline.BACKWARDS, 2)).toBe(true);
-            const expectedEvents2 = tls[0].getEvents().slice(1, 3)
-                .concat(tls[1].getEvents());
+            const expectedEvents2 = tls[0].getEvents().slice(1, 3).concat(tls[1].getEvents());
             expect(timelineWindow.getEvents()).toEqual(expectedEvents2);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(true);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(false);
 
             expect(await timelineWindow.paginate(EventTimeline.BACKWARDS, 2)).toBe(true);
             // the windowLimit should have made us drop an event from
             // tls[1]
-            const expectedEvents3 = tls[0].getEvents()
-                .concat(tls[1].getEvents().slice(0, 2));
+            const expectedEvents3 = tls[0].getEvents().concat(tls[1].getEvents().slice(0, 2));
             expect(timelineWindow.getEvents()).toEqual(expectedEvents3);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(false);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(true);
             expect(await timelineWindow.paginate(EventTimeline.BACKWARDS, 2)).toBe(false);
         });
 
-        it("should make forward pagination requests", async function() {
+        it("should make forward pagination requests", async function () {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.FORWARDS);
 
@@ -377,7 +357,7 @@ describe("TimelineWindow", function() {
             expect(timelineWindow.getEvents()).toEqual(expectedEvents2);
         });
 
-        it("should make backward pagination requests", async function() {
+        it("should make backward pagination requests", async function () {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.BACKWARDS);
 
@@ -403,7 +383,7 @@ describe("TimelineWindow", function() {
             expect(timelineWindow.getEvents()).toEqual(expectedEvents2);
         });
 
-        it("should limit the number of unsuccessful pagination requests", async function() {
+        it("should limit the number of unsuccessful pagination requests", async function () {
             const timeline = createTimeline();
             timeline.setPaginationToken("toktok", EventTimeline.FORWARDS);
 
@@ -418,10 +398,8 @@ describe("TimelineWindow", function() {
             const expectedEvents = timeline.getEvents();
             expect(timelineWindow.getEvents()).toEqual(expectedEvents);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(false);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(true);
             expect(await timelineWindow.paginate(EventTimeline.FORWARDS, 2, true, 3)).toBe(false);
 
             expect(mockClient.paginateEventTimeline).toHaveBeenCalledWith(timeline, { backwards: false, limit: 2 });
@@ -430,10 +408,8 @@ describe("TimelineWindow", function() {
             const expectedEvents2 = timeline.getEvents().slice(0, 3);
             expect(timelineWindow.getEvents()).toEqual(expectedEvents2);
 
-            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS))
-                .toBe(false);
-            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS))
-                .toBe(true);
+            expect(timelineWindow.canPaginate(EventTimeline.BACKWARDS)).toBe(false);
+            expect(timelineWindow.canPaginate(EventTimeline.FORWARDS)).toBe(true);
         });
     });
 });

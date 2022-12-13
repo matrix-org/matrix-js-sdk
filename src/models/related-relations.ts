@@ -22,7 +22,7 @@ export class RelatedRelations {
     private relations: Relations[];
 
     public constructor(relations: Relations[]) {
-        this.relations = relations.filter(r => !!r);
+        this.relations = relations.filter((r) => !!r);
     }
 
     public getRelations(): MatrixEvent[] {
@@ -30,10 +30,10 @@ export class RelatedRelations {
     }
 
     public on<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>): void {
-        this.relations.forEach(r => r.on(ev, fn));
+        this.relations.forEach((r) => r.on(ev, fn));
     }
 
     public off<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>): void {
-        this.relations.forEach(r => r.off(ev, fn));
+        this.relations.forEach((r) => r.off(ev, fn));
     }
 }

@@ -22,13 +22,7 @@ import { MatrixClient } from "../../client";
 import { Room } from "../../models/room";
 import { OlmDevice } from "../OlmDevice";
 import { IContent, MatrixEvent, RoomMember } from "../../matrix";
-import {
-    Crypto,
-    IEncryptedContent,
-    IEventDecryptionResult,
-    IMegolmSessionData,
-    IncomingRoomKeyRequest,
-} from "..";
+import { Crypto, IEncryptedContent, IEventDecryptionResult, IMegolmSessionData, IncomingRoomKeyRequest } from "..";
 import { DeviceInfo } from "../deviceinfo";
 import { IRoomEncryption } from "../RoomList";
 
@@ -217,19 +211,23 @@ export class DecryptionError extends Error {
     public constructor(public readonly code: string, msg: string, details?: Record<string, string | Error>) {
         super(msg);
         this.code = code;
-        this.name = 'DecryptionError';
+        this.name = "DecryptionError";
         this.detailedString = detailedStringForDecryptionError(this, details);
     }
 }
 
 function detailedStringForDecryptionError(err: DecryptionError, details?: Record<string, string | Error>): string {
-    let result = err.name + '[msg: ' + err.message;
+    let result = err.name + "[msg: " + err.message;
 
     if (details) {
-        result += ', ' + Object.keys(details).map((k) => k + ': ' + details[k]).join(', ');
+        result +=
+            ", " +
+            Object.keys(details)
+                .map((k) => k + ": " + details[k])
+                .join(", ");
     }
 
-    result += ']';
+    result += "]";
 
     return result;
 }
