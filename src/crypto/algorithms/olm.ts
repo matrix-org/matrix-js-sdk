@@ -18,13 +18,14 @@ limitations under the License.
  * Defines m.olm encryption/decryption
  */
 
+import type { IEventDecryptionResult } from "../../@types/crypto";
 import { logger } from "../../logger";
 import * as olmlib from "../olmlib";
 import { DeviceInfo } from "../deviceinfo";
 import { DecryptionAlgorithm, DecryptionError, EncryptionAlgorithm, registerAlgorithm } from "./base";
 import { Room } from "../../models/room";
 import { IContent, MatrixEvent } from "../../models/event";
-import { IEncryptedContent, IEventDecryptionResult, IOlmEncryptedContent } from "../index";
+import { IEncryptedContent, IOlmEncryptedContent } from "../index";
 import { IInboundSession } from "../OlmDevice";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;

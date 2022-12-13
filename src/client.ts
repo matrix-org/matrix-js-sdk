@@ -210,6 +210,7 @@ import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
+import { CryptoBackend } from "./common-crypto/CryptoBackend";
 
 export type Store = IStore;
 
@@ -1147,7 +1148,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public identityServer?: IIdentityServerProvider;
     public http: MatrixHttpApi<IHttpOpts & { onlyData: true }>; // XXX: Intended private, used in code.
-    public crypto?: Crypto; // XXX: Intended private, used in code.
+    public crypto?: Crypto; // libolm crypto implementation. XXX: Intended private, used in code. Being replaced by cryptoBackend
+    private cryptoBackend?: CryptoBackend; // one of crypto or rustCrypto
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
     public groupCallEventHandler?: GroupCallEventHandler;
@@ -1455,7 +1457,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * clean shutdown.
      */
     public stopClient(): void {
-        this.crypto?.stop(); // crypto might have been initialised even if the client wasn't fully started
+        this.cryptoBackend?.stop(); // crypto might have been initialised even if the client wasn't fully started
 
         if (!this.clientRunning) return; // already stopped
 
@@ -1972,7 +1974,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Initialise support for end-to-end encryption in this client
+     * Initialise support for end-to-end encryption in this client, using libolm.
      *
      * You should call this method after creating the matrixclient, but *before*
      * calling `startClient`, if you want to support end-to-end encryption.
@@ -1988,7 +1990,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         }
 
-        if (this.crypto) {
+        if (this.cryptoBackend) {
             logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
             return;
         }
@@ -2053,7 +2055,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // if crypto initialisation was successful, tell it to attach its event handlers.
         crypto.registerEventHandlers(this as Parameters<Crypto["registerEventHandlers"]>[0]);
-        this.crypto = crypto;
+        this.cryptoBackend = this.crypto = crypto;
 
         // upload our keys in the background
         this.crypto.uploadDeviceKeys().catch((e) => {
@@ -2067,7 +2069,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns True if end-to-end is enabled.
      */
     public isCryptoEnabled(): boolean {
-        return !!this.crypto;
+        return !!this.cryptoBackend;
     }
 
     /**
@@ -2312,10 +2314,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param value - whether to blacklist all unverified devices by default
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.globalBlacklistUnverifiedDevices = value;
+        this.cryptoBackend.globalBlacklistUnverifiedDevices = value;
         return value;
     }
 
@@ -2323,10 +2325,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns whether to blacklist all unverified devices by default
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.globalBlacklistUnverifiedDevices;
+        return this.cryptoBackend.globalBlacklistUnverifiedDevices;
     }
 
     /**
@@ -2340,10 +2342,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param value - whether error on unknown devices
      */
     public setGlobalErrorOnUnknownDevices(value: boolean): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.globalErrorOnUnknownDevices = value;
+        this.cryptoBackend.globalErrorOnUnknownDevices = value;
     }
 
     /**
@@ -2352,10 +2354,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * This API is currently UNSTABLE and may change or be removed without notice.
      */
     public getGlobalErrorOnUnknownDevices(): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.globalErrorOnUnknownDevices;
+        return this.cryptoBackend.globalErrorOnUnknownDevices;
     }
 
     /**
@@ -2495,10 +2497,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * the cross-signing pseudo-device.
      */
     public userHasCrossSigningKeys(): Promise<boolean> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.userHasCrossSigningKeys();
+        return this.cryptoBackend.userHasCrossSigningKeys();
     }
 
     /**
@@ -7193,7 +7195,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public decryptEventIfNeeded(event: MatrixEvent, options?: IDecryptOptions): Promise<void> {
         if (event.shouldAttemptDecryption() && this.isCryptoEnabled()) {
-            event.attemptDecryption(this.crypto!, options);
+            event.attemptDecryption(this.cryptoBackend!, options);
         }
 
         if (event.isBeingDecrypted()) {
