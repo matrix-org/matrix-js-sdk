@@ -211,6 +211,7 @@ import { LocalNotificationSettings } from "./@types/local_notifications";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
+import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
 
 export type Store = IStore;
 
@@ -1667,7 +1668,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // No indexeddb support
                 return;
             }
-            for (const dbname of ["matrix-js-sdk::matrix-sdk-crypto", "matrix-js-sdk::matrix-sdk-crypto-meta"]) {
+            for (const dbname of [
+                `${RUST_SDK_STORE_PREFIX}::matrix-sdk-crypto`,
+                `${RUST_SDK_STORE_PREFIX}::matrix-sdk-crypto-meta`,
+            ]) {
                 const prom = new Promise((resolve, reject) => {
                     logger.info(`Removing IndexedDB instance ${dbname}`);
                     const req = indexedDB.deleteDatabase(dbname);

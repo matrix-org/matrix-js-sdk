@@ -19,6 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import { RustCrypto } from "./rust-crypto";
 import { logger } from "../logger";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { RUST_SDK_STORE_PREFIX } from "./constants";
 
 export async function initRustCrypto(userId: string, deviceId: string): Promise<CryptoBackend> {
     // initialise the rust matrix-sdk-crypto-js, if it hasn't already been done
@@ -32,7 +33,7 @@ export async function initRustCrypto(userId: string, deviceId: string): Promise<
     logger.info("Init OlmMachine");
 
     // TODO: use the pickle key for the passphrase
-    const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(u, d, "matrix-js-sdk", "test pass");
+    const olmMachine = await RustSdkCryptoJs.OlmMachine.initialize(u, d, RUST_SDK_STORE_PREFIX, "test pass");
     const rustCrypto = new RustCrypto(olmMachine, userId, deviceId);
 
     logger.info("Completed rust crypto-sdk setup");
