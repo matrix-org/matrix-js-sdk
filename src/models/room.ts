@@ -2066,6 +2066,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         events: MatrixEvent[] = [],
         toStartOfTimeline: boolean,
     ): Thread {
+        if (this.threads.has(threadId)) {
+            return this.threads.get(threadId)!;
+        }
+
         if (rootEvent) {
             const relatedEvents = this.relations.getAllChildEventsForEvent(rootEvent.getId()!);
             if (relatedEvents?.length) {
