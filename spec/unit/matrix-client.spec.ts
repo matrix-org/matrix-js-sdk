@@ -282,6 +282,23 @@ describe("MatrixClient", function () {
         client.stopClient();
     });
 
+    describe("getSafeUserId()", () => {
+        it("returns the logged in user id", () => {
+            expect(client.getSafeUserId()).toEqual(userId);
+        });
+
+        it("throws when there is not logged in user", () => {
+            const notLoggedInClient = new MatrixClient({
+                baseUrl: "https://my.home.server",
+                idBaseUrl: identityServerUrl,
+                fetchFn: function () {} as any, // NOP
+                store: store,
+                scheduler: scheduler,
+            });
+            expect(() => notLoggedInClient.getSafeUserId()).toThrow("Expected logged in user but found none.");
+        });
+    });
+
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";

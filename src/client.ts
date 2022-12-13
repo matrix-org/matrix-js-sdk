@@ -1671,6 +1671,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Get the user-id of the logged-in user
+     *
+     * @returns MXID for the logged-in user, or throws if not logged in
+     */
+    public getSafeUserId(): string {
+        const userId = this.getUserId();
+        if (!userId) {
+            throw new Error("Expected logged in user but found none.");
+        }
+        return userId;
+    }
+
+    /**
      * Get the domain for this client's MXID
      * @returns Domain of this MXID
      */
