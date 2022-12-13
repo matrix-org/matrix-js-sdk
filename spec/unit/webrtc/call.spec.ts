@@ -1521,7 +1521,7 @@ describe("Call", function () {
             hasAdvancedBy += advanceBy;
 
             expect(lengthChangedListener).toHaveBeenCalledTimes(hasAdvancedBy);
-            expect(lengthChangedListener).toBeCalledWith(hasAdvancedBy);
+            expect(lengthChangedListener).toHaveBeenCalledWith(hasAdvancedBy);
         }
     });
 

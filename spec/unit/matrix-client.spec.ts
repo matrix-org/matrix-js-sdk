@@ -806,7 +806,7 @@ describe("MatrixClient", function () {
         // Disabled because now `startClient` makes a legit call to `/versions`
         // And those tests are really unhappy about it... Not possible to figure
         // out what a good resolution would look like
-        xit("should transition ERROR -> CATCHUP after /sync if prev failed", function (done) {
+        it.skip("should transition ERROR -> CATCHUP after /sync if prev failed", function (done) {
             const expectedStates: [string, string | null][] = [];
             acceptKeepalives = false;
             httpLookups = [];
@@ -848,7 +848,7 @@ describe("MatrixClient", function () {
             client.startClient();
         });
 
-        xit("should transition SYNCING -> ERROR after a failed /sync", function (done) {
+        it.skip("should transition SYNCING -> ERROR after a failed /sync", function (done) {
             acceptKeepalives = false;
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
@@ -870,7 +870,7 @@ describe("MatrixClient", function () {
             client.startClient();
         });
 
-        xit("should transition ERROR -> SYNCING after /sync if prev failed", function (done) {
+        it.skip("should transition ERROR -> SYNCING after /sync if prev failed", function (done) {
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
                 method: "GET",
@@ -898,7 +898,7 @@ describe("MatrixClient", function () {
             client.startClient();
         });
 
-        xit("should transition ERROR -> ERROR if keepalive keeps failing", function (done) {
+        it.skip("should transition ERROR -> ERROR if keepalive keeps failing", function (done) {
             acceptKeepalives = false;
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
@@ -961,7 +961,7 @@ describe("MatrixClient", function () {
             expect(httpLookups.length).toBe(0);
         });
 
-        xit("should be able to peek into a room using peekInRoom", function (done) {});
+        it.skip("should be able to peek into a room using peekInRoom", function (done) {});
     });
 
     describe("getPresence", function () {

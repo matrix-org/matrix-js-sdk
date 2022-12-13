@@ -329,7 +329,7 @@ describe("Group Call", function () {
                 jest.spyOn(call, "getOpponentMember").mockReturnValue({ userId: undefined });
 
                 // @ts-ignore Mock
-                expect(() => groupCall.onCallFeedsChanged(call)).toThrowError();
+                expect(() => groupCall.onCallFeedsChanged(call)).toThrow();
             });
 
             describe("usermedia feeds", () => {

@@ -78,11 +78,11 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(1);
-        expect(stateUpdated).toBeCalledTimes(1);
+        expect(doRequest).toHaveBeenCalledTimes(1);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
     });
 
-    it("should handle auth errcode presence ", async () => {
+    it("should handle auth errcode presence", async () => {
         const doRequest = jest.fn();
         const stateUpdated = jest.fn();
 
@@ -128,8 +128,8 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(1);
-        expect(stateUpdated).toBeCalledTimes(1);
+        expect(doRequest).toHaveBeenCalledTimes(1);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
     });
 
     it("should handle set emailSid for email flow", async () => {
@@ -180,9 +180,9 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(1);
-        expect(stateUpdated).toBeCalledTimes(1);
-        expect(requestEmailToken).toBeCalledTimes(0);
+        expect(doRequest).toHaveBeenCalledTimes(1);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
+        expect(requestEmailToken).toHaveBeenCalledTimes(0);
         expect(ia.getEmailSid()).toBe("myEmailSid");
     });
 
@@ -244,8 +244,8 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(2);
-        expect(stateUpdated).toBeCalledTimes(1);
+        expect(doRequest).toHaveBeenCalledTimes(2);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
     });
 
     it("should make a request if authdata is null", async () => {
@@ -306,8 +306,8 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(2);
-        expect(stateUpdated).toBeCalledTimes(1);
+        expect(doRequest).toHaveBeenCalledTimes(2);
+        expect(stateUpdated).toHaveBeenCalledTimes(1);
     });
 
     it("should start an auth stage and reject if no auth flow", async () => {
@@ -430,8 +430,8 @@ describe("InteractiveAuth", () => {
 
         const res = await ia.attemptAuth();
         expect(res).toBe(requestRes);
-        expect(doRequest).toBeCalledTimes(1);
-        expect(stateUpdated).toBeCalledTimes(0);
+        expect(doRequest).toHaveBeenCalledTimes(1);
+        expect(stateUpdated).toHaveBeenCalledTimes(0);
     });
 
     describe("requestEmailToken", () => {
@@ -508,7 +508,7 @@ describe("InteractiveAuth", () => {
                 requestEmailToken,
             });
 
-            await expect(ia.requestEmailToken.bind(ia)).rejects.toThrowError("unspecific network error");
+            await expect(ia.requestEmailToken.bind(ia)).rejects.toThrow("unspecific network error");
         });
 
         it("only starts one request at a time", async () => {

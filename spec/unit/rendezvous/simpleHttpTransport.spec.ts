@@ -98,7 +98,7 @@ describe("SimpleHttpRendezvousTransport", function () {
     it("should throw an error when no server available", function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({ client, fetchFn });
-        expect(simpleHttpTransport.send({})).rejects.toThrowError("Invalid rendezvous URI");
+        expect(simpleHttpTransport.send({})).rejects.toThrow("Invalid rendezvous URI");
     });
 
     it("POST to fallback server", async function () {
@@ -130,7 +130,7 @@ describe("SimpleHttpRendezvousTransport", function () {
             fetchFn,
         });
         const prom = simpleHttpTransport.send({});
-        expect(prom).rejects.toThrowError();
+        expect(prom).rejects.toThrow();
         httpBackend.when("POST", "https://fallbackserver/rz").response = {
             body: null,
             response: {
@@ -373,7 +373,7 @@ describe("SimpleHttpRendezvousTransport", function () {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        expect(simpleHttpTransport.details()).rejects.toThrowError();
+        expect(simpleHttpTransport.details()).rejects.toThrow();
     });
 
     it("send after cancelled", async function () {
@@ -394,7 +394,7 @@ describe("SimpleHttpRendezvousTransport", function () {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        expect(simpleHttpTransport.receive()).rejects.toThrowError();
+        expect(simpleHttpTransport.receive()).rejects.toThrow();
     });
 
     it("404 failure callback", async function () {
@@ -416,7 +416,7 @@ describe("SimpleHttpRendezvousTransport", function () {
             },
         };
         await httpBackend.flush("", 1);
-        expect(onFailure).toBeCalledWith(RendezvousFailureReason.Unknown);
+        expect(onFailure).toHaveBeenCalledWith(RendezvousFailureReason.Unknown);
     });
 
     it("404 failure callback mapped to expired", async function () {
@@ -456,7 +456,7 @@ describe("SimpleHttpRendezvousTransport", function () {
                 },
             };
             await httpBackend.flush("");
-            expect(onFailure).toBeCalledWith(RendezvousFailureReason.Expired);
+            expect(onFailure).toHaveBeenCalledWith(RendezvousFailureReason.Expired);
         }
     });
 });

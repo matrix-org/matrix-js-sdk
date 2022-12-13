@@ -724,7 +724,7 @@ describe("MatrixClient syncing", () => {
         // events that arrive in the incremental sync as if they preceeded the
         // timeline events, however this breaks peeking, so it's disabled
         // (see sync.js)
-        xit("should correctly interpret state in incremental sync.", () => {
+        it.skip("should correctly interpret state in incremental sync.", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
@@ -741,9 +741,9 @@ describe("MatrixClient syncing", () => {
             });
         });
 
-        xit("should update power levels for users in a room", () => {});
+        it.skip("should update power levels for users in a room", () => {});
 
-        xit("should update the room topic", () => {});
+        it.skip("should update the room topic", () => {});
 
         describe("onMarkerStateEvent", () => {
             const normalMessageEvent = utils.mkMessage({
@@ -1546,13 +1546,13 @@ describe("MatrixClient syncing", () => {
     });
 
     describe("of a room", () => {
-        xit(
+        it.skip(
             "should sync when a join event (which changes state) for the user" +
                 " arrives down the event stream (e.g. join from another device)",
             () => {},
         );
 
-        xit("should sync when the user explicitly calls joinRoom", () => {});
+        it.skip("should sync when the user explicitly calls joinRoom", () => {});
     });
 
     describe("syncLeftRooms", () => {
