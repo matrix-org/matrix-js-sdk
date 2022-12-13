@@ -2088,8 +2088,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * An alternative to {@link initCrypto}.
      *
-     * *WARNING*: this API is very experimental and should not yet be used in production code! Eventually
-     *    it will be deprecated and `initCrypto` will do the same thing.
+     * *WARNING*: this API is very experimental, should not be used in production, and may change without notice!
+     *    Eventually it will be deprecated and `initCrypto` will do the same thing.
      *
      * @returns a Promise which will resolve when the crypto layer has been
      *    successfully initialised.
