@@ -16,6 +16,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// `expect` is allowed in helper functions which are called within `test`/`it` blocks
+/* eslint-disable jest/no-standalone-expect */
+
 // load olm before the sdk if possible
 import "./olm-loader";
 
