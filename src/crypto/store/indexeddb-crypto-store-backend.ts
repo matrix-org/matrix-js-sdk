@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, PrefixedLogger } from '../../logger';
+import { logger, PrefixedLogger } from "../../logger";
 import * as utils from "../../utils";
 import {
     CryptoStore,
@@ -25,7 +25,8 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory, SecretStorePrivateKeys,
+    ParkedSharedHistory,
+    SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody, IRoomKeyRequestRecipient } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -39,14 +40,11 @@ const PROFILE_TRANSACTIONS = false;
  * Implementation of a CryptoStore which is backed by an existing
  * IndexedDB connection. Generally you want IndexedDBCryptoStore
  * which connects to the database and defers to one of these.
- *
- * @implements {module:crypto/store/base~CryptoStore}
  */
 export class Backend implements CryptoStore {
     private nextTxnId = 0;
 
     /**
-     * @param {IDBDatabase} db
      */
     public constructor(private db: IDBDatabase) {
         // make sure we close the db on `onversionchange` - otherwise
@@ -71,10 +69,9 @@ export class Backend implements CryptoStore {
      * Look for an existing outgoing room key request, and if none is found,
      * add a new one
      *
-     * @param {module:crypto/store/base~OutgoingRoomKeyRequest} request
      *
-     * @returns {Promise} resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     * @returns resolves to
+     *    {@link OutgoingRoomKeyRequest}: either the
      *    same instance as passed in, or the existing one.
      */
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
@@ -99,11 +96,10 @@ export class Backend implements CryptoStore {
 
                 // we got to the end of the list without finding a match
                 // - add the new request.
-                logger.log(
-                    `enqueueing key request for ${requestBody.room_id} / ` +
-                        requestBody.session_id,
-                );
-                txn.oncomplete = (): void => {resolve(request);};
+                logger.log(`enqueueing key request for ${requestBody.room_id} / ` + requestBody.session_id);
+                txn.oncomplete = (): void => {
+                    resolve(request);
+                };
                 const store = txn.objectStore("outgoingRoomKeyRequests");
                 store.add(request);
             });
@@ -113,11 +109,10 @@ export class Backend implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
-     * @return {Promise} resolves to the matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     * @returns resolves to the matching
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found
      */
     public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
@@ -134,13 +129,12 @@ export class Backend implements CryptoStore {
     /**
      * look for an existing room key request in the db
      *
-     * @private
-     * @param {IDBTransaction} txn  database transaction
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     *    existing request to look for
-     * @param {Function} callback  function to call with the results of the
+     * @internal
+     * @param txn -  database transaction
+     * @param requestBody - existing request to look for
+     * @param callback -  function to call with the results of the
      *    search. Either passed a matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found.
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -152,10 +146,7 @@ export class Backend implements CryptoStore {
         const store = txn.objectStore("outgoingRoomKeyRequests");
 
         const idx = store.index("session");
-        const cursorReq = idx.openCursor([
-            requestBody.room_id,
-            requestBody.session_id,
-        ]);
+        const cursorReq = idx.openCursor([requestBody.room_id, requestBody.session_id]);
 
         cursorReq.onsuccess = (): void => {
             const cursor = cursorReq.result;
@@ -181,10 +172,10 @@ export class Backend implements CryptoStore {
     /**
      * Look for room key requests by state
      *
-     * @param {Array<Number>} wantedStates list of acceptable states
+     * @param wantedStates - list of acceptable states
      *
-     * @return {Promise} resolves to the a
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     * @returns resolves to the a
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states. If there are multiple
      *    requests in those states, an arbitrary one is chosen.
      */
@@ -233,8 +224,7 @@ export class Backend implements CryptoStore {
 
     /**
      *
-     * @param {Number} wantedState
-     * @return {Promise<Array<*>>} All elements in a given state
+     * @returns All elements in a given state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
         return new Promise((resolve, reject) => {
@@ -260,9 +250,12 @@ export class Backend implements CryptoStore {
             const cursor = this.result;
             if (cursor) {
                 const keyReq = cursor.value;
-                if (keyReq.recipients.some((recipient: IRoomKeyRequestRecipient) =>
-                    recipient.userId === userId && recipient.deviceId === deviceId,
-                )) {
+                if (
+                    keyReq.recipients.some(
+                        (recipient: IRoomKeyRequestRecipient) =>
+                            recipient.userId === userId && recipient.deviceId === deviceId,
+                    )
+                ) {
                     results.push(keyReq);
                 }
                 cursor.continue();
@@ -294,12 +287,12 @@ export class Backend implements CryptoStore {
      * Look for an existing room key request by id and state, and update it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
-     * @param {Object} updates        name/value map of updates to apply
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
+     * @param updates -        name/value map of updates to apply
      *
-     * @returns {Promise} resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     * @returns resolves to
+     *    {@link OutgoingRoomKeyRequest}
      *    updated request, or null if no matching row was found
      */
     public updateOutgoingRoomKeyRequest(
@@ -318,7 +311,7 @@ export class Backend implements CryptoStore {
             if (data.state != expectedState) {
                 logger.warn(
                     `Cannot update room key request from ${expectedState} ` +
-                    `as it was already updated to ${data.state}`,
+                        `as it was already updated to ${data.state}`,
                 );
                 return;
             }
@@ -337,10 +330,10 @@ export class Backend implements CryptoStore {
      * Look for an existing room key request by id and state, and delete it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
      *
-     * @returns {Promise} resolves once the operation is completed
+     * @returns resolves once the operation is completed
      */
     public deleteOutgoingRoomKeyRequest(
         requestId: string,
@@ -355,10 +348,7 @@ export class Backend implements CryptoStore {
             }
             const data = cursor.value;
             if (data.state != expectedState) {
-                logger.warn(
-                    `Cannot delete room key request in state ${data.state} `
-                        + `(expected ${expectedState})`,
-                );
+                logger.warn(`Cannot delete room key request in state ${data.state} ` + `(expected ${expectedState})`);
                 return;
             }
             cursor.delete();
@@ -371,7 +361,7 @@ export class Backend implements CryptoStore {
     public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("-");
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             try {
                 func(getReq.result || null);
             } catch (e) {
@@ -391,7 +381,7 @@ export class Backend implements CryptoStore {
     ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get("crossSigningKeys");
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             try {
                 func(getReq.result || null);
             } catch (e) {
@@ -407,7 +397,7 @@ export class Backend implements CryptoStore {
     ): void {
         const objectStore = txn.objectStore("account");
         const getReq = objectStore.get(`ssss_cache:${type}`);
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             try {
                 func(getReq.result || null);
             } catch (e) {
@@ -435,7 +425,7 @@ export class Backend implements CryptoStore {
     public countEndToEndSessions(txn: IDBTransaction, func: (count: number) => void): void {
         const objectStore = txn.objectStore("sessions");
         const countReq = objectStore.count();
-        countReq.onsuccess = function(): void {
+        countReq.onsuccess = function (): void {
             try {
                 func(countReq.result);
             } catch (e) {
@@ -453,7 +443,7 @@ export class Backend implements CryptoStore {
         const idx = objectStore.index("deviceKey");
         const getReq = idx.openCursor(deviceKey);
         const results: Parameters<Parameters<Backend["getEndToEndSessions"]>[2]>[0] = {};
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             const cursor = getReq.result;
             if (cursor) {
                 results[cursor.value.sessionId] = {
@@ -479,7 +469,7 @@ export class Backend implements CryptoStore {
     ): void {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.get([deviceKey, sessionId]);
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             try {
                 if (getReq.result) {
                     func({
@@ -498,7 +488,7 @@ export class Backend implements CryptoStore {
     public getAllEndToEndSessions(txn: IDBTransaction, func: (session: ISessionInfo | null) => void): void {
         const objectStore = txn.objectStore("sessions");
         const getReq = objectStore.openCursor();
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             try {
                 const cursor = getReq.result;
                 if (cursor) {
@@ -579,19 +569,21 @@ export class Backend implements CryptoStore {
 
         const ret: IOlmDevice[] = [];
 
-        await Promise.all(devices.map((device) => {
-            return new Promise<void>((resolve) => {
-                const { userId, deviceInfo } = device;
-                const getReq = objectStore.get([userId, deviceInfo.deviceId]);
-                getReq.onsuccess = function(): void {
-                    if (!getReq.result) {
-                        objectStore.put({ userId, deviceId: deviceInfo.deviceId });
-                        ret.push(device);
-                    }
-                    resolve();
-                };
-            });
-        }));
+        await Promise.all(
+            devices.map((device) => {
+                return new Promise<void>((resolve) => {
+                    const { userId, deviceInfo } = device;
+                    const getReq = objectStore.get([userId, deviceInfo.deviceId]);
+                    getReq.onsuccess = function (): void {
+                        if (!getReq.result) {
+                            objectStore.put({ userId, deviceId: deviceInfo.deviceId });
+                            ret.push(device);
+                        }
+                        resolve();
+                    };
+                });
+            }),
+        );
 
         return ret;
     }
@@ -608,7 +600,7 @@ export class Backend implements CryptoStore {
         let withheld: IWithheld | null | boolean = false;
         const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.get([senderCurve25519Key, sessionId]);
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             try {
                 if (getReq.result) {
                     session = getReq.result.session;
@@ -625,7 +617,7 @@ export class Backend implements CryptoStore {
 
         const withheldObjectStore = txn.objectStore("inbound_group_sessions_withheld");
         const withheldGetReq = withheldObjectStore.get([senderCurve25519Key, sessionId]);
-        withheldGetReq.onsuccess = function(): void {
+        withheldGetReq.onsuccess = function (): void {
             try {
                 if (withheldGetReq.result) {
                     withheld = withheldGetReq.result.session;
@@ -644,7 +636,7 @@ export class Backend implements CryptoStore {
     public getAllEndToEndInboundGroupSessions(txn: IDBTransaction, func: (session: ISession | null) => void): void {
         const objectStore = txn.objectStore("inbound_group_sessions");
         const getReq = objectStore.openCursor();
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             const cursor = getReq.result;
             if (cursor) {
                 try {
@@ -675,22 +667,19 @@ export class Backend implements CryptoStore {
     ): void {
         const objectStore = txn.objectStore("inbound_group_sessions");
         const addReq = objectStore.add({
-            senderCurve25519Key, sessionId, session: sessionData,
+            senderCurve25519Key,
+            sessionId,
+            session: sessionData,
         });
         addReq.onerror = (ev): void => {
-            if (addReq.error?.name === 'ConstraintError') {
+            if (addReq.error?.name === "ConstraintError") {
                 // This stops the error from triggering the txn's onerror
                 ev.stopPropagation();
                 // ...and this stops it from aborting the transaction
                 ev.preventDefault();
-                logger.log(
-                    "Ignoring duplicate inbound group session: " +
-                    senderCurve25519Key + " / " + sessionId,
-                );
+                logger.log("Ignoring duplicate inbound group session: " + senderCurve25519Key + " / " + sessionId);
             } else {
-                abortWithException(txn, new Error(
-                    "Failed to add inbound group session: " + addReq.error,
-                ));
+                abortWithException(txn, new Error("Failed to add inbound group session: " + addReq.error));
             }
         };
     }
@@ -703,7 +692,9 @@ export class Backend implements CryptoStore {
     ): void {
         const objectStore = txn.objectStore("inbound_group_sessions");
         objectStore.put({
-            senderCurve25519Key, sessionId, session: sessionData,
+            senderCurve25519Key,
+            sessionId,
+            session: sessionData,
         });
     }
 
@@ -715,14 +706,16 @@ export class Backend implements CryptoStore {
     ): void {
         const objectStore = txn.objectStore("inbound_group_sessions_withheld");
         objectStore.put({
-            senderCurve25519Key, sessionId, session: sessionData,
+            senderCurve25519Key,
+            sessionId,
+            session: sessionData,
         });
     }
 
     public getEndToEndDeviceData(txn: IDBTransaction, func: (deviceData: IDeviceData | null) => void): void {
         const objectStore = txn.objectStore("device_data");
         const getReq = objectStore.get("-");
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             try {
                 func(getReq.result || null);
             } catch (e) {
@@ -745,7 +738,7 @@ export class Backend implements CryptoStore {
         const rooms: Parameters<Parameters<Backend["getEndToEndRooms"]>[1]>[0] = {};
         const objectStore = txn.objectStore("rooms");
         const getReq = objectStore.openCursor();
-        getReq.onsuccess = function(): void {
+        getReq.onsuccess = function (): void {
             const cursor = getReq.result;
             if (cursor) {
                 rooms[cursor.key as string] = cursor.value;
@@ -766,22 +759,19 @@ export class Backend implements CryptoStore {
         return new Promise((resolve, reject) => {
             const sessions: ISession[] = [];
 
-            const txn = this.db.transaction(
-                ["sessions_needing_backup", "inbound_group_sessions"],
-                "readonly",
-            );
+            const txn = this.db.transaction(["sessions_needing_backup", "inbound_group_sessions"], "readonly");
             txn.onerror = reject;
-            txn.oncomplete = function(): void {
+            txn.oncomplete = function (): void {
                 resolve(sessions);
             };
             const objectStore = txn.objectStore("sessions_needing_backup");
             const sessionStore = txn.objectStore("inbound_group_sessions");
             const getReq = objectStore.openCursor();
-            getReq.onsuccess = function(): void {
+            getReq.onsuccess = function (): void {
                 const cursor = getReq.result;
                 if (cursor) {
                     const sessionGetReq = sessionStore.get(cursor.key);
-                    sessionGetReq.onsuccess = function(): void {
+                    sessionGetReq.onsuccess = function (): void {
                         sessions.push({
                             senderKey: sessionGetReq.result.senderCurve25519Key,
                             sessionId: sessionGetReq.result.sessionId,
@@ -813,13 +803,15 @@ export class Backend implements CryptoStore {
             txn = this.db.transaction("sessions_needing_backup", "readwrite");
         }
         const objectStore = txn.objectStore("sessions_needing_backup");
-        await Promise.all(sessions.map((session) => {
-            return new Promise((resolve, reject) => {
-                const req = objectStore.delete([session.senderKey, session.sessionId]);
-                req.onsuccess = resolve;
-                req.onerror = reject;
-            });
-        }));
+        await Promise.all(
+            sessions.map((session) => {
+                return new Promise((resolve, reject) => {
+                    const req = objectStore.delete([session.senderKey, session.sessionId]);
+                    req.onsuccess = resolve;
+                    req.onerror = reject;
+                });
+            }),
+        );
     }
 
     public async markSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
@@ -827,16 +819,18 @@ export class Backend implements CryptoStore {
             txn = this.db.transaction("sessions_needing_backup", "readwrite");
         }
         const objectStore = txn.objectStore("sessions_needing_backup");
-        await Promise.all(sessions.map((session) => {
-            return new Promise((resolve, reject) => {
-                const req = objectStore.put({
-                    senderCurve25519Key: session.senderKey,
-                    sessionId: session.sessionId,
+        await Promise.all(
+            sessions.map((session) => {
+                return new Promise((resolve, reject) => {
+                    const req = objectStore.put({
+                        senderCurve25519Key: session.senderKey,
+                        sessionId: session.sessionId,
+                    });
+                    req.onsuccess = resolve;
+                    req.onerror = reject;
                 });
-                req.onsuccess = resolve;
-                req.onerror = reject;
-            });
-        }));
+            }),
+        );
     }
 
     public addSharedHistoryInboundGroupSession(
@@ -846,9 +840,7 @@ export class Backend implements CryptoStore {
         txn?: IDBTransaction,
     ): void {
         if (!txn) {
-            txn = this.db.transaction(
-                "shared_history_inbound_group_sessions", "readwrite",
-            );
+            txn = this.db.transaction("shared_history_inbound_group_sessions", "readwrite");
         }
         const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
         const req = objectStore.get([roomId]);
@@ -864,9 +856,7 @@ export class Backend implements CryptoStore {
         txn?: IDBTransaction,
     ): Promise<[senderKey: string, sessionId: string][]> {
         if (!txn) {
-            txn = this.db.transaction(
-                "shared_history_inbound_group_sessions", "readonly",
-            );
+            txn = this.db.transaction("shared_history_inbound_group_sessions", "readonly");
         }
         const objectStore = txn.objectStore("shared_history_inbound_group_sessions");
         const req = objectStore.get([roomId]);
@@ -879,15 +869,9 @@ export class Backend implements CryptoStore {
         });
     }
 
-    public addParkedSharedHistory(
-        roomId: string,
-        parkedData: ParkedSharedHistory,
-        txn?: IDBTransaction,
-    ): void {
+    public addParkedSharedHistory(roomId: string, parkedData: ParkedSharedHistory, txn?: IDBTransaction): void {
         if (!txn) {
-            txn = this.db.transaction(
-                "parked_shared_history", "readwrite",
-            );
+            txn = this.db.transaction("parked_shared_history", "readwrite");
         }
         const objectStore = txn.objectStore("parked_shared_history");
         const req = objectStore.get([roomId]);
@@ -898,14 +882,9 @@ export class Backend implements CryptoStore {
         };
     }
 
-    public takeParkedSharedHistory(
-        roomId: string,
-        txn?: IDBTransaction,
-    ): Promise<ParkedSharedHistory[]> {
+    public takeParkedSharedHistory(roomId: string, txn?: IDBTransaction): Promise<ParkedSharedHistory[]> {
         if (!txn) {
-            txn = this.db.transaction(
-                "parked_shared_history", "readwrite",
-            );
+            txn = this.db.transaction("parked_shared_history", "readwrite");
         }
         const cursorReq = txn.objectStore("parked_shared_history").openCursor(roomId);
         return new Promise((resolve, reject) => {
@@ -941,13 +920,16 @@ export class Backend implements CryptoStore {
         const promise = promiseifyTxn(txn);
         const result = func(txn);
         if (PROFILE_TRANSACTIONS) {
-            promise.then(() => {
-                const elapsedTime = Date.now() - startTime;
-                log.debug(`Finished ${description}, took ${elapsedTime} ms`);
-            }, () => {
-                const elapsedTime = Date.now() - startTime;
-                log.error(`Failed ${description}, took ${elapsedTime} ms`);
-            });
+            promise.then(
+                () => {
+                    const elapsedTime = Date.now() - startTime;
+                    log.debug(`Finished ${description}, took ${elapsedTime} ms`);
+                },
+                () => {
+                    const elapsedTime = Date.now() - startTime;
+                    log.error(`Failed ${description}, took ${elapsedTime} ms`);
+                },
+            );
         }
         return promise.then(() => {
             return result;
@@ -957,8 +939,12 @@ export class Backend implements CryptoStore {
 
 type DbMigration = (db: IDBDatabase) => void;
 const DB_MIGRATIONS: DbMigration[] = [
-    (db): void => { createDatabase(db); },
-    (db): void => { db.createObjectStore("account"); },
+    (db): void => {
+        createDatabase(db);
+    },
+    (db): void => {
+        db.createObjectStore("account");
+    },
     (db): void => {
         const sessionsStore = db.createObjectStore("sessions", {
             keyPath: ["deviceKey", "sessionId"],
@@ -970,8 +956,12 @@ const DB_MIGRATIONS: DbMigration[] = [
             keyPath: ["senderCurve25519Key", "sessionId"],
         });
     },
-    (db): void => { db.createObjectStore("device_data"); },
-    (db): void => { db.createObjectStore("rooms"); },
+    (db): void => {
+        db.createObjectStore("device_data");
+    },
+    (db): void => {
+        db.createObjectStore("rooms");
+    },
     (db): void => {
         db.createObjectStore("sessions_needing_backup", {
             keyPath: ["senderCurve25519Key", "sessionId"],
@@ -1007,24 +997,18 @@ const DB_MIGRATIONS: DbMigration[] = [
 export const VERSION = DB_MIGRATIONS.length;
 
 export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
-    logger.log(
-        `Upgrading IndexedDBCryptoStore from version ${oldVersion}`
-            + ` to ${VERSION}`,
-    );
+    logger.log(`Upgrading IndexedDBCryptoStore from version ${oldVersion}` + ` to ${VERSION}`);
     DB_MIGRATIONS.forEach((migration, index) => {
         if (oldVersion <= index) migration(db);
     });
 }
 
 function createDatabase(db: IDBDatabase): void {
-    const outgoingRoomKeyRequestsStore =
-        db.createObjectStore("outgoingRoomKeyRequests", { keyPath: "requestId" });
+    const outgoingRoomKeyRequestsStore = db.createObjectStore("outgoingRoomKeyRequests", { keyPath: "requestId" });
 
     // we assume that the RoomKeyRequestBody will have room_id and session_id
     // properties, to make the index efficient.
-    outgoingRoomKeyRequestsStore.createIndex("session",
-        ["requestBody.room_id", "requestBody.session_id"],
-    );
+    outgoingRoomKeyRequestsStore.createIndex("session", ["requestBody.room_id", "requestBody.session_id"]);
 
     outgoingRoomKeyRequestsStore.createIndex("state", "state");
 }

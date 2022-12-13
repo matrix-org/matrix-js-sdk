@@ -20,8 +20,11 @@ import { IEvent, MatrixEvent, MatrixEventEvent } from "./models/event";
 export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 
 export interface MapperOpts {
+    // don't re-emit events emitted on an event mapped by this mapper on the client
     preventReEmit?: boolean;
+    // decrypt event proactively
     decrypt?: boolean;
+    // the event is a to_device event
     toDevice?: boolean;
 }
 
@@ -59,9 +62,7 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
 
         if (event.isEncrypted()) {
             if (!preventReEmit) {
-                client.reEmitter.reEmit(event, [
-                    MatrixEventEvent.Decrypted,
-                ]);
+                client.reEmitter.reEmit(event, [MatrixEventEvent.Decrypted]);
             }
             if (decrypt) {
                 client.decryptEventIfNeeded(event);
@@ -69,13 +70,8 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
         }
 
         if (!preventReEmit) {
-            client.reEmitter.reEmit(event, [
-                MatrixEventEvent.Replaced,
-                MatrixEventEvent.VisibilityChange,
-            ]);
-            room?.reEmitter.reEmit(event, [
-                MatrixEventEvent.BeforeRedaction,
-            ]);
+            client.reEmitter.reEmit(event, [MatrixEventEvent.Replaced, MatrixEventEvent.VisibilityChange]);
+            room?.reEmitter.reEmit(event, [MatrixEventEvent.BeforeRedaction]);
         }
         return event;
     }

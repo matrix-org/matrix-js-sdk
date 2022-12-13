@@ -16,10 +16,6 @@ limitations under the License.
 
 import { ISignatures } from "../@types/signed";
 
-/**
- * @module crypto/deviceinfo
- */
-
 export interface IDevice {
     keys: Record<string, string>;
     algorithms: string[];
@@ -36,70 +32,58 @@ enum DeviceVerification {
 }
 
 /**
-  * Information about a user's device
-  *
-  * @constructor
-  * @alias module:crypto/deviceinfo
-  *
-  * @property {string} deviceId the ID of this device
-  *
-  * @property {string[]} algorithms list of algorithms supported by this device
-  *
-  * @property {Object.<string,string>} keys a map from
-  *      &lt;key type&gt;:&lt;id&gt; -> &lt;base64-encoded key&gt;>
-  *
-  * @property {module:crypto/deviceinfo.DeviceVerification} verified
-  *     whether the device has been verified/blocked by the user
-  *
-  * @property {boolean} known
-  *     whether the user knows of this device's existence (useful when warning
-  *     the user that a user has added new devices)
-  *
-  * @property {Object} unsigned  additional data from the homeserver
-  *
-  * @param {string} deviceId id of the device
-  */
+ * Information about a user's device
+ */
 export class DeviceInfo {
     /**
      * rehydrate a DeviceInfo from the session store
      *
-     * @param {object} obj  raw object from session store
-     * @param {string} deviceId id of the device
+     * @param obj -  raw object from session store
+     * @param deviceId - id of the device
      *
-     * @return {module:crypto~DeviceInfo} new DeviceInfo
+     * @returns new DeviceInfo
      */
     public static fromStorage(obj: Partial<IDevice>, deviceId: string): DeviceInfo {
         const res = new DeviceInfo(deviceId);
         for (const prop in obj) {
             if (obj.hasOwnProperty(prop)) {
-                res[prop] = obj[prop];
+                // @ts-ignore - this is messy and typescript doesn't like it
+                res[prop as keyof IDevice] = obj[prop as keyof IDevice];
             }
         }
         return res;
     }
 
-    /**
-     * @enum
-     */
     public static DeviceVerification = {
         VERIFIED: DeviceVerification.Verified,
         UNVERIFIED: DeviceVerification.Unverified,
         BLOCKED: DeviceVerification.Blocked,
     };
 
+    /** list of algorithms supported by this device */
     public algorithms: string[] = [];
+    /** a map from `<key type>:<id> -> <base64-encoded key>` */
     public keys: Record<string, string> = {};
+    /** whether the device has been verified/blocked by the user */
     public verified = DeviceVerification.Unverified;
+    /**
+     * whether the user knows of this device's existence
+     * (useful when warning the user that a user has added new devices)
+     */
     public known = false;
+    /** additional data from the homeserver */
     public unsigned: Record<string, any> = {};
     public signatures: ISignatures = {};
 
+    /**
+     * @param deviceId - id of the device
+     */
     public constructor(public readonly deviceId: string) {}
 
     /**
      * Prepare a DeviceInfo for JSON serialisation in the session store
      *
-     * @return {object} deviceinfo with non-serialised members removed
+     * @returns deviceinfo with non-serialised members removed
      */
     public toStorage(): IDevice {
         return {
@@ -115,7 +99,7 @@ export class DeviceInfo {
     /**
      * Get the fingerprint for this device (ie, the Ed25519 key)
      *
-     * @return {string} base64-encoded fingerprint of this device
+     * @returns base64-encoded fingerprint of this device
      */
     public getFingerprint(): string {
         return this.keys["ed25519:" + this.deviceId];
@@ -124,7 +108,7 @@ export class DeviceInfo {
     /**
      * Get the identity key for this device (ie, the Curve25519 key)
      *
-     * @return {string} base64-encoded identity key of this device
+     * @returns base64-encoded identity key of this device
      */
     public getIdentityKey(): string {
         return this.keys["curve25519:" + this.deviceId];
@@ -133,7 +117,7 @@ export class DeviceInfo {
     /**
      * Get the configured display name for this device, if any
      *
-     * @return {string?} displayname
+     * @returns displayname
      */
     public getDisplayName(): string | null {
         return this.unsigned.device_display_name || null;
@@ -142,7 +126,7 @@ export class DeviceInfo {
     /**
      * Returns true if this device is blocked
      *
-     * @return {Boolean} true if blocked
+     * @returns true if blocked
      */
     public isBlocked(): boolean {
         return this.verified == DeviceVerification.Blocked;
@@ -151,7 +135,7 @@ export class DeviceInfo {
     /**
      * Returns true if this device is verified
      *
-     * @return {Boolean} true if verified
+     * @returns true if verified
      */
     public isVerified(): boolean {
         return this.verified == DeviceVerification.Verified;
@@ -160,7 +144,7 @@ export class DeviceInfo {
     /**
      * Returns true if this device is unverified
      *
-     * @return {Boolean} true if unverified
+     * @returns true if unverified
      */
     public isUnverified(): boolean {
         return this.verified == DeviceVerification.Unverified;
@@ -169,7 +153,7 @@ export class DeviceInfo {
     /**
      * Returns true if the user knows about this device's existence
      *
-     * @return {Boolean} true if known
+     * @returns true if known
      */
     public isKnown(): boolean {
         return this.known === true;

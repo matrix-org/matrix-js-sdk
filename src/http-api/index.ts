@@ -35,27 +35,13 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     /**
      * Upload content to the homeserver
      *
-     * @param {object} file The object to upload. On a browser, something that
+     * @param file - The object to upload. On a browser, something that
      *   can be sent to XMLHttpRequest.send (typically a File).  Under node.js,
      *   a Buffer, String or ReadStream.
      *
-     * @param {object} opts  options object
+     * @param opts - options object
      *
-     * @param {string=} opts.name   Name to give the file on the server. Defaults
-     *   to <tt>file.name</tt>.
-     *
-     * @param {boolean=} opts.includeFilename if false will not send the filename,
-     *   e.g for encrypted file uploads where filename leaks are undesirable.
-     *   Defaults to true.
-     *
-     * @param {string=} opts.type   Content-type for the upload. Defaults to
-     *   <tt>file.type</tt>, or <tt>application/octet-stream</tt>.
-     *
-     * @param {Function=} opts.progressHandler Optional. Called when a chunk of
-     *    data has been uploaded, with an object containing the fields `loaded`
-     *    (number of bytes transferred) and `total` (total size, if known).
-     *
-     * @return {Promise} Resolves to response object, as
+     * @returns Promise which resolves to response object, as
      *    determined by this.opts.onlyData, opts.rawResponse, and
      *    opts.onlyContentUri.  Rejects with an error (usually a MatrixError).
      */
@@ -64,7 +50,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         const abortController = opts.abortController ?? new AbortController();
 
         // If the file doesn't have a mime type, use a default since the HS errors if we don't supply one.
-        const contentType = opts.type ?? (file as File).type ?? 'application/octet-stream';
+        const contentType = opts.type ?? (file as File).type ?? "application/octet-stream";
         const fileName = opts.name ?? (file as File).name;
 
         const upload = {
@@ -77,7 +63,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
         if (global.XMLHttpRequest) {
             const xhr = new global.XMLHttpRequest();
 
-            const timeoutFn = function(): void {
+            const timeoutFn = function (): void {
                 xhr.abort();
                 defer.reject(new Error("Timeout"));
             };
@@ -85,7 +71,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             // set an initial timeout of 30s; we'll advance it each time we get a progress notification
             let timeoutTimer = callbacks.setTimeout(timeoutFn, 30000);
 
-            xhr.onreadystatechange = function(): void {
+            xhr.onreadystatechange = function (): void {
                 switch (xhr.readyState) {
                     case global.XMLHttpRequest.DONE:
                         callbacks.clearTimeout(timeoutTimer);
@@ -94,7 +80,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                                 throw new DOMException(xhr.statusText, "AbortError"); // mimic fetch API
                             }
                             if (!xhr.responseText) {
-                                throw new Error('No response body.');
+                                throw new Error("No response body.");
                             }
 
                             if (xhr.status >= 400) {
@@ -152,23 +138,23 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
 
             const headers: Record<string, string> = { "Content-Type": contentType };
 
-            this.authedRequest<UploadResponse>(
-                Method.Post, "/upload", queryParams, file, {
-                    prefix: MediaPrefix.R0,
-                    headers,
-                    abortSignal: abortController.signal,
-                },
-            ).then(response => {
-                return this.opts.onlyData ? <UploadResponse>response : response.json();
-            }).then(defer.resolve, defer.reject);
+            this.authedRequest<UploadResponse>(Method.Post, "/upload", queryParams, file, {
+                prefix: MediaPrefix.R0,
+                headers,
+                abortSignal: abortController.signal,
+            })
+                .then((response) => {
+                    return this.opts.onlyData ? <UploadResponse>response : response.json();
+                })
+                .then(defer.resolve, defer.reject);
         }
 
         // remove the upload from the list on completion
         upload.promise = defer.promise.finally(() => {
-            utils.removeElement(this.uploads, elem => elem === upload);
+            utils.removeElement(this.uploads, (elem) => elem === upload);
         });
         abortController.signal.addEventListener("abort", () => {
-            utils.removeElement(this.uploads, elem => elem === upload);
+            utils.removeElement(this.uploads, (elem) => elem === upload);
             defer.reject(new DOMException("Aborted", "AbortError"));
         });
         this.uploads.push(upload);
@@ -176,7 +162,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
     }
 
     public cancelUpload(promise: Promise<UploadResponse>): boolean {
-        const upload = this.uploads.find(u => u.promise === promise);
+        const upload = this.uploads.find((u) => u.promise === promise);
         if (upload) {
             upload.abortController.abort();
             return true;
@@ -190,7 +176,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
 
     /**
      * Get the content repository url with query parameters.
-     * @return {Object} An object with a 'base', 'path' and 'params' for base URL,
+     * @returns An object with a 'base', 'path' and 'params' for base URL,
      *          path and query parameters respectively.
      */
     public getContentUri(): IContentUri {

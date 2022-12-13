@@ -38,11 +38,11 @@ export interface CachedReceipt {
     data: Receipt;
 }
 
-export type ReceiptCache = {[eventId: string]: CachedReceipt[]};
+export type ReceiptCache = { [eventId: string]: CachedReceipt[] };
 
 export interface ReceiptContent {
     [eventId: string]: {
-        [key in ReceiptType]: {
+        [key in ReceiptType | string]: {
             [userId: string]: Receipt;
         };
     };

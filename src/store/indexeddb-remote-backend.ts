@@ -36,114 +36,108 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
      * worker.
      *
      * Construct a new Indexed Database store backend. This requires a call to
-     * <code>connect()</code> before this store can be used.
-     * @constructor
-     * @param {Function} workerFactory Factory which produces a Worker
-     * @param {string=} dbName Optional database name. The same name must be used
+     * `connect()` before this store can be used.
+     * @param workerFactory - Factory which produces a Worker
+     * @param dbName - Optional database name. The same name must be used
      * to open the same database.
      */
-    public constructor(
-        private readonly workerFactory: () => Worker,
-        private readonly dbName?: string,
-    ) {}
+    public constructor(private readonly workerFactory: () => Worker, private readonly dbName?: string) {}
 
     /**
      * Attempt to connect to the database. This can fail if the user does not
      * grant permission.
-     * @return {Promise} Resolves if successfully connected.
+     * @returns Promise which resolves if successfully connected.
      */
     public connect(): Promise<void> {
-        return this.ensureStarted().then(() => this.doCmd('connect'));
+        return this.ensureStarted().then(() => this.doCmd("connect"));
     }
 
     /**
      * Clear the entire database. This should be used when logging out of a client
      * to prevent mixing data between accounts.
-     * @return {Promise} Resolved when the database is cleared.
+     * @returns Resolved when the database is cleared.
      */
     public clearDatabase(): Promise<void> {
-        return this.ensureStarted().then(() => this.doCmd('clearDatabase'));
+        return this.ensureStarted().then(() => this.doCmd("clearDatabase"));
     }
 
-    /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
+    /** @returns whether or not the database was newly created in this session. */
     public isNewlyCreated(): Promise<boolean> {
-        return this.doCmd('isNewlyCreated');
+        return this.doCmd("isNewlyCreated");
     }
 
     /**
-     * @return {Promise} Resolves with a sync response to restore the
+     * @returns Promise which resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
     public getSavedSync(): Promise<ISavedSync> {
-        return this.doCmd('getSavedSync');
+        return this.doCmd("getSavedSync");
     }
 
     public getNextBatchToken(): Promise<string> {
-        return this.doCmd('getNextBatchToken');
+        return this.doCmd("getNextBatchToken");
     }
 
     public setSyncData(syncData: ISyncResponse): Promise<void> {
-        return this.doCmd('setSyncData', [syncData]);
+        return this.doCmd("setSyncData", [syncData]);
     }
 
     public syncToDatabase(userTuples: UserTuple[]): Promise<void> {
-        return this.doCmd('syncToDatabase', [userTuples]);
+        return this.doCmd("syncToDatabase", [userTuples]);
     }
 
     /**
      * Returns the out-of-band membership events for this room that
      * were previously loaded.
-     * @param {string} roomId
-     * @returns {event[]} the events, potentially an empty array if OOB loading didn't yield any new members
-     * @returns {null} in case the members for this room haven't been stored yet
+     * @returns the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns in case the members for this room haven't been stored yet
      */
     public getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null> {
-        return this.doCmd('getOutOfBandMembers', [roomId]);
+        return this.doCmd("getOutOfBandMembers", [roomId]);
     }
 
     /**
      * Stores the out-of-band membership events for this room. Note that
      * it still makes sense to store an empty array as the OOB status for the room is
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
-     * @param {string} roomId
-     * @param {event[]} membershipEvents the membership events to store
-     * @returns {Promise} when all members have been stored
+     * @param membershipEvents - the membership events to store
+     * @returns when all members have been stored
      */
     public setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
-        return this.doCmd('setOutOfBandMembers', [roomId, membershipEvents]);
+        return this.doCmd("setOutOfBandMembers", [roomId, membershipEvents]);
     }
 
     public clearOutOfBandMembers(roomId: string): Promise<void> {
-        return this.doCmd('clearOutOfBandMembers', [roomId]);
+        return this.doCmd("clearOutOfBandMembers", [roomId]);
     }
 
     public getClientOptions(): Promise<IStoredClientOpts | undefined> {
-        return this.doCmd('getClientOptions');
+        return this.doCmd("getClientOptions");
     }
 
     public storeClientOptions(options: IStoredClientOpts): Promise<void> {
-        return this.doCmd('storeClientOptions', [options]);
+        return this.doCmd("storeClientOptions", [options]);
     }
 
     /**
      * Load all user presence events from the database. This is not cached.
-     * @return {Promise<Object[]>} A list of presence events in their raw form.
+     * @returns A list of presence events in their raw form.
      */
     public getUserPresenceEvents(): Promise<UserTuple[]> {
-        return this.doCmd('getUserPresenceEvents');
+        return this.doCmd("getUserPresenceEvents");
     }
 
     public async saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void> {
-        return this.doCmd('saveToDeviceBatches', [batches]);
+        return this.doCmd("saveToDeviceBatches", [batches]);
     }
 
     public async getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null> {
-        return this.doCmd('getOldestToDeviceBatch');
+        return this.doCmd("getOldestToDeviceBatch");
     }
 
     public async removeToDeviceBatch(id: number): Promise<void> {
-        return this.doCmd('removeToDeviceBatch', [id]);
+        return this.doCmd("removeToDeviceBatch", [id]);
     }
 
     private ensureStarted(): Promise<void> {
@@ -152,7 +146,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
             this.worker.onmessage = this.onWorkerMessage;
 
             // tell the worker the db name.
-            this.startPromise = this.doCmd('setupWorker', [this.dbName]).then(() => {
+            this.startPromise = this.doCmd("setupWorker", [this.dbName]).then(() => {
                 logger.log("IndexedDB worker is ready");
             });
         }
@@ -177,7 +171,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private onWorkerMessage = (ev: MessageEvent): void => {
         const msg = ev.data;
 
-        if (msg.command == 'cmd_success' || msg.command == 'cmd_fail') {
+        if (msg.command == "cmd_success" || msg.command == "cmd_fail") {
             if (msg.seq === undefined) {
                 logger.error("Got reply from worker with no seq");
                 return;
@@ -190,7 +184,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
             }
             delete this.inFlight[msg.seq];
 
-            if (msg.command == 'cmd_success') {
+            if (msg.command == "cmd_success") {
                 def.resolve(msg.result);
             } else {
                 const error = new Error(msg.error.message);
@@ -202,4 +196,3 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         }
     };
 }
-

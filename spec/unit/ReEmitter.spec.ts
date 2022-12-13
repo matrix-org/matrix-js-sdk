@@ -27,16 +27,14 @@ class EventSource extends EventEmitter {
     }
 
     doAnError() {
-        this.emit('error');
+        this.emit("error");
     }
 }
 
-class EventTarget extends EventEmitter {
+class EventTarget extends EventEmitter {}
 
-}
-
-describe("ReEmitter", function() {
-    it("Re-Emits events with the same args", function() {
+describe("ReEmitter", function () {
+    it("Re-Emits events with the same args", function () {
         const src = new EventSource();
         const tgt = new EventTarget();
 
@@ -53,18 +51,18 @@ describe("ReEmitter", function() {
         expect(handler).toHaveBeenCalledWith("foo", "bar", src);
     });
 
-    it("Doesn't throw if no handler for 'error' event", function() {
+    it("Doesn't throw if no handler for 'error' event", function () {
         const src = new EventSource();
         const tgt = new EventTarget();
 
         const reEmitter = new ReEmitter(tgt);
-        reEmitter.reEmit(src, ['error']);
+        reEmitter.reEmit(src, ["error"]);
 
         // without the workaround in ReEmitter, this would throw
         src.doAnError();
 
         const handler = jest.fn();
-        tgt.on('error', handler);
+        tgt.on("error", handler);
 
         src.doAnError();
 

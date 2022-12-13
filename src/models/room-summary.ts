@@ -14,38 +14,31 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/room-summary
- */
-
 export interface IRoomSummary {
     "m.heroes": string[];
-    "m.joined_member_count": number;
-    "m.invited_member_count": number;
+    "m.joined_member_count"?: number;
+    "m.invited_member_count"?: number;
 }
 
 interface IInfo {
+    /** The title of the room (e.g. `m.room.name`) */
     title: string;
+    /** The description of the room (e.g. `m.room.topic`) */
     desc?: string;
+    /** The number of joined users. */
     numMembers?: number;
+    /** The list of aliases for this room. */
     aliases?: string[];
+    /** The timestamp for this room. */
     timestamp?: number;
 }
 
 /**
  * Construct a new Room Summary. A summary can be used for display on a recent
  * list, without having to load the entire room list into memory.
- * @constructor
- * @param {string} roomId Required. The ID of this room.
- * @param {Object} info Optional. The summary info. Additional keys are supported.
- * @param {string} info.title The title of the room (e.g. <code>m.room.name</code>)
- * @param {string} info.desc The description of the room (e.g.
- * <code>m.room.topic</code>)
- * @param {Number} info.numMembers The number of joined users.
- * @param {string[]} info.aliases The list of aliases for this room.
- * @param {Number} info.timestamp The timestamp for this room.
+ * @param roomId - Required. The ID of this room.
+ * @param info - Optional. The summary info. Additional keys are supported.
  */
 export class RoomSummary {
     public constructor(public readonly roomId: string, info?: IInfo) {}
 }
-

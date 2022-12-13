@@ -14,11 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger, PrefixedLogger } from '../../logger';
-import { LocalStorageCryptoStore } from './localStorage-crypto-store';
-import { MemoryCryptoStore } from './memory-crypto-store';
-import * as IndexedDBCryptoStoreBackend from './indexeddb-crypto-store-backend';
-import { InvalidCryptoStoreError, InvalidCryptoStoreState } from '../../errors';
+import { logger, PrefixedLogger } from "../../logger";
+import { LocalStorageCryptoStore } from "./localStorage-crypto-store";
+import { MemoryCryptoStore } from "./memory-crypto-store";
+import * as IndexedDBCryptoStoreBackend from "./indexeddb-crypto-store-backend";
+import { InvalidCryptoStoreError, InvalidCryptoStoreState } from "../../errors";
 import * as IndexedDBHelpers from "../../indexeddb-helpers";
 import {
     CryptoStore,
@@ -29,7 +29,8 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory, SecretStorePrivateKeys,
+    ParkedSharedHistory,
+    SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -39,26 +40,22 @@ import { InboundGroupSessionData } from "../OlmDevice";
 
 /**
  * Internal module. indexeddb storage for e2e.
- *
- * @module
  */
 
 /**
  * An implementation of CryptoStore, which is normally backed by an indexeddb,
  * but with fallback to MemoryCryptoStore.
- *
- * @implements {module:crypto/store/base~CryptoStore}
  */
 export class IndexedDBCryptoStore implements CryptoStore {
-    public static STORE_ACCOUNT = 'account';
-    public static STORE_SESSIONS = 'sessions';
-    public static STORE_INBOUND_GROUP_SESSIONS = 'inbound_group_sessions';
-    public static STORE_INBOUND_GROUP_SESSIONS_WITHHELD = 'inbound_group_sessions_withheld';
-    public static STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS = 'shared_history_inbound_group_sessions';
-    public static STORE_PARKED_SHARED_HISTORY = 'parked_shared_history';
-    public static STORE_DEVICE_DATA = 'device_data';
-    public static STORE_ROOMS = 'rooms';
-    public static STORE_BACKUP = 'sessions_needing_backup';
+    public static STORE_ACCOUNT = "account";
+    public static STORE_SESSIONS = "sessions";
+    public static STORE_INBOUND_GROUP_SESSIONS = "inbound_group_sessions";
+    public static STORE_INBOUND_GROUP_SESSIONS_WITHHELD = "inbound_group_sessions_withheld";
+    public static STORE_SHARED_HISTORY_INBOUND_GROUP_SESSIONS = "shared_history_inbound_group_sessions";
+    public static STORE_PARKED_SHARED_HISTORY = "parked_shared_history";
+    public static STORE_DEVICE_DATA = "device_data";
+    public static STORE_ROOMS = "rooms";
+    public static STORE_BACKUP = "sessions_needing_backup";
 
     public static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
         return IndexedDBHelpers.exists(indexedDB, dbName);
@@ -70,8 +67,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Create a new IndexedDBCryptoStore
      *
-     * @param {IDBFactory} indexedDB  global indexedDB instance
-     * @param {string} dbName   name of db to connect to
+     * @param indexedDB -  global indexedDB instance
+     * @param dbName -   name of db to connect to
      */
     public constructor(private readonly indexedDB: IDBFactory, private readonly dbName: string) {}
 
@@ -81,7 +78,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *
      * This must be called before the store can be used.
      *
-     * @return {Promise} resolves to either an IndexedDBCryptoStoreBackend.Backend,
+     * @returns resolves to either an IndexedDBCryptoStoreBackend.Backend,
      * or a MemoryCryptoStore
      */
     public startup(): Promise<CryptoStore> {
@@ -91,7 +88,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
         this.backendPromise = new Promise<CryptoStore>((resolve, reject) => {
             if (!this.indexedDB) {
-                reject(new Error('no indexeddb support available'));
+                reject(new Error("no indexeddb support available"));
                 return;
             }
 
@@ -106,9 +103,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
             };
 
             req.onblocked = (): void => {
-                logger.log(
-                    `can't yet open IndexedDBCryptoStore because it is open elsewhere`,
-                );
+                logger.log(`can't yet open IndexedDBCryptoStore because it is open elsewhere`);
             };
 
             req.onerror = (ev): void => {
@@ -122,44 +117,46 @@ export class IndexedDBCryptoStore implements CryptoStore {
                 logger.log(`connected to indexeddb ${this.dbName}`);
                 resolve(new IndexedDBCryptoStoreBackend.Backend(db));
             };
-        }).then((backend) => {
-            // Edge has IndexedDB but doesn't support compund keys which we use fairly extensively.
-            // Try a dummy query which will fail if the browser doesn't support compund keys, so
-            // we can fall back to a different backend.
-            return backend.doTxn(
-                'readonly',
-                [
-                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
-                    IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
-                ],
-                (txn) => {
-                    backend.getEndToEndInboundGroupSession('', '', txn, () => {});
-                }).then(() => backend,
-            );
-        }).catch((e) => {
-            if (e.name === 'VersionError') {
-                logger.warn("Crypto DB is too new for us to use!", e);
-                // don't fall back to a different store: the user has crypto data
-                // in this db so we should use it or nothing at all.
-                throw new InvalidCryptoStoreError(InvalidCryptoStoreState.TooNew);
-            }
-            logger.warn(
-                `unable to connect to indexeddb ${this.dbName}` +
-                    `: falling back to localStorage store: ${e}`,
-            );
-
-            try {
-                return new LocalStorageCryptoStore(global.localStorage);
-            } catch (e) {
+        })
+            .then((backend) => {
+                // Edge has IndexedDB but doesn't support compund keys which we use fairly extensively.
+                // Try a dummy query which will fail if the browser doesn't support compund keys, so
+                // we can fall back to a different backend.
+                return backend
+                    .doTxn(
+                        "readonly",
+                        [
+                            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+                            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+                        ],
+                        (txn) => {
+                            backend.getEndToEndInboundGroupSession("", "", txn, () => {});
+                        },
+                    )
+                    .then(() => backend);
+            })
+            .catch((e) => {
+                if (e.name === "VersionError") {
+                    logger.warn("Crypto DB is too new for us to use!", e);
+                    // don't fall back to a different store: the user has crypto data
+                    // in this db so we should use it or nothing at all.
+                    throw new InvalidCryptoStoreError(InvalidCryptoStoreState.TooNew);
+                }
                 logger.warn(
-                    `unable to open localStorage: falling back to in-memory store: ${e}`,
+                    `unable to connect to indexeddb ${this.dbName}` + `: falling back to localStorage store: ${e}`,
                 );
-                return new MemoryCryptoStore();
-            }
-        }).then(backend => {
-            this.backend = backend;
-            return backend;
-        });
+
+                try {
+                    return new LocalStorageCryptoStore(global.localStorage);
+                } catch (e) {
+                    logger.warn(`unable to open localStorage: falling back to in-memory store: ${e}`);
+                    return new MemoryCryptoStore();
+                }
+            })
+            .then((backend) => {
+                this.backend = backend;
+                return backend;
+            });
 
         return this.backendPromise;
     }
@@ -167,12 +164,12 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Delete all data from this store.
      *
-     * @returns {Promise} resolves when the store has been cleared.
+     * @returns resolves when the store has been cleared.
      */
     public deleteAllData(): Promise<void> {
         return new Promise<void>((resolve, reject) => {
             if (!this.indexedDB) {
-                reject(new Error('no indexeddb support available'));
+                reject(new Error("no indexeddb support available"));
                 return;
             }
 
@@ -180,9 +177,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
             const req = this.indexedDB.deleteDatabase(this.dbName);
 
             req.onblocked = (): void => {
-                logger.log(
-                    `can't yet delete IndexedDBCryptoStore because it is open elsewhere`,
-                );
+                logger.log(`can't yet delete IndexedDBCryptoStore because it is open elsewhere`);
             };
 
             req.onerror = (ev): void => {
@@ -206,10 +201,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Look for an existing outgoing room key request, and if none is found,
      * add a new one
      *
-     * @param {module:crypto/store/base~OutgoingRoomKeyRequest} request
      *
-     * @returns {Promise} resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     * @returns resolves to
+     *    {@link OutgoingRoomKeyRequest}: either the
      *    same instance as passed in, or the existing one.
      */
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
@@ -219,11 +213,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
-     * @return {Promise} resolves to the matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     * @returns resolves to the matching
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found
      */
     public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
@@ -233,10 +226,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Look for room key requests by state
      *
-     * @param {Array<Number>} wantedStates list of acceptable states
+     * @param wantedStates - list of acceptable states
      *
-     * @return {Promise} resolves to the a
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     * @returns resolves to the a
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states. If there are multiple
      *    requests in those states, an arbitrary one is chosen.
      */
@@ -248,8 +241,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Look for room key requests by state –
      * unlike above, return a list of all entries in one state.
      *
-     * @param {Number} wantedState
-     * @return {Promise<Array<*>>} Returns an array of requests in the given state
+     * @returns Returns an array of requests in the given state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
         return this.backend!.getAllOutgoingRoomKeyRequestsByState(wantedState);
@@ -258,33 +250,31 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Look for room key requests by target device and state
      *
-     * @param {string} userId Target user ID
-     * @param {string} deviceId Target device ID
-     * @param {Array<Number>} wantedStates list of acceptable states
+     * @param userId - Target user ID
+     * @param deviceId - Target device ID
+     * @param wantedStates - list of acceptable states
      *
-     * @return {Promise} resolves to a list of all the
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     * @returns resolves to a list of all the
+     *    {@link OutgoingRoomKeyRequest}
      */
     public getOutgoingRoomKeyRequestsByTarget(
         userId: string,
         deviceId: string,
         wantedStates: number[],
     ): Promise<OutgoingRoomKeyRequest[]> {
-        return this.backend!.getOutgoingRoomKeyRequestsByTarget(
-            userId, deviceId, wantedStates,
-        );
+        return this.backend!.getOutgoingRoomKeyRequestsByTarget(userId, deviceId, wantedStates);
     }
 
     /**
      * Look for an existing room key request by id and state, and update it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
-     * @param {Object} updates        name/value map of updates to apply
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
+     * @param updates -        name/value map of updates to apply
      *
-     * @returns {Promise} resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     * @returns resolves to
+     *    {@link OutgoingRoomKeyRequest}
      *    updated request, or null if no matching row was found
      */
     public updateOutgoingRoomKeyRequest(
@@ -292,19 +282,17 @@ export class IndexedDBCryptoStore implements CryptoStore {
         expectedState: number,
         updates: Partial<OutgoingRoomKeyRequest>,
     ): Promise<OutgoingRoomKeyRequest | null> {
-        return this.backend!.updateOutgoingRoomKeyRequest(
-            requestId, expectedState, updates,
-        );
+        return this.backend!.updateOutgoingRoomKeyRequest(requestId, expectedState, updates);
     }
 
     /**
      * Look for an existing room key request by id and state, and delete it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
      *
-     * @returns {Promise} resolves once the operation is completed
+     * @returns resolves once the operation is completed
      */
     public deleteOutgoingRoomKeyRequest(
         requestId: string,
@@ -319,8 +307,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Get the account pickle from the store.
      * This requires an active transaction. See doTxn().
      *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(string)} func Called with the account pickle
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called with the account pickle
      */
     public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void): void {
         this.backend!.getAccount(txn, func);
@@ -330,8 +318,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Write the account pickle to the store.
      * This requires an active transaction. See doTxn().
      *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {string} accountPickle The new account pickle to store.
+     * @param txn - An active transaction. See doTxn().
+     * @param accountPickle - The new account pickle to store.
      */
     public storeAccount(txn: IDBTransaction, accountPickle: string): void {
         this.backend!.storeAccount(txn, accountPickle);
@@ -341,9 +329,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Get the public part of the cross-signing keys (eg. self-signing key,
      * user signing key).
      *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(string)} func Called with the account keys object:
-     *        { key_type: base64 encoded seed } where key type = user_signing_key_seed or self_signing_key_seed
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called with the account keys object:
+     *        `{ key_type: base64 encoded seed }` where key type = user_signing_key_seed or self_signing_key_seed
      */
     public getCrossSigningKeys(
         txn: IDBTransaction,
@@ -353,9 +341,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
     }
 
     /**
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(string)} func Called with the private key
-     * @param {string} type A key type
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called with the private key
+     * @param type - A key type
      */
     public getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: IDBTransaction,
@@ -368,8 +356,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Write the cross-signing keys back to the store
      *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {string} keys keys object as getCrossSigningKeys()
+     * @param txn - An active transaction. See doTxn().
+     * @param keys - keys object as getCrossSigningKeys()
      */
     public storeCrossSigningKeys(txn: IDBTransaction, keys: Record<string, ICrossSigningKey>): void {
         this.backend!.storeCrossSigningKeys(txn, keys);
@@ -378,9 +366,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Write the cross-signing private keys back to the store
      *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {string} type The type of cross-signing private key to store
-     * @param {string} key keys object as getCrossSigningKeys()
+     * @param txn - An active transaction. See doTxn().
+     * @param type - The type of cross-signing private key to store
+     * @param key - keys object as getCrossSigningKeys()
      */
     public storeSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
         txn: IDBTransaction,
@@ -394,8 +382,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Returns the number of end-to-end sessions in the store
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(int)} func Called with the count of sessions
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called with the count of sessions
      */
     public countEndToEndSessions(txn: IDBTransaction, func: (count: number) => void): void {
         this.backend!.countEndToEndSessions(txn, func);
@@ -404,10 +392,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Retrieve a specific end-to-end session between the logged-in user
      * and another device.
-     * @param {string} deviceKey The public key of the other device.
-     * @param {string} sessionId The ID of the session to retrieve
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(object)} func Called with A map from sessionId
+     * @param deviceKey - The public key of the other device.
+     * @param sessionId - The ID of the session to retrieve
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called with A map from sessionId
      *     to session information object with 'session' key being the
      *     Base64 end-to-end session and lastReceivedMessageTs being the
      *     timestamp in milliseconds at which the session last received
@@ -425,9 +413,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Retrieve the end-to-end sessions between the logged-in user and another
      * device.
-     * @param {string} deviceKey The public key of the other device.
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(object)} func Called with A map from sessionId
+     * @param deviceKey - The public key of the other device.
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called with A map from sessionId
      *     to session information object with 'session' key being the
      *     Base64 end-to-end session and lastReceivedMessageTs being the
      *     timestamp in milliseconds at which the session last received
@@ -443,8 +431,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Retrieve all end-to-end sessions
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(object)} func Called one for each session with
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called one for each session with
      *     an object with, deviceKey, lastReceivedMessageTs, sessionId
      *     and session keys.
      */
@@ -454,10 +442,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Store a session between the logged-in user and another device
-     * @param {string} deviceKey The public key of the other device.
-     * @param {string} sessionId The ID for this end-to-end session.
-     * @param {string} sessionInfo Session information object
-     * @param {*} txn An active transaction. See doTxn().
+     * @param deviceKey - The public key of the other device.
+     * @param sessionId - The ID for this end-to-end session.
+     * @param sessionInfo - Session information object
+     * @param txn - An active transaction. See doTxn().
      */
     public storeEndToEndSession(
         deviceKey: string,
@@ -485,10 +473,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Retrieve the end-to-end inbound group session for a given
      * server key and session ID
-     * @param {string} senderCurve25519Key The sender's curve 25519 key
-     * @param {string} sessionId The ID of the session
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(object)} func Called with A map from sessionId
+     * @param senderCurve25519Key - The sender's curve 25519 key
+     * @param sessionId - The ID of the session
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called with A map from sessionId
      *     to Base64 end-to-end session.
      */
     public getEndToEndInboundGroupSession(
@@ -502,15 +490,12 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Fetches all inbound group sessions in the store
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(object)} func Called once for each group session
-     *     in the store with an object having keys {senderKey, sessionId,
-     *     sessionData}, then once with null to indicate the end of the list.
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Called once for each group session
+     *     in the store with an object having keys `{senderKey, sessionId, sessionData}`,
+     *     then once with null to indicate the end of the list.
      */
-    public getAllEndToEndInboundGroupSessions(
-        txn: IDBTransaction,
-        func: (session: ISession | null) => void,
-    ): void {
+    public getAllEndToEndInboundGroupSessions(txn: IDBTransaction, func: (session: ISession | null) => void): void {
         this.backend!.getAllEndToEndInboundGroupSessions(txn, func);
     }
 
@@ -518,10 +503,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Adds an end-to-end inbound group session to the store.
      * If there already exists an inbound group session with the same
      * senderCurve25519Key and sessionID, the session will not be added.
-     * @param {string} senderCurve25519Key The sender's curve 25519 key
-     * @param {string} sessionId The ID of the session
-     * @param {object} sessionData The session data structure
-     * @param {*} txn An active transaction. See doTxn().
+     * @param senderCurve25519Key - The sender's curve 25519 key
+     * @param sessionId - The ID of the session
+     * @param sessionData - The session data structure
+     * @param txn - An active transaction. See doTxn().
      */
     public addEndToEndInboundGroupSession(
         senderCurve25519Key: string,
@@ -536,10 +521,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * Writes an end-to-end inbound group session to the store.
      * If there already exists an inbound group session with the same
      * senderCurve25519Key and sessionID, it will be overwritten.
-     * @param {string} senderCurve25519Key The sender's curve 25519 key
-     * @param {string} sessionId The ID of the session
-     * @param {object} sessionData The session data structure
-     * @param {*} txn An active transaction. See doTxn().
+     * @param senderCurve25519Key - The sender's curve 25519 key
+     * @param sessionId - The ID of the session
+     * @param sessionData - The session data structure
+     * @param txn - An active transaction. See doTxn().
      */
     public storeEndToEndInboundGroupSession(
         senderCurve25519Key: string,
@@ -568,8 +553,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * These all need to be written out in full each time such that the snapshot
      * is always consistent, so they are stored in one object.
      *
-     * @param {Object} deviceData
-     * @param {*} txn An active transaction. See doTxn().
+     * @param txn - An active transaction. See doTxn().
      */
     public storeEndToEndDeviceData(deviceData: IDeviceData, txn: IDBTransaction): void {
         this.backend!.storeEndToEndDeviceData(deviceData, txn);
@@ -578,8 +562,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Get the state of all tracked devices
      *
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(Object)} func Function called with the
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Function called with the
      *     device data
      */
     public getEndToEndDeviceData(txn: IDBTransaction, func: (deviceData: IDeviceData | null) => void): void {
@@ -590,18 +574,18 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Store the end-to-end state for a room.
-     * @param {string} roomId The room's ID.
-     * @param {object} roomInfo The end-to-end info for the room.
-     * @param {*} txn An active transaction. See doTxn().
+     * @param roomId - The room's ID.
+     * @param roomInfo - The end-to-end info for the room.
+     * @param txn - An active transaction. See doTxn().
      */
     public storeEndToEndRoom(roomId: string, roomInfo: IRoomEncryption, txn: IDBTransaction): void {
         this.backend!.storeEndToEndRoom(roomId, roomInfo, txn);
     }
 
     /**
-     * Get an object of roomId->roomInfo for all e2e rooms in the store
-     * @param {*} txn An active transaction. See doTxn().
-     * @param {function(Object)} func Function called with the end to end encrypted rooms
+     * Get an object of `roomId->roomInfo` for all e2e rooms in the store
+     * @param txn - An active transaction. See doTxn().
+     * @param func - Function called with the end-to-end encrypted rooms
      */
     public getEndToEndRooms(txn: IDBTransaction, func: (rooms: Record<string, IRoomEncryption>) => void): void {
         this.backend!.getEndToEndRooms(txn, func);
@@ -611,9 +595,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Get the inbound group sessions that need to be backed up.
-     * @param {number} limit The maximum number of sessions to retrieve.  0
+     * @param limit - The maximum number of sessions to retrieve.  0
      * for no limit.
-     * @returns {Promise} resolves to an array of inbound group sessions
+     * @returns resolves to an array of inbound group sessions
      */
     public getSessionsNeedingBackup(limit: number): Promise<ISession[]> {
         return this.backend!.getSessionsNeedingBackup(limit);
@@ -621,8 +605,8 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Count the inbound group sessions that need to be backed up.
-     * @param {*} txn An active transaction. See doTxn(). (optional)
-     * @returns {Promise} resolves to the number of sessions
+     * @param txn - An active transaction. See doTxn(). (optional)
+     * @returns resolves to the number of sessions
      */
     public countSessionsNeedingBackup(txn?: IDBTransaction): Promise<number> {
         return this.backend!.countSessionsNeedingBackup(txn);
@@ -630,9 +614,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Unmark sessions as needing to be backed up.
-     * @param {Array<object>} sessions The sessions that need to be backed up.
-     * @param {*} txn An active transaction. See doTxn(). (optional)
-     * @returns {Promise} resolves when the sessions are unmarked
+     * @param sessions - The sessions that need to be backed up.
+     * @param txn - An active transaction. See doTxn(). (optional)
+     * @returns resolves when the sessions are unmarked
      */
     public unmarkSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
         return this.backend!.unmarkSessionsNeedingBackup(sessions, txn);
@@ -640,9 +624,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Mark sessions as needing to be backed up.
-     * @param {Array<object>} sessions The sessions that need to be backed up.
-     * @param {*} txn An active transaction. See doTxn(). (optional)
-     * @returns {Promise} resolves when the sessions are marked
+     * @param sessions - The sessions that need to be backed up.
+     * @param txn - An active transaction. See doTxn(). (optional)
+     * @returns resolves when the sessions are marked
      */
     public markSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
         return this.backend!.markSessionsNeedingBackup(sessions, txn);
@@ -650,10 +634,10 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Add a shared-history group session for a room.
-     * @param {string} roomId The room that the key belongs to
-     * @param {string} senderKey The sender's curve 25519 key
-     * @param {string} sessionId The ID of the session
-     * @param {*} txn An active transaction. See doTxn(). (optional)
+     * @param roomId - The room that the key belongs to
+     * @param senderKey - The sender's curve 25519 key
+     * @param sessionId - The ID of the session
+     * @param txn - An active transaction. See doTxn(). (optional)
      */
     public addSharedHistoryInboundGroupSession(
         roomId: string,
@@ -666,9 +650,9 @@ export class IndexedDBCryptoStore implements CryptoStore {
 
     /**
      * Get the shared-history group session for a room.
-     * @param {string} roomId The room that the key belongs to
-     * @param {*} txn An active transaction. See doTxn(). (optional)
-     * @returns {Promise} Resolves to an array of [senderKey, sessionId]
+     * @param roomId - The room that the key belongs to
+     * @param txn - An active transaction. See doTxn(). (optional)
+     * @returns Promise which resolves to an array of [senderKey, sessionId]
      */
     public getSharedHistoryInboundGroupSessions(
         roomId: string,
@@ -680,21 +664,14 @@ export class IndexedDBCryptoStore implements CryptoStore {
     /**
      * Park a shared-history group session for a room we may be invited to later.
      */
-    public addParkedSharedHistory(
-        roomId: string,
-        parkedData: ParkedSharedHistory,
-        txn?: IDBTransaction,
-    ): void {
+    public addParkedSharedHistory(roomId: string, parkedData: ParkedSharedHistory, txn?: IDBTransaction): void {
         this.backend!.addParkedSharedHistory(roomId, parkedData, txn);
     }
 
     /**
      * Pop out all shared-history group sessions for a room.
      */
-    public takeParkedSharedHistory(
-        roomId: string,
-        txn?: IDBTransaction,
-    ): Promise<ParkedSharedHistory[]> {
+    public takeParkedSharedHistory(roomId: string, txn?: IDBTransaction): Promise<ParkedSharedHistory[]> {
         return this.backend!.takeParkedSharedHistory(roomId, txn);
     }
 
@@ -704,16 +681,16 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * only be called within a callback of either this function or
      * one of the store functions operating on the same transaction.
      *
-     * @param {string} mode 'readwrite' if you need to call setter
+     * @param mode - 'readwrite' if you need to call setter
      *     functions with this transaction. Otherwise, 'readonly'.
-     * @param {string[]} stores List IndexedDBCryptoStore.STORE_*
+     * @param stores - List IndexedDBCryptoStore.STORE_*
      *     options representing all types of object that will be
      *     accessed or written to with this transaction.
-     * @param {function(*)} func Function called with the
+     * @param func - Function called with the
      *     transaction object: an opaque object that should be passed
      *     to store functions.
-     * @param {Logger} [log] A possibly customised log
-     * @return {Promise} Promise that resolves with the result of the `func`
+     * @param log - A possibly customised log
+     * @returns Promise that resolves with the result of the `func`
      *     when the transaction is complete. If the backend is
      *     async (ie. the indexeddb backend) any of the callback
      *     functions throwing an exception will cause this promise to

@@ -39,7 +39,7 @@ let threadEvent: MatrixEvent;
 const ROOM_ID = "!roomId:example.org";
 let THREAD_ID: string;
 
-function mkPushAction(notify, highlight): IActionsObject {
+function mkPushAction(notify: boolean, highlight: boolean): IActionsObject {
     return {
         notify,
         tweaks: {
@@ -57,9 +57,9 @@ describe("fixNotificationCountOnDecryption", () => {
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
             supportsExperimentalThreads: jest.fn().mockReturnValue(true),
         });
-        mockClient.reEmitter = mock(ReEmitter, 'ReEmitter');
+        mockClient.reEmitter = mock(ReEmitter, "ReEmitter");
         mockClient.canSupport = new Map();
-        Object.keys(Feature).forEach(feature => {
+        Object.keys(Feature).forEach((feature) => {
             mockClient.canSupport.set(feature as Feature, ServerSupport.Stable);
         });
 
@@ -67,14 +67,17 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setUnreadNotificationCount(NotificationCountType.Total, 1);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
-        event = mkEvent({
-            type: EventType.RoomMessage,
-            content: {
-                msgtype: MsgType.Text,
-                body: "Hello world!",
+        event = mkEvent(
+            {
+                type: EventType.RoomMessage,
+                content: {
+                    msgtype: MsgType.Text,
+                    body: "Hello world!",
+                },
+                event: true,
             },
-            event: true,
-        }, mockClient);
+            mockClient,
+        );
 
         THREAD_ID = event.getId()!;
         threadEvent = mkEvent({
@@ -133,6 +136,29 @@ describe("fixNotificationCountOnDecryption", () => {
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 
         fixNotificationCountOnDecryption(mockClient, event);
+
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);
+    });
+
+    it("does not calculate for threads unknown to the room", () => {
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
+
+        const unknownThreadEvent = mkEvent({
+            type: EventType.RoomMessage,
+            content: {
+                "m.relates_to": {
+                    rel_type: RelationType.Thread,
+                    event_id: "$unknownthread",
+                },
+                "msgtype": MsgType.Text,
+                "body": "Thread reply",
+            },
+            event: true,
+        });
+
+        fixNotificationCountOnDecryption(mockClient, unknownThreadEvent);
 
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(0);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(0);

@@ -48,9 +48,9 @@ export enum ConditionOperator {
 
 export type PushRuleAction = Tweaks | PushRuleActionName;
 
-export type MemberCountCondition
-    <N extends number, Op extends ConditionOperator = ConditionOperator.ExactEquals>
-    = `${Op}${N}` | (Op extends ConditionOperator.ExactEquals ? `${N}` : never);
+export type MemberCountCondition<N extends number, Op extends ConditionOperator = ConditionOperator.ExactEquals> =
+    | `${Op}${N}`
+    | (Op extends ConditionOperator.ExactEquals ? `${N}` : never);
 
 export type AnyMemberCountCondition = MemberCountCondition<number, ConditionOperator>;
 
@@ -103,7 +103,8 @@ export interface ICallStartedPrefixCondition extends IPushRuleCondition<Conditio
 
 // XXX: custom conditions are possible but always fail, and break the typescript discriminated union so ignore them here
 // IPushRuleCondition<Exclude<string, ConditionKind>> unfortunately does not resolve this at the time of writing.
-export type PushRuleCondition = IEventMatchCondition
+export type PushRuleCondition =
+    | IEventMatchCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition
@@ -157,21 +158,21 @@ export interface IPushRules {
 }
 
 export interface IPusher {
-    app_display_name: string;
-    app_id: string;
-    data: {
+    "app_display_name": string;
+    "app_id": string;
+    "data": {
         format?: string;
         url?: string; // TODO: Required if kind==http
         brand?: string; // TODO: For email notifications only? Unspecced field
     };
-    device_display_name: string;
-    kind: "http" | string;
-    lang: string;
-    profile_tag?: string;
-    pushkey: string;
-    enabled?: boolean | null;
+    "device_display_name": string;
+    "kind": "http" | string;
+    "lang": string;
+    "profile_tag"?: string;
+    "pushkey": string;
+    "enabled"?: boolean | null;
     "org.matrix.msc3881.enabled"?: boolean | null;
-    device_id?: string | null;
+    "device_id"?: string | null;
     "org.matrix.msc3881.device_id"?: string | null;
 }
 

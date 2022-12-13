@@ -14,10 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/room-member
- */
-
 import { getHttpUriForMxc } from "../content-repo";
 import * as utils from "../utils";
 import { User } from "./user";
@@ -35,9 +31,56 @@ export enum RoomMemberEvent {
 }
 
 export type RoomMemberEventHandlerMap = {
+    /**
+     * Fires whenever any room member's membership state changes.
+     * @param event - The matrix event which caused this event to fire.
+     * @param member - The member whose RoomMember.membership changed.
+     * @param oldMembership - The previous membership state. Null if it's a new member.
+     * @example
+     * ```
+     * matrixClient.on("RoomMember.membership", function(event, member, oldMembership){
+     *   var newState = member.membership;
+     * });
+     * ```
+     */
     [RoomMemberEvent.Membership]: (event: MatrixEvent, member: RoomMember, oldMembership?: string) => void;
+    /**
+     * Fires whenever any room member's name changes.
+     * @param event - The matrix event which caused this event to fire.
+     * @param member - The member whose RoomMember.name changed.
+     * @param oldName - The previous name. Null if the member didn't have a name previously.
+     * @example
+     * ```
+     * matrixClient.on("RoomMember.name", function(event, member){
+     *   var newName = member.name;
+     * });
+     * ```
+     */
     [RoomMemberEvent.Name]: (event: MatrixEvent, member: RoomMember, oldName: string | null) => void;
+    /**
+     * Fires whenever any room member's power level changes.
+     * @param event - The matrix event which caused this event to fire.
+     * @param member - The member whose RoomMember.powerLevel changed.
+     * @example
+     * ```
+     * matrixClient.on("RoomMember.powerLevel", function(event, member){
+     *   var newPowerLevel = member.powerLevel;
+     *   var newNormPowerLevel = member.powerLevelNorm;
+     * });
+     * ```
+     */
     [RoomMemberEvent.PowerLevel]: (event: MatrixEvent, member: RoomMember) => void;
+    /**
+     * Fires whenever any room member's typing state changes.
+     * @param event - The matrix event which caused this event to fire.
+     * @param member - The member whose RoomMember.typing changed.
+     * @example
+     * ```
+     * matrixClient.on("RoomMember.typing", function(event, member){
+     *   var isTyping = member.typing;
+     * });
+     * ```
+     */
     [RoomMemberEvent.Typing]: (event: MatrixEvent, member: RoomMember) => void;
 };
 
@@ -47,41 +90,55 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     public requestedProfileInfo = false; // used by sync.ts
 
     // XXX these should be read-only
+    /**
+     * True if the room member is currently typing.
+     */
     public typing = false;
+    /**
+     * The human-readable name for this room member. This will be
+     * disambiguated with a suffix of " (\@user_id:matrix.org)" if another member shares the
+     * same displayname.
+     */
     public name: string;
+    /**
+     * The ambiguous displayname of this room member.
+     */
     public rawDisplayName: string;
+    /**
+     * The power level for this room member.
+     */
     public powerLevel = 0;
+    /**
+     * The normalised power level (0-100) for this room member.
+     */
     public powerLevelNorm = 0;
+    /**
+     * The User object for this room member, if one exists.
+     */
     public user?: User;
+    /**
+     * The membership state for this room member e.g. 'join'.
+     */
     public membership?: string;
+    /**
+     * True if the member's name is disambiguated.
+     */
     public disambiguate = false;
+    /**
+     * The events describing this RoomMember.
+     */
     public events: {
+        /**
+         * The m.room.member event for this RoomMember.
+         */
         member?: MatrixEvent;
     } = {};
 
     /**
      * Construct a new room member.
      *
-     * @constructor
-     * @alias module:models/room-member
-     *
-     * @param {string} roomId The room ID of the member.
-     * @param {string} userId The user ID of the member.
-     * @prop {string} roomId The room ID for this member.
-     * @prop {string} userId The user ID of this member.
-     * @prop {boolean} typing True if the room member is currently typing.
-     * @prop {string} name The human-readable name for this room member. This will be
-     * disambiguated with a suffix of " (@user_id:matrix.org)" if another member shares the
-     * same displayname.
-     * @prop {string} rawDisplayName The ambiguous displayname of this room member.
-     * @prop {Number} powerLevel The power level for this room member.
-     * @prop {Number} powerLevelNorm The normalised power level (0-100) for this
-     * room member.
-     * @prop {User} user The User object for this room member, if one exists.
-     * @prop {string} membership The membership state for this room member e.g. 'join'.
-     * @prop {Object} events The events describing this RoomMember.
-     * @prop {MatrixEvent} events.member The m.room.member event for this RoomMember.
-     * @prop {boolean} disambiguate True if the member's name is disambiguated.
+     * @param roomId - The room ID of the member.
+     * @param userId - The user ID of the member.
      */
     public constructor(public readonly roomId: string, public readonly userId: string) {
         super();
@@ -99,7 +156,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 
     /**
-     * @return {boolean} does the member come from a channel that is not sync?
+     * @returns does the member come from a channel that is not sync?
      * This is used to store the member seperately
      * from the sync state so it available across browser sessions.
      */
@@ -110,11 +167,13 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update this room member's membership event. May fire "RoomMember.name" if
      * this event updates this member's name.
-     * @param {MatrixEvent} event The <code>m.room.member</code> event
-     * @param {RoomState} roomState Optional. The room state to take into account
+     * @param event - The `m.room.member` event
+     * @param roomState - Optional. The room state to take into account
      * when calculating (e.g. for disambiguating users with the same name).
-     * @fires module:client~MatrixClient#event:"RoomMember.name"
-     * @fires module:client~MatrixClient#event:"RoomMember.membership"
+     *
+     * @remarks
+     * Fires {@link RoomMemberEvent.Name}
+     * Fires {@link RoomMemberEvent.Membership}
      */
     public setMembershipEvent(event: MatrixEvent, roomState?: RoomState): void {
         const displayName = event.getDirectionalContent().displayname ?? "";
@@ -135,7 +194,8 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             logger.trace(
                 `membership event with membership undefined (forwardLooking: ${event.forwardLooking})!`,
                 event.getContent(),
-                `prevcontent is `, event.getPrevContent(),
+                `prevcontent is `,
+                event.getPrevContent(),
             );
         }
 
@@ -164,9 +224,10 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update this room member's power level event. May fire
      * "RoomMember.powerLevel" if this event updates this member's power levels.
-     * @param {MatrixEvent} powerLevelEvent The <code>m.room.power_levels</code>
-     * event
-     * @fires module:client~MatrixClient#event:"RoomMember.powerLevel"
+     * @param powerLevelEvent - The `m.room.power_levels` event
+     *
+     * @remarks
+     * Fires {@link RoomMemberEvent.PowerLevel}
      */
     public setPowerLevelEvent(powerLevelEvent: MatrixEvent): void {
         if (powerLevelEvent.getType() !== EventType.RoomPowerLevels || powerLevelEvent.getStateKey() !== "") {
@@ -206,8 +267,10 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     /**
      * Update this room member's typing event. May fire "RoomMember.typing" if
      * this event changes this member's typing state.
-     * @param {MatrixEvent} event The typing event
-     * @fires module:client~MatrixClient#event:"RoomMember.typing"
+     * @param event - The typing event
+     *
+     * @remarks
+     * Fires {@link RoomMemberEvent.Typing}
      */
     public setTypingEvent(event: MatrixEvent): void {
         if (event.getType() !== "m.typing") {
@@ -240,22 +303,24 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * Get the timestamp when this RoomMember was last updated. This timestamp is
      * updated when properties on this RoomMember are updated.
      * It is updated <i>before</i> firing events.
-     * @return {number} The timestamp
+     * @returns The timestamp
      */
     public getLastModifiedTime(): number {
         return this.modified;
     }
 
     public isKicked(): boolean {
-        return this.membership === "leave"
-            && this.events.member !== undefined
-            && this.events.member.getSender() !== this.events.member.getStateKey();
+        return (
+            this.membership === "leave" &&
+            this.events.member !== undefined &&
+            this.events.member.getSender() !== this.events.member.getStateKey()
+        );
     }
 
     /**
      * If this member was invited with the is_direct flag set, return
      * the user that invited this member
-     * @return {string} user id of the inviter
+     * @returns user id of the inviter
      */
     public getDMInviter(): string | undefined {
         // when not available because that room state hasn't been loaded in,
@@ -285,21 +350,21 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
     /**
      * Get the avatar URL for a room member.
-     * @param {string} baseUrl The base homeserver URL See
-     * {@link module:client~MatrixClient#getHomeserverUrl}.
-     * @param {Number} width The desired width of the thumbnail.
-     * @param {Number} height The desired height of the thumbnail.
-     * @param {string} resizeMethod The thumbnail resize method to use, either
+     * @param baseUrl - The base homeserver URL See
+     * {@link MatrixClient#getHomeserverUrl}.
+     * @param width - The desired width of the thumbnail.
+     * @param height - The desired height of the thumbnail.
+     * @param resizeMethod - The thumbnail resize method to use, either
      * "crop" or "scale".
-     * @param {Boolean} allowDefault (optional) Passing false causes this method to
+     * @param allowDefault - (optional) Passing false causes this method to
      * return null if the user has no avatar image. Otherwise, a default image URL
      * will be returned. Default: true. (Deprecated)
-     * @param {Boolean} allowDirectLinks (optional) If true, the avatar URL will be
+     * @param allowDirectLinks - (optional) If true, the avatar URL will be
      * returned even if it is a direct hyperlink rather than a matrix content URL.
      * If false, any non-matrix content URLs will be ignored. Setting this option to
      * true will expose URLs that, if fetched, will leak information about the user
      * to anyone who they share a room with.
-     * @return {?string} the avatar URL or null.
+     * @returns the avatar URL or null.
      */
     public getAvatarUrl(
         baseUrl: string,
@@ -323,7 +388,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 
     /**
      * get the mxc avatar url, either from a state event, or from a lazily loaded member
-     * @return {string} the mxc avatar url
+     * @returns the mxc avatar url
      */
     public getMxcAvatarUrl(): string | undefined {
         if (this.events.member) {
@@ -364,11 +429,7 @@ function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?
     return false;
 }
 
-function calculateDisplayName(
-    selfUserId: string,
-    displayName: string | undefined,
-    disambiguate: boolean,
-): string {
+function calculateDisplayName(selfUserId: string, displayName: string | undefined, disambiguate: boolean): string {
     if (!displayName || displayName === selfUserId) return selfUserId;
 
     if (disambiguate) return utils.removeDirectionOverrideChars(displayName) + " (" + selfUserId + ")";
@@ -390,52 +451,3 @@ function calculateDisplayName(
     // with the embed chars or marker chars.
     return utils.removeDirectionOverrideChars(displayName);
 }
-
-/**
- * Fires whenever any room member's name changes.
- * @event module:client~MatrixClient#"RoomMember.name"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomMember} member The member whose RoomMember.name changed.
- * @param {string?} oldName The previous name. Null if the member didn't have a
- *    name previously.
- * @example
- * matrixClient.on("RoomMember.name", function(event, member){
- *   var newName = member.name;
- * });
- */
-
-/**
- * Fires whenever any room member's membership state changes.
- * @event module:client~MatrixClient#"RoomMember.membership"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomMember} member The member whose RoomMember.membership changed.
- * @param {string?} oldMembership The previous membership state. Null if it's a
- *    new member.
- * @example
- * matrixClient.on("RoomMember.membership", function(event, member, oldMembership){
- *   var newState = member.membership;
- * });
- */
-
-/**
- * Fires whenever any room member's typing state changes.
- * @event module:client~MatrixClient#"RoomMember.typing"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomMember} member The member whose RoomMember.typing changed.
- * @example
- * matrixClient.on("RoomMember.typing", function(event, member){
- *   var isTyping = member.typing;
- * });
- */
-
-/**
- * Fires whenever any room member's power level changes.
- * @event module:client~MatrixClient#"RoomMember.powerLevel"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomMember} member The member whose RoomMember.powerLevel changed.
- * @example
- * matrixClient.on("RoomMember.powerLevel", function(event, member){
- *   var newPowerLevel = member.powerLevel;
- *   var newNormPowerLevel = member.powerLevelNorm;
- * });
- */

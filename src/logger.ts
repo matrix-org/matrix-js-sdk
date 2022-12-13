@@ -15,10 +15,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module logger
- */
-
 import log, { Logger } from "loglevel";
 
 // This is to demonstrate, that you can use any namespace you want.
@@ -34,17 +30,15 @@ const DEFAULT_NAMESPACE = "matrix";
 // to avoid the issue, we override the methodFactory of loglevel that binds to the
 // console methods at initialization time by a factory that looks up the console methods
 // when logging so we always get the current value of console methods.
-log.methodFactory = function(methodName, logLevel, loggerName) {
-    return function(this: PrefixedLogger, ...args): void {
+log.methodFactory = function (methodName, logLevel, loggerName) {
+    return function (this: PrefixedLogger, ...args): void {
         /* eslint-disable @typescript-eslint/no-invalid-this */
         if (this.prefix) {
             args.unshift(this.prefix);
         }
         /* eslint-enable @typescript-eslint/no-invalid-this */
-        const supportedByConsole = methodName === "error" ||
-            methodName === "warn" ||
-            methodName === "trace" ||
-            methodName === "info";
+        const supportedByConsole =
+            methodName === "error" || methodName === "warn" || methodName === "trace" || methodName === "info";
         /* eslint-disable no-console */
         if (supportedByConsole) {
             return console[methodName](...args);
@@ -56,7 +50,7 @@ log.methodFactory = function(methodName, logLevel, loggerName) {
 };
 
 /**
- * Drop-in replacement for <code>console</code> using {@link https://www.npmjs.com/package/loglevel|loglevel}.
+ * Drop-in replacement for `console` using {@link https://www.npmjs.com/package/loglevel|loglevel}.
  * Can be tailored down to specific use cases if needed.
  */
 export const logger = log.getLogger(DEFAULT_NAMESPACE) as PrefixedLogger;
@@ -68,7 +62,7 @@ export interface PrefixedLogger extends Logger {
 }
 
 function extendLogger(logger: Logger): void {
-    (<PrefixedLogger>logger).withPrefix = function(prefix: string): PrefixedLogger {
+    (<PrefixedLogger>logger).withPrefix = function (prefix: string): PrefixedLogger {
         const existingPrefix = this.prefix || "";
         return getPrefixedLogger(existingPrefix + prefix);
     };

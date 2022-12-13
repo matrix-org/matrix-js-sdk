@@ -18,10 +18,20 @@ import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
 import { EventStatus } from "../../src/models/event";
-import { MatrixError, ClientEvent, IEvent, MatrixClient, RoomEvent } from "../../src";
+import {
+    MatrixError,
+    ClientEvent,
+    IEvent,
+    MatrixClient,
+    RoomEvent,
+    ISyncResponse,
+    IMinimalEvent,
+    IRoomEvent,
+    Room,
+} from "../../src";
 import { TestClient } from "../TestClient";
 
-describe("MatrixClient room timelines", function() {
+describe("MatrixClient room timelines", function () {
     const userId = "@alice:localhost";
     const userName = "Alice";
     const accessToken = "aseukfgwef";
@@ -31,24 +41,32 @@ describe("MatrixClient room timelines", function() {
     let httpBackend: HttpBackend | undefined;
 
     const USER_MEMBERSHIP_EVENT = utils.mkMembership({
-        room: roomId, mship: "join", user: userId, name: userName,
+        room: roomId,
+        mship: "join",
+        user: userId,
+        name: userName,
     });
     const ROOM_NAME_EVENT = utils.mkEvent({
-        type: "m.room.name", room: roomId, user: otherUserId,
+        type: "m.room.name",
+        room: roomId,
+        user: otherUserId,
         content: {
             name: "Old room name",
         },
     });
-    let NEXT_SYNC_DATA;
+    let NEXT_SYNC_DATA: Partial<ISyncResponse>;
     const SYNC_DATA = {
         next_batch: "s_5_3",
         rooms: {
             join: {
-                "!foo:bar": { // roomId
+                "!foo:bar": {
+                    // roomId
                     timeline: {
                         events: [
                             utils.mkMessage({
-                                room: roomId, user: otherUserId, msg: "hello",
+                                room: roomId,
+                                user: otherUserId,
+                                msg: "hello",
                             }),
                         ],
                         prev_batch: "f_1_1",
@@ -57,12 +75,16 @@ describe("MatrixClient room timelines", function() {
                         events: [
                             ROOM_NAME_EVENT,
                             utils.mkMembership({
-                                room: roomId, mship: "join",
-                                user: otherUserId, name: "Bob",
+                                room: roomId,
+                                mship: "join",
+                                user: otherUserId,
+                                name: "Bob",
                             }),
                             USER_MEMBERSHIP_EVENT,
                             utils.mkEvent({
-                                type: "m.room.create", room: roomId, user: userId,
+                                type: "m.room.create",
+                                room: roomId,
+                                user: userId,
                                 content: {
                                     creator: userId,
                                 },
@@ -88,32 +110,26 @@ describe("MatrixClient room timelines", function() {
                     },
                 },
                 leave: {},
-            },
+            } as unknown as ISyncResponse["rooms"],
         };
-        events.forEach(function(e) {
+        events.forEach(function (e) {
             if (e.room_id !== roomId) {
                 throw new Error("setNextSyncData only works with one room id");
             }
             if (e.state_key) {
                 // push the current
-                NEXT_SYNC_DATA.rooms.join[roomId].timeline.events.push(e);
+                NEXT_SYNC_DATA.rooms!.join[roomId].timeline.events.push(e as unknown as IRoomEvent);
             } else if (["m.typing", "m.receipt"].indexOf(e.type!) !== -1) {
-                NEXT_SYNC_DATA.rooms.join[roomId].ephemeral.events.push(e);
+                NEXT_SYNC_DATA.rooms!.join[roomId].ephemeral.events.push(e as unknown as IMinimalEvent);
             } else {
-                NEXT_SYNC_DATA.rooms.join[roomId].timeline.events.push(e);
+                NEXT_SYNC_DATA.rooms!.join[roomId].timeline.events.push(e as unknown as IRoomEvent);
             }
         });
     }
 
     const setupTestClient = (): [MatrixClient, HttpBackend] => {
         // these tests should work with or without timelineSupport
-        const testClient = new TestClient(
-            userId,
-            "DEVICE",
-            accessToken,
-            undefined,
-            { timelineSupport: true },
-        );
+        const testClient = new TestClient(userId, "DEVICE", accessToken, undefined, { timelineSupport: true });
         const httpBackend = testClient.httpBackend;
         const client = testClient.client;
 
@@ -122,7 +138,7 @@ describe("MatrixClient room timelines", function() {
         httpBackend!.when("GET", "/pushrules").respond(200, {});
         httpBackend!.when("POST", "/filter").respond(200, { filter_id: "fid" });
         httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
-        httpBackend!.when("GET", "/sync").respond(200, function() {
+        httpBackend!.when("GET", "/sync").respond(200, function () {
             return NEXT_SYNC_DATA;
         });
         client!.startClient();
@@ -130,119 +146,131 @@ describe("MatrixClient room timelines", function() {
         return [client!, httpBackend];
     };
 
-    beforeEach(async function() {
+    beforeEach(async function () {
         [client!, httpBackend] = setupTestClient();
         await httpBackend.flush("/versions");
         await httpBackend.flush("/pushrules");
         await httpBackend.flush("/filter");
     });
 
-    afterEach(function() {
+    afterEach(function () {
         httpBackend!.verifyNoOutstandingExpectation();
         client!.stopClient();
         return httpBackend!.stop();
     });
 
-    describe("local echo events", function() {
-        it("should be added immediately after calling MatrixClient.sendEvent " +
-        "with EventStatus.SENDING and the right event.sender", function(done) {
-            client!.on(ClientEvent.Sync, function(state) {
-                if (state !== "PREPARED") {
-                    return;
-                }
-                const room = client!.getRoom(roomId)!;
-                expect(room.timeline.length).toEqual(1);
+    describe("local echo events", function () {
+        it(
+            "should be added immediately after calling MatrixClient.sendEvent " +
+                "with EventStatus.SENDING and the right event.sender",
+            function (done) {
+                client!.on(ClientEvent.Sync, function (state) {
+                    if (state !== "PREPARED") {
+                        return;
+                    }
+                    const room = client!.getRoom(roomId)!;
+                    expect(room.timeline.length).toEqual(1);
 
-                client!.sendTextMessage(roomId, "I am a fish", "txn1");
-                // check it was added
-                expect(room.timeline.length).toEqual(2);
-                // check status
-                expect(room.timeline[1].status).toEqual(EventStatus.SENDING);
-                // check member
-                const member = room.timeline[1].sender;
-                expect(member?.userId).toEqual(userId);
-                expect(member?.name).toEqual(userName);
+                    client!.sendTextMessage(roomId, "I am a fish", "txn1");
+                    // check it was added
+                    expect(room.timeline.length).toEqual(2);
+                    // check status
+                    expect(room.timeline[1].status).toEqual(EventStatus.SENDING);
+                    // check member
+                    const member = room.timeline[1].sender;
+                    expect(member?.userId).toEqual(userId);
+                    expect(member?.name).toEqual(userName);
 
-                httpBackend!.flush("/sync", 1).then(function() {
-                    done();
+                    httpBackend!.flush("/sync", 1).then(function () {
+                        done();
+                    });
                 });
-            });
-            httpBackend!.flush("/sync", 1);
-        });
+                httpBackend!.flush("/sync", 1);
+            },
+        );
 
-        it("should be updated correctly when the send request finishes " +
-        "BEFORE the event comes down the event stream", function(done) {
-            const eventId = "$foo:bar";
-            httpBackend!.when("PUT", "/txn1").respond(200, {
-                event_id: eventId,
-            });
+        it(
+            "should be updated correctly when the send request finishes " +
+                "BEFORE the event comes down the event stream",
+            function (done) {
+                const eventId = "$foo:bar";
+                httpBackend!.when("PUT", "/txn1").respond(200, {
+                    event_id: eventId,
+                });
 
-            const ev = utils.mkMessage({
-                msg: "I am a fish", user: userId, room: roomId,
-            });
-            ev.event_id = eventId;
-            ev.unsigned = { transaction_id: "txn1" };
-            setNextSyncData([ev]);
+                const ev = utils.mkMessage({
+                    msg: "I am a fish",
+                    user: userId,
+                    room: roomId,
+                });
+                ev.event_id = eventId;
+                ev.unsigned = { transaction_id: "txn1" };
+                setNextSyncData([ev]);
 
-            client!.on(ClientEvent.Sync, function(state) {
-                if (state !== "PREPARED") {
-                    return;
-                }
-                const room = client!.getRoom(roomId)!;
-                client!.sendTextMessage(roomId, "I am a fish", "txn1").then(
-                    function() {
+                client!.on(ClientEvent.Sync, function (state) {
+                    if (state !== "PREPARED") {
+                        return;
+                    }
+                    const room = client!.getRoom(roomId)!;
+                    client!.sendTextMessage(roomId, "I am a fish", "txn1").then(function () {
                         expect(room.timeline[1].getId()).toEqual(eventId);
-                        httpBackend!.flush("/sync", 1).then(function() {
+                        httpBackend!.flush("/sync", 1).then(function () {
                             expect(room.timeline[1].getId()).toEqual(eventId);
                             done();
                         });
                     });
-                httpBackend!.flush("/txn1", 1);
-            });
-            httpBackend!.flush("/sync", 1);
-        });
-
-        it("should be updated correctly when the send request finishes " +
-        "AFTER the event comes down the event stream", function(done) {
-            const eventId = "$foo:bar";
-            httpBackend!.when("PUT", "/txn1").respond(200, {
-                event_id: eventId,
-            });
-
-            const ev = utils.mkMessage({
-                msg: "I am a fish", user: userId, room: roomId,
-            });
-            ev.event_id = eventId;
-            ev.unsigned = { transaction_id: "txn1" };
-            setNextSyncData([ev]);
-
-            client!.on(ClientEvent.Sync, function(state) {
-                if (state !== "PREPARED") {
-                    return;
-                }
-                const room = client!.getRoom(roomId)!;
-                const promise = client!.sendTextMessage(roomId, "I am a fish", "txn1");
-                httpBackend!.flush("/sync", 1).then(function() {
-                    expect(room.timeline.length).toEqual(2);
                     httpBackend!.flush("/txn1", 1);
-                    promise.then(function() {
+                });
+                httpBackend!.flush("/sync", 1);
+            },
+        );
+
+        it(
+            "should be updated correctly when the send request finishes " +
+                "AFTER the event comes down the event stream",
+            function (done) {
+                const eventId = "$foo:bar";
+                httpBackend!.when("PUT", "/txn1").respond(200, {
+                    event_id: eventId,
+                });
+
+                const ev = utils.mkMessage({
+                    msg: "I am a fish",
+                    user: userId,
+                    room: roomId,
+                });
+                ev.event_id = eventId;
+                ev.unsigned = { transaction_id: "txn1" };
+                setNextSyncData([ev]);
+
+                client!.on(ClientEvent.Sync, function (state) {
+                    if (state !== "PREPARED") {
+                        return;
+                    }
+                    const room = client!.getRoom(roomId)!;
+                    const promise = client!.sendTextMessage(roomId, "I am a fish", "txn1");
+                    httpBackend!.flush("/sync", 1).then(function () {
                         expect(room.timeline.length).toEqual(2);
-                        expect(room.timeline[1].getId()).toEqual(eventId);
-                        done();
+                        httpBackend!.flush("/txn1", 1);
+                        promise.then(function () {
+                            expect(room.timeline.length).toEqual(2);
+                            expect(room.timeline[1].getId()).toEqual(eventId);
+                            done();
+                        });
                     });
                 });
-            });
-            httpBackend!.flush("/sync", 1);
-        });
+                httpBackend!.flush("/sync", 1);
+            },
+        );
     });
 
-    describe("paginated events", function() {
-        let sbEvents;
+    describe("paginated events", function () {
+        let sbEvents: Partial<IEvent>[];
         const sbEndTok = "pagin_end";
 
-        beforeEach(function() {
+        beforeEach(function () {
             sbEvents = [];
-            httpBackend!.when("GET", "/messages").respond(200, function() {
+            httpBackend!.when("GET", "/messages").respond(200, function () {
                 return {
                     chunk: sbEvents,
                     start: "pagin_start",
@@ -251,16 +279,15 @@ describe("MatrixClient room timelines", function() {
             });
         });
 
-        it("should set Room.oldState.paginationToken to null at the start" +
-        " of the timeline.", function(done) {
-            client!.on(ClientEvent.Sync, function(state) {
+        it("should set Room.oldState.paginationToken to null at the start" + " of the timeline.", function (done) {
+            client!.on(ClientEvent.Sync, function (state) {
                 if (state !== "PREPARED") {
                     return;
                 }
                 const room = client!.getRoom(roomId)!;
                 expect(room.timeline.length).toEqual(1);
 
-                client!.scrollback(room).then(function() {
+                client!.scrollback(room).then(function () {
                     expect(room.timeline.length).toEqual(1);
                     expect(room.oldState.paginationToken).toBe(null);
 
@@ -275,7 +302,7 @@ describe("MatrixClient room timelines", function() {
             httpBackend!.flush("/sync", 1);
         });
 
-        it("should set the right event.sender values", function(done) {
+        it("should set the right event.sender values", function (done) {
             // We're aiming for an eventual timeline of:
             //
             // 'Old Alice' joined the room
@@ -287,14 +314,20 @@ describe("MatrixClient room timelines", function() {
 
             // make an m.room.member event for alice's join
             const joinMshipEvent = utils.mkMembership({
-                mship: "join", user: userId, room: roomId, name: "Old Alice",
+                mship: "join",
+                user: userId,
+                room: roomId,
+                name: "Old Alice",
                 url: undefined,
             });
 
             // make an m.room.member event with prev_content for alice's nick
             // change
             const oldMshipEvent = utils.mkMembership({
-                mship: "join", user: userId, room: roomId, name: userName,
+                mship: "join",
+                user: userId,
+                room: roomId,
+                name: userName,
                 url: "mxc://some/url",
             });
             oldMshipEvent.prev_content = {
@@ -307,16 +340,20 @@ describe("MatrixClient room timelines", function() {
             // N.B. synapse returns /messages in reverse chronological order
             sbEvents = [
                 utils.mkMessage({
-                    user: userId, room: roomId, msg: "I'm alice",
+                    user: userId,
+                    room: roomId,
+                    msg: "I'm alice",
                 }),
                 oldMshipEvent,
                 utils.mkMessage({
-                    user: userId, room: roomId, msg: "I'm old alice",
+                    user: userId,
+                    room: roomId,
+                    msg: "I'm old alice",
                 }),
                 joinMshipEvent,
             ];
 
-            client!.on(ClientEvent.Sync, function(state) {
+            client!.on(ClientEvent.Sync, function (state) {
                 if (state !== "PREPARED") {
                     return;
                 }
@@ -324,7 +361,7 @@ describe("MatrixClient room timelines", function() {
                 // sync response
                 expect(room.timeline.length).toEqual(1);
 
-                client!.scrollback(room).then(function() {
+                client!.scrollback(room).then(function () {
                     expect(room.timeline.length).toEqual(5);
                     const joinMsg = room.timeline[0];
                     expect(joinMsg.sender?.name).toEqual("Old Alice");
@@ -344,25 +381,29 @@ describe("MatrixClient room timelines", function() {
             httpBackend!.flush("/sync", 1);
         });
 
-        it("should add it them to the right place in the timeline", function(done) {
+        it("should add it them to the right place in the timeline", function (done) {
             // set the list of events to return on scrollback
             sbEvents = [
                 utils.mkMessage({
-                    user: userId, room: roomId, msg: "I am new",
+                    user: userId,
+                    room: roomId,
+                    msg: "I am new",
                 }),
                 utils.mkMessage({
-                    user: userId, room: roomId, msg: "I am old",
+                    user: userId,
+                    room: roomId,
+                    msg: "I am old",
                 }),
             ];
 
-            client!.on(ClientEvent.Sync, function(state) {
+            client!.on(ClientEvent.Sync, function (state) {
                 if (state !== "PREPARED") {
                     return;
                 }
                 const room = client!.getRoom(roomId)!;
                 expect(room.timeline.length).toEqual(1);
 
-                client!.scrollback(room).then(function() {
+                client!.scrollback(room).then(function () {
                     expect(room.timeline.length).toEqual(3);
                     expect(room.timeline[0].event).toEqual(sbEvents[1]);
                     expect(room.timeline[1].event).toEqual(sbEvents[0]);
@@ -378,26 +419,28 @@ describe("MatrixClient room timelines", function() {
             httpBackend!.flush("/sync", 1);
         });
 
-        it("should use 'end' as the next pagination token", function(done) {
+        it("should use 'end' as the next pagination token", function (done) {
             // set the list of events to return on scrollback
             sbEvents = [
                 utils.mkMessage({
-                    user: userId, room: roomId, msg: "I am new",
+                    user: userId,
+                    room: roomId,
+                    msg: "I am new",
                 }),
             ];
 
-            client!.on(ClientEvent.Sync, function(state) {
+            client!.on(ClientEvent.Sync, function (state) {
                 if (state !== "PREPARED") {
                     return;
                 }
                 const room = client!.getRoom(roomId)!;
                 expect(room.oldState.paginationToken).toBeTruthy();
 
-                client!.scrollback(room, 1).then(function() {
+                client!.scrollback(room, 1).then(function () {
                     expect(room.oldState.paginationToken).toEqual(sbEndTok);
                 });
 
-                httpBackend!.flush("/messages", 1).then(function() {
+                httpBackend!.flush("/messages", 1).then(function () {
                     // still have a sync to flush
                     httpBackend!.flush("/sync", 1).then(() => {
                         done();
@@ -408,22 +451,19 @@ describe("MatrixClient room timelines", function() {
         });
     });
 
-    describe("new events", function() {
-        it("should be added to the right place in the timeline", function() {
+    describe("new events", function () {
+        it("should be added to the right place in the timeline", function () {
             const eventData = [
                 utils.mkMessage({ user: userId, room: roomId }),
                 utils.mkMessage({ user: userId, room: roomId }),
             ];
             setNextSyncData(eventData);
 
-            return Promise.all([
-                httpBackend!.flush("/sync", 1),
-                utils.syncPromise(client!),
-            ]).then(() => {
+            return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(() => {
                 const room = client!.getRoom(roomId)!;
 
                 let index = 0;
-                client!.on(RoomEvent.Timeline, function(event, rm, toStart) {
+                client!.on(RoomEvent.Timeline, function (event, rm, toStart) {
                     expect(toStart).toBe(false);
                     expect(rm).toEqual(room);
                     expect(event.event).toEqual(eventData[index]);
@@ -431,41 +471,31 @@ describe("MatrixClient room timelines", function() {
                 });
 
                 httpBackend!.flush("/messages", 1);
-                return Promise.all([
-                    httpBackend!.flush("/sync", 1),
-                    utils.syncPromise(client!),
-                ]).then(function() {
+                return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(function () {
                     expect(index).toEqual(2);
                     expect(room.timeline.length).toEqual(3);
-                    expect(room.timeline[2].event).toEqual(
-                        eventData[1],
-                    );
-                    expect(room.timeline[1].event).toEqual(
-                        eventData[0],
-                    );
+                    expect(room.timeline[2].event).toEqual(eventData[1]);
+                    expect(room.timeline[1].event).toEqual(eventData[0]);
                 });
             });
         });
 
-        it("should set the right event.sender values", function() {
+        it("should set the right event.sender values", function () {
             const eventData = [
                 utils.mkMessage({ user: userId, room: roomId }),
                 utils.mkMembership({
-                    user: userId, room: roomId, mship: "join", name: "New Name",
+                    user: userId,
+                    room: roomId,
+                    mship: "join",
+                    name: "New Name",
                 }),
                 utils.mkMessage({ user: userId, room: roomId }),
             ];
             setNextSyncData(eventData);
 
-            return Promise.all([
-                httpBackend!.flush("/sync", 1),
-                utils.syncPromise(client!),
-            ]).then(() => {
+            return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(() => {
                 const room = client!.getRoom(roomId)!;
-                return Promise.all([
-                    httpBackend!.flush("/sync", 1),
-                    utils.syncPromise(client!),
-                ]).then(function() {
+                return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(function () {
                     const preNameEvent = room.timeline[room.timeline.length - 3];
                     const postNameEvent = room.timeline[room.timeline.length - 1];
                     expect(preNameEvent.sender?.name).toEqual(userName);
@@ -474,92 +504,85 @@ describe("MatrixClient room timelines", function() {
             });
         });
 
-        it("should set the right room.name", function() {
+        it("should set the right room.name", function () {
             const secondRoomNameEvent = utils.mkEvent({
-                user: userId, room: roomId, type: "m.room.name", content: {
+                user: userId,
+                room: roomId,
+                type: "m.room.name",
+                content: {
                     name: "Room 2",
                 },
             });
             setNextSyncData([secondRoomNameEvent]);
 
-            return Promise.all([
-                httpBackend!.flush("/sync", 1),
-                utils.syncPromise(client!),
-            ]).then(() => {
+            return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(() => {
                 const room = client!.getRoom(roomId)!;
                 let nameEmitCount = 0;
-                client!.on(RoomEvent.Name, function(rm) {
+                client!.on(RoomEvent.Name, function (rm) {
                     nameEmitCount += 1;
                 });
 
-                return Promise.all([
-                    httpBackend!.flush("/sync", 1),
-                    utils.syncPromise(client!),
-                ]).then(function() {
-                    expect(nameEmitCount).toEqual(1);
-                    expect(room.name).toEqual("Room 2");
-                    // do another round
-                    const thirdRoomNameEvent = utils.mkEvent({
-                        user: userId, room: roomId, type: "m.room.name", content: {
-                            name: "Room 3",
-                        },
+                return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)])
+                    .then(function () {
+                        expect(nameEmitCount).toEqual(1);
+                        expect(room.name).toEqual("Room 2");
+                        // do another round
+                        const thirdRoomNameEvent = utils.mkEvent({
+                            user: userId,
+                            room: roomId,
+                            type: "m.room.name",
+                            content: {
+                                name: "Room 3",
+                            },
+                        });
+                        setNextSyncData([thirdRoomNameEvent]);
+                        httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
+                        return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]);
+                    })
+                    .then(function () {
+                        expect(nameEmitCount).toEqual(2);
+                        expect(room.name).toEqual("Room 3");
                     });
-                    setNextSyncData([thirdRoomNameEvent]);
-                    httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
-                    return Promise.all([
-                        httpBackend!.flush("/sync", 1),
-                        utils.syncPromise(client!),
-                    ]);
-                }).then(function() {
-                    expect(nameEmitCount).toEqual(2);
-                    expect(room.name).toEqual("Room 3");
-                });
             });
         });
 
-        it("should set the right room members", function() {
+        it("should set the right room members", function () {
             const userC = "@cee:bar";
             const userD = "@dee:bar";
             const eventData = [
                 utils.mkMembership({
-                    user: userC, room: roomId, mship: "join", name: "C",
+                    user: userC,
+                    room: roomId,
+                    mship: "join",
+                    name: "C",
                 }),
                 utils.mkMembership({
-                    user: userC, room: roomId, mship: "invite", skey: userD,
+                    user: userC,
+                    room: roomId,
+                    mship: "invite",
+                    skey: userD,
                 }),
             ];
             setNextSyncData(eventData);
 
-            return Promise.all([
-                httpBackend!.flush("/sync", 1),
-                utils.syncPromise(client!),
-            ]).then(() => {
+            return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(() => {
                 const room = client!.getRoom(roomId)!;
-                return Promise.all([
-                    httpBackend!.flush("/sync", 1),
-                    utils.syncPromise(client!),
-                ]).then(function() {
+                return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(function () {
                     expect(room.currentState.getMembers().length).toEqual(4);
                     expect(room.currentState.getMember(userC)!.name).toEqual("C");
-                    expect(room.currentState.getMember(userC)!.membership).toEqual(
-                        "join",
-                    );
+                    expect(room.currentState.getMember(userC)!.membership).toEqual("join");
                     expect(room.currentState.getMember(userD)!.name).toEqual(userD);
-                    expect(room.currentState.getMember(userD)!.membership).toEqual(
-                        "invite",
-                    );
+                    expect(room.currentState.getMember(userD)!.membership).toEqual("invite");
                 });
             });
         });
     });
 
-    describe("gappy sync", function() {
-        it("should copy the last known state to the new timeline", function() {
-            const eventData = [
-                utils.mkMessage({ user: userId, room: roomId }),
-            ];
+    describe("gappy sync", function () {
+        it("should copy the last known state to the new timeline", function () {
+            const eventData = [utils.mkMessage({ user: userId, room: roomId })];
             setNextSyncData(eventData);
-            NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
+            NEXT_SYNC_DATA.rooms!.join[roomId].timeline.limited = true;
 
             return Promise.all([
                 httpBackend!.flush("/versions", 1),
@@ -569,106 +592,83 @@ describe("MatrixClient room timelines", function() {
                 const room = client!.getRoom(roomId)!;
 
                 httpBackend!.flush("/messages", 1);
-                return Promise.all([
-                    httpBackend!.flush("/sync", 1),
-                    utils.syncPromise(client!),
-                ]).then(function() {
+                return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(function () {
                     expect(room.timeline.length).toEqual(1);
                     expect(room.timeline[0].event).toEqual(eventData[0]);
                     expect(room.currentState.getMembers().length).toEqual(2);
                     expect(room.currentState.getMember(userId)!.name).toEqual(userName);
-                    expect(room.currentState.getMember(userId)!.membership).toEqual(
-                        "join",
-                    );
+                    expect(room.currentState.getMember(userId)!.membership).toEqual("join");
                     expect(room.currentState.getMember(otherUserId)!.name).toEqual("Bob");
-                    expect(room.currentState.getMember(otherUserId)!.membership).toEqual(
-                        "join",
-                    );
+                    expect(room.currentState.getMember(otherUserId)!.membership).toEqual("join");
                 });
             });
         });
 
-        it("should emit a `RoomEvent.TimelineReset` event when the sync response is `limited`", function() {
-            const eventData = [
-                utils.mkMessage({ user: userId, room: roomId }),
-            ];
+        it("should emit a `RoomEvent.TimelineReset` event when the sync response is `limited`", function () {
+            const eventData = [utils.mkMessage({ user: userId, room: roomId })];
             setNextSyncData(eventData);
-            NEXT_SYNC_DATA.rooms.join[roomId].timeline.limited = true;
+            NEXT_SYNC_DATA.rooms!.join[roomId].timeline.limited = true;
 
-            return Promise.all([
-                httpBackend!.flush("/sync", 1),
-                utils.syncPromise(client!),
-            ]).then(() => {
+            return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(() => {
                 const room = client!.getRoom(roomId)!;
 
                 let emitCount = 0;
-                client!.on(RoomEvent.TimelineReset, function(emitRoom) {
+                client!.on(RoomEvent.TimelineReset, function (emitRoom) {
                     expect(emitRoom).toEqual(room);
                     emitCount++;
                 });
 
                 httpBackend!.flush("/messages", 1);
-                return Promise.all([
-                    httpBackend!.flush("/sync", 1),
-                    utils.syncPromise(client!),
-                ]).then(function() {
+                return Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!)]).then(function () {
                     expect(emitCount).toEqual(1);
                 });
             });
         });
     });
 
-    describe('Refresh live timeline', () => {
+    describe("Refresh live timeline", () => {
         const initialSyncEventData = [
             utils.mkMessage({ user: userId, room: roomId }),
             utils.mkMessage({ user: userId, room: roomId }),
             utils.mkMessage({ user: userId, room: roomId }),
         ];
 
-        const contextUrl = `/rooms/${encodeURIComponent(roomId)}/context/` +
-        `${encodeURIComponent(initialSyncEventData[2].event_id!)}`;
+        const contextUrl =
+            `/rooms/${encodeURIComponent(roomId)}/context/` +
+            `${encodeURIComponent(initialSyncEventData[2].event_id!)}`;
         const contextResponse = {
             start: "start_token",
             events_before: [initialSyncEventData[1], initialSyncEventData[0]],
             event: initialSyncEventData[2],
             events_after: [],
-            state: [
-                USER_MEMBERSHIP_EVENT,
-            ],
+            state: [USER_MEMBERSHIP_EVENT],
             end: "end_token",
         };
 
-        let room;
+        let room: Room;
         beforeEach(async () => {
             setNextSyncData(initialSyncEventData);
 
             // Create a room from the sync
-            await Promise.all([
-                httpBackend!.flushAllExpected(),
-                utils.syncPromise(client!, 1),
-            ]);
+            await Promise.all([httpBackend!.flushAllExpected(), utils.syncPromise(client!, 1)]);
 
             // Get the room after the first sync so the room is created
             room = client!.getRoom(roomId)!;
             expect(room).toBeTruthy();
         });
 
-        it('should clear and refresh messages in timeline', async () => {
+        it("should clear and refresh messages in timeline", async () => {
             // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
             // to construct a new timeline from.
-            httpBackend!.when("GET", contextUrl)
-                .respond(200, function() {
-                    // The timeline should be cleared at this point in the refresh
-                    expect(room.timeline.length).toEqual(0);
+            httpBackend!.when("GET", contextUrl).respond(200, function () {
+                // The timeline should be cleared at this point in the refresh
+                expect(room.timeline.length).toEqual(0);
 
-                    return contextResponse;
-                });
+                return contextResponse;
+            });
 
             // Refresh the timeline.
-            await Promise.all([
-                room.refreshLiveTimeline(),
-                httpBackend!.flushAllExpected(),
-            ]);
+            await Promise.all([room.refreshLiveTimeline(), httpBackend!.flushAllExpected()]);
 
             // Make sure the message are visible
             const resultantEventsInTimeline = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();
@@ -680,7 +680,7 @@ describe("MatrixClient room timelines", function() {
             ]);
         });
 
-        it('Perfectly merges timelines if a sync finishes while refreshing the timeline', async () => {
+        it("Perfectly merges timelines if a sync finishes while refreshing the timeline", async () => {
             // `/context` request for `refreshLiveTimeline()` ->
             // `getEventTimeline()` to construct a new timeline from.
             //
@@ -689,11 +689,10 @@ describe("MatrixClient room timelines", function() {
             // middle of all of this refresh timeline logic. We want to make
             // sure the sync pagination still works as expected after messing
             // the refresh timline logic messes with the pagination tokens.
-            httpBackend!.when("GET", contextUrl)
-                .respond(200, () => {
-                    // Now finally return and make the `/context` request respond
-                    return contextResponse;
-                });
+            httpBackend!.when("GET", contextUrl).respond(200, () => {
+                // Now finally return and make the `/context` request respond
+                return contextResponse;
+            });
 
             // Wait for the timeline to reset(when it goes blank) which means
             // it's in the middle of the refrsh logic right before the
@@ -705,22 +704,20 @@ describe("MatrixClient room timelines", function() {
             //
             // We define this here so the event listener is in place before we
             // call `room.refreshLiveTimeline()`.
-            const racingSyncEventData = [
-                utils.mkMessage({ user: userId, room: roomId }),
-            ];
+            const racingSyncEventData = [utils.mkMessage({ user: userId, room: roomId })];
             const waitForRaceySyncAfterResetPromise = new Promise<void>((resolve, reject) => {
                 let eventFired = false;
                 // Throw a more descriptive error if this part of the test times out.
                 const failTimeout = setTimeout(() => {
                     if (eventFired) {
-                        reject(new Error(
-                            'TestError: `RoomEvent.TimelineReset` fired but we timed out trying to make' +
-                            'a `/sync` happen in time.',
-                        ));
+                        reject(
+                            new Error(
+                                "TestError: `RoomEvent.TimelineReset` fired but we timed out trying to make" +
+                                    "a `/sync` happen in time.",
+                            ),
+                        );
                     } else {
-                        reject(new Error(
-                            'TestError: Timed out while waiting for `RoomEvent.TimelineReset` to fire.',
-                        ));
+                        reject(new Error("TestError: Timed out while waiting for `RoomEvent.TimelineReset` to fire."));
                     }
                 }, 4000 /* FIXME: Is there a way to reference the current timeout of this test in Jest? */);
 
@@ -734,23 +731,19 @@ describe("MatrixClient room timelines", function() {
                         // Then make a `/sync` happen by sending a message and seeing that it
                         // shows up (simulate a /sync naturally racing with us).
                         setNextSyncData(racingSyncEventData);
-                        httpBackend!.when("GET", "/sync").respond(200, function() {
+                        httpBackend!.when("GET", "/sync").respond(200, function () {
                             return NEXT_SYNC_DATA;
                         });
-                        await Promise.all([
-                            httpBackend!.flush("/sync", 1),
-                            utils.syncPromise(client!, 1),
-                        ]);
+                        await Promise.all([httpBackend!.flush("/sync", 1), utils.syncPromise(client!, 1)]);
                         // Make sure the timeline has the racey sync data
                         const afterRaceySyncTimelineEvents = room
                             .getUnfilteredTimelineSet()
                             .getLiveTimeline()
                             .getEvents();
-                        const afterRaceySyncTimelineEventIds = afterRaceySyncTimelineEvents
-                            .map((event) => event.getId());
-                        expect(afterRaceySyncTimelineEventIds).toEqual([
-                            racingSyncEventData[0].event_id,
-                        ]);
+                        const afterRaceySyncTimelineEventIds = afterRaceySyncTimelineEvents.map((event) =>
+                            event.getId(),
+                        );
+                        expect(afterRaceySyncTimelineEventIds).toEqual([racingSyncEventData[0].event_id]);
 
                         clearTimeout(failTimeout);
                         resolve();
@@ -774,17 +767,12 @@ describe("MatrixClient room timelines", function() {
 
             // Make sure sync pagination still works by seeing a new message show up
             // after refreshing the timeline.
-            const afterRefreshEventData = [
-                utils.mkMessage({ user: userId, room: roomId }),
-            ];
+            const afterRefreshEventData = [utils.mkMessage({ user: userId, room: roomId })];
             setNextSyncData(afterRefreshEventData);
-            httpBackend!.when("GET", "/sync").respond(200, function() {
+            httpBackend!.when("GET", "/sync").respond(200, function () {
                 return NEXT_SYNC_DATA;
             });
-            await Promise.all([
-                httpBackend!.flushAllExpected(),
-                utils.syncPromise(client!, 1),
-            ]);
+            await Promise.all([httpBackend!.flushAllExpected(), utils.syncPromise(client!, 1)]);
 
             // Make sure the timeline includes the the events from the `/sync`
             // that raced and beat us in the middle of everything and the
@@ -799,17 +787,24 @@ describe("MatrixClient room timelines", function() {
             ]);
         });
 
-        it('Timeline recovers after `/context` request to generate new timeline fails', async () => {
+        it("Timeline recovers after `/context` request to generate new timeline fails", async () => {
             // `/context` request for `refreshLiveTimeline()` -> `getEventTimeline()`
             // to construct a new timeline from.
-            httpBackend!.when("GET", contextUrl).check(() => {
-                // The timeline should be cleared at this point in the refresh
-                expect(room.timeline.length).toEqual(0);
-            }).respond(500, new MatrixError({
-                errcode: 'TEST_FAKE_ERROR',
-                error: 'We purposely intercepted this /context request to make it fail ' +
-                    'in order to test whether the refresh timeline code is resilient',
-            }));
+            httpBackend!
+                .when("GET", contextUrl)
+                .check(() => {
+                    // The timeline should be cleared at this point in the refresh
+                    expect(room.timeline.length).toEqual(0);
+                })
+                .respond(
+                    500,
+                    new MatrixError({
+                        errcode: "TEST_FAKE_ERROR",
+                        error:
+                            "We purposely intercepted this /context request to make it fail " +
+                            "in order to test whether the refresh timeline code is resilient",
+                    }),
+                );
 
             // Refresh the timeline and expect it to fail
             const settledFailedRefreshPromises = await Promise.allSettled([
@@ -818,9 +813,9 @@ describe("MatrixClient room timelines", function() {
             ]);
             // We only expect `TEST_FAKE_ERROR` here. Anything else is
             // unexpected and should fail the test.
-            if (settledFailedRefreshPromises[0].status === 'fulfilled') {
-                throw new Error('Expected the /context request to fail with a 500');
-            } else if (settledFailedRefreshPromises[0].reason.errcode !== 'TEST_FAKE_ERROR') {
+            if (settledFailedRefreshPromises[0].status === "fulfilled") {
+                throw new Error("Expected the /context request to fail with a 500");
+            } else if (settledFailedRefreshPromises[0].reason.errcode !== "TEST_FAKE_ERROR") {
                 throw settledFailedRefreshPromises[0].reason;
             }
 
@@ -830,45 +825,37 @@ describe("MatrixClient room timelines", function() {
 
             // `/messages` request for `refreshLiveTimeline()` ->
             // `getLatestTimeline()` to construct a new timeline from.
-            httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomId)}/messages`)
-                .respond(200, function() {
-                    return {
-                        chunk: [{
+            httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomId)}/messages`).respond(200, function () {
+                return {
+                    chunk: [
+                        {
                             // The latest message in the room
                             event_id: initialSyncEventData[2].event_id,
-                        }],
-                    };
-                });
+                        },
+                    ],
+                };
+            });
             // `/context` request for `refreshLiveTimeline()` ->
             // `getLatestTimeline()` -> `getEventTimeline()` to construct a new
             // timeline from.
-            httpBackend!.when("GET", contextUrl)
-                .respond(200, function() {
-                    // The timeline should be cleared at this point in the refresh
-                    expect(room.timeline.length).toEqual(0);
+            httpBackend!.when("GET", contextUrl).respond(200, function () {
+                // The timeline should be cleared at this point in the refresh
+                expect(room.timeline.length).toEqual(0);
 
-                    return contextResponse;
-                });
+                return contextResponse;
+            });
 
             // Refresh the timeline again but this time it should pass
-            await Promise.all([
-                room.refreshLiveTimeline(),
-                httpBackend!.flushAllExpected(),
-            ]);
+            await Promise.all([room.refreshLiveTimeline(), httpBackend!.flushAllExpected()]);
 
             // Make sure sync pagination still works by seeing a new message show up
             // after refreshing the timeline.
-            const afterRefreshEventData = [
-                utils.mkMessage({ user: userId, room: roomId }),
-            ];
+            const afterRefreshEventData = [utils.mkMessage({ user: userId, room: roomId })];
             setNextSyncData(afterRefreshEventData);
-            httpBackend!.when("GET", "/sync").respond(200, function() {
+            httpBackend!.when("GET", "/sync").respond(200, function () {
                 return NEXT_SYNC_DATA;
             });
-            await Promise.all([
-                httpBackend!.flushAllExpected(),
-                utils.syncPromise(client!, 1),
-            ]);
+            await Promise.all([httpBackend!.flushAllExpected(), utils.syncPromise(client!, 1)]);
 
             // Make sure the message are visible
             const resultantEventsInTimeline = room.getUnfilteredTimelineSet().getLiveTimeline().getEvents();

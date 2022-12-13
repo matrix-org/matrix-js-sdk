@@ -17,12 +17,12 @@ limitations under the License.
 */
 
 // load olm before the sdk if possible
-import './olm-loader';
+import "./olm-loader";
 
-import MockHttpBackend from 'matrix-mock-request';
+import MockHttpBackend from "matrix-mock-request";
 
-import { LocalStorageCryptoStore } from '../src/crypto/store/localStorage-crypto-store';
-import { logger } from '../src/logger';
+import { LocalStorageCryptoStore } from "../src/crypto/store/localStorage-crypto-store";
+import { logger } from "../src/logger";
 import { syncPromise } from "./test-utils/test-utils";
 import { createClient } from "../src/matrix";
 import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
@@ -30,7 +30,7 @@ import { MockStorageApi } from "./MockStorageApi";
 import { encodeUri } from "../src/utils";
 import { IDeviceKeys, IOneTimeKey } from "../src/crypto/dehydration";
 import { IKeyBackupSession } from "../src/crypto/keybackup";
-import { IKeysUploadResponse, IUploadKeysRequest } from '../src/client';
+import { IKeysUploadResponse, IUploadKeysRequest } from "../src/client";
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
@@ -73,14 +73,14 @@ export class TestClient {
     }
 
     public toString(): string {
-        return 'TestClient[' + this.userId + ']';
+        return "TestClient[" + this.userId + "]";
     }
 
     /**
      * start the client, and wait for it to initialise.
      */
     public start(): Promise<void> {
-        logger.log(this + ': starting');
+        logger.log(this + ": starting");
         this.httpBackend.when("GET", "/versions").respond(200, {});
         this.httpBackend.when("GET", "/pushrules").respond(200, {});
         this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
@@ -95,17 +95,14 @@ export class TestClient {
             pendingEventOrdering: PendingEventOrdering.Detached,
         });
 
-        return Promise.all([
-            this.httpBackend.flushAllExpected(),
-            syncPromise(this.client),
-        ]).then(() => {
-            logger.log(this + ': started');
+        return Promise.all([this.httpBackend.flushAllExpected(), syncPromise(this.client)]).then(() => {
+            logger.log(this + ": started");
         });
     }
 
     /**
      * stop the client
-     * @return {Promise} Resolves once the mock http backend has finished all pending flushes
+     * @returns Promise which resolves once the mock http backend has finished all pending flushes
      */
     public async stop(): Promise<void> {
         this.client.stopClient();
@@ -116,12 +113,13 @@ export class TestClient {
      * Set up expectations that the client will upload device keys.
      */
     public expectDeviceKeyUpload() {
-        this.httpBackend.when("POST", "/keys/upload")
+        this.httpBackend
+            .when("POST", "/keys/upload")
             .respond<IKeysUploadResponse, IUploadKeysRequest>(200, (_path, content) => {
                 expect(content.one_time_keys).toBe(undefined);
                 expect(content.device_keys).toBeTruthy();
 
-                logger.log(this + ': received device keys');
+                logger.log(this + ": received device keys");
                 // we expect this to happen before any one-time keys are uploaded.
                 expect(Object.keys(this.oneTimeKeys!).length).toEqual(0);
 
@@ -135,7 +133,7 @@ export class TestClient {
      * set up an expectation that the keys will be uploaded, and wait for
      * that to happen.
      *
-     * @returns {Promise} for the one-time keys
+     * @returns Promise for the one-time keys
      */
     public awaitOneTimeKeyUpload(): Promise<Record<string, IOneTimeKey>> {
         if (Object.keys(this.oneTimeKeys!).length != 0) {
@@ -143,30 +141,35 @@ export class TestClient {
             return Promise.resolve(this.oneTimeKeys!);
         }
 
-        this.httpBackend.when("POST", "/keys/upload")
+        this.httpBackend
+            .when("POST", "/keys/upload")
             .respond<IKeysUploadResponse, IUploadKeysRequest>(200, (_path, content: IUploadKeysRequest) => {
                 expect(content.device_keys).toBe(undefined);
                 expect(content.one_time_keys).toBe(undefined);
-                return { one_time_key_counts: {
-                    signed_curve25519: Object.keys(this.oneTimeKeys!).length,
-                } };
+                return {
+                    one_time_key_counts: {
+                        signed_curve25519: Object.keys(this.oneTimeKeys!).length,
+                    },
+                };
             });
 
-        this.httpBackend.when("POST", "/keys/upload")
+        this.httpBackend
+            .when("POST", "/keys/upload")
             .respond<IKeysUploadResponse, IUploadKeysRequest>(200, (_path, content: IUploadKeysRequest) => {
                 expect(content.device_keys).toBe(undefined);
                 expect(content.one_time_keys).toBeTruthy();
                 expect(content.one_time_keys).not.toEqual({});
-                logger.log('%s: received %i one-time keys', this,
-                    Object.keys(content.one_time_keys!).length);
+                logger.log("%s: received %i one-time keys", this, Object.keys(content.one_time_keys!).length);
                 this.oneTimeKeys = content.one_time_keys;
-                return { one_time_key_counts: {
-                    signed_curve25519: Object.keys(this.oneTimeKeys!).length,
-                } };
+                return {
+                    one_time_key_counts: {
+                        signed_curve25519: Object.keys(this.oneTimeKeys!).length,
+                    },
+                };
             });
 
         // this can take ages
-        return this.httpBackend.flush('/keys/upload', 2, 1000).then((flushed) => {
+        return this.httpBackend.flush("/keys/upload", 2, 1000).then((flushed) => {
             expect(flushed).toEqual(2);
             return this.oneTimeKeys!;
         });
@@ -177,45 +180,49 @@ export class TestClient {
      *
      * We check that the query contains each of the users in `response`.
      *
-     * @param {Object} response   response to the query.
+     * @param response -   response to the query.
      */
     public expectKeyQuery(response: IDownloadKeyResult) {
-        this.httpBackend.when('POST', '/keys/query').respond<IDownloadKeyResult>(
-            200, (_path, content) => {
-                Object.keys(response.device_keys).forEach((userId) => {
-                    expect(content.device_keys![userId]).toEqual([]);
-                });
-                return response;
+        this.httpBackend.when("POST", "/keys/query").respond<IDownloadKeyResult>(200, (_path, content) => {
+            Object.keys(response.device_keys).forEach((userId) => {
+                expect((content.device_keys! as Record<string, any>)[userId]).toEqual([]);
             });
+            return response;
+        });
     }
 
     /**
      * Set up expectations that the client will query key backups for a particular session
      */
     public expectKeyBackupQuery(roomId: string, sessionId: string, status: number, response: IKeyBackupSession) {
-        this.httpBackend.when('GET', encodeUri("/room_keys/keys/$roomId/$sessionId", {
-            $roomId: roomId,
-            $sessionId: sessionId,
-        })).respond(status, response);
+        this.httpBackend
+            .when(
+                "GET",
+                encodeUri("/room_keys/keys/$roomId/$sessionId", {
+                    $roomId: roomId,
+                    $sessionId: sessionId,
+                }),
+            )
+            .respond(status, response);
     }
 
     /**
      * get the uploaded curve25519 device key
      *
-     * @return {string} base64 device key
+     * @returns base64 device key
      */
     public getDeviceKey(): string {
-        const keyId = 'curve25519:' + this.deviceId;
+        const keyId = "curve25519:" + this.deviceId;
         return this.deviceKeys!.keys[keyId];
     }
 
     /**
      * get the uploaded ed25519 device key
      *
-     * @return {string} base64 device key
+     * @returns base64 device key
      */
     public getSigningKey(): string {
-        const keyId = 'ed25519:' + this.deviceId;
+        const keyId = "ed25519:" + this.deviceId;
         return this.deviceKeys!.keys[keyId];
     }
 
@@ -224,10 +231,7 @@ export class TestClient {
      */
     public flushSync(): Promise<void> {
         logger.log(`${this}: flushSync`);
-        return Promise.all([
-            this.httpBackend.flush('/sync', 1),
-            syncPromise(this.client),
-        ]).then(() => {
+        return Promise.all([this.httpBackend.flush("/sync", 1), syncPromise(this.client)]).then(() => {
             logger.log(`${this}: flushSync completed`);
         });
     }

@@ -23,7 +23,7 @@ import { logger } from "../logger";
 import { MatrixClient } from "../client";
 
 export enum MediaHandlerEvent {
-    LocalStreamsChanged = "local_streams_changed"
+    LocalStreamsChanged = "local_streams_changed",
 }
 
 export type MediaHandlerEventHandlerMap = {
@@ -47,7 +47,8 @@ export interface AudioSettings {
 }
 
 export class MediaHandler extends TypedEventEmitter<
-    MediaHandlerEvent.LocalStreamsChanged, MediaHandlerEventHandlerMap
+    MediaHandlerEvent.LocalStreamsChanged,
+    MediaHandlerEventHandlerMap
 > {
     private audioInput?: string;
     private audioSettings?: AudioSettings;
@@ -67,7 +68,7 @@ export class MediaHandler extends TypedEventEmitter<
 
     /**
      * Set an audio input device to use for MatrixCalls
-     * @param {string} deviceId the identifier for the device
+     * @param deviceId - the identifier for the device
      * undefined treated as unset
      */
     public async setAudioInput(deviceId: string): Promise<void> {
@@ -81,7 +82,7 @@ export class MediaHandler extends TypedEventEmitter<
 
     /**
      * Set audio settings for MatrixCalls
-     * @param {AudioSettings} opts audio options to set
+     * @param opts - audio options to set
      */
     public async setAudioSettings(opts: AudioSettings): Promise<void> {
         logger.info("Setting audio settings to", opts);
@@ -92,7 +93,7 @@ export class MediaHandler extends TypedEventEmitter<
 
     /**
      * Set a video input device to use for MatrixCalls
-     * @param {string} deviceId the identifier for the device
+     * @param deviceId - the identifier for the device
      * undefined treated as unset
      */
     public async setVideoInput(deviceId: string): Promise<void> {
@@ -106,8 +107,8 @@ export class MediaHandler extends TypedEventEmitter<
 
     /**
      * Set media input devices to use for MatrixCalls
-     * @param {string} audioInput the identifier for the audio device
-     * @param {string} videoInput the identifier for the video device
+     * @param audioInput - the identifier for the audio device
+     * @param videoInput - the identifier for the video device
      * undefined treated as unset
      */
     public async setMediaInputs(audioInput: string, videoInput: string): Promise<void> {
@@ -123,7 +124,7 @@ export class MediaHandler extends TypedEventEmitter<
     public async updateLocalUsermediaStreams(): Promise<void> {
         if (this.userMediaStreams.length === 0) return;
 
-        const callMediaStreamParams: Map<string, { audio: boolean, video: boolean }> = new Map();
+        const callMediaStreamParams: Map<string, { audio: boolean; video: boolean }> = new Map();
         for (const call of this.client.callEventHandler!.calls.values()) {
             callMediaStreamParams.set(call.callId, {
                 audio: call.hasLocalUserMediaAudioTrack,
@@ -163,12 +164,10 @@ export class MediaHandler extends TypedEventEmitter<
                 continue;
             }
 
-            logger.log(`mediaHandler updateLocalUsermediaStreams getUserMediaStream groupCall ${
-                groupCall.groupCallId}`);
-            const stream = await this.getUserMediaStream(
-                true,
-                groupCall.type === GroupCallType.Video,
+            logger.log(
+                `mediaHandler updateLocalUsermediaStreams getUserMediaStream groupCall ${groupCall.groupCallId}`,
             );
+            const stream = await this.getUserMediaStream(true, groupCall.type === GroupCallType.Video);
 
             if (groupCall.state === GroupCallState.Ended) {
                 continue;
@@ -182,23 +181,23 @@ export class MediaHandler extends TypedEventEmitter<
 
     public async hasAudioDevice(): Promise<boolean> {
         const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter(device => device.kind === "audioinput").length > 0;
+        return devices.filter((device) => device.kind === "audioinput").length > 0;
     }
 
     public async hasVideoDevice(): Promise<boolean> {
         const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter(device => device.kind === "videoinput").length > 0;
+        return devices.filter((device) => device.kind === "videoinput").length > 0;
     }
 
     /**
-     * @param audio should have an audio track
-     * @param video should have a video track
-     * @param reusable is allowed to be reused by the MediaHandler
-     * @returns {MediaStream} based on passed parameters
+     * @param audio - should have an audio track
+     * @param video - should have a video track
+     * @param reusable - is allowed to be reused by the MediaHandler
+     * @returns based on passed parameters
      */
     public async getUserMediaStream(audio: boolean, video: boolean, reusable = true): Promise<MediaStream> {
-        const shouldRequestAudio = audio && await this.hasAudioDevice();
-        const shouldRequestVideo = video && await this.hasVideoDevice();
+        const shouldRequestAudio = audio && (await this.hasAudioDevice());
+        const shouldRequestVideo = video && (await this.hasVideoDevice());
 
         let stream: MediaStream;
 
@@ -218,7 +217,8 @@ export class MediaHandler extends TypedEventEmitter<
             if (shouldRequestVideo) {
                 if (
                     this.localUserMediaStream.getVideoTracks().length === 0 ||
-                    this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput) {
+                    this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput
+                ) {
                     canReuseStream = false;
                 }
             }
@@ -229,8 +229,10 @@ export class MediaHandler extends TypedEventEmitter<
         if (!canReuseStream) {
             const constraints = this.getUserMediaContraints(shouldRequestAudio, shouldRequestVideo);
             stream = await navigator.mediaDevices.getUserMedia(constraints);
-            logger.log(`mediaHandler getUserMediaStream streamId ${stream.id} shouldRequestAudio ${
-                shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`, constraints);
+            logger.log(
+                `mediaHandler getUserMediaStream streamId ${stream.id} shouldRequestAudio ${shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`,
+                constraints,
+            );
 
             for (const track of stream.getTracks()) {
                 const settings = track.getSettings();
@@ -247,8 +249,9 @@ export class MediaHandler extends TypedEventEmitter<
             }
         } else {
             stream = this.localUserMediaStream!.clone();
-            logger.log(`mediaHandler clone userMediaStream ${this.localUserMediaStream?.id} new stream ${
-                stream.id} shouldRequestAudio ${shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`);
+            logger.log(
+                `mediaHandler clone userMediaStream ${this.localUserMediaStream?.id} new stream ${stream.id} shouldRequestAudio ${shouldRequestAudio} shouldRequestVideo ${shouldRequestVideo}`,
+            );
 
             if (!shouldRequestAudio) {
                 for (const track of stream.getAudioTracks()) {
@@ -296,9 +299,9 @@ export class MediaHandler extends TypedEventEmitter<
     }
 
     /**
-     * @param desktopCapturerSourceId sourceId for Electron DesktopCapturer
-     * @param reusable is allowed to be reused by the MediaHandler
-     * @returns {MediaStream} based on passed parameters
+     * @param desktopCapturerSourceId - sourceId for Electron DesktopCapturer
+     * @param reusable - is allowed to be reused by the MediaHandler
+     * @returns based on passed parameters
      */
     public async getScreensharingStream(opts: IScreensharingOpts = {}, reusable = true): Promise<MediaStream> {
         let stream: MediaStream;
@@ -379,23 +382,23 @@ export class MediaHandler extends TypedEventEmitter<
         return {
             audio: audio
                 ? {
-                    deviceId: this.audioInput ? { ideal: this.audioInput } : undefined,
-                    autoGainControl: this.audioSettings ? { ideal: this.audioSettings.autoGainControl } : undefined,
-                    echoCancellation: this.audioSettings ? { ideal: this.audioSettings.echoCancellation } : undefined,
-                    noiseSuppression: this.audioSettings ? { ideal: this.audioSettings.noiseSuppression } : undefined,
-                }
+                      deviceId: this.audioInput ? { ideal: this.audioInput } : undefined,
+                      autoGainControl: this.audioSettings ? { ideal: this.audioSettings.autoGainControl } : undefined,
+                      echoCancellation: this.audioSettings ? { ideal: this.audioSettings.echoCancellation } : undefined,
+                      noiseSuppression: this.audioSettings ? { ideal: this.audioSettings.noiseSuppression } : undefined,
+                  }
                 : false,
             video: video
                 ? {
-                    deviceId: this.videoInput ? { ideal: this.videoInput } : undefined,
-                    /* We want 640x360.  Chrome will give it only if we ask exactly,
+                      deviceId: this.videoInput ? { ideal: this.videoInput } : undefined,
+                      /* We want 640x360.  Chrome will give it only if we ask exactly,
                    FF refuses entirely if we ask exactly, so have to ask for ideal
                    instead
                    XXX: Is this still true?
                  */
-                    width: isWebkit ? { exact: 640 } : { ideal: 640 },
-                    height: isWebkit ? { exact: 360 } : { ideal: 360 },
-                }
+                      width: isWebkit ? { exact: 640 } : { ideal: 640 },
+                      height: isWebkit ? { exact: 360 } : { ideal: 360 },
+                  }
                 : false,
         };
     }

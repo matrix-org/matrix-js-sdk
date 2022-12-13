@@ -85,7 +85,7 @@ export interface ICapabilities {
 
     /**
      * Whether this client needs access to TURN servers.
-     * @default false
+     * @defaultValue false
      */
     turnServers?: boolean;
 }
@@ -97,7 +97,7 @@ export interface ICapabilities {
  */
 export class RoomWidgetClient extends MatrixClient {
     private room?: Room;
-    private widgetApiReady = new Promise<void>(resolve => this.widgetApi.once("ready", resolve));
+    private widgetApiReady = new Promise<void>((resolve) => this.widgetApi.once("ready", resolve));
     private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
 
@@ -111,36 +111,28 @@ export class RoomWidgetClient extends MatrixClient {
 
         // Request capabilities for the functionality this client needs to support
         if (
-            capabilities.sendEvent?.length
-            || capabilities.receiveEvent?.length
-            || capabilities.sendMessage === true
-            || (Array.isArray(capabilities.sendMessage) && capabilities.sendMessage.length)
-            || capabilities.receiveMessage === true
-            || (Array.isArray(capabilities.receiveMessage) && capabilities.receiveMessage.length)
-            || capabilities.sendState?.length
-            || capabilities.receiveState?.length
+            capabilities.sendEvent?.length ||
+            capabilities.receiveEvent?.length ||
+            capabilities.sendMessage === true ||
+            (Array.isArray(capabilities.sendMessage) && capabilities.sendMessage.length) ||
+            capabilities.receiveMessage === true ||
+            (Array.isArray(capabilities.receiveMessage) && capabilities.receiveMessage.length) ||
+            capabilities.sendState?.length ||
+            capabilities.receiveState?.length
         ) {
             widgetApi.requestCapabilityForRoomTimeline(roomId);
         }
-        capabilities.sendEvent?.forEach(eventType =>
-            widgetApi.requestCapabilityToSendEvent(eventType),
-        );
-        capabilities.receiveEvent?.forEach(eventType =>
-            widgetApi.requestCapabilityToReceiveEvent(eventType),
-        );
+        capabilities.sendEvent?.forEach((eventType) => widgetApi.requestCapabilityToSendEvent(eventType));
+        capabilities.receiveEvent?.forEach((eventType) => widgetApi.requestCapabilityToReceiveEvent(eventType));
         if (capabilities.sendMessage === true) {
             widgetApi.requestCapabilityToSendMessage();
         } else if (Array.isArray(capabilities.sendMessage)) {
-            capabilities.sendMessage.forEach(msgType =>
-                widgetApi.requestCapabilityToSendMessage(msgType),
-            );
+            capabilities.sendMessage.forEach((msgType) => widgetApi.requestCapabilityToSendMessage(msgType));
         }
         if (capabilities.receiveMessage === true) {
             widgetApi.requestCapabilityToReceiveMessage();
         } else if (Array.isArray(capabilities.receiveMessage)) {
-            capabilities.receiveMessage.forEach(msgType =>
-                widgetApi.requestCapabilityToReceiveMessage(msgType),
-            );
+            capabilities.receiveMessage.forEach((msgType) => widgetApi.requestCapabilityToReceiveMessage(msgType));
         }
         capabilities.sendState?.forEach(({ eventType, stateKey }) =>
             widgetApi.requestCapabilityToSendState(eventType, stateKey),
@@ -148,12 +140,8 @@ export class RoomWidgetClient extends MatrixClient {
         capabilities.receiveState?.forEach(({ eventType, stateKey }) =>
             widgetApi.requestCapabilityToReceiveState(eventType, stateKey),
         );
-        capabilities.sendToDevice?.forEach(eventType =>
-            widgetApi.requestCapabilityToSendToDevice(eventType),
-        );
-        capabilities.receiveToDevice?.forEach(eventType =>
-            widgetApi.requestCapabilityToReceiveToDevice(eventType),
-        );
+        capabilities.sendToDevice?.forEach((eventType) => widgetApi.requestCapabilityToSendToDevice(eventType));
+        capabilities.receiveToDevice?.forEach((eventType) => widgetApi.requestCapabilityToReceiveToDevice(eventType));
         if (capabilities.turnServers) {
             widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
         }
@@ -195,10 +183,10 @@ export class RoomWidgetClient extends MatrixClient {
         await Promise.all(
             this.capabilities.receiveState?.map(async ({ eventType, stateKey }) => {
                 const rawEvents = await this.widgetApi.readStateEvents(eventType, undefined, stateKey, [this.roomId]);
-                const events = rawEvents.map(rawEvent => new MatrixEvent(rawEvent as Partial<IEvent>));
+                const events = rawEvents.map((rawEvent) => new MatrixEvent(rawEvent as Partial<IEvent>));
 
                 await this.syncApi!.injectRoomEvents(this.room!, [], events);
-                events.forEach(event => {
+                events.forEach((event) => {
                     this.emit(ClientEvent.Event, event);
                     logger.info(`Backfilled event ${event.getId()} ${event.getType()} ${event.getStateKey()}`);
                 });
@@ -264,12 +252,12 @@ export class RoomWidgetClient extends MatrixClient {
         await this.widgetApi.sendToDevice(eventType, false, contentMap);
     }
 
-    public async encryptAndSendToDevices(
-        userDeviceInfoArr: IOlmDevice<DeviceInfo>[],
-        payload: object,
-    ): Promise<void> {
+    public async encryptAndSendToDevices(userDeviceInfoArr: IOlmDevice<DeviceInfo>[], payload: object): Promise<void> {
         const contentMap: { [userId: string]: { [deviceId: string]: object } } = {};
-        for (const { userId, deviceInfo: { deviceId } } of userDeviceInfoArr) {
+        for (const {
+            userId,
+            deviceInfo: { deviceId },
+        } of userDeviceInfoArr) {
             if (!contentMap[userId]) contentMap[userId] = {};
             contentMap[userId][deviceId] = payload;
         }
@@ -342,11 +330,13 @@ export class RoomWidgetClient extends MatrixClient {
 
         try {
             for await (const server of servers) {
-                this.turnServers = [{
-                    urls: server.uris,
-                    username: server.username,
-                    credential: server.password,
-                }];
+                this.turnServers = [
+                    {
+                        urls: server.uris,
+                        username: server.username,
+                        credential: server.password,
+                    },
+                ];
                 this.emit(ClientEvent.TurnServers, this.turnServers);
                 logger.log(`Received TURN server: ${server.uris}`);
             }

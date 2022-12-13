@@ -16,12 +16,10 @@ limitations under the License.
 
 /**
  * Error messages.
- *
- * @module crypto/verification/Error
  */
 
 import { MatrixEvent } from "../../models/event";
-import { EventType } from '../../@types/event';
+import { EventType } from "../../@types/event";
 
 export function newVerificationError(code: string, reason: string, extraData?: Record<string, any>): MatrixEvent {
     const content = Object.assign({}, { code, reason }, extraData);
@@ -32,7 +30,7 @@ export function newVerificationError(code: string, reason: string, extraData?: R
 }
 
 export function errorFactory(code: string, reason: string): (extraData?: Record<string, any>) => MatrixEvent {
-    return function(extraData?: Record<string, any>) {
+    return function (extraData?: Record<string, any>) {
         return newVerificationError(code, reason, extraData);
     };
 }
@@ -55,25 +53,19 @@ export const newUnknownMethodError = errorFactory("m.unknown_method", "Unknown m
 /**
  * An unexpected message was sent.
  */
-export const newUnexpectedMessageError = errorFactory(
-    "m.unexpected_message", "Unexpected message",
-);
+export const newUnexpectedMessageError = errorFactory("m.unexpected_message", "Unexpected message");
 
 /**
  * The key does not match.
  */
-export const newKeyMismatchError = errorFactory(
-    "m.key_mismatch", "Key mismatch",
-);
+export const newKeyMismatchError = errorFactory("m.key_mismatch", "Key mismatch");
 
 /**
  * An invalid message was sent.
  */
-export const newInvalidMessageError = errorFactory(
-    "m.invalid_message", "Invalid message",
-);
+export const newInvalidMessageError = errorFactory("m.invalid_message", "Invalid message");
 
-export function errorFromEvent(event: MatrixEvent): { code: string, reason: string } {
+export function errorFromEvent(event: MatrixEvent): { code: string; reason: string } {
     const content = event.getContent();
     if (content) {
         const { code, reason } = content;

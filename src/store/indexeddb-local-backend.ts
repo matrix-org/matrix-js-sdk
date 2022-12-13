@@ -17,7 +17,7 @@ limitations under the License.
 import { IMinimalEvent, ISyncData, ISyncResponse, SyncAccumulator } from "../sync-accumulator";
 import * as utils from "../utils";
 import * as IndexedDBHelpers from "../indexeddb-helpers";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import { IStateEventWithRoomId, IStoredClientOpts } from "../matrix";
 import { ISavedSync } from "./index";
 import { IIndexedDBBackend, UserTuple } from "./indexeddb-backend";
@@ -37,26 +37,29 @@ const DB_MIGRATIONS: DbMigration[] = [
         db.createObjectStore("sync", { keyPath: ["clobber"] });
     },
     (db): void => {
-        const oobMembersStore = db.createObjectStore(
-            "oob_membership_events", {
-                keyPath: ["room_id", "state_key"],
-            });
+        const oobMembersStore = db.createObjectStore("oob_membership_events", {
+            keyPath: ["room_id", "state_key"],
+        });
         oobMembersStore.createIndex("room", "room_id");
     },
-    (db): void => { db.createObjectStore("client_options", { keyPath: ["clobber"] }); },
-    (db): void => { db.createObjectStore("to_device_queue", { autoIncrement: true }); },
+    (db): void => {
+        db.createObjectStore("client_options", { keyPath: ["clobber"] });
+    },
+    (db): void => {
+        db.createObjectStore("to_device_queue", { autoIncrement: true });
+    },
     // Expand as needed.
 ];
 const VERSION = DB_MIGRATIONS.length;
 
 /**
  * Helper method to collect results from a Cursor and promiseify it.
- * @param {ObjectStore|Index} store The store to perform openCursor on.
- * @param {IDBKeyRange=} keyRange Optional key range to apply on the cursor.
- * @param {Function} resultMapper A function which is repeatedly called with a
+ * @param store - The store to perform openCursor on.
+ * @param keyRange - Optional key range to apply on the cursor.
+ * @param resultMapper - A function which is repeatedly called with a
  * Cursor.
  * Return the data you want to keep.
- * @return {Promise<T[]>} Resolves to an array of whatever you returned from
+ * @returns Promise which resolves to an array of whatever you returned from
  * resultMapper.
  */
 function selectQuery<T>(
@@ -85,10 +88,10 @@ function selectQuery<T>(
 
 function txnAsPromise(txn: IDBTransaction): Promise<Event> {
     return new Promise((resolve, reject) => {
-        txn.oncomplete = function(event): void {
+        txn.oncomplete = function (event): void {
             resolve(event);
         };
-        txn.onerror = function(): void {
+        txn.onerror = function (): void {
             reject(txn.error);
         };
     });
@@ -96,10 +99,10 @@ function txnAsPromise(txn: IDBTransaction): Promise<Event> {
 
 function reqAsEventPromise(req: IDBRequest): Promise<Event> {
     return new Promise((resolve, reject) => {
-        req.onsuccess = function(event): void {
+        req.onsuccess = function (event): void {
             resolve(event);
         };
-        req.onerror = function(): void {
+        req.onerror = function (): void {
             reject(req.error);
         };
     });
@@ -134,11 +137,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Does the actual reading from and writing to the indexeddb
      *
      * Construct a new Indexed Database store backend. This requires a call to
-     * <code>connect()</code> before this store can be used.
-     * @constructor
-     * @param {Object} indexedDB The Indexed DB interface e.g
-     * <code>window.indexedDB</code>
-     * @param {string=} dbName Optional database name. The same name must be used
+     * `connect()` before this store can be used.
+     * @param indexedDB - The Indexed DB interface e.g
+     * `window.indexedDB`
+     * @param dbName - Optional database name. The same name must be used
      * to open the same database.
      */
     public constructor(private readonly indexedDB: IDBFactory, dbName = "default") {
@@ -149,7 +151,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     /**
      * Attempt to connect to the database. This can fail if the user does not
      * grant permission.
-     * @return {Promise} Resolves if successfully connected.
+     * @returns Promise which resolves if successfully connected.
      */
     public connect(): Promise<void> {
         if (!this.disconnected) {
@@ -164,9 +166,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         req.onupgradeneeded = (ev): void => {
             const db = req.result;
             const oldVersion = ev.oldVersion;
-            logger.log(
-                `LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`,
-            );
+            logger.log(`LocalIndexedDBStoreBackend.connect: upgrading from ${oldVersion}`);
             if (oldVersion < 1) {
                 // The database did not previously exist
                 this._isNewlyCreated = true;
@@ -195,37 +195,36 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         });
     }
 
-    /** @return {boolean} whether or not the database was newly created in this session. */
+    /** @returns whether or not the database was newly created in this session. */
     public isNewlyCreated(): Promise<boolean> {
         return Promise.resolve(this._isNewlyCreated);
     }
 
     /**
      * Having connected, load initial data from the database and prepare for use
-     * @return {Promise} Resolves on success
+     * @returns Promise which resolves on success
      */
     private init(): Promise<unknown> {
-        return Promise.all([
-            this.loadAccountData(),
-            this.loadSyncData(),
-        ]).then(([accountData, syncData]) => {
+        return Promise.all([this.loadAccountData(), this.loadSyncData()]).then(([accountData, syncData]) => {
             logger.log(`LocalIndexedDBStoreBackend: loaded initial data`);
-            this.syncAccumulator.accumulate({
-                next_batch: syncData.nextBatch,
-                rooms: syncData.roomsData,
-                account_data: {
-                    events: accountData,
+            this.syncAccumulator.accumulate(
+                {
+                    next_batch: syncData.nextBatch,
+                    rooms: syncData.roomsData,
+                    account_data: {
+                        events: accountData,
+                    },
                 },
-            }, true);
+                true,
+            );
         });
     }
 
     /**
      * Returns the out-of-band membership events for this room that
      * were previously loaded.
-     * @param {string} roomId
-     * @returns {Promise<event[]>} the events, potentially an empty array if OOB loading didn't yield any new members
-     * @returns {null} in case the members for this room haven't been stored yet
+     * @returns the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns in case the members for this room haven't been stored yet
      */
     public getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null> {
         return new Promise<IStateEventWithRoomId[] | null>((resolve, reject) => {
@@ -273,12 +272,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Stores the out-of-band membership events for this room. Note that
      * it still makes sense to store an empty array as the OOB status for the room is
      * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
-     * @param {string} roomId
-     * @param {event[]} membershipEvents the membership events to store
+     * @param membershipEvents - the membership events to store
      */
     public async setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
-        logger.log(`LL: backend about to store ${membershipEvents.length}` +
-            ` members for ${roomId}`);
+        logger.log(`LL: backend about to store ${membershipEvents.length}` + ` members for ${roomId}`);
         const tx = this.db!.transaction(["oob_membership_events"], "readwrite");
         const store = tx.objectStore("oob_membership_events");
         membershipEvents.forEach((e) => {
@@ -306,40 +303,35 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         // keys in the store.
         // this should be way faster than deleting every member
         // individually for a large room.
-        const readTx = this.db!.transaction(
-            ["oob_membership_events"],
-            "readonly");
+        const readTx = this.db!.transaction(["oob_membership_events"], "readonly");
         const store = readTx.objectStore("oob_membership_events");
         const roomIndex = store.index("room");
         const roomRange = IDBKeyRange.only(roomId);
 
-        const minStateKeyProm = reqAsCursorPromise(
-            roomIndex.openKeyCursor(roomRange, "next"),
-        ).then((cursor) => cursor && cursor.primaryKey[1]);
-        const maxStateKeyProm = reqAsCursorPromise(
-            roomIndex.openKeyCursor(roomRange, "prev"),
-        ).then((cursor) => cursor && cursor.primaryKey[1]);
-        const [minStateKey, maxStateKey] = await Promise.all(
-            [minStateKeyProm, maxStateKeyProm]);
+        const minStateKeyProm = reqAsCursorPromise(roomIndex.openKeyCursor(roomRange, "next")).then(
+            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)[1],
+        );
+        const maxStateKeyProm = reqAsCursorPromise(roomIndex.openKeyCursor(roomRange, "prev")).then(
+            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)[1],
+        );
+        const [minStateKey, maxStateKey] = await Promise.all([minStateKeyProm, maxStateKeyProm]);
 
-        const writeTx = this.db!.transaction(
-            ["oob_membership_events"],
-            "readwrite");
+        const writeTx = this.db!.transaction(["oob_membership_events"], "readwrite");
         const writeStore = writeTx.objectStore("oob_membership_events");
-        const membersKeyRange = IDBKeyRange.bound(
+        const membersKeyRange = IDBKeyRange.bound([roomId, minStateKey], [roomId, maxStateKey]);
+
+        logger.log(
+            `LL: Deleting all users + marker in storage for room ${roomId}, with key range:`,
             [roomId, minStateKey],
             [roomId, maxStateKey],
         );
-
-        logger.log(`LL: Deleting all users + marker in storage for room ${roomId}, with key range:`,
-            [roomId, minStateKey], [roomId, maxStateKey]);
         await reqAsPromise(writeStore.delete(membersKeyRange));
     }
 
     /**
      * Clear the entire database. This should be used when logging out of a client
      * to prevent mixing data between accounts.
-     * @return {Promise} Resolved when the database is cleared.
+     * @returns Resolved when the database is cleared.
      */
     public clearDatabase(): Promise<void> {
         return new Promise((resolve) => {
@@ -366,11 +358,11 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     /**
-     * @param {boolean=} copy If false, the data returned is from internal
+     * @param copy - If false, the data returned is from internal
      * buffers and must not be mutated. Otherwise, a copy is made before
      * returning such that the data can be safely mutated. Default: true.
      *
-     * @return {Promise} Resolves with a sync response to restore the
+     * @returns Promise which resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
@@ -421,14 +413,11 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
     /**
      * Persist rooms /sync data along with the next batch token.
-     * @param {string} nextBatch The next_batch /sync value.
-     * @param {Object} roomsData The 'rooms' /sync data from a SyncAccumulator
-     * @return {Promise} Resolves if the data was persisted.
+     * @param nextBatch - The next_batch /sync value.
+     * @param roomsData - The 'rooms' /sync data from a SyncAccumulator
+     * @returns Promise which resolves if the data was persisted.
      */
-    private persistSyncData(
-        nextBatch: string,
-        roomsData: ISyncResponse["rooms"],
-    ): Promise<void> {
+    private persistSyncData(nextBatch: string, roomsData: ISyncResponse["rooms"]): Promise<void> {
         logger.log("Persisting sync data up to", nextBatch);
         return utils.promiseTry<void>(() => {
             const txn = this.db!.transaction(["sync"], "readwrite");
@@ -447,8 +436,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     /**
      * Persist a list of account data events. Events with the same 'type' will
      * be replaced.
-     * @param {Object[]} accountData An array of raw user-scoped account data events
-     * @return {Promise} Resolves if the events were persisted.
+     * @param accountData - An array of raw user-scoped account data events
+     * @returns Promise which resolves if the events were persisted.
      */
     private persistAccountData(accountData: IMinimalEvent[]): Promise<void> {
         return utils.promiseTry<void>(() => {
@@ -466,8 +455,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Users with the same 'userId' will be replaced.
      * Presence events should be the event in its raw form (not the Event
      * object)
-     * @param {Object[]} tuples An array of [userid, event] tuples
-     * @return {Promise} Resolves if the users were persisted.
+     * @param tuples - An array of [userid, event] tuples
+     * @returns Promise which resolves if the users were persisted.
      */
     private persistUserPresenceEvents(tuples: UserTuple[]): Promise<void> {
         return utils.promiseTry<void>(() => {
@@ -487,7 +476,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Load all user presence events from the database. This is not cached.
      * FIXME: It would probably be more sensible to store the events in the
      * sync.
-     * @return {Promise<Object[]>} A list of presence events in their raw form.
+     * @returns A list of presence events in their raw form.
      */
     public getUserPresenceEvents(): Promise<UserTuple[]> {
         return utils.promiseTry<UserTuple[]>(() => {
@@ -501,7 +490,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
     /**
      * Load all the account data events from the database. This is not cached.
-     * @return {Promise<Object[]>} A list of raw global account events.
+     * @returns A list of raw global account events.
      */
     private loadAccountData(): Promise<IMinimalEvent[]> {
         logger.log(`LocalIndexedDBStoreBackend: loading account data...`);
@@ -519,7 +508,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
 
     /**
      * Load the sync data from the database.
-     * @return {Promise<Object>} An object with "roomsData" and "nextBatch" keys.
+     * @returns An object with "roomsData" and "nextBatch" keys.
      */
     private loadSyncData(): Promise<ISyncData> {
         logger.log(`LocalIndexedDBStoreBackend: loading sync data...`);
@@ -533,7 +522,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 if (results.length > 1) {
                     logger.warn("loadSyncData: More than 1 sync row found.");
                 }
-                return results.length > 0 ? results[0] : {} as ISyncData;
+                return results.length > 0 ? results[0] : ({} as ISyncData);
             });
         });
     }

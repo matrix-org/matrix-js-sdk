@@ -15,13 +15,11 @@ limitations under the License.
 */
 
 /**
- * @module crypto/RoomList
- *
  * Manages the list of encrypted rooms
  */
 
-import { CryptoStore } from './store/base';
-import { IndexedDBCryptoStore } from './store/indexeddb-crypto-store';
+import { CryptoStore } from "./store/base";
+import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 
 /* eslint-disable camelcase */
 export interface IRoomEncryption {
@@ -31,9 +29,6 @@ export interface IRoomEncryption {
 }
 /* eslint-enable camelcase */
 
-/**
- * @alias module:crypto/RoomList
- */
 export class RoomList {
     // Object of roomId -> room e2e info object (body of the m.room.encryption event)
     private roomEncryption: Record<string, IRoomEncryption> = {};
@@ -41,13 +36,11 @@ export class RoomList {
     public constructor(private readonly cryptoStore?: CryptoStore) {}
 
     public async init(): Promise<void> {
-        await this.cryptoStore!.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
-                this.cryptoStore!.getEndToEndRooms(txn, (result) => {
-                    this.roomEncryption = result;
-                });
-            },
-        );
+        await this.cryptoStore!.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
+            this.cryptoStore!.getEndToEndRooms(txn, (result) => {
+                this.roomEncryption = result;
+            });
+        });
     }
 
     public getRoomEncryption(roomId: string): IRoomEncryption {
@@ -63,10 +56,8 @@ export class RoomList {
         // as it prevents the Crypto::setRoomEncryption from calling
         // this twice for consecutive m.room.encryption events
         this.roomEncryption[roomId] = roomInfo;
-        await this.cryptoStore!.doTxn(
-            'readwrite', [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
-                this.cryptoStore!.storeEndToEndRoom(roomId, roomInfo, txn);
-            },
-        );
+        await this.cryptoStore!.doTxn("readwrite", [IndexedDBCryptoStore.STORE_ROOMS], (txn) => {
+            this.cryptoStore!.storeEndToEndRoom(roomId, roomInfo, txn);
+        });
     }
 }

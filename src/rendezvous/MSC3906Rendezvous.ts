@@ -25,17 +25,17 @@ import { logger } from "../logger";
 import { sleep } from "../utils";
 
 enum PayloadType {
-    Start = 'm.login.start',
-    Finish = 'm.login.finish',
-    Progress = 'm.login.progress',
+    Start = "m.login.start",
+    Finish = "m.login.finish",
+    Progress = "m.login.progress",
 }
 
 enum Outcome {
-    Success = 'success',
-    Failure = 'failure',
-    Verified = 'verified',
-    Declined = 'declined',
-    Unsupported = 'unsupported',
+    Success = "success",
+    Failure = "failure",
+    Verified = "verified",
+    Declined = "declined",
+    Unsupported = "unsupported",
 }
 
 export interface MSC3906RendezvousPayload {
@@ -67,9 +67,9 @@ export class MSC3906Rendezvous {
     private _code?: string;
 
     /**
-     * @param channel The secure channel used for communication
-     * @param client The Matrix client in used on the device already logged in
-     * @param onFailure Callback for when the rendezvous fails
+     * @param channel - The secure channel used for communication
+     * @param client - The Matrix client in used on the device already logged in
+     * @param onFailure - Callback for when the rendezvous fails
      */
     public constructor(
         private channel: RendezvousChannel<MSC3906RendezvousPayload>,
@@ -111,13 +111,13 @@ export class MSC3906Rendezvous {
 
         await this.send({ type: PayloadType.Progress, protocols: [LOGIN_TOKEN_PROTOCOL.name] });
 
-        logger.info('Waiting for other device to chose protocol');
+        logger.info("Waiting for other device to chose protocol");
         const { type, protocol, outcome } = await this.receive();
 
         if (type === PayloadType.Finish) {
             // new device decided not to complete
-            switch (outcome ?? '') {
-                case 'unsupported':
+            switch (outcome ?? "") {
+                case "unsupported":
                     await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
                     break;
                 default:
@@ -140,7 +140,7 @@ export class MSC3906Rendezvous {
     }
 
     private async receive(): Promise<MSC3906RendezvousPayload> {
-        return await this.channel.receive() as MSC3906RendezvousPayload;
+        return (await this.channel.receive()) as MSC3906RendezvousPayload;
     }
 
     private async send(payload: MSC3906RendezvousPayload): Promise<void> {
@@ -148,7 +148,7 @@ export class MSC3906Rendezvous {
     }
 
     public async declineLoginOnExistingDevice(): Promise<void> {
-        logger.info('User declined sign in');
+        logger.info("User declined sign in");
         await this.send({ type: PayloadType.Finish, outcome: Outcome.Declined });
     }
 
@@ -156,15 +156,15 @@ export class MSC3906Rendezvous {
         // eslint-disable-next-line camelcase
         await this.send({ type: PayloadType.Progress, login_token: loginToken, homeserver: this.client.baseUrl });
 
-        logger.info('Waiting for outcome');
+        logger.info("Waiting for outcome");
         const res = await this.receive();
         if (!res) {
             return undefined;
         }
         const { outcome, device_id: deviceId, device_key: deviceKey } = res;
 
-        if (outcome !== 'success') {
-            throw new Error('Linking failed');
+        if (outcome !== "success") {
+            throw new Error("Linking failed");
         }
 
         this.newDeviceId = deviceId;
@@ -175,11 +175,11 @@ export class MSC3906Rendezvous {
 
     private async verifyAndCrossSignDevice(deviceInfo: DeviceInfo): Promise<CrossSigningInfo | DeviceInfo> {
         if (!this.client.crypto) {
-            throw new Error('Crypto not available on client');
+            throw new Error("Crypto not available on client");
         }
 
         if (!this.newDeviceId) {
-            throw new Error('No new device ID set');
+            throw new Error("No new device ID set");
         }
 
         // check that keys received from the server for the new device match those received from the device itself
@@ -192,17 +192,13 @@ export class MSC3906Rendezvous {
         const userId = this.client.getUserId();
 
         if (!userId) {
-            throw new Error('No user ID set');
+            throw new Error("No user ID set");
         }
         // mark the device as verified locally + cross sign
         logger.info(`Marking device ${this.newDeviceId} as verified`);
-        const info = await this.client.crypto.setDeviceVerification(
-            userId,
-            this.newDeviceId,
-            true, false, true,
-        );
+        const info = await this.client.crypto.setDeviceVerification(userId, this.newDeviceId, true, false, true);
 
-        const masterPublicKey = this.client.crypto.crossSigningInfo.getId('master')!;
+        const masterPublicKey = this.client.crypto.crossSigningInfo.getId("master")!;
 
         await this.send({
             type: PayloadType.Finish,
@@ -217,14 +213,14 @@ export class MSC3906Rendezvous {
 
     /**
      * Verify the device and cross-sign it.
-     * @param timeout time in milliseconds to wait for device to come online
+     * @param timeout - time in milliseconds to wait for device to come online
      * @returns the new device info if the device was verified
      */
     public async verifyNewDeviceOnExistingDevice(
         timeout = 10 * 1000,
     ): Promise<DeviceInfo | CrossSigningInfo | undefined> {
         if (!this.newDeviceId) {
-            throw new Error('No new device to sign');
+            throw new Error("No new device to sign");
         }
 
         if (!this.newDeviceKey) {
@@ -233,13 +229,13 @@ export class MSC3906Rendezvous {
         }
 
         if (!this.client.crypto) {
-            throw new Error('Crypto not available on client');
+            throw new Error("Crypto not available on client");
         }
 
         const userId = this.client.getUserId();
 
         if (!userId) {
-            throw new Error('No user ID set');
+            throw new Error("No user ID set");
         }
 
         let deviceInfo = this.client.crypto.getStoredDevice(userId, this.newDeviceId);
@@ -254,7 +250,7 @@ export class MSC3906Rendezvous {
             return await this.verifyAndCrossSignDevice(deviceInfo);
         }
 
-        throw new Error('Device not online within timeout');
+        throw new Error("Device not online within timeout");
     }
 
     public async cancel(reason: RendezvousFailureReason): Promise<void> {

@@ -19,9 +19,9 @@ import { ReceiptType } from "../../src/@types/read_receipts";
 
 // TODO: Fix types throughout
 
-describe("utils", function() {
-    describe("encodeParams", function() {
-        it("should url encode and concat with &s", function() {
+describe("utils", function () {
+    describe("encodeParams", function () {
+        it("should url encode and concat with &s", function () {
             const params = {
                 foo: "bar",
                 baz: "beer@",
@@ -29,7 +29,7 @@ describe("utils", function() {
             expect(utils.encodeParams(params).toString()).toEqual("foo=bar&baz=beer%40");
         });
 
-        it("should handle boolean and numeric values", function() {
+        it("should handle boolean and numeric values", function () {
             const params = {
                 string: "foobar",
                 number: 12345,
@@ -56,38 +56,36 @@ describe("utils", function() {
         });
     });
 
-    describe("encodeUri", function() {
-        it("should replace based on object keys and url encode", function() {
+    describe("encodeUri", function () {
+        it("should replace based on object keys and url encode", function () {
             const path = "foo/bar/%something/%here";
             const vals = {
                 "%something": "baz",
                 "%here": "beer@",
             };
-            expect(utils.encodeUri(path, vals)).toEqual(
-                "foo/bar/baz/beer%40",
-            );
+            expect(utils.encodeUri(path, vals)).toEqual("foo/bar/baz/beer%40");
         });
     });
 
-    describe("removeElement", function() {
-        it("should remove only 1 element if there is a match", function() {
-            const matchFn = function() {
+    describe("removeElement", function () {
+        it("should remove only 1 element if there is a match", function () {
+            const matchFn = function () {
                 return true;
             };
             const arr = [55, 66, 77];
             utils.removeElement(arr, matchFn);
             expect(arr).toEqual([66, 77]);
         });
-        it("should be able to remove in reverse order", function() {
-            const matchFn = function() {
+        it("should be able to remove in reverse order", function () {
+            const matchFn = function () {
                 return true;
             };
             const arr = [55, 66, 77];
             utils.removeElement(arr, matchFn, true);
             expect(arr).toEqual([55, 66]);
         });
-        it("should remove nothing if the function never returns true", function() {
-            const matchFn = function() {
+        it("should remove nothing if the function never returns true", function () {
+            const matchFn = function () {
                 return false;
             };
             const arr = [55, 66, 77];
@@ -96,8 +94,8 @@ describe("utils", function() {
         });
     });
 
-    describe("isFunction", function() {
-        it("should return true for functions", function() {
+    describe("isFunction", function () {
+        it("should return true for functions", function () {
             expect(utils.isFunction([])).toBe(false);
             expect(utils.isFunction([5, 3, 7])).toBe(false);
             expect(utils.isFunction(undefined)).toBe(false);
@@ -106,36 +104,39 @@ describe("utils", function() {
             expect(utils.isFunction("foo")).toBe(false);
             expect(utils.isFunction(555)).toBe(false);
 
-            expect(utils.isFunction(function() {})).toBe(true);
-            const s = { foo: function() {} };
+            expect(utils.isFunction(function () {})).toBe(true);
+            const s = { foo: function () {} };
             expect(utils.isFunction(s.foo)).toBe(true);
         });
     });
 
-    describe("checkObjectHasKeys", function() {
-        it("should throw for missing keys", function() {
-            expect(function() {
+    describe("checkObjectHasKeys", function () {
+        it("should throw for missing keys", function () {
+            expect(function () {
                 utils.checkObjectHasKeys({}, ["foo"]);
             }).toThrow();
-            expect(function() {
-                utils.checkObjectHasKeys({
-                    foo: "bar",
-                }, ["foo"]);
+            expect(function () {
+                utils.checkObjectHasKeys(
+                    {
+                        foo: "bar",
+                    },
+                    ["foo"],
+                );
             }).not.toThrow();
         });
     });
 
-    describe("deepCompare", function() {
+    describe("deepCompare", function () {
         const assert = {
-            isTrue: function(x: any) {
+            isTrue: function (x: any) {
                 expect(x).toBe(true);
             },
-            isFalse: function(x: any) {
+            isFalse: function (x: any) {
                 expect(x).toBe(false);
             },
         };
 
-        it("should handle primitives", function() {
+        it("should handle primitives", function () {
             assert.isTrue(utils.deepCompare(null, null));
             assert.isFalse(utils.deepCompare(null, undefined));
             assert.isTrue(utils.deepCompare("hi", "hi"));
@@ -143,26 +144,26 @@ describe("utils", function() {
             assert.isFalse(utils.deepCompare(5, 10));
         });
 
-        it("should handle regexps", function() {
+        it("should handle regexps", function () {
             assert.isTrue(utils.deepCompare(/abc/, /abc/));
             assert.isFalse(utils.deepCompare(/abc/, /123/));
             const r = /abc/;
             assert.isTrue(utils.deepCompare(r, r));
         });
 
-        it("should handle dates", function() {
+        it("should handle dates", function () {
             assert.isTrue(utils.deepCompare(new Date("2011-03-31"), new Date("2011-03-31")));
             assert.isFalse(utils.deepCompare(new Date("2011-03-31"), new Date("1970-01-01")));
         });
 
-        it("should handle arrays", function() {
+        it("should handle arrays", function () {
             assert.isTrue(utils.deepCompare([], []));
             assert.isTrue(utils.deepCompare([1, 2], [1, 2]));
             assert.isFalse(utils.deepCompare([1, 2], [2, 1]));
             assert.isFalse(utils.deepCompare([1, 2], [1, 2, 3]));
         });
 
-        it("should handle simple objects", function() {
+        it("should handle simple objects", function () {
             assert.isTrue(utils.deepCompare({}, {}));
             assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { a: 1, b: 2 }));
             assert.isTrue(utils.deepCompare({ a: 1, b: 2 }, { b: 2, a: 1 }));
@@ -171,34 +172,44 @@ describe("utils", function() {
             assert.isFalse(utils.deepCompare({ a: 1 }, { a: 1, b: 2 }));
             assert.isFalse(utils.deepCompare({ a: 1 }, { b: 1 }));
 
-            assert.isTrue(utils.deepCompare({
-                1: { name: "mhc", age: 28 },
-                2: { name: "arb", age: 26 },
-            }, {
-                1: { name: "mhc", age: 28 },
-                2: { name: "arb", age: 26 },
-            }));
+            assert.isTrue(
+                utils.deepCompare(
+                    {
+                        1: { name: "mhc", age: 28 },
+                        2: { name: "arb", age: 26 },
+                    },
+                    {
+                        1: { name: "mhc", age: 28 },
+                        2: { name: "arb", age: 26 },
+                    },
+                ),
+            );
 
-            assert.isFalse(utils.deepCompare({
-                1: { name: "mhc", age: 28 },
-                2: { name: "arb", age: 26 },
-            }, {
-                1: { name: "mhc", age: 28 },
-                2: { name: "arb", age: 27 },
-            }));
+            assert.isFalse(
+                utils.deepCompare(
+                    {
+                        1: { name: "mhc", age: 28 },
+                        2: { name: "arb", age: 26 },
+                    },
+                    {
+                        1: { name: "mhc", age: 28 },
+                        2: { name: "arb", age: 27 },
+                    },
+                ),
+            );
 
             assert.isFalse(utils.deepCompare({}, null));
             assert.isFalse(utils.deepCompare({}, undefined));
         });
 
-        it("should handle functions", function() {
+        it("should handle functions", function () {
             // no two different function is equal really, they capture their
             // context variables so even if they have same toString(), they
             // won't have same functionality
-            const func = function() {
+            const func = function () {
                 return true;
             };
-            const func2 = function() {
+            const func2 = function () {
                 return true;
             };
             assert.isTrue(utils.deepCompare(func, func));
@@ -208,8 +219,8 @@ describe("utils", function() {
         });
     });
 
-    describe("chunkPromises", function() {
-        it("should execute promises in chunks", async function() {
+    describe("chunkPromises", function () {
+        it("should execute promises in chunks", async function () {
             let promiseCount = 0;
 
             async function fn1() {
@@ -228,8 +239,8 @@ describe("utils", function() {
         });
     });
 
-    describe('simpleRetryOperation', () => {
-        it('should retry', async () => {
+    describe("simpleRetryOperation", () => {
+        it("should retry", async () => {
             let count = 0;
             const val = {};
             const fn = (attempt: any) => {
@@ -256,24 +267,24 @@ describe("utils", function() {
         // all that concerns us.
     });
 
-    describe('DEFAULT_ALPHABET', () => {
-        it('should be usefully printable ASCII in order', () => {
+    describe("DEFAULT_ALPHABET", () => {
+        it("should be usefully printable ASCII in order", () => {
             expect(DEFAULT_ALPHABET).toEqual(
                 " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~",
             );
         });
     });
 
-    describe('alphabetPad', () => {
-        it('should pad to the alphabet length', () => {
+    describe("alphabetPad", () => {
+        it("should pad to the alphabet length", () => {
             const len = 12;
-            expect(alphabetPad("a", len)).toEqual("a" + ("".padEnd(len - 1, DEFAULT_ALPHABET[0])));
-            expect(alphabetPad("a", len, "123")).toEqual("a" + ("".padEnd(len - 1, '1')));
+            expect(alphabetPad("a", len)).toEqual("a" + "".padEnd(len - 1, DEFAULT_ALPHABET[0]));
+            expect(alphabetPad("a", len, "123")).toEqual("a" + "".padEnd(len - 1, "1"));
         });
     });
 
-    describe('baseToString', () => {
-        it('should calculate the appropriate string from numbers', () => {
+    describe("baseToString", () => {
+        it("should calculate the appropriate string from numbers", () => {
             // Verify the whole alphabet
             for (let i = BigInt(1); i <= DEFAULT_ALPHABET.length; i++) {
                 logger.log({ i }); // for debugging
@@ -290,14 +301,14 @@ describe("utils", function() {
             expect(baseToString(BigInt(7820126496))).toEqual(DEFAULT_ALPHABET[0].repeat(6));
 
             expect(baseToString(BigInt(10))).toEqual(DEFAULT_ALPHABET[9]);
-            expect(baseToString(BigInt(10), "abcdefghijklmnopqrstuvwxyz")).toEqual('j');
+            expect(baseToString(BigInt(10), "abcdefghijklmnopqrstuvwxyz")).toEqual("j");
             expect(baseToString(BigInt(6337))).toEqual("ab");
-            expect(baseToString(BigInt(80), "abcdefghijklmnopqrstuvwxyz")).toEqual('cb');
+            expect(baseToString(BigInt(80), "abcdefghijklmnopqrstuvwxyz")).toEqual("cb");
         });
     });
 
-    describe('stringToBase', () => {
-        it('should calculate the appropriate number for a string', () => {
+    describe("stringToBase", () => {
+        it("should calculate the appropriate number for a string", () => {
             expect(stringToBase(DEFAULT_ALPHABET[0].repeat(1))).toEqual(BigInt(1));
             expect(stringToBase(DEFAULT_ALPHABET[0].repeat(2))).toEqual(BigInt(96));
             expect(stringToBase(DEFAULT_ALPHABET[0].repeat(3))).toEqual(BigInt(9121));
@@ -312,42 +323,42 @@ describe("utils", function() {
         });
     });
 
-    describe('averageBetweenStrings', () => {
-        it('should average appropriately', () => {
+    describe("averageBetweenStrings", () => {
+        it("should average appropriately", () => {
             expect(averageBetweenStrings("  ", "!!")).toEqual(" P");
             expect(averageBetweenStrings(" ", "!")).toEqual("  ");
-            expect(averageBetweenStrings('A', 'B')).toEqual('A ');
-            expect(averageBetweenStrings('AA', 'BB')).toEqual('Aq');
-            expect(averageBetweenStrings('A', 'z')).toEqual(']');
-            expect(averageBetweenStrings('a', 'z', "abcdefghijklmnopqrstuvwxyz")).toEqual('m');
-            expect(averageBetweenStrings('AA', 'zz')).toEqual('^.');
-            expect(averageBetweenStrings('aa', 'zz', "abcdefghijklmnopqrstuvwxyz")).toEqual('mz');
-            expect(averageBetweenStrings('cat', 'doggo')).toEqual("d9>Cw");
-            expect(averageBetweenStrings('cat', 'doggo', "abcdefghijklmnopqrstuvwxyz")).toEqual("cumqh");
+            expect(averageBetweenStrings("A", "B")).toEqual("A ");
+            expect(averageBetweenStrings("AA", "BB")).toEqual("Aq");
+            expect(averageBetweenStrings("A", "z")).toEqual("]");
+            expect(averageBetweenStrings("a", "z", "abcdefghijklmnopqrstuvwxyz")).toEqual("m");
+            expect(averageBetweenStrings("AA", "zz")).toEqual("^.");
+            expect(averageBetweenStrings("aa", "zz", "abcdefghijklmnopqrstuvwxyz")).toEqual("mz");
+            expect(averageBetweenStrings("cat", "doggo")).toEqual("d9>Cw");
+            expect(averageBetweenStrings("cat", "doggo", "abcdefghijklmnopqrstuvwxyz")).toEqual("cumqh");
         });
     });
 
-    describe('nextString', () => {
-        it('should find the next string appropriately', () => {
-            expect(nextString('A')).toEqual('B');
-            expect(nextString('b', 'abcdefghijklmnopqrstuvwxyz')).toEqual('c');
-            expect(nextString('cat')).toEqual('cau');
-            expect(nextString('cat', 'abcdefghijklmnopqrstuvwxyz')).toEqual('cau');
+    describe("nextString", () => {
+        it("should find the next string appropriately", () => {
+            expect(nextString("A")).toEqual("B");
+            expect(nextString("b", "abcdefghijklmnopqrstuvwxyz")).toEqual("c");
+            expect(nextString("cat")).toEqual("cau");
+            expect(nextString("cat", "abcdefghijklmnopqrstuvwxyz")).toEqual("cau");
         });
     });
 
-    describe('prevString', () => {
-        it('should find the next string appropriately', () => {
-            expect(prevString('B')).toEqual('A');
-            expect(prevString('c', 'abcdefghijklmnopqrstuvwxyz')).toEqual('b');
-            expect(prevString('cau')).toEqual('cat');
-            expect(prevString('cau', 'abcdefghijklmnopqrstuvwxyz')).toEqual('cat');
+    describe("prevString", () => {
+        it("should find the next string appropriately", () => {
+            expect(prevString("B")).toEqual("A");
+            expect(prevString("c", "abcdefghijklmnopqrstuvwxyz")).toEqual("b");
+            expect(prevString("cau")).toEqual("cat");
+            expect(prevString("cau", "abcdefghijklmnopqrstuvwxyz")).toEqual("cat");
         });
     });
 
     // Let's just ensure the ordering is sensible for lexicographic ordering
-    describe('string averaging unified', () => {
-        it('should be truly previous and next', () => {
+    describe("string averaging unified", () => {
+        it("should be truly previous and next", () => {
             let midpoint = "cat";
 
             // We run this test 100 times to ensure we end up with a sane sequence.
@@ -364,7 +375,7 @@ describe("utils", function() {
             }
         });
 
-        it('should roll over', () => {
+        it("should roll over", () => {
             const lastAlpha = DEFAULT_ALPHABET[DEFAULT_ALPHABET.length - 1];
             const firstAlpha = DEFAULT_ALPHABET[0];
 
@@ -375,14 +386,14 @@ describe("utils", function() {
             expect(prevString(highRoll)).toEqual(lowRoll);
         });
 
-        it('should be reversible on small strings', () => {
+        it("should be reversible on small strings", () => {
             // Large scale reversibility is tested for max space order value
             const input = "cats";
             expect(prevString(nextString(input))).toEqual(input);
         });
 
         // We want to explicitly make sure that Space order values are supported and roll appropriately
-        it('should properly handle rolling over at 50 characters', () => {
+        it("should properly handle rolling over at 50 characters", () => {
             // Note: we also test reversibility of large strings here.
 
             const maxSpaceValue = DEFAULT_ALPHABET[DEFAULT_ALPHABET.length - 1].repeat(50);
@@ -397,30 +408,30 @@ describe("utils", function() {
         });
     });
 
-    describe('lexicographicCompare', () => {
-        it('should work', () => {
+    describe("lexicographicCompare", () => {
+        it("should work", () => {
             // Simple tests
-            expect(lexicographicCompare('a', 'b') < 0).toBe(true);
-            expect(lexicographicCompare('ab', 'b') < 0).toBe(true);
-            expect(lexicographicCompare('cat', 'dog') < 0).toBe(true);
+            expect(lexicographicCompare("a", "b") < 0).toBe(true);
+            expect(lexicographicCompare("ab", "b") < 0).toBe(true);
+            expect(lexicographicCompare("cat", "dog") < 0).toBe(true);
 
             // Simple tests (reversed)
-            expect(lexicographicCompare('b', 'a') > 0).toBe(true);
-            expect(lexicographicCompare('b', 'ab') > 0).toBe(true);
-            expect(lexicographicCompare('dog', 'cat') > 0).toBe(true);
+            expect(lexicographicCompare("b", "a") > 0).toBe(true);
+            expect(lexicographicCompare("b", "ab") > 0).toBe(true);
+            expect(lexicographicCompare("dog", "cat") > 0).toBe(true);
 
             // Simple equality tests
-            expect(lexicographicCompare('a', 'a') === 0).toBe(true);
-            expect(lexicographicCompare('A', 'A') === 0).toBe(true);
+            expect(lexicographicCompare("a", "a") === 0).toBe(true);
+            expect(lexicographicCompare("A", "A") === 0).toBe(true);
 
             // ASCII rule testing
-            expect(lexicographicCompare('A', 'a') < 0).toBe(true);
-            expect(lexicographicCompare('a', 'A') > 0).toBe(true);
+            expect(lexicographicCompare("A", "a") < 0).toBe(true);
+            expect(lexicographicCompare("a", "A") > 0).toBe(true);
         });
     });
 
-    describe('deepSortedObjectEntries', () => {
-        it('should auto-return non-objects', () => {
+    describe("deepSortedObjectEntries", () => {
+        it("should auto-return non-objects", () => {
             expect(deepSortedObjectEntries(42)).toEqual(42);
             expect(deepSortedObjectEntries("not object")).toEqual("not object");
             expect(deepSortedObjectEntries(true)).toEqual(true);
@@ -429,7 +440,7 @@ describe("utils", function() {
             expect(deepSortedObjectEntries(undefined)).toEqual(undefined);
         });
 
-        it('should sort objects appropriately', () => {
+        it("should sort objects appropriately", () => {
             const input = {
                 a: 42,
                 b: {
@@ -442,11 +453,14 @@ describe("utils", function() {
             const output: any = [
                 ["72", "test"],
                 ["a", 42],
-                ["b", [
-                    ["a", "test"],
-                    ["b", "alpha"],
-                    ["d", []],
-                ]],
+                [
+                    "b",
+                    [
+                        ["a", "test"],
+                        ["b", "alpha"],
+                        ["d", []],
+                    ],
+                ],
             ];
 
             expect(deepSortedObjectEntries(input)).toMatchObject(output);
@@ -455,12 +469,20 @@ describe("utils", function() {
 
     describe("recursivelyAssign", () => {
         it("doesn't override with null/undefined", () => {
-            const result = utils.recursivelyAssign(
+            const result = utils.recursivelyAssign<
+                {
+                    string: string;
+                    object: object;
+                    float: number;
+                },
+                {}
+            >(
                 {
                     string: "Hello world",
                     object: {},
                     float: 0.1,
-                }, {
+                },
+                {
                     string: null,
                     object: undefined,
                 },
@@ -475,7 +497,14 @@ describe("utils", function() {
         });
 
         it("assigns recursively", () => {
-            const result = utils.recursivelyAssign(
+            const result = utils.recursivelyAssign<
+                {
+                    number: number;
+                    object: object;
+                    thing: string | object;
+                },
+                {}
+            >(
                 {
                     number: 42,
                     object: {
@@ -486,7 +515,8 @@ describe("utils", function() {
                         },
                     },
                     thing: "string",
-                }, {
+                },
+                {
                     number: 2,
                     object: {
                         message: "How are you",
@@ -517,9 +547,9 @@ describe("utils", function() {
         });
     });
 
-    describe('sortEventsByLatestContentTimestamp', () => {
-        const roomId = '!room:server';
-        const userId = '@user:server';
+    describe("sortEventsByLatestContentTimestamp", () => {
+        const roomId = "!room:server";
+        const userId = "@user:server";
         const eventWithoutContentTimestamp = mkMessage({ room: roomId, user: userId, event: true });
         // m.beacon events have timestamp in content
         const beaconEvent1 = makeBeaconEvent(userId, { timestamp: 1648804528557 });
@@ -527,32 +557,33 @@ describe("utils", function() {
         const beaconEvent3 = makeBeaconEvent(userId, { timestamp: 1648804528000 });
         const beaconEvent4 = makeBeaconEvent(userId, { timestamp: 0 });
 
-        it('sorts events with timestamps as later than events without', () => {
+        it("sorts events with timestamps as later than events without", () => {
             expect(
-                [beaconEvent4, eventWithoutContentTimestamp, beaconEvent1]
-                    .sort(utils.sortEventsByLatestContentTimestamp),
-            ).toEqual([
-                beaconEvent1, beaconEvent4, eventWithoutContentTimestamp,
-            ]);
+                [beaconEvent4, eventWithoutContentTimestamp, beaconEvent1].sort(
+                    utils.sortEventsByLatestContentTimestamp,
+                ),
+            ).toEqual([beaconEvent1, beaconEvent4, eventWithoutContentTimestamp]);
         });
 
-        it('sorts by content timestamps correctly', () => {
-            expect(
-                [beaconEvent1, beaconEvent2, beaconEvent3].sort(sortEventsByLatestContentTimestamp),
-            ).toEqual([beaconEvent2, beaconEvent1, beaconEvent3]);
+        it("sorts by content timestamps correctly", () => {
+            expect([beaconEvent1, beaconEvent2, beaconEvent3].sort(sortEventsByLatestContentTimestamp)).toEqual([
+                beaconEvent2,
+                beaconEvent1,
+                beaconEvent3,
+            ]);
         });
     });
 
-    describe('isSupportedReceiptType', () => {
-        it('should support m.read', () => {
+    describe("isSupportedReceiptType", () => {
+        it("should support m.read", () => {
             expect(utils.isSupportedReceiptType(ReceiptType.Read)).toBeTruthy();
         });
 
-        it('should support m.read.private', () => {
+        it("should support m.read.private", () => {
             expect(utils.isSupportedReceiptType(ReceiptType.ReadPrivate)).toBeTruthy();
         });
 
-        it('should not support other receipt types', () => {
+        it("should not support other receipt types", () => {
             expect(utils.isSupportedReceiptType("this is a receipt type")).toBeFalsy();
         });
     });

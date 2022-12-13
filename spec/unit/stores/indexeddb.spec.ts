@@ -14,8 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import 'fake-indexeddb/auto';
-import 'jest-localstorage-mock';
+import "fake-indexeddb/auto";
+import "jest-localstorage-mock";
 
 import { IndexedDBStore, IStateEventWithRoomId, MemoryStore } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
@@ -61,8 +61,9 @@ describe("IndexedDBStore", () => {
 
         // Simulate a broken IDB
         (store.backend as LocalIndexedDBStoreBackend)["db"]!.transaction = (): IDBTransaction => {
-            const err = new Error("Failed to execute 'transaction' on 'IDBDatabase': " +
-                "The database connection is closing.");
+            const err = new Error(
+                "Failed to execute 'transaction' on 'IDBDatabase': " + "The database connection is closing.",
+            );
             err.name = "InvalidStateError";
             throw err;
         };

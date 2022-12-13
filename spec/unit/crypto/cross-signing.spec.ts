@@ -15,26 +15,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import '../../olm-loader';
-import anotherjson from 'another-json';
-import { PkSigning } from '@matrix-org/olm';
+import "../../olm-loader";
+import anotherjson from "another-json";
+import { PkSigning } from "@matrix-org/olm";
+import HttpBackend from "matrix-mock-request";
 
 import * as olmlib from "../../../src/crypto/olmlib";
-import { MatrixError } from '../../../src/http-api';
-import { logger } from '../../../src/logger';
-import { ICrossSigningKey, ICreateClientOpts, ISignedKey } from '../../../src/client';
-import { CryptoEvent } from '../../../src/crypto';
-import { IDevice } from '../../../src/crypto/deviceinfo';
-import { TestClient } from '../../TestClient';
+import { MatrixError } from "../../../src/http-api";
+import { logger } from "../../../src/logger";
+import { ICrossSigningKey, ICreateClientOpts, ISignedKey, MatrixClient } from "../../../src/client";
+import { CryptoEvent, IBootstrapCrossSigningOpts } from "../../../src/crypto";
+import { IDevice } from "../../../src/crypto/deviceinfo";
+import { TestClient } from "../../TestClient";
 import { resetCrossSigningKeys } from "./crypto-utils";
 
-const PUSH_RULES_RESPONSE = {
+const PUSH_RULES_RESPONSE: Response = {
     method: "GET",
     path: "/pushrules/",
     data: {},
 };
 
-const filterResponse = function(userId) {
+const filterResponse = function (userId: string): Response {
     const filterPath = "/user/" + encodeURIComponent(userId) + "/filter";
     return {
         method: "POST",
@@ -43,33 +44,37 @@ const filterResponse = function(userId) {
     };
 };
 
-function setHttpResponses(httpBackend, responses) {
-    responses.forEach(response => {
-        httpBackend
-            .when(response.method, response.path)
-            .respond(200, response.data);
+interface Response {
+    method: "GET" | "PUT" | "POST" | "DELETE";
+    path: string;
+    data: object;
+}
+
+function setHttpResponses(httpBackend: HttpBackend, responses: Response[]) {
+    responses.forEach((response) => {
+        httpBackend.when(response.method, response.path).respond(200, response.data);
     });
 }
 
 async function makeTestClient(
-    userInfo: { userId: string, deviceId: string},
+    userInfo: { userId: string; deviceId: string },
     options: Partial<ICreateClientOpts> = {},
-    keys = {},
+    keys: Record<string, Uint8Array> = {},
 ) {
-    function getCrossSigningKey(type) {
-        return keys[type];
+    function getCrossSigningKey(type: string) {
+        return keys[type] ?? null;
     }
 
-    function saveCrossSigningKeys(k) {
+    function saveCrossSigningKeys(k: Record<string, Uint8Array>) {
         Object.assign(keys, k);
     }
 
     options.cryptoCallbacks = Object.assign(
-        {}, { getCrossSigningKey, saveCrossSigningKeys }, options.cryptoCallbacks || {},
+        {},
+        { getCrossSigningKey, saveCrossSigningKeys },
+        options.cryptoCallbacks || {},
     );
-    const testClient = new TestClient(
-        userInfo.userId, userInfo.deviceId, undefined, undefined, options,
-    );
+    const testClient = new TestClient(userInfo.userId, userInfo.deviceId, undefined, undefined, options);
     const client = testClient.client;
 
     await client.initCrypto();
@@ -77,24 +82,25 @@ async function makeTestClient(
     return { client, httpBackend: testClient.httpBackend };
 }
 
-describe("Cross Signing", function() {
+describe("Cross Signing", function () {
     if (!global.Olm) {
-        logger.warn('Not running megolm backup unit tests: libolm not present');
+        logger.warn("Not running megolm backup unit tests: libolm not present");
         return;
     }
 
-    beforeAll(function() {
+    beforeAll(function () {
         return global.Olm.init();
     });
 
-    it("should sign the master key with the device key", async function() {
-        const { client: alice } = await makeTestClient(
-            { userId: "@alice:example.com", deviceId: "Osborne2" },
-        );
+    it("should sign the master key with the device key", async function () {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         alice.uploadDeviceSigningKeys = jest.fn().mockImplementation(async (auth, keys) => {
             await olmlib.verifySignature(
-                alice.crypto!.olmDevice, keys.master_key, "@alice:example.com",
-                "Osborne2", alice.crypto!.olmDevice.deviceEd25519Key!,
+                alice.crypto!.olmDevice,
+                keys.master_key,
+                "@alice:example.com",
+                "Osborne2",
+                alice.crypto!.olmDevice.deviceEd25519Key!,
             );
         });
         alice.uploadKeySignatures = async () => ({ failures: {} });
@@ -102,24 +108,22 @@ describe("Cross Signing", function() {
         alice.getAccountDataFromServer = async <T>() => ({} as T);
         // set Alice's cross-signing key
         await alice.bootstrapCrossSigning({
-            authUploadDeviceSigningKeys: async func => { await func({}); },
+            authUploadDeviceSigningKeys: async (func) => {
+                await func({});
+            },
         });
         expect(alice.uploadDeviceSigningKeys).toHaveBeenCalled();
         alice.stopClient();
     });
 
-    it("should abort bootstrap if device signing auth fails", async function() {
-        const { client: alice } = await makeTestClient(
-            { userId: "@alice:example.com", deviceId: "Osborne2" },
-        );
+    it("should abort bootstrap if device signing auth fails", async function () {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         alice.uploadDeviceSigningKeys = async (auth, keys) => {
             const errorResponse = {
                 session: "sessionId",
                 flows: [
                     {
-                        stages: [
-                            "m.login.password",
-                        ],
+                        stages: ["m.login.password"],
                     },
                 ],
                 params: {},
@@ -141,8 +145,10 @@ describe("Cross Signing", function() {
         };
         alice.uploadKeySignatures = async () => ({ failures: {} });
         alice.setAccountData = async () => ({});
-        alice.getAccountDataFromServer = async <T extends {[k: string]: any}>(): Promise<T | null> => ({} as T);
-        const authUploadDeviceSigningKeys = async func => await func({});
+        alice.getAccountDataFromServer = async <T extends { [k: string]: any }>(): Promise<T | null> => ({} as T);
+        const authUploadDeviceSigningKeys: IBootstrapCrossSigningOpts["authUploadDeviceSigningKeys"] = async (func) => {
+            await func({});
+        };
 
         // Try bootstrap, expecting `authUploadDeviceSigningKeys` to pass
         // through failure, stopping before actually applying changes.
@@ -160,10 +166,8 @@ describe("Cross Signing", function() {
         alice.stopClient();
     });
 
-    it("should upload a signature when a user is verified", async function() {
-        const { client: alice } = await makeTestClient(
-            { userId: "@alice:example.com", deviceId: "Osborne2" },
-        );
+    it("should upload a signature when a user is verified", async function () {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         alice.uploadDeviceSigningKeys = async () => ({});
         alice.uploadKeySignatures = async () => ({ failures: {} });
         // set Alice's cross-signing key
@@ -195,18 +199,14 @@ describe("Cross Signing", function() {
         alice.stopClient();
     });
 
-    it.skip("should get cross-signing keys from sync", async function() {
+    it.skip("should get cross-signing keys from sync", async function () {
         const masterKey = new Uint8Array([
-            0xda, 0x5a, 0x27, 0x60, 0xe3, 0x3a, 0xc5, 0x82,
-            0x9d, 0x12, 0xc3, 0xbe, 0xe8, 0xaa, 0xc2, 0xef,
-            0xae, 0xb1, 0x05, 0xc1, 0xe7, 0x62, 0x78, 0xa6,
-            0xd7, 0x1f, 0xf8, 0x2c, 0x51, 0x85, 0xf0, 0x1d,
+            0xda, 0x5a, 0x27, 0x60, 0xe3, 0x3a, 0xc5, 0x82, 0x9d, 0x12, 0xc3, 0xbe, 0xe8, 0xaa, 0xc2, 0xef, 0xae, 0xb1,
+            0x05, 0xc1, 0xe7, 0x62, 0x78, 0xa6, 0xd7, 0x1f, 0xf8, 0x2c, 0x51, 0x85, 0xf0, 0x1d,
         ]);
         const selfSigningKey = new Uint8Array([
-            0x1e, 0xf4, 0x01, 0x6d, 0x4f, 0xa1, 0x73, 0x66,
-            0x6b, 0xf8, 0x93, 0xf5, 0xb0, 0x4d, 0x17, 0xc0,
-            0x17, 0xb5, 0xa5, 0xf6, 0x59, 0x11, 0x8b, 0x49,
-            0x34, 0xf2, 0x4b, 0x64, 0x9b, 0x52, 0xf8, 0x5f,
+            0x1e, 0xf4, 0x01, 0x6d, 0x4f, 0xa1, 0x73, 0x66, 0x6b, 0xf8, 0x93, 0xf5, 0xb0, 0x4d, 0x17, 0xc0, 0x17, 0xb5,
+            0xa5, 0xf6, 0x59, 0x11, 0x8b, 0x49, 0x34, 0xf2, 0x4b, 0x64, 0x9b, 0x52, 0xf8, 0x5f,
         ]);
 
         const { client: alice, httpBackend } = await makeTestClient(
@@ -214,8 +214,8 @@ describe("Cross Signing", function() {
             {
                 cryptoCallbacks: {
                     // will be called to sign our own device
-                    getCrossSigningKey: async type => {
-                        if (type === 'master') {
+                    getCrossSigningKey: async (type) => {
+                        if (type === "master") {
                             return masterKey;
                         } else {
                             return selfSigningKey;
@@ -239,11 +239,10 @@ describe("Cross Signing", function() {
                 try {
                     await olmlib.verifySignature(
                         alice.crypto!.olmDevice,
-                        content["@alice:example.com"][
-                            "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"
-                        ],
+                        content["@alice:example.com"]["nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk"],
                         "@alice:example.com",
-                        "Osborne2", alice.crypto!.olmDevice.deviceEd25519Key!,
+                        "Osborne2",
+                        alice.crypto!.olmDevice.deviceEd25519Key!,
                     );
                     olmlib.pkVerify(
                         content["@alice:example.com"]["Osborne2"],
@@ -258,8 +257,7 @@ describe("Cross Signing", function() {
         });
 
         // @ts-ignore private property
-        const deviceInfo = alice.crypto!.deviceList.devices["@alice:example.com"]
-            .Osborne2;
+        const deviceInfo = alice.crypto!.deviceList.devices["@alice:example.com"].Osborne2;
         const aliceDevice = {
             user_id: "@alice:example.com",
             device_id: "Osborne2",
@@ -267,15 +265,10 @@ describe("Cross Signing", function() {
             algorithms: deviceInfo.algorithms,
         };
         await alice.crypto!.signObject(aliceDevice);
-        olmlib.pkSign(
-            aliceDevice as ISignedKey,
-            selfSigningKey as unknown as PkSigning,
-            "@alice:example.com",
-            '',
-        );
+        olmlib.pkSign(aliceDevice as ISignedKey, selfSigningKey as unknown as PkSigning, "@alice:example.com", "");
 
         // feed sync result that includes master key, ssk, device key
-        const responses = [
+        const responses: Response[] = [
             PUSH_RULES_RESPONSE,
             {
                 method: "POST",
@@ -294,10 +287,7 @@ describe("Cross Signing", function() {
                 data: {
                     next_batch: "abcdefg",
                     device_lists: {
-                        changed: [
-                            "@alice:example.com",
-                            "@bob:example.com",
-                        ],
+                        changed: ["@alice:example.com", "@bob:example.com"],
                     },
                 },
             },
@@ -305,35 +295,35 @@ describe("Cross Signing", function() {
                 method: "POST",
                 path: "/keys/query",
                 data: {
-                    "failures": {},
-                    "device_keys": {
+                    failures: {},
+                    device_keys: {
                         "@alice:example.com": {
-                            "Osborne2": aliceDevice,
+                            Osborne2: aliceDevice,
                         },
                     },
-                    "master_keys": {
+                    master_keys: {
                         "@alice:example.com": {
                             user_id: "@alice:example.com",
                             usage: ["master"],
                             keys: {
                                 "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
-                                "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+                                    "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
                             },
                         },
                     },
-                    "self_signing_keys": {
+                    self_signing_keys: {
                         "@alice:example.com": {
                             user_id: "@alice:example.com",
                             usage: ["self-signing"],
                             keys: {
                                 "ed25519:EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ":
-                                "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
+                                    "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
                             },
                             signatures: {
                                 "@alice:example.com": {
                                     "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
-                                    "Wqx/HXR851KIi8/u/UX+fbAMtq9Uj8sr8FsOcqrLfVYa6lAmbXs"
-                                    + "Vhfy4AlZ3dnEtjgZx0U0QDrghEn2eYBeOCA",
+                                        "Wqx/HXR851KIi8/u/UX+fbAMtq9Uj8sr8FsOcqrLfVYa6lAmbXs" +
+                                        "Vhfy4AlZ3dnEtjgZx0U0QDrghEn2eYBeOCA",
                                 },
                             },
                         },
@@ -373,10 +363,8 @@ describe("Cross Signing", function() {
         alice.stopClient();
     });
 
-    it("should use trust chain to determine device verification", async function() {
-        const { client: alice } = await makeTestClient(
-            { userId: "@alice:example.com", deviceId: "Osborne2" },
-        );
+    it("should use trust chain to determine device verification", async function () {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         alice.uploadDeviceSigningKeys = async () => ({});
         alice.uploadKeySignatures = async () => ({ failures: {} });
         // set Alice's cross-signing key
@@ -463,8 +451,8 @@ describe("Cross Signing", function() {
         alice.stopClient();
     });
 
-    it.skip("should trust signatures received from other devices", async function() {
-        const aliceKeys: Record<string, PkSigning> = {};
+    it.skip("should trust signatures received from other devices", async function () {
+        const aliceKeys: Record<string, Uint8Array> = {};
         const { client: alice, httpBackend } = await makeTestClient(
             { userId: "@alice:example.com", deviceId: "Osborne2" },
             undefined,
@@ -479,10 +467,8 @@ describe("Cross Signing", function() {
         await resetCrossSigningKeys(alice);
 
         const selfSigningKey = new Uint8Array([
-            0x1e, 0xf4, 0x01, 0x6d, 0x4f, 0xa1, 0x73, 0x66,
-            0x6b, 0xf8, 0x93, 0xf5, 0xb0, 0x4d, 0x17, 0xc0,
-            0x17, 0xb5, 0xa5, 0xf6, 0x59, 0x11, 0x8b, 0x49,
-            0x34, 0xf2, 0x4b, 0x64, 0x9b, 0x52, 0xf8, 0x5f,
+            0x1e, 0xf4, 0x01, 0x6d, 0x4f, 0xa1, 0x73, 0x66, 0x6b, 0xf8, 0x93, 0xf5, 0xb0, 0x4d, 0x17, 0xc0, 0x17, 0xb5,
+            0xa5, 0xf6, 0x59, 0x11, 0x8b, 0x49, 0x34, 0xf2, 0x4b, 0x64, 0x9b, 0x52, 0xf8, 0x5f,
         ]);
 
         const keyChangePromise = new Promise<void>((resolve, reject) => {
@@ -494,8 +480,7 @@ describe("Cross Signing", function() {
         });
 
         // @ts-ignore private property
-        const deviceInfo = alice.crypto!.deviceList.devices["@alice:example.com"]
-            .Osborne2;
+        const deviceInfo = alice.crypto!.deviceList.devices["@alice:example.com"].Osborne2;
         const aliceDevice = {
             user_id: "@alice:example.com",
             device_id: "Osborne2",
@@ -527,29 +512,23 @@ describe("Cross Signing", function() {
             verified: 0,
             known: false,
         };
-        olmlib.pkSign(
-            bobDevice,
-            selfSigningKey as unknown as PkSigning,
-            "@bob:example.com",
-            '',
-        );
+        olmlib.pkSign(bobDevice, selfSigningKey as unknown as PkSigning, "@bob:example.com", "");
 
         const bobMaster: ICrossSigningKey = {
             user_id: "@bob:example.com",
             usage: ["master"],
             keys: {
-                "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
-                "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+                "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk": "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
             },
         };
-        olmlib.pkSign(bobMaster, aliceKeys.user_signing, "@alice:example.com", '');
+        olmlib.pkSign(bobMaster, aliceKeys.user_signing, "@alice:example.com", "");
 
         // Alice downloads Bob's keys
         // - device key
         // - ssk
         // - master key signed by her usk (pretend that it was signed by another
         //   of Alice's devices)
-        const responses = [
+        const responses: Response[] = [
             PUSH_RULES_RESPONSE,
             {
                 method: "POST",
@@ -568,9 +547,7 @@ describe("Cross Signing", function() {
                 data: {
                     next_batch: "abcdefg",
                     device_lists: {
-                        changed: [
-                            "@bob:example.com",
-                        ],
+                        changed: ["@bob:example.com"],
                     },
                 },
             },
@@ -578,31 +555,31 @@ describe("Cross Signing", function() {
                 method: "POST",
                 path: "/keys/query",
                 data: {
-                    "failures": {},
-                    "device_keys": {
+                    failures: {},
+                    device_keys: {
                         "@alice:example.com": {
-                            "Osborne2": aliceDevice,
+                            Osborne2: aliceDevice,
                         },
                         "@bob:example.com": {
-                            "Dynabook": bobDevice,
+                            Dynabook: bobDevice,
                         },
                     },
-                    "master_keys": {
+                    master_keys: {
                         "@bob:example.com": bobMaster,
                     },
-                    "self_signing_keys": {
+                    self_signing_keys: {
                         "@bob:example.com": {
                             user_id: "@bob:example.com",
                             usage: ["self-signing"],
                             keys: {
                                 "ed25519:EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ":
-                                "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
+                                    "EmkqvokUn8p+vQAGZitOk4PWjp7Ukp3txV2TbMPEiBQ",
                             },
                             signatures: {
                                 "@bob:example.com": {
                                     "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
-                                    "2KLiufImvEbfJuAFvsaZD+PsL8ELWl7N1u9yr/9hZvwRghBfQMB"
-                                    + "LAI86b1kDV9+Cq1lt85ykReeCEzmTEPY2BQ",
+                                        "2KLiufImvEbfJuAFvsaZD+PsL8ELWl7N1u9yr/9hZvwRghBfQMB" +
+                                        "LAI86b1kDV9+Cq1lt85ykReeCEzmTEPY2BQ",
                                 },
                             },
                         },
@@ -638,10 +615,8 @@ describe("Cross Signing", function() {
         alice.stopClient();
     });
 
-    it("should dis-trust an unsigned device", async function() {
-        const { client: alice } = await makeTestClient(
-            { userId: "@alice:example.com", deviceId: "Osborne2" },
-        );
+    it("should dis-trust an unsigned device", async function () {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         alice.uploadDeviceSigningKeys = async () => ({});
         alice.uploadKeySignatures = async () => ({ failures: {} });
         // set Alice's cross-signing key
@@ -708,10 +683,8 @@ describe("Cross Signing", function() {
         alice.stopClient();
     });
 
-    it("should dis-trust a user when their ssk changes", async function() {
-        const { client: alice } = await makeTestClient(
-            { userId: "@alice:example.com", deviceId: "Osborne2" },
-        );
+    it("should dis-trust a user when their ssk changes", async function () {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         alice.uploadDeviceSigningKeys = async () => ({});
         alice.uploadKeySignatures = async () => ({ failures: {} });
         await resetCrossSigningKeys(alice);
@@ -852,8 +825,8 @@ describe("Cross Signing", function() {
         alice.stopClient();
     });
 
-    it("should offer to upgrade device verifications to cross-signing", async function() {
-        let upgradeResolveFunc;
+    it("should offer to upgrade device verifications to cross-signing", async function () {
+        let upgradeResolveFunc: Function;
 
         const { client: alice } = await makeTestClient(
             { userId: "@alice:example.com", deviceId: "Osborne2" },
@@ -866,11 +839,8 @@ describe("Cross Signing", function() {
                     },
                 },
             },
-
         );
-        const { client: bob } = await makeTestClient(
-            { userId: "@bob:example.com", deviceId: "Dynabook" },
-        );
+        const { client: bob } = await makeTestClient({ userId: "@bob:example.com", deviceId: "Dynabook" });
 
         bob.uploadDeviceSigningKeys = async () => ({});
         bob.uploadKeySignatures = async () => ({ failures: {} });
@@ -887,10 +857,7 @@ describe("Cross Signing", function() {
                 known: true,
             },
         });
-        alice.crypto!.deviceList.storeCrossSigningForUser(
-            "@bob:example.com",
-            bob.crypto!.crossSigningInfo.toStorage(),
-        );
+        alice.crypto!.deviceList.storeCrossSigningForUser("@bob:example.com", bob.crypto!.crossSigningInfo.toStorage());
 
         alice.uploadDeviceSigningKeys = async () => ({});
         alice.uploadKeySignatures = async () => ({ failures: {} });
@@ -909,8 +876,9 @@ describe("Cross Signing", function() {
         expect(bobTrust.isTofu()).toBeTruthy();
 
         // "forget" that Bob is trusted
-        delete alice.crypto!.deviceList.crossSigningInfo["@bob:example.com"]
-            .keys.master.signatures!["@alice:example.com"];
+        delete alice.crypto!.deviceList.crossSigningInfo["@bob:example.com"].keys.master.signatures![
+            "@alice:example.com"
+        ];
 
         const bobTrust2 = alice.checkUserTrust("@bob:example.com");
         expect(bobTrust2.isCrossSigningVerified()).toBeFalsy();
@@ -932,91 +900,83 @@ describe("Cross Signing", function() {
         bob.stopClient();
     });
 
-    it(
-        "should observe that our own device is cross-signed, even if this device doesn't trust the key",
-        async function() {
-            const { client: alice } = await makeTestClient(
-                { userId: "@alice:example.com", deviceId: "Osborne2" },
-            );
-            alice.uploadDeviceSigningKeys = async () => ({});
-            alice.uploadKeySignatures = async () => ({ failures: {} });
+    it("should observe that our own device is cross-signed, even if this device doesn't trust the key", async function () {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        alice.uploadDeviceSigningKeys = async () => ({});
+        alice.uploadKeySignatures = async () => ({ failures: {} });
 
-            // Generate Alice's SSK etc
-            const aliceMasterSigning = new global.Olm.PkSigning();
-            const aliceMasterPrivkey = aliceMasterSigning.generate_seed();
-            const aliceMasterPubkey = aliceMasterSigning.init_with_seed(aliceMasterPrivkey);
-            const aliceSigning = new global.Olm.PkSigning();
-            const alicePrivkey = aliceSigning.generate_seed();
-            const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
-            const aliceSSK: ICrossSigningKey = {
-                user_id: "@alice:example.com",
-                usage: ["self_signing"],
-                keys: {
-                    ["ed25519:" + alicePubkey]: alicePubkey,
+        // Generate Alice's SSK etc
+        const aliceMasterSigning = new global.Olm.PkSigning();
+        const aliceMasterPrivkey = aliceMasterSigning.generate_seed();
+        const aliceMasterPubkey = aliceMasterSigning.init_with_seed(aliceMasterPrivkey);
+        const aliceSigning = new global.Olm.PkSigning();
+        const alicePrivkey = aliceSigning.generate_seed();
+        const alicePubkey = aliceSigning.init_with_seed(alicePrivkey);
+        const aliceSSK: ICrossSigningKey = {
+            user_id: "@alice:example.com",
+            usage: ["self_signing"],
+            keys: {
+                ["ed25519:" + alicePubkey]: alicePubkey,
+            },
+        };
+        const sskSig = aliceMasterSigning.sign(anotherjson.stringify(aliceSSK));
+        aliceSSK.signatures = {
+            "@alice:example.com": {
+                ["ed25519:" + aliceMasterPubkey]: sskSig,
+            },
+        };
+
+        // Alice's device downloads the keys, but doesn't trust them yet
+        alice.crypto!.deviceList.storeCrossSigningForUser("@alice:example.com", {
+            keys: {
+                master: {
+                    user_id: "@alice:example.com",
+                    usage: ["master"],
+                    keys: {
+                        ["ed25519:" + aliceMasterPubkey]: aliceMasterPubkey,
+                    },
                 },
-            };
-            const sskSig = aliceMasterSigning.sign(anotherjson.stringify(aliceSSK));
-            aliceSSK.signatures = {
+                self_signing: aliceSSK,
+            },
+            firstUse: true,
+            crossSigningVerifiedBefore: false,
+        });
+
+        // Alice has a second device that's cross-signed
+        const aliceDeviceId = "Dynabook";
+        const aliceUnsignedDevice = {
+            user_id: "@alice:example.com",
+            device_id: aliceDeviceId,
+            algorithms: ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
+            keys: {
+                "curve25519:Dynabook": "somePubkey",
+                "ed25519:Dynabook": "someOtherPubkey",
+            },
+        };
+        const sig = aliceSigning.sign(anotherjson.stringify(aliceUnsignedDevice));
+        const aliceCrossSignedDevice: IDevice = {
+            ...aliceUnsignedDevice,
+            verified: 0,
+            known: false,
+            signatures: {
                 "@alice:example.com": {
-                    ["ed25519:" + aliceMasterPubkey]: sskSig,
+                    ["ed25519:" + alicePubkey]: sig,
                 },
-            };
+            },
+        };
+        alice.crypto!.deviceList.storeDevicesForUser("@alice:example.com", {
+            [aliceDeviceId]: aliceCrossSignedDevice,
+        });
 
-            // Alice's device downloads the keys, but doesn't trust them yet
-            alice.crypto!.deviceList.storeCrossSigningForUser("@alice:example.com", {
-                keys: {
-                    master: {
-                        user_id: "@alice:example.com",
-                        usage: ["master"],
-                        keys: {
-                            ["ed25519:" + aliceMasterPubkey]: aliceMasterPubkey,
-                        },
-                    },
-                    self_signing: aliceSSK,
-                },
-                firstUse: true,
-                crossSigningVerifiedBefore: false,
-            });
+        // We don't trust the cross-signing keys yet...
+        expect(alice.checkDeviceTrust("@alice:example.com", aliceDeviceId).isCrossSigningVerified()).toBeFalsy();
+        // ... but we do acknowledge that the device is signed by them
+        expect(alice.checkIfOwnDeviceCrossSigned(aliceDeviceId)).toBeTruthy();
+        alice.stopClient();
+    });
 
-            // Alice has a second device that's cross-signed
-            const aliceDeviceId = 'Dynabook';
-            const aliceUnsignedDevice = {
-                user_id: "@alice:example.com",
-                device_id: aliceDeviceId,
-                algorithms: ["m.olm.curve25519-aes-sha256", "m.megolm.v1.aes-sha"],
-                keys: {
-                    "curve25519:Dynabook": "somePubkey",
-                    "ed25519:Dynabook": "someOtherPubkey",
-                },
-            };
-            const sig = aliceSigning.sign(anotherjson.stringify(aliceUnsignedDevice));
-            const aliceCrossSignedDevice: IDevice = {
-                ...aliceUnsignedDevice,
-                verified: 0,
-                known: false,
-                signatures: {
-                    "@alice:example.com": {
-                        ["ed25519:" + alicePubkey]: sig,
-                    },
-                } };
-            alice.crypto!.deviceList.storeDevicesForUser("@alice:example.com", {
-                [aliceDeviceId]: aliceCrossSignedDevice,
-            });
-
-            // We don't trust the cross-signing keys yet...
-            expect(
-                alice.checkDeviceTrust("@alice:example.com", aliceDeviceId).isCrossSigningVerified(),
-            ).toBeFalsy();
-            // ... but we do acknowledge that the device is signed by them
-            expect(alice.checkIfOwnDeviceCrossSigned(aliceDeviceId)).toBeTruthy();
-            alice.stopClient();
-        },
-    );
-
-    it("should observe that our own device isn't cross-signed", async function() {
-        const { client: alice } = await makeTestClient(
-            { userId: "@alice:example.com", deviceId: "Osborne2" },
-        );
+    it("should observe that our own device isn't cross-signed", async function () {
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         alice.uploadDeviceSigningKeys = async () => ({});
         alice.uploadKeySignatures = async () => ({ failures: {} });
 
@@ -1076,9 +1036,7 @@ describe("Cross Signing", function() {
     });
 
     it("checkIfOwnDeviceCrossSigned should sanely handle unknown devices", async () => {
-        const { client: alice } = await makeTestClient(
-            { userId: "@alice:example.com", deviceId: "Osborne2" },
-        );
+        const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         alice.uploadDeviceSigningKeys = async () => ({});
         alice.uploadKeySignatures = async () => ({ failures: {} });
 
@@ -1127,5 +1085,69 @@ describe("Cross Signing", function() {
         const { client: alice } = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
         expect(alice.checkIfOwnDeviceCrossSigned("notadevice")).toBeFalsy();
         alice.stopClient();
+    });
+});
+
+describe("userHasCrossSigningKeys", function () {
+    if (!global.Olm) {
+        return;
+    }
+
+    beforeAll(() => {
+        return global.Olm.init();
+    });
+
+    let aliceClient: MatrixClient;
+    let httpBackend: HttpBackend;
+    beforeEach(async () => {
+        const testClient = await makeTestClient({ userId: "@alice:example.com", deviceId: "Osborne2" });
+        aliceClient = testClient.client;
+        httpBackend = testClient.httpBackend;
+    });
+
+    afterEach(() => {
+        aliceClient.stopClient();
+    });
+
+    it("should download devices and return true if one is a cross-signing key", async () => {
+        httpBackend.when("POST", "/keys/query").respond(200, {
+            master_keys: {
+                "@alice:example.com": {
+                    user_id: "@alice:example.com",
+                    usage: ["master"],
+                    keys: {
+                        "ed25519:nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk":
+                            "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+                    },
+                },
+            },
+        });
+
+        let result: boolean;
+        await Promise.all([
+            httpBackend.flush("/keys/query"),
+            aliceClient.userHasCrossSigningKeys().then((res) => {
+                result = res;
+            }),
+        ]);
+        expect(result!).toBeTruthy();
+    });
+
+    it("should download devices and return false if there is no cross-signing key", async () => {
+        httpBackend.when("POST", "/keys/query").respond(200, {});
+
+        let result: boolean;
+        await Promise.all([
+            httpBackend.flush("/keys/query"),
+            aliceClient.userHasCrossSigningKeys().then((res) => {
+                result = res;
+            }),
+        ]);
+        expect(result!).toBeFalsy();
+    });
+
+    it("throws an error if crypto is disabled", () => {
+        aliceClient["cryptoBackend"] = undefined;
+        expect(() => aliceClient.userHasCrossSigningKeys()).toThrowError("encryption disabled");
     });
 });

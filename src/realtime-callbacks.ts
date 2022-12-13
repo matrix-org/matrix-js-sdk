@@ -24,7 +24,7 @@ limitations under the License.
  * it will instead fire as soon as possible after resume.
  */
 
-import { logger } from './logger';
+import { logger } from "./logger";
 
 // we schedule a callback at least this often, to check if we've missed out on
 // some wall-clock time due to being suspended.
@@ -48,16 +48,17 @@ type Callback = {
 const callbackList: Callback[] = [];
 
 // var debuglog = logger.log.bind(logger);
-const debuglog = function(...params: any[]): void {};
+/* istanbul ignore next */
+const debuglog = function (...params: any[]): void {};
 
 /**
  * reimplementation of window.setTimeout, which will call the callback if
  * the wallclock time goes past the deadline.
  *
- * @param {function} func   callback to be called after a delay
- * @param {Number} delayMs  number of milliseconds to delay by
+ * @param func -   callback to be called after a delay
+ * @param delayMs -  number of milliseconds to delay by
  *
- * @return {Number} an identifier for this callback, which may be passed into
+ * @returns an identifier for this callback, which may be passed into
  *                   clearTimeout later.
  */
 export function setTimeout(func: (...params: any[]) => void, delayMs: number, ...params: any[]): number {
@@ -68,8 +69,7 @@ export function setTimeout(func: (...params: any[]) => void, delayMs: number, ..
 
     const runAt = Date.now() + delayMs;
     const key = count++;
-    debuglog("setTimeout: scheduling cb", key, "at", runAt,
-        "(delay", delayMs, ")");
+    debuglog("setTimeout: scheduling cb", key, "at", runAt, "(delay", delayMs, ")");
     const data = {
         runAt: runAt,
         func: func,
@@ -78,11 +78,9 @@ export function setTimeout(func: (...params: any[]) => void, delayMs: number, ..
     };
 
     // figure out where it goes in the list
-    const idx = binarySearch(
-        callbackList, function(el) {
-            return el.runAt - runAt;
-        },
-    );
+    const idx = binarySearch(callbackList, function (el) {
+        return el.runAt - runAt;
+    });
 
     callbackList.splice(idx, 0, data);
     scheduleRealCallback();
@@ -93,7 +91,7 @@ export function setTimeout(func: (...params: any[]) => void, delayMs: number, ..
 /**
  * reimplementation of window.clearTimeout, which mirrors setTimeout
  *
- * @param {Number} key   result from an earlier setTimeout call
+ * @param key -   result from an earlier setTimeout call
  */
 export function clearTimeout(key: number): void {
     if (callbackList.length === 0) {

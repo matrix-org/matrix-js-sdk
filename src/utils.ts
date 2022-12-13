@@ -17,7 +17,6 @@ limitations under the License.
 
 /**
  * This is an internal module.
- * @module utils
  */
 
 import unhomoglyph from "unhomoglyph";
@@ -33,7 +32,7 @@ const interns = new Map<string, string>();
 /**
  * Internalises a string, reusing a known pointer or storing the pointer
  * if needed for future strings.
- * @param str The string to internalise.
+ * @param str - The string to internalise.
  * @returns The internalised string.
  */
 export function internaliseString(str: string): string {
@@ -55,16 +54,16 @@ export function internaliseString(str: string): string {
 /**
  * Encode a dictionary of query parameters.
  * Omits any undefined/null values.
- * @param {Object} params A dict of key/values to encode e.g.
- * {"foo": "bar", "baz": "taz"}
- * @return {string} The encoded string e.g. foo=bar&baz=taz
+ * @param params - A dict of key/values to encode e.g.
+ * `{"foo": "bar", "baz": "taz"}`
+ * @returns The encoded string e.g. foo=bar&baz=taz
  */
 export function encodeParams(params: QueryDict, urlSearchParams?: URLSearchParams): URLSearchParams {
     const searchParams = urlSearchParams ?? new URLSearchParams();
     for (const [key, val] of Object.entries(params)) {
         if (val !== undefined && val !== null) {
             if (Array.isArray(val)) {
-                val.forEach(v => {
+                val.forEach((v) => {
                     searchParams.append(key, String(v));
                 });
             } else {
@@ -79,15 +78,8 @@ export type QueryDict = Record<string, string[] | string | number | boolean | un
 
 /**
  * Replace a stable parameter with the unstable naming for params
- * @param stable
- * @param unstable
- * @param dict
  */
-export function replaceParam(
-    stable: string,
-    unstable: string,
-    dict: QueryDict,
-): QueryDict {
+export function replaceParam(stable: string, unstable: string, dict: QueryDict): QueryDict {
     const result = {
         ...dict,
         [unstable]: dict[stable],
@@ -98,9 +90,9 @@ export function replaceParam(
 
 /**
  * Decode a query string in `application/x-www-form-urlencoded` format.
- * @param {string} query A query string to decode e.g.
+ * @param query - A query string to decode e.g.
  * foo=bar&via=server1&server2
- * @return {Object} The decoded object, if any keys occurred multiple times
+ * @returns The decoded object, if any keys occurred multiple times
  * then the value will be an array of strings, else it will be an array.
  * This behaviour matches Node's qs.parse but is built on URLSearchParams
  * for native web compatibility
@@ -118,10 +110,10 @@ export function decodeParams(query: string): Record<string, string | string[]> {
 /**
  * Encodes a URI according to a set of template variables. Variables will be
  * passed through encodeURIComponent.
- * @param {string} pathTemplate The path with template variables e.g. '/foo/$bar'.
- * @param {Object} variables The key/value pairs to replace the template
- * variables with. E.g. { "$bar": "baz" }.
- * @return {string} The result of replacing all template variables e.g. '/foo/baz'.
+ * @param pathTemplate - The path with template variables e.g. '/foo/$bar'.
+ * @param variables - The key/value pairs to replace the template
+ * variables with. E.g. `{ "$bar": "baz" }`.
+ * @returns The result of replacing all template variables e.g. '/foo/baz'.
  */
 export function encodeUri(pathTemplate: string, variables: Record<string, Optional<string>>): string {
     for (const key in variables) {
@@ -132,9 +124,7 @@ export function encodeUri(pathTemplate: string, variables: Record<string, Option
         if (value === undefined || value === null) {
             continue;
         }
-        pathTemplate = pathTemplate.replace(
-            key, encodeURIComponent(value),
-        );
+        pathTemplate = pathTemplate.replace(key, encodeURIComponent(value));
     }
     return pathTemplate;
 }
@@ -142,18 +132,14 @@ export function encodeUri(pathTemplate: string, variables: Record<string, Option
 /**
  * The removeElement() method removes the first element in the array that
  * satisfies (returns true) the provided testing function.
- * @param {Array} array The array.
- * @param {Function} fn Function to execute on each value in the array, with the
- * function signature <code>fn(element, index, array)</code>. Return true to
+ * @param array - The array.
+ * @param fn - Function to execute on each value in the array, with the
+ * function signature `fn(element, index, array)`. Return true to
  * remove this element and break.
- * @param {boolean} reverse True to search in reverse order.
- * @return {boolean} True if an element was removed.
+ * @param reverse - True to search in reverse order.
+ * @returns True if an element was removed.
  */
-export function removeElement<T>(
-    array: T[],
-    fn: (t: T, i?: number, a?: T[]) => boolean,
-    reverse?: boolean,
-): boolean {
+export function removeElement<T>(array: T[], fn: (t: T, i?: number, a?: T[]) => boolean, reverse?: boolean): boolean {
     let i: number;
     if (reverse) {
         for (i = array.length - 1; i >= 0; i--) {
@@ -175,8 +161,8 @@ export function removeElement<T>(
 
 /**
  * Checks if the given thing is a function.
- * @param {*} value The thing to check.
- * @return {boolean} True if it is a function.
+ * @param value - The thing to check.
+ * @returns True if it is a function.
  */
 export function isFunction(value: any): boolean {
     return Object.prototype.toString.call(value) === "[object Function]";
@@ -184,8 +170,8 @@ export function isFunction(value: any): boolean {
 
 /**
  * Checks that the given object has the specified keys.
- * @param {Object} obj The object to check.
- * @param {string[]} keys The list of keys that 'obj' must have.
+ * @param obj - The object to check.
+ * @param keys - The list of keys that 'obj' must have.
  * @throws If the object is missing keys.
  */
 // note using 'keys' here would shadow the 'keys' function defined above
@@ -200,8 +186,8 @@ export function checkObjectHasKeys(obj: object, keys: string[]): void {
 /**
  * Deep copy the given object. The object MUST NOT have circular references and
  * MUST NOT have functions.
- * @param {Object} obj The object to deep copy.
- * @return {Object} A copy of the object without any references to the original.
+ * @param obj - The object to deep copy.
+ * @returns A copy of the object without any references to the original.
  */
 export function deepCopy<T>(obj: T): T {
     return JSON.parse(JSON.stringify(obj));
@@ -210,10 +196,10 @@ export function deepCopy<T>(obj: T): T {
 /**
  * Compare two objects for equality. The objects MUST NOT have circular references.
  *
- * @param {Object} x The first object to compare.
- * @param {Object} y The second object to compare.
+ * @param x - The first object to compare.
+ * @param y - The second object to compare.
  *
- * @return {boolean} true if the two objects are equal
+ * @returns true if the two objects are equal
  */
 export function deepCompare(x: any, y: any): boolean {
     // Inspired by
@@ -230,7 +216,7 @@ export function deepCompare(x: any, y: any): boolean {
     }
 
     // special-case NaN (since NaN !== NaN)
-    if (typeof x === 'number' && isNaN(x) && isNaN(y)) {
+    if (typeof x === "number" && isNaN(x) && isNaN(y)) {
         return true;
     }
 
@@ -290,11 +276,11 @@ export function deepCompare(x: any, y: any): boolean {
  * sorts the result by key, recursively. The input object must
  * ensure it does not have loops. If the input is not an object
  * then it will be returned as-is.
- * @param {*} obj The object to get entries of
- * @returns {Array} The entries, sorted by key.
+ * @param obj - The object to get entries of
+ * @returns The entries, sorted by key.
  */
 export function deepSortedObjectEntries(obj: any): [string, any][] {
-    if (typeof(obj) !== "object") return obj;
+    if (typeof obj !== "object") return obj;
 
     // Apparently these are object types...
     if (obj === null || obj === undefined || Array.isArray(obj)) return obj;
@@ -313,34 +299,33 @@ export function deepSortedObjectEntries(obj: any): [string, any][] {
 /**
  * Returns whether the given value is a finite number without type-coercion
  *
- * @param {*} value the value to test
- * @return {boolean} whether or not value is a finite number without type-coercion
+ * @param value - the value to test
+ * @returns whether or not value is a finite number without type-coercion
  */
-export function isNumber(value: any): boolean {
-    return typeof value === 'number' && isFinite(value);
+export function isNumber(value: any): value is number {
+    return typeof value === "number" && isFinite(value);
 }
 
 /**
  * Removes zero width chars, diacritics and whitespace from the string
  * Also applies an unhomoglyph on the string, to prevent similar looking chars
- * @param {string} str the string to remove hidden characters from
- * @return {string} a string with the hidden characters removed
+ * @param str - the string to remove hidden characters from
+ * @returns a string with the hidden characters removed
  */
 export function removeHiddenChars(str: string): string {
     if (typeof str === "string") {
-        return unhomoglyph(str.normalize('NFD').replace(removeHiddenCharsRegex, ''));
+        return unhomoglyph(str.normalize("NFD").replace(removeHiddenCharsRegex, ""));
     }
     return "";
 }
 
 /**
  * Removes the direction override characters from a string
- * @param {string} input
  * @returns string with chars removed
  */
 export function removeDirectionOverrideChars(str: string): string {
     if (typeof str === "string") {
-        return str.replace(/[\u202d-\u202e]/g, '');
+        return str.replace(/[\u202d-\u202e]/g, "");
     }
     return "";
 }
@@ -348,11 +333,13 @@ export function removeDirectionOverrideChars(str: string): string {
 export function normalize(str: string): string {
     // Note: we have to match the filter with the removeHiddenChars() because the
     // function strips spaces and other characters (M becomes RN for example, in lowercase).
-    return removeHiddenChars(str.toLowerCase())
-        // Strip all punctuation
-        .replace(/[\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~\u2000-\u206f\u2e00-\u2e7f]/g, "")
-        // We also doubly convert to lowercase to work around oddities of the library.
-        .toLowerCase();
+    return (
+        removeHiddenChars(str.toLowerCase())
+            // Strip all punctuation
+            .replace(/[\\'!"#$%&()*+,\-./:;<=>?@[\]^_`{|}~\u2000-\u206f\u2e00-\u2e7f]/g, "")
+            // We also doubly convert to lowercase to work around oddities of the library.
+            .toLowerCase()
+    );
 }
 
 // Regex matching bunch of unicode control characters and otherwise misleading/invisible characters.
@@ -376,24 +363,20 @@ export function globToRegexp(glob: string, extended = false): string {
     // https://github.com/matrix-org/synapse/blob/abbee6b29be80a77e05730707602f3bbfc3f38cb/synapse/push/__init__.py#L132
     // Because micromatch is about 130KB with dependencies,
     // and minimatch is not much better.
-    const replacements: ([RegExp, string | ((substring: string, ...args: any[]) => string) ])[] = [
-        [/\\\*/g, '.*'],
-        [/\?/g, '.'],
+    const replacements: [RegExp, string | ((substring: string, ...args: any[]) => string)][] = [
+        [/\\\*/g, ".*"],
+        [/\?/g, "."],
     ];
     if (!extended) {
         replacements.push([
             /\\\[(!|)(.*)\\]/g,
-            (_match: string, neg: string, pat: string): string => [
-                '[',
-                neg ? '^' : '',
-                pat.replace(/\\-/, '-'),
-                ']',
-            ].join(''),
+            (_match: string, neg: string, pat: string): string =>
+                ["[", neg ? "^" : "", pat.replace(/\\-/, "-"), "]"].join(""),
         ]);
     }
     return replacements.reduce(
         // https://github.com/microsoft/TypeScript/issues/30134
-        (pat, args) => args ? pat.replace(args[0], args[1] as any) : pat,
+        (pat, args) => (args ? pat.replace(args[0], args[1] as any) : pat),
         escapeRegExp(glob),
     );
 }
@@ -411,9 +394,9 @@ export function ensureNoTrailingSlash(url?: string): string | undefined {
 
 // Returns a promise which resolves with a given value after the given number of ms
 export function sleep<T>(ms: number, value?: T): Promise<T> {
-    return new Promise((resolve => {
+    return new Promise((resolve) => {
         setTimeout(resolve, ms, value);
-    }));
+    });
 }
 
 export function isNullOrUndefined(val: any): boolean {
@@ -428,8 +411,8 @@ export interface IDeferred<T> {
 
 // Returns a Deferred
 export function defer<T = void>(): IDeferred<T> {
-    let resolve;
-    let reject;
+    let resolve!: IDeferred<T>["resolve"];
+    let reject!: IDeferred<T>["reject"];
 
     const promise = new Promise<T>((_resolve, _reject) => {
         resolve = _resolve;
@@ -456,7 +439,7 @@ export function promiseTry<T>(fn: () => T | Promise<T>): Promise<T> {
 export async function chunkPromises<T>(fns: (() => Promise<T>)[], chunkSize: number): Promise<T[]> {
     const results: T[] = [];
     for (let i = 0; i < fns.length; i += chunkSize) {
-        results.push(...(await Promise.all(fns.slice(i, i + chunkSize).map(fn => fn()))));
+        results.push(...(await Promise.all(fns.slice(i, i + chunkSize).map((fn) => fn()))));
     }
     return results;
 }
@@ -466,19 +449,22 @@ export async function chunkPromises<T>(fns: (() => Promise<T>)[], chunkSize: num
  * a promise which throws/rejects on error, otherwise the retry will assume the request
  * succeeded. The promise chain returned will contain the successful promise. The given function
  * should always return a new promise.
- * @param {Function} promiseFn The function to call to get a fresh promise instance. Takes an
+ * @param promiseFn - The function to call to get a fresh promise instance. Takes an
  * attempt count as an argument, for logging/debugging purposes.
- * @returns {Promise<T>} The promise for the retried operation.
+ * @returns The promise for the retried operation.
  */
 export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<T>): Promise<T> {
-    return promiseRetry((attempt: number) => {
-        return promiseFn(attempt);
-    }, {
-        forever: true,
-        factor: 2,
-        minTimeout: 3000, // ms
-        maxTimeout: 15000, // ms
-    });
+    return promiseRetry(
+        (attempt: number) => {
+            return promiseFn(attempt);
+        },
+        {
+            forever: true,
+            factor: 2,
+            minTimeout: 3000, // ms
+            maxTimeout: 15000, // ms
+        },
+    );
 }
 
 // String averaging inspired by https://stackoverflow.com/a/2510816
@@ -492,7 +478,7 @@ export function simpleRetryOperation<T>(promiseFn: (attempt: number) => Promise<
  */
 export const DEFAULT_ALPHABET = ((): string => {
     let str = "";
-    for (let c = 0x20; c <= 0x7E; c++) {
+    for (let c = 0x20; c <= 0x7e; c++) {
         str += String.fromCharCode(c);
     }
     return str;
@@ -503,10 +489,10 @@ export const DEFAULT_ALPHABET = ((): string => {
  * padded at the end with the first character in the alphabet.
  *
  * This is intended for use with string averaging.
- * @param {string} s The string to pad.
- * @param {number} n The length to pad to.
- * @param {string} alphabet The alphabet to use as a single string.
- * @returns {string} The padded string.
+ * @param s - The string to pad.
+ * @param n - The length to pad to.
+ * @param alphabet - The alphabet to use as a single string.
+ * @returns The padded string.
  */
 export function alphabetPad(s: string, n: number, alphabet = DEFAULT_ALPHABET): string {
     return s.padEnd(n, alphabet[0]);
@@ -516,9 +502,9 @@ export function alphabetPad(s: string, n: number, alphabet = DEFAULT_ALPHABET): 
  * Converts a baseN number to a string, where N is the alphabet's length.
  *
  * This is intended for use with string averaging.
- * @param {bigint} n The baseN number.
- * @param {string} alphabet The alphabet to use as a single string.
- * @returns {string} The baseN number encoded as a string from the alphabet.
+ * @param n - The baseN number.
+ * @param alphabet - The alphabet to use as a single string.
+ * @returns The baseN number encoded as a string from the alphabet.
  */
 export function baseToString(n: bigint, alphabet = DEFAULT_ALPHABET): string {
     // Developer note: the stringToBase() function offsets the character set by 1 so that repeated
@@ -550,9 +536,9 @@ export function baseToString(n: bigint, alphabet = DEFAULT_ALPHABET): string {
  * Converts a string to a baseN number, where N is the alphabet's length.
  *
  * This is intended for use with string averaging.
- * @param {string} s The string to convert to a number.
- * @param {string} alphabet The alphabet to use as a single string.
- * @returns {bigint} The baseN number.
+ * @param s - The string to convert to a number.
+ * @param alphabet - The alphabet to use as a single string.
+ * @returns The baseN number.
  */
 export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): bigint {
     const len = BigInt(alphabet.length);
@@ -575,7 +561,7 @@ export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): bigint {
 
         // We add 1 to the char index to offset the whole numbering scheme. We unpack this in
         // the baseToString() function.
-        result += BigInt(1 + charIndex) * (len ** j);
+        result += BigInt(1 + charIndex) * len ** j;
     }
     return result;
 }
@@ -584,10 +570,10 @@ export function stringToBase(s: string, alphabet = DEFAULT_ALPHABET): bigint {
  * Averages two strings, returning the midpoint between them. This is accomplished by
  * converting both to baseN numbers (where N is the alphabet's length) then averaging
  * those before re-encoding as a string.
- * @param {string} a The first string.
- * @param {string} b The second string.
- * @param {string} alphabet The alphabet to use as a single string.
- * @returns {string} The midpoint between the strings, as a string.
+ * @param a - The first string.
+ * @param b - The second string.
+ * @param alphabet - The alphabet to use as a single string.
+ * @returns The midpoint between the strings, as a string.
  */
 export function averageBetweenStrings(a: string, b: string, alphabet = DEFAULT_ALPHABET): string {
     const padN = Math.max(a.length, b.length);
@@ -608,9 +594,9 @@ export function averageBetweenStrings(a: string, b: string, alphabet = DEFAULT_A
  * Finds the next string using the alphabet provided. This is done by converting the
  * string to a baseN number, where N is the alphabet's length, then adding 1 before
  * converting back to a string.
- * @param {string} s The string to start at.
- * @param {string} alphabet The alphabet to use as a single string.
- * @returns {string} The string which follows the input string.
+ * @param s - The string to start at.
+ * @param alphabet - The alphabet to use as a single string.
+ * @returns The string which follows the input string.
  */
 export function nextString(s: string, alphabet = DEFAULT_ALPHABET): string {
     return baseToString(stringToBase(s, alphabet) + BigInt(1), alphabet);
@@ -620,9 +606,9 @@ export function nextString(s: string, alphabet = DEFAULT_ALPHABET): string {
  * Finds the previous string using the alphabet provided. This is done by converting the
  * string to a baseN number, where N is the alphabet's length, then subtracting 1 before
  * converting back to a string.
- * @param {string} s The string to start at.
- * @param {string} alphabet The alphabet to use as a single string.
- * @returns {string} The string which precedes the input string.
+ * @param s - The string to start at.
+ * @param alphabet - The alphabet to use as a single string.
+ * @returns The string which precedes the input string.
  */
 export function prevString(s: string, alphabet = DEFAULT_ALPHABET): string {
     return baseToString(stringToBase(s, alphabet) - BigInt(1), alphabet);
@@ -630,9 +616,9 @@ export function prevString(s: string, alphabet = DEFAULT_ALPHABET): string {
 
 /**
  * Compares strings lexicographically as a sort-safe function.
- * @param {string} a The first (reference) string.
- * @param {string} b The second (compare) string.
- * @returns {number} Negative if the reference string is before the compare string;
+ * @param a - The first (reference) string.
+ * @param b - The second (compare) string.
+ * @returns Negative if the reference string is before the compare string;
  * positive if the reference string is after; and zero if equal.
  */
 export function lexicographicCompare(a: string, b: string): number {
@@ -650,8 +636,8 @@ export function lexicographicCompare(a: string, b: string): number {
 const collator = new Intl.Collator();
 /**
  * Performant language-sensitive string comparison
- * @param a the first string to compare
- * @param b the second string to compare
+ * @param a - the first string to compare
+ * @param b - the second string to compare
  */
 export function compare(a: string, b: string): number {
     return collator.compare(a, b);
@@ -661,22 +647,24 @@ export function compare(a: string, b: string): number {
  * This function is similar to Object.assign() but it assigns recursively and
  * allows you to ignore nullish values from the source
  *
- * @param {Object} target
- * @param {Object} source
  * @returns the target object
  */
-export function recursivelyAssign(target: Object, source: Object, ignoreNullish = false): any {
+export function recursivelyAssign<T1 extends T2, T2 extends Record<string, any>>(
+    target: T1,
+    source: T2,
+    ignoreNullish = false,
+): T1 & T2 {
     for (const [sourceKey, sourceValue] of Object.entries(source)) {
         if (target[sourceKey] instanceof Object && sourceValue) {
             recursivelyAssign(target[sourceKey], sourceValue);
             continue;
         }
         if ((sourceValue !== null && sourceValue !== undefined) || !ignoreNullish) {
-            target[sourceKey] = sourceValue;
+            target[sourceKey as keyof T1] = sourceValue;
             continue;
         }
     }
-    return target;
+    return target as T1 & T2;
 }
 
 function getContentTimestampWithFallback(event: MatrixEvent): number {
@@ -697,7 +685,7 @@ export function isSupportedReceiptType(receiptType: string): boolean {
 
 /**
  * Determines whether two maps are equal.
- * @param eq The equivalence relation to compare values by. Defaults to strict equality.
+ * @param eq - The equivalence relation to compare values by. Defaults to strict equality.
  */
 export function mapsEqual<K, V>(x: Map<K, V>, y: Map<K, V>, eq = (v1: V, v2: V): boolean => v1 === v2): boolean {
     if (x.size !== y.size) return false;

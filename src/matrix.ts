@@ -47,40 +47,36 @@ export * from "./store/indexeddb";
 export * from "./crypto/store/memory-crypto-store";
 export * from "./crypto/store/indexeddb-crypto-store";
 export * from "./content-repo";
-export * from './@types/event';
-export * from './@types/PushRules';
-export * from './@types/partials';
-export * from './@types/requests';
-export * from './@types/search';
-export * from './models/room-summary';
+export * from "./@types/event";
+export * from "./@types/PushRules";
+export * from "./@types/partials";
+export * from "./@types/requests";
+export * from "./@types/search";
+export * from "./models/room-summary";
 export * as ContentHelpers from "./content-helpers";
 export type { ICryptoCallbacks } from "./crypto"; // used to be located here
 export { createNewMatrixCall } from "./webrtc/call";
 export type { MatrixCall } from "./webrtc/call";
-export {
-    GroupCallEvent,
-    GroupCallIntent,
-    GroupCallState,
-    GroupCallType,
-} from "./webrtc/groupCall";
+export { GroupCallEvent, GroupCallIntent, GroupCallState, GroupCallType } from "./webrtc/groupCall";
 export type { GroupCall } from "./webrtc/groupCall";
 
-let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore;
+let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
 
 /**
  * Configure a different factory to be used for creating crypto stores
  *
- * @param {Function} fac  a function which will return a new
- *    {@link module:crypto.store.base~CryptoStore}.
+ * @param fac - a function which will return a new {@link CryptoStore}
  */
 export function setCryptoStoreFactory(fac: () => CryptoStore): void {
     cryptoStoreFactory = fac;
 }
 
 function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
-    opts.store = opts.store ?? new MemoryStore({
-        localStorage: global.localStorage,
-    });
+    opts.store =
+        opts.store ??
+        new MemoryStore({
+            localStorage: global.localStorage,
+        });
     opts.scheduler = opts.scheduler ?? new MatrixScheduler();
     opts.cryptoStore = opts.cryptoStore ?? cryptoStoreFactory();
 
@@ -88,24 +84,14 @@ function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
 }
 
 /**
- * Construct a Matrix Client. Similar to {@link module:client.MatrixClient}
+ * Construct a Matrix Client. Similar to {@link MatrixClient}
  * except that the 'request', 'store' and 'scheduler' dependencies are satisfied.
- * @param {Object} opts The configuration options for this client. These configuration
- * options will be passed directly to {@link module:client.MatrixClient}.
- * @param {Object} opts.store If not set, defaults to
- * {@link module:store/memory.MemoryStore}.
- * @param {Object} opts.scheduler If not set, defaults to
- * {@link module:scheduler~MatrixScheduler}.
+ * @param opts - The configuration options for this client. These configuration
+ * options will be passed directly to {@link MatrixClient}.
  *
- * @param {module:crypto.store.base~CryptoStore=} opts.cryptoStore
- *    crypto store implementation. Calls the factory supplied to
- *    {@link setCryptoStoreFactory} if unspecified; or if no factory has been
- *    specified, uses a default implementation (indexeddb in the browser,
- *    in-memory otherwise).
- *
- * @return {MatrixClient} A new matrix client.
- * @see {@link module:client.MatrixClient} for the full list of options for
- * <code>opts</code>.
+ * @returns A new matrix client.
+ * @see {@link MatrixClient} for the full list of options for
+ * `opts`.
  */
 export function createClient(opts: ICreateClientOpts): MatrixClient {
     return new MatrixClient(amendClientOpts(opts));

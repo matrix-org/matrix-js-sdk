@@ -171,21 +171,26 @@ export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.m
  * eventual removal.
  *
  * Schema (TypeScript):
+ * ```
  * {
  *   service_members?: string[]
  * }
+ * ```
  *
- * Example:
+ * @example
+ * ```
  * {
  *   "service_members": [
  *     "@helperbot:localhost",
  *     "@reminderbot:alice.tdl"
  *   ]
  * }
+ * ```
  */
 export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
     "io.element.functional_members",
-    "io.element.functional_members");
+    "io.element.functional_members",
+);
 
 /**
  * A type of message that affects visibility of a message,
@@ -193,27 +198,21 @@ export const UNSTABLE_ELEMENT_FUNCTIONAL_USERS = new UnstableValue(
  *
  * @experimental
  */
-export const EVENT_VISIBILITY_CHANGE_TYPE = new UnstableValue(
-    "m.visibility",
-    "org.matrix.msc3531.visibility");
+export const EVENT_VISIBILITY_CHANGE_TYPE = new UnstableValue("m.visibility", "org.matrix.msc3531.visibility");
 
 /**
  * https://github.com/matrix-org/matrix-doc/pull/3881
  *
  * @experimental
  */
-export const PUSHER_ENABLED = new UnstableValue(
-    "enabled",
-    "org.matrix.msc3881.enabled");
+export const PUSHER_ENABLED = new UnstableValue("enabled", "org.matrix.msc3881.enabled");
 
 /**
-     * https://github.com/matrix-org/matrix-doc/pull/3881
-     *
-     * @experimental
-     */
-export const PUSHER_DEVICE_ID = new UnstableValue(
-    "device_id",
-    "org.matrix.msc3881.device_id");
+ * https://github.com/matrix-org/matrix-doc/pull/3881
+ *
+ * @experimental
+ */
+export const PUSHER_DEVICE_ID = new UnstableValue("device_id", "org.matrix.msc3881.device_id");
 
 /**
  * https://github.com/matrix-org/matrix-doc/pull/3890
@@ -222,7 +221,8 @@ export const PUSHER_DEVICE_ID = new UnstableValue(
  */
 export const LOCAL_NOTIFICATION_SETTINGS_PREFIX = new UnstableValue(
     "m.local_notification_settings",
-    "org.matrix.msc3890.local_notification_settings");
+    "org.matrix.msc3890.local_notification_settings",
+);
 
 export interface IEncryptedFile {
     url: string;
@@ -235,6 +235,6 @@ export interface IEncryptedFile {
         ext: boolean;
     };
     iv: string;
-    hashes: {[alg: string]: string};
+    hashes: { [alg: string]: string };
     v: string;
 }

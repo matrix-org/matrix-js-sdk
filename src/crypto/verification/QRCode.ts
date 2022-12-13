@@ -16,13 +16,12 @@ limitations under the License.
 
 /**
  * QR code key verification.
- * @module crypto/verification/QRCode
  */
 
 import { VerificationBase as Base, VerificationEventHandlerMap } from "./Base";
-import { newKeyMismatchError, newUserCancelledError } from './Error';
+import { newKeyMismatchError, newUserCancelledError } from "./Error";
 import { decodeBase64, encodeUnpaddedBase64 } from "../olmlib";
-import { logger } from '../../logger';
+import { logger } from "../../logger";
 import { VerificationRequest } from "./request/VerificationRequest";
 import { MatrixClient } from "../../client";
 import { IVerificationChannel } from "./request/Channel";
@@ -44,10 +43,6 @@ type EventHandlerMap = {
     [QrCodeEvent.ShowReciprocateQr]: (qr: IReciprocateQr) => void;
 } & VerificationEventHandlerMap;
 
-/**
- * @class crypto/verification/QRCode/ReciprocateQRCode
- * @extends {module:crypto/verification/Base}
- */
 export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
     public reciprocateQREvent?: IReciprocateQr;
 
@@ -70,13 +65,12 @@ export class ReciprocateQRCode extends Base<QrCodeEvent, EventHandlerMap> {
     protected doVerification = async (): Promise<void> => {
         if (!this.startEvent) {
             // TODO: Support scanning QR codes
-            throw new Error("It is not currently possible to start verification" +
-                "with this method yet.");
+            throw new Error("It is not currently possible to start verification" + "with this method yet.");
         }
 
         const { qrCodeData } = this.request;
         // 1. check the secret
-        if (this.startEvent.getContent()['secret'] !== qrCodeData?.encodedSharedSecret) {
+        if (this.startEvent.getContent()["secret"] !== qrCodeData?.encodedSharedSecret) {
             throw newKeyMismatchError();
         }
 
@@ -255,8 +249,8 @@ export class QRCodeData {
             version: CODE_VERSION,
             mode,
             transactionId,
-            firstKeyB64: '', // worked out shortly
-            secondKeyB64: '', // worked out shortly
+            firstKeyB64: "", // worked out shortly
+            secondKeyB64: "", // worked out shortly
             secretB64: encodedSharedSecret,
         };
 
@@ -283,21 +277,21 @@ export class QRCodeData {
     private static generateBuffer(qrData: IQrData): Buffer {
         let buf = Buffer.alloc(0); // we'll concat our way through life
 
-        const appendByte = (b): void => {
+        const appendByte = (b: number): void => {
             const tmpBuf = Buffer.from([b]);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendInt = (i): void => {
+        const appendInt = (i: number): void => {
             const tmpBuf = Buffer.alloc(2);
             tmpBuf.writeInt16BE(i, 0);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendStr = (s, enc, withLengthPrefix = true): void => {
+        const appendStr = (s: string, enc: BufferEncoding, withLengthPrefix = true): void => {
             const tmpBuf = Buffer.from(s, enc);
             if (withLengthPrefix) appendInt(tmpBuf.byteLength);
             buf = Buffer.concat([buf, tmpBuf]);
         };
-        const appendEncBase64 = (b64): void => {
+        const appendEncBase64 = (b64: string): void => {
             const b = decodeBase64(b64);
             const tmpBuf = Buffer.from(b);
             buf = Buffer.concat([buf, tmpBuf]);
@@ -307,7 +301,7 @@ export class QRCodeData {
         appendStr(qrData.prefix, "ascii", false);
         appendByte(qrData.version);
         appendByte(qrData.mode);
-        appendStr(qrData.transactionId, "utf-8");
+        appendStr(qrData.transactionId!, "utf-8");
         appendEncBase64(qrData.firstKeyB64);
         appendEncBase64(qrData.secondKeyB64);
         appendEncBase64(qrData.secretB64);

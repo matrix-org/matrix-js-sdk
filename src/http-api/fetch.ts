@@ -16,7 +16,6 @@ limitations under the License.
 
 /**
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
- * @module http-api
  */
 
 import * as utils from "../utils";
@@ -33,10 +32,11 @@ interface TypedResponse<T> extends Response {
     json(): Promise<T>;
 }
 
-export type ResponseType<T, O extends IHttpOpts> =
-    O extends undefined ? T :
-        O extends { onlyData: true } ? T :
-            TypedResponse<T>;
+export type ResponseType<T, O extends IHttpOpts> = O extends undefined
+    ? T
+    : O extends { onlyData: true }
+    ? T
+    : TypedResponse<T>;
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
@@ -64,13 +64,13 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Sets the base URL for the identity server
-     * @param {string} url The new base url
+     * @param url - The new base url
      */
     public setIdBaseUrl(url: string): void {
         this.opts.idBaseUrl = url;
     }
 
-    public idServerRequest<T extends {}>(
+    public idServerRequest<T extends Record<string, unknown>>(
         method: Method,
         path: string,
         params: Record<string, string | string[]> | undefined,
@@ -104,35 +104,29 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Perform an authorised request to the homeserver.
-     * @param {string} method The HTTP method e.g. "GET".
-     * @param {string} path The HTTP path <b>after</b> the supplied prefix e.g.
+     * @param method - The HTTP method e.g. "GET".
+     * @param path - The HTTP path <b>after</b> the supplied prefix e.g.
      * "/createRoom".
      *
-     * @param {Object=} queryParams A dict of query params (these will NOT be
+     * @param queryParams - A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
-     * @param {Object} [body] The HTTP JSON body.
+     * @param body - The HTTP JSON body.
      *
-     * @param {Object|Number=} opts additional options. If a number is specified,
+     * @param opts - additional options. If a number is specified,
      * this is treated as `opts.localTimeoutMs`.
      *
-     * @param {Number=} opts.localTimeoutMs The maximum amount of time to wait before
-     * timing out the request. If not specified, there is no timeout.
-     *
-     * @param {string=} opts.prefix The full prefix to use e.g.
-     * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
-     *
-     * @param {string=} opts.baseUrl The alternative base url to use.
-     * If not specified, uses this.opts.baseUrl
-     *
-     * @param {Object=} opts.headers map of additional request headers
-     *
-     * @return {Promise} Resolves to <code>{data: {Object},
-     * headers: {Object}, code: {Number}}</code>.
-     * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
-     * object only.
-     * @return {module:http-api.MatrixError} Rejects with an error if a problem
-     * occurred. This includes network problems and Matrix-specific error JSON.
+     * @returns Promise which resolves to
+     * ```
+     * {
+     *     data: {Object},
+     *     headers: {Object},
+     *     code: {Number},
+     * }
+     * ```
+     * If `onlyData` is set, this will resolve to the `data` object only.
+     * @returns Rejects with an error if a problem occurred.
+     * This includes network problems and Matrix-specific error JSON.
      */
     public authedRequest<T>(
         method: Method,
@@ -162,9 +156,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
         const requestPromise = this.request<T>(method, path, queryParams, body, opts);
 
         requestPromise.catch((err: MatrixError) => {
-            if (err.errcode == 'M_UNKNOWN_TOKEN' && !opts?.inhibitLogoutEmit) {
+            if (err.errcode == "M_UNKNOWN_TOKEN" && !opts?.inhibitLogoutEmit) {
                 this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, err);
-            } else if (err.errcode == 'M_CONSENT_NOT_GIVEN') {
+            } else if (err.errcode == "M_CONSENT_NOT_GIVEN") {
                 this.eventEmitter.emit(HttpApiEvent.NoConsent, err.message, err.data.consent_uri);
             }
         });
@@ -176,30 +170,28 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Perform a request to the homeserver without any credentials.
-     * @param {string} method The HTTP method e.g. "GET".
-     * @param {string} path The HTTP path <b>after</b> the supplied prefix e.g.
+     * @param method - The HTTP method e.g. "GET".
+     * @param path - The HTTP path <b>after</b> the supplied prefix e.g.
      * "/createRoom".
      *
-     * @param {Object=} queryParams A dict of query params (these will NOT be
+     * @param queryParams - A dict of query params (these will NOT be
      * urlencoded). If unspecified, there will be no query params.
      *
-     * @param {Object} [body] The HTTP JSON body.
+     * @param body - The HTTP JSON body.
      *
-     * @param {Object=} opts additional options
+     * @param opts - additional options
      *
-     * @param {Number=} opts.localTimeoutMs The maximum amount of time to wait before
-     * timing out the request. If not specified, there is no timeout.
-     *
-     * @param {string=} opts.prefix The full prefix to use e.g.
-     * "/_matrix/client/v2_alpha". If not specified, uses this.opts.prefix.
-     *
-     * @param {Object=} opts.headers map of additional request headers
-     *
-     * @return {Promise} Resolves to <code>{data: {Object},
-     * headers: {Object}, code: {Number}}</code>.
-     * If <code>onlyData</code> is set, this will resolve to the <code>data</code>
+     * @returns Promise which resolves to
+     * ```
+     * {
+     *  data: {Object},
+     *  headers: {Object},
+     *  code: {Number},
+     * }
+     * ```
+     * If `onlyData</code> is set, this will resolve to the <code>data`
      * object only.
-     * @return {module:http-api.MatrixError} Rejects with an error if a problem
+     * @returns Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public request<T>(
@@ -215,21 +207,16 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Perform a request to an arbitrary URL.
-     * @param {string} method The HTTP method e.g. "GET".
-     * @param {string} url The HTTP URL object.
+     * @param method - The HTTP method e.g. "GET".
+     * @param url - The HTTP URL object.
      *
-     * @param {Object} [body] The HTTP JSON body.
+     * @param body - The HTTP JSON body.
      *
-     * @param {Object=} opts additional options
+     * @param opts - additional options
      *
-     * @param {Number=} opts.localTimeoutMs The maximum amount of time to wait before
-     * timing out the request. If not specified, there is no timeout.
-     *
-     * @param {Object=} opts.headers map of additional request headers
-     *
-     * @return {Promise} Resolves to data unless `onlyData` is specified as false,
+     * @returns Promise which resolves to data unless `onlyData` is specified as false,
      * where the resolved value will be a fetch Response object.
-     * @return {module:http-api.MatrixError} Rejects with an error if a problem
+     * @returns Rejects with an error if a problem
      * occurred. This includes network problems and Matrix-specific error JSON.
      */
     public async requestOtherUrl<T>(
@@ -255,9 +242,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
         const timeout = opts.localTimeoutMs ?? this.opts.localTimeoutMs;
         const keepAlive = opts.keepAlive ?? false;
-        const signals = [
-            this.abortController.signal,
-        ];
+        const signals = [this.abortController.signal];
         if (timeout !== undefined) {
             signals.push(timeoutSignal(timeout));
         }
@@ -310,18 +295,13 @@ export class FetchHttpApi<O extends IHttpOpts> {
 
     /**
      * Form and return a homeserver request URL based on the given path params and prefix.
-     * @param {string} path The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".
-     * @param {Object} queryParams A dict of query params (these will NOT be urlencoded).
-     * @param {string} prefix The full prefix to use e.g. "/_matrix/client/v2_alpha", defaulting to this.opts.prefix.
-     * @param {string} baseUrl The baseUrl to use e.g. "https://matrix.org/", defaulting to this.opts.baseUrl.
-     * @return {string} URL
+     * @param path - The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".
+     * @param queryParams - A dict of query params (these will NOT be urlencoded).
+     * @param prefix - The full prefix to use e.g. "/_matrix/client/v2_alpha", defaulting to this.opts.prefix.
+     * @param baseUrl - The baseUrl to use e.g. "https://matrix.org/", defaulting to this.opts.baseUrl.
+     * @returns URL
      */
-    public getUrl(
-        path: string,
-        queryParams?: QueryDict,
-        prefix?: string,
-        baseUrl?: string,
-    ): URL {
+    public getUrl(path: string, queryParams?: QueryDict, prefix?: string, baseUrl?: string): URL {
         const url = new URL((baseUrl ?? this.opts.baseUrl) + (prefix ?? this.opts.prefix) + path);
         if (queryParams) {
             utils.encodeParams(queryParams, url.searchParams);

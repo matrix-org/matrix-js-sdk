@@ -63,13 +63,15 @@ export abstract class ReadReceipt<
 
     /**
      * Gets the latest receipt for a given user in the room
-     * @param userId The id of the user for which we want the receipt
-     * @param ignoreSynthesized Whether to ignore synthesized receipts or not
-     * @param receiptType Optional. The type of the receipt we want to get
+     * @param userId - The id of the user for which we want the receipt
+     * @param ignoreSynthesized - Whether to ignore synthesized receipts or not
+     * @param receiptType - Optional. The type of the receipt we want to get
      * @returns the latest receipts of the chosen type for the chosen user
      */
     public getReadReceiptForUserId(
-        userId: string, ignoreSynthesized = false, receiptType = ReceiptType.Read,
+        userId: string,
+        ignoreSynthesized = false,
+        receiptType = ReceiptType.Read,
     ): WrappedReceipt | null {
         const [realReceipt, syntheticReceipt] = this.receipts[receiptType]?.[userId] ?? [];
         if (ignoreSynthesized) {
@@ -82,11 +84,11 @@ export abstract class ReadReceipt<
     /**
      * Get the ID of the event that a given user has read up to, or null if we
      * have received no read receipts from them.
-     * @param {String} userId The user ID to get read receipt event ID for
-     * @param {Boolean} ignoreSynthesized If true, return only receipts that have been
+     * @param userId - The user ID to get read receipt event ID for
+     * @param ignoreSynthesized - If true, return only receipts that have been
      *                                    sent by the server, not implicit ones generated
      *                                    by the JS SDK.
-     * @return {String} ID of the latest event that the given user has read, or null.
+     * @returns ID of the latest event that the given user has read, or null.
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
         // XXX: This is very very ugly and I hope I won't have to ever add a new
@@ -113,7 +115,7 @@ export abstract class ReadReceipt<
         if (!comparison) return privateReadReceipt?.eventId ?? publicReadReceipt?.eventId ?? null;
 
         // If public read receipt is older, return the private one
-        return ((comparison < 0) ? privateReadReceipt?.eventId : publicReadReceipt?.eventId) ?? null;
+        return (comparison < 0 ? privateReadReceipt?.eventId : publicReadReceipt?.eventId) ?? null;
     }
 
     public addReceiptToStructure(
@@ -140,10 +142,7 @@ export abstract class ReadReceipt<
         if (existingReceipt) {
             // we only want to add this receipt if we think it is later than the one we already have.
             // This is managed server-side, but because we synthesize RRs locally we have to do it here too.
-            const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(
-                existingReceipt.eventId,
-                eventId,
-            );
+            const ordering = this.getUnfilteredTimelineSet().compareEventOrdering(existingReceipt.eventId, eventId);
             if (ordering !== null && ordering >= 0) {
                 return;
             }
@@ -188,11 +187,9 @@ export abstract class ReadReceipt<
         if (cachedReceipt && this.receiptCacheByEventId[cachedReceipt.eventId]) {
             const previousEventId = cachedReceipt.eventId;
             // Remove the receipt we're about to clobber out of existence from the cache
-            this.receiptCacheByEventId[previousEventId] = (
-                this.receiptCacheByEventId[previousEventId].filter(r => {
-                    return r.type !== receiptType || r.userId !== userId;
-                })
-            );
+            this.receiptCacheByEventId[previousEventId] = this.receiptCacheByEventId[previousEventId].filter((r) => {
+                return r.type !== receiptType || r.userId !== userId;
+            });
 
             if (this.receiptCacheByEventId[previousEventId].length < 1) {
                 delete this.receiptCacheByEventId[previousEventId]; // clean up the cache keys
@@ -212,8 +209,8 @@ export abstract class ReadReceipt<
 
     /**
      * Get a list of receipts for the given event.
-     * @param {MatrixEvent} event the event to get receipts for
-     * @return {Object[]} A list of receipts with a userId, type and data keys or
+     * @param event - the event to get receipts for
+     * @returns A list of receipts with a userId, type and data keys or
      * an empty list.
      */
     public getReceiptsForEvent(event: MatrixEvent): CachedReceipt[] {
@@ -225,9 +222,9 @@ export abstract class ReadReceipt<
     /**
      * Add a temporary local-echo receipt to the room to reflect in the
      * client the fact that we've sent one.
-     * @param {string} userId The user ID if the receipt sender
-     * @param {MatrixEvent} e The event that is to be acknowledged
-     * @param {ReceiptType} receiptType The type of receipt
+     * @param userId - The user ID if the receipt sender
+     * @param e - The event that is to be acknowledged
+     * @param receiptType - The type of receipt
      */
     public addLocalEchoReceipt(userId: string, e: MatrixEvent, receiptType: ReceiptType): void {
         this.addReceipt(synthesizeReceipt(userId, e, receiptType), true);
@@ -235,32 +232,36 @@ export abstract class ReadReceipt<
 
     /**
      * Get a list of user IDs who have <b>read up to</b> the given event.
-     * @param {MatrixEvent} event the event to get read receipts for.
-     * @return {String[]} A list of user IDs.
+     * @param event - the event to get read receipts for.
+     * @returns A list of user IDs.
      */
     public getUsersReadUpTo(event: MatrixEvent): string[] {
-        return this.getReceiptsForEvent(event).filter(function(receipt) {
-            return utils.isSupportedReceiptType(receipt.type);
-        }).map(function(receipt) {
-            return receipt.userId;
-        });
+        return this.getReceiptsForEvent(event)
+            .filter(function (receipt) {
+                return utils.isSupportedReceiptType(receipt.type);
+            })
+            .map(function (receipt) {
+                return receipt.userId;
+            });
     }
 
     /**
      * Determines if the given user has read a particular event ID with the known
      * history of the room. This is not a definitive check as it relies only on
      * what is available to the room at the time of execution.
-     * @param {String} userId The user ID to check the read state of.
-     * @param {String} eventId The event ID to check if the user read.
-     * @returns {Boolean} True if the user has read the event, false otherwise.
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
+     * @returns True if the user has read the event, false otherwise.
      */
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         const readUpToId = this.getEventReadUpTo(userId, false);
         if (readUpToId === eventId) return true;
 
-        if (this.timeline?.length
-            && this.timeline[this.timeline.length - 1].getSender()
-            && this.timeline[this.timeline.length - 1].getSender() === userId) {
+        if (
+            this.timeline?.length &&
+            this.timeline[this.timeline.length - 1].getSender() &&
+            this.timeline[this.timeline.length - 1].getSender() === userId
+        ) {
             // It doesn't matter where the event is in the timeline, the user has read
             // it because they've sent the latest event.
             return true;

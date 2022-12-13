@@ -14,33 +14,30 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import '../../olm-loader';
-import { TestClient } from '../../TestClient';
-import { logger } from '../../../src/logger';
-import { DEHYDRATION_ALGORITHM } from '../../../src/crypto/dehydration';
+import "../../olm-loader";
+import { TestClient } from "../../TestClient";
+import { logger } from "../../../src/logger";
+import { DEHYDRATION_ALGORITHM } from "../../../src/crypto/dehydration";
 
 const Olm = global.Olm;
 
 describe("Dehydration", () => {
     if (!global.Olm) {
-        logger.warn('Not running dehydration unit tests: libolm not present');
+        logger.warn("Not running dehydration unit tests: libolm not present");
         return;
     }
 
-    beforeAll(function() {
+    beforeAll(function () {
         return global.Olm.init();
     });
 
     it("should rehydrate a dehydrated device", async () => {
         const key = new Uint8Array([1, 2, 3]);
-        const alice = new TestClient(
-            "@alice:example.com", "Osborne2", undefined, undefined,
-            {
-                cryptoCallbacks: {
-                    getDehydrationKey: async t => key,
-                },
+        const alice = new TestClient("@alice:example.com", "Osborne2", undefined, undefined, {
+            cryptoCallbacks: {
+                getDehydrationKey: async (t) => key,
             },
-        );
+        });
 
         const dehydratedDevice = new Olm.Account();
         dehydratedDevice.create();
@@ -56,25 +53,20 @@ describe("Dehydration", () => {
             success: true,
         });
 
-        expect((await Promise.all([
-            alice.client.rehydrateDevice(),
-            alice.httpBackend.flushAllExpected(),
-        ]))[0])
-            .toEqual("ABCDEFG");
+        expect((await Promise.all([alice.client.rehydrateDevice(), alice.httpBackend.flushAllExpected()]))[0]).toEqual(
+            "ABCDEFG",
+        );
 
         expect(alice.client.getDeviceId()).toEqual("ABCDEFG");
     });
 
     it("should dehydrate a device", async () => {
         const key = new Uint8Array([1, 2, 3]);
-        const alice = new TestClient(
-            "@alice:example.com", "Osborne2", undefined, undefined,
-            {
-                cryptoCallbacks: {
-                    getDehydrationKey: async t => key,
-                },
+        const alice = new TestClient("@alice:example.com", "Osborne2", undefined, undefined, {
+            cryptoCallbacks: {
+                getDehydrationKey: async (t) => key,
             },
-        );
+        });
 
         await alice.client.initCrypto();
 
@@ -84,7 +76,8 @@ describe("Dehydration", () => {
 
         let pickledAccount = "";
 
-        alice.httpBackend.when("PUT", "/dehydrated_device")
+        alice.httpBackend
+            .when("PUT", "/dehydrated_device")
             .check((req) => {
                 expect(req.data.device_data).toMatchObject({
                     algorithm: DEHYDRATION_ALGORITHM,
@@ -95,7 +88,8 @@ describe("Dehydration", () => {
             .respond(200, {
                 device_id: "ABCDEFG",
             });
-        alice.httpBackend.when("POST", "/keys/upload/ABCDEFG")
+        alice.httpBackend
+            .when("POST", "/keys/upload/ABCDEFG")
             .check((req) => {
                 expect(req.data).toMatchObject({
                     "device_keys": expect.objectContaining({
@@ -119,11 +113,12 @@ describe("Dehydration", () => {
             .respond(200, {});
 
         try {
-            const deviceId =
-                (await Promise.all([
+            const deviceId = (
+                await Promise.all([
                     alice.client.createDehydratedDevice(new Uint8Array(key), {}),
                     alice.httpBackend.flushAllExpected(),
-                ]))[0];
+                ])
+            )[0];
 
             expect(deviceId).toEqual("ABCDEFG");
             expect(deviceId).not.toEqual("");

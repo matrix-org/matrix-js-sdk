@@ -17,7 +17,6 @@ limitations under the License.
 /**
  * Verification method that is illegal to have (cannot possibly
  * do verification with this method).
- * @module crypto/verification/IllegalMethod
  */
 
 import { VerificationBase as Base, VerificationEvent, VerificationEventHandlerMap } from "./Base";
@@ -26,10 +25,6 @@ import { MatrixClient } from "../../client";
 import { MatrixEvent } from "../../models/event";
 import { VerificationRequest } from "./request/VerificationRequest";
 
-/**
- * @class crypto/verification/IllegalMethod/IllegalMethod
- * @extends {module:crypto/verification/Base}
- */
 export class IllegalMethod extends Base<VerificationEvent, VerificationEventHandlerMap> {
     public static factory(
         channel: IVerificationChannel,

@@ -106,13 +106,13 @@ export class MSC3089TreeSpace {
         // but is safe for a managed usecase like we offer in the SDK.
         const parentEvents = this.room.currentState.getStateEvents(EventType.SpaceParent);
         if (!parentEvents?.length) return true;
-        return parentEvents.every(e => !e.getContent()?.['via']);
+        return parentEvents.every((e) => !e.getContent()?.["via"]);
     }
 
     /**
      * Sets the name of the tree space.
-     * @param {string} name The new name for the space.
-     * @returns {Promise<void>} Resolves when complete.
+     * @param name - The new name for the space.
+     * @returns Promise which resolves when complete.
      */
     public async setName(name: string): Promise<void> {
         await this.client.sendStateEvent(this.roomId, EventType.RoomName, { name }, "");
@@ -121,20 +121,20 @@ export class MSC3089TreeSpace {
     /**
      * Invites a user to the tree space. They will be given the default Viewer
      * permission level unless specified elsewhere.
-     * @param {string} userId The user ID to invite.
-     * @param {boolean} andSubspaces True (default) to invite the user to all
+     * @param userId - The user ID to invite.
+     * @param andSubspaces - True (default) to invite the user to all
      * directories/subspaces too, recursively.
-     * @param {boolean} shareHistoryKeys True (default) to share encryption keys
+     * @param shareHistoryKeys - True (default) to share encryption keys
      * with the invited user. This will allow them to decrypt the events (files)
      * in the tree. Keys will not be shared if the room is lacking appropriate
      * history visibility (by default, history visibility is "shared" in trees,
      * which is an appropriate visibility for these purposes).
-     * @returns {Promise<void>} Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async invite(userId: string, andSubspaces = true, shareHistoryKeys = true): Promise<void> {
         const promises: Promise<void>[] = [this.retryInvite(userId)];
         if (andSubspaces) {
-            promises.push(...this.getDirectories().map(d => d.invite(userId, andSubspaces, shareHistoryKeys)));
+            promises.push(...this.getDirectories().map((d) => d.invite(userId, andSubspaces, shareHistoryKeys)));
         }
         return Promise.all(promises).then(() => {
             // Note: key sharing is default on because for file trees it is relatively important that the invite
@@ -150,7 +150,7 @@ export class MSC3089TreeSpace {
 
     private retryInvite(userId: string): Promise<void> {
         return simpleRetryOperation(async () => {
-            await this.client.invite(this.roomId, userId).catch(e => {
+            await this.client.invite(this.roomId, userId).catch((e) => {
                 // We don't want to retry permission errors forever...
                 if (e?.errcode === "M_FORBIDDEN") {
                     throw new promiseRetry.AbortError(e);
@@ -164,20 +164,20 @@ export class MSC3089TreeSpace {
      * Sets the permissions of a user to the given role. Note that if setting a user
      * to Owner then they will NOT be able to be demoted. If the user does not have
      * permission to change the power level of the target, an error will be thrown.
-     * @param {string} userId The user ID to change the role of.
-     * @param {TreePermissions} role The role to assign.
-     * @returns {Promise<void>} Resolves when complete.
+     * @param userId - The user ID to change the role of.
+     * @param role - The role to assign.
+     * @returns Promise which resolves when complete.
      */
     public async setPermissions(userId: string, role: TreePermissions): Promise<void> {
         const currentPls = this.room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
         const pls = currentPls?.getContent() || {};
-        const viewLevel = pls['users_default'] || 0;
-        const editLevel = pls['events_default'] || 50;
-        const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;
+        const viewLevel = pls["users_default"] || 0;
+        const editLevel = pls["events_default"] || 50;
+        const adminLevel = pls["events"]?.[EventType.RoomPowerLevels] || 100;
 
-        const users = pls['users'] || {};
+        const users = pls["users"] || {};
         switch (role) {
             case TreePermissions.Viewer:
                 users[userId] = viewLevel;
@@ -191,7 +191,7 @@ export class MSC3089TreeSpace {
             default:
                 throw new Error("Invalid role: " + role);
         }
-        pls['users'] = users;
+        pls["users"] = users;
 
         await this.client.sendStateEvent(this.roomId, EventType.RoomPowerLevels, pls, "");
     }
@@ -200,19 +200,19 @@ export class MSC3089TreeSpace {
      * Gets the current permissions of a user. Note that any users missing explicit permissions (or not
      * in the space) will be considered Viewers. Appropriate membership checks need to be performed
      * elsewhere.
-     * @param {string} userId The user ID to check permissions of.
-     * @returns {TreePermissions} The permissions for the user, defaulting to Viewer.
+     * @param userId - The user ID to check permissions of.
+     * @returns The permissions for the user, defaulting to Viewer.
      */
     public getPermissions(userId: string): TreePermissions {
         const currentPls = this.room.currentState.getStateEvents(EventType.RoomPowerLevels, "");
         if (Array.isArray(currentPls)) throw new Error("Unexpected return type for power levels");
 
         const pls = currentPls?.getContent() || {};
-        const viewLevel = pls['users_default'] || 0;
-        const editLevel = pls['events_default'] || 50;
-        const adminLevel = pls['events']?.[EventType.RoomPowerLevels] || 100;
+        const viewLevel = pls["users_default"] || 0;
+        const editLevel = pls["events_default"] || 50;
+        const adminLevel = pls["events"]?.[EventType.RoomPowerLevels] || 100;
 
-        const userLevel = pls['users']?.[userId] || viewLevel;
+        const userLevel = pls["users"]?.[userId] || viewLevel;
         if (userLevel >= adminLevel) return TreePermissions.Owner;
         if (userLevel >= editLevel) return TreePermissions.Editor;
         return TreePermissions.Viewer;
@@ -220,26 +220,36 @@ export class MSC3089TreeSpace {
 
     /**
      * Creates a directory under this tree space, represented as another tree space.
-     * @param {string} name The name for the directory.
-     * @returns {Promise<MSC3089TreeSpace>} Resolves to the created directory.
+     * @param name - The name for the directory.
+     * @returns Promise which resolves to the created directory.
      */
     public async createDirectory(name: string): Promise<MSC3089TreeSpace> {
         const directory = await this.client.unstableCreateFileTree(name);
 
-        await this.client.sendStateEvent(this.roomId, EventType.SpaceChild, {
-            via: [this.client.getDomain()],
-        }, directory.roomId);
+        await this.client.sendStateEvent(
+            this.roomId,
+            EventType.SpaceChild,
+            {
+                via: [this.client.getDomain()],
+            },
+            directory.roomId,
+        );
 
-        await this.client.sendStateEvent(directory.roomId, EventType.SpaceParent, {
-            via: [this.client.getDomain()],
-        }, this.roomId);
+        await this.client.sendStateEvent(
+            directory.roomId,
+            EventType.SpaceParent,
+            {
+                via: [this.client.getDomain()],
+            },
+            this.roomId,
+        );
 
         return directory;
     }
 
     /**
      * Gets a list of all known immediate subdirectories to this tree space.
-     * @returns {MSC3089TreeSpace[]} The tree spaces (directories). May be empty, but not null.
+     * @returns The tree spaces (directories). May be empty, but not null.
      */
     public getDirectories(): MSC3089TreeSpace[] {
         const trees: MSC3089TreeSpace[] = [];
@@ -261,16 +271,16 @@ export class MSC3089TreeSpace {
     /**
      * Gets a subdirectory of a given ID under this tree space. Note that this will not recurse
      * into children and instead only look one level deep.
-     * @param {string} roomId The room ID (directory ID) to find.
-     * @returns {MSC3089TreeSpace | undefined} The directory, or undefined if not found.
+     * @param roomId - The room ID (directory ID) to find.
+     * @returns The directory, or undefined if not found.
      */
     public getDirectory(roomId: string): MSC3089TreeSpace | undefined {
-        return this.getDirectories().find(r => r.roomId === roomId);
+        return this.getDirectories().find((r) => r.roomId === roomId);
     }
 
     /**
      * Deletes the tree, kicking all members and deleting **all subdirectories**.
-     * @returns {Promise<void>} Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async delete(): Promise<void> {
         const subdirectories = this.getDirectories();
@@ -294,10 +304,10 @@ export class MSC3089TreeSpace {
         await this.client.leave(this.roomId);
     }
 
-    private getOrderedChildren(children: MatrixEvent[]): { roomId: string, order: string }[] {
-        const ordered: { roomId: string, order: string }[] = children
-            .map(c => ({ roomId: c.getStateKey(), order: c.getContent()['order'] }))
-            .filter(c => c.roomId) as { roomId: string, order: string }[];
+    private getOrderedChildren(children: MatrixEvent[]): { roomId: string; order: string }[] {
+        const ordered: { roomId: string; order: string }[] = children
+            .map((c) => ({ roomId: c.getStateKey(), order: c.getContent()["order"] }))
+            .filter((c) => c.roomId) as { roomId: string; order: string }[];
         ordered.sort((a, b) => {
             if (a.order && !b.order) {
                 return -1;
@@ -306,7 +316,8 @@ export class MSC3089TreeSpace {
             } else if (!a.order && !b.order) {
                 const roomA = this.client.getRoom(a.roomId);
                 const roomB = this.client.getRoom(b.roomId);
-                if (!roomA || !roomB) { // just don't bother trying to do more partial sorting
+                if (!roomA || !roomB) {
+                    // just don't bother trying to do more partial sorting
                     return lexicographicCompare(a.roomId, b.roomId);
                 }
 
@@ -316,7 +327,8 @@ export class MSC3089TreeSpace {
                     return lexicographicCompare(a.roomId, b.roomId);
                 }
                 return createTsA - createTsB;
-            } else { // both not-null orders
+            } else {
+                // both not-null orders
                 return lexicographicCompare(a.order, b.order);
             }
         });
@@ -341,7 +353,7 @@ export class MSC3089TreeSpace {
     /**
      * Gets the current order index for this directory. Note that if this is the top level space
      * then -1 will be returned.
-     * @returns {number} The order index of this space.
+     * @returns The order index of this space.
      */
     public getOrder(): number {
         if (this.isTopLevel) return -1;
@@ -350,15 +362,15 @@ export class MSC3089TreeSpace {
         const children = parentRoom.currentState.getStateEvents(EventType.SpaceChild);
         const ordered = this.getOrderedChildren(children);
 
-        return ordered.findIndex(c => c.roomId === this.roomId);
+        return ordered.findIndex((c) => c.roomId === this.roomId);
     }
 
     /**
      * Sets the order index for this directory within its parent. Note that if this is a top level
      * space then an error will be thrown. -1 can be used to move the child to the start, and numbers
      * larger than the number of children can be used to move the child to the end.
-     * @param {number} index The new order index for this space.
-     * @returns {Promise<void>} Resolves when complete.
+     * @param index - The new order index for this space.
+     * @returns Promise which resolves when complete.
      * @throws Throws if this is a top level space.
      */
     public async setOrder(index: number): Promise<void> {
@@ -371,14 +383,14 @@ export class MSC3089TreeSpace {
 
         const currentIndex = this.getOrder();
         const movingUp = currentIndex < index;
-        if (movingUp && index === (ordered.length - 1)) {
+        if (movingUp && index === ordered.length - 1) {
             index--;
         } else if (!movingUp && index === 0) {
             index++;
         }
 
-        const prev = ordered[movingUp ? index : (index - 1)];
-        const next = ordered[movingUp ? (index + 1) : index];
+        const prev = ordered[movingUp ? index : index - 1];
+        const next = ordered[movingUp ? index + 1 : index];
 
         let newOrder = DEFAULT_ALPHABET[0];
         let ensureBeforeIsSane = false;
@@ -387,7 +399,7 @@ export class MSC3089TreeSpace {
             if (next?.order) {
                 newOrder = prevString(next.order);
             }
-        } else if (index === (ordered.length - 1)) {
+        } else if (index === ordered.length - 1) {
             // Move to back
             if (next?.order) {
                 newOrder = nextString(next.order);
@@ -435,10 +447,15 @@ export class MSC3089TreeSpace {
                     lastOrder = lastOrder ? nextString(lastOrder) : DEFAULT_ALPHABET[0];
                     const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, target.roomId);
                     const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
-                    await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
-                        ...content,
-                        order: lastOrder,
-                    }, target.roomId);
+                    await this.client.sendStateEvent(
+                        parentRoom.roomId,
+                        EventType.SpaceChild,
+                        {
+                            ...content,
+                            order: lastOrder,
+                        },
+                        target.roomId,
+                    );
                 } else {
                     lastOrder = target.order;
                 }
@@ -453,22 +470,27 @@ export class MSC3089TreeSpace {
         // Now we can finally update our own order state
         const currentChild = parentRoom.currentState.getStateEvents(EventType.SpaceChild, this.roomId);
         const content = currentChild?.getContent() ?? { via: [this.client.getDomain()] };
-        await this.client.sendStateEvent(parentRoom.roomId, EventType.SpaceChild, {
-            ...content,
+        await this.client.sendStateEvent(
+            parentRoom.roomId,
+            EventType.SpaceChild,
+            {
+                ...content,
 
-            // TODO: Safely constrain to 50 character limit required by spaces.
-            order: newOrder,
-        }, this.roomId);
+                // TODO: Safely constrain to 50 character limit required by spaces.
+                order: newOrder,
+            },
+            this.roomId,
+        );
     }
 
     /**
      * Creates (uploads) a new file to this tree. The file must have already been encrypted for the room.
      * The file contents are in a type that is compatible with MatrixClient.uploadContent().
-     * @param {string} name The name of the file.
-     * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
-     * @param {Partial<IEncryptedFile>} info The encrypted file information.
-     * @param {IContent} additionalContent Optional event content fields to include in the message.
-     * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
+     * @param name - The name of the file.
+     * @param encryptedContents - The encrypted contents.
+     * @param info - The encrypted file information.
+     * @param additionalContent - Optional event content fields to include in the message.
+     * @returns Promise which resolves to the file event's sent response.
      */
     public async createFile(
         name: string,
@@ -502,18 +524,23 @@ export class MSC3089TreeSpace {
             [UNSTABLE_MSC3089_LEAF.name]: {},
         });
 
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            active: true,
-            name: name,
-        }, res['event_id']);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                active: true,
+                name: name,
+            },
+            res["event_id"],
+        );
 
         return res;
     }
 
     /**
      * Retrieves a file from the tree.
-     * @param {string} fileEventId The event ID of the file.
-     * @returns {MSC3089Branch | null} The file, or null if not found.
+     * @param fileEventId - The event ID of the file.
+     * @returns The file, or null if not found.
      */
     public getFile(fileEventId: string): MSC3089Branch | null {
         const branch = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name, fileEventId);
@@ -522,18 +549,18 @@ export class MSC3089TreeSpace {
 
     /**
      * Gets an array of all known files for the tree.
-     * @returns {MSC3089Branch[]} The known files. May be empty, but not null.
+     * @returns The known files. May be empty, but not null.
      */
     public listFiles(): MSC3089Branch[] {
-        return this.listAllFiles().filter(b => b.isActive);
+        return this.listAllFiles().filter((b) => b.isActive);
     }
 
     /**
      * Gets an array of all known files for the tree, including inactive/invalid ones.
-     * @returns {MSC3089Branch[]} The known files. May be empty, but not null.
+     * @returns The known files. May be empty, but not null.
      */
     public listAllFiles(): MSC3089Branch[] {
         const branches = this.room.currentState.getStateEvents(UNSTABLE_MSC3089_BRANCH.name) ?? [];
-        return branches.map(e => new MSC3089Branch(this.client, e, this));
+        return branches.map((e) => new MSC3089Branch(this.client, e, this));
     }
 }

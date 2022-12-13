@@ -16,7 +16,7 @@ limitations under the License.
 
 import HttpBackend from "matrix-mock-request";
 
-import "./setupTests";// uses browser-matrix instead of the src
+import "./setupTests"; // uses browser-matrix instead of the src
 import type { MatrixClient } from "../../src";
 
 const USER_ID = "@user:test.server";
@@ -24,7 +24,7 @@ const DEVICE_ID = "device_id";
 const ACCESS_TOKEN = "access_token";
 const ROOM_ID = "!room_id:server.test";
 
-describe("Browserify Test", function() {
+describe("Browserify Test", function () {
     let client: MatrixClient;
     let httpBackend: HttpBackend;
 
@@ -65,22 +65,21 @@ describe("Browserify Test", function() {
         const syncData = {
             next_batch: "batch1",
             rooms: {
-                join: {},
-            },
-        };
-        syncData.rooms.join[ROOM_ID] = {
-            timeline: {
-                events: [
-                    event,
-                ],
-                limited: false,
+                join: {
+                    [ROOM_ID]: {
+                        timeline: {
+                            events: [event],
+                            limited: false,
+                        },
+                    },
+                },
             },
         };
 
         httpBackend.when("GET", "/sync").respond(200, syncData);
         httpBackend.when("GET", "/sync").respond(200, syncData);
 
-        const syncPromise = new Promise(r => client.once(global.matrixcs.ClientEvent.Sync, r));
+        const syncPromise = new Promise((r) => client.once(global.matrixcs.ClientEvent.Sync, r));
         const unexpectedErrorFn = jest.fn();
         client.once(global.matrixcs.ClientEvent.SyncUnexpectedError, unexpectedErrorFn);
 

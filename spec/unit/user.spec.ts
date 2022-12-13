@@ -17,28 +17,30 @@ limitations under the License.
 import { User, UserEvent } from "../../src/models/user";
 import { mkEvent } from "../test-utils/test-utils";
 
-describe("User", function() {
+describe("User", function () {
     const userId = "@alice:bar";
     let user: User;
 
-    beforeEach(function() {
+    beforeEach(function () {
         user = new User(userId);
     });
 
-    describe("setPresenceEvent", function() {
+    describe("setPresenceEvent", function () {
         const event = mkEvent({
-            type: "m.presence", content: {
+            type: "m.presence",
+            content: {
                 presence: "online",
                 user_id: userId,
                 displayname: "Alice",
                 last_active_ago: 1085,
                 avatar_url: "mxc://foo/bar",
-            }, event: true,
+            },
+            event: true,
         });
 
-        it("should emit 'User.displayName' if the display name changes", function() {
+        it("should emit 'User.displayName' if the display name changes", function () {
             let emitCount = 0;
-            user.on(UserEvent.DisplayName, function(ev, usr) {
+            user.on(UserEvent.DisplayName, function (ev, usr) {
                 emitCount += 1;
             });
             user.setPresenceEvent(event);
@@ -47,9 +49,9 @@ describe("User", function() {
             expect(emitCount).toEqual(1);
         });
 
-        it("should emit 'User.avatarUrl' if the avatar URL changes", function() {
+        it("should emit 'User.avatarUrl' if the avatar URL changes", function () {
             let emitCount = 0;
-            user.on(UserEvent.AvatarUrl, function(ev, usr) {
+            user.on(UserEvent.AvatarUrl, function (ev, usr) {
                 emitCount += 1;
             });
             user.setPresenceEvent(event);
@@ -58,9 +60,9 @@ describe("User", function() {
             expect(emitCount).toEqual(1);
         });
 
-        it("should emit 'User.presence' if the presence changes", function() {
+        it("should emit 'User.presence' if the presence changes", function () {
             let emitCount = 0;
-            user.on(UserEvent.Presence, function(ev, usr) {
+            user.on(UserEvent.Presence, function (ev, usr) {
                 emitCount += 1;
             });
             user.setPresenceEvent(event);
@@ -69,27 +71,27 @@ describe("User", function() {
             expect(emitCount).toEqual(1);
         });
 
-        it("should set User.displayName", function() {
+        it("should set User.displayName", function () {
             user.setPresenceEvent(event);
             expect(user.displayName).toEqual("Alice");
         });
 
-        it("should set User.avatarUrl", function() {
+        it("should set User.avatarUrl", function () {
             user.setPresenceEvent(event);
             expect(user.avatarUrl).toEqual("mxc://foo/bar");
         });
 
-        it("should set User.presence", function() {
+        it("should set User.presence", function () {
             user.setPresenceEvent(event);
             expect(user.presence).toEqual("online");
         });
 
-        it("should set User.lastActiveAgo", function() {
+        it("should set User.lastActiveAgo", function () {
             user.setPresenceEvent(event);
             expect(user.lastActiveAgo).toEqual(1085);
         });
 
-        it("should set User.events.presence", function() {
+        it("should set User.events.presence", function () {
             user.setPresenceEvent(event);
             expect(user.events.presence).toEqual(event);
         });

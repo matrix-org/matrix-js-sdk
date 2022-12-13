@@ -66,8 +66,7 @@ export interface IRecoveryKey {
 export interface ICreateSecretStorageOpts {
     /**
      * Function called to await a secret storage key creation flow.
-     * Returns:
-     *     {Promise<Object>} Object with public key metadata, encoded private
+     * @returns Promise resolving to an object with public key metadata, encoded private
      *     recovery key which should be disposed of after displaying to the user,
      *     and raw private key to avoid round tripping if needed.
      */
@@ -131,6 +130,7 @@ export interface IImportOpts {
 }
 
 export interface IImportRoomKeysOpts {
+    /** called with an object that has a "stage" param */
     progressCallback?: (stage: IImportOpts) => void;
     untrusted?: boolean;
     source?: string; // TODO: Enum

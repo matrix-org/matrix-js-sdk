@@ -30,12 +30,10 @@ import { IEncryptedPayload } from "../aes";
 
 /**
  * Internal module. Definitions for storage for the crypto module
- *
- * @module
  */
 
 export interface SecretStorePrivateKeys {
-    dehydration: {
+    "dehydration": {
         keyInfo: DehydrationManager["keyInfo"];
         key: IEncryptedPayload;
         deviceDisplayName: string;
@@ -46,8 +44,6 @@ export interface SecretStorePrivateKeys {
 
 /**
  * Abstraction of things that can store data required for end-to-end encryption
- *
- * @interface CryptoStore
  */
 export interface CryptoStore {
     startup(): Promise<CryptoStore>;
@@ -69,7 +65,7 @@ export interface CryptoStore {
     deleteOutgoingRoomKeyRequest(requestId: string, expectedState: number): Promise<OutgoingRoomKeyRequest | null>;
 
     // Olm Account
-    getAccount(txn: unknown, func: (accountPickle: string | null) => void);
+    getAccount(txn: unknown, func: (accountPickle: string | null) => void): void;
     storeAccount(txn: unknown, accountPickle: string): void;
     getCrossSigningKeys(txn: unknown, func: (keys: Record<string, ICrossSigningKey> | null) => void): void;
     getSecretStorePrivateKey<K extends keyof SecretStorePrivateKeys>(
@@ -110,10 +106,7 @@ export interface CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void;
-    getAllEndToEndInboundGroupSessions(
-        txn: unknown,
-        func: (session: ISession | null) => void,
-    ): void;
+    getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void;
     addEndToEndInboundGroupSession(
         senderCurve25519Key: string,
         sessionId: string,
@@ -171,12 +164,12 @@ export interface ISessionInfo {
 
 export interface IDeviceData {
     devices: {
-        [ userId: string ]: {
-            [ deviceId: string ]: IDevice;
+        [userId: string]: {
+            [deviceId: string]: IDevice;
         };
     };
     trackingStatus: {
-        [ userId: string ]: TrackingStatus;
+        [userId: string]: TrackingStatus;
     };
     crossSigningInfo?: Record<string, ICrossSigningInfo>;
     syncToken?: string;
@@ -197,32 +190,29 @@ export interface IWithheld {
 
 /**
  * Represents an outgoing room key request
- *
- * @typedef {Object} OutgoingRoomKeyRequest
- *
- * @property {string} requestId    unique id for this request. Used for both
- *    an id within the request for later pairing with a cancellation, and for
- *    the transaction id when sending the to_device messages to our local
- *    server.
- *
- * @property {string?} cancellationTxnId
- *    transaction id for the cancellation, if any
- *
- * @property {Array<{userId: string, deviceId: string}>} recipients
- *    list of recipients for the request
- *
- * @property {module:crypto~RoomKeyRequestBody} requestBody
- *    parameters for the request.
- *
- * @property {Number} state   current state of this request (states are defined
- *    in {@link module:crypto/OutgoingRoomKeyRequestManager~ROOM_KEY_REQUEST_STATES})
  */
 export interface OutgoingRoomKeyRequest {
+    /**
+     * Unique id for this request. Used for both an id within the request for later pairing with a cancellation,
+     * and for the transaction id when sending the to_device messages to our local server.
+     */
     requestId: string;
     requestTxnId?: string;
+    /**
+     * Transaction id for the cancellation, if any
+     */
     cancellationTxnId?: string;
+    /**
+     * List of recipients for the request
+     */
     recipients: IRoomKeyRequestRecipient[];
+    /**
+     * Parameters for the request
+     */
     requestBody: IRoomKeyRequestBody;
+    /**
+     * current state of this request (states are defined in {@link OutgoingRoomKeyRequestManager})
+     */
     state: RoomKeyRequestState;
 }
 

@@ -14,27 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module filter
- */
-
-import {
-    EventType,
-    RelationType,
-} from "./@types/event";
+import { EventType, RelationType } from "./@types/event";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { FilterComponent, IFilterComponent } from "./filter-component";
 import { MatrixEvent } from "./models/event";
 
 /**
- * @param {Object} obj
- * @param {string} keyNesting
- * @param {*} val
  */
-function setProp(obj: object, keyNesting: string, val: any): void {
-    const nestedKeys = keyNesting.split(".");
+function setProp(obj: Record<string, any>, keyNesting: string, val: any): void {
+    const nestedKeys = keyNesting.split(".") as [keyof typeof obj];
     let currentObj = obj;
-    for (let i = 0; i < (nestedKeys.length - 1); i++) {
+    for (let i = 0; i < nestedKeys.length - 1; i++) {
         if (!currentObj[nestedKeys[i]]) {
             currentObj[nestedKeys[i]] = {};
         }
@@ -53,12 +43,12 @@ export interface IFilterDefinition {
 }
 
 export interface IRoomEventFilter extends IFilterComponent {
-    lazy_load_members?: boolean;
-    include_redundant_members?: boolean;
-    types?: Array<EventType | string>;
-    related_by_senders?: Array<RelationType | string>;
-    related_by_rel_types?: string[];
-    unread_thread_notifications?: boolean;
+    "lazy_load_members"?: boolean;
+    "include_redundant_members"?: boolean;
+    "types"?: Array<EventType | string>;
+    "related_by_senders"?: Array<RelationType | string>;
+    "related_by_rel_types"?: string[];
+    "unread_thread_notifications"?: boolean;
     "org.matrix.msc3773.unread_thread_notifications"?: boolean;
 
     // Unstable values
@@ -79,14 +69,6 @@ interface IRoomFilter {
 }
 /* eslint-enable camelcase */
 
-/**
- * Construct a new Filter.
- * @constructor
- * @param {string} userId The user ID for this filter.
- * @param {string=} filterId The filter ID if known.
- * @prop {string} userId The user ID of the filter
- * @prop {?string} filterId The filter ID
- */
 export class Filter {
     public static LAZY_LOADING_MESSAGES_FILTER = {
         lazy_load_members: true,
@@ -94,11 +76,6 @@ export class Filter {
 
     /**
      * Create a filter from existing data.
-     * @static
-     * @param {string} userId
-     * @param {string} filterId
-     * @param {Object} jsonObj
-     * @return {Filter}
      */
     public static fromJson(userId: string | undefined | null, filterId: string, jsonObj: IFilterDefinition): Filter {
         const filter = new Filter(userId, filterId);
@@ -110,11 +87,16 @@ export class Filter {
     private roomFilter?: FilterComponent;
     private roomTimelineFilter?: FilterComponent;
 
+    /**
+     * Construct a new Filter.
+     * @param userId - The user ID for this filter.
+     * @param filterId - The filter ID if known.
+     */
     public constructor(public readonly userId: string | undefined | null, public filterId?: string) {}
 
     /**
      * Get the ID of this filter on your homeserver (if known)
-     * @return {?string} The filter ID
+     * @returns The filter ID
      */
     public getFilterId(): string | undefined {
         return this.filterId;
@@ -122,7 +104,7 @@ export class Filter {
 
     /**
      * Get the JSON body of the filter.
-     * @return {Object} The filter definition
+     * @returns The filter definition
      */
     public getDefinition(): IFilterDefinition {
         return this.definition;
@@ -130,7 +112,7 @@ export class Filter {
 
     /**
      * Set the JSON body of the filter
-     * @param {Object} definition The filter definition
+     * @param definition - The filter definition
      */
     public setDefinition(definition: IFilterDefinition): void {
         this.definition = definition;
@@ -199,7 +181,7 @@ export class Filter {
 
     /**
      * Get the room.timeline filter component of the filter
-     * @return {FilterComponent} room timeline filter component
+     * @returns room timeline filter component
      */
     public getRoomTimelineFilterComponent(): FilterComponent | undefined {
         return this.roomTimelineFilter;
@@ -208,8 +190,8 @@ export class Filter {
     /**
      * Filter the list of events based on whether they are allowed in a timeline
      * based on this filter
-     * @param {MatrixEvent[]} events  the list of events being filtered
-     * @return {MatrixEvent[]} the list of events which match the filter
+     * @param events -  the list of events being filtered
+     * @returns the list of events which match the filter
      */
     public filterRoomTimeline(events: MatrixEvent[]): MatrixEvent[] {
         if (this.roomFilter) {
@@ -223,7 +205,7 @@ export class Filter {
 
     /**
      * Set the max number of events to return for each room's timeline.
-     * @param {Number} limit The max number of events to return for each room.
+     * @param limit - The max number of events to return for each room.
      */
     public setTimelineLimit(limit: number): void {
         setProp(this.definition, "room.timeline.limit", limit);
@@ -231,7 +213,6 @@ export class Filter {
 
     /**
      * Enable threads unread notification
-     * @param {boolean} enabled
      */
     public setUnreadThreadNotifications(enabled: boolean): void {
         this.definition = {
@@ -252,7 +233,7 @@ export class Filter {
 
     /**
      * Control whether left rooms should be included in responses.
-     * @param {boolean} includeLeave True to make rooms the user has left appear
+     * @param includeLeave - True to make rooms the user has left appear
      * in responses.
      */
     public setIncludeLeaveRooms(includeLeave: boolean): void {

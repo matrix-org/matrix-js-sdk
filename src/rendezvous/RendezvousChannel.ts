@@ -14,11 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    RendezvousCode,
-    RendezvousIntent,
-    RendezvousFailureReason,
-} from ".";
+import { RendezvousCode, RendezvousIntent, RendezvousFailureReason } from ".";
 
 export interface RendezvousChannel<T> {
     /**
@@ -28,7 +24,7 @@ export interface RendezvousChannel<T> {
 
     /**
      * Send a payload via the channel.
-     * @param data payload to send
+     * @param data - payload to send
      */
     send(data: T): Promise<void>;
 

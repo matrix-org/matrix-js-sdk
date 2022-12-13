@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import MockHttpBackend from 'matrix-mock-request';
+import MockHttpBackend from "matrix-mock-request";
 
-import { MAIN_ROOM_TIMELINE, ReceiptType } from '../../src/@types/read_receipts';
+import { MAIN_ROOM_TIMELINE, ReceiptType } from "../../src/@types/read_receipts";
 import { MatrixClient } from "../../src/client";
-import { Feature, ServerSupport } from '../../src/feature';
-import { EventType } from '../../src/matrix';
-import { synthesizeReceipt } from '../../src/models/read-receipt';
-import { encodeUri } from '../../src/utils';
+import { Feature, ServerSupport } from "../../src/feature";
+import { EventType } from "../../src/matrix";
+import { synthesizeReceipt } from "../../src/models/read-receipt";
+import { encodeUri } from "../../src/utils";
 import * as utils from "../test-utils/test-utils";
 
 // Jest now uses @sinonjs/fake-timers which exposes tickAsync() and a number of
@@ -32,7 +32,7 @@ import * as utils from "../test-utils/test-utils";
 // and avoids assuming anything about the app's behaviour.
 const realSetTimeout = setTimeout;
 function flushPromises() {
-    return new Promise(r => {
+    return new Promise((r) => {
         realSetTimeout(r, 1);
     });
 }
@@ -53,7 +53,7 @@ const threadEvent = utils.mkEvent({
         "m.relates_to": {
             "event_id": THREAD_ID,
             "m.in_reply_to": {
-                "event_id": THREAD_ID,
+                event_id: THREAD_ID,
             },
             "rel_type": "m.thread",
         },
@@ -66,11 +66,11 @@ const roomEvent = utils.mkEvent({
     user: "@bob:matrix.org",
     room: ROOM_ID,
     content: {
-        "body": "Hello from a room",
+        body: "Hello from a room",
     },
 });
 
-function mockServerSideSupport(client, serverSideSupport: ServerSupport) {
+function mockServerSideSupport(client: MatrixClient, serverSideSupport: ServerSupport) {
     client.canSupport.set(Feature.ThreadUnreadNotifications, serverSideSupport);
 }
 
@@ -87,15 +87,19 @@ describe("Read receipt", () => {
 
     describe("sendReceipt", () => {
         it("sends a thread read receipt", async () => {
-            httpBackend.when(
-                "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                    $roomId: ROOM_ID,
-                    $receiptType: ReceiptType.Read,
-                    $eventId: threadEvent.getId()!,
-                }),
-            ).check((request) => {
-                expect(request.data.thread_id).toEqual(THREAD_ID);
-            }).respond(200, {});
+            httpBackend
+                .when(
+                    "POST",
+                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                        $roomId: ROOM_ID,
+                        $receiptType: ReceiptType.Read,
+                        $eventId: threadEvent.getId()!,
+                    }),
+                )
+                .check((request) => {
+                    expect(request.data.thread_id).toEqual(THREAD_ID);
+                })
+                .respond(200, {});
 
             mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReceipt(threadEvent, ReceiptType.Read, {});
@@ -105,15 +109,19 @@ describe("Read receipt", () => {
         });
 
         it("sends an unthreaded receipt", async () => {
-            httpBackend.when(
-                "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                    $roomId: ROOM_ID,
-                    $receiptType: ReceiptType.Read,
-                    $eventId: threadEvent.getId()!,
-                }),
-            ).check((request) => {
-                expect(request.data.thread_id).toBeUndefined();
-            }).respond(200, {});
+            httpBackend
+                .when(
+                    "POST",
+                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                        $roomId: ROOM_ID,
+                        $receiptType: ReceiptType.Read,
+                        $eventId: threadEvent.getId()!,
+                    }),
+                )
+                .check((request) => {
+                    expect(request.data.thread_id).toBeUndefined();
+                })
+                .respond(200, {});
 
             mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReadReceipt(threadEvent, ReceiptType.Read, true);
@@ -123,15 +131,19 @@ describe("Read receipt", () => {
         });
 
         it("sends a room read receipt", async () => {
-            httpBackend.when(
-                "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                    $roomId: ROOM_ID,
-                    $receiptType: ReceiptType.Read,
-                    $eventId: roomEvent.getId()!,
-                }),
-            ).check((request) => {
-                expect(request.data.thread_id).toEqual(MAIN_ROOM_TIMELINE);
-            }).respond(200, {});
+            httpBackend
+                .when(
+                    "POST",
+                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                        $roomId: ROOM_ID,
+                        $receiptType: ReceiptType.Read,
+                        $eventId: roomEvent.getId()!,
+                    }),
+                )
+                .check((request) => {
+                    expect(request.data.thread_id).toEqual(MAIN_ROOM_TIMELINE);
+                })
+                .respond(200, {});
 
             mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReceipt(roomEvent, ReceiptType.Read, {});
@@ -141,15 +153,19 @@ describe("Read receipt", () => {
         });
 
         it("sends a room read receipt when there's no server support", async () => {
-            httpBackend.when(
-                "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                    $roomId: ROOM_ID,
-                    $receiptType: ReceiptType.Read,
-                    $eventId: threadEvent.getId()!,
-                }),
-            ).check((request) => {
-                expect(request.data.thread_id).toBeUndefined();
-            }).respond(200, {});
+            httpBackend
+                .when(
+                    "POST",
+                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                        $roomId: ROOM_ID,
+                        $receiptType: ReceiptType.Read,
+                        $eventId: threadEvent.getId()!,
+                    }),
+                )
+                .check((request) => {
+                    expect(request.data.thread_id).toBeUndefined();
+                })
+                .respond(200, {});
 
             mockServerSideSupport(client, ServerSupport.Unsupported);
             client.sendReceipt(threadEvent, ReceiptType.Read, {});
@@ -159,15 +175,19 @@ describe("Read receipt", () => {
         });
 
         it("sends a valid room read receipt even when body omitted", async () => {
-            httpBackend.when(
-                "POST", encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                    $roomId: ROOM_ID,
-                    $receiptType: ReceiptType.Read,
-                    $eventId: threadEvent.getId()!,
-                }),
-            ).check((request) => {
-                expect(request.data).toEqual({});
-            }).respond(200, {});
+            httpBackend
+                .when(
+                    "POST",
+                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
+                        $roomId: ROOM_ID,
+                        $receiptType: ReceiptType.Read,
+                        $eventId: threadEvent.getId()!,
+                    }),
+                )
+                .check((request) => {
+                    expect(request.data).toEqual({});
+                })
+                .respond(200, {});
 
             mockServerSideSupport(client, ServerSupport.Unsupported);
             client.sendReceipt(threadEvent, ReceiptType.Read, undefined);

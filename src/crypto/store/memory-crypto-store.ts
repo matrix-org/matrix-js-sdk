@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { logger } from '../../logger';
+import { logger } from "../../logger";
 import * as utils from "../../utils";
 import {
     CryptoStore,
@@ -25,7 +25,8 @@ import {
     IWithheld,
     Mode,
     OutgoingRoomKeyRequest,
-    ParkedSharedHistory, SecretStorePrivateKeys,
+    ParkedSharedHistory,
+    SecretStorePrivateKeys,
 } from "./base";
 import { IRoomKeyRequestBody } from "../index";
 import { ICrossSigningKey } from "../../client";
@@ -35,13 +36,8 @@ import { InboundGroupSessionData } from "../OlmDevice";
 
 /**
  * Internal module. in-memory storage for e2e.
- *
- * @module
  */
 
-/**
- * @implements {module:crypto/store/base~CryptoStore}
- */
 export class MemoryCryptoStore implements CryptoStore {
     private outgoingRoomKeyRequests: OutgoingRoomKeyRequest[] = [];
     private account: string | null = null;
@@ -65,7 +61,7 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * This must be called before the store can be used.
      *
-     * @return {Promise} resolves to the store.
+     * @returns resolves to the store.
      */
     public async startup(): Promise<CryptoStore> {
         // No startup work to do for the memory store.
@@ -75,7 +71,7 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Delete all data from this store.
      *
-     * @returns {Promise} Promise which resolves when the store has been cleared.
+     * @returns Promise which resolves when the store has been cleared.
      */
     public deleteAllData(): Promise<void> {
         return Promise.resolve();
@@ -85,10 +81,9 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing outgoing room key request, and if none is found,
      * add a new one
      *
-     * @param {module:crypto/store/base~OutgoingRoomKeyRequest} request
      *
-     * @returns {Promise} resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}: either the
+     * @returns resolves to
+     *    {@link OutgoingRoomKeyRequest}: either the
      *    same instance as passed in, or the existing one.
      */
     public getOrAddOutgoingRoomKeyRequest(request: OutgoingRoomKeyRequest): Promise<OutgoingRoomKeyRequest> {
@@ -102,18 +97,15 @@ export class MemoryCryptoStore implements CryptoStore {
                 // this entry matches the request - return it.
                 logger.log(
                     `already have key request outstanding for ` +
-                    `${requestBody.room_id} / ${requestBody.session_id}: ` +
-                    `not sending another`,
+                        `${requestBody.room_id} / ${requestBody.session_id}: ` +
+                        `not sending another`,
                 );
                 return existing;
             }
 
             // we got to the end of the list without finding a match
             // - add the new request.
-            logger.log(
-                `enqueueing key request for ${requestBody.room_id} / ` +
-                requestBody.session_id,
-            );
+            logger.log(`enqueueing key request for ${requestBody.room_id} / ` + requestBody.session_id);
             this.outgoingRoomKeyRequests.push(request);
             return request;
         });
@@ -122,11 +114,10 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for an existing room key request
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
-     * @return {Promise} resolves to the matching
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     * @returns resolves to the matching
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    not found
      */
     public getOutgoingRoomKeyRequest(requestBody: IRoomKeyRequestBody): Promise<OutgoingRoomKeyRequest | null> {
@@ -138,10 +129,9 @@ export class MemoryCryptoStore implements CryptoStore {
      *
      * @internal
      *
-     * @param {module:crypto~RoomKeyRequestBody} requestBody
-     *    existing request to look for
+     * @param requestBody - existing request to look for
      *
-     * @return {module:crypto/store/base~OutgoingRoomKeyRequest?}
+     * @returns
      *    the matching request, or null if not found
      */
     // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -157,10 +147,10 @@ export class MemoryCryptoStore implements CryptoStore {
     /**
      * Look for room key requests by state
      *
-     * @param {Array<Number>} wantedStates list of acceptable states
+     * @param wantedStates - list of acceptable states
      *
-     * @return {Promise} resolves to the a
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}, or null if
+     * @returns resolves to the a
+     *    {@link OutgoingRoomKeyRequest}, or null if
      *    there are no pending requests in those states
      */
     public getOutgoingRoomKeyRequestByState(wantedStates: number[]): Promise<OutgoingRoomKeyRequest | null> {
@@ -176,15 +166,10 @@ export class MemoryCryptoStore implements CryptoStore {
 
     /**
      *
-     * @param {Number} wantedState
-     * @return {Promise<Array<*>>} All OutgoingRoomKeyRequests in state
+     * @returns All OutgoingRoomKeyRequests in state
      */
     public getAllOutgoingRoomKeyRequestsByState(wantedState: number): Promise<OutgoingRoomKeyRequest[]> {
-        return Promise.resolve(
-            this.outgoingRoomKeyRequests.filter(
-                (r) => r.state == wantedState,
-            ),
-        );
+        return Promise.resolve(this.outgoingRoomKeyRequests.filter((r) => r.state == wantedState));
     }
 
     public getOutgoingRoomKeyRequestsByTarget(
@@ -196,9 +181,10 @@ export class MemoryCryptoStore implements CryptoStore {
 
         for (const req of this.outgoingRoomKeyRequests) {
             for (const state of wantedStates) {
-                if (req.state === state && req.recipients.some(
-                    (recipient) => recipient.userId === userId && recipient.deviceId === deviceId,
-                )) {
+                if (
+                    req.state === state &&
+                    req.recipients.some((recipient) => recipient.userId === userId && recipient.deviceId === deviceId)
+                ) {
                     results.push(req);
                 }
             }
@@ -210,12 +196,12 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing room key request by id and state, and update it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
-     * @param {Object} updates        name/value map of updates to apply
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
+     * @param updates -        name/value map of updates to apply
      *
-     * @returns {Promise} resolves to
-     *    {@link module:crypto/store/base~OutgoingRoomKeyRequest}
+     * @returns resolves to
+     *    {@link OutgoingRoomKeyRequest}
      *    updated request, or null if no matching row was found
      */
     public updateOutgoingRoomKeyRequest(
@@ -231,7 +217,7 @@ export class MemoryCryptoStore implements CryptoStore {
             if (req.state !== expectedState) {
                 logger.warn(
                     `Cannot update room key request from ${expectedState} ` +
-                    `as it was already updated to ${req.state}`,
+                        `as it was already updated to ${req.state}`,
                 );
                 return Promise.resolve(null);
             }
@@ -246,10 +232,10 @@ export class MemoryCryptoStore implements CryptoStore {
      * Look for an existing room key request by id and state, and delete it if
      * found
      *
-     * @param {string} requestId      ID of request to update
-     * @param {number} expectedState  state we expect to find the request in
+     * @param requestId -      ID of request to update
+     * @param expectedState -  state we expect to find the request in
      *
-     * @returns {Promise} resolves once the operation is completed
+     * @returns resolves once the operation is completed
      */
     public deleteOutgoingRoomKeyRequest(
         requestId: string,
@@ -263,10 +249,7 @@ export class MemoryCryptoStore implements CryptoStore {
             }
 
             if (req.state != expectedState) {
-                logger.warn(
-                    `Cannot delete room key request in state ${req.state} `
-                    + `(expected ${expectedState})`,
-                );
+                logger.warn(`Cannot delete room key request in state ${req.state} ` + `(expected ${expectedState})`);
                 return Promise.resolve(null);
             }
 
@@ -358,7 +341,7 @@ export class MemoryCryptoStore implements CryptoStore {
     }
 
     public async storeEndToEndSessionProblem(deviceKey: string, type: string, fixed: boolean): Promise<void> {
-        const problems = this.sessionProblems[deviceKey] = this.sessionProblems[deviceKey] || [];
+        const problems = (this.sessionProblems[deviceKey] = this.sessionProblems[deviceKey] || []);
         problems.push({ type, fixed, time: Date.now() });
         problems.sort((a, b) => {
             return a.time - b.time;
@@ -411,17 +394,11 @@ export class MemoryCryptoStore implements CryptoStore {
         txn: unknown,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
-        func(
-            this.inboundGroupSessions[k] || null,
-            this.inboundGroupSessionsWithheld[k] || null,
-        );
+        const k = senderCurve25519Key + "/" + sessionId;
+        func(this.inboundGroupSessions[k] || null, this.inboundGroupSessionsWithheld[k] || null);
     }
 
-    public getAllEndToEndInboundGroupSessions(
-        txn: unknown,
-        func: (session: ISession | null) => void,
-    ): void {
+    public getAllEndToEndInboundGroupSessions(txn: unknown, func: (session: ISession | null) => void): void {
         for (const key of Object.keys(this.inboundGroupSessions)) {
             // we can't use split, as the components we are trying to split out
             // might themselves contain '/' characters. We rely on the
@@ -443,7 +420,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
+        const k = senderCurve25519Key + "/" + sessionId;
         if (this.inboundGroupSessions[k] === undefined) {
             this.inboundGroupSessions[k] = sessionData;
         }
@@ -455,7 +432,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: unknown,
     ): void {
-        this.inboundGroupSessions[senderCurve25519Key+'/'+sessionId] = sessionData;
+        this.inboundGroupSessions[senderCurve25519Key + "/" + sessionId] = sessionData;
     }
 
     public storeEndToEndInboundGroupSessionWithheld(
@@ -464,7 +441,7 @@ export class MemoryCryptoStore implements CryptoStore {
         sessionData: IWithheld,
         txn: unknown,
     ): void {
-        const k = senderCurve25519Key+'/'+sessionId;
+        const k = senderCurve25519Key + "/" + sessionId;
         this.inboundGroupSessionsWithheld[k] = sessionData;
     }
 
@@ -511,7 +488,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public unmarkSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + '/' + session.sessionId;
+            const sessionKey = session.senderKey + "/" + session.sessionId;
             delete this.sessionsNeedingBackup[sessionKey];
         }
         return Promise.resolve();
@@ -519,7 +496,7 @@ export class MemoryCryptoStore implements CryptoStore {
 
     public markSessionsNeedingBackup(sessions: ISession[]): Promise<void> {
         for (const session of sessions) {
-            const sessionKey = session.senderKey + '/' + session.sessionId;
+            const sessionKey = session.senderKey + "/" + session.sessionId;
             this.sessionsNeedingBackup[sessionKey] = true;
         }
         return Promise.resolve();

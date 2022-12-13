@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ToDeviceMessageId } from './@types/event';
+import { ToDeviceMessageId } from "./@types/event";
 import { logger } from "./logger";
 import { MatrixError, MatrixClient } from "./matrix";
 import { IndexedToDeviceBatch, ToDeviceBatch, ToDeviceBatchWithTxnId, ToDevicePayload } from "./models/ToDeviceMessage";
@@ -32,8 +32,7 @@ export class ToDeviceMessageQueue {
     private retryTimeout: ReturnType<typeof setTimeout> | null = null;
     private retryAttempts = 0;
 
-    public constructor(private client: MatrixClient) {
-    }
+    public constructor(private client: MatrixClient) {}
 
     public start(): void {
         this.running = true;
@@ -59,7 +58,8 @@ export class ToDeviceMessageQueue {
                 (msg) => `${msg.userId}/${msg.deviceId} (msgid ${msg.payload[ToDeviceMessageId]})`,
             );
             logger.info(
-                `Enqueuing batch of to-device messages. type=${batch.eventType} txnid=${batchWithTxnId.txnId}`, msgmap,
+                `Enqueuing batch of to-device messages. type=${batch.eventType} txnid=${batchWithTxnId.txnId}`,
+                msgmap,
             );
         }
 

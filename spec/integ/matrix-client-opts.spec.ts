@@ -1,13 +1,13 @@
 import HttpBackend from "matrix-mock-request";
 
 import * as utils from "../test-utils/test-utils";
-import { MatrixClient } from "../../src/matrix";
+import { ClientEvent, MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
 import { IStore } from "../../src/store";
 
-describe("MatrixClient opts", function() {
+describe("MatrixClient opts", function () {
     const baseUrl = "http://localhost.or.something";
     let httpBackend = new HttpBackend();
     const userId = "@alice:localhost";
@@ -19,11 +19,14 @@ describe("MatrixClient opts", function() {
         presence: {},
         rooms: {
             join: {
-                "!foo:bar": { // roomId
+                "!foo:bar": {
+                    // roomId
                     timeline: {
                         events: [
                             utils.mkMessage({
-                                room: roomId, user: userB, msg: "hello",
+                                room: roomId,
+                                user: userB,
+                                msg: "hello",
                             }),
                         ],
                         prev_batch: "f_1_1",
@@ -31,19 +34,29 @@ describe("MatrixClient opts", function() {
                     state: {
                         events: [
                             utils.mkEvent({
-                                type: "m.room.name", room: roomId, user: userB,
+                                type: "m.room.name",
+                                room: roomId,
+                                user: userB,
                                 content: {
                                     name: "Old room name",
                                 },
                             }),
                             utils.mkMembership({
-                                room: roomId, mship: "join", user: userB, name: "Bob",
+                                room: roomId,
+                                mship: "join",
+                                user: userB,
+                                name: "Bob",
                             }),
                             utils.mkMembership({
-                                room: roomId, mship: "join", user: userId, name: "Alice",
+                                room: roomId,
+                                mship: "join",
+                                user: userId,
+                                name: "Alice",
                             }),
                             utils.mkEvent({
-                                type: "m.room.create", room: roomId, user: userId,
+                                type: "m.room.create",
+                                room: roomId,
+                                user: userId,
                                 content: {
                                     creator: userId,
                                 },
@@ -55,18 +68,18 @@ describe("MatrixClient opts", function() {
         },
     };
 
-    beforeEach(function() {
+    beforeEach(function () {
         httpBackend = new HttpBackend();
     });
 
-    afterEach(function() {
+    afterEach(function () {
         httpBackend.verifyNoOutstandingExpectation();
         return httpBackend.stop();
     });
 
-    describe("without opts.store", function() {
-        let client;
-        beforeEach(function() {
+    describe("without opts.store", function () {
+        let client: MatrixClient;
+        beforeEach(function () {
             client = new MatrixClient({
                 fetchFn: httpBackend.fetchFn as typeof global.fetch,
                 store: undefined,
@@ -77,34 +90,34 @@ describe("MatrixClient opts", function() {
             });
         });
 
-        afterEach(function() {
+        afterEach(function () {
             client.stopClient();
         });
 
-        it("should be able to send messages", function(done) {
+        it("should be able to send messages", function (done) {
             const eventId = "$flibble:wibble";
             httpBackend.when("PUT", "/txn1").respond(200, {
                 event_id: eventId,
             });
-            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function(res) {
+            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function (res) {
                 expect(res.event_id).toEqual(eventId);
                 done();
             });
             httpBackend.flush("/txn1", 1);
         });
 
-        it("should be able to sync / get new events", async function() {
-            const expectedEventTypes = [ // from /initialSync
-                "m.room.message", "m.room.name", "m.room.member", "m.room.member",
+        it("should be able to sync / get new events", async function () {
+            const expectedEventTypes = [
+                // from /initialSync
+                "m.room.message",
+                "m.room.name",
+                "m.room.member",
+                "m.room.member",
                 "m.room.create",
             ];
-            client.on("event", function(event) {
-                expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(
-                    -1,
-                );
-                expectedEventTypes.splice(
-                    expectedEventTypes.indexOf(event.getType()), 1,
-                );
+            client.on(ClientEvent.Event, function (event) {
+                expect(expectedEventTypes.indexOf(event.getType())).not.toEqual(-1);
+                expectedEventTypes.splice(expectedEventTypes.indexOf(event.getType()), 1);
             });
             httpBackend.when("GET", "/versions").respond(200, {});
             httpBackend.when("GET", "/pushrules").respond(200, {});
@@ -114,19 +127,14 @@ describe("MatrixClient opts", function() {
             await httpBackend.flush("/versions", 1);
             await httpBackend.flush("/pushrules", 1);
             await httpBackend.flush("/filter", 1);
-            await Promise.all([
-                httpBackend.flush("/sync", 1),
-                utils.syncPromise(client),
-            ]);
-            expect(expectedEventTypes.length).toEqual(
-                0,
-            );
+            await Promise.all([httpBackend.flush("/sync", 1), utils.syncPromise(client)]);
+            expect(expectedEventTypes.length).toEqual(0);
         });
     });
 
-    describe("without opts.scheduler", function() {
-        let client;
-        beforeEach(function() {
+    describe("without opts.scheduler", function () {
+        let client: MatrixClient;
+        beforeEach(function () {
             client = new MatrixClient({
                 fetchFn: httpBackend.fetchFn as typeof global.fetch,
                 store: new MemoryStore() as IStore,
@@ -137,25 +145,31 @@ describe("MatrixClient opts", function() {
             });
         });
 
-        afterEach(function() {
+        afterEach(function () {
             client.stopClient();
         });
 
-        it("shouldn't retry sending events", function(done) {
-            httpBackend.when("PUT", "/txn1").respond(500, new MatrixError({
-                errcode: "M_SOMETHING",
-                error: "Ruh roh",
-            }));
-            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function(res) {
-                expect(false).toBe(true);
-            }, function(err) {
-                expect(err.errcode).toEqual("M_SOMETHING");
-                done();
-            });
+        it("shouldn't retry sending events", function (done) {
+            httpBackend.when("PUT", "/txn1").respond(
+                500,
+                new MatrixError({
+                    errcode: "M_SOMETHING",
+                    error: "Ruh roh",
+                }),
+            );
+            client.sendTextMessage("!foo:bar", "a body", "txn1").then(
+                function (res) {
+                    expect(false).toBe(true);
+                },
+                function (err) {
+                    expect(err.errcode).toEqual("M_SOMETHING");
+                    done();
+                },
+            );
             httpBackend.flush("/txn1", 1);
         });
 
-        it("shouldn't queue events", function(done) {
+        it("shouldn't queue events", function (done) {
             httpBackend.when("PUT", "/txn1").respond(200, {
                 event_id: "AAA",
             });
@@ -164,26 +178,26 @@ describe("MatrixClient opts", function() {
             });
             let sentA = false;
             let sentB = false;
-            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function(res) {
+            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function (res) {
                 sentA = true;
                 expect(sentB).toBe(true);
             });
-            client.sendTextMessage("!foo:bar", "b body", "txn2").then(function(res) {
+            client.sendTextMessage("!foo:bar", "b body", "txn2").then(function (res) {
                 sentB = true;
                 expect(sentA).toBe(false);
             });
-            httpBackend.flush("/txn2", 1).then(function() {
-                httpBackend.flush("/txn1", 1).then(function() {
+            httpBackend.flush("/txn2", 1).then(function () {
+                httpBackend.flush("/txn1", 1).then(function () {
                     done();
                 });
             });
         });
 
-        it("should be able to send messages", function(done) {
+        it("should be able to send messages", function (done) {
             httpBackend.when("PUT", "/txn1").respond(200, {
                 event_id: "foo",
             });
-            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function(res) {
+            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function (res) {
                 expect(res.event_id).toEqual("foo");
                 done();
             });

@@ -26,9 +26,8 @@ interface IErrorJson extends Partial<IUsageLimit> {
 /**
  * Construct a generic HTTP error. This is a JavaScript Error with additional information
  * specific to HTTP responses.
- * @constructor
- * @param {string} msg The error message to include.
- * @param {number} httpStatus The HTTP response status code.
+ * @param msg - The error message to include.
+ * @param httpStatus - The HTTP response status code.
  */
 export class HTTPError extends Error {
     public constructor(msg: string, public readonly httpStatus?: number) {
@@ -36,21 +35,18 @@ export class HTTPError extends Error {
     }
 }
 
-/**
- * Construct a Matrix error. This is a JavaScript Error with additional
- * information specific to the standard Matrix error response.
- * @constructor
- * @param {Object} errorJson The Matrix error JSON returned from the homeserver.
- * @prop {string} errcode The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
- * @prop {string} name Same as MatrixError.errcode but with a default unknown string.
- * @prop {string} message The Matrix 'error' value, e.g. "Missing token."
- * @prop {Object} data The raw Matrix error JSON used to construct this object.
- * @prop {number} httpStatus The numeric HTTP status code given
- */
 export class MatrixError extends HTTPError {
+    // The Matrix 'errcode' value, e.g. "M_FORBIDDEN".
     public readonly errcode?: string;
+    // The raw Matrix error JSON used to construct this object.
     public data: IErrorJson;
 
+    /**
+     * Construct a Matrix error. This is a JavaScript Error with additional
+     * information specific to the standard Matrix error response.
+     * @param errorJson - The Matrix error JSON returned from the homeserver.
+     * @param httpStatus - The numeric HTTP status code given
+     */
     public constructor(
         errorJson: IErrorJson = {},
         public readonly httpStatus?: number,
@@ -76,7 +72,6 @@ export class MatrixError extends HTTPError {
  * that a request failed because of some error with the connection, either
  * CORS was not correctly configured on the server, the server didn't response,
  * the request timed out, or the internet connection on the client side went down.
- * @constructor
  */
 export class ConnectionError extends Error {
     public constructor(message: string, cause?: Error) {
