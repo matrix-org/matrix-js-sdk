@@ -24,6 +24,7 @@ import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
+import { UnstableValue } from "../NamespacedValue";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -141,8 +142,8 @@ export interface IGroupCallRoomMemberDevice {
     "session_id": string;
     "expires_ts": number;
     "feeds": IGroupCallRoomMemberFeed[];
-    "m.foci.active"?: IFocusInfo[];
-    "m.foci.preferred"?: IFocusInfo[];
+    "org.matrix.msc3898.foci.active"?: IFocusInfo[];
+    "org.matrix.msc3898.foci.preferred"?: IFocusInfo[];
 }
 
 export interface IGroupCallRoomMemberCallState {
@@ -514,7 +515,7 @@ export class GroupCall extends TypedEventEmitter<
         for (const event of this.getMemberStateEvents()) {
             const focus =
                 event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.[
-                    "m.foci.active"
+                    "org.matrix.msc3898.foci.active"
                 ]?.[0];
             if (focus) {
                 focusOfAnotherMember = focus;
@@ -1373,8 +1374,8 @@ export class GroupCall extends TypedEventEmitter<
                 "session_id": this.client.getSessionId(),
                 "expires_ts": Date.now() + DEVICE_TIMEOUT,
                 "feeds": this.getLocalFeeds().map((feed) => ({ purpose: feed.purpose })),
-                "m.foci.active": this.foci,
-                "m.foci.preferred": this.getPreferredFoci(),
+                "org.matrix.msc3898.foci.active": this.foci,
+                "org.matrix.msc3898.foci.preferred": this.getPreferredFoci(),
                 // TODO: Add data channels
             },
         ]);
