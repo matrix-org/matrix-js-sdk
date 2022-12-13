@@ -2533,11 +2533,7 @@ describe("Room", function () {
             prom = emitPromise(room, ThreadEvent.Update);
             room.addLiveEvents([threadResponseEdit]);
             await prom;
-            /*
             expect(thread.replyToEvent!.getContent().body).toBe(threadResponseEdit.getContent()["m.new_content"].body);
-
-            /*
-             */
         });
 
         it("Redactions to thread responses decrement the length", async () => {
