@@ -60,6 +60,9 @@ module.exports = {
                 ],
             },
         ],
+        // Disabled tests are a reality for now but as soon as all of the xits are
+        // eliminated, we should enforce this.
+        "jest/no-disabled-tests": "off",
     },
     overrides: [
         {
