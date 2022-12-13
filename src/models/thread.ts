@@ -262,7 +262,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.addEventToTimeline(event, toStartOfTimeline);
 
             this.client.decryptEventIfNeeded(event, {});
-        } else if (!toStartOfTimeline && isNewestReply) {
+        } else if (!toStartOfTimeline && this.initialEventsFetched && isNewestReply) {
             this.addEventToTimeline(event, false);
             this.fetchEditsWhereNeeded(event);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
