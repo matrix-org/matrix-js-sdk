@@ -220,20 +220,18 @@ describe("MatrixClient", function () {
             return Promise.resolve(next.data);
         }
 
-        const receivedRequestQueryString = new URLSearchParams(
-            convertQueryDictToStringRecord(queryParams),
-        ).toString();
+        const receivedRequestQueryString = new URLSearchParams(convertQueryDictToStringRecord(queryParams)).toString();
         const receivedRequestDebugString = `${method} ${prefix}${path}${receivedRequestQueryString}`;
         const expectedQueryString = new URLSearchParams(
             convertQueryDictToStringRecord(next.expectQueryParams),
         ).toString();
-        const expectedRequestDebugString = `${next.method} ${next.prefix ?? ''}${next.path}${expectedQueryString}`;
+        const expectedRequestDebugString = `${next.method} ${next.prefix ?? ""}${next.path}${expectedQueryString}`;
         // If you're seeing this then you forgot to handle at least 1 pending request.
         throw new Error(
             `A pending request was not handled: ${receivedRequestDebugString} ` +
-            `(next request expected was ${expectedRequestDebugString})\n` +
-            `Check your tests to ensure your number of expectations lines up with your number of requests ` +
-            `made, and that those requests match your expectations.`,
+                `(next request expected was ${expectedRequestDebugString})\n` +
+                `Check your tests to ensure your number of expectations lines up with your number of requests ` +
+                `made, and that those requests match your expectations.`,
         );
     }
 
@@ -317,126 +315,117 @@ describe("MatrixClient", function () {
         client.stopClient();
     });
 
-    describe('timestampToEvent', () => {
-        const roomId = '!room:server.org';
+    describe("timestampToEvent", () => {
+        const roomId = "!room:server.org";
         const eventId = "$eventId:example.org";
         const unstableMSC3030Prefix = "/_matrix/client/unstable/org.matrix.msc3030";
 
-        it('should call stable endpoint', async () => {
-            httpLookups = [{
-                method: "GET",
-                path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-                data: { event_id: eventId },
-                expectQueryParams: {
-                    ts: '0',
-                    dir: 'f',
+        it("should call stable endpoint", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
+                    data: { event_id: eventId },
+                    expectQueryParams: {
+                        ts: "0",
+                        dir: "f",
+                    },
                 },
-            }];
+            ];
 
             await client.timestampToEvent(roomId, 0, Direction.Forward);
 
             expect(mocked(client.http.authedRequest).mock.calls.length).toStrictEqual(1);
-            const [method, path, queryParams,, { prefix }] = mocked(client.http.authedRequest).mock.calls[0];
-            expect(method).toStrictEqual('GET');
+            const [method, path, queryParams, , { prefix }] = mocked(client.http.authedRequest).mock.calls[0];
+            expect(method).toStrictEqual("GET");
             expect(prefix).toStrictEqual(ClientPrefix.V1);
-            expect(path).toStrictEqual(
-                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-            );
+            expect(path).toStrictEqual(`/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`);
             expect(queryParams).toStrictEqual({
-                ts: '0',
-                dir: 'f',
+                ts: "0",
+                dir: "f",
             });
         });
 
-        it('should fallback to unstable endpoint when no support for stable endpoint', async () => {
-            httpLookups = [{
-                method: "GET",
-                path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-                prefix: ClientPrefix.V1,
-                error: {
-                    httpStatus: 404,
-                    errcode: "M_UNRECOGNIZED",
+        it("should fallback to unstable endpoint when no support for stable endpoint", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
+                    prefix: ClientPrefix.V1,
+                    error: {
+                        httpStatus: 404,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                    expectQueryParams: {
+                        ts: "0",
+                        dir: "f",
+                    },
                 },
-                expectQueryParams: {
-                    ts: '0',
-                    dir: 'f',
+                {
+                    method: "GET",
+                    path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
+                    prefix: unstableMSC3030Prefix,
+                    data: { event_id: eventId },
+                    expectQueryParams: {
+                        ts: "0",
+                        dir: "f",
+                    },
                 },
-            }, {
-                method: "GET",
-                path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-                prefix: unstableMSC3030Prefix,
-                data: { event_id: eventId },
-                expectQueryParams: {
-                    ts: '0',
-                    dir: 'f',
-                },
-            }];
+            ];
 
             await client.timestampToEvent(roomId, 0, Direction.Forward);
 
             expect(mocked(client.http.authedRequest).mock.calls.length).toStrictEqual(2);
-            const [
-                stableMethod,
-                stablePath,
-                stableQueryParams,
-                ,
-                { prefix: stablePrefix },
-            ] = mocked(client.http.authedRequest).mock.calls[0];
-            expect(stableMethod).toStrictEqual('GET');
+            const [stableMethod, stablePath, stableQueryParams, , { prefix: stablePrefix }] = mocked(
+                client.http.authedRequest,
+            ).mock.calls[0];
+            expect(stableMethod).toStrictEqual("GET");
             expect(stablePrefix).toStrictEqual(ClientPrefix.V1);
-            expect(stablePath).toStrictEqual(
-                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-            );
+            expect(stablePath).toStrictEqual(`/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`);
             expect(stableQueryParams).toStrictEqual({
-                ts: '0',
-                dir: 'f',
+                ts: "0",
+                dir: "f",
             });
 
-            const [
-                unstableMethod,
-                unstablePath,
-                unstableQueryParams,
-                ,
-                { prefix: unstablePrefix },
-            ] = mocked(client.http.authedRequest).mock.calls[1];
-            expect(unstableMethod).toStrictEqual('GET');
+            const [unstableMethod, unstablePath, unstableQueryParams, , { prefix: unstablePrefix }] = mocked(
+                client.http.authedRequest,
+            ).mock.calls[1];
+            expect(unstableMethod).toStrictEqual("GET");
             expect(unstablePrefix).toStrictEqual(unstableMSC3030Prefix);
-            expect(unstablePath).toStrictEqual(
-                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-            );
+            expect(unstablePath).toStrictEqual(`/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`);
             expect(unstableQueryParams).toStrictEqual({
-                ts: '0',
-                dir: 'f',
+                ts: "0",
+                dir: "f",
             });
         });
 
-        it('should not fallback to unstable endpoint when stable endpoint returns an error', async () => {
-            httpLookups = [{
-                method: "GET",
-                path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-                prefix: ClientPrefix.V1,
-                error: {
-                    httpStatus: 500,
-                    errcode: "Fake response error",
+        it("should not fallback to unstable endpoint when stable endpoint returns an error", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
+                    prefix: ClientPrefix.V1,
+                    error: {
+                        httpStatus: 500,
+                        errcode: "Fake response error",
+                    },
+                    expectQueryParams: {
+                        ts: "0",
+                        dir: "f",
+                    },
                 },
-                expectQueryParams: {
-                    ts: '0',
-                    dir: 'f',
-                },
-            }];
+            ];
 
             await expect(client.timestampToEvent(roomId, 0, Direction.Forward)).rejects.toBeDefined();
 
             expect(mocked(client.http.authedRequest).mock.calls.length).toStrictEqual(1);
-            const [method, path, queryParams,, { prefix }] = mocked(client.http.authedRequest).mock.calls[0];
-            expect(method).toStrictEqual('GET');
+            const [method, path, queryParams, , { prefix }] = mocked(client.http.authedRequest).mock.calls[0];
+            expect(method).toStrictEqual("GET");
             expect(prefix).toStrictEqual(ClientPrefix.V1);
-            expect(path).toStrictEqual(
-                `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`,
-            );
+            expect(path).toStrictEqual(`/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`);
             expect(queryParams).toStrictEqual({
-                ts: '0',
-                dir: 'f',
+                ts: "0",
+                dir: "f",
             });
         });
     });

@@ -480,9 +480,9 @@ export interface ICapability {
     enabled: boolean;
 }
 
-export interface IChangePasswordCapability extends ICapability { }
+export interface IChangePasswordCapability extends ICapability {}
 
-export interface IThreadsCapability extends ICapability { }
+export interface IThreadsCapability extends ICapability {}
 
 interface ICapabilities {
     [key: string]: any;
@@ -1244,12 +1244,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (this.deviceId) {
                 logger.warn(
                     "not importing device because device ID is provided to " +
-                    "constructor independently of exported data",
+                        "constructor independently of exported data",
                 );
             } else if (this.credentials.userId) {
                 logger.warn(
                     "not importing device because user ID is provided to " +
-                    "constructor independently of exported data",
+                        "constructor independently of exported data",
                 );
             } else if (!opts.deviceToImport.deviceId) {
                 logger.warn("not importing device because no device ID in exported data");
@@ -1973,7 +1973,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!isCryptoAvailable()) {
             throw new Error(
                 `End-to-end encryption not supported in this js-sdk build: did ` +
-                `you remember to load the olm library?`,
+                    `you remember to load the olm library?`,
             );
         }
 
@@ -1998,13 +1998,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (userId === null) {
             throw new Error(
                 `Cannot enable encryption on MatrixClient with unknown userId: ` +
-                `ensure userId is passed in createClient().`,
+                    `ensure userId is passed in createClient().`,
             );
         }
         if (this.deviceId === null) {
             throw new Error(
                 `Cannot enable encryption on MatrixClient with unknown deviceId: ` +
-                `ensure deviceId is passed in createClient().`,
+                    `ensure deviceId is passed in createClient().`,
             );
         }
 
@@ -5350,7 +5350,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.timelineSupport) {
             throw new Error(
                 "timeline support is disabled. Set the 'timelineSupport'" +
-                " parameter to true when creating MatrixClient to enable it.",
+                    " parameter to true when creating MatrixClient to enable it.",
             );
         }
 
@@ -5590,7 +5590,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!this.timelineSupport) {
             throw new Error(
                 "timeline support is disabled. Set the 'timelineSupport'" +
-                " parameter to true when creating MatrixClient to enable it.",
+                    " parameter to true when creating MatrixClient to enable it.",
             );
         }
 
@@ -9269,38 +9269,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         };
 
         try {
-            return await this.http.authedRequest(
-                Method.Get,
-                path,
-                queryParams,
-                undefined,
-                {
-                    prefix: ClientPrefix.V1,
-                },
-            );
+            return await this.http.authedRequest(Method.Get, path, queryParams, undefined, {
+                prefix: ClientPrefix.V1,
+            });
         } catch (err) {
             // Fallback to the prefixed unstable endpoint. Since the stable endpoint is
             // new, we should also try the unstable endpoint before giving up. We can
             // remove this fallback request in a year (remove after 2023-11-28).
             if (
-                (<MatrixError>err).errcode === "M_UNRECOGNIZED" && (
-                    // XXX: The 400 status code check should be removed in the future
-                    // when Synapse is compliant with MSC3743.
-                    (<MatrixError>err).httpStatus === 400 ||
+                (<MatrixError>err).errcode === "M_UNRECOGNIZED" &&
+                // XXX: The 400 status code check should be removed in the future
+                // when Synapse is compliant with MSC3743.
+                ((<MatrixError>err).httpStatus === 400 ||
                     // This the correct standard status code for an unsupported
                     // endpoint according to MSC3743.
-                    (<MatrixError>err).httpStatus === 404
-                )
+                    (<MatrixError>err).httpStatus === 404)
             ) {
-                return await this.http.authedRequest(
-                    Method.Get,
-                    path,
-                    queryParams,
-                    undefined,
-                    {
-                        prefix: "/_matrix/client/unstable/org.matrix.msc3030",
-                    },
-                );
+                return await this.http.authedRequest(Method.Get, path, queryParams, undefined, {
+                    prefix: "/_matrix/client/unstable/org.matrix.msc3030",
+                });
             }
 
             throw err;
@@ -9338,12 +9325,12 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
             hasReadEvent = thread
                 ? thread.hasUserReadEvent(cli.getUserId()!, event.getId()!)
                 : // If the thread object does not exist in the room yet, we don't
-                // want to calculate notification for this event yet. We have not
-                // restored the read receipts yet and can't accurately calculate
-                // highlight notifications at this stage.
-                //
-                // This issue can likely go away when MSC3874 is implemented
-                true;
+                  // want to calculate notification for this event yet. We have not
+                  // restored the read receipts yet and can't accurately calculate
+                  // highlight notifications at this stage.
+                  //
+                  // This issue can likely go away when MSC3874 is implemented
+                  true;
         } else {
             hasReadEvent = room.hasUserReadEvent(cli.getUserId()!, event.getId()!);
         }
