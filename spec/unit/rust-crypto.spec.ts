@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import "fake-indexeddb/auto";
+
 import { RustCrypto } from "../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../src/rust-crypto";
-import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
 afterEach(() => {
