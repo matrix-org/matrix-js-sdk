@@ -163,15 +163,6 @@ describe("SimpleHttpRendezvousTransport", function () {
         );
     });
 
-    it("POST with relative path response including parent", async function () {
-        await postAndCheckLocation(
-            false,
-            "https://fallbackserver/rz/abc",
-            "../xyz/123",
-            "https://fallbackserver/rz/xyz/123",
-        );
-    });
-
     it("POST to follow 307 to other server", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc3886Enabled: false });
         const simpleHttpTransport = new MSC3886SimpleHttpRendezvousTransport({

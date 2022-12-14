@@ -464,35 +464,6 @@ describe("InteractiveAuth", () => {
             expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 5, undefined);
         });
 
-        it("increases auth attempts", async () => {
-            const doRequest = jest.fn();
-            const stateUpdated = jest.fn();
-            const requestEmailToken = jest.fn();
-            requestEmailToken.mockImplementation(async () => ({ sid: "" }));
-
-            const ia = new InteractiveAuth({
-                matrixClient: getFakeClient(),
-                doRequest,
-                stateUpdated,
-                requestEmailToken,
-            });
-
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 1, undefined);
-            requestEmailToken.mockClear();
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 2, undefined);
-            requestEmailToken.mockClear();
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 3, undefined);
-            requestEmailToken.mockClear();
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 4, undefined);
-            requestEmailToken.mockClear();
-            await ia.requestEmailToken();
-            expect(requestEmailToken).toHaveBeenLastCalledWith(undefined, ia.getClientSecret(), 5, undefined);
-        });
-
         it("passes errors through", async () => {
             const doRequest = jest.fn();
             const stateUpdated = jest.fn();

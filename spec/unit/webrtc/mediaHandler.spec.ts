@@ -403,7 +403,7 @@ describe("Media Handler", function () {
         });
     });
 
-    describe("stopUserMediaStream", () => {
+    describe("stopScreensharingStream", () => {
         let stream: MediaStream;
 
         beforeEach(async () => {

@@ -278,7 +278,7 @@ describe("Rendezvous", function () {
         expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UnsupportedAlgorithm);
     });
 
-    it("new device declines protocol", async function () {
+    it("new device declines protocol (TODO: how is this different from the other test with the same name?)", async function () {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
