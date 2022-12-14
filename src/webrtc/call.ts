@@ -614,7 +614,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
 
             // We use transceivers here because we need to send the actual
-            // trackIds which the SFU will see which will probably differ from
+            // trackIds which the focus will see which will probably differ from
             // the local trackIds on MediaStreams
             const tracks = Array.from(this.transceivers.values()).reduce((tracks, transceiver) => {
                 // XXX: We only use double equals because MediaDescription::mid is in fact a number
@@ -627,7 +627,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             if (!Object.keys(tracks).length) continue;
 
             metadata[localFeed.sdpMetadataStreamId] = {
-                // FIXME: This allows for impersonation - the SFU should be
+                // FIXME: This allows for impersonation - the focus should be
                 // handling these
                 user_id: this.client.getUserId()!,
                 device_id: this.client.getDeviceId()!,
@@ -2018,10 +2018,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return;
     }
 
-    public async subscribeToSFU(): Promise<void> {
-        await this.waitForDatachannelToBeOpen();
+    public subscribeToFocus(): void {
         if (!this.remoteSDPStreamMetadata) return;
-        if (this.dataChannel?.readyState !== "open") return;
 
         const tracks: FocusTrackDescription[] = Object.entries(this.remoteSDPStreamMetadata)
             .filter(([, info]) => Boolean(info.tracks)) // Skip trackless feeds
@@ -2059,7 +2057,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             feed.userId = this.remoteSDPStreamMetadata![streamId]?.user_id;
         }
         if (this.isFocus) {
-            this.subscribeToSFU();
+            this.subscribeToFocus();
         }
     }
 
@@ -2145,7 +2143,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.callHasEnded()) return;
 
         // TODO: Handle this better
-        // Other than the initial offer, we handle negotiation manually when calling with an SFU
+        // Other than the initial offer, we handle negotiation manually when
+        // calling with a focus
         if (this.isFocus && ![CallState.Fledgling, CallState.CreateOffer].includes(this.state)) {
             this.sendFocusEvent(EventType.CallNegotiate, {
                 description: this.peerConn!.localDescription?.toJSON(),
@@ -2342,8 +2341,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private setupDataChannel(dataChannel: RTCDataChannel): void {
         this.dataChannel = dataChannel;
-        this.emit(CallEvent.DataChannel, dataChannel);
         this.dataChannel.addEventListener("message", this.onDataChannelMessage);
+        this.emit(CallEvent.DataChannel, dataChannel);
     }
 
     /**
@@ -2498,7 +2497,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
-    private sendFocusEvent(type: EventType, content: FocusEventBaseContent = {}): void {
+    private async sendFocusEvent(type: EventType, content: FocusEventBaseContent = {}): Promise<void> {
+        await this.waitForDatachannelToBeOpen();
+        if (this.dataChannel?.readyState !== "open") {
+            logger.error("Failed to send focus event because data-channel is not open");
+            return;
+        }
+
         const event: FocusEvent = {
             type: type,
             content: content,

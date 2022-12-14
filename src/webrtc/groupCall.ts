@@ -462,7 +462,7 @@ export class GroupCall extends TypedEventEmitter<
         if (this.foci[0]) {
             const opponentDevice = {
                 device_id: this.foci[0].device_id,
-                // XXX: What if an SFU gets restarted?
+                // XXX: What if a focus gets restarted?
                 session_id: "sfu",
                 feeds: [],
             };
@@ -478,29 +478,29 @@ export class GroupCall extends TypedEventEmitter<
                 );
             };
 
-            const sfuCall = createNewMatrixCall(this.client, this.room.roomId, {
+            const focusCall = createNewMatrixCall(this.client, this.room.roomId, {
                 invitee: this.foci[0].user_id,
                 opponentDeviceId: opponentDevice.device_id,
                 opponentSessionId: opponentDevice.session_id,
                 groupCallId: this.groupCallId,
                 isFocus: true,
             });
-            if (!sfuCall) {
+            if (!focusCall) {
                 onError();
                 return;
             }
 
             try {
-                sfuCall.isPtt = this.isPtt;
-                await sfuCall.placeCallWithCallFeeds(this.getLocalFeeds());
-                sfuCall.createDataChannel("datachannel", this.dataChannelOptions);
+                focusCall.isPtt = this.isPtt;
+                await focusCall.placeCallWithCallFeeds(this.getLocalFeeds());
+                focusCall.createDataChannel("datachannel", this.dataChannelOptions);
             } catch (e) {
                 onError(e);
                 return;
             }
 
-            this.calls.set(this.foci[0], new Map([[opponentDevice.device_id, sfuCall]]));
-            this.initCall(sfuCall);
+            this.calls.set(this.foci[0], new Map([[opponentDevice.device_id, focusCall]]));
+            this.initCall(focusCall);
         }
     }
 
@@ -1097,9 +1097,9 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         if (state === CallState.Connected) {
-            // if we're calling an SFU, subscribe to its feeds
+            // If we're calling a focus, subscribe to its feeds
             if (call.isFocus) {
-                call.subscribeToSFU();
+                call.subscribeToFocus();
             }
 
             const opponent = call.getOpponentMember()!;
