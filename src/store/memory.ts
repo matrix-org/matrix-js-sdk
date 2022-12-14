@@ -286,7 +286,13 @@ export class MemoryStore implements IStore {
      */
     public storeAccountDataEvents(events: MatrixEvent[]): void {
         events.forEach((event) => {
-            this.accountData[event.getType()] = event;
+            // MSC3391: an event with content of {} should be interpreted as deleted
+            const isDeleted = !Object.keys(event.getContent()).length;
+            if (isDeleted) {
+                delete this.accountData[event.getType()];
+            } else {
+                this.accountData[event.getType()] = event;
+            }
         });
     }
 
