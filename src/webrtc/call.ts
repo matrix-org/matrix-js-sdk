@@ -1877,7 +1877,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     public async onNegotiateReceived(event: MatrixEvent): Promise<void> {
         const content = event.getContent<MCallInviteNegotiate>();
-        const description = content.description;
+        return this.onNegotiateContentReceived(content.description, content[SDPStreamMetadataKey]);
+    }
+
+    private async onNegotiateContentReceived(
+        description: RTCSessionDescription,
+        sdpStreamMetadata: SDPStreamMetadata,
+    ): Promise<void> {
         if (!description || !description.sdp || !description.type) {
             logger.info(`Call ${this.callId} Ignoring invalid m.call.negotiate event`);
             return;
@@ -1900,7 +1906,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const prevLocalOnHold = this.isLocalOnHold();
 
-        const sdpStreamMetadata = content[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
             this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
         } else {
@@ -1923,10 +1928,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                 await this.peerConn!.setLocalDescription(answer);
 
-                this.sendVoipEvent(EventType.CallNegotiate, {
-                    description: this.peerConn!.localDescription?.toJSON(),
-                    [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
-                });
+                if (this.isFocus) {
+                    this.sendFocusEvent(EventType.CallNegotiate, {
+                        description: answer,
+                    } as FocusNegotiateEvent);
+                } else {
+                    this.sendVoipEvent(EventType.CallNegotiate, {
+                        description: this.peerConn!.localDescription?.toJSON(),
+                        [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(true),
+                    });
+                }
             }
         } catch (err) {
             logger.warn(`Call ${this.callId} Failed to complete negotiation`, err);
@@ -1956,37 +1967,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         switch (json.type) {
             case EventType.CallNegotiate:
                 {
-                    // TODO: Use MatrixCall::onNegotiateReceived()
-
                     const negotiate = json.content as FocusNegotiateEvent;
-                    this.updateRemoteSDPStreamMetadata(negotiate[SDPStreamMetadataKeyStable]!);
-
-                    if (!["offer", "answer"].includes(negotiate.description.type)) {
-                        throw new Error("Unknown description type - ignoring");
-                    }
-
-                    try {
-                        await this.peerConn!.setRemoteDescription(negotiate.description);
-                    } catch (error) {
-                        logger.debug(`Call ${this.callId} Failed to set remote description`, error);
-                        this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
-                        return;
-                    }
-
-                    if (negotiate.description.type === "offer") {
-                        try {
-                            const answer = await this.peerConn!.createAnswer();
-                            await this.peerConn!.setLocalDescription(answer);
-
-                            this.sendFocusEvent(EventType.CallNegotiate, {
-                                description: answer,
-                            } as FocusNegotiateEvent);
-                        } catch (error) {
-                            logger.debug(`Call ${this.callId} Failed to set local description`, error);
-                            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, false);
-                            return;
-                        }
-                    }
+                    this.onNegotiateContentReceived(negotiate.description, negotiate[SDPStreamMetadataKeyStable]);
                 }
                 break;
             case EventType.CallSDPStreamMetadataChanged:
