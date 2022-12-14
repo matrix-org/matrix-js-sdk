@@ -63,6 +63,9 @@ module.exports = {
         // Disabled tests are a reality for now but as soon as all of the xits are
         // eliminated, we should enforce this.
         "jest/no-disabled-tests": "off",
+        // TODO: There are many tests with invalid expects that should be fixed,
+        // https://github.com/matrix-org/matrix-js-sdk/issues/2976
+        "jest/valid-expect": "off",
     },
     overrides: [
         {
