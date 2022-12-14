@@ -66,6 +66,9 @@ module.exports = {
         // TODO: There are many tests with invalid expects that should be fixed,
         // https://github.com/matrix-org/matrix-js-sdk/issues/2976
         "jest/valid-expect": "off",
+        // TODO: There are many cases to refactor away,
+        // https://github.com/matrix-org/matrix-js-sdk/issues/2978
+        "jest/no-conditional-expect": "off",
     },
     overrides: [
         {
