@@ -194,12 +194,12 @@ export class GroupCall extends TypedEventEmitter<
     public localCallFeed?: CallFeed;
     public localScreenshareFeed?: CallFeed;
     public localDesktopCapturerSourceId?: string;
-    public readonly calls = new Map<RoomMember | IFocusInfo, Map<string, MatrixCall>>();
     public readonly userMediaFeeds: CallFeed[] = [];
     public readonly screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
     public foci: IFocusInfo[] = [];
 
+    private readonly calls = new Map<RoomMember | IFocusInfo, Map<string, MatrixCall>>(); // RoomMember | IFocusInfo -> device ID -> MatrixCall
     private callHandlers = new Map<string, Map<string, ICallHandlers>>(); // User ID -> device ID -> handlers
     private activeSpeakerLoopInterval?: ReturnType<typeof setTimeout>;
     private retryCallLoopInterval?: ReturnType<typeof setTimeout>;
@@ -218,7 +218,7 @@ export class GroupCall extends TypedEventEmitter<
         public isPtt: boolean,
         public intent: GroupCallIntent,
         groupCallId?: string,
-        private dataChannelsEnabled = false,
+        private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
     ) {
         super();
@@ -443,8 +443,6 @@ export class GroupCall extends TypedEventEmitter<
         this.chooseFocus();
 
         await this.updateMemberState();
-
-        this.activeSpeaker = undefined;
 
         logger.log(`Entered group call ${this.groupCallId}`);
         this.state = GroupCallState.Entered;

@@ -336,7 +336,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // whether this call should have push-to-talk semantics
     // This should be set by the consumer on incoming & outgoing calls.
     public isPtt = false;
-    public isFocus = false;
+    public readonly isFocus: boolean = false;
 
     private _state = CallState.Fledgling;
     private readonly client: MatrixClient;
@@ -388,10 +388,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private remoteCandidateBuffer = new Map<string, RTCIceCandidate[]>();
 
     private remoteAssertedIdentity?: AssertedIdentity;
-
     private remoteSDPStreamMetadata?: SDPStreamMetadata;
 
-    private sfuKeepAliveInterval?: ReturnType<typeof setInterval>;
     private callLengthInterval?: ReturnType<typeof setInterval>;
     private callStartTime?: number;
 
@@ -659,8 +657,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        const userId = metadata.user_id;
-        const deviceId = metadata.device_id;
+        // If we're calling with a focus we trust its metadata, otherwise we
+        // only trust ourselves to avoid impersonation
+        const userId = this.isFocus ? metadata.user_id : this.getOpponentMember()!.userId;
+        const deviceId = this.isFocus ? metadata.device_id : this.getOpponentDeviceId()!;
         const purpose = metadata.purpose;
         const audioMuted = metadata.audio_muted;
         const videoMuted = metadata.video_muted;
@@ -699,6 +699,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 `active="${stream.active}" ` +
                 `purpose=${purpose} ` +
                 `userId=${userId}` +
+                `deviceId=${deviceId}` +
                 `)`,
         );
     }
@@ -718,8 +719,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // If we already have a stream, check this stream has the same id
         if (oldRemoteStream && stream.id !== oldRemoteStream.id) {
             logger.warn(
-                `Call ${this.callId} Ignoring new stream ID ${stream.id}: ` +
-                    `we already have stream ID ${oldRemoteStream.id}`,
+                `Call ${this.callId} Ignoring new stream ID ${stream.id}: we already have stream ID ${oldRemoteStream.id}`,
             );
             return;
         }
@@ -858,7 +858,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const audioTransceiverKey = getTransceiverKey(callFeed.purpose, "audio");
         const videoTransceiverKey = getTransceiverKey(callFeed.purpose, "video");
 
-        const tracksToUnpublish: FocusTrackDescription[] = [];
         for (const transceiverKey of [audioTransceiverKey, videoTransceiverKey]) {
             // this is slightly mixing the track and transceiver API but is basically just shorthand.
             // There is no way to actually remove a transceiver, so this just sets it to inactive
@@ -867,12 +866,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 const transceiver = this.transceivers.get(transceiverKey)!;
                 if (transceiver.sender) {
                     this.peerConn!.removeTrack(transceiver.sender);
-                }
-                if (transceiver?.sender?.track) {
-                    tracksToUnpublish.push({
-                        stream_id: callFeed.stream.id,
-                        track_id: transceiver.sender.track.id,
-                    });
                 }
             }
         }
@@ -1957,11 +1950,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        if (!json.type) {
-            logger.warn("Ignoring unrecognized DC event:", json);
-            return;
-        }
-
         logger.info(`Received DC ${json.type} event`, json);
 
         switch (json.type) {
@@ -2521,7 +2509,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         // FIXME: RPC reliability over DC
         this.dataChannel!.send(JSON.stringify(event));
-        logger.warn(`Sent ${event.type} over DC:`, event);
+        logger.info(`Sent ${event.type} over DC:`, event);
     }
 
     /**
@@ -2666,10 +2654,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
             this.callLengthInterval = undefined;
-        }
-        if (this.sfuKeepAliveInterval) {
-            clearInterval(this.sfuKeepAliveInterval);
-            this.sfuKeepAliveInterval = undefined;
         }
 
         for (const [stream, listener] of this.removeTrackListeners) {
