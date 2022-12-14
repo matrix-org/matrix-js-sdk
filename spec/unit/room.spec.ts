@@ -29,6 +29,8 @@ import {
     EventTimelineSet,
     EventType,
     IContent,
+    IEvent,
+    IRelationsRequestOpts,
     IStateEventWithRoomId,
     JoinRule,
     MatrixEvent,
@@ -46,6 +48,7 @@ import { TestClient } from "../TestClient";
 import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { Crypto } from "../../src/crypto";
+import { mkThread } from "../test-utils/thread";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -2438,6 +2441,21 @@ describe("Room", function () {
             expect(() => room.createThread(rootEvent.getId()!, rootEvent, [], false)).not.toThrow();
         });
 
+        it("returns the same model when creating a thread twice", () => {
+            const { thread, rootEvent } = mkThread({
+                room,
+                client: new TestClient().client,
+                authorId: "@bob:example.org",
+                participantUserIds: ["@bob:example.org"],
+            });
+
+            expect(thread).toBeInstanceOf(Thread);
+
+            const duplicateThread = room.createThread(rootEvent.getId()!, rootEvent, [], false);
+
+            expect(duplicateThread).toBe(thread);
+        });
+
         it("creating thread from edited event should not conflate old versions of the event", () => {
             const message = mkMessage();
             const edit = mkEdit(message);
@@ -2473,11 +2491,24 @@ describe("Room", function () {
                     },
                 });
 
+            room.client.fetchRelations = (
+                roomId: string,
+                eventId: string,
+                relationType?: RelationType | string | null,
+                eventType?: EventType | string | null,
+                opts: IRelationsRequestOpts = { dir: Direction.Backward },
+            ) =>
+                Promise.resolve({
+                    chunk: [threadResponse.event] as IEvent[],
+                    next_batch: "start_token",
+                });
+
             let prom = emitPromise(room, ThreadEvent.New);
             room.addLiveEvents([randomMessage, threadRoot, threadResponse]);
             const thread: Thread = await prom;
             await emitPromise(room, ThreadEvent.Update);
 
+            expect(thread.initialEventsFetched).toBeTruthy();
             expect(thread.replyToEvent!.event).toEqual(threadResponse.event);
             expect(thread.replyToEvent!.getContent().body).toBe(threadResponse.getContent().body);
 
@@ -2688,13 +2719,27 @@ describe("Room", function () {
                     },
                 });
 
+            room.client.fetchRelations = (
+                roomId: string,
+                eventId: string,
+                relationType?: RelationType | string | null,
+                eventType?: EventType | string | null,
+                opts: IRelationsRequestOpts = { dir: Direction.Backward },
+            ) =>
+                Promise.resolve({
+                    chunk: [threadResponse1.event] as IEvent[],
+                    next_batch: "start_token",
+                });
+
             let prom = emitPromise(room, ThreadEvent.New);
-            room.addLiveEvents([threadRoot, threadResponse1, threadResponse2]);
-            const thread = await prom;
+            room.addLiveEvents([threadRoot, threadResponse1]);
+            const thread: Thread = await prom;
             await emitPromise(room, ThreadEvent.Update);
 
+            expect(thread.initialEventsFetched).toBeTruthy();
+            room.addLiveEvents([threadResponse2]);
             expect(thread).toHaveLength(2);
-            expect(thread.replyToEvent.getId()).toBe(threadResponse2.getId());
+            expect(thread.replyToEvent!.getId()).toBe(threadResponse2.getId());
 
             room.client.fetchRoomEvent = (eventId: string) =>
                 Promise.resolve({
@@ -2717,7 +2762,7 @@ describe("Room", function () {
             await prom;
             await emitPromise(room, ThreadEvent.Update);
             expect(thread).toHaveLength(1);
-            expect(thread.replyToEvent.getId()).toBe(threadResponse1.getId());
+            expect(thread.replyToEvent!.getId()).toBe(threadResponse1.getId());
 
             room.client.fetchRoomEvent = (eventId: string) =>
                 Promise.resolve({
@@ -2741,7 +2786,7 @@ describe("Room", function () {
             await prom;
             await prom2;
             expect(thread).toHaveLength(0);
-            expect(thread.replyToEvent.getId()).toBe(threadRoot.getId());
+            expect(thread.replyToEvent!.getId()).toBe(threadRoot.getId());
         });
     });
 
