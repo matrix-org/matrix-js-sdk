@@ -1465,7 +1465,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
      *
      */
     private forwardedRoomKeyFromEvent(event: MatrixEvent): RoomKey | undefined {
-        let roomKey = this.roomKeyFromEvent(event);
+        const roomKey = this.roomKeyFromEvent(event);
 
         if (!roomKey) {
             return;
@@ -1479,8 +1479,8 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         // We received this room key from event.getSenderKey(), but the original
         // creator of the room key is claimed in the content. Let's try to fetch
         // those keys now.
-        const claimed_curve25519Key = content.sender_key;
-        const claimed_ed25519Key = content.sender_claimed_ed25519_key;
+        const claimedCurve25519Key = content.sender_key;
+        const claimedEd25519Key = content.sender_claimed_ed25519_key;
 
         let forwardingKeyChain = Array.isArray(content.forwarding_curve25519_key_chain)
             ? content.forwarding_curve25519_key_chain
@@ -1496,18 +1496,18 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             return;
         }
 
-        if (!claimed_curve25519Key) {
+        if (!claimedCurve25519Key) {
             logger.error("forwarded_room_key event is missing sender_key field");
             return;
         }
 
-        if (!claimed_ed25519Key) {
+        if (!claimedEd25519Key) {
             logger.error(`forwarded_room_key_event is missing sender_claimed_ed25519_key field`);
             return;
         }
 
         const keysClaimed = {
-            ed25519: claimed_ed25519Key,
+            ed25519: claimedEd25519Key,
         };
 
         // FIXME: We're reusing the same field to track both:
@@ -1517,7 +1517,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         // untrusted case) to be the original creator of this room key.
         //
         // We now overwrite the value tracking usage 1 with the value tracking usage 2.
-        roomKey.senderKey = claimed_curve25519Key;
+        roomKey.senderKey = claimedCurve25519Key;
         // Replace our keysClaimed as well.
         roomKey.keysClaimed = keysClaimed;
         roomKey.exportFormat = true;
@@ -1723,7 +1723,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
      *
      */
     private async onForwardedRoomKey(event: MatrixEvent): Promise<void> {
-        let roomKey = this.forwardedRoomKeyFromEvent(event);
+        const roomKey = this.forwardedRoomKeyFromEvent(event);
 
         if (!roomKey) {
             return;
