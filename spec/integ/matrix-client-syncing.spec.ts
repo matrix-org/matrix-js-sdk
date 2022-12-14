@@ -81,17 +81,15 @@ describe("MatrixClient syncing", () => {
             presence: {},
         };
 
-        it("should /sync after /pushrules and /filter.", (done) => {
+        it("should /sync after /pushrules and /filter.", async () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
             client!.startClient();
 
-            httpBackend!.flushAllExpected().then(() => {
-                done();
-            });
+            await httpBackend!.flushAllExpected();
         });
 
-        it("should pass the 'next_batch' token from /sync to the since= param  of the next /sync", (done) => {
+        it("should pass the 'next_batch' token from /sync to the since= param  of the next /sync", async () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!
                 .when("GET", "/sync")
@@ -102,9 +100,7 @@ describe("MatrixClient syncing", () => {
 
             client!.startClient();
 
-            httpBackend!.flushAllExpected().then(() => {
-                done();
-            });
+            await httpBackend!.flushAllExpected();
         });
 
         it("should emit RoomEvent.MyMembership for invite->leave->invite cycles", async () => {
@@ -1556,17 +1552,14 @@ describe("MatrixClient syncing", () => {
     });
 
     describe("syncLeftRooms", () => {
-        beforeEach((done) => {
+        beforeEach(async () => {
             client!.startClient();
 
-            httpBackend!.flushAllExpected().then(() => {
-                // the /sync call from syncLeftRooms ends up in the request
-                // queue behind the call from the running client; add a response
-                // to flush the client's one out.
-                httpBackend!.when("GET", "/sync").respond(200, {});
-
-                done();
-            });
+            await httpBackend!.flushAllExpected();
+            // the /sync call from syncLeftRooms ends up in the request
+            // queue behind the call from the running client; add a response
+            // to flush the client's one out.
+            await httpBackend!.when("GET", "/sync").respond(200, {});
         });
 
         it("should create and use an appropriate filter", () => {

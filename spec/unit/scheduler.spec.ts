@@ -154,7 +154,7 @@ describe("MatrixScheduler", function () {
         }
     });
 
-    it("should treat each queue separately", function (done) {
+    it("should treat each queue separately", async () => {
         // Queue messages A B C D.
         // Bucket A&D into queue_A
         // Bucket B&C into queue_B
@@ -179,13 +179,15 @@ describe("MatrixScheduler", function () {
 
         const expectOrder = [eventA.getId(), eventB.getId(), eventD.getId()];
         const deferA = defer<Record<string, boolean>>();
-        scheduler.setProcessFunction(function (event) {
-            const id = expectOrder.shift();
-            expect(id).toEqual(event.getId());
-            if (expectOrder.length === 0) {
-                done();
-            }
-            return id === eventA.getId() ? deferA.promise : deferred.promise;
+        const allExpectedEventsSeenInOrderPromise = new Promise((resolve) => {
+            scheduler.setProcessFunction(function (event) {
+                const id = expectOrder.shift();
+                expect(id).toEqual(event.getId());
+                if (expectOrder.length === 0) {
+                    resolve(null);
+                }
+                return id === eventA.getId() ? deferA.promise : deferred.promise;
+            });
         });
         scheduler.queueEvent(eventA);
         scheduler.queueEvent(eventB);
@@ -197,6 +199,7 @@ describe("MatrixScheduler", function () {
             deferA.resolve({});
         }, 1000);
         jest.advanceTimersByTime(1000);
+        await allExpectedEventsSeenInOrderPromise;
     });
 
     describe("queueEvent", function () {
