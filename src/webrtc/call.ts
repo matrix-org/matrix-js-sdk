@@ -393,11 +393,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private callLengthInterval?: ReturnType<typeof setInterval>;
     private callStartTime?: number;
 
+    private dataChannel?: RTCDataChannel;
+
     private opponentDeviceId?: string;
     private opponentDeviceInfo?: DeviceInfo;
     private opponentSessionId?: string;
     public groupCallId?: string;
-    public dataChannel?: RTCDataChannel;
 
     /**
      * Construct a new Matrix Call.
