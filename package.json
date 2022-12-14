@@ -65,7 +65,7 @@
         "qs": "^6.9.6",
         "sdp-transform": "^2.14.1",
         "unhomoglyph": "^1.0.6",
-        "uuid": "7"
+        "uuid": "9"
     },
     "devDependencies": {
         "@babel/cli": "^7.12.10",
