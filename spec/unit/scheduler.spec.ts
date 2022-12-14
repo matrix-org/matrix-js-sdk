@@ -297,7 +297,7 @@ describe("MatrixScheduler", function () {
     });
 
     describe("setProcessFunction", function () {
-        it("should call the processFn if there are queued events", function () {
+        it("should call the processFn if there are queued events", async () => {
             queueFn = function () {
                 return "yep";
             };
@@ -310,9 +310,8 @@ describe("MatrixScheduler", function () {
             });
             // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
             // wait just long enough before it does
-            Promise.resolve().then(() => {
-                expect(procCount).toEqual(1);
-            });
+            await Promise.resolve();
+            expect(procCount).toEqual(1);
         });
 
         it("should not call the processFn if there are no queued events", function () {
