@@ -220,7 +220,7 @@ describe("Rendezvous", function () {
         await bobStartPromise;
     });
 
-    it("new device declines protocol (unsupported outcome)", async function () {
+    it("new device declines protocol with outcome unsupported", async function () {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
@@ -278,7 +278,7 @@ describe("Rendezvous", function () {
         expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UnsupportedAlgorithm);
     });
 
-    it("new device declines protocol (bad protocol)", async function () {
+    it("new device requests an invalid protocol", async function () {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
