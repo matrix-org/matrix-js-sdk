@@ -24,7 +24,6 @@ import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
-import { UnstableValue } from "../NamespacedValue";
 
 export enum GroupCallIntent {
     Ring = "m.ring",

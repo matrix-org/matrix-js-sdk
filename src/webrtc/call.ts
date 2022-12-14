@@ -1965,48 +1965,51 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         logger.info(`Received DC ${json.type} event`, json);
 
         switch (json.type) {
-            case EventType.CallNegotiate: {
-                // TODO: Use MatrixCall::onNegotiateReceived()
+            case EventType.CallNegotiate:
+                {
+                    // TODO: Use MatrixCall::onNegotiateReceived()
 
-                const negotiate = json.content as FocusNegotiateEvent;
-                this.updateRemoteSDPStreamMetadata(negotiate[SDPStreamMetadataKeyStable]!);
-                
-                if (!["offer", "answer"].includes(negotiate.description.type)) {
-                    throw new Error("Unknown description type - ignoring");
-                }
+                    const negotiate = json.content as FocusNegotiateEvent;
+                    this.updateRemoteSDPStreamMetadata(negotiate[SDPStreamMetadataKeyStable]!);
 
-                try {
-                    await this.peerConn!.setRemoteDescription(negotiate.description);
-                } catch (error) {
-                    logger.debug(`Call ${this.callId} Failed to set remote description`, error);
-                    this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
-                    return;
-                }
+                    if (!["offer", "answer"].includes(negotiate.description.type)) {
+                        throw new Error("Unknown description type - ignoring");
+                    }
 
-                if (negotiate.description.type === "offer") {
                     try {
-                        const answer = await this.peerConn!.createAnswer();
-                        await this.peerConn!.setLocalDescription(answer);
-
-                        this.sendFocusEvent(EventType.CallNegotiate, {
-                            description: answer,
-                        } as FocusNegotiateEvent);
+                        await this.peerConn!.setRemoteDescription(negotiate.description);
                     } catch (error) {
-                        logger.debug(`Call ${this.callId} Failed to set local description`, error);
-                        this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, false);
+                        logger.debug(`Call ${this.callId} Failed to set remote description`, error);
+                        this.terminate(CallParty.Local, CallErrorCode.SetRemoteDescription, false);
                         return;
                     }
+
+                    if (negotiate.description.type === "offer") {
+                        try {
+                            const answer = await this.peerConn!.createAnswer();
+                            await this.peerConn!.setLocalDescription(answer);
+
+                            this.sendFocusEvent(EventType.CallNegotiate, {
+                                description: answer,
+                            } as FocusNegotiateEvent);
+                        } catch (error) {
+                            logger.debug(`Call ${this.callId} Failed to set local description`, error);
+                            this.terminate(CallParty.Local, CallErrorCode.SetLocalDescription, false);
+                            return;
+                        }
+                    }
                 }
-            }
                 break;
-            case EventType.CallSDPStreamMetadataChanged: {
-                const metadata = json.content as FocusSDPStreamMetadataChangedEvent;
-                this.updateRemoteSDPStreamMetadata(metadata[SDPStreamMetadataKeyStable]!);
-            }
+            case EventType.CallSDPStreamMetadataChanged:
+                {
+                    const metadata = json.content as FocusSDPStreamMetadataChangedEvent;
+                    this.updateRemoteSDPStreamMetadata(metadata[SDPStreamMetadataKeyStable]!);
+                }
                 break;
-            case EventType.CallPing: {
-                this.sendFocusEvent(EventType.CallPong);
-            }
+            case EventType.CallPing:
+                {
+                    this.sendFocusEvent(EventType.CallPong);
+                }
                 break;
             default:
                 logger.warn("Ignoring unrecognized DC event op ", json.type);
@@ -2016,7 +2019,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     };
 
     private async waitForDatachannelToBeOpen(): Promise<void> {
-        if (this.dataChannel?.readyState === 'connecting') {
+        if (this.dataChannel?.readyState === "connecting") {
             const p = new Promise<void>((resolve) => {
                 this.dataChannel!.onopen = (): void => resolve();
                 this.dataChannel!.onclose = (): void => resolve();
@@ -2033,9 +2036,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const tracks: FocusTrackDescription[] = Object.entries(this.remoteSDPStreamMetadata)
             .filter(([, info]) => Boolean(info.tracks)) // Skip trackless feeds
-            .reduce((a: FocusTrackDescription[], [s, i]) => (
-                [...a, ...Object.keys(i.tracks).map((t) => ({ stream_id: s, track_id: t }))]
-            ), []) // Get array of tracks from feeds
+            .reduce(
+                (a: FocusTrackDescription[], [s, i]) => [
+                    ...a,
+                    ...Object.keys(i.tracks).map((t) => ({ stream_id: s, track_id: t })),
+                ],
+                [],
+            ) // Get array of tracks from feeds
             .filter((track) => !this.subscribedTracks.find((subscribed) => utils.deepCompare(track, subscribed))); // Filter out already subscribed tracks
 
         if (tracks.length === 0) {
