@@ -653,9 +653,7 @@ describe("megolm", () => {
     describe("get|setGlobalErrorOnUnknownDevices", () => {
         it("should raise an error if crypto is disabled", () => {
             aliceTestClient.client["cryptoBackend"] = undefined;
-            expect(() => aliceTestClient.client.setGlobalErrorOnUnknownDevices(true)).toThrow(
-                "encryption disabled",
-            );
+            expect(() => aliceTestClient.client.setGlobalErrorOnUnknownDevices(true)).toThrow("encryption disabled");
             expect(() => aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toThrow("encryption disabled");
         });
 
@@ -712,9 +710,7 @@ describe("megolm", () => {
             expect(() => aliceTestClient.client.setGlobalBlacklistUnverifiedDevices(true)).toThrow(
                 "encryption disabled",
             );
-            expect(() => aliceTestClient.client.getGlobalBlacklistUnverifiedDevices()).toThrow(
-                "encryption disabled",
-            );
+            expect(() => aliceTestClient.client.getGlobalBlacklistUnverifiedDevices()).toThrow("encryption disabled");
         });
 
         it("should disable sending to unverified devices", async () => {
