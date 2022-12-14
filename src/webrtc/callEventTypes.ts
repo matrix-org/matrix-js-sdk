@@ -13,7 +13,11 @@ export enum SDPStreamMetadataPurpose {
     Screenshare = "m.screenshare",
 }
 
-export interface SDPStreamMetadataTrack {}
+export interface SDPStreamMetadataTrack {
+    kind: string;
+    width?: number;
+    height?: number;
+}
 
 export interface SDPStreamMetadataTracks {
     [key: string]: SDPStreamMetadataTrack;
@@ -103,6 +107,8 @@ export interface MCallHangupReject extends MCallBase {
 export interface FocusTrackDescription {
     stream_id: string;
     track_id: string;
+    width?: number;
+    height?: number;
 }
 
 export interface FocusEvent {

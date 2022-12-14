@@ -53,7 +53,7 @@ import {
     SDPStreamMetadataKeyStable,
     FocusEventBaseContent,
 } from "./callEventTypes";
-import { CallFeed } from "./callFeed";
+import { CallFeed, CallFeedEvent } from "./callFeed";
 import { MatrixClient } from "../client";
 import { EventEmitterEvents, TypedEventEmitter } from "../models/typed-event-emitter";
 import { DeviceInfo } from "../crypto/deviceinfo";
@@ -91,6 +91,12 @@ interface TurnServer {
 interface AssertedIdentity {
     id: string;
     displayName: string;
+}
+
+export enum SimulcastResolution {
+    Full = "f",
+    Half = "h",
+    Quarter = "q",
 }
 
 enum MediaType {
@@ -294,6 +300,10 @@ function getCodecParamMods(isPtt: boolean): CodecParamsMod[] {
     ] as CodecParamsMod[];
 
     return mods;
+}
+
+function isFirefox(): boolean {
+    return navigator.userAgent.indexOf("Firefox") !== -1;
 }
 
 export type CallEventHandlerMap = {
@@ -617,10 +627,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             // trackIds which the focus will see which will probably differ from
             // the local trackIds on MediaStreams
             const tracks = Array.from(this.transceivers.values()).reduce((tracks, transceiver) => {
+                if (!transceiver.sender.track) return tracks;
+
                 // XXX: We only use double equals because MediaDescription::mid is in fact a number
                 const trackId = sdp?.media?.find((m) => m.mid == transceiver.mid)?.msid?.split(" ")?.[1];
                 if (trackId) {
-                    tracks[trackId] = {};
+                    tracks[trackId] = {
+                        kind: transceiver.sender.track?.kind,
+                        width: transceiver.sender.track.getSettings().width,
+                        height: transceiver.sender.track.getSettings().height,
+                    };
                 }
                 return tracks;
             }, {} as SDPStreamMetadataTracks);
@@ -678,19 +694,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        this.feeds.push(
-            new CallFeed({
-                client: this.client,
-                call: this,
-                roomId: this.roomId,
-                userId,
-                deviceId,
-                stream,
-                purpose,
-                audioMuted,
-                videoMuted,
-            }),
-        );
+        const feed = new CallFeed({
+            client: this.client,
+            call: this,
+            roomId: this.roomId,
+            userId,
+            deviceId,
+            stream,
+            purpose,
+            audioMuted,
+            videoMuted,
+        });
+        feed.addListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
+        this.feeds.push(feed);
 
         this.emit(CallEvent.FeedsChanged, this.feeds);
 
@@ -804,6 +820,32 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                         `) to peer connection`,
                 );
 
+                const encodings: RTCRtpEncodingParameters[] | undefined =
+                    track.kind === "video"
+                        ? [
+                              // Order is important here: some browsers (e.g.
+                              // Chrome) will only send some of the encodings, if
+                              // the track has a resolution to low for it to send
+                              // all, in that case the encoding higher in the list
+                              // has priority and therefore we put full as first
+                              // as we always want to send the full resolution
+                              {
+                                  maxBitrate: 4_500_000,
+                                  rid: SimulcastResolution.Full,
+                              },
+                              {
+                                  maxBitrate: 1_500_000,
+                                  rid: SimulcastResolution.Half,
+                                  scaleResolutionDownBy: 2.0,
+                              },
+                              {
+                                  maxBitrate: 300_000,
+                                  rid: SimulcastResolution.Quarter,
+                                  scaleResolutionDownBy: 4.0,
+                              },
+                          ]
+                        : undefined;
+
                 const tKey = getTransceiverKey(callFeed.purpose, track.kind);
                 if (this.transceivers.has(tKey)) {
                     // we already have a sender, so we re-use it. We try to re-use transceivers as much
@@ -818,6 +860,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     if (transceiver.sender.setStreams) transceiver.sender.setStreams(callFeed.stream);
 
                     transceiver.sender.replaceTrack(track);
+
+                    const parameters = transceiver.sender.getParameters();
+                    transceiver.sender.setParameters({
+                        ...transceiver.sender.getParameters(),
+                        encodings: encodings ?? parameters.encodings,
+                    });
+
                     // set the direction to indicate we're going to start sending again
                     // (this will trigger the re-negotiation)
                     transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
@@ -826,15 +875,21 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     // doesn't yet implement RTCRTPSender.setStreams()
                     // (https://bugzilla.mozilla.org/show_bug.cgi?id=1510802) so we'd have no way to group the
                     // two tracks together into a stream.
-                    const newSender = this.peerConn!.addTrack(track, callFeed.stream);
+                    const transceiver = this.peerConn!.addTransceiver(track, {
+                        streams: [callFeed.stream],
+                        sendEncodings: isFirefox() ? undefined : encodings,
+                    });
+
+                    const parameters = transceiver.sender.getParameters();
+                    if (isFirefox()) {
+                        transceiver.sender.setParameters({
+                            ...transceiver.sender.getParameters(),
+                            encodings: encodings ?? parameters.encodings,
+                        });
+                    }
 
                     // now go & fish for the new transceiver
-                    const newTransciever = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
-                    if (newTransciever) {
-                        this.transceivers.set(tKey, newTransciever);
-                    } else {
-                        logger.warn("Didn't find a matching transceiver after adding track!");
-                    }
+                    this.transceivers.set(tKey, transceiver);
                 }
             }
         }
@@ -880,8 +935,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private deleteAllFeeds(): void {
         for (const feed of this.feeds) {
-            if (!feed.isLocal() || !this.groupCallId) {
-                feed.dispose();
+            if (!feed.isLocal()) {
+                feed.removeListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
+                if (!this.groupCallId) {
+                    feed.dispose();
+                }
             }
         }
 
@@ -2026,6 +2084,24 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             unsubscribe: [],
         } as FocusTrackSubscriptionEvent);
     }
+
+    private onCallFeedSizeChanged = async (feed: CallFeed, width: number, height: number): Promise<void> => {
+        const trackId = Object.entries(this.remoteSDPStreamMetadata![feed.stream.id].tracks).find(
+            ([_, info]) => info.kind === "video",
+        )?.[0];
+        if (!trackId) return;
+
+        await this.sendFocusEvent(EventType.CallTrackSubscription, {
+            subscribe: [
+                {
+                    track_id: trackId,
+                    stream_id: feed.stream.id,
+                    width: Math.round(width),
+                    height: Math.round(height),
+                },
+            ],
+        } as FocusTrackSubscriptionEvent);
+    };
 
     public updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
         if (!metadata) return;

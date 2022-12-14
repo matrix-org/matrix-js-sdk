@@ -25,6 +25,7 @@ import { CallEvent, CallState, MatrixCall } from "./call";
 const POLLING_INTERVAL = 200; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
 const SPEAKING_SAMPLE_COUNT = 8; // samples
+const SIZE_CHANGED_EVENT_DELAY = 2000; // ms
 
 export interface ICallFeedOpts {
     client: MatrixClient;
@@ -53,6 +54,7 @@ export enum CallFeedEvent {
     LocalVolumeChanged = "local_volume_changed",
     VolumeChanged = "volume_changed",
     ConnectedChanged = "connected_changed",
+    SizeChanged = "size_changed",
     Speaking = "speaking",
     Disposed = "disposed",
 }
@@ -63,6 +65,7 @@ type EventHandlerMap = {
     [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.ConnectedChanged]: (connected: boolean) => void;
+    [CallFeedEvent.SizeChanged]: (feed: CallFeed, width: number, height: number) => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
     [CallFeedEvent.Disposed]: () => void;
 };
@@ -88,6 +91,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
     private volumeLooperTimeout?: ReturnType<typeof setTimeout>;
+    private sizeChangedTimeout?: ReturnType<typeof setTimeout>;
     private _disposed = false;
     private _connected = false;
 
@@ -357,5 +361,15 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public setLocalVolume(localVolume: number): void {
         this.localVolume = localVolume;
         this.emit(CallFeedEvent.LocalVolumeChanged, localVolume);
+    }
+
+    public setResolution(width: number, height: number): void {
+        if (this.isLocal()) return;
+
+        // We should throttle this more intelligently depending on the use case
+        clearTimeout(this.sizeChangedTimeout);
+        this.sizeChangedTimeout = setTimeout(() => {
+            this.emit(CallFeedEvent.SizeChanged, this, width, height);
+        }, SIZE_CHANGED_EVENT_DELAY);
     }
 }
