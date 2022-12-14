@@ -22,6 +22,7 @@ import {
     GroupCallIntent,
     GroupCallType,
     IContent,
+    IFocusInfo,
     ISendEventResponse,
     MatrixClient,
     MatrixEvent,
@@ -487,6 +488,10 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
 
     public emitRoomState(event: MatrixEvent, state: RoomState): void {
         this.emit(RoomStateEvent.Events, event, state, null);
+    }
+
+    public getFoci(): IFocusInfo[] {
+        return [];
     }
 }
 
