@@ -1,3 +1,32 @@
+Changes in [23.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.0.0-rc.1) (2022-12-14)
+============================================================================================================
+
+## 🚨 BREAKING CHANGES
+ * Process `m.room.encryption` events before emitting `RoomMember` events ([\#2914](https://github.com/matrix-org/matrix-js-sdk/pull/2914)). Fixes vector-im/element-web#23819.
+
+## ✨ Features
+ * Support MSC3391: Account data deletion ([\#2967](https://github.com/matrix-org/matrix-js-sdk/pull/2967)).
+ * Add a message ID on each to-device message ([\#2938](https://github.com/matrix-org/matrix-js-sdk/pull/2938)).
+ * Enable multiple users' power levels to be set at once ([\#2892](https://github.com/matrix-org/matrix-js-sdk/pull/2892)). Contributed by @GoodGuyMarco.
+ * Include pending events in thread summary and count again ([\#2922](https://github.com/matrix-org/matrix-js-sdk/pull/2922)). Fixes vector-im/element-web#23642.
+ * Make GroupCall work better with widgets ([\#2935](https://github.com/matrix-org/matrix-js-sdk/pull/2935)).
+ * Add method to get outgoing room key requests for a given event ([\#2930](https://github.com/matrix-org/matrix-js-sdk/pull/2930)).
+
+## 🐛 Bug Fixes
+ * Fix messages loaded during initial fetch ending up out of order ([\#2971](https://github.com/matrix-org/matrix-js-sdk/pull/2971)). Fixes vector-im/element-web#23972.
+ * Fix #23919: Root message for new thread loaded from network ([\#2965](https://github.com/matrix-org/matrix-js-sdk/pull/2965)). Fixes vector-im/element-web#23919.
+ * Fix #23916: Prevent edits of the last message in a thread getting lost ([\#2951](https://github.com/matrix-org/matrix-js-sdk/pull/2951)). Fixes vector-im/element-web#23916 and vector-im/element-web#23942.
+ * Fix infinite loop when restoring cached read receipts ([\#2963](https://github.com/matrix-org/matrix-js-sdk/pull/2963)). Fixes vector-im/element-web#23951.
+ * Don't swallow errors coming from the shareSession call ([\#2962](https://github.com/matrix-org/matrix-js-sdk/pull/2962)). Fixes vector-im/element-web#23792.
+ * Make sure that MegolmEncryption.setupPromise always resolves  ([\#2960](https://github.com/matrix-org/matrix-js-sdk/pull/2960)).
+ * Do not calculate highlight notifs for threads unknown to the room ([\#2957](https://github.com/matrix-org/matrix-js-sdk/pull/2957)).
+ * Cache read receipts for unknown threads ([\#2953](https://github.com/matrix-org/matrix-js-sdk/pull/2953)).
+ * bugfix: sliding sync initial room timelines shouldn't notify ([\#2933](https://github.com/matrix-org/matrix-js-sdk/pull/2933)).
+ * Redo key sharing after own device verification ([\#2921](https://github.com/matrix-org/matrix-js-sdk/pull/2921)). Fixes vector-im/element-web#23333.
+ * Move updated threads to the end of the thread list ([\#2923](https://github.com/matrix-org/matrix-js-sdk/pull/2923)). Fixes vector-im/element-web#23876.
+ * Fix highlight notifications increasing when total notification is zero ([\#2937](https://github.com/matrix-org/matrix-js-sdk/pull/2937)). Fixes vector-im/element-web#23885.
+ * Fix synthesizeReceipt ([\#2916](https://github.com/matrix-org/matrix-js-sdk/pull/2916)). Fixes vector-im/element-web#23827 vector-im/element-web#23754 and vector-im/element-web#23847.
+
 Changes in [22.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v22.0.0) (2022-12-06)
 ==================================================================================================
 
