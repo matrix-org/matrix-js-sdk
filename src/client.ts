@@ -1673,6 +1673,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Get the user-id of the logged-in user
+     *
+     * @returns MXID for the logged-in user
+     * @throws Error if not logged in
+     */
+    public getSafeUserId(): string {
+        const userId = this.getUserId();
+        if (!userId) {
+            throw new Error("Expected logged in user but found none.");
+        }
+        return userId;
+    }
+
+    /**
      * Get the domain for this client's MXID
      * @returns Domain of this MXID
      */
@@ -3764,6 +3778,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             throw e;
         }
+    }
+
+    public async deleteAccountData(eventType: string): Promise<void> {
+        const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
+        // if deletion is not supported overwrite with empty content
+        if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
+            await this.setAccountData(eventType, {});
+            return;
+        }
+        const path = utils.encodeUri("/user/$userId/account_data/$type", {
+            $userId: this.getSafeUserId(),
+            $type: eventType,
+        });
+        const options =
+            msc3391DeleteAccountDataServerSupport === ServerSupport.Unstable
+                ? { prefix: "/_matrix/client/unstable/org.matrix.msc3391" }
+                : undefined;
+        return await this.http.authedRequest(Method.Delete, path, undefined, undefined, options);
     }
 
     /**
