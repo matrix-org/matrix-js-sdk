@@ -836,6 +836,7 @@ describe("MatrixClient syncing", () => {
                     roomVersion: "org.matrix.msc2716v3",
                 },
             ].forEach((testMeta) => {
+                // eslint-disable-next-line jest/valid-title
                 describe(testMeta.label, () => {
                     const roomCreateEvent = utils.mkEvent({
                         type: "m.room.create",
