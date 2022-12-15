@@ -492,7 +492,7 @@ export class GroupCall extends TypedEventEmitter<
 
             try {
                 focusCall.isPtt = this.isPtt;
-                await focusCall.placeCallWithCallFeeds(this.getLocalFeeds());
+                await focusCall.placeCallWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
                 focusCall.createDataChannel("datachannel", this.dataChannelOptions);
             } catch (e) {
                 onError(e);
@@ -752,9 +752,7 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 // TODO: handle errors
-                this.forEachCall((call) =>
-                    call.pushLocalFeed(call.isFocus ? this.localScreenshareFeed! : this.localScreenshareFeed!.clone()),
-                );
+                this.forEachCall((call) => call.pushLocalFeed(this.localScreenshareFeed!.clone()));
 
                 return true;
             } catch (error) {
@@ -777,9 +775,7 @@ export class GroupCall extends TypedEventEmitter<
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed!.stream);
             // We have to remove the feed manually as MatrixCall has its clone,
             // so it won't be removed automatically
-            if (!this.foci[0]) {
-                this.removeScreenshareFeed(this.localScreenshareFeed!);
-            }
+            this.removeScreenshareFeed(this.localScreenshareFeed!);
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
             this.emit(GroupCallEvent.LocalScreenshareStateChanged, false, undefined, undefined);
