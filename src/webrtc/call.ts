@@ -2375,7 +2375,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     };
 
     public onHangupReceived = (msg: MCallHangupReject): void => {
-        logger.debug("Hangup received for call ID " + this.callId);
+        logger.debug(`Hangup received for call ID ${this.callId}: ${msg}`);
 
         // party ID must match (our chosen partner hanging up the call) or be undefined (we haven't chosen
         // a partner yet but we're treating the hangup as a reject as per VoIP v0)
