@@ -15,10 +15,10 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 
 import { RustCrypto } from "../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../src/rust-crypto";
-import { IDBFactory } from "fake-indexeddb";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
