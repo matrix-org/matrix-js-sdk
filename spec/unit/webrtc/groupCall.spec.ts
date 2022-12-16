@@ -309,7 +309,7 @@ describe("Group Call", function () {
         });
 
         // FIXME: Do we need the methods for replacing feeds
-        describe.skip("call feeds changing", () => {
+        describe("call feeds changing", () => {
             let call: MockMatrixCall;
             const currentFeed = new MockCallFeed(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, new MockMediaStream("current"));
             const newFeed = new MockCallFeed(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, new MockMediaStream("new"));
@@ -317,6 +317,8 @@ describe("Group Call", function () {
             beforeEach(async () => {
                 jest.spyOn(currentFeed, "dispose");
                 jest.spyOn(newFeed, "measureVolumeActivity");
+                jest.spyOn(currentFeed, "isLocal").mockReturnValue(false);
+                jest.spyOn(newFeed, "isLocal").mockReturnValue(false);
 
                 jest.spyOn(groupCall, "emit");
 
@@ -325,17 +327,14 @@ describe("Group Call", function () {
                 await groupCall.create();
             });
 
-            it("ignores changes, if we can't get user id of opponent", async () => {
-                const call = new MockMatrixCall(room.roomId, groupCall.groupCallId);
-                jest.spyOn(call, "getOpponentMember").mockReturnValue({ userId: undefined });
-
-                // @ts-ignore Mock
-                expect(() => groupCall.onCallFeedsChanged(call)).toThrowError();
-            });
-
             describe("usermedia feeds", () => {
+                beforeEach(() => {
+                    currentFeed.purpose = SDPStreamMetadataPurpose.Usermedia;
+                    newFeed.purpose = SDPStreamMetadataPurpose.Usermedia;
+                });
+
                 it("adds new usermedia feed", async () => {
-                    call.remoteUsermediaFeed = newFeed.typed();
+                    call.feeds = [newFeed.typed()];
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -345,7 +344,8 @@ describe("Group Call", function () {
                 it("replaces usermedia feed", async () => {
                     groupCall.userMediaFeeds.push(currentFeed.typed());
 
-                    call.remoteUsermediaFeed = newFeed.typed();
+                    call.feeds = [newFeed.typed()];
+
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -353,6 +353,7 @@ describe("Group Call", function () {
                 });
 
                 it("removes usermedia feed", async () => {
+                    currentFeed.dispose();
                     groupCall.userMediaFeeds.push(currentFeed.typed());
 
                     // @ts-ignore Mock
@@ -363,8 +364,14 @@ describe("Group Call", function () {
             });
 
             describe("screenshare feeds", () => {
+                beforeEach(() => {
+                    currentFeed.purpose = SDPStreamMetadataPurpose.Screenshare;
+                    newFeed.purpose = SDPStreamMetadataPurpose.Screenshare;
+                });
+
                 it("adds new screenshare feed", async () => {
-                    call.remoteScreensharingFeed = newFeed.typed();
+                    call.feeds = [newFeed.typed()];
+
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -374,7 +381,8 @@ describe("Group Call", function () {
                 it("replaces screenshare feed", async () => {
                     groupCall.screenshareFeeds.push(currentFeed.typed());
 
-                    call.remoteScreensharingFeed = newFeed.typed();
+                    call.feeds = [newFeed.typed()];
+
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -382,6 +390,7 @@ describe("Group Call", function () {
                 });
 
                 it("removes screenshare feed", async () => {
+                    currentFeed.dispose();
                     groupCall.screenshareFeeds.push(currentFeed.typed());
 
                     // @ts-ignore Mock

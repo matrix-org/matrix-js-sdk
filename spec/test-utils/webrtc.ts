@@ -37,6 +37,7 @@ import { ReEmitter } from "../../src/ReEmitter";
 import { SyncState } from "../../src/sync";
 import { CallEvent, CallEventHandlerMap, CallState, MatrixCall } from "../../src/webrtc/call";
 import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "../../src/webrtc/callEventHandler";
+import { SDPStreamMetadataPurpose } from "../../src/webrtc/callEventTypes";
 import { CallFeed } from "../../src/webrtc/callFeed";
 import { GroupCallEventHandlerMap } from "../../src/webrtc/groupCall";
 import { GroupCallEventHandlerEvent } from "../../src/webrtc/groupCallEventHandler";
@@ -534,8 +535,7 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
         stream: new MockMediaStream("stream"),
     };
-    public remoteUsermediaFeed?: CallFeed;
-    public remoteScreensharingFeed?: CallFeed;
+    public feeds: CallFeed[] = [];
 
     public reject = jest.fn<void, []>();
     public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
@@ -546,6 +546,14 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public on = jest.fn();
     public removeListener = jest.fn();
 
+    public get remoteUsermediaFeed(): CallFeed | undefined {
+        return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
+    }
+
+    public get remoteScreensharingFeed(): CallFeed | undefined {
+        return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+    }
+
     public getOpponentMember(): Partial<RoomMember> {
         return this.opponentMember;
     }
@@ -555,10 +563,7 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     }
 
     public getRemoteFeeds(): CallFeed[] {
-        const feeds: CallFeed[] = [];
-        if (this.remoteUsermediaFeed) feeds.push(this.remoteUsermediaFeed);
-        if (this.remoteScreensharingFeed) feeds.push(this.remoteScreensharingFeed);
-        return feeds;
+        return this.feeds.filter((feed) => !feed.isLocal());
     }
 
     public typed(): MatrixCall {
@@ -567,10 +572,20 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
 }
 
 export class MockCallFeed {
-    constructor(public userId: string, public deviceId: string | undefined, public stream: MockMediaStream) {}
+    constructor(
+        public userId: string,
+        public deviceId: string | undefined,
+        public stream: MockMediaStream,
+        public purpose?: SDPStreamMetadataPurpose,
+    ) {}
+
+    public disposed = false;
 
     public measureVolumeActivity(val: boolean) {}
-    public dispose() {}
+    public dispose() {
+        this.disposed = true;
+    }
+    public isLocal: () => boolean = jest.fn();
 
     public typed(): CallFeed {
         return this as unknown as CallFeed;

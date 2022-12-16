@@ -1060,6 +1060,16 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onCallFeedsChanged = (call: MatrixCall): void => {
+        // Find replaced feeds
+        call.getRemoteFeeds().filter((cf) => {
+            [...this.userMediaFeeds, ...this.screenshareFeeds].forEach((gf) => {
+                if (gf !== cf && gf.userId === cf.userId && gf.deviceId === cf.deviceId && gf.purpose === cf.purpose) {
+                    if (cf.purpose === SDPStreamMetadataPurpose.Usermedia) this.replaceUserMediaFeed(gf, cf);
+                    else if (cf.purpose === SDPStreamMetadataPurpose.Screenshare) this.replaceScreenshareFeed(gf, cf);
+                }
+            });
+        });
+
         // Find removed feeds
         [...this.userMediaFeeds, ...this.screenshareFeeds]
             .filter((gf) => gf.disposed)
@@ -1071,7 +1081,7 @@ export class GroupCall extends TypedEventEmitter<
         // Find new feeds
         call.getRemoteFeeds()
             .filter((cf) => {
-                return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
+                return !this.userMediaFeeds.find((gf) => gf === cf) && !this.screenshareFeeds.find((gf) => gf === cf);
             })
             .forEach((feed) => {
                 if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
@@ -1149,6 +1159,22 @@ export class GroupCall extends TypedEventEmitter<
         this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
     }
 
+    private replaceUserMediaFeed(existingFeed: CallFeed, replacementFeed: CallFeed): void {
+        const feedIndex = this.userMediaFeeds.findIndex(
+            (f) => f.userId === existingFeed.userId && f.deviceId! === existingFeed.deviceId,
+        );
+
+        if (feedIndex === -1) {
+            throw new Error("Couldn't find user media feed to replace");
+        }
+
+        this.userMediaFeeds.splice(feedIndex, 1, replacementFeed);
+
+        existingFeed.dispose();
+        replacementFeed.measureVolumeActivity(true);
+        this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
+    }
+
     private removeUserMediaFeed(callFeed: CallFeed): void {
         const feedIndex = this.userMediaFeeds.findIndex(
             (f) => f.userId === callFeed.userId && f.deviceId! === callFeed.deviceId,
@@ -1203,6 +1229,21 @@ export class GroupCall extends TypedEventEmitter<
 
     private addScreenshareFeed(callFeed: CallFeed): void {
         this.screenshareFeeds.push(callFeed);
+        this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
+    }
+
+    private replaceScreenshareFeed(existingFeed: CallFeed, replacementFeed: CallFeed): void {
+        const feedIndex = this.screenshareFeeds.findIndex(
+            (f) => f.userId === existingFeed.userId && f.deviceId! === existingFeed.deviceId,
+        );
+
+        if (feedIndex === -1) {
+            throw new Error("Couldn't find screenshare feed to replace");
+        }
+
+        this.screenshareFeeds.splice(feedIndex, 1, replacementFeed);
+
+        existingFeed.dispose();
         this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
     }
 
