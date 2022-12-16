@@ -38,4 +38,5 @@ cee7f7a280a8c20bafc21c0a2911f60851f7a7ca
 7ed65407e6cdf292ce3cf659310c68d19dcd52b2
 # Switch to ESLint from JSHint (Google eslint rules as a base)
 e057956ede9ad1a931ff8050c411aca7907e0394
-
+# prettier
+349c2c2587c2885bb69eda4aa078b5383724cf5e
