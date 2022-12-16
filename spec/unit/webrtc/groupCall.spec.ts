@@ -308,7 +308,8 @@ describe("Group Call", function () {
             }
         });
 
-        describe("call feeds changing", () => {
+        // FIXME: Do we need the methods for replacing feeds
+        describe.skip("call feeds changing", () => {
             let call: MockMatrixCall;
             const currentFeed = new MockCallFeed(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, new MockMediaStream("current"));
             const newFeed = new MockCallFeed(FAKE_USER_ID_1, FAKE_DEVICE_ID_1, new MockMediaStream("new"));
