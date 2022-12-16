@@ -27,6 +27,7 @@ export enum Feature {
     ThreadUnreadNotifications = "ThreadUnreadNotifications",
     LoginTokenRequest = "LoginTokenRequest",
     RelationBasedRedactions = "RelationBasedRedactions",
+    AccountDataDeletion = "AccountDataDeletion",
 }
 
 type FeatureSupportCondition = {
@@ -48,6 +49,9 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     },
     [Feature.RelationBasedRedactions]: {
         unstablePrefixes: ["org.matrix.msc3912"],
+    },
+    [Feature.AccountDataDeletion]: {
+        unstablePrefixes: ["org.matrix.msc3391"],
     },
 };
 
