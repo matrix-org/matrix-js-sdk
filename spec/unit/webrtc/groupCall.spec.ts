@@ -841,6 +841,7 @@ describe("Group Call", function () {
                 // @ts-ignore
                 const call = groupCall.calls.get(groupCall.room.getMember(FAKE_USER_ID_2)!)!.get(FAKE_DEVICE_ID_2)!;
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+                call.onSDPStreamMetadataChangedReceived(metadataEvent);
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
                     // @ts-ignore Mock
@@ -849,7 +850,6 @@ describe("Group Call", function () {
                         new MockMediaStreamTrack("video_track", "video"),
                     ]),
                 );
-                call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
                 const feed = groupCall.getUserMediaFeed(call.invitee!, call.getOpponentDeviceId()!);
                 expect(feed!.isAudioMuted()).toBe(true);
@@ -868,6 +868,7 @@ describe("Group Call", function () {
                 // @ts-ignore
                 const call = groupCall.calls.get(groupCall.room.getMember(FAKE_USER_ID_2)!)!.get(FAKE_DEVICE_ID_2)!;
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+                call.onSDPStreamMetadataChangedReceived(metadataEvent);
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
                     // @ts-ignore Mock
@@ -876,7 +877,6 @@ describe("Group Call", function () {
                         new MockMediaStreamTrack("video_track", "video"),
                     ]),
                 );
-                call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
                 const feed = groupCall.getUserMediaFeed(call.invitee!, call.getOpponentDeviceId()!);
                 expect(feed!.isAudioMuted()).toBe(false);
