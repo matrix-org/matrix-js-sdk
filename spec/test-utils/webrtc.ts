@@ -554,6 +554,13 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
         return this.opponentDeviceId;
     }
 
+    public getRemoteFeeds(): CallFeed[] {
+        const feeds: CallFeed[] = [];
+        if (this.remoteUsermediaFeed) feeds.push(this.remoteUsermediaFeed);
+        if (this.remoteScreensharingFeed) feeds.push(this.remoteScreensharingFeed);
+        return feeds;
+    }
+
     public typed(): MatrixCall {
         return this as unknown as MatrixCall;
     }
