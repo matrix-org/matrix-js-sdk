@@ -573,16 +573,16 @@ describe("Call", function () {
         await call.setMicrophoneMuted(true);
 
         expect((call as any).getLocalSDPStreamMetadata()).toStrictEqual({
-            local_stream1: {
+            local_stream1: expect.objectContaining({
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audio_muted: true,
                 video_muted: true,
-            },
-            local_stream2: {
+            }),
+            local_stream2: expect.objectContaining({
                 purpose: SDPStreamMetadataPurpose.Screenshare,
                 audio_muted: true,
                 video_muted: false,
-            },
+            }),
         });
     });
 
@@ -834,11 +834,11 @@ describe("Call", function () {
                 await call.setMicrophoneMuted(true);
                 expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
                     [SDPStreamMetadataKey]: {
-                        mock_stream_from_media_handler: {
+                        mock_stream_from_media_handler: expect.objectContaining({
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                             audio_muted: true,
                             video_muted: false,
-                        },
+                        }),
                     },
                 });
             });
@@ -847,11 +847,11 @@ describe("Call", function () {
                 await call.setLocalVideoMuted(true);
                 expect(mockSendVoipEvent).toHaveBeenCalledWith(EventType.CallSDPStreamMetadataChangedPrefix, {
                     [SDPStreamMetadataKey]: {
-                        mock_stream_from_media_handler: {
+                        mock_stream_from_media_handler: expect.objectContaining({
                             purpose: SDPStreamMetadataPurpose.Usermedia,
                             audio_muted: false,
                             video_muted: true,
-                        },
+                        }),
                     },
                 });
             });
