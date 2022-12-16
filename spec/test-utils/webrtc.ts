@@ -116,6 +116,16 @@ export class MockAudioContext {
     public close() {}
 }
 
+export class MockRTCDataChannel {
+    constructor(public readonly label: string, public readonly id?: number) {}
+
+    public typed(): RTCDataChannel {
+        return this as unknown as RTCDataChannel;
+    }
+
+    addEventListener() {}
+}
+
 export interface MockRTCSessionDescription {
     sdp: string;
     type: RTCSdpType;
@@ -176,8 +186,8 @@ export class MockRTCPeerConnection {
             this.onTrackListener = listener;
         }
     }
-    public createDataChannel(label: string, opts: RTCDataChannelInit) {
-        return { label, ...opts };
+    public createDataChannel(label: string, opts: RTCDataChannelInit): MockRTCDataChannel {
+        return new MockRTCDataChannel(label, opts.id);
     }
     public createOffer() {
         return Promise.resolve({
