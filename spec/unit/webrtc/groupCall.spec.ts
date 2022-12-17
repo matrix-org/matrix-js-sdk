@@ -142,6 +142,15 @@ describe("Group Call", function () {
             } as unknown as RoomMember;
         });
 
+        it.each(Object.values(GroupCallState).filter((v) => v !== GroupCallState.LocalCallFeedUninitialized))(
+            "throws when initializing local call feed in %s state",
+            async (state: GroupCallState) => {
+                // @ts-ignore
+                groupCall.state = state;
+                await expect(groupCall.initLocalCallFeed()).rejects.toThrowError();
+            },
+        );
+
         it("does not initialize local call feed, if it already is", async () => {
             await groupCall.initLocalCallFeed();
             jest.spyOn(groupCall, "initLocalCallFeed");
@@ -306,6 +315,17 @@ describe("Group Call", function () {
             } finally {
                 groupCall.leave();
             }
+        });
+
+        describe("hasLocalParticipant()", () => {
+            it("should return false, if we don't have a local participant", () => {
+                expect(groupCall.hasLocalParticipant()).toBeFalsy();
+            });
+
+            it("should return true, if we do have local participant", async () => {
+                await groupCall.enter();
+                expect(groupCall.hasLocalParticipant()).toBeTruthy();
+            });
         });
 
         describe("call feeds changing", () => {
