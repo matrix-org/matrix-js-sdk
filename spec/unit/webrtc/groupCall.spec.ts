@@ -1027,6 +1027,43 @@ describe("Group Call", function () {
                 expect(groupCall.calls).toEqual(newCallsMap);
             });
         });
+
+        describe("handles call being hangup", () => {
+            let callChangedListener: jest.Mock;
+            let mockCall: MockMatrixCall;
+
+            beforeEach(() => {
+                callChangedListener = jest.fn();
+                groupCall.addListener(GroupCallEvent.CallsChanged, callChangedListener);
+                mockCall = new MockMatrixCall(room.roomId, groupCall.groupCallId);
+            });
+
+            it("doesn't throw when calls map is empty", () => {
+                // @ts-ignore
+                expect(() => groupCall.onCallHangup(mockCall)).not.toThrow();
+            });
+
+            it("clears map completely when we're the last users device left", () => {
+                mockClient.emit(CallEventHandlerEvent.Incoming, mockCall.typed());
+                mockCall.emit(CallEvent.Hangup, mockCall.typed());
+                // @ts-ignore
+                expect(groupCall.calls).toEqual(new Map());
+            });
+
+            it("doesn't remove another call of the same user", () => {
+                const anotherCallOfTheSameUser = new MockMatrixCall(room.roomId, groupCall.groupCallId);
+                anotherCallOfTheSameUser.callId = "another call id";
+                anotherCallOfTheSameUser.getOpponentDeviceId = () => FAKE_DEVICE_ID_2;
+                mockClient.emit(CallEventHandlerEvent.Incoming, anotherCallOfTheSameUser.typed());
+
+                mockClient.emit(CallEventHandlerEvent.Incoming, mockCall.typed());
+                mockCall.emit(CallEvent.Hangup, mockCall.typed());
+                // @ts-ignore
+                expect(groupCall.calls).toEqual(
+                    new Map([[FAKE_USER_ID_1, new Map([[FAKE_DEVICE_ID_2, anotherCallOfTheSameUser.typed()]])]]),
+                );
+            });
+        });
     });
 
     describe("screensharing", () => {
