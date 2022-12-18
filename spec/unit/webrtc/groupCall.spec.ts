@@ -988,24 +988,44 @@ describe("Group Call", function () {
             expect(call.answerWithCallFeeds).toHaveBeenCalled();
         });
 
-        it("handles call being replaced", () => {
-            const callChangedListener = jest.fn();
-            groupCall.addListener(GroupCallEvent.CallsChanged, callChangedListener);
+        describe("handles call being replaced", () => {
+            let callChangedListener: jest.Mock;
+            let oldMockCall: MockMatrixCall;
+            let newMockCall: MockMatrixCall;
+            let newCallsMap: Map<string, Map<string, MatrixCall>>;
 
-            const oldMockCall = new MockMatrixCall(room.roomId, groupCall.groupCallId);
-            const newMockCall = new MockMatrixCall(room.roomId, groupCall.groupCallId);
-            newMockCall.opponentMember = oldMockCall.opponentMember; // Ensure referential equality
-            newMockCall.callId = "not " + oldMockCall.callId;
+            beforeEach(() => {
+                callChangedListener = jest.fn();
+                groupCall.addListener(GroupCallEvent.CallsChanged, callChangedListener);
 
-            mockClient.emit(CallEventHandlerEvent.Incoming, oldMockCall.typed());
-            oldMockCall.emit(CallEvent.Replaced, newMockCall.typed());
+                oldMockCall = new MockMatrixCall(room.roomId, groupCall.groupCallId);
+                newMockCall = new MockMatrixCall(room.roomId, groupCall.groupCallId);
+                newCallsMap = new Map([[FAKE_USER_ID_1, new Map([[FAKE_DEVICE_ID_1, newMockCall.typed()]])]]);
 
-            const newCallsMap = new Map([[FAKE_USER_ID_1, new Map([[FAKE_DEVICE_ID_1, newMockCall]])]]);
+                newMockCall.opponentMember = oldMockCall.opponentMember; // Ensure referential equality
+                newMockCall.callId = "not " + oldMockCall.callId;
+                mockClient.emit(CallEventHandlerEvent.Incoming, oldMockCall.typed());
+            });
 
-            expect(oldMockCall.hangup).toHaveBeenCalled();
-            expect(callChangedListener).toHaveBeenCalledWith(newCallsMap);
-            // @ts-ignore
-            expect(groupCall.calls).toEqual(newCallsMap);
+            it("handles regular case", () => {
+                oldMockCall.emit(CallEvent.Replaced, newMockCall.typed());
+
+                expect(oldMockCall.hangup).toHaveBeenCalled();
+                expect(callChangedListener).toHaveBeenCalledWith(newCallsMap);
+                // @ts-ignore
+                expect(groupCall.calls).toEqual(newCallsMap);
+            });
+
+            it("handles case where call is missing from the calls map", () => {
+                // @ts-ignore
+                groupCall.calls = new Map();
+                oldMockCall.emit(CallEvent.Replaced, newMockCall.typed());
+
+                expect(oldMockCall.hangup).toHaveBeenCalled();
+                expect(callChangedListener).toHaveBeenCalledWith(newCallsMap);
+                // @ts-ignore
+                expect(groupCall.calls).toEqual(newCallsMap);
+            });
         });
     });
 
