@@ -987,6 +987,26 @@ describe("Group Call", function () {
 
             expect(call.answerWithCallFeeds).toHaveBeenCalled();
         });
+
+        it("handles call being replaced", () => {
+            const callChangedListener = jest.fn();
+            groupCall.addListener(GroupCallEvent.CallsChanged, callChangedListener);
+
+            const oldMockCall = new MockMatrixCall(room.roomId, groupCall.groupCallId);
+            const newMockCall = new MockMatrixCall(room.roomId, groupCall.groupCallId);
+            newMockCall.opponentMember = oldMockCall.opponentMember; // Ensure referential equality
+            newMockCall.callId = "not " + oldMockCall.callId;
+
+            mockClient.emit(CallEventHandlerEvent.Incoming, oldMockCall.typed());
+            oldMockCall.emit(CallEvent.Replaced, newMockCall.typed());
+
+            const newCallsMap = new Map([[FAKE_USER_ID_1, new Map([[FAKE_DEVICE_ID_1, newMockCall]])]]);
+
+            expect(oldMockCall.hangup).toHaveBeenCalled();
+            expect(callChangedListener).toHaveBeenCalledWith(newCallsMap);
+            // @ts-ignore
+            expect(groupCall.calls).toEqual(newCallsMap);
+        });
     });
 
     describe("screensharing", () => {
