@@ -6084,7 +6084,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     this.processBeaconEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
-                        timelineEvents.filter((it) => it.isRelation(THREAD_RELATION_TYPE.name)),
+                        timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
 
