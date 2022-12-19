@@ -1016,6 +1016,61 @@ describe("MatrixClient event timelines", function () {
                 httpBackend.flushAllExpected(),
             ]);
         });
+
+        it("should create threads for thread roots discovered", function () {
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id!))
+                .respond(200, function () {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: EVENTS[0],
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/messages")
+                .check(function (req) {
+                    const params = req.queryParams!;
+                    expect(params.dir).toEqual("b");
+                    expect(params.from).toEqual("start_token0");
+                    expect(params.limit).toEqual("30");
+                })
+                .respond(200, function () {
+                    return {
+                        chunk: [EVENTS[1], EVENTS[2], THREAD_ROOT],
+                        end: "start_token1",
+                    };
+                });
+
+            let tl: EventTimeline;
+            return Promise.all([
+                client
+                    .getEventTimeline(timelineSet, EVENTS[0].event_id!)
+                    .then(function (tl0) {
+                        tl = tl0!;
+                        return client.paginateEventTimeline(tl, { backwards: true });
+                    })
+                    .then(function (success) {
+                        expect(success).toBeTruthy();
+                        expect(tl!.getEvents().length).toEqual(4);
+                        expect(tl!.getEvents()[0].event).toEqual(THREAD_ROOT);
+                        expect(tl!.getEvents()[1].event).toEqual(EVENTS[2]);
+                        expect(tl!.getEvents()[2].event).toEqual(EVENTS[1]);
+                        expect(tl!.getEvents()[3].event).toEqual(EVENTS[0]);
+                        expect(room.getThreads().map((it) => it.id)).toEqual([THREAD_ROOT.event_id!]);
+                        expect(tl!.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("start_token1");
+                        expect(tl!.getPaginationToken(EventTimeline.FORWARDS)).toEqual("end_token0");
+                    }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
     });
 
     describe("paginateEventTimeline for thread list timeline", function () {
