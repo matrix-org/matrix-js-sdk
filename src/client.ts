@@ -4445,7 +4445,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param txnId -  transaction id. One will be made up if not supplied.
-     * @param opts - Options to pass on, may contain `reason` an `with_relations` (MSC3912).
+     * @param opts - Options to pass on, may contain `reason` and `with_relations` (MSC3912)
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      * @throws Error if called with `with_relations` (MSC3912) but the server does not support it.

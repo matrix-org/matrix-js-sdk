@@ -47,7 +47,13 @@ export interface IJoinRoomOpts {
 
 export interface IRedactOpts {
     reason?: string;
-    // also delete related events, if the server supports it (MSC3912)
+    /**
+     * Also try to delete related events of the relation types in this array.
+     * <b>Raises an Error if the server does not support it.</b>
+     * Check for server-side support before using this param with
+     * <code>client.canSupport.get(Feature.RelationBasedRedactions)</code>.
+     * {@link https://github.com/matrix-org/matrix-spec-proposals/pull/3912}
+     */
     with_relations?: Array<RelationType | string>;
 }
 
