@@ -1081,7 +1081,7 @@ export class GroupCall extends TypedEventEmitter<
         // Find new feeds
         call.getRemoteFeeds()
             .filter((cf) => {
-                return !this.userMediaFeeds.find((gf) => gf === cf) && !this.screenshareFeeds.find((gf) => gf === cf);
+                return ![...this.userMediaFeeds, ...this.screenshareFeeds].find((gf) => gf === cf);
             })
             .forEach((feed) => {
                 if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
