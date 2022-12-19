@@ -397,7 +397,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param sub - The subscription information.
      */
     public addCustomSubscription(name: string, sub: MSC3575RoomSubscription): void {
-        if (this.customSubscriptions.get(name) !== undefined) {
+        if (this.customSubscriptions.has(name)) {
             logger.warn(`addCustomSubscription: ${name} already exists as a custom subscription, ignoring.`);
             return;
         }
