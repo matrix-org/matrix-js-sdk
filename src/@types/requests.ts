@@ -48,7 +48,11 @@ export interface IJoinRoomOpts {
 export interface IRedactOpts {
     reason?: string;
     /**
-     * Also try to delete related events of the relation types in this array.
+     * Whether events related to the redacted event should be redacted.
+     *
+     * If specified, then any events which relate to the event being redacted with
+     * any of the relationship types listed will also be redacted.
+     *
      * <b>Raises an Error if the server does not support it.</b>
      * Check for server-side support before using this param with
      * <code>client.canSupport.get(Feature.RelationBasedRedactions)</code>.
