@@ -536,6 +536,9 @@ export class GroupCall extends TypedEventEmitter<
             this.localDesktopCapturerSourceId = undefined;
         }
 
+        this.userMediaFeeds.splice(0, this.userMediaFeeds.length);
+        this.screenshareFeeds.splice(0, this.screenshareFeeds.length);
+
         this.client.getMediaHandler().stopAllStreams();
 
         if (this.transmitTimer !== null) {
