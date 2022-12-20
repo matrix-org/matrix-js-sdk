@@ -624,6 +624,16 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
+     * Check if loading of out-of-band-members has completed
+     *
+     * @returns true if the full membership list of this room has been loaded. False if it is not started or is in
+     *    progress.
+     */
+    public outOfBandMembersReady(): boolean {
+        return this.oobMemberFlags.status === OobStatus.Finished;
+    }
+
+    /**
      * Mark this room state as waiting for out-of-band members,
      * ensuring it doesn't ask for them to be requested again
      * through needsOutOfBandMembers

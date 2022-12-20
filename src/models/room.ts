@@ -889,6 +889,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Check if loading of out-of-band-members has completed
+     *
+     * @returns true if the full membership list of this room has been loaded (including if lazy-loading is disabled).
+     *    False if the load is not started or is in progress.
+     */
+    public membersLoaded(): boolean {
+        if (!this.opts.lazyLoadMembers) {
+            return true;
+        }
+
+        return this.currentState.outOfBandMembersReady();
+    }
+
+    /**
      * Preloads the member list in case lazy loading
      * of memberships is in use. Can be called multiple times,
      * it will only preload once.
@@ -909,10 +923,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const inMemoryUpdate = this.loadMembers()
             .then((result) => {
                 this.currentState.setOutOfBandMembers(result.memberEvents);
-                // now the members are loaded, start to track the e2e devices if needed
-                if (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId)) {
-                    this.client.crypto!.trackRoomDevices(this.roomId);
-                }
                 return result.fromServer;
             })
             .catch((err) => {

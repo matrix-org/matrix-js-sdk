@@ -89,6 +89,7 @@ import { ISyncResponse } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { RoomState, RoomStateEvent } from "../models/room-state";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -2606,14 +2607,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             await storeConfigPromise;
         }
 
-        if (!this.lazyLoadMembers) {
-            logger.log(
-                "Enabling encryption in " + roomId + "; " + "starting to track device lists for all users therein",
-            );
+        logger.log(`Enabling encryption in ${roomId}`);
 
+        // we don't want to force a download of the full membership list of this room, but as soon as we have that
+        // list we can start tracking the device list.
+        if (room.membersLoaded()) {
             await this.trackRoomDevicesImpl(room);
         } else {
-            logger.log("Enabling encryption in " + roomId);
+            // wait for the membership list to be loaded
+            const onState = (_state: RoomState): void => {
+                room.off(RoomStateEvent.Update, onState);
+                if (room.membersLoaded()) {
+                    this.trackRoomDevicesImpl(room).catch((e) => {
+                        logger.error(`Error enabling device tracking in ${roomId}`, e);
+                    });
+                }
+            };
+            room.on(RoomStateEvent.Update, onState);
         }
     }
 
@@ -2622,6 +2632,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param roomId - The room ID to start tracking devices in.
      * @returns when all devices for the room have been fetched and marked to track
+     * @deprecated there's normally no need to call this function: device list tracking
+     *    will be enabled as soon as we have the full membership list.
      */
     public trackRoomDevices(roomId: string): Promise<void> {
         const room = this.clientStore.getRoom(roomId);
