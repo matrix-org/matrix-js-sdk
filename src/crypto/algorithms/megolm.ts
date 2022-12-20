@@ -20,7 +20,7 @@ limitations under the License.
 
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult } from "../../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../../@types/crypto";
 import { logger } from "../../logger";
 import * as olmlib from "../olmlib";
 import {
@@ -39,7 +39,7 @@ import { IOlmSessionResult } from "../olmlib";
 import { DeviceInfoMap } from "../DeviceList";
 import { IContent, MatrixEvent } from "../../models/event";
 import { EventType, MsgType, ToDeviceMessageId } from "../../@types/event";
-import { IMegolmEncryptedContent, IMegolmSessionData, IncomingRoomKeyRequest, IEncryptedContent } from "../index";
+import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } from "../index";
 import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
 import { MatrixError } from "../../http-api";
