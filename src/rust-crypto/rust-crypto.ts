@@ -25,11 +25,13 @@ import {
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IToDeviceEvent } from "../sync-accumulator";
+import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { QueryDict } from "../utils";
+import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
@@ -78,6 +80,24 @@ export class RustCrypto implements CryptoBackend {
         throw new Error("not implemented");
     }
 
+    public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
+        // TODO: make this work properly. Or better, replace it.
+
+        const ret: Partial<IEncryptedEventInfo> = {};
+
+        ret.senderKey = event.getSenderKey() ?? undefined;
+        ret.algorithm = event.getWireContent().algorithm;
+
+        if (!ret.senderKey || !ret.algorithm) {
+            ret.encrypted = false;
+            return ret as IEncryptedEventInfo;
+        }
+        ret.encrypted = true;
+        ret.authenticated = true;
+        ret.mismatchedSender = true;
+        return ret as IEncryptedEventInfo;
+    }
+
     public async userHasCrossSigningKeys(): Promise<boolean> {
         // TODO
         return false;
@@ -86,6 +106,16 @@ export class RustCrypto implements CryptoBackend {
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
+    }
+
+    public checkUserTrust(userId: string): UserTrustLevel {
+        // TODO
+        return new UserTrustLevel(false, false, false);
+    }
+
+    public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
+        // TODO
+        return new DeviceTrustLevel(false, false, false, false);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
