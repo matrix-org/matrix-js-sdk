@@ -22,11 +22,13 @@ import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
+    RelationType,
     RoomCreateTypeField,
     RoomType,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { Crypto } from "../../src/crypto";
@@ -121,6 +123,10 @@ describe("MatrixClient", function () {
         data: SYNC_DATA,
     };
 
+    const unstableFeatures: Record<string, boolean> = {
+        "org.matrix.msc3440.stable": true,
+    };
+
     // items are popped off when processed and block if no items left.
     let httpLookups: HttpLookup[] = [];
     let acceptKeepalives: boolean;
@@ -132,9 +138,7 @@ describe("MatrixClient", function () {
     function httpReq(method: Method, path: string, qp?: QueryDict, data?: BodyInit, opts?: IRequestOpts) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
-                unstable_features: {
-                    "org.matrix.msc3440.stable": true,
-                },
+                unstable_features: unstableFeatures,
                 versions: ["r0.6.0", "r0.6.1"],
             });
         }
@@ -1084,6 +1088,59 @@ describe("MatrixClient", function () {
             ];
 
             await client.redactEvent(roomId, eventId, txnId, { reason });
+        });
+
+        describe("when calling with with_relations", () => {
+            const eventId = "$event42:example.org";
+
+            it("should raise an error if server has no support for relation based redactions", async () => {
+                // load supported features
+                await client.getVersions();
+
+                const txnId = client.makeTxnId();
+
+                expect(() => {
+                    client.redactEvent(roomId, eventId, txnId, {
+                        with_relations: [RelationType.Reference],
+                    });
+                }).toThrowError(
+                    new Error(
+                        "Server does not support relation based redactions " +
+                            `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId null`,
+                    ),
+                );
+            });
+
+            describe("and the server supports relation based redactions (unstable)", () => {
+                beforeEach(async () => {
+                    unstableFeatures["org.matrix.msc3912"] = true;
+                    // load supported features
+                    await client.getVersions();
+                });
+
+                it("should send with_relations in the request body", async () => {
+                    const txnId = client.makeTxnId();
+
+                    httpLookups = [
+                        {
+                            method: "PUT",
+                            path:
+                                `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
+                                `/${encodeURIComponent(txnId)}`,
+                            expectBody: {
+                                reason: "redaction test",
+                                [MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: [RelationType.Reference],
+                            },
+                            data: { event_id: eventId },
+                        },
+                    ];
+
+                    await client.redactEvent(roomId, eventId, txnId, {
+                        reason: "redaction test",
+                        with_relations: [RelationType.Reference],
+                    });
+                });
+            });
         });
     });
 
