@@ -30,6 +30,7 @@ import {
 } from "../../src";
 import { FeatureSupport, Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
+import { eventMapperFor } from "../../src/event-mapper";
 
 describe("EventTimelineSet", () => {
     const roomId = "!foo:bar";
@@ -206,6 +207,7 @@ describe("EventTimelineSet", () => {
 
         it("should allow edits to be added to thread timeline", async () => {
             jest.spyOn(client, "supportsExperimentalThreads").mockReturnValue(true);
+            jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
             Thread.hasServerSideSupport = FeatureSupport.Stable;
 
             const sender = "@alice:matrix.org";
@@ -233,6 +235,25 @@ describe("EventTimelineSet", () => {
                 sender,
             });
 
+            root.setUnsigned({
+                "m.relations": {
+                    [RelationType.Thread]: {
+                        count: 1,
+                        latest_event: {
+                            content: threadReply.getContent(),
+                            origin_server_ts: 5,
+                            room_id: room.roomId,
+                            sender,
+                            type: EventType.RoomMessage,
+                            event_id: threadReply.getId()!,
+                            user_id: sender,
+                            age: 1,
+                        },
+                        current_user_participated: true,
+                    },
+                },
+            });
+
             const editToThreadReply = utils.mkEvent({
                 event: true,
                 content: {
@@ -251,9 +272,6 @@ describe("EventTimelineSet", () => {
                 sender,
             });
 
-            const thread = room.createThread(root.getId()!, root, [threadReply, editToThreadReply], false);
-
-            jest.spyOn(thread, "processEvent").mockResolvedValue();
             jest.spyOn(client, "paginateEventTimeline").mockImplementation(async () => {
                 thread.timelineSet.getLiveTimeline().addEvent(threadReply, { toStartOfTimeline: true });
                 return true;
@@ -262,6 +280,7 @@ describe("EventTimelineSet", () => {
                 events: [],
             });
 
+            const thread = room.createThread(root.getId()!, root, [threadReply, editToThreadReply], false);
             thread.once(RoomEvent.TimelineReset, () => {
                 const lastEvent = thread.timeline.at(-1)!;
                 expect(lastEvent.getContent().body).toBe(" * edit");

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IEventDecryptionResult } from "../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import { MatrixEvent } from "../models/event";
 
 /**
@@ -60,4 +60,14 @@ export interface CryptoBackend {
      * Rejects with an error if there is a problem decrypting the event.
      */
     decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult>;
+
+    /**
+     * Get a list containing all of the room keys
+     *
+     * This should be encrypted before returning it to the user.
+     *
+     * @returns a promise which resolves to a list of
+     *    session export objects
+     */
+    exportRoomKeys(): Promise<IMegolmSessionData[]>;
 }

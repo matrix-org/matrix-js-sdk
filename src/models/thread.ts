@@ -141,7 +141,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.setEventMetadata(this.rootEvent);
     }
 
-    public async fetchRootEvent(): Promise<void> {
+    private async fetchRootEvent(): Promise<void> {
         this.rootEvent = this.room.findEventById(this.id);
         // If the rootEvent does not exist in the local stores, then fetch it from the server.
         try {
@@ -335,7 +335,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
     }
 
-    public async processRootEvent(): Promise<void> {
+    private async processRootEvent(): Promise<void> {
         const bundledRelationship = this.getRootEventBundledRelationship();
         if (Thread.hasServerSideSupport && bundledRelationship) {
             this.replyCount = bundledRelationship.count;

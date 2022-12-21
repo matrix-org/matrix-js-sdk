@@ -20,7 +20,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult } from "../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -171,26 +171,6 @@ export interface IRoomKeyRequestBody extends IRoomKey {
     sender_key: string;
 }
 
-interface Extensible {
-    [key: string]: any;
-}
-
-export interface IMegolmSessionData extends Extensible {
-    // Sender's Curve25519 device key
-    sender_key: string;
-    // Devices which forwarded this session to us (normally empty).
-    forwarding_curve25519_key_chain: string[];
-    // Other keys the sender claims.
-    sender_claimed_keys: Record<string, string>;
-    // Room this session is used in
-    room_id: string;
-    // Unique id for the session
-    session_id: string;
-    // Base64'ed key data
-    session_key: string;
-    algorithm?: string;
-    untrusted?: boolean;
-}
 /* eslint-enable camelcase */
 
 interface IDeviceVerificationUpgrade {
@@ -3894,5 +3874,5 @@ class IncomingRoomKeyRequestCancellation {
     }
 }
 
-// IEventDecryptionResult is re-exported for backwards compatibility, in case any applications are referencing it.
-export type { IEventDecryptionResult } from "../@types/crypto";
+// a number of types are re-exported for backwards compatibility, in case any applications are referencing it.
+export type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";

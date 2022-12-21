@@ -1418,6 +1418,102 @@ describe("SlidingSync", () => {
             await httpBackend!.flushAllExpected();
             slidingSync.stop();
         });
+
+        it("should not be possible to add/modify an already added custom subscription", async () => {
+            const slidingSync = new SlidingSync(proxyBaseUrl, [], defaultSub, client!, 1);
+            slidingSync.addCustomSubscription(customSubName1, customSub1);
+            slidingSync.addCustomSubscription(customSubName1, customSub2);
+            slidingSync.useCustomSubscription(roomA, customSubName1);
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomA]));
+
+            httpBackend!
+                .when("POST", syncUrl)
+                .check(function (req) {
+                    const body = req.data;
+                    logger.log("custom subs", body);
+                    expect(body.room_subscriptions).toBeTruthy();
+                    expect(body.room_subscriptions[roomA]).toEqual(customSub1);
+                })
+                .respond(200, {
+                    pos: "b",
+                    lists: [],
+                    extensions: {},
+                    rooms: {},
+                });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+            slidingSync.stop();
+        });
+
+        it("should change the custom subscription if they are different", async () => {
+            const slidingSync = new SlidingSync(proxyBaseUrl, [], defaultSub, client!, 1);
+            slidingSync.addCustomSubscription(customSubName1, customSub1);
+            slidingSync.addCustomSubscription(customSubName2, customSub2);
+            slidingSync.useCustomSubscription(roomA, customSubName1);
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomA]));
+
+            httpBackend!
+                .when("POST", syncUrl)
+                .check(function (req) {
+                    const body = req.data;
+                    logger.log("custom subs", body);
+                    expect(body.room_subscriptions).toBeTruthy();
+                    expect(body.room_subscriptions[roomA]).toEqual(customSub1);
+                    expect(body.unsubscribe_rooms).toBeUndefined();
+                })
+                .respond(200, {
+                    pos: "b",
+                    lists: [],
+                    extensions: {},
+                    rooms: {},
+                });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+
+            // using the same subscription doesn't unsub nor changes subscriptions
+            slidingSync.useCustomSubscription(roomA, customSubName1);
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomA]));
+
+            httpBackend!
+                .when("POST", syncUrl)
+                .check(function (req) {
+                    const body = req.data;
+                    logger.log("custom subs", body);
+                    expect(body.room_subscriptions).toBeUndefined();
+                    expect(body.unsubscribe_rooms).toBeUndefined();
+                })
+                .respond(200, {
+                    pos: "b",
+                    lists: [],
+                    extensions: {},
+                    rooms: {},
+                });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+
+            // Changing the subscription works
+            slidingSync.useCustomSubscription(roomA, customSubName2);
+            slidingSync.modifyRoomSubscriptions(new Set<string>([roomA]));
+
+            httpBackend!
+                .when("POST", syncUrl)
+                .check(function (req) {
+                    const body = req.data;
+                    logger.log("custom subs", body);
+                    expect(body.room_subscriptions).toBeTruthy();
+                    expect(body.room_subscriptions[roomA]).toEqual(customSub2);
+                    expect(body.unsubscribe_rooms).toBeUndefined();
+                })
+                .respond(200, {
+                    pos: "b",
+                    lists: [],
+                    extensions: {},
+                    rooms: {},
+                });
+            slidingSync.start();
+            await httpBackend!.flushAllExpected();
+            slidingSync.stop();
+        });
     });
 
     describe("extensions", () => {

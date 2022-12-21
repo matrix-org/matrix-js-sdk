@@ -21,8 +21,7 @@ import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import * as algorithms from "./algorithms";
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
-import { IMegolmSessionData } from "./index";
-import { OlmGroupSessionExtraData } from "../@types/crypto";
+import { IMegolmSessionData, OlmGroupSessionExtraData } from "../@types/crypto";
 import { IMessage } from "./algorithms/olm";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
