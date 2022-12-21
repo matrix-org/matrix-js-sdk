@@ -20,6 +20,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -67,7 +68,7 @@ import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
 import { RoomMember, RoomMemberEvent } from "../models/room-member";
-import { EventStatus, IClearEvent, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
+import { EventStatus, IEvent, MatrixEvent, MatrixEventEvent } from "../models/event";
 import { ToDeviceBatch } from "../models/ToDeviceMessage";
 import {
     ClientEvent,
@@ -87,6 +88,7 @@ import { IContent } from "../models/event";
 import { ISyncResponse } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
+import { CryptoBackend } from "../common-crypto/CryptoBackend";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -169,26 +171,6 @@ export interface IRoomKeyRequestBody extends IRoomKey {
     sender_key: string;
 }
 
-interface Extensible {
-    [key: string]: any;
-}
-
-export interface IMegolmSessionData extends Extensible {
-    // Sender's Curve25519 device key
-    sender_key: string;
-    // Devices which forwarded this session to us (normally empty).
-    forwarding_curve25519_key_chain: string[];
-    // Other keys the sender claims.
-    sender_claimed_keys: Record<string, string>;
-    // Room this session is used in
-    room_id: string;
-    // Unique id for the session
-    session_id: string;
-    // Base64'ed key data
-    session_key: string;
-    algorithm?: string;
-    untrusted?: boolean;
-}
 /* eslint-enable camelcase */
 
 interface IDeviceVerificationUpgrade {
@@ -216,30 +198,6 @@ export interface IRoomKeyRequestRecipient {
 interface ISignableObject {
     signatures?: ISignatures;
     unsigned?: object;
-}
-
-/**
- * The result of a (successful) call to decryptEvent.
- */
-export interface IEventDecryptionResult {
-    /**
-     * The plaintext payload for the event (typically containing <tt>type</tt> and <tt>content</tt> fields).
-     */
-    clearEvent: IClearEvent;
-    /**
-     * List of curve25519 keys involved in telling us about the senderCurve25519Key and claimedEd25519Key.
-     * See {@link MatrixEvent#getForwardingCurve25519KeyChain}.
-     */
-    forwardingCurve25519KeyChain?: string[];
-    /**
-     * Key owned by the sender of this event.  See {@link MatrixEvent#getSenderKey}.
-     */
-    senderCurve25519Key?: string;
-    /**
-     * ed25519 key claimed by the sender of this event. See {@link MatrixEvent#getClaimedEd25519Key}.
-     */
-    claimedEd25519Key?: string;
-    untrusted?: boolean;
 }
 
 export interface IRequestsMap {
@@ -380,7 +338,7 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.UserCrossSigningUpdated]: (userId: string) => void;
 };
 
-export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> {
+export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap> implements CryptoBackend {
     /**
      * @returns The version of Olm.
      */
@@ -3915,3 +3873,6 @@ class IncomingRoomKeyRequestCancellation {
         this.requestId = content.request_id;
     }
 }
+
+// a number of types are re-exported for backwards compatibility, in case any applications are referencing it.
+export type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";

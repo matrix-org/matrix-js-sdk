@@ -2743,18 +2743,20 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private stopAllMedia(): void {
-        logger.debug(
-            !this.groupCallId
-                ? `Call ${this.callId} stopping all media`
-                : `Call ${this.callId} stopping all media except local feeds`,
-        );
+        logger.debug(`Call ${this.callId} stopping all media`);
 
         for (const feed of this.feeds) {
-            if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia && !this.groupCallId) {
+            // Slightly awkward as local feed need to go via the correct method on
+            // the mediahandler so they get removed from mediahandler (remote tracks
+            // don't)
+            // NB. We clone local streams when passing them to individual calls in a group
+            // call, so we can (and should) stop the clones once we no longer need them:
+            // the other clones will continue fine.
+            if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
                 this.client.getMediaHandler().stopUserMediaStream(feed.stream);
-            } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare && !this.groupCallId) {
+            } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
                 this.client.getMediaHandler().stopScreensharingStream(feed.stream);
-            } else if (!feed.isLocal() || !this.groupCallId) {
+            } else if (!feed.isLocal()) {
                 logger.debug("Stopping remote stream", feed.stream.id);
                 for (const track of feed.stream.getTracks()) {
                     track.stop();

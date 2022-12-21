@@ -22,11 +22,13 @@ import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
     EventType,
+    RelationType,
     RoomCreateTypeField,
     RoomType,
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { Crypto } from "../../src/crypto";
@@ -57,6 +59,7 @@ import {
 import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
 import { QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
+import * as featureUtils from "../../src/feature";
 
 jest.useFakeTimers();
 
@@ -120,6 +123,10 @@ describe("MatrixClient", function () {
         data: SYNC_DATA,
     };
 
+    const unstableFeatures: Record<string, boolean> = {
+        "org.matrix.msc3440.stable": true,
+    };
+
     // items are popped off when processed and block if no items left.
     let httpLookups: HttpLookup[] = [];
     let acceptKeepalives: boolean;
@@ -131,9 +138,7 @@ describe("MatrixClient", function () {
     function httpReq(method: Method, path: string, qp?: QueryDict, data?: BodyInit, opts?: IRequestOpts) {
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
-                unstable_features: {
-                    "org.matrix.msc3440.stable": true,
-                },
+                unstable_features: unstableFeatures,
                 versions: ["r0.6.0", "r0.6.1"],
             });
         }
@@ -279,6 +284,23 @@ describe("MatrixClient", function () {
             return new Promise(() => {});
         });
         client.stopClient();
+    });
+
+    describe("getSafeUserId()", () => {
+        it("returns the logged in user id", () => {
+            expect(client.getSafeUserId()).toEqual(userId);
+        });
+
+        it("throws when there is not logged in user", () => {
+            const notLoggedInClient = new MatrixClient({
+                baseUrl: "https://my.home.server",
+                idBaseUrl: identityServerUrl,
+                fetchFn: function () {} as any, // NOP
+                store: store,
+                scheduler: scheduler,
+            });
+            expect(() => notLoggedInClient.getSafeUserId()).toThrow("Expected logged in user but found none.");
+        });
     });
 
     describe("sendEvent", () => {
@@ -1067,6 +1089,59 @@ describe("MatrixClient", function () {
 
             await client.redactEvent(roomId, eventId, txnId, { reason });
         });
+
+        describe("when calling with with_relations", () => {
+            const eventId = "$event42:example.org";
+
+            it("should raise an error if server has no support for relation based redactions", async () => {
+                // load supported features
+                await client.getVersions();
+
+                const txnId = client.makeTxnId();
+
+                expect(() => {
+                    client.redactEvent(roomId, eventId, txnId, {
+                        with_relations: [RelationType.Reference],
+                    });
+                }).toThrowError(
+                    new Error(
+                        "Server does not support relation based redactions " +
+                            `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId null`,
+                    ),
+                );
+            });
+
+            describe("and the server supports relation based redactions (unstable)", () => {
+                beforeEach(async () => {
+                    unstableFeatures["org.matrix.msc3912"] = true;
+                    // load supported features
+                    await client.getVersions();
+                });
+
+                it("should send with_relations in the request body", async () => {
+                    const txnId = client.makeTxnId();
+
+                    httpLookups = [
+                        {
+                            method: "PUT",
+                            path:
+                                `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
+                                `/${encodeURIComponent(txnId)}`,
+                            expectBody: {
+                                reason: "redaction test",
+                                [MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: [RelationType.Reference],
+                            },
+                            data: { event_id: eventId },
+                        },
+                    ];
+
+                    await client.redactEvent(roomId, eventId, txnId, {
+                        reason: "redaction test",
+                        with_relations: [RelationType.Reference],
+                    });
+                });
+            });
+        });
     });
 
     describe("cancelPendingEvent", () => {
@@ -1826,6 +1901,70 @@ describe("MatrixClient", function () {
             });
 
             expect(client.getUseE2eForGroupCall()).toBe(false);
+        });
+    });
+
+    describe("delete account data", () => {
+        afterEach(() => {
+            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockRestore();
+        });
+        it("makes correct request when deletion is supported by server in unstable versions", async () => {
+            const eventType = "im.vector.test";
+            const versionsResponse = {
+                versions: ["1"],
+                unstable_features: {
+                    "org.matrix.msc3391": true,
+                },
+            };
+            jest.spyOn(client.http, "request").mockResolvedValue(versionsResponse);
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const unstablePrefix = "/_matrix/client/unstable/org.matrix.msc3391";
+            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+
+            // populate version support
+            await client.getVersions();
+            await client.deleteAccountData(eventType);
+
+            expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, {
+                prefix: unstablePrefix,
+            });
+        });
+
+        it("makes correct request when deletion is supported by server based on matrix version", async () => {
+            const eventType = "im.vector.test";
+            // we don't have a stable version for account data deletion yet to test this code path with
+            // so mock the support map to fake stable support
+            const stableSupportedDeletionMap = new Map();
+            stableSupportedDeletionMap.set(featureUtils.Feature.AccountDataDeletion, featureUtils.ServerSupport.Stable);
+            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(new Map());
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+
+            // populate version support
+            await client.getVersions();
+            await client.deleteAccountData(eventType);
+
+            expect(requestSpy).toHaveBeenCalledWith(Method.Delete, path, undefined, undefined, undefined);
+        });
+
+        it("makes correct request when deletion is not supported by server", async () => {
+            const eventType = "im.vector.test";
+            const versionsResponse = {
+                versions: ["1"],
+                unstable_features: {
+                    "org.matrix.msc3391": false,
+                },
+            };
+            jest.spyOn(client.http, "request").mockResolvedValue(versionsResponse);
+            const requestSpy = jest.spyOn(client.http, "authedRequest").mockImplementation(() => Promise.resolve());
+            const path = `/user/${encodeURIComponent(userId)}/account_data/${eventType}`;
+
+            // populate version support
+            await client.getVersions();
+            await client.deleteAccountData(eventType);
+
+            // account data updated with empty content
+            expect(requestSpy).toHaveBeenCalledWith(Method.Put, path, undefined, {});
         });
     });
 });

@@ -20,6 +20,7 @@ limitations under the License.
 
 import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent, Optional } from "matrix-events-sdk";
 
+import type { IMegolmSessionData } from "./@types/crypto";
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import {
     EventStatus,
@@ -74,7 +75,6 @@ import {
     ICryptoCallbacks,
     IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
-    IMegolmSessionData,
     isCryptoAvailable,
     VerificationMethod,
     IRoomKeyRequestBody,
@@ -154,6 +154,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "./@types/event";
 import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
@@ -210,6 +211,8 @@ import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
+import { CryptoBackend } from "./common-crypto/CryptoBackend";
+import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
 
 export type Store = IStore;
 
@@ -1163,7 +1166,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public identityServer?: IIdentityServerProvider;
     public http: MatrixHttpApi<IHttpOpts & { onlyData: true }>; // XXX: Intended private, used in code.
-    public crypto?: Crypto; // XXX: Intended private, used in code.
+    public crypto?: Crypto; // libolm crypto implementation. XXX: Intended private, used in code. Being replaced by cryptoBackend
+    private cryptoBackend?: CryptoBackend; // one of crypto or rustCrypto
     public cryptoCallbacks: ICryptoCallbacks; // XXX: Intended private, used in code.
     public callEventHandler?: CallEventHandler; // XXX: Intended private, used in code.
     public groupCallEventHandler?: GroupCallEventHandler;
@@ -1476,7 +1480,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * clean shutdown.
      */
     public stopClient(): void {
-        this.crypto?.stop(); // crypto might have been initialised even if the client wasn't fully started
+        this.cryptoBackend?.stop(); // crypto might have been initialised even if the client wasn't fully started
 
         if (!this.clientRunning) return; // already stopped
 
@@ -1676,6 +1680,41 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.cryptoStore) {
             promises.push(this.cryptoStore.deleteAllData());
         }
+
+        // delete the stores used by the rust matrix-sdk-crypto, in case they were used
+        const deleteRustSdkStore = async (): Promise<void> => {
+            let indexedDB: IDBFactory;
+            try {
+                indexedDB = global.indexedDB;
+            } catch (e) {
+                // No indexeddb support
+                return;
+            }
+            for (const dbname of [
+                `${RUST_SDK_STORE_PREFIX}::matrix-sdk-crypto`,
+                `${RUST_SDK_STORE_PREFIX}::matrix-sdk-crypto-meta`,
+            ]) {
+                const prom = new Promise((resolve, reject) => {
+                    logger.info(`Removing IndexedDB instance ${dbname}`);
+                    const req = indexedDB.deleteDatabase(dbname);
+                    req.onsuccess = (_): void => {
+                        logger.info(`Removed IndexedDB instance ${dbname}`);
+                        resolve(0);
+                    };
+                    req.onerror = (e): void => {
+                        logger.error(`Failed to remove IndexedDB instance ${dbname}: ${e}`);
+                        reject(new Error(`Error clearing storage: ${e}`));
+                    };
+                    req.onblocked = (e): void => {
+                        logger.info(`cannot yet remove IndexedDB instance ${dbname}`);
+                        //reject(new Error(`Error clearing storage: ${e}`));
+                    };
+                });
+                await prom;
+            }
+        };
+        promises.push(deleteRustSdkStore());
+
         return Promise.all(promises).then(); // .then to fix types
     }
 
@@ -1689,6 +1728,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return this.credentials.userId;
         }
         return null;
+    }
+
+    /**
+     * Get the user-id of the logged-in user
+     *
+     * @returns MXID for the logged-in user
+     * @throws Error if not logged in
+     */
+    public getSafeUserId(): string {
+        const userId = this.getUserId();
+        if (!userId) {
+            throw new Error("Expected logged in user but found none.");
+        }
+        return userId;
     }
 
     /**
@@ -1991,7 +2044,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Initialise support for end-to-end encryption in this client
+     * Initialise support for end-to-end encryption in this client, using libolm.
      *
      * You should call this method after creating the matrixclient, but *before*
      * calling `startClient`, if you want to support end-to-end encryption.
@@ -2007,7 +2060,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         }
 
-        if (this.crypto) {
+        if (this.cryptoBackend) {
             logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
             return;
         }
@@ -2072,7 +2125,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // if crypto initialisation was successful, tell it to attach its event handlers.
         crypto.registerEventHandlers(this as Parameters<Crypto["registerEventHandlers"]>[0]);
-        this.crypto = crypto;
+        this.cryptoBackend = this.crypto = crypto;
 
         // upload our keys in the background
         this.crypto.uploadDeviceKeys().catch((e) => {
@@ -2082,11 +2135,51 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Initialise support for end-to-end encryption in this client, using the rust matrix-sdk-crypto.
+     *
+     * An alternative to {@link initCrypto}.
+     *
+     * *WARNING*: this API is very experimental, should not be used in production, and may change without notice!
+     *    Eventually it will be deprecated and `initCrypto` will do the same thing.
+     *
+     * @experimental
+     *
+     * @returns a Promise which will resolve when the crypto layer has been
+     *    successfully initialised.
+     */
+    public async initRustCrypto(): Promise<void> {
+        if (this.cryptoBackend) {
+            logger.warn("Attempt to re-initialise e2e encryption on MatrixClient");
+            return;
+        }
+
+        const userId = this.getUserId();
+        if (userId === null) {
+            throw new Error(
+                `Cannot enable encryption on MatrixClient with unknown userId: ` +
+                    `ensure userId is passed in createClient().`,
+            );
+        }
+        const deviceId = this.getDeviceId();
+        if (deviceId === null) {
+            throw new Error(
+                `Cannot enable encryption on MatrixClient with unknown deviceId: ` +
+                    `ensure deviceId is passed in createClient().`,
+            );
+        }
+
+        // importing rust-crypto will download the webassembly, so we delay it until we know it will be
+        // needed.
+        const RustCrypto = await import("./rust-crypto");
+        this.cryptoBackend = await RustCrypto.initRustCrypto(userId, deviceId);
+    }
+
+    /**
      * Is end-to-end crypto enabled for this client.
      * @returns True if end-to-end is enabled.
      */
     public isCryptoEnabled(): boolean {
-        return !!this.crypto;
+        return !!this.cryptoBackend;
     }
 
     /**
@@ -2331,10 +2424,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param value - whether to blacklist all unverified devices by default
      */
     public setGlobalBlacklistUnverifiedDevices(value: boolean): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.globalBlacklistUnverifiedDevices = value;
+        this.cryptoBackend.globalBlacklistUnverifiedDevices = value;
         return value;
     }
 
@@ -2342,10 +2435,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns whether to blacklist all unverified devices by default
      */
     public getGlobalBlacklistUnverifiedDevices(): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.globalBlacklistUnverifiedDevices;
+        return this.cryptoBackend.globalBlacklistUnverifiedDevices;
     }
 
     /**
@@ -2359,10 +2452,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param value - whether error on unknown devices
      */
     public setGlobalErrorOnUnknownDevices(value: boolean): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.globalErrorOnUnknownDevices = value;
+        this.cryptoBackend.globalErrorOnUnknownDevices = value;
     }
 
     /**
@@ -2371,10 +2464,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * This API is currently UNSTABLE and may change or be removed without notice.
      */
     public getGlobalErrorOnUnknownDevices(): boolean {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.globalErrorOnUnknownDevices;
+        return this.cryptoBackend.globalErrorOnUnknownDevices;
     }
 
     /**
@@ -2514,10 +2607,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * the cross-signing pseudo-device.
      */
     public userHasCrossSigningKeys(): Promise<boolean> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.userHasCrossSigningKeys();
+        return this.cryptoBackend.userHasCrossSigningKeys();
     }
 
     /**
@@ -2973,10 +3066,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    session export objects
      */
     public exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             return Promise.reject(new Error("End-to-end encryption disabled"));
         }
-        return this.crypto.exportRoomKeys();
+        return this.cryptoBackend.exportRoomKeys();
     }
 
     /**
@@ -3796,6 +3889,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
+    public async deleteAccountData(eventType: string): Promise<void> {
+        const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
+        // if deletion is not supported overwrite with empty content
+        if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
+            await this.setAccountData(eventType, {});
+            return;
+        }
+        const path = utils.encodeUri("/user/$userId/account_data/$type", {
+            $userId: this.getSafeUserId(),
+            $type: eventType,
+        });
+        const options =
+            msc3391DeleteAccountDataServerSupport === ServerSupport.Unstable
+                ? { prefix: "/_matrix/client/unstable/org.matrix.msc3391" }
+                : undefined;
+        return await this.http.authedRequest(Method.Delete, path, undefined, undefined, options);
+    }
+
     /**
      * Gets the users that are ignored by this client
      * @returns The array of users that are ignored (empty if none)
@@ -4366,9 +4477,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param txnId -  transaction id. One will be made up if not supplied.
-     * @param opts - Options to pass on, may contain `reason`.
+     * @param opts - Options to pass on, may contain `reason` and `with_relations` (MSC3912)
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
+     * @throws Error if called with `with_relations` (MSC3912) but the server does not support it.
+     *         Callers should check whether the server supports MSC3912 via `MatrixClient.canSupport`.
      */
     public redactEvent(
         roomId: string,
@@ -4397,12 +4510,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const reason = opts?.reason;
+
+        if (
+            opts?.with_relations &&
+            this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported
+        ) {
+            throw new Error(
+                "Server does not support relation based redactions " +
+                    `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
+            );
+        }
+
+        const withRelations = opts?.with_relations
+            ? {
+                  [this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
+                      ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
+                      : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: opts?.with_relations,
+              }
+            : {};
+
         return this.sendCompleteEvent(
             roomId,
             threadId,
             {
                 type: EventType.RoomRedaction,
-                content: { reason },
+                content: {
+                    ...withRelations,
+                    reason,
+                },
                 redacts: eventId,
             },
             txnId as string,
@@ -5981,7 +6116,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     this.processBeaconEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
-                        timelineEvents.filter((it) => it.isRelation(THREAD_RELATION_TYPE.name)),
+                        timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
 
@@ -7194,7 +7329,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public decryptEventIfNeeded(event: MatrixEvent, options?: IDecryptOptions): Promise<void> {
         if (event.shouldAttemptDecryption() && this.isCryptoEnabled()) {
-            event.attemptDecryption(this.crypto!, options);
+            event.attemptDecryption(this.cryptoBackend!, options);
         }
 
         if (event.isBeingDecrypted()) {
