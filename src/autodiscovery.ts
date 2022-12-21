@@ -18,6 +18,7 @@ limitations under the License.
 import { IClientWellKnown, IWellKnownConfig } from "./client";
 import { logger } from "./logger";
 import { MatrixError, Method, timeoutSignal } from "./http-api";
+import { MINIMUM_MATRIX_VERSION } from "./version-support";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -40,6 +41,9 @@ enum AutoDiscoveryError {
     InvalidIs = "Invalid identity server discovery response",
     MissingWellknown = "No .well-known JSON file found",
     InvalidJson = "Invalid JSON",
+    HomeserverTooOld = "The homeserver does not meet the minimum version requirements",
+    // TODO: Implement when Sydent supports the `/versions` endpoint - https://github.com/matrix-org/sydent/issues/424
+    //IdentityServerTooOld = "The identity server does not meet the minimum version requirements",
 }
 
 interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
@@ -79,6 +83,8 @@ export class AutoDiscovery {
     public static readonly ERROR_MISSING_WELLKNOWN = AutoDiscoveryError.MissingWellknown;
 
     public static readonly ERROR_INVALID_JSON = AutoDiscoveryError.InvalidJson;
+
+    public static readonly ERROR_HOMESERVER_TOO_OLD = AutoDiscoveryError.HomeserverTooOld;
 
     public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError);
 
@@ -171,9 +177,21 @@ export class AutoDiscovery {
 
         // Step 3: Make sure the homeserver URL points to a homeserver.
         const hsVersions = await this.fetchWellKnownObject(`${hsUrl}/_matrix/client/versions`);
-        if (!hsVersions || !hsVersions.raw?.["versions"]) {
+        if (!hsVersions || !Array.isArray(hsVersions.raw?.["versions"])) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
+
+            // Supply the base_url to the caller because they may be ignoring liveliness
+            // errors, like this one.
+            clientConfig["m.homeserver"].base_url = hsUrl;
+
+            return Promise.resolve(clientConfig);
+        }
+
+        // Step 3.1: Non-spec check to ensure the server will actually work for us
+        if (!hsVersions.raw!["versions"].includes(MINIMUM_MATRIX_VERSION)) {
+            logger.error("Homeserver does not meet minimum version requirements");
+            clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_HOMESERVER_TOO_OLD;
 
             // Supply the base_url to the caller because they may be ignoring liveliness
             // errors, like this one.
