@@ -1,8 +1,9 @@
-Changes in [23.0.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.0.0-rc.1) (2022-12-14)
-============================================================================================================
+Changes in [23.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.0.0) (2022-12-21)
+==================================================================================================
 
 ## 🚨 BREAKING CHANGES
  * Process `m.room.encryption` events before emitting `RoomMember` events ([\#2914](https://github.com/matrix-org/matrix-js-sdk/pull/2914)). Fixes vector-im/element-web#23819.
+ * Don't expose `calls` on `GroupCall` ([\#2941](https://github.com/matrix-org/matrix-js-sdk/pull/2941)).
 
 ## ✨ Features
  * Support MSC3391: Account data deletion ([\#2967](https://github.com/matrix-org/matrix-js-sdk/pull/2967)).
