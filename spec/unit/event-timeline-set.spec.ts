@@ -24,9 +24,11 @@ import {
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
+    RelationType,
     Room,
+    RoomEvent,
 } from "../../src";
-import { Thread } from "../../src/models/thread";
+import { FeatureSupport, Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
 
 describe("EventTimelineSet", () => {
@@ -200,6 +202,70 @@ describe("EventTimelineSet", () => {
                 toStartOfTimeline: true,
             });
             expect(liveTimeline.getEvents().length).toStrictEqual(0);
+        });
+
+        it("should allow edits to be added to thread timeline", async () => {
+            jest.spyOn(client, "supportsExperimentalThreads").mockReturnValue(true);
+            Thread.hasServerSideSupport = FeatureSupport.Stable;
+
+            const sender = "@alice:matrix.org";
+
+            const root = utils.mkEvent({
+                event: true,
+                content: {
+                    body: "Thread root",
+                },
+                type: EventType.RoomMessage,
+                sender,
+            });
+            room.addLiveEvents([root]);
+
+            const threadReply = utils.mkEvent({
+                event: true,
+                content: {
+                    "body": "Thread reply",
+                    "m.relates_to": {
+                        event_id: root.getId()!,
+                        rel_type: RelationType.Thread,
+                    },
+                },
+                type: EventType.RoomMessage,
+                sender,
+            });
+
+            const editToThreadReply = utils.mkEvent({
+                event: true,
+                content: {
+                    "body": " * edit",
+                    "m.new_content": {
+                        "body": "edit",
+                        "msgtype": "m.text",
+                        "org.matrix.msc1767.text": "edit",
+                    },
+                    "m.relates_to": {
+                        event_id: threadReply.getId()!,
+                        rel_type: RelationType.Replace,
+                    },
+                },
+                type: EventType.RoomMessage,
+                sender,
+            });
+
+            const thread = room.createThread(root.getId()!, root, [threadReply, editToThreadReply], false);
+
+            jest.spyOn(thread, "processEvent").mockResolvedValue();
+            jest.spyOn(client, "paginateEventTimeline").mockImplementation(async () => {
+                thread.timelineSet.getLiveTimeline().addEvent(threadReply, { toStartOfTimeline: true });
+                return true;
+            });
+            jest.spyOn(client, "relations").mockResolvedValue({
+                events: [],
+            });
+
+            thread.once(RoomEvent.TimelineReset, () => {
+                const lastEvent = thread.timeline.at(-1)!;
+                expect(lastEvent.getContent().body).toBe(" * edit");
+            });
         });
 
         describe("non-room timeline", () => {
