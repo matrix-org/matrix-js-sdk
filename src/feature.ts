@@ -26,6 +26,7 @@ export enum Feature {
     Thread = "Thread",
     ThreadUnreadNotifications = "ThreadUnreadNotifications",
     LoginTokenRequest = "LoginTokenRequest",
+    RelationBasedRedactions = "RelationBasedRedactions",
     AccountDataDeletion = "AccountDataDeletion",
 }
 
@@ -45,6 +46,9 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     },
     [Feature.LoginTokenRequest]: {
         unstablePrefixes: ["org.matrix.msc3882"],
+    },
+    [Feature.RelationBasedRedactions]: {
+        unstablePrefixes: ["org.matrix.msc3912"],
     },
     [Feature.AccountDataDeletion]: {
         unstablePrefixes: ["org.matrix.msc3391"],

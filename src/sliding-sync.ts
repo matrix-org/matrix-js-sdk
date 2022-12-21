@@ -397,6 +397,10 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * @param sub - The subscription information.
      */
     public addCustomSubscription(name: string, sub: MSC3575RoomSubscription): void {
+        if (this.customSubscriptions.has(name)) {
+            logger.warn(`addCustomSubscription: ${name} already exists as a custom subscription, ignoring.`);
+            return;
+        }
         this.customSubscriptions.set(name, sub);
     }
 
@@ -408,6 +412,11 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
      * will be used.
      */
     public useCustomSubscription(roomId: string, name: string): void {
+        // We already know about this custom subscription, as it is immutable,
+        // we don't need to unconfirm the subscription.
+        if (this.roomIdToCustomSubscription.get(roomId) === name) {
+            return;
+        }
         this.roomIdToCustomSubscription.set(roomId, name);
         // unconfirm this subscription so a resend() will send it up afresh.
         this.confirmedRoomSubscriptions.delete(roomId);
