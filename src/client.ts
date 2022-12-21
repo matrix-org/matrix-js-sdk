@@ -842,6 +842,11 @@ interface ITimestampToEventResponse {
     event_id: string;
     origin_server_ts: string;
 }
+
+interface IWhoamiResponse {
+    user_id: string;
+    device_id?: string;
+}
 /* eslint-enable camelcase */
 
 // We're using this constant for methods overloading and inspect whether a variable
@@ -9375,10 +9380,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetches the user_id of the configured access token.
+     * Fetches information about the user for the configured access token.
      */
-    public async whoami(): Promise<{ user_id: string }> {
-        // eslint-disable-line camelcase
+    public async whoami(): Promise<IWhoamiResponse> {
         return this.http.authedRequest(Method.Get, "/account/whoami");
     }
 
