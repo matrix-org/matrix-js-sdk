@@ -9377,7 +9377,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Fetches the user_id of the configured access token.
      */
-    public async whoami(): Promise<{ user_id: string }> {
+    public async whoami(): Promise<{ user_id: string, device_id?: string }> {
         // eslint-disable-line camelcase
         return this.http.authedRequest(Method.Get, "/account/whoami");
     }
