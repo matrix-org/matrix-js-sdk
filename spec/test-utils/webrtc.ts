@@ -513,9 +513,6 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
 
     public sendMetadataUpdate = jest.fn<void, []>();
 
-    public on = jest.fn();
-    public removeListener = jest.fn();
-
     public getOpponentMember(): Partial<RoomMember> {
         return this.opponentMember;
     }

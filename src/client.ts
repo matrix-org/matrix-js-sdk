@@ -20,6 +20,7 @@ limitations under the License.
 
 import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent, Optional } from "matrix-events-sdk";
 
+import type { IMegolmSessionData } from "./@types/crypto";
 import { ISyncStateData, SyncApi, SyncState } from "./sync";
 import {
     EventStatus,
@@ -74,7 +75,6 @@ import {
     ICryptoCallbacks,
     IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
-    IMegolmSessionData,
     isCryptoAvailable,
     VerificationMethod,
     IRoomKeyRequestBody,
@@ -154,6 +154,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "./@types/event";
 import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
@@ -3033,10 +3034,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    session export objects
      */
     public exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             return Promise.reject(new Error("End-to-end encryption disabled"));
         }
-        return this.crypto.exportRoomKeys();
+        return this.cryptoBackend.exportRoomKeys();
     }
 
     /**
@@ -4444,9 +4445,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param txnId -  transaction id. One will be made up if not supplied.
-     * @param opts - Options to pass on, may contain `reason`.
+     * @param opts - Options to pass on, may contain `reason` and `with_relations` (MSC3912)
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
+     * @throws Error if called with `with_relations` (MSC3912) but the server does not support it.
+     *         Callers should check whether the server supports MSC3912 via `MatrixClient.canSupport`.
      */
     public redactEvent(
         roomId: string,
@@ -4475,12 +4478,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const reason = opts?.reason;
+
+        if (
+            opts?.with_relations &&
+            this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported
+        ) {
+            throw new Error(
+                "Server does not support relation based redactions " +
+                    `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
+            );
+        }
+
+        const withRelations = opts?.with_relations
+            ? {
+                  [this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
+                      ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
+                      : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: opts?.with_relations,
+              }
+            : {};
+
         return this.sendCompleteEvent(
             roomId,
             threadId,
             {
                 type: EventType.RoomRedaction,
-                content: { reason },
+                content: {
+                    ...withRelations,
+                    reason,
+                },
                 redacts: eventId,
             },
             txnId as string,
@@ -6059,7 +6084,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     this.processBeaconEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
-                        timelineEvents.filter((it) => it.isRelation(THREAD_RELATION_TYPE.name)),
+                        timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
 
