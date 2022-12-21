@@ -119,7 +119,7 @@ describe("SlidingSyncSdk", () => {
         if (testOpts.withCrypto) {
             httpBackend!.when("GET", "/room_keys/version").respond(404, {});
             await client!.initCrypto();
-            syncOpts.crypto = client!.crypto;
+            syncOpts.cryptoCallbacks = syncOpts.crypto = client!.crypto;
         }
         httpBackend!.when("GET", "/_matrix/client/r0/pushrules").respond(200, {});
         sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts, syncOpts);

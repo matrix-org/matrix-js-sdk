@@ -20,7 +20,7 @@ import { MatrixEvent } from "../models/event";
 /**
  * Common interface for the crypto implementations
  */
-export interface CryptoBackend {
+export interface CryptoBackend extends SyncCryptoCallbacks {
     /**
      * Global override for whether the client should ever send encrypted
      * messages to unverified devices. This provides the default for rooms which
@@ -71,3 +71,6 @@ export interface CryptoBackend {
      */
     exportRoomKeys(): Promise<IMegolmSessionData[]>;
 }
+
+/** The methods which crypto implementations should expose to the Sync api */
+export interface SyncCryptoCallbacks {}
