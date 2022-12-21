@@ -19,7 +19,7 @@ import { logger } from "./logger";
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData, SyncState, _createAndReEmitRoom } from "./sync";
+import { ISyncStateData, SyncState, _createAndReEmitRoom, SyncApiOptions } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator";
@@ -351,7 +351,8 @@ export class SlidingSyncSdk {
     public constructor(
         private readonly slidingSync: SlidingSync,
         private readonly client: MatrixClient,
-        private readonly opts: Partial<IStoredClientOpts> = {},
+        private readonly opts: IStoredClientOpts = {},
+        private readonly syncOpts: SyncApiOptions = {},
     ) {
         this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
         this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
@@ -359,8 +360,8 @@ export class SlidingSyncSdk {
         this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
         this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
 
-        if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (_roomId: string): boolean => {
+        if (!syncOpts.canResetEntireTimeline) {
+            syncOpts.canResetEntireTimeline = (_roomId: string): boolean => {
                 return false;
             };
         }
@@ -377,8 +378,8 @@ export class SlidingSyncSdk {
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
         ];
-        if (this.opts.crypto) {
-            extensions.push(new ExtensionE2EE(this.opts.crypto));
+        if (this.syncOpts.crypto) {
+            extensions.push(new ExtensionE2EE(this.syncOpts.crypto));
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);
@@ -698,7 +699,7 @@ export class SlidingSyncSdk {
             if (limited) {
                 room.resetLiveTimeline(
                     roomData.prev_batch,
-                    null, // TODO this.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
+                    null, // TODO this.syncOpts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
                 );
 
                 // We have to assume any gap in any timeline is
@@ -730,8 +731,8 @@ export class SlidingSyncSdk {
 
         const processRoomEvent = async (e: MatrixEvent): Promise<void> => {
             client.emit(ClientEvent.Event, e);
-            if (e.isState() && e.getType() == EventType.RoomEncryption && this.opts.crypto) {
-                await this.opts.crypto.onCryptoEvent(room, e);
+            if (e.isState() && e.getType() == EventType.RoomEncryption && this.syncOpts.crypto) {
+                await this.syncOpts.crypto.onCryptoEvent(room, e);
             }
         };
 
