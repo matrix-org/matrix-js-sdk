@@ -214,7 +214,7 @@ export class AutoDiscovery {
 
             // Step 5b: Verify there is an identity server listening on the provided
             // URL.
-            const isResponse = await this.fetchWellKnownObject(`${isUrl}/_matrix/identity/api/v1`);
+            const isResponse = await this.fetchWellKnownObject(`${isUrl}/_matrix/identity/v2`);
             if (!isResponse?.raw || isResponse.action !== AutoDiscoveryAction.SUCCESS) {
                 logger.error("Invalid /api/v1 response");
                 failingClientConfig["m.identity_server"].error = AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
