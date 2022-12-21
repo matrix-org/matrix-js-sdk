@@ -2866,11 +2866,20 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         if (event.isRedacted()) {
+            // Try to decrypt the redaction event, to support encrypted
+            // redaction reasons.  If we can't decrypt, just fall back to using
+            // the original redacted_because.
             const redactionEvent = new MatrixEvent({
                 room_id: event.getRoomId(),
                 ...event.getUnsigned().redacted_because,
             });
-            const decryptedEvent = await this.decryptEvent(redactionEvent);
+            let redactedBecause: IEvent;
+            try {
+                const decryptedEvent = await this.decryptEvent(redactionEvent);
+                redactedBecause = decryptedEvent.clearEvent as IEvent;
+            } catch {
+                redactedBecause = event.getUnsigned().redacted_because!;
+            }
 
             return {
                 clearEvent: {
@@ -2878,7 +2887,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     type: "m.room.message",
                     content: {},
                     unsigned: {
-                        redacted_because: decryptedEvent.clearEvent as IEvent,
+                        redacted_because: redactedBecause,
                     },
                 },
             };
