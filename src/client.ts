@@ -9383,7 +9383,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Fetches information about the user for the configured access token.
      */
     public async whoami(): Promise<IWhoamiResponse> {
-        // eslint-disable-line camelcase
         return this.http.authedRequest(Method.Get, "/account/whoami");
     }
 
