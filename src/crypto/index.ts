@@ -2873,12 +2873,14 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 room_id: event.getRoomId(),
                 ...event.getUnsigned().redacted_because,
             });
-            let redactedBecause: IEvent;
-            try {
-                const decryptedEvent = await this.decryptEvent(redactionEvent);
-                redactedBecause = decryptedEvent.clearEvent as IEvent;
-            } catch {
-                redactedBecause = event.getUnsigned().redacted_because!;
+            let redactedBecause: IEvent = event.getUnsigned().redacted_because!;
+            if (redactionEvent.isEncrypted()) {
+                try {
+                    const decryptedEvent = await this.decryptEvent(redactionEvent);
+                    redactedBecause = decryptedEvent.clearEvent as IEvent;
+                } catch (e) {
+                    logger.warn("Decryption of redaction failed. Falling back to unencrypted event.", e);
+                }
             }
 
             return {

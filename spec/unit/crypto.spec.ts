@@ -193,6 +193,9 @@ describe("Crypto", function () {
             });
             await event.attemptDecryption(client.crypto!);
             expect(event.isDecryptionFailure()).toBeFalsy();
+            // since the redaction event isn't encrypted, the redacted_because
+            // should be the same as in the original event
+            expect(event.getRedactionEvent()).toEqual(event.getUnsigned().redacted_because);
 
             client.stopClient();
         });
