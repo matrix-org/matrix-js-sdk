@@ -97,6 +97,11 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     private readonly pendingEventOrdering: PendingEventOrdering;
 
     public initialEventsFetched = !Thread.hasServerSideSupport;
+    /**
+     * An array of events to add to the timeline once the thread has been initialised
+     * with server suppport.
+     */
+    public replayEvents: MatrixEvent[] | null = [];
 
     public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
         super();
@@ -266,6 +271,20 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             this.addEventToTimeline(event, false);
             this.fetchEditsWhereNeeded(event);
         } else if (event.isRelation(RelationType.Annotation) || event.isRelation(RelationType.Replace)) {
+            if (!this.initialEventsFetched) {
+                /**
+                 * A thread can be fully discovered via a single sync response
+                 * And when that's the case we still ask the server to do an initialisation
+                 * as it's the safest to ensure we have everything.
+                 * However when we are in that scenario we might loose annotation or edits
+                 *
+                 * This fix keeps a reference to those events and replay them once the thread
+                 * has been initialised properly.
+                 */
+                this.replayEvents?.push(event);
+            } else {
+                this.addEventToTimeline(event, toStartOfTimeline);
+            }
             // Apply annotations and replace relations to the relations of the timeline only
             this.timelineSet.relations?.aggregateParentEvent(event);
             this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
@@ -375,6 +394,10 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                         limit: Math.max(1, this.length),
                     });
                 }
+                for (const event of this.replayEvents!) {
+                    this.addEvent(event, false);
+                }
+                this.replayEvents = null;
                 // just to make sure that, if we've created a timeline window for this thread before the thread itself
                 // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
                 this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
