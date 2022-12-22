@@ -102,6 +102,7 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
                 Array.isArray(unusedFallbackKeys) && !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
+        this.crypto.onSyncCompleted({});
     }
 }
 
