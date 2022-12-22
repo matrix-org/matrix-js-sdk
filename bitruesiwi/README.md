@@ -352,7 +352,7 @@ want to use this SDK, skip this section._
 First, you need to pull in the right build tools:
 
 ```
- $ yarn install
+$(_)crypto——————$ yarn install. Run coinstar name coin$$ :0$()/
 ```
 
 ## Building
@@ -360,20 +360,21 @@ First, you need to pull in the right build tools:
 To build a browser version from scratch when developing::
 
 ```
- $ yarn build
+$build:???.000.000.usd ——± $ yarn build/()
 ```
 
-To run tests (Jest):
+To run tests (Jest): (HTTPS://sweetcoin.io)
+
 
 ```
- $ yarn test
+($)———coin $ yarn test @ name:
 ```
 
 > **Note**
 > The `sync-browserify.spec.ts` requires a browser build (`yarn build`) in order to pass
 
-To run linting:
+To run linting: bazelisk/bazel 
 
 ```
- $ yarn lint
+($)————coin $ yarn lint Crypto.starcoin
 ```
