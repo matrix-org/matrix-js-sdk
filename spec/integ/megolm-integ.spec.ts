@@ -1590,4 +1590,92 @@ describe("megolm", () => {
             aliceTestClient.httpBackend.flush("/send/m.room.encrypted/", 1),
         ]);
     });
+
+    describe("Lazy-loading member lists", () => {
+        let p2pSession: Olm.Session;
+
+        beforeEach(async () => {
+            // set up the aliceTestClient so that it is a room with no known members
+            aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await aliceTestClient.start({ lazyLoadMembers: true });
+            aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
+
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse([]));
+            await aliceTestClient.flushSync();
+
+            p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
+        });
+
+        async function expectMembershipRequest(roomId: string, members: string[]): Promise<void> {
+            const membersPath = `/rooms/${encodeURIComponent(roomId)}/members?not_membership=leave`;
+            aliceTestClient.httpBackend.when("GET", membersPath).respond(200, {
+                chunk: [
+                    testUtils.mkMembershipCustom({
+                        membership: "join",
+                        sender: "@bob:xyz",
+                    }),
+                ],
+            });
+            await aliceTestClient.httpBackend.flush(membersPath, 1);
+        }
+
+        it("Sending an event initiates a member list sync", async () => {
+            // we expect a call to the /members list...
+            const memberListPromise = expectMembershipRequest(ROOM_ID, ["@bob:xyz"]);
+
+            // then a request for bob's devices...
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+
+            // then a to-device with the room_key
+            const inboundGroupSessionPromise = expectSendRoomKey(
+                aliceTestClient.httpBackend,
+                "@bob:xyz",
+                testOlmAccount,
+                p2pSession,
+            );
+
+            // and finally the megolm message
+            const megolmMessagePromise = expectSendMegolmMessage(
+                aliceTestClient.httpBackend,
+                inboundGroupSessionPromise,
+            );
+
+            // kick it off
+            const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, "test");
+
+            await Promise.all([
+                sendPromise,
+                megolmMessagePromise,
+                memberListPromise,
+                aliceTestClient.httpBackend.flush("/keys/query", 1),
+            ]);
+        });
+
+        it("loading the membership list inhibits a later load", async () => {
+            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+            await Promise.all([room.loadMembersIfNeeded(), expectMembershipRequest(ROOM_ID, ["@bob:xyz"])]);
+
+            // expect a request for bob's devices...
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+
+            // then a to-device with the room_key
+            const inboundGroupSessionPromise = expectSendRoomKey(
+                aliceTestClient.httpBackend,
+                "@bob:xyz",
+                testOlmAccount,
+                p2pSession,
+            );
+
+            // and finally the megolm message
+            const megolmMessagePromise = expectSendMegolmMessage(
+                aliceTestClient.httpBackend,
+                inboundGroupSessionPromise,
+            );
+
+            // kick it off
+            const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, "test");
+
+            await Promise.all([sendPromise, megolmMessagePromise, aliceTestClient.httpBackend.flush("/keys/query", 1)]);
+        });
+    });
 });

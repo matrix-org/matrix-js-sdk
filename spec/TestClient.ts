@@ -24,7 +24,7 @@ import MockHttpBackend from "matrix-mock-request";
 import { LocalStorageCryptoStore } from "../src/crypto/store/localStorage-crypto-store";
 import { logger } from "../src/logger";
 import { syncPromise } from "./test-utils/test-utils";
-import { createClient } from "../src/matrix";
+import { createClient, IStartClientOpts } from "../src/matrix";
 import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
 import { MockStorageApi } from "./MockStorageApi";
 import { encodeUri } from "../src/utils";
@@ -79,9 +79,12 @@ export class TestClient {
     /**
      * start the client, and wait for it to initialise.
      */
-    public start(): Promise<void> {
+    public start(opts: IStartClientOpts = {}): Promise<void> {
         logger.log(this + ": starting");
-        this.httpBackend.when("GET", "/versions").respond(200, {});
+        this.httpBackend.when("GET", "/versions").respond(200, {
+            // we have tests that rely on support for lazy-loading members
+            versions: ["r0.5.0"],
+        });
         this.httpBackend.when("GET", "/pushrules").respond(200, {});
         this.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
         this.expectDeviceKeyUpload();
@@ -93,6 +96,8 @@ export class TestClient {
         this.client.startClient({
             // set this so that we can get hold of failed events
             pendingEventOrdering: PendingEventOrdering.Detached,
+
+            ...opts,
         });
 
         return Promise.all([this.httpBackend.flushAllExpected(), syncPromise(this.client)]).then(() => {
