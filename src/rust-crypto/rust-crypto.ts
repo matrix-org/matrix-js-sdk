@@ -16,6 +16,7 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import {
+    DecryptedRoomEvent,
     KeysBackupRequest,
     KeysClaimRequest,
     KeysQueryRequest,
@@ -74,8 +75,23 @@ export class RustCrypto implements CryptoBackend {
     }
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
-        await this.olmMachine.decryptRoomEvent("event", new RustSdkCryptoJs.RoomId("room"));
-        throw new Error("not implemented");
+        const res = (await this.olmMachine.decryptRoomEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getWireType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getWireContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+        )) as DecryptedRoomEvent;
+        return {
+            clearEvent: JSON.parse(res.event),
+            claimedEd25519Key: res.senderClaimedEd25519Key,
+            senderCurve25519Key: res.senderCurve25519Key,
+            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+        };
     }
 
     public async userHasCrossSigningKeys(): Promise<boolean> {
