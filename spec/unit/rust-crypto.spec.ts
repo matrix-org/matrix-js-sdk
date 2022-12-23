@@ -19,6 +19,7 @@ import { IDBFactory } from "fake-indexeddb";
 
 import { RustCrypto } from "../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../src/rust-crypto";
+import { IHttpOpts, MatrixHttpApi } from "../../src";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -34,7 +35,8 @@ describe("RustCrypto", () => {
     let rustCrypto: RustCrypto;
 
     beforeEach(async () => {
-        rustCrypto = (await initRustCrypto(TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
+        const mockHttpApi = {} as MatrixHttpApi<IHttpOpts>;
+        rustCrypto = (await initRustCrypto(mockHttpApi, TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
     });
 
     describe(".exportRoomKeys", () => {

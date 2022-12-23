@@ -19,6 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import { MatrixEvent } from "../models/event";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { IHttpOpts, MatrixHttpApi } from "../http-api";
 
 // import { logger } from "../logger";
 
@@ -32,7 +33,12 @@ export class RustCrypto implements CryptoBackend {
     /** whether stop() has been called */
     private stopped = false;
 
-    public constructor(private readonly olmMachine: RustSdkCryptoJs.OlmMachine, _userId: string, _deviceId: string) {}
+    public constructor(
+        private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
+        private readonly http: MatrixHttpApi<IHttpOpts>,
+        _userId: string,
+        _deviceId: string,
+    ) {}
 
     public stop(): void {
         // stop() may be called multiple times, but attempting to close() the OlmMachine twice
