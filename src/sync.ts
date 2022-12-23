@@ -180,7 +180,20 @@ type WrappedRoom<T> = T & {
     isBrandNewRoom: boolean;
 };
 
+/** add default settings to an IStoredClientOpts */
+export function defaultClientOpts(opts?: IStoredClientOpts): IStoredClientOpts {
+    return {
+        initialSyncLimit: 8,
+        resolveInvitesToProfiles: false,
+        pollTimeout: 30 * 1000,
+        pendingEventOrdering: PendingEventOrdering.Chronological,
+        experimentalThreadSupport: false,
+        ...opts,
+    };
+}
+
 export class SyncApi {
+    private readonly opts: IStoredClientOpts;
     private _peekRoom: Optional<Room> = null;
     private currentSyncRequest?: Promise<ISyncResponse>;
     private abortController?: AbortController;
@@ -203,14 +216,10 @@ export class SyncApi {
      */
     public constructor(
         private readonly client: MatrixClient,
-        private readonly opts: IStoredClientOpts = {},
+        opts?: IStoredClientOpts,
         private readonly syncOpts: SyncApiOptions = {},
     ) {
-        this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
-        this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
-        this.opts.pollTimeout = this.opts.pollTimeout || 30 * 1000;
-        this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
-        this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
+        this.opts = defaultClientOpts(opts);
 
         if (!syncOpts.canResetEntireTimeline) {
             syncOpts.canResetEntireTimeline = (roomId: string): boolean => {

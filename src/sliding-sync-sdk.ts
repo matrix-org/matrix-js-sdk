@@ -18,8 +18,8 @@ import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { logger } from "./logger";
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
-import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData, SyncState, _createAndReEmitRoom, SyncApiOptions } from "./sync";
+import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client";
+import { ISyncStateData, SyncState, _createAndReEmitRoom, SyncApiOptions, defaultClientOpts } from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator";
@@ -342,6 +342,7 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
  */
 export class SlidingSyncSdk {
+    private readonly opts: IStoredClientOpts;
     private syncState: SyncState | null = null;
     private syncStateData?: ISyncStateData;
     private lastPos: string | null = null;
@@ -351,14 +352,10 @@ export class SlidingSyncSdk {
     public constructor(
         private readonly slidingSync: SlidingSync,
         private readonly client: MatrixClient,
-        private readonly opts: IStoredClientOpts = {},
+        opts?: IStoredClientOpts,
         private readonly syncOpts: SyncApiOptions = {},
     ) {
-        this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
-        this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
-        this.opts.pollTimeout = this.opts.pollTimeout || 30 * 1000;
-        this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
-        this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
+        this.opts = defaultClientOpts(opts);
 
         if (!syncOpts.canResetEntireTimeline) {
             syncOpts.canResetEntireTimeline = (_roomId: string): boolean => {
