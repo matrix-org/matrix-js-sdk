@@ -192,8 +192,17 @@ export function defaultClientOpts(opts?: IStoredClientOpts): IStoredClientOpts {
     };
 }
 
+export function defaultSyncApiOpts(syncOpts?: SyncApiOptions): SyncApiOptions {
+    return {
+        canResetEntireTimeline: (_roomId): boolean => false,
+        ...syncOpts,
+    };
+}
+
 export class SyncApi {
     private readonly opts: IStoredClientOpts;
+    private readonly syncOpts: SyncApiOptions;
+
     private _peekRoom: Optional<Room> = null;
     private currentSyncRequest?: Promise<ISyncResponse>;
     private abortController?: AbortController;
@@ -214,18 +223,9 @@ export class SyncApi {
      * @param syncOpts - sync-specific options passed by the client
      * @internal
      */
-    public constructor(
-        private readonly client: MatrixClient,
-        opts?: IStoredClientOpts,
-        private readonly syncOpts: SyncApiOptions = {},
-    ) {
+    public constructor(private readonly client: MatrixClient, opts?: IStoredClientOpts, syncOpts?: SyncApiOptions) {
         this.opts = defaultClientOpts(opts);
-
-        if (!syncOpts.canResetEntireTimeline) {
-            syncOpts.canResetEntireTimeline = (roomId: string): boolean => {
-                return false;
-            };
-        }
+        this.syncOpts = defaultSyncApiOpts(syncOpts);
 
         if (client.getNotifTimelineSet()) {
             client.reEmitter.reEmit(client.getNotifTimelineSet()!, [RoomEvent.Timeline, RoomEvent.TimelineReset]);

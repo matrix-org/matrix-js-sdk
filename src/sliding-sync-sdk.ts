@@ -19,7 +19,14 @@ import { logger } from "./logger";
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
 import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client";
-import { ISyncStateData, SyncState, _createAndReEmitRoom, SyncApiOptions, defaultClientOpts } from "./sync";
+import {
+    ISyncStateData,
+    SyncState,
+    _createAndReEmitRoom,
+    SyncApiOptions,
+    defaultClientOpts,
+    defaultSyncApiOpts,
+} from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator";
@@ -343,6 +350,7 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
  */
 export class SlidingSyncSdk {
     private readonly opts: IStoredClientOpts;
+    private readonly syncOpts: SyncApiOptions;
     private syncState: SyncState | null = null;
     private syncStateData?: ISyncStateData;
     private lastPos: string | null = null;
@@ -353,15 +361,10 @@ export class SlidingSyncSdk {
         private readonly slidingSync: SlidingSync,
         private readonly client: MatrixClient,
         opts?: IStoredClientOpts,
-        private readonly syncOpts: SyncApiOptions = {},
+        syncOpts?: SyncApiOptions,
     ) {
         this.opts = defaultClientOpts(opts);
-
-        if (!syncOpts.canResetEntireTimeline) {
-            syncOpts.canResetEntireTimeline = (_roomId: string): boolean => {
-                return false;
-            };
-        }
+        this.syncOpts = defaultSyncApiOpts(syncOpts);
 
         if (client.getNotifTimelineSet()) {
             client.reEmitter.reEmit(client.getNotifTimelineSet()!, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
