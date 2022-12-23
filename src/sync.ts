@@ -935,8 +935,8 @@ export class SyncApi {
 
             // tell the crypto module to do its processing. It may block (to do a
             // /keys/changes request).
-            if (this.syncOpts.crypto) {
-                await this.syncOpts.crypto.onSyncCompleted(syncEventData);
+            if (this.syncOpts.cryptoCallbacks) {
+                await this.syncOpts.cryptoCallbacks.onSyncCompleted(syncEventData);
             }
 
             // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates

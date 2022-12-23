@@ -73,4 +73,25 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
 }
 
 /** The methods which crypto implementations should expose to the Sync api */
-export interface SyncCryptoCallbacks {}
+export interface SyncCryptoCallbacks {
+    /**
+     * Called by the /sync loop after each /sync response is processed.
+     *
+     * Used to complete batch processing, or to initiate background processes
+     *
+     * @param syncState - information about the completed sync.
+     */
+    onSyncCompleted(syncState: OnSyncCompletedData): void;
+}
+
+export interface OnSyncCompletedData {
+    /**
+     * The 'next_batch' result from /sync, which will become the 'since' token for the next call to /sync.
+     */
+    nextSyncToken?: string;
+
+    /**
+     * True if we are working our way through a backlog of events after connecting.
+     */
+    catchingUp?: boolean;
+}

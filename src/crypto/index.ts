@@ -88,7 +88,7 @@ import { IContent } from "../models/event";
 import { ISyncResponse } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
-import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { RoomState, RoomStateEvent } from "../models/room-state";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
@@ -3013,7 +3013,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param syncData -  the data from the 'MatrixClient.sync' event
      */
-    public async onSyncCompleted(syncData: ISyncStateData): Promise<void> {
+    public async onSyncCompleted(syncData: OnSyncCompletedData): Promise<void> {
         this.deviceList.setSyncToken(syncData.nextSyncToken ?? null);
         this.deviceList.saveIfDirty();
 
