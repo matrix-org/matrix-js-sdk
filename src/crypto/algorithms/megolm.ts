@@ -73,13 +73,25 @@ export interface IOlmDevice<T = DeviceInfo> {
     deviceInfo: T;
 }
 
+/** The result of parsing the an `m.room_key` or `m.forwarded_room_key` to-device event */
 interface RoomKey {
+    /** 
+      * The Curve25519 key of the megolm session creator.
+      *
+      * For `m.room_key`, this is also the sender of the `m.room_key` to-device event. 
+      * For `m.forwarded_room_key`, the two are different (and the key of the sender of the 
+      * `m.forwarded_room_key` event is included in `forwardingKeyChain`)
+      */
     senderKey: string;
     sessionId: string;
     sessionKey: string;
     exportFormat: boolean;
     roomId: string;
     algorithm: string;
+    /**
+     * A list of the curve25519 keys of the users involved in forwarding this key, most recent last.
+     * For `m.room_key` events, this is empty.
+     */
     forwardingKeyChain: string[];
     keysClaimed: Partial<Record<"ed25519", string>>;
     extraSessionData: OlmGroupSessionExtraData;
@@ -1465,6 +1477,8 @@ export class MegolmDecryption extends DecryptionAlgorithm {
      *
      */
     private forwardedRoomKeyFromEvent(event: MatrixEvent): RoomKey | undefined {
+        // the properties in m.forwarded_room_key are a superset of those in m.room_key, so
+        // start by parsing the m.room_key fields.
         const roomKey = this.roomKeyFromEvent(event);
 
         if (!roomKey) {
@@ -1476,9 +1490,8 @@ export class MegolmDecryption extends DecryptionAlgorithm {
 
         const senderKeyUser = this.baseApis.crypto!.deviceList.getUserByIdentityKey(olmlib.OLM_ALGORITHM, senderKey);
 
-        // We received this room key from event.getSenderKey(), but the original
-        // creator of the room key is claimed in the content. Let's try to fetch
-        // those keys now.
+        // We received this to-device event from event.getSenderKey(), but the original
+        // creator of the room key is claimed in the content.
         const claimedCurve25519Key = content.sender_key;
         const claimedEd25519Key = content.sender_claimed_ed25519_key;
 
@@ -1529,7 +1542,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
     }
 
     /**
-     * Should we accept the forwarded room key that was found in the given
+     * Determine if we should accept the forwarded room key that was found in the given
      * event.
      *
      * @param event - An `m.forwarded_room_key` event.
