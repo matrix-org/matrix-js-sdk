@@ -1642,6 +1642,13 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         }
     }
 
+    /**
+     * Check if a forwarded room key should be parked.
+     *
+     * A forwarded room key should be parked if it's a key for a room we're not
+     * in. We park the forwarded room key in case *this sender* invites us to
+     * that room later.
+     */
     private shouldParkForwardedKey(roomKey: RoomKey): boolean {
         const room = this.baseApis.getRoom(roomKey.roomId);
 
