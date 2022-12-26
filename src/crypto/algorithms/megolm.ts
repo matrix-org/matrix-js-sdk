@@ -75,13 +75,13 @@ export interface IOlmDevice<T = DeviceInfo> {
 
 /** The result of parsing the an `m.room_key` or `m.forwarded_room_key` to-device event */
 interface RoomKey {
-    /** 
-      * The Curve25519 key of the megolm session creator.
-      *
-      * For `m.room_key`, this is also the sender of the `m.room_key` to-device event. 
-      * For `m.forwarded_room_key`, the two are different (and the key of the sender of the 
-      * `m.forwarded_room_key` event is included in `forwardingKeyChain`)
-      */
+    /**
+     * The Curve25519 key of the megolm session creator.
+     *
+     * For `m.room_key`, this is also the sender of the `m.room_key` to-device event.
+     * For `m.forwarded_room_key`, the two are different (and the key of the sender of the
+     * `m.forwarded_room_key` event is included in `forwardingKeyChain`)
+     */
     senderKey: string;
     sessionId: string;
     sessionKey: string;
