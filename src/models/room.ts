@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk";
+import { M_POLL_START, Optional } from "matrix-events-sdk";
 
 import {
     EventTimelineSet,
@@ -59,6 +59,7 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
+import { Poll, PollEvent } from "./poll";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -304,6 +305,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, { event: MatrixEvent; synthetic: boolean }[]>();
     private readonly timelineSets: EventTimelineSet[];
+    public readonly polls: Map<string, Poll> = new Map<string, Poll>();
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
@@ -1865,6 +1867,29 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.on(ThreadEvent.NewReply, this.onThreadNewReply);
         this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
+    }
+
+    public processPollEvents(events: MatrixEvent[], matrixClient: MatrixClient): void {
+        const processPollStartEvent = (event: MatrixEvent) => {
+            if (!M_POLL_START.matches(event.getType())) return;
+            const poll = new Poll(event, matrixClient);
+            this.polls.set(event.getId()!, poll);
+            console.log('hhh processPollEvents', this.roomId, { poll });
+            this.emit(PollEvent.New, poll);
+        }
+
+        events.forEach((event: MatrixEvent) => {
+            matrixClient.decryptEventIfNeeded(event);
+
+            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
+                // add an event listener for once the event is decrypted.
+                event.once(MatrixEventEvent.Decrypted, async () => {
+                    processPollStartEvent(event);
+                });
+            } else {
+                processPollStartEvent(event);
+            }
+        });
     }
 
     /**
