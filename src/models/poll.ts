@@ -24,6 +24,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum PollEvent {
     New = "Poll.new",
+    End = "Poll.end",
     Update = "Poll.update",
     Responses = "Poll.Responses",
     Destroy = "Poll.Destroy",
@@ -32,7 +33,7 @@ export enum PollEvent {
 export type PollEventHandlerMap = {
     [PollEvent.Update]: (event: MatrixEvent, poll: Poll) => void;
     [PollEvent.Destroy]: (pollIdentifier: string) => void;
-    [PollEvent.Destroy]: (pollIdentifier: string) => void;
+    [PollEvent.End]: () => void;
     [PollEvent.Responses]: (responses: Relations) => void;
 };
 
@@ -51,7 +52,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     private pollEvent: PollStartEvent | undefined;
     private fetchingResponsesPromise: null | Promise<void> = null;
     private responses: null | Relations = null;
-    private closeEvent: MatrixEvent | undefined;
+    private endEvent: MatrixEvent | undefined;
 
     public constructor(private rootEvent: MatrixEvent, private matrixClient: MatrixClient) {
         super();
@@ -65,7 +66,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
     public get isEnded(): boolean {
         // @TODO(kerrya) should be false while responses are loading?
-        return !!this.closeEvent;
+        return !!this.endEvent;
     }
 
     public setPollInstance(event: MatrixEvent): void {
@@ -96,6 +97,33 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         return this.responses!;
     }
 
+    public onNewRelation(event: MatrixEvent): void {
+        if (M_POLL_END.matches(event.getType())) {
+            this.endEvent = event;
+            this.emit(PollEvent.End);
+        }
+
+        // wait for poll to be initialised
+        // @TODO(kerrya) races here?
+        if (!this.responses) {
+            return;
+        }
+
+        if (event.isDecryptionFailure()) {
+            // undecryptableRelationsCount++
+            return;
+        }
+        const pollCloseTimestamp = this.endEvent?.getTs() || Number.MAX_SAFE_INTEGER;
+        if (
+            M_POLL_RESPONSE.matches(event.getType()) &&
+            // response made before poll closed
+            event.getTs() <= pollCloseTimestamp
+        ) {
+            this.responses.addEvent(event);
+        }
+
+    }
+
     private async fetchResponses(): Promise<void> {
         this.fetchingResponsesPromise = new Promise<void>(() => {});
 
@@ -116,8 +144,8 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         const responses = new Relations('m.reference', M_POLL_RESPONSE.name, this.matrixClient);
         let undecryptableRelationsCount = 0;
 
-        const pollCloseEvent = allRelations.events.find(event => M_POLL_END.matches(event.getType()));
-        const pollCloseTimestamp = pollCloseEvent?.getTs() || Number.MAX_SAFE_INTEGER;
+        const pollEndEvent = allRelations.events.find(event => M_POLL_END.matches(event.getType()));
+        const pollCloseTimestamp = pollEndEvent?.getTs() || Number.MAX_SAFE_INTEGER;
 
         allRelations.events.forEach(event => {
             if (event.isDecryptionFailure()) {
@@ -135,8 +163,9 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
         console.log('hhh', 'relations!!', responses);
 
+
         this.responses = responses;
-        this.closeEvent = pollCloseEvent;
+        this.endEvent = pollEndEvent;
         this.emit(PollEvent.Responses, this.responses);
     }
 }

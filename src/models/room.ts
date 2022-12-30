@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_START, Optional } from "matrix-events-sdk";
+import { M_POLL_RESPONSE, M_POLL_START, Optional } from "matrix-events-sdk";
 
 import {
     EventTimelineSet,
@@ -1878,16 +1878,29 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.emit(PollEvent.New, poll);
         }
 
+        const processPollRelationEvent = (event: MatrixEvent) => {
+            const relationEventId = event.getRelation()?.event_id;
+            if (relationEventId && this.polls.has(relationEventId)) {
+                const poll = this.polls.get(relationEventId);
+                poll?.onNewRelation(event);
+            }
+        }
+
+        const processPollEvent = (event: MatrixEvent) => {
+            processPollStartEvent(event);
+            processPollRelationEvent(event);
+        }
+
         events.forEach((event: MatrixEvent) => {
             matrixClient.decryptEventIfNeeded(event);
 
             if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
                 // add an event listener for once the event is decrypted.
                 event.once(MatrixEventEvent.Decrypted, async () => {
-                    processPollStartEvent(event);
+                    processPollEvent(event);
                 });
             } else {
-                processPollStartEvent(event);
+                processPollEvent(event);
             }
         });
     }
