@@ -25,6 +25,7 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
+import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import * as utils from "./utils";
@@ -115,8 +116,17 @@ function debuglog(...params: any[]): void {
  * Options passed into the constructor of SyncApi by MatrixClient
  */
 export interface SyncApiOptions {
-    // Crypto manager
+    /**
+     * Crypto manager
+     *
+     * @deprecated in favour of cryptoCallbacks
+     */
     crypto?: Crypto;
+
+    /**
+     * If crypto is enabled on our client, callbacks into the crypto module
+     */
+    cryptoCallbacks?: SyncCryptoCallbacks;
 
     /**
      * A function which is called
@@ -925,8 +935,8 @@ export class SyncApi {
 
             // tell the crypto module to do its processing. It may block (to do a
             // /keys/changes request).
-            if (this.syncOpts.crypto) {
-                await this.syncOpts.crypto.onSyncCompleted(syncEventData);
+            if (this.syncOpts.cryptoCallbacks) {
+                await this.syncOpts.cryptoCallbacks.onSyncCompleted(syncEventData);
             }
 
             // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates

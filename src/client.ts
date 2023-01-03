@@ -1453,6 +1453,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected buildSyncApiOptions(): SyncApiOptions {
         return {
             crypto: this.crypto,
+            cryptoCallbacks: this.cryptoBackend,
             canResetEntireTimeline: (roomId: string): boolean => {
                 if (!this.canResetTimelineCallback) {
                     return false;
