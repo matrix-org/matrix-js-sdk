@@ -32,8 +32,10 @@ jobs:
                   ref: gh-pages
 
             - name: 🔪 Prepare
+              env:
+                GITHUB_REF_NAME: ${{ github.ref_name }}
               run: |
-                  tag="${{ github.ref_name }}"
+                  tag="${GITHUB_REF_NAME}"
                   VERSION="${tag#v}"
                   [ ! -e "$VERSION" ] || rm -r $VERSION
                   cp -r $RUNNER_TEMP/_docs/ $VERSION
