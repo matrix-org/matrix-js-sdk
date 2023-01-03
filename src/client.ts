@@ -21,7 +21,7 @@ limitations under the License.
 import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent, Optional } from "matrix-events-sdk";
 
 import type { IMegolmSessionData } from "./@types/crypto";
-import { ISyncStateData, SyncApi, SyncState } from "./sync";
+import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
 import {
     EventStatus,
     IContent,
@@ -456,17 +456,7 @@ export interface IStartClientOpts {
     slidingSync?: SlidingSync;
 }
 
-export interface IStoredClientOpts extends IStartClientOpts {
-    // Crypto manager
-    crypto?: Crypto;
-    /**
-     * A function which is called
-     * with a room ID and returns a boolean. It should return 'true' if the SDK can
-     * SAFELY remove events from this room. It may not be safe to remove events if
-     * there are other references to the timelines for this room.
-     */
-    canResetEntireTimeline: ResetTimelineCallback;
-}
+export interface IStoredClientOpts extends IStartClientOpts {}
 
 export enum RoomVersionStability {
     Stable = "stable",
@@ -1433,20 +1423,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logger.error("Can't fetch server versions, continuing to initialise sync, this will be retried later", e);
         }
 
-        // shallow-copy the opts dict before modifying and storing it
-        this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
-        this.clientOpts.crypto = this.crypto;
-        this.clientOpts.canResetEntireTimeline = (roomId): boolean => {
-            if (!this.canResetTimelineCallback) {
-                return false;
-            }
-            return this.canResetTimelineCallback(roomId);
-        };
+        this.clientOpts = opts ?? {};
         if (this.clientOpts.slidingSync) {
-            this.syncApi = new SlidingSyncSdk(this.clientOpts.slidingSync, this, this.clientOpts);
+            this.syncApi = new SlidingSyncSdk(
+                this.clientOpts.slidingSync,
+                this,
+                this.clientOpts,
+                this.buildSyncApiOptions(),
+            );
         } else {
-            this.syncApi = new SyncApi(this, this.clientOpts);
+            this.syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
         }
+
         this.syncApi.sync();
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
@@ -1457,6 +1445,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.toDeviceMessageQueue.start();
+    }
+
+    /**
+     * Construct a SyncApiOptions for this client, suitable for passing into the SyncApi constructor
+     */
+    protected buildSyncApiOptions(): SyncApiOptions {
+        return {
+            crypto: this.crypto,
+            canResetEntireTimeline: (roomId: string): boolean => {
+                if (!this.canResetTimelineCallback) {
+                    return false;
+                }
+                return this.canResetTimelineCallback(roomId);
+            },
+        };
     }
 
     /**
@@ -3954,7 +3957,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryString, data);
 
             const roomId = res.room_id;
-            const syncApi = new SyncApi(this, this.clientOpts);
+            const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
             const room = syncApi.createRoom(roomId);
             if (opts.syncRoom) {
                 // v2 will do this for us
@@ -6154,7 +6157,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public peekInRoom(roomId: string): Promise<Room> {
         this.peekSync?.stopPeeking();
-        this.peekSync = new SyncApi(this, this.clientOpts);
+        this.peekSync = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
         return this.peekSync.peek(roomId);
     }
 
@@ -6661,7 +6664,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.syncLeftRoomsPromise) {
             return this.syncLeftRoomsPromise; // return the ongoing request
         }
-        const syncApi = new SyncApi(this, this.clientOpts);
+        const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
         this.syncLeftRoomsPromise = syncApi.syncLeftRooms();
 
         // cleanup locks
