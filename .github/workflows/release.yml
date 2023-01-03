@@ -33,7 +33,7 @@ jobs:
 
             - name: 🔪 Prepare
               env:
-                GITHUB_REF_NAME: ${{ github.ref_name }}
+                  GITHUB_REF_NAME: ${{ github.ref_name }}
               run: |
                   tag="${GITHUB_REF_NAME}"
                   VERSION="${tag#v}"
