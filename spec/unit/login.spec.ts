@@ -1,5 +1,15 @@
+import fetchMock from "fetch-mock-jest";
+
+import { MatrixClient } from "../../src/client";
+import { ClientPrefix } from "../../src/http-api";
 import { SSOAction } from "../../src/@types/auth";
 import { TestClient } from "../TestClient";
+
+function createExampleMatrixClient(): MatrixClient {
+    return new MatrixClient({
+        baseUrl: "https://example.com",
+    });
+}
 
 describe("Login request", function () {
     let client: TestClient;
@@ -55,5 +65,48 @@ describe("SSO login URL", function () {
             const url = new URL(urlString);
             expect(url.searchParams.get("org.matrix.msc3824.action")).toEqual("login");
         });
+    });
+});
+
+describe("refreshToken", () => {
+    afterEach(() => {
+        fetchMock.mockReset();
+    });
+
+    it("requests the correctly-prefixed /refresh endpoint when server correctly accepts /v3", async () => {
+        const client = createExampleMatrixClient();
+
+        const response = {
+            access_token: "access_token",
+            refresh_token: "refresh_token",
+            expires_in_ms: 30000,
+        };
+
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V3).toString(), response);
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V1).toString(), () => {
+            throw new Error("/v1/refresh unexpectedly called");
+        });
+
+        const refreshResult = await client.refreshToken("initial_refresh_token");
+        expect(refreshResult).toEqual(response);
+    });
+
+    it("falls back to /v1 when server does not recognized /v3 refresh", async () => {
+        const client = createExampleMatrixClient();
+
+        const response = {
+            access_token: "access_token",
+            refresh_token: "refresh_token",
+            expires_in_ms: 30000,
+        };
+
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V3).toString(), {
+            status: 400,
+            body: { errcode: "M_UNRECOGNIZED" },
+        });
+        fetchMock.postOnce(client.http.getUrl("/refresh", undefined, ClientPrefix.V1).toString(), response);
+
+        const refreshResult = await client.refreshToken("initial_refresh_token");
+        expect(refreshResult).toEqual(response);
     });
 });
