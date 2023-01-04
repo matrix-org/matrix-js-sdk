@@ -512,6 +512,16 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         throw new Error("Unsupported function on the thread model");
     }
 
+    public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
+        if (userId === this.client.getUserId()) {
+            if ((this?.lastReply()?.getTs() ?? 0) < this.room.oldestRecordedThreadedReceiptTs) {
+                return this.lastReply()!.getId() ?? null;
+            }
+        }
+
+        return super.getEventReadUpTo(userId, ignoreSynthesized);
+    }
+
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         if (userId === this.client.getUserId()) {
             // We consider all threaded events read if they are part of a thread
