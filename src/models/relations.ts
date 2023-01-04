@@ -33,9 +33,6 @@ export type EventHandlerMap = {
     [RelationsEvent.Redaction]: (event: MatrixEvent) => void;
 };
 
-const matchesEventType = (eventType: string, targetEventType: string, altTargetEventTypes: string[] = []): boolean =>
-    [targetEventType, ...altTargetEventTypes].includes(eventType);
-
 /**
  * A container for relation events that supports easy access to common ways of
  * aggregating such events. Each instance holds events that of a single relation
@@ -63,7 +60,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         public readonly relationType: RelationType | string,
         public readonly eventType: string,
         client: MatrixClient | Room,
-        public readonly altEventTypes?: string[],
     ) {
         super();
         this.client = client instanceof Room ? client.client : client;
@@ -88,7 +84,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         const relationType = relation.rel_type;
         const eventType = event.getType();
 
-        if (this.relationType !== relationType || !matchesEventType(eventType, this.eventType, this.altEventTypes)) {
+        if (this.relationType !== relationType || this.eventType !== eventType) {
             logger.error("Event relation info doesn't match this container");
             return;
         }
@@ -135,7 +131,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         const relationType = relation.rel_type;
         const eventType = event.getType();
 
-        if (this.relationType !== relationType || !matchesEventType(eventType, this.eventType, this.altEventTypes)) {
+        if (this.relationType !== relationType || this.eventType !== eventType) {
             logger.error("Event relation info doesn't match this container");
             return;
         }
