@@ -102,6 +102,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * with server suppport.
      */
     public replayEvents: MatrixEvent[] | null = [];
+    public replayReceipts: CachedReceiptStructure[] = [];
 
     public constructor(public readonly id: string, public rootEvent: MatrixEvent | undefined, opts: IThreadOpts) {
         super();
@@ -133,7 +134,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.room.on(RoomEvent.LocalEchoUpdated, this.onLocalEcho);
         this.timelineSet.on(RoomEvent.Timeline, this.onTimelineEvent);
 
-        this.processReceipts(opts.receipts);
+        if (opts.receipts) {
+            this.replayReceipts = opts.receipts;
+        }
 
         // even if this thread is thought to be originating from this client, we initialise it as we may be in a
         // gappy sync and a thread around this event may already exist.
@@ -390,6 +393,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
                     this.addEvent(event, false);
                 }
                 this.replayEvents = null;
+                this.processReceipts(this.replayReceipts);
                 // just to make sure that, if we've created a timeline window for this thread before the thread itself
                 // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
                 this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);
