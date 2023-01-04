@@ -514,6 +514,15 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         if (userId === this.client.getUserId()) {
+
+            // We consider all threaded events read if they are part of a thread
+            // that has no activity since the first ever threaded event recorded in that room
+            // This prevents rooms to generated unwanted notifications for threads
+            // created before MSC3771
+            if ((this?.lastReply()?.getTs() ?? 0) < this.room.oldestRecordedThreadedReceiptTs) {
+                return true;
+            }
+
             const publicReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.Read);
             const privateReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.ReadPrivate);
             const hasUnreads = this.room.getThreadUnreadNotificationCount(this.id, NotificationCountType.Total) > 0;

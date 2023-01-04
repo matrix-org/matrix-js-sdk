@@ -303,6 +303,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, { event: MatrixEvent; synthetic: boolean }[]>();
+    public oldestRecordedThreadedReceiptTs = Infinity;
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -2723,6 +2724,19 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                             ...(this.cachedThreadReadReceipts.get(receipt.thread_id!) ?? []),
                             { event, synthetic },
                         ]);
+                    }
+
+                    // Some threads were created before MSC3771 landed. Those threads
+                    // do not have read receipts, and this will be problematic in encrypted
+                    // rooms where clients rely on receipts to compute highlight notifications
+                    // Having a ref to the oldest known thread receipt in this room
+                    // means that we can opt-out of that logic for threads that have their last
+                    // reply before
+                    const me = this.client.getSafeUserId();
+                    if (!receiptForMainTimeline && userId === me) {
+                        if (receipt.ts < this.oldestRecordedThreadedReceiptTs) {
+                            this.oldestRecordedThreadedReceiptTs = receipt.ts;
+                        }
                     }
                 });
             });
