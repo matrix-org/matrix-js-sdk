@@ -126,20 +126,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             return;
         }
 
-        const relation = event.getRelation();
-        if (!relation) {
-            logger.error("Event must have relation info");
-            return;
-        }
-
-        const relationType = relation.rel_type;
-        const eventType = event.getType();
-
-        if (this.relationType !== relationType || !matchesEventType(eventType, this.eventType, this.altEventTypes)) {
-            logger.error("Event relation info doesn't match this container");
-            return;
-        }
-
         this.relations.delete(event);
 
         if (this.relationType === RelationType.Annotation) {
