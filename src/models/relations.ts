@@ -58,6 +58,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param relationType - The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
      * @param eventType - The relation event's type, such as "m.reaction", etc.
      * @param client - The client which created this instance. For backwards compatibility also accepts a Room.
+     * @param altEventTypes - alt event types for relation events, for example to support unstable prefixed event types
      */
     public constructor(
         public readonly relationType: RelationType | string,
