@@ -506,8 +506,10 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
         if (userId === this.client.getUserId()) {
-            if ((this?.lastReply()?.getTs() ?? 0) < this.room.oldestRecordedThreadedReceiptTs) {
-                return this.lastReply()!.getId() ?? null;
+            if (this.lastReply()) {
+                if ((this?.lastReply()?.getTs() ?? 0) < this.room.oldestRecordedThreadedReceiptTs) {
+                    return this.lastReply()?.getId() ?? null;
+                }
             }
         }
 
