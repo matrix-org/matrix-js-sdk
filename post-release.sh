@@ -21,9 +21,9 @@ if [ "$(git branch -lr | grep origin/develop -c)" -ge 1 ]; then
             # to the TypeScript source.
             src_value=$(jq -r ".matrix_src_$i" package.json)
             if [ "$src_value" != "null" ]; then
-                jq ".$i = .matrix_src_$i" package.json > package.json.new && mv package.json.new package.json
+                jq ".$i = .matrix_src_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
             else
-                jq "del(.$i)" package.json > package.json.new && mv package.json.new package.json
+                jq "del(.$i)" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
             fi
         fi
     done

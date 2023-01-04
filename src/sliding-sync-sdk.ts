@@ -18,8 +18,15 @@ import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { logger } from "./logger";
 import * as utils from "./utils";
 import { EventTimeline } from "./models/event-timeline";
-import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
-import { ISyncStateData, SyncState, _createAndReEmitRoom } from "./sync";
+import { ClientEvent, IStoredClientOpts, MatrixClient } from "./client";
+import {
+    ISyncStateData,
+    SyncState,
+    _createAndReEmitRoom,
+    SyncApiOptions,
+    defaultClientOpts,
+    defaultSyncApiOpts,
+} from "./sync";
 import { MatrixEvent } from "./models/event";
 import { Crypto } from "./crypto";
 import { IMinimalEvent, IRoomEvent, IStateEvent, IStrippedState, ISyncResponse } from "./sync-accumulator";
@@ -102,6 +109,7 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
                 Array.isArray(unusedFallbackKeys) && !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }
+        this.crypto.onSyncCompleted({});
     }
 }
 
@@ -341,6 +349,8 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
  */
 export class SlidingSyncSdk {
+    private readonly opts: IStoredClientOpts;
+    private readonly syncOpts: SyncApiOptions;
     private syncState: SyncState | null = null;
     private syncStateData?: ISyncStateData;
     private lastPos: string | null = null;
@@ -350,19 +360,11 @@ export class SlidingSyncSdk {
     public constructor(
         private readonly slidingSync: SlidingSync,
         private readonly client: MatrixClient,
-        private readonly opts: Partial<IStoredClientOpts> = {},
+        opts?: IStoredClientOpts,
+        syncOpts?: SyncApiOptions,
     ) {
-        this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
-        this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
-        this.opts.pollTimeout = this.opts.pollTimeout || 30 * 1000;
-        this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
-        this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
-
-        if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (_roomId: string): boolean => {
-                return false;
-            };
-        }
+        this.opts = defaultClientOpts(opts);
+        this.syncOpts = defaultSyncApiOpts(syncOpts);
 
         if (client.getNotifTimelineSet()) {
             client.reEmitter.reEmit(client.getNotifTimelineSet()!, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
@@ -376,8 +378,8 @@ export class SlidingSyncSdk {
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
         ];
-        if (this.opts.crypto) {
-            extensions.push(new ExtensionE2EE(this.opts.crypto));
+        if (this.syncOpts.crypto) {
+            extensions.push(new ExtensionE2EE(this.syncOpts.crypto));
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);
@@ -697,7 +699,7 @@ export class SlidingSyncSdk {
             if (limited) {
                 room.resetLiveTimeline(
                     roomData.prev_batch,
-                    null, // TODO this.opts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
+                    null, // TODO this.syncOpts.canResetEntireTimeline(room.roomId) ? null : syncEventData.oldSyncToken,
                 );
 
                 // We have to assume any gap in any timeline is
@@ -729,8 +731,8 @@ export class SlidingSyncSdk {
 
         const processRoomEvent = async (e: MatrixEvent): Promise<void> => {
             client.emit(ClientEvent.Event, e);
-            if (e.isState() && e.getType() == EventType.RoomEncryption && this.opts.crypto) {
-                await this.opts.crypto.onCryptoEvent(room, e);
+            if (e.isState() && e.getType() == EventType.RoomEncryption && this.syncOpts.crypto) {
+                await this.syncOpts.crypto.onCryptoEvent(room, e);
             }
         };
 

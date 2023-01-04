@@ -58,6 +58,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param relationType - The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
      * @param eventType - The relation event's type, such as "m.reaction", etc.
      * @param client - The client which created this instance. For backwards compatibility also accepts a Room.
+     * @param altEventTypes - alt event types for relation events, for example to support unstable prefixed event types
      */
     public constructor(
         public readonly relationType: RelationType | string,
@@ -123,20 +124,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      */
     private async removeEvent(event: MatrixEvent): Promise<void> {
         if (!this.relations.has(event)) {
-            return;
-        }
-
-        const relation = event.getRelation();
-        if (!relation) {
-            logger.error("Event must have relation info");
-            return;
-        }
-
-        const relationType = relation.rel_type;
-        const eventType = event.getType();
-
-        if (this.relationType !== relationType || !matchesEventType(eventType, this.eventType, this.altEventTypes)) {
-            logger.error("Event relation info doesn't match this container");
             return;
         }
 

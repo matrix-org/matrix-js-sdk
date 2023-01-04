@@ -167,9 +167,9 @@ export class RoomWidgetClient extends MatrixClient {
         // still has some valuable helper methods that we make use of, so we
         // instantiate it anyways
         if (opts.slidingSync) {
-            this.syncApi = new SlidingSyncSdk(opts.slidingSync, this, opts);
+            this.syncApi = new SlidingSyncSdk(opts.slidingSync, this, opts, this.buildSyncApiOptions());
         } else {
-            this.syncApi = new SyncApi(this, opts);
+            this.syncApi = new SyncApi(this, opts, this.buildSyncApiOptions());
         }
 
         this.room = this.syncApi.createRoom(this.roomId);

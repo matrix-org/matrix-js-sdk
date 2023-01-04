@@ -18,7 +18,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import { MatrixEvent } from "../models/event";
-import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 
 // import { logger } from "../logger";
 
@@ -62,4 +62,12 @@ export class RustCrypto implements CryptoBackend {
         // TODO
         return [];
     }
+
+    /** called by the sync loop after processing each sync.
+     *
+     * TODO: figure out something equivalent for sliding sync.
+     *
+     * @param syncState - information on the completed sync.
+     */
+    public onSyncCompleted(syncState: OnSyncCompletedData): void {}
 }
