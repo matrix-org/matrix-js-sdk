@@ -310,6 +310,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
     public oldestRecordedThreadedReceiptTs = Infinity;
+    public newestRecordedUnthreadedReceiptTs = 0;
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -2739,9 +2740,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     // means that we can opt-out of that logic for threads that have their last
                     // reply before
                     const me = this.client.getSafeUserId();
-                    if (!receiptForMainTimeline && userId === me) {
-                        if (receipt.ts < this.oldestRecordedThreadedReceiptTs) {
+                    if (userId === me) {
+                        if (!receiptForMainTimeline && receipt.ts < this.oldestRecordedThreadedReceiptTs) {
                             this.oldestRecordedThreadedReceiptTs = receipt.ts;
+                        }
+
+                        if (!receipt.thread_id && receipt.ts > this.newestRecordedUnthreadedReceiptTs) {
+                            this.newestRecordedUnthreadedReceiptTs = receipt.ts;
                         }
                     }
                 });

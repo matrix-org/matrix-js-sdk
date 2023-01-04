@@ -507,7 +507,12 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
         if (userId === this.client.getUserId()) {
             if (this.lastReply()) {
-                if ((this?.lastReply()?.getTs() ?? 0) < this.room.oldestRecordedThreadedReceiptTs) {
+                const beforeFirstThreadedReceipt =
+                    this?.lastReply()?.getTs() ?? 0 < this.room.oldestRecordedThreadedReceiptTs;
+                const beforeLastUnthreadedReceipt =
+                    this?.lastReply()?.getTs() ?? 0 < this.room.newestRecordedUnthreadedReceiptTs;
+
+                if (beforeFirstThreadedReceipt || beforeLastUnthreadedReceipt) {
                     return this.lastReply()?.getId() ?? null;
                 }
             }
@@ -522,7 +527,12 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             // that has no activity since the first ever threaded event recorded in that room
             // This prevents rooms to generated unwanted notifications for threads
             // created before MSC3771
-            if ((this?.lastReply()?.getTs() ?? 0) < this.room.oldestRecordedThreadedReceiptTs) {
+            const beforeFirstThreadedReceipt =
+                this?.lastReply()?.getTs() ?? 0 < this.room.oldestRecordedThreadedReceiptTs;
+            const beforeLastUnthreadedReceipt =
+                this?.lastReply()?.getTs() ?? 0 < this.room.newestRecordedUnthreadedReceiptTs;
+
+            if (beforeFirstThreadedReceipt || beforeLastUnthreadedReceipt) {
                 return true;
             }
 
