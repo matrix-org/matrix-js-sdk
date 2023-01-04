@@ -169,11 +169,11 @@ export class RustCrypto implements CryptoBackend {
         opts: IRequestOpts = {},
     ): Promise<string> {
         // unbeknownst to HttpApi, we are sending JSON
-        opts.headers ??= {};
+        if (!opts.headers) opts.headers = {};
         opts.headers["Content-Type"] = "application/json";
 
         // we use the full prefix
-        opts.prefix ??= "";
+        if (!opts.prefix) opts.prefix = "";
 
         const resp = await this.http.authedRequest(method, path, queryParams, body, opts);
         return await resp.text();
