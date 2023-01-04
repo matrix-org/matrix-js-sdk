@@ -16,7 +16,6 @@ limitations under the License.
 
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
-import { EventType } from "../../../src";
 import { Crypto } from "../../../src/crypto";
 
 describe("MatrixEvent", () => {
