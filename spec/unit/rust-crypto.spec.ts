@@ -29,7 +29,7 @@ import MockHttpBackend from "matrix-mock-request";
 
 import { RustCrypto } from "../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../src/rust-crypto";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, MatrixHttpApi } from "../../src";
+import { HttpApiEvent, HttpApiEventHandlerMap, MatrixClient, MatrixHttpApi } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 
 afterEach(() => {
@@ -47,7 +47,7 @@ describe("RustCrypto", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            const mockHttpApi = {} as MatrixHttpApi<IHttpOpts>;
+            const mockHttpApi = {} as MatrixClient["http"];
             rustCrypto = (await initRustCrypto(mockHttpApi, TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
         });
 
@@ -90,6 +90,7 @@ describe("RustCrypto", () => {
                 baseUrl: "https://example.com",
                 prefix: "/_matrix",
                 fetchFn: httpBackend.fetchFn as typeof global.fetch,
+                onlyData: true,
             });
 
             // for these tests we use a mock OlmMachine, with an implementation of outgoingRequests that
