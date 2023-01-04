@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_RESPONSE, M_POLL_START, Optional } from "matrix-events-sdk";
+import { M_POLL_START, Optional } from "matrix-events-sdk";
 
 import {
     EventTimelineSet,
@@ -157,7 +157,8 @@ export type RoomEmittedEvents =
     | BeaconEvent.New
     | BeaconEvent.Update
     | BeaconEvent.Destroy
-    | BeaconEvent.LivenessChange;
+    | BeaconEvent.LivenessChange
+    | PollEvent.New;
 
 export type RoomEventHandlerMap = {
     /**
@@ -284,6 +285,11 @@ export type RoomEventHandlerMap = {
     [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
+    /**
+     * Fires when a new poll instance is added to the room state
+     * @param poll
+     */
+    [PollEvent.New]: (poll: Poll) => void;
 } & Pick<ThreadHandlerMap, ThreadEvent.Update | ThreadEvent.NewReply | ThreadEvent.Delete> &
     EventTimelineSetHandlerMap &
     Pick<MatrixEventHandlerMap, MatrixEventEvent.BeforeRedaction> &
@@ -1884,9 +1890,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             if (!M_POLL_START.matches(event.getType())) return;
             const poll = new Poll(event, matrixClient);
             this.polls.set(event.getId()!, poll);
-            console.log('hhh processPollEvents', this.roomId, { poll });
+            console.log("hhh processPollEvents", this.roomId, { poll });
             this.emit(PollEvent.New, poll);
-        }
+        };
 
         const processPollRelationEvent = (event: MatrixEvent) => {
             const relationEventId = event.getRelation()?.event_id;
@@ -1894,12 +1900,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 const poll = this.polls.get(relationEventId);
                 poll?.onNewRelation(event);
             }
-        }
+        };
 
         const processPollEvent = (event: MatrixEvent) => {
             processPollStartEvent(event);
             processPollRelationEvent(event);
-        }
+        };
 
         events.forEach((event: MatrixEvent) => {
             matrixClient.decryptEventIfNeeded(event);

@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_END, M_POLL_RESPONSE, M_POLL_START, PollStartEvent } from "matrix-events-sdk";
+import { M_POLL_END, M_POLL_RESPONSE, PollStartEvent } from "matrix-events-sdk";
+
 import { MatrixClient } from "..";
-import { MPollEventContent } from "../@types/poll";
 import { MatrixEvent } from "./event";
-import { RelatedRelations } from "./related-relations";
 import { Relations } from "./relations";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
@@ -37,14 +36,29 @@ export type PollEventHandlerMap = {
     [PollEvent.Responses]: (responses: Relations) => void;
 };
 
-export const isTimestampInDuration = (startTimestamp: number, durationMs: number, timestamp: number): boolean =>
-    timestamp >= startTimestamp && startTimestamp + durationMs >= timestamp;
+const filterResponseRelations = (
+    relationEvents: MatrixEvent[],
+    pollEndTimestamp: number,
+): {
+    hasUndecryptableRelations: boolean;
+    responseEvents: MatrixEvent[];
+} => {
+    let hasUndecryptableRelations = false;
+    const responseEvents = relationEvents.filter((event) => {
+        if (event.isDecryptionFailure()) {
+            hasUndecryptableRelations = true;
+            return;
+        }
+        return (
+            M_POLL_RESPONSE.matches(event.getType()) &&
+            // From MSC3381:
+            // "Votes sent on or before the end event's timestamp are valid votes"
+            event.getTs() <= pollEndTimestamp
+        );
+    });
 
-// poll info events are uniquely identified by
-// `<roomId>_<state_key>`
-export type PollIdentifier = string;
-export const getPollInfoIdentifier = (event: MatrixEvent): PollIdentifier =>
-    `${event.getRoomId()}_${event.getStateKey()}`;
+    return { hasUndecryptableRelations, responseEvents };
+};
 
 // https://github.com/matrix-org/matrix-spec-proposals/pull/3672
 export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, PollEventHandlerMap> {
@@ -53,11 +67,12 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     private fetchingResponsesPromise: null | Promise<void> = null;
     private responses: null | Relations = null;
     private endEvent: MatrixEvent | undefined;
+    private hasUndecryptableRelations = false;
 
     public constructor(private rootEvent: MatrixEvent, private matrixClient: MatrixClient) {
         super();
         this.roomId = this.rootEvent.getRoomId()!;
-        this.setPollInstance(this.rootEvent);
+        this.setPollStartEvent(this.rootEvent);
     }
 
     public get pollId(): string {
@@ -69,19 +84,12 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         return !!this.endEvent;
     }
 
-    public setPollInstance(event: MatrixEvent): void {
+    public setPollStartEvent(event: MatrixEvent): void {
         this.pollEvent = event.unstableExtensibleEvent as PollStartEvent;
     }
 
-    public getPollInstance(): PollStartEvent {
+    public getPollStartEvent(): PollStartEvent {
         return this.pollEvent!;
-    }
-
-    public update(pollInfoEvent: MatrixEvent): void {
-        
-    }
-
-    public destroy(): void {
     }
 
     public async getResponses(): Promise<Relations> {
@@ -97,6 +105,11 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         return this.responses!;
     }
 
+    /**
+     *
+     * @param event event with a relation to the rootEvent
+     * @returns void
+     */
     public onNewRelation(event: MatrixEvent): void {
         if (M_POLL_END.matches(event.getType())) {
             this.endEvent = event;
@@ -104,24 +117,21 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         }
 
         // wait for poll to be initialised
-        // @TODO(kerrya) races here?
         if (!this.responses) {
             return;
         }
 
-        if (event.isDecryptionFailure()) {
-            // undecryptableRelationsCount++
-            return;
-        }
         const pollCloseTimestamp = this.endEvent?.getTs() || Number.MAX_SAFE_INTEGER;
-        if (
-            M_POLL_RESPONSE.matches(event.getType()) &&
-            // response made before poll closed
-            event.getTs() <= pollCloseTimestamp
-        ) {
-            this.responses.addEvent(event);
+        const { hasUndecryptableRelations, responseEvents } = filterResponseRelations([event], pollCloseTimestamp);
+
+        if (responseEvents.length) {
+            responseEvents.forEach((event) => {
+                this.responses!.addEvent(event);
+            });
+            this.emit(PollEvent.Responses, this.responses);
         }
 
+        this.hasUndecryptableRelations = this.hasUndecryptableRelations || hasUndecryptableRelations;
     }
 
     private async fetchResponses(): Promise<void> {
@@ -131,41 +141,32 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         // - stable and unstable M_POLL_RESPONSE
         // - stable and unstable M_POLL_END
         // so make one api call and filter by event type client side
-        const allRelations = await this.matrixClient.relations(
-            this.roomId,
-            this.rootEvent.getId()!,
-            'm.reference',
-        )
-
-        console.log('hhh', { allRelations });
+        const allRelations = await this.matrixClient.relations(this.roomId, this.rootEvent.getId()!, "m.reference");
 
         // @TODO(kerrya) paging results
 
-        const responses = new Relations('m.reference', M_POLL_RESPONSE.name, this.matrixClient);
-        let undecryptableRelationsCount = 0;
+        const responses = new Relations(
+            "m.reference",
+            M_POLL_RESPONSE.name,
+            this.matrixClient,
+            [M_POLL_RESPONSE.altName!]
+            );
 
-        const pollEndEvent = allRelations.events.find(event => M_POLL_END.matches(event.getType()));
+        const pollEndEvent = allRelations.events.find((event) => M_POLL_END.matches(event.getType()));
         const pollCloseTimestamp = pollEndEvent?.getTs() || Number.MAX_SAFE_INTEGER;
 
-        allRelations.events.forEach(event => {
-            if (event.isDecryptionFailure()) {
-                undecryptableRelationsCount++
-                return;
-            }
-            if (
-                M_POLL_RESPONSE.matches(event.getType()) &&
-                // response made before poll closed
-                event.getTs() <= pollCloseTimestamp
-            ) {
-                responses.addEvent(event);
-            }
-        })
+        const { hasUndecryptableRelations, responseEvents } = filterResponseRelations(
+            allRelations.events,
+            pollCloseTimestamp,
+        );
 
-        console.log('hhh', 'relations!!', responses);
-
+        responseEvents.forEach((event) => {
+            responses.addEvent(event);
+        });
 
         this.responses = responses;
         this.endEvent = pollEndEvent;
+        this.hasUndecryptableRelations = hasUndecryptableRelations;
         this.emit(PollEvent.Responses, this.responses);
     }
 }
