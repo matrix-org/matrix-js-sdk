@@ -28,7 +28,7 @@ import type { IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, IRequestOpts, MatrixHttpApi, Method } from "../http-api";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { QueryDict } from "../utils";
 
 /**
@@ -54,7 +54,7 @@ export class RustCrypto implements CryptoBackend {
 
     public constructor(
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-        private readonly http: MatrixHttpApi<IHttpOpts>,
+        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         _userId: string,
         _deviceId: string,
     ) {}
@@ -181,21 +181,21 @@ export class RustCrypto implements CryptoBackend {
         }
     }
 
-    private async rawJsonRequest(
-        method: Method,
-        path: string,
-        queryParams: QueryDict,
-        body: string,
-        opts: IRequestOpts = {},
-    ): Promise<string> {
-        // unbeknownst to HttpApi, we are sending JSON
-        if (!opts.headers) opts.headers = {};
-        opts.headers["Content-Type"] = "application/json";
+    private async rawJsonRequest(method: Method, path: string, queryParams: QueryDict, body: string): Promise<string> {
+        const opts = {
+            // inhibit the JSON stringification and parsing within HttpApi.
+            json: false,
 
-        // we use the full prefix
-        if (!opts.prefix) opts.prefix = "";
+            // nevertheless, we are sending, and accept, JSON.
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
 
-        const resp = await this.http.authedRequest(method, path, queryParams, body, opts);
-        return await resp.text();
+            // we use the full prefix
+            prefix: "",
+        };
+
+        return await this.http.authedRequest<string>(method, path, queryParams, body, opts);
     }
 }
