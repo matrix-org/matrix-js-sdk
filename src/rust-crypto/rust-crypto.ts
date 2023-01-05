@@ -24,10 +24,11 @@ import {
 } from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, IRequestOpts, MatrixHttpApi, Method } from "../http-api";
+import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { QueryDict } from "../utils";
 
 /**
@@ -92,6 +93,25 @@ export class RustCrypto implements CryptoBackend {
     // SyncCryptoCallbacks implementation
     //
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /** called by the sync loop to preprocess incoming to-device messages
+     *
+     * @param events - the received to-device messages
+     * @returns A list of preprocessed to-device messages.
+     */
+    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
+        // send the received to-device messages into receiveSyncChanges. We have no info on device-list changes,
+        // one-time-keys, or fallback keys, so just pass empty data.
+        const result = await this.olmMachine.receiveSyncChanges(
+            JSON.stringify(events),
+            new RustSdkCryptoJs.DeviceLists(),
+            new Map(),
+            new Set(),
+        );
+
+        // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
+        return JSON.parse(result);
+    }
 
     /** called by the sync loop after processing each sync.
      *

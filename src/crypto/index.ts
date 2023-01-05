@@ -85,7 +85,7 @@ import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IContent } from "../models/event";
-import { ISyncResponse } from "../sync-accumulator";
+import { ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
@@ -3197,6 +3197,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             logger.error("Error handling membership change:", e);
         }
     };
+
+    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
+        // all we do here is filter out encrypted to-device messages with the wrong algorithm. Decryption
+        // happens later in decryptEvent, via the EventMapper
+        return events.filter((toDevice) => {
+            if (
+                toDevice.type === EventType.RoomMessageEncrypted &&
+                !["m.olm.v1.curve25519-aes-sha2"].includes(toDevice.content?.algorithm)
+            ) {
+                logger.log("Ignoring invalid encrypted to-device event from " + toDevice.sender);
+                return false;
+            }
+            return true;
+        });
+    }
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
         try {
