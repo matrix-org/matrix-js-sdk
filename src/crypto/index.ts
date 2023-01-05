@@ -2225,9 +2225,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 await upload({ shouldEmit: true });
                 // XXX: we'll need to wait for the device list to be updated
             }
-
-            // redo key requests after verification
-            this.cancelAndResendAllOutgoingKeyRequests();
         }
 
         const deviceObj = DeviceInfo.fromStorage(dev, deviceId);
