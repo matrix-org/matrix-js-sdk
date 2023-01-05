@@ -33,6 +33,9 @@ export type EventHandlerMap = {
     [RelationsEvent.Redaction]: (event: MatrixEvent) => void;
 };
 
+const matchesEventType = (eventType: string, targetEventType: string, altTargetEventTypes: string[] = []): boolean =>
+    [targetEventType, ...altTargetEventTypes].includes(eventType);
+
 /**
  * A container for relation events that supports easy access to common ways of
  * aggregating such events. Each instance holds events that of a single relation
@@ -55,11 +58,13 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param relationType - The type of relation involved, such as "m.annotation", "m.reference", "m.replace", etc.
      * @param eventType - The relation event's type, such as "m.reaction", etc.
      * @param client - The client which created this instance. For backwards compatibility also accepts a Room.
+     * @param altEventTypes - alt event types for relation events, for example to support unstable prefixed event types
      */
     public constructor(
         public readonly relationType: RelationType | string,
         public readonly eventType: string,
         client: MatrixClient | Room,
+        public readonly altEventTypes?: string[],
     ) {
         super();
         this.client = client instanceof Room ? client.client : client;
@@ -84,7 +89,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         const relationType = relation.rel_type;
         const eventType = event.getType();
 
-        if (this.relationType !== relationType || this.eventType !== eventType) {
+        if (this.relationType !== relationType || !matchesEventType(eventType, this.eventType, this.altEventTypes)) {
             logger.error("Event relation info doesn't match this container");
             return;
         }
@@ -119,20 +124,6 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      */
     private async removeEvent(event: MatrixEvent): Promise<void> {
         if (!this.relations.has(event)) {
-            return;
-        }
-
-        const relation = event.getRelation();
-        if (!relation) {
-            logger.error("Event must have relation info");
-            return;
-        }
-
-        const relationType = relation.rel_type;
-        const eventType = event.getType();
-
-        if (this.relationType !== relationType || this.eventType !== eventType) {
-            logger.error("Event relation info doesn't match this container");
             return;
         }
 
