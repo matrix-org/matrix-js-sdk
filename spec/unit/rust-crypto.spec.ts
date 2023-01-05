@@ -22,6 +22,7 @@ import {
     KeysClaimRequest,
     KeysQueryRequest,
     KeysUploadRequest,
+    OlmMachine,
     SignatureUploadRequest,
 } from "@matrix-org/matrix-sdk-crypto-js";
 import { Mocked } from "jest-mock";
@@ -29,7 +30,7 @@ import MockHttpBackend from "matrix-mock-request";
 
 import { RustCrypto } from "../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../src/rust-crypto";
-import { HttpApiEvent, HttpApiEventHandlerMap, IHttpOpts, MatrixHttpApi } from "../../src";
+import { HttpApiEvent, HttpApiEventHandlerMap, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
 
 afterEach(() => {
@@ -47,13 +48,54 @@ describe("RustCrypto", () => {
         let rustCrypto: RustCrypto;
 
         beforeEach(async () => {
-            const mockHttpApi = {} as MatrixHttpApi<IHttpOpts>;
+            const mockHttpApi = {} as MatrixClient["http"];
             rustCrypto = (await initRustCrypto(mockHttpApi, TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
         });
 
         it("should return a list", async () => {
             const keys = await rustCrypto.exportRoomKeys();
             expect(Array.isArray(keys)).toBeTruthy();
+        });
+    });
+
+    describe("to-device messages", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            const mockHttpApi = {} as MatrixClient["http"];
+            rustCrypto = (await initRustCrypto(mockHttpApi, TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
+        });
+
+        it("should pass through unencrypted to-device messages", async () => {
+            const inputs: IToDeviceEvent[] = [
+                { content: { key: "value" }, type: "org.matrix.test", sender: "@alice:example.com" },
+            ];
+            const res = await rustCrypto.preprocessToDeviceMessages(inputs);
+            expect(res).toEqual(inputs);
+        });
+
+        it("should pass through bad encrypted messages", async () => {
+            const olmMachine: OlmMachine = rustCrypto["olmMachine"];
+            const keys = olmMachine.identityKeys;
+            const inputs: IToDeviceEvent[] = [
+                {
+                    type: "m.room.encrypted",
+                    content: {
+                        algorithm: "m.olm.v1.curve25519-aes-sha2",
+                        sender_key: "IlRMeOPX2e0MurIyfWEucYBRVOEEUMrOHqn/8mLqMjA",
+                        ciphertext: {
+                            [keys.curve25519.toBase64()]: {
+                                type: 0,
+                                body: "ajyjlghi",
+                            },
+                        },
+                    },
+                    sender: "@alice:example.com",
+                },
+            ];
+
+            const res = await rustCrypto.preprocessToDeviceMessages(inputs);
+            expect(res).toEqual(inputs);
         });
     });
 
@@ -90,6 +132,7 @@ describe("RustCrypto", () => {
                 baseUrl: "https://example.com",
                 prefix: "/_matrix",
                 fetchFn: httpBackend.fetchFn as typeof global.fetch,
+                onlyData: true,
             });
 
             // for these tests we use a mock OlmMachine, with an implementation of outgoingRequests that

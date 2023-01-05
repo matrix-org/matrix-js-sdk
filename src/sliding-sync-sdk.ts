@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import { logger } from "./logger";
 import * as utils from "./utils";
@@ -127,7 +128,7 @@ type ExtensionToDeviceResponse = {
 class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, ExtensionToDeviceResponse> {
     private nextBatch: string | null = null;
 
-    public constructor(private readonly client: MatrixClient) {}
+    public constructor(private readonly client: MatrixClient, private readonly cryptoCallbacks?: SyncCryptoCallbacks) {}
 
     public name(): string {
         return "to_device";
@@ -150,8 +151,12 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
         const cancelledKeyVerificationTxns: string[] = [];
-        data.events
-            ?.map(this.client.getEventMapper())
+        let events = data["events"] || [];
+        if (events.length > 0 && this.cryptoCallbacks) {
+            events = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
+        }
+        events
+            .map(this.client.getEventMapper())
             .map((toDeviceEvent) => {
                 // map is a cheap inline forEach
                 // We want to flag m.key.verification.start events as cancelled
@@ -373,7 +378,7 @@ export class SlidingSyncSdk {
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
         const extensions: Extension<any, any>[] = [
-            new ExtensionToDevice(this.client),
+            new ExtensionToDevice(this.client, this.syncOpts.cryptoCallbacks),
             new ExtensionAccountData(this.client),
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),

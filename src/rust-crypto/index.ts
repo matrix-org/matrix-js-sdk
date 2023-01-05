@@ -23,7 +23,7 @@ import { RUST_SDK_STORE_PREFIX } from "./constants";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 
 export async function initRustCrypto(
-    http: MatrixHttpApi<IHttpOpts>,
+    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     userId: string,
     deviceId: string,
 ): Promise<CryptoBackend> {
