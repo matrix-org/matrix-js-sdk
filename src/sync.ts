@@ -48,6 +48,7 @@ import {
     IStrippedState,
     ISyncResponse,
     ITimeline,
+    IToDeviceEvent,
 } from "./sync-accumulator";
 import { MatrixEvent } from "./models/event";
 import { MatrixError, Method } from "./http-api";
@@ -1170,19 +1171,15 @@ export class SyncApi {
         }
 
         // handle to-device events
-        if (Array.isArray(data.to_device?.events) && data.to_device!.events.length > 0) {
-            const cancelledKeyVerificationTxns: string[] = [];
-            data.to_device!.events.filter((eventJSON) => {
-                if (
-                    eventJSON.type === EventType.RoomMessageEncrypted &&
-                    !["m.olm.v1.curve25519-aes-sha2"].includes(eventJSON.content?.algorithm)
-                ) {
-                    logger.log("Ignoring invalid encrypted to-device event from " + eventJSON.sender);
-                    return false;
-                }
+        if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
+            let toDeviceMessages: IToDeviceEvent[] = data.to_device.events;
 
-                return true;
-            })
+            if (this.syncOpts.cryptoCallbacks) {
+                toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
+            }
+
+            const cancelledKeyVerificationTxns: string[] = [];
+            toDeviceMessages
                 .map(client.getEventMapper({ toDevice: true }))
                 .map((toDeviceEvent) => {
                     // map is a cheap inline forEach
