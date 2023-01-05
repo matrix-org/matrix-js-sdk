@@ -309,9 +309,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
-    // Useful to know at what point the current user has started using thread in this room
+    // Useful to know at what point the current user has started using threads in this room
     public oldestThreadedReceiptTs = Infinity;
-    // Important to compute compute `hasUserReadEvent` and similar method correctly
+    // Important to compute `hasUserReadEvent` and similar methods correctly.
     public unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
@@ -2736,10 +2736,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                     }
 
                     const me = this.client.getSafeUserId();
+                    // Track the time of the current user's oldest threaded receipt in the room.
                     if (userId === me && !receiptForMainTimeline && receipt.ts < this.oldestThreadedReceiptTs) {
                         this.oldestThreadedReceiptTs = receipt.ts;
                     }
 
+                    // Track each user's unthreaded read receipt.
                     if (!receipt.thread_id && receipt.ts > (this.unthreadedReceipts.get(userId)?.ts ?? 0)) {
                         this.unthreadedReceipts.set(userId, receipt);
                     }
