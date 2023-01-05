@@ -509,7 +509,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         if (isCurrentUser && this.lastReply()) {
             // If the last activity in a thread is prior to the first threaded read receipt
             // sent in the room we want to consider this thread as read.
-            const beforeFirstThreadedReceipt = (this.lastReply().getTs() ?? 0) < this.room.oldestThreadedReceiptTs;
+            const beforeFirstThreadedReceipt = (this.lastReply()?.getTs() ?? 0) < this.room.oldestThreadedReceiptTs;
             if (beforeFirstThreadedReceipt) {
                 return this.timeline.at(-1)?.getId() ?? null;
             }
@@ -519,7 +519,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
         // Checking whether the unthreaded read receipt for that user is more recent
         // than the read receipt inside that thread.
-        if (isCurrentUser && this.lastReply()) {
+        if (this.lastReply()) {
             if (!this.room.unthreadedReceipts.has(userId)) {
                 return readUpToId;
             }
