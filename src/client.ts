@@ -4840,8 +4840,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        if (this.supportsExperimentalThreads() && !unthreaded) {
-            body.thread_id = event.threadRootId ? event.threadRootId : MAIN_ROOM_TIMELINE;
+        const supportsThreadRR = this.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported;
+        if (supportsThreadRR && !unthreaded) {
+            const isThread = !!event.threadRootId;
+            body = {
+                ...body,
+                thread_id: isThread ? event.threadRootId : MAIN_ROOM_TIMELINE,
+            };
         }
 
         const promise = this.http.authedRequest<{}>(Method.Post, path, undefined, body || {});

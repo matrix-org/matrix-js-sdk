@@ -2735,7 +2735,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         ]);
                     }
 
-                    const me = this.client.getSafeUserId();
+                    const me = this.client.getUserId();
                     // Track the time of the current user's oldest threaded receipt in the room.
                     if (userId === me && !receiptForMainTimeline && receipt.ts < this.oldestThreadedReceiptTs) {
                         this.oldestThreadedReceiptTs = receipt.ts;
