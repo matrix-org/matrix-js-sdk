@@ -449,9 +449,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 });
                 events.forEach(async (serializedEvent: Partial<IEvent>) => {
                     const event = mapper(serializedEvent);
-                    if (event.getType() === EventType.RoomMessageEncrypted && this.client.isCryptoEnabled()) {
-                        await event.attemptDecryption(this.client.crypto!);
-                    }
+                    await client.decryptEventIfNeeded(event);
                     event.setStatus(EventStatus.NOT_SENT);
                     this.addPendingEvent(event, event.getTxnId()!);
                 });
@@ -511,9 +509,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         const decryptionPromises = events
             .slice(readReceiptTimelineIndex)
-            .filter((event) => event.shouldAttemptDecryption())
             .reverse()
-            .map((event) => event.attemptDecryption(this.client.crypto!, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
 
         await Promise.allSettled(decryptionPromises);
     }
@@ -529,9 +526,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const decryptionPromises = this.getUnfilteredTimelineSet()
             .getLiveTimeline()
             .getEvents()
-            .filter((event) => event.shouldAttemptDecryption())
+            .slice(0) // copy before reversing
             .reverse()
-            .map((event) => event.attemptDecryption(this.client.crypto!, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
 
         await Promise.allSettled(decryptionPromises);
     }

@@ -19,7 +19,7 @@ import { M_POLL_START } from "matrix-events-sdk";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
-import { Relations } from "../../src/models/relations";
+import { Relations, RelationsEvent } from "../../src/models/relations";
 import { TestClient } from "../TestClient";
 import { RelationType } from "../../src";
 import { logger } from "../../src/logger";
@@ -143,7 +143,7 @@ describe("Relations", function () {
 
             // event added
             expect(relations.getRelations()).toEqual([event]);
-            expect(emitSpy).toHaveBeenCalled();
+            expect(emitSpy).toHaveBeenCalledWith(RelationsEvent.Add, event);
         });
 
         it("should not add events of incorrect relation type", async () => {

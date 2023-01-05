@@ -145,12 +145,9 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
         // @TODO(kerrya) paging results
 
-        const responses = new Relations(
-            "m.reference",
-            M_POLL_RESPONSE.name,
-            this.matrixClient,
-            [M_POLL_RESPONSE.altName!]
-            );
+        const responses = new Relations("m.reference", M_POLL_RESPONSE.name, this.matrixClient, [
+            M_POLL_RESPONSE.altName!,
+        ]);
 
         const pollEndEvent = allRelations.events.find((event) => M_POLL_END.matches(event.getType()));
         const pollCloseTimestamp = pollEndEvent?.getTs() || Number.MAX_SAFE_INTEGER;

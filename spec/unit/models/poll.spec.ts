@@ -14,7 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { PollStartEvent, M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, REFERENCE_RELATION, M_POLL_END } from "matrix-events-sdk";
+import {
+    PollStartEvent,
+    M_POLL_KIND_DISCLOSED,
+    M_POLL_RESPONSE,
+    REFERENCE_RELATION,
+    M_POLL_END,
+} from "matrix-events-sdk";
 
 import { IEvent, MatrixEvent, PollEvent } from "../../../src";
 import { Poll } from "../../../src/models/poll";
@@ -110,23 +116,18 @@ describe("Poll", () => {
             expect(responses.getRelations()).toEqual([stableResponseEvent, unstableResponseEvent]);
         });
 
-        describe('with poll end event', () => {
-            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable! })
-            const unstablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.unstable! })
+        describe("with poll end event", () => {
+            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable! });
+            const unstablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.unstable! });
             const responseEventBeforeEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now - 1000);
             const responseEventAtEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
             const responseEventAfterEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now + 1000);
 
             beforeEach(() => {
                 mockClient.relations.mockResolvedValue({
-                    events: [
-                        responseEventAfterEnd,
-                        responseEventAtEnd,
-                        responseEventBeforeEnd,
-                        stablePollEndEvent
-                    ],
+                    events: [responseEventAfterEnd, responseEventAtEnd, responseEventBeforeEnd, stablePollEndEvent],
                 });
-            })
+            });
 
             it("sets poll end event with stable event type", async () => {
                 const poll = new Poll(basePollStartEvent, mockClient);
@@ -137,9 +138,7 @@ describe("Poll", () => {
 
             it("sets poll end event with unstable event type", async () => {
                 mockClient.relations.mockResolvedValue({
-                    events: [
-                        unstablePollEndEvent
-                    ],
+                    events: [unstablePollEndEvent],
                 });
                 const poll = new Poll(basePollStartEvent, mockClient);
                 await poll.getResponses();
@@ -153,10 +152,7 @@ describe("Poll", () => {
 
                 // just response type events
                 // and response with ts after poll end event is excluded
-                expect(responses.getRelations()).toEqual([
-                    responseEventAtEnd,
-                    responseEventBeforeEnd,
-                ]);
+                expect(responses.getRelations()).toEqual([responseEventAtEnd, responseEventBeforeEnd]);
             });
         });
     });

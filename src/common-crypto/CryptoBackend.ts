@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { IToDeviceEvent } from "../sync-accumulator";
 import { MatrixEvent } from "../models/event";
 
 /**
@@ -74,6 +75,20 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
 
 /** The methods which crypto implementations should expose to the Sync api */
 export interface SyncCryptoCallbacks {
+    /**
+     * Called by the /sync loop whenever there are incoming to-device messages.
+     *
+     * The implementation may preprocess the received messages (eg, decrypt them) and return an
+     * updated list of messages for dispatch to the rest of the system.
+     *
+     * Note that, unlike {@link ClientEvent.ToDeviceEvent} events, this is called on the raw to-device
+     * messages, rather than the results of any decryption attempts.
+     *
+     * @param events - the received to-device messages
+     * @returns A list of preprocessed to-device messages.
+     */
+    preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
+
     /**
      * Called by the /sync loop after each /sync response is processed.
      *
