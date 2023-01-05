@@ -504,8 +504,42 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         throw new Error("Unsupported function on the thread model");
     }
 
+    public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {
+        const isCurrentUser = userId === this.client.getUserId();
+        if (isCurrentUser && this.lastReply()) {
+            // If a thread last activity is prior the first read receipt sent in a thread
+            // we want to consider that this thread has been read
+            const beforeFirstThreadedReceipt = (this.lastReply()?.getTs() ?? 0) < this.room.oldestThreadedReceiptTs;
+            if (beforeFirstThreadedReceipt) {
+                return this.timeline.at(-1)?.getId() ?? null;
+            }
+        }
+
+        const readUpToId = super.getEventReadUpTo(userId, ignoreSynthesized);
+
+        // Checking whether the unthreaded read receipt for that user is more recent
+        // than the read receipt inside that thread.
+        if (isCurrentUser && this.lastReply()) {
+            const unthreadedReceiptTs = this.room.unthreadedReceipts.get(userId)?.ts ?? Infinity;
+            for (let i = this.timeline?.length - 1; i >= 0; --i) {
+                const ev = this.timeline[i];
+                if (ev.getTs() > unthreadedReceiptTs) return ev.getId() ?? readUpToId;
+                if (ev.getId() === readUpToId) return readUpToId;
+            }
+        }
+
+        return readUpToId;
+    }
+
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         if (userId === this.client.getUserId()) {
+            const beforeFirstThreadedReceipt = (this.lastReply()?.getTs() ?? 0) < this.room.oldestThreadedReceiptTs;
+            const unthreadedReceiptTs = this.room.unthreadedReceipts.get(userId)?.ts ?? 0;
+            const beforeLastUnthreadedReceipt = (this?.lastReply()?.getTs() ?? 0) < unthreadedReceiptTs;
+            if (beforeFirstThreadedReceipt || beforeLastUnthreadedReceipt) {
+                return true;
+            }
+
             const publicReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.Read);
             const privateReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.ReadPrivate);
             const hasUnreads = this.room.getThreadUnreadNotificationCount(this.id, NotificationCountType.Total) > 0;
