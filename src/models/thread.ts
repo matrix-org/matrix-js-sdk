@@ -523,11 +523,12 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             if (!this.room.unthreadedReceipts.has(userId)) {
                 return readUpToId;
             }
-            const unthreadedReceiptTs = this.room.unthreadedReceipts.get(userId).ts;
+
+            const unthreadedReceiptTs = this.room.unthreadedReceipts.get(userId)!.ts;
             for (let i = this.timeline?.length - 1; i >= 0; --i) {
                 const ev = this.timeline[i];
-                if (ev.getTs() > unthreadedReceiptTs) return ev.getId() ?? readUpToId;
                 if (ev.getId() === readUpToId) return readUpToId;
+                if (ev.getTs() < unthreadedReceiptTs) return ev.getId() ?? readUpToId;
             }
         }
 
