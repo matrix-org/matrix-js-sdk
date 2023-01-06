@@ -417,12 +417,28 @@ describe("MatrixClient", function () {
             ]);
         });
 
-        it("should fallback to unstable endpoint when no support for stable endpoint", async () => {
+        it("should fallback to unstable endpoint when stable endpoint 404s", async () => {
             await assertRequestsMade([
                 {
                     prefix: ClientPrefix.V1,
                     error: {
                         httpStatus: 404,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                },
+                {
+                    prefix: unstableMSC3030Prefix,
+                    data: { event_id: eventId },
+                },
+            ]);
+        });
+
+        it("should fallback to unstable endpoint when stable endpoint 405s", async () => {
+            await assertRequestsMade([
+                {
+                    prefix: ClientPrefix.V1,
+                    error: {
+                        httpStatus: 405,
                         errcode: "M_UNRECOGNIZED",
                     },
                 },
