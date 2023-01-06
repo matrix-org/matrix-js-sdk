@@ -417,6 +417,22 @@ describe("MatrixClient", function () {
             ]);
         });
 
+        it("should fallback to unstable endpoint when stable endpoint 400s", async () => {
+            await assertRequestsMade([
+                {
+                    prefix: ClientPrefix.V1,
+                    error: {
+                        httpStatus: 400,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                },
+                {
+                    prefix: unstableMSC3030Prefix,
+                    data: { event_id: eventId },
+                },
+            ]);
+        });
+
         it("should fallback to unstable endpoint when stable endpoint 404s", async () => {
             await assertRequestsMade([
                 {
@@ -449,13 +465,43 @@ describe("MatrixClient", function () {
             ]);
         });
 
-        it("should not fallback to unstable endpoint when stable endpoint returns an error", async () => {
+        it("should not fallback to unstable endpoint when stable endpoint returns an error (500)", async () => {
             await assertRequestsMade(
                 [
                     {
                         prefix: ClientPrefix.V1,
                         error: {
                             httpStatus: 500,
+                            errcode: "Fake response error",
+                        },
+                    },
+                ],
+                true,
+            );
+        });
+
+        it("should not fallback to unstable endpoint when stable endpoint is rate-limiting (429)", async () => {
+            await assertRequestsMade(
+                [
+                    {
+                        prefix: ClientPrefix.V1,
+                        error: {
+                            httpStatus: 429,
+                            errcode: "M_UNRECOGNIZED", // Still refuses even if the errcode claims unrecognised
+                        },
+                    },
+                ],
+                true,
+            );
+        });
+
+        it("should not fallback to unstable endpoint when stable endpoint says bad gateway (502)", async () => {
+            await assertRequestsMade(
+                [
+                    {
+                        prefix: ClientPrefix.V1,
+                        error: {
+                            httpStatus: 502,
                             errcode: "Fake response error",
                         },
                     },
