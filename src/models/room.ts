@@ -54,7 +54,13 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
+import {
+    CachedReceiptStructure,
+    MAIN_ROOM_TIMELINE,
+    Receipt,
+    ReceiptContent,
+    ReceiptType,
+} from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
@@ -302,7 +308,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
-    public readonly cachedThreadReadReceipts = new Map<string, { event: MatrixEvent; synthetic: boolean }[]>();
+    public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -441,9 +447,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 });
                 events.forEach(async (serializedEvent: Partial<IEvent>) => {
                     const event = mapper(serializedEvent);
-                    if (event.getType() === EventType.RoomMessageEncrypted && this.client.isCryptoEnabled()) {
-                        await event.attemptDecryption(this.client.crypto!);
-                    }
+                    await client.decryptEventIfNeeded(event);
                     event.setStatus(EventStatus.NOT_SENT);
                     this.addPendingEvent(event, event.getTxnId()!);
                 });
@@ -503,9 +507,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         const decryptionPromises = events
             .slice(readReceiptTimelineIndex)
-            .filter((event) => event.shouldAttemptDecryption())
             .reverse()
-            .map((event) => event.attemptDecryption(this.client.crypto!, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
 
         await Promise.allSettled(decryptionPromises);
     }
@@ -521,9 +524,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const decryptionPromises = this.getUnfilteredTimelineSet()
             .getLiveTimeline()
             .getEvents()
-            .filter((event) => event.shouldAttemptDecryption())
+            .slice(0) // copy before reversing
             .reverse()
-            .map((event) => event.attemptDecryption(this.client.crypto!, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
 
         await Promise.allSettled(decryptionPromises);
     }
@@ -889,6 +892,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Check if loading of out-of-band-members has completed
+     *
+     * @returns true if the full membership list of this room has been loaded (including if lazy-loading is disabled).
+     *    False if the load is not started or is in progress.
+     */
+    public membersLoaded(): boolean {
+        if (!this.opts.lazyLoadMembers) {
+            return true;
+        }
+
+        return this.currentState.outOfBandMembersReady();
+    }
+
+    /**
      * Preloads the member list in case lazy loading
      * of memberships is in use. Can be called multiple times,
      * it will only preload once.
@@ -909,10 +926,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const inMemoryUpdate = this.loadMembers()
             .then((result) => {
                 this.currentState.setOutOfBandMembers(result.memberEvents);
-                // now the members are loaded, start to track the e2e devices if needed
-                if (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId)) {
-                    this.client.crypto!.trackRoomDevices(this.roomId);
-                }
                 return result.fromServer;
             })
             .catch((err) => {
@@ -2711,7 +2724,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         // when the thread is created
                         this.cachedThreadReadReceipts.set(receipt.thread_id!, [
                             ...(this.cachedThreadReadReceipts.get(receipt.thread_id!) ?? []),
-                            { event, synthetic },
+                            { eventId, receiptType, userId, receipt, synthetic },
                         ]);
                     }
                 });

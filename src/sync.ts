@@ -25,6 +25,7 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
+import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend";
 import { User, UserEvent } from "./models/user";
 import { NotificationCountType, Room, RoomEvent } from "./models/room";
 import * as utils from "./utils";
@@ -34,7 +35,7 @@ import { EventTimeline } from "./models/event-timeline";
 import { PushProcessor } from "./pushprocessor";
 import { logger } from "./logger";
 import { InvalidStoreError, InvalidStoreState } from "./errors";
-import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering } from "./client";
+import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client";
 import {
     IEphemeral,
     IInvitedRoom,
@@ -47,6 +48,7 @@ import {
     IStrippedState,
     ISyncResponse,
     ITimeline,
+    IToDeviceEvent,
 } from "./sync-accumulator";
 import { MatrixEvent } from "./models/event";
 import { MatrixError, Method } from "./http-api";
@@ -59,6 +61,7 @@ import { BeaconEvent } from "./models/beacon";
 import { IEventsResponse } from "./@types/requests";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { Feature, ServerSupport } from "./feature";
+import { Crypto } from "./crypto";
 
 const DEBUG = true;
 
@@ -108,6 +111,31 @@ function getFilterName(userId: string, suffix?: string): string {
 function debuglog(...params: any[]): void {
     if (!DEBUG) return;
     logger.log(...params);
+}
+
+/**
+ * Options passed into the constructor of SyncApi by MatrixClient
+ */
+export interface SyncApiOptions {
+    /**
+     * Crypto manager
+     *
+     * @deprecated in favour of cryptoCallbacks
+     */
+    crypto?: Crypto;
+
+    /**
+     * If crypto is enabled on our client, callbacks into the crypto module
+     */
+    cryptoCallbacks?: SyncCryptoCallbacks;
+
+    /**
+     * A function which is called
+     * with a room ID and returns a boolean. It should return 'true' if the SDK can
+     * SAFELY remove events from this room. It may not be safe to remove events if
+     * there are other references to the timelines for this room.
+     */
+    canResetEntireTimeline?: ResetTimelineCallback;
 }
 
 interface ISyncOptions {
@@ -163,7 +191,29 @@ type WrappedRoom<T> = T & {
     isBrandNewRoom: boolean;
 };
 
+/** add default settings to an IStoredClientOpts */
+export function defaultClientOpts(opts?: IStoredClientOpts): IStoredClientOpts {
+    return {
+        initialSyncLimit: 8,
+        resolveInvitesToProfiles: false,
+        pollTimeout: 30 * 1000,
+        pendingEventOrdering: PendingEventOrdering.Chronological,
+        experimentalThreadSupport: false,
+        ...opts,
+    };
+}
+
+export function defaultSyncApiOpts(syncOpts?: SyncApiOptions): SyncApiOptions {
+    return {
+        canResetEntireTimeline: (_roomId): boolean => false,
+        ...syncOpts,
+    };
+}
+
 export class SyncApi {
+    private readonly opts: IStoredClientOpts;
+    private readonly syncOpts: SyncApiOptions;
+
     private _peekRoom: Optional<Room> = null;
     private currentSyncRequest?: Promise<ISyncResponse>;
     private abortController?: AbortController;
@@ -180,21 +230,13 @@ export class SyncApi {
     /**
      * Construct an entity which is able to sync with a homeserver.
      * @param client - The matrix client instance to use.
-     * @param opts - Config options
+     * @param opts - client config options
+     * @param syncOpts - sync-specific options passed by the client
      * @internal
      */
-    public constructor(private readonly client: MatrixClient, private readonly opts: Partial<IStoredClientOpts> = {}) {
-        this.opts.initialSyncLimit = this.opts.initialSyncLimit ?? 8;
-        this.opts.resolveInvitesToProfiles = this.opts.resolveInvitesToProfiles || false;
-        this.opts.pollTimeout = this.opts.pollTimeout || 30 * 1000;
-        this.opts.pendingEventOrdering = this.opts.pendingEventOrdering || PendingEventOrdering.Chronological;
-        this.opts.experimentalThreadSupport = this.opts.experimentalThreadSupport === true;
-
-        if (!opts.canResetEntireTimeline) {
-            opts.canResetEntireTimeline = (roomId: string): boolean => {
-                return false;
-            };
-        }
+    public constructor(private readonly client: MatrixClient, opts?: IStoredClientOpts, syncOpts?: SyncApiOptions) {
+        this.opts = defaultClientOpts(opts);
+        this.syncOpts = defaultSyncApiOpts(syncOpts);
 
         if (client.getNotifTimelineSet()) {
             client.reEmitter.reEmit(client.getNotifTimelineSet()!, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
@@ -632,7 +674,7 @@ export class SyncApi {
             return;
         }
         if (this.opts.lazyLoadMembers) {
-            this.opts.crypto?.enableLazyLoading();
+            this.syncOpts.crypto?.enableLazyLoading();
         }
         try {
             debuglog("Storing client options...");
@@ -866,10 +908,10 @@ export class SyncApi {
                 catchingUp: this.catchingUp,
             };
 
-            if (this.opts.crypto) {
+            if (this.syncOpts.crypto) {
                 // tell the crypto module we're about to process a sync
                 // response
-                await this.opts.crypto.onSyncWillProcess(syncEventData);
+                await this.syncOpts.crypto.onSyncWillProcess(syncEventData);
             }
 
             try {
@@ -894,8 +936,8 @@ export class SyncApi {
 
             // tell the crypto module to do its processing. It may block (to do a
             // /keys/changes request).
-            if (this.opts.crypto) {
-                await this.opts.crypto.onSyncCompleted(syncEventData);
+            if (this.syncOpts.cryptoCallbacks) {
+                await this.syncOpts.cryptoCallbacks.onSyncCompleted(syncEventData);
             }
 
             // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
@@ -907,8 +949,8 @@ export class SyncApi {
                 // stored sync data which means we don't have to worry that we may have missed
                 // device changes. We can also skip the delay since we're not calling this very
                 // frequently (and we don't really want to delay the sync for it).
-                if (this.opts.crypto) {
-                    await this.opts.crypto.saveDeviceList(0);
+                if (this.syncOpts.crypto) {
+                    await this.syncOpts.crypto.saveDeviceList(0);
                 }
 
                 // tell databases that everything is now in a consistent state and can be saved.
@@ -1129,19 +1171,15 @@ export class SyncApi {
         }
 
         // handle to-device events
-        if (Array.isArray(data.to_device?.events) && data.to_device!.events.length > 0) {
-            const cancelledKeyVerificationTxns: string[] = [];
-            data.to_device!.events.filter((eventJSON) => {
-                if (
-                    eventJSON.type === EventType.RoomMessageEncrypted &&
-                    !["m.olm.v1.curve25519-aes-sha2"].includes(eventJSON.content?.algorithm)
-                ) {
-                    logger.log("Ignoring invalid encrypted to-device event from " + eventJSON.sender);
-                    return false;
-                }
+        if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
+            let toDeviceMessages: IToDeviceEvent[] = data.to_device.events;
 
-                return true;
-            })
+            if (this.syncOpts.cryptoCallbacks) {
+                toDeviceMessages = await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
+            }
+
+            const cancelledKeyVerificationTxns: string[] = [];
+            toDeviceMessages
                 .map(client.getEventMapper({ toDevice: true }))
                 .map((toDeviceEvent) => {
                     // map is a cheap inline forEach
@@ -1356,7 +1394,7 @@ export class SyncApi {
                 if (limited) {
                     room.resetLiveTimeline(
                         joinObj.timeline.prev_batch,
-                        this.opts.canResetEntireTimeline!(room.roomId) ? null : syncEventData.oldSyncToken ?? null,
+                        this.syncOpts.canResetEntireTimeline!(room.roomId) ? null : syncEventData.oldSyncToken ?? null,
                     );
 
                     // We have to assume any gap in any timeline is
@@ -1370,10 +1408,10 @@ export class SyncApi {
             // avoids a race condition if the application tries to send a message after the
             // state event is processed, but before crypto is enabled, which then causes the
             // crypto layer to complain.
-            if (this.opts.crypto) {
+            if (this.syncOpts.crypto) {
                 for (const e of stateEvents.concat(events)) {
                     if (e.isState() && e.getType() === EventType.RoomEncryption && e.getStateKey() === "") {
-                        await this.opts.crypto.onCryptoEvent(room, e);
+                        await this.syncOpts.crypto.onCryptoEvent(room, e);
                     }
                 }
             }
@@ -1462,8 +1500,8 @@ export class SyncApi {
 
         // Handle device list updates
         if (data.device_lists) {
-            if (this.opts.crypto) {
-                await this.opts.crypto.handleDeviceListChanges(syncEventData, data.device_lists);
+            if (this.syncOpts.crypto) {
+                await this.syncOpts.crypto.handleDeviceListChanges(syncEventData, data.device_lists);
             } else {
                 // FIXME if we *don't* have a crypto module, we still need to
                 // invalidate the device lists. But that would require a
@@ -1472,12 +1510,12 @@ export class SyncApi {
         }
 
         // Handle one_time_keys_count
-        if (this.opts.crypto && data.device_one_time_keys_count) {
+        if (this.syncOpts.crypto && data.device_one_time_keys_count) {
             const currentCount = data.device_one_time_keys_count.signed_curve25519 || 0;
-            this.opts.crypto.updateOneTimeKeyCount(currentCount);
+            this.syncOpts.crypto.updateOneTimeKeyCount(currentCount);
         }
         if (
-            this.opts.crypto &&
+            this.syncOpts.crypto &&
             (data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"])
         ) {
             // The presence of device_unused_fallback_key_types indicates that the
@@ -1485,7 +1523,7 @@ export class SyncApi {
             // signed_curve25519 fallback key we need a new one.
             const unusedFallbackKeys =
                 data.device_unused_fallback_key_types || data["org.matrix.msc2732.device_unused_fallback_key_types"];
-            this.opts.crypto.setNeedsNewFallback(
+            this.syncOpts.crypto.setNeedsNewFallback(
                 Array.isArray(unusedFallbackKeys) && !unusedFallbackKeys.includes("signed_curve25519"),
             );
         }

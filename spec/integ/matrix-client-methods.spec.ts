@@ -35,9 +35,7 @@ describe("MatrixClient", function () {
     let store: MemoryStore | undefined;
 
     const defaultClientOpts: IStoredClientOpts = {
-        canResetEntireTimeline: (roomId) => false,
         experimentalThreadSupport: false,
-        crypto: {} as unknown as IStoredClientOpts["crypto"],
     };
     const setupTests = (): [MatrixClient, HttpBackend, MemoryStore] => {
         const store = new MemoryStore();

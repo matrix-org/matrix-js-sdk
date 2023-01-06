@@ -167,6 +167,38 @@ describe("Crypto", function () {
 
             client.stopClient();
         });
+
+        it("doesn't throw an error when attempting to decrypt a redacted event", async () => {
+            const client = new TestClient("@alice:example.com", "deviceid").client;
+            await client.initCrypto();
+
+            const event = new MatrixEvent({
+                content: {},
+                event_id: "$event_id",
+                room_id: "!room_id",
+                sender: "@bob:example.com",
+                type: "m.room.encrypted",
+                unsigned: {
+                    redacted_because: {
+                        content: {},
+                        event_id: "$redaction_event_id",
+                        redacts: "$event_id",
+                        room_id: "!room_id",
+                        origin_server_ts: 1234567890,
+                        sender: "@bob:example.com",
+                        type: "m.room.redaction",
+                        unsigned: {},
+                    },
+                },
+            });
+            await event.attemptDecryption(client.crypto!);
+            expect(event.isDecryptionFailure()).toBeFalsy();
+            // since the redaction event isn't encrypted, the redacted_because
+            // should be the same as in the original event
+            expect(event.getRedactionEvent()).toEqual(event.getUnsigned().redacted_because);
+
+            client.stopClient();
+        });
     });
 
     describe("Session management", function () {

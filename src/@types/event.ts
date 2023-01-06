@@ -66,11 +66,12 @@ export enum EventType {
     KeyVerificationDone = "m.key.verification.done",
     KeyVerificationKey = "m.key.verification.key",
     KeyVerificationAccept = "m.key.verification.accept",
-    // XXX this event is not yet supported by js-sdk
+    // Not used directly - see READY_TYPE in VerificationRequest.
     KeyVerificationReady = "m.key.verification.ready",
     // use of this is discouraged https://matrix.org/docs/spec/client_server/r0.6.1#m-room-message-feedback
     RoomMessageFeedback = "m.room.message.feedback",
     Reaction = "m.reaction",
+    PollStart = "org.matrix.msc3381.poll.start",
 
     // Room ephemeral events
     Typing = "m.typing",
