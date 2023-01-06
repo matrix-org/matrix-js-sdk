@@ -1115,7 +1115,9 @@ export class GroupCall extends TypedEventEmitter<
     private onCallHangup = (call: MatrixCall): void => {
         if (call.hangupReason === CallErrorCode.Replaced) return;
 
-        const opponentUserId = call.getOpponentMember()?.userId ?? this.room.getMember(call.invitee!)!.userId;
+        const opponentUserId = call.invitee ?? call.getOpponentMember()?.userId;
+        if (!opponentUserId) return;
+
         const deviceMap = this.calls.get(opponentUserId);
 
         // Sanity check that this call is in fact in the map
