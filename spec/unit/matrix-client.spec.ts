@@ -70,15 +70,12 @@ jest.mock("../../src/webrtc/call", () => ({
 
 // Utility function to ease the transition from our QueryDict type to a string record
 // which we can use to stringify with URLSearchParams
-function convertQueryDictToStringRecord(queryDict?: QueryDict): Record<string, string> {
+function convertQueryDictToStringRecord(queryDict?: QueryDict): Map<string, string> {
     if (!queryDict) {
-        return {};
+        return new Map();
     }
 
-    return Object.entries(queryDict).reduce((resultant, [key, value]) => {
-        resultant[key] = String(value);
-        return resultant;
-    }, {} as Record<string, string>);
+    return new Map(Object.entries(queryDict).map(([k, v]) => [k, String(v)]));
 }
 
 type HttpLookup = {
@@ -103,28 +100,37 @@ type WrappedRoom = Room & {
 
 describe("convertQueryDictToStringRecord", () => {
     it("returns an empty map when dict is undefined", () => {
-        expect(convertQueryDictToStringRecord(undefined)).toEqual({});
+        expect(convertQueryDictToStringRecord(undefined)).toEqual(new Map());
     });
 
     it("converts an empty QueryDict to an empty map", () => {
-        expect(convertQueryDictToStringRecord({})).toEqual({});
+        expect(convertQueryDictToStringRecord({})).toEqual(new Map());
     });
 
     it("converts a QueryDict of strings to the equivalent map", () => {
-        expect(convertQueryDictToStringRecord({ a: "b", c: "d" })).toEqual({ a: "b", c: "d" });
+        expect(convertQueryDictToStringRecord({ a: "b", c: "d" })).toEqual(
+            new Map([
+                ["a", "b"],
+                ["c", "d"],
+            ]),
+        );
     });
 
     it("converts the values of the supplied QueryDict to strings", () => {
-        expect(convertQueryDictToStringRecord({ arr: ["b", "c"], num: 45, boo: true, und: undefined })).toEqual({
-            arr: "b,c",
-            num: "45",
-            boo: "true",
-            und: "undefined",
-        });
+        expect(convertQueryDictToStringRecord({ arr: ["b", "c"], num: 45, boo: true, und: undefined })).toEqual(
+            new Map([
+                ["arr", "b,c"],
+                ["num", "45"],
+                ["boo", "true"],
+                ["und", "undefined"],
+            ]),
+        );
     });
 
     it("produces sane URLSearchParams conversions", () => {
-        expect(new URLSearchParams(convertQueryDictToStringRecord({ a: "b", c: "d" })).toString()).toEqual("a=b&c=d");
+        expect(new URLSearchParams(Array.from(convertQueryDictToStringRecord({ a: "b", c: "d" }))).toString()).toEqual(
+            "a=b&c=d",
+        );
     });
 });
 
@@ -248,10 +254,12 @@ describe("MatrixClient", function () {
             return Promise.resolve(next.data);
         }
 
-        const receivedRequestQueryString = new URLSearchParams(convertQueryDictToStringRecord(queryParams)).toString();
+        const receivedRequestQueryString = new URLSearchParams(
+            Array.from(convertQueryDictToStringRecord(queryParams)),
+        ).toString();
         const receivedRequestDebugString = `${method} ${prefix}${path}${receivedRequestQueryString}`;
         const expectedQueryString = new URLSearchParams(
-            convertQueryDictToStringRecord(next.expectQueryParams),
+            Array.from(convertQueryDictToStringRecord(next.expectQueryParams)),
         ).toString();
         const expectedRequestDebugString = `${next.method} ${next.prefix ?? ""}${next.path}${expectedQueryString}`;
         // If you're seeing this then you forgot to handle at least 1 pending request.
