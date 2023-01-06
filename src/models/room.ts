@@ -54,7 +54,13 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
+import {
+    CachedReceiptStructure,
+    MAIN_ROOM_TIMELINE,
+    Receipt,
+    ReceiptContent,
+    ReceiptType,
+} from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
@@ -302,7 +308,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
-    public readonly cachedThreadReadReceipts = new Map<string, { event: MatrixEvent; synthetic: boolean }[]>();
+    public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -2718,7 +2724,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         // when the thread is created
                         this.cachedThreadReadReceipts.set(receipt.thread_id!, [
                             ...(this.cachedThreadReadReceipts.get(receipt.thread_id!) ?? []),
-                            { event, synthetic },
+                            { eventId, receiptType, userId, receipt, synthetic },
                         ]);
                     }
                 });

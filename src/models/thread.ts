@@ -27,7 +27,7 @@ import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
 import { ReadReceipt } from "./read-receipt";
-import { Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
+import { CachedReceiptStructure, ReceiptType } from "../@types/read_receipts";
 
 export enum ThreadEvent {
     New = "Thread.new",
@@ -50,7 +50,7 @@ interface IThreadOpts {
     room: Room;
     client: MatrixClient;
     pendingEventOrdering?: PendingEventOrdering;
-    receipts?: { event: MatrixEvent; synthetic: boolean }[];
+    receipts?: CachedReceiptStructure[];
 }
 
 export enum FeatureSupport {
@@ -317,17 +317,9 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * and apply them to the current thread
      * @param receipts - A collection of the receipts cached from initial sync
      */
-    private processReceipts(receipts: { event: MatrixEvent; synthetic: boolean }[] = []): void {
-        for (const { event, synthetic } of receipts) {
-            const content = event.getContent<ReceiptContent>();
-            Object.keys(content).forEach((eventId: string) => {
-                Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
-                    Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
-                        const receipt = content[eventId][receiptType][userId] as Receipt;
-                        this.addReceiptToStructure(eventId, receiptType as ReceiptType, userId, receipt, synthetic);
-                    });
-                });
-            });
+    private processReceipts(receipts: CachedReceiptStructure[] = []): void {
+        for (const { eventId, receiptType, userId, receipt, synthetic } of receipts) {
+            this.addReceiptToStructure(eventId, receiptType as ReceiptType, userId, receipt, synthetic);
         }
     }
 
