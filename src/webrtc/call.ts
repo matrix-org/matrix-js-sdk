@@ -624,15 +624,27 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
 
             // We use transceivers here because we need to send the actual
-            // trackIds which the focus will see which will probably differ from
-            // the local trackIds on MediaStreams
-            const tracks = Array.from(this.transceivers.values()).reduce((tracks, transceiver) => {
+            // trackIds and streamIds which the focus will see which will
+            // probably differ from the local trackIds and streamIds
+            let streamId = localFeed.sdpMetadataStreamId;
+            const tracks = Array.from(this.transceivers.entries()).reduce((tracks, [transceiverKey, transceiver]) => {
                 if (!transceiver.sender.track) return tracks;
+                if (
+                    ![
+                        getTransceiverKey(localFeed.purpose, "audio"),
+                        getTransceiverKey(localFeed.purpose, "video"),
+                    ].includes(transceiverKey)
+                ) {
+                    return tracks;
+                }
 
                 // XXX: We only use double equals because MediaDescription::mid is in fact a number
-                const trackId = sdp?.media?.find((m) => m.mid == transceiver.mid)?.msid?.split(" ")?.[1];
-                if (trackId) {
-                    tracks[trackId] = {
+                const msid = sdp?.media?.find((m) => m.mid == transceiver.mid)?.msid?.split(" ");
+                if (msid?.[0]) {
+                    streamId = msid?.[0];
+                }
+                if (msid?.[1]) {
+                    tracks[msid[1]] = {
                         kind: transceiver.sender.track?.kind,
                         width: transceiver.sender.track.getSettings().width,
                         height: transceiver.sender.track.getSettings().height,
@@ -642,7 +654,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }, {} as SDPStreamMetadataTracks);
             if (!Object.keys(tracks).length) continue;
 
-            metadata[localFeed.sdpMetadataStreamId] = {
+            metadata[streamId] = {
                 // FIXME: This allows for impersonation - the focus should be
                 // handling these
                 user_id: this.client.getUserId()!,
@@ -2451,7 +2463,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     };
 
     public onHangupReceived = (msg: MCallHangupReject): void => {
-        logger.debug("Hangup received for call ID " + this.callId);
+        logger.debug(`Hangup received for call ID ${this.callId}:`, msg);
 
         // party ID must match (our chosen partner hanging up the call) or be undefined (we haven't chosen
         // a partner yet but we're treating the hangup as a reject as per VoIP v0)

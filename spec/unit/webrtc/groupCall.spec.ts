@@ -336,6 +336,8 @@ describe("Group Call", function () {
             beforeEach(async () => {
                 jest.spyOn(currentFeed, "dispose");
                 jest.spyOn(newFeed, "measureVolumeActivity");
+                jest.spyOn(currentFeed, "isLocal").mockReturnValue(false);
+                jest.spyOn(newFeed, "isLocal").mockReturnValue(false);
 
                 jest.spyOn(groupCall, "emit");
 
@@ -344,17 +346,14 @@ describe("Group Call", function () {
                 await groupCall.create();
             });
 
-            it("ignores changes, if we can't get user id of opponent", async () => {
-                const call = new MockMatrixCall(room.roomId, groupCall.groupCallId);
-                jest.spyOn(call, "getOpponentMember").mockReturnValue({ userId: undefined });
-
-                // @ts-ignore Mock
-                expect(() => groupCall.onCallFeedsChanged(call)).toThrowError();
-            });
-
             describe("usermedia feeds", () => {
+                beforeEach(() => {
+                    currentFeed.purpose = SDPStreamMetadataPurpose.Usermedia;
+                    newFeed.purpose = SDPStreamMetadataPurpose.Usermedia;
+                });
+
                 it("adds new usermedia feed", async () => {
-                    call.remoteUsermediaFeed = newFeed.typed();
+                    call.feeds = [newFeed.typed()];
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -364,7 +363,8 @@ describe("Group Call", function () {
                 it("replaces usermedia feed", async () => {
                     groupCall.userMediaFeeds.push(currentFeed.typed());
 
-                    call.remoteUsermediaFeed = newFeed.typed();
+                    call.feeds = [newFeed.typed()];
+
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -372,6 +372,7 @@ describe("Group Call", function () {
                 });
 
                 it("removes usermedia feed", async () => {
+                    currentFeed.dispose();
                     groupCall.userMediaFeeds.push(currentFeed.typed());
 
                     // @ts-ignore Mock
@@ -382,8 +383,14 @@ describe("Group Call", function () {
             });
 
             describe("screenshare feeds", () => {
+                beforeEach(() => {
+                    currentFeed.purpose = SDPStreamMetadataPurpose.Screenshare;
+                    newFeed.purpose = SDPStreamMetadataPurpose.Screenshare;
+                });
+
                 it("adds new screenshare feed", async () => {
-                    call.remoteScreensharingFeed = newFeed.typed();
+                    call.feeds = [newFeed.typed()];
+
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -393,7 +400,8 @@ describe("Group Call", function () {
                 it("replaces screenshare feed", async () => {
                     groupCall.screenshareFeeds.push(currentFeed.typed());
 
-                    call.remoteScreensharingFeed = newFeed.typed();
+                    call.feeds = [newFeed.typed()];
+
                     // @ts-ignore Mock
                     groupCall.onCallFeedsChanged(call);
 
@@ -401,6 +409,7 @@ describe("Group Call", function () {
                 });
 
                 it("removes screenshare feed", async () => {
+                    currentFeed.dispose();
                     groupCall.screenshareFeeds.push(currentFeed.typed());
 
                     // @ts-ignore Mock
@@ -857,6 +866,7 @@ describe("Group Call", function () {
                 // @ts-ignore
                 const call = groupCall.calls.get(FAKE_USER_ID_2)!.get(FAKE_DEVICE_ID_2)!;
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+                call.onSDPStreamMetadataChangedReceived(metadataEvent);
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
                     // @ts-ignore Mock
@@ -865,7 +875,6 @@ describe("Group Call", function () {
                         new MockMediaStreamTrack("video_track", "video"),
                     ]),
                 );
-                call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
                 const feed = groupCall.getUserMediaFeed(call.invitee!, call.getOpponentDeviceId()!);
                 expect(feed!.isAudioMuted()).toBe(true);
@@ -884,6 +893,7 @@ describe("Group Call", function () {
                 // @ts-ignore
                 const call = groupCall.calls.get(FAKE_USER_ID_2).get(FAKE_DEVICE_ID_2)!;
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
+                call.onSDPStreamMetadataChangedReceived(metadataEvent);
                 // @ts-ignore Mock
                 call.pushRemoteFeed(
                     // @ts-ignore Mock
@@ -892,7 +902,6 @@ describe("Group Call", function () {
                         new MockMediaStreamTrack("video_track", "video"),
                     ]),
                 );
-                call.onSDPStreamMetadataChangedReceived(metadataEvent);
 
                 const feed = groupCall.getUserMediaFeed(call.invitee!, call.getOpponentDeviceId()!);
                 expect(feed!.isAudioMuted()).toBe(false);

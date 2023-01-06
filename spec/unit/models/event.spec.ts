@@ -16,7 +16,6 @@ limitations under the License.
 
 import { MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
-import { EventType } from "../../../src";
 import { Crypto } from "../../../src/crypto";
 
 describe("MatrixEvent", () => {
@@ -88,22 +87,6 @@ describe("MatrixEvent", () => {
         expect(ev.getWireContent().ciphertext).toBeUndefined();
     });
 
-    it("should abort decryption if fails with an error other than a DecryptionError", async () => {
-        const ev = new MatrixEvent({
-            type: EventType.RoomMessageEncrypted,
-            content: {
-                body: "Test",
-            },
-            event_id: "$event1:server",
-        });
-        await ev.attemptDecryption({
-            decryptEvent: jest.fn().mockRejectedValue(new Error("Not a DecryptionError")),
-        } as unknown as Crypto);
-        expect(ev.isEncrypted()).toBeTruthy();
-        expect(ev.isBeingDecrypted()).toBeFalsy();
-        expect(ev.isDecryptionFailure()).toBeFalsy();
-    });
-
     describe("applyVisibilityEvent", () => {
         it("should emit VisibilityChange if a change was made", async () => {
             const ev = new MatrixEvent({
@@ -131,6 +114,21 @@ describe("MatrixEvent", () => {
                 content: {
                     ciphertext: "secrets",
                 },
+            });
+        });
+
+        it("should report decryption errors", async () => {
+            const crypto = {
+                decryptEvent: jest.fn().mockRejectedValue(new Error("test error")),
+            } as unknown as Crypto;
+
+            await encryptedEvent.attemptDecryption(crypto);
+            expect(encryptedEvent.isEncrypted()).toBeTruthy();
+            expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
+            expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
+            expect(encryptedEvent.getContent()).toEqual({
+                msgtype: "m.bad.encrypted",
+                body: "** Unable to decrypt: Error: test error **",
             });
         });
 

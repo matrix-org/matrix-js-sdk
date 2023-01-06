@@ -38,7 +38,7 @@ import {
     IRoomTimelineData,
 } from "../../src";
 import { SlidingSyncSdk } from "../../src/sliding-sync-sdk";
-import { SyncState } from "../../src/sync";
+import { SyncApiOptions, SyncState } from "../../src/sync";
 import { IStoredClientOpts } from "../../src/client";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
@@ -111,6 +111,7 @@ describe("SlidingSyncSdk", () => {
     // assign client/httpBackend globals
     const setupClient = async (testOpts?: Partial<IStoredClientOpts & { withCrypto: boolean }>) => {
         testOpts = testOpts || {};
+        const syncOpts: SyncApiOptions = {};
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
@@ -118,10 +119,10 @@ describe("SlidingSyncSdk", () => {
         if (testOpts.withCrypto) {
             httpBackend!.when("GET", "/room_keys/version").respond(404, {});
             await client!.initCrypto();
-            testOpts.crypto = client!.crypto;
+            syncOpts.cryptoCallbacks = syncOpts.crypto = client!.crypto;
         }
         httpBackend!.when("GET", "/_matrix/client/r0/pushrules").respond(200, {});
-        sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts);
+        sdk = new SlidingSyncSdk(mockSlidingSync, client, testOpts, syncOpts);
     };
 
     // tear down client/httpBackend globals

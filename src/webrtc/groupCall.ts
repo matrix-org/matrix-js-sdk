@@ -485,7 +485,7 @@ export class GroupCall extends TypedEventEmitter<
 
             try {
                 focusCall.isPtt = this.isPtt;
-                await focusCall.placeCallWithCallFeeds(this.getLocalFeeds());
+                await focusCall.placeCallWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
                 focusCall.createDataChannel("datachannel", this.dataChannelOptions);
             } catch (e) {
                 onError(e);
@@ -528,6 +528,9 @@ export class GroupCall extends TypedEventEmitter<
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
         }
+
+        this.userMediaFeeds.splice(0, this.userMediaFeeds.length);
+        this.screenshareFeeds.splice(0, this.screenshareFeeds.length);
 
         this.client.getMediaHandler().stopAllStreams();
 
@@ -745,9 +748,7 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 // TODO: handle errors
-                this.forEachCall((call) =>
-                    call.pushLocalFeed(call.isFocus ? this.localScreenshareFeed! : this.localScreenshareFeed!.clone()),
-                );
+                this.forEachCall((call) => call.pushLocalFeed(this.localScreenshareFeed!.clone()));
 
                 return true;
             } catch (error) {
@@ -770,9 +771,7 @@ export class GroupCall extends TypedEventEmitter<
             this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed!.stream);
             // We have to remove the feed manually as MatrixCall has its clone,
             // so it won't be removed automatically
-            if (!this.foci[0]) {
-                this.removeScreenshareFeed(this.localScreenshareFeed!);
-            }
+            this.removeScreenshareFeed(this.localScreenshareFeed!);
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
             this.emit(GroupCallEvent.LocalScreenshareStateChanged, false, undefined, undefined);
@@ -1057,6 +1056,16 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onCallFeedsChanged = (call: MatrixCall): void => {
+        // Find replaced feeds
+        call.getRemoteFeeds().filter((cf) => {
+            [...this.userMediaFeeds, ...this.screenshareFeeds].forEach((gf) => {
+                if (gf !== cf && gf.userId === cf.userId && gf.deviceId === cf.deviceId && gf.purpose === cf.purpose) {
+                    if (cf.purpose === SDPStreamMetadataPurpose.Usermedia) this.replaceUserMediaFeed(gf, cf);
+                    else if (cf.purpose === SDPStreamMetadataPurpose.Screenshare) this.replaceScreenshareFeed(gf, cf);
+                }
+            });
+        });
+
         // Find removed feeds
         [...this.userMediaFeeds, ...this.screenshareFeeds]
             .filter((gf) => gf.disposed)
@@ -1068,7 +1077,7 @@ export class GroupCall extends TypedEventEmitter<
         // Find new feeds
         call.getRemoteFeeds()
             .filter((cf) => {
-                return !this.userMediaFeeds.find((gf) => gf.stream.id === cf.stream.id);
+                return ![...this.userMediaFeeds, ...this.screenshareFeeds].find((gf) => gf === cf);
             })
             .forEach((feed) => {
                 if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
@@ -1106,7 +1115,9 @@ export class GroupCall extends TypedEventEmitter<
     private onCallHangup = (call: MatrixCall): void => {
         if (call.hangupReason === CallErrorCode.Replaced) return;
 
-        const opponentUserId = call.getOpponentMember()?.userId ?? this.room.getMember(call.invitee!)!.userId;
+        const opponentUserId = call.invitee ?? call.getOpponentMember()?.userId;
+        if (!opponentUserId) return;
+
         const deviceMap = this.calls.get(opponentUserId);
 
         // Sanity check that this call is in fact in the map
@@ -1144,6 +1155,22 @@ export class GroupCall extends TypedEventEmitter<
     private addUserMediaFeed(callFeed: CallFeed): void {
         this.userMediaFeeds.push(callFeed);
         callFeed.measureVolumeActivity(true);
+        this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
+    }
+
+    private replaceUserMediaFeed(existingFeed: CallFeed, replacementFeed: CallFeed): void {
+        const feedIndex = this.userMediaFeeds.findIndex(
+            (f) => f.userId === existingFeed.userId && f.deviceId! === existingFeed.deviceId,
+        );
+
+        if (feedIndex === -1) {
+            throw new Error("Couldn't find user media feed to replace");
+        }
+
+        this.userMediaFeeds.splice(feedIndex, 1, replacementFeed);
+
+        existingFeed.dispose();
+        replacementFeed.measureVolumeActivity(true);
         this.emit(GroupCallEvent.UserMediaFeedsChanged, this.userMediaFeeds);
     }
 
@@ -1201,6 +1228,21 @@ export class GroupCall extends TypedEventEmitter<
 
     private addScreenshareFeed(callFeed: CallFeed): void {
         this.screenshareFeeds.push(callFeed);
+        this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
+    }
+
+    private replaceScreenshareFeed(existingFeed: CallFeed, replacementFeed: CallFeed): void {
+        const feedIndex = this.screenshareFeeds.findIndex(
+            (f) => f.userId === existingFeed.userId && f.deviceId! === existingFeed.deviceId,
+        );
+
+        if (feedIndex === -1) {
+            throw new Error("Couldn't find screenshare feed to replace");
+        }
+
+        this.screenshareFeeds.splice(feedIndex, 1, replacementFeed);
+
+        existingFeed.dispose();
         this.emit(GroupCallEvent.ScreenshareFeedsChanged, this.screenshareFeeds);
     }
 
