@@ -1,5 +1,5 @@
 /*
-Copyright 2021-2022 The Matrix.org Foundation C.I.C.
+Copyright 2021 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import { RelationType } from "../@types/event";
 import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set";
-import { NotificationCountType, Room, RoomEvent } from "./room";
+import { Room, RoomEvent } from "./room";
 import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
@@ -541,18 +541,6 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             const unthreadedReceiptTs = this.room.unthreadedReceipts.get(userId)?.ts ?? 0;
             const beforeLastUnthreadedReceipt = (this?.lastReply()?.getTs() ?? 0) < unthreadedReceiptTs;
             if (beforeFirstThreadedReceipt || beforeLastUnthreadedReceipt) {
-                return true;
-            }
-
-            const publicReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.Read);
-            const privateReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.ReadPrivate);
-            const hasUnreads = this.room.getThreadUnreadNotificationCount(this.id, NotificationCountType.Total) > 0;
-
-            if (!publicReadReceipt && !privateReadReceipt && !hasUnreads) {
-                // Consider an event read if it's part of a thread that has no
-                // read receipts and has no notifications. It is likely that it is
-                // part of a thread that was created before read receipts for threads
-                // were supported (via MSC3771)
                 return true;
             }
         }
