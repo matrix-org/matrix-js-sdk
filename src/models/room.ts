@@ -310,9 +310,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
     // Useful to know at what point the current user has started using threads in this room
-    public oldestThreadedReceiptTs = Infinity;
-    // Important to compute `hasUserReadEvent` and similar methods correctly.
-    public unthreadedReceipts = new Map<string, Receipt>();
+    private oldestThreadedReceiptTs = Infinity;
+    /**
+     * Keeping a record of the lastest unthread receipts per user
+     * This is useful in determining whether a user has read a thread or not
+     */
+    private unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -3291,6 +3294,24 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return;
         }
         event.applyVisibilityEvent(visibilityChange);
+    }
+
+    /**
+     * Find when a client has gained thread capabilities by inspecting the oldest
+     * threaded receipt
+     * @returns the timestamp of the oldest threaded receipt
+     */
+    public getOldestThreadedReceiptTs(): number {
+        return this.oldestThreadedReceiptTs;
+    }
+
+    /**
+     * Returns the most receipt unthreaded receipt for a given user
+     * @param userId - the MxID of the User
+     * @returns an unthreaded Receipt
+     */
+    public getLastUnthreadedReceiptFor(userId: string): Receipt | undefined {
+        return this.unthreadedReceipts.get(userId);
     }
 }
 

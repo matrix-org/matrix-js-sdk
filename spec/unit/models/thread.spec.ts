@@ -267,8 +267,7 @@ describe("Thread", () => {
                 ts: 10,
             });
 
-            // The 10th event has been read, as alice's last unthreaded receipt is at ts 200
-            // and `mkThread` increment every thread response by 1ms.
+            // This is marked as read as it is before alice's first threaded receipt...
             expect(thread.getEventReadUpTo(myUserId)).toBe(events.at(-1)!.getId());
 
             const { thread: thread2 } = mkThread({
