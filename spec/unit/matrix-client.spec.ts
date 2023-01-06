@@ -101,6 +101,33 @@ type WrappedRoom = Room & {
     _state: Map<string, any>;
 };
 
+describe("convertQueryDictToStringRecord", () => {
+    it("returns an empty map when dict is undefined", () => {
+        expect(convertQueryDictToStringRecord(undefined)).toEqual({});
+    });
+
+    it("converts an empty QueryDict to an empty map", () => {
+        expect(convertQueryDictToStringRecord({})).toEqual({});
+    });
+
+    it("converts a QueryDict of strings to the equivalent map", () => {
+        expect(convertQueryDictToStringRecord({ a: "b", c: "d" })).toEqual({ a: "b", c: "d" });
+    });
+
+    it("converts the values of the supplied QueryDict to strings", () => {
+        expect(convertQueryDictToStringRecord({ arr: ["b", "c"], num: 45, boo: true, und: undefined })).toEqual({
+            arr: "b,c",
+            num: "45",
+            boo: "true",
+            und: "undefined",
+        });
+    });
+
+    it("produces sane URLSearchParams conversions", () => {
+        expect(new URLSearchParams(convertQueryDictToStringRecord({ a: "b", c: "d" })).toString()).toEqual("a=b&c=d");
+    });
+});
+
 describe("MatrixClient", function () {
     const userId = "@alice:bar";
     const identityServerUrl = "https://identity.server";
