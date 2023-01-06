@@ -504,6 +504,15 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         throw new Error("Unsupported function on the thread model");
     }
 
+    /**
+     * Get the ID of the event that a given user has read up to, or null if we
+     * have received no read receipts from them.
+     * @param userId - The user ID to get read receipt event ID for
+     * @param ignoreSynthesized - If true, return only receipts that have been
+     *                            sent by the server, not implicit ones generated
+     *                            by the JS SDK.
+     * @returns ID of the latest event that the given user has read, or null.
+     */
     public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {
         const isCurrentUser = userId === this.client.getUserId();
         if (isCurrentUser && this.lastReply()) {
@@ -537,6 +546,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         return readUpToId;
     }
 
+    /**
+     * Determines if the given user has read a particular event ID with the known
+     * history of the room. This is not a definitive check as it relies only on
+     * what is available to the thread at the time of execution.
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
+     * @returns True if the user has read the event, false otherwise.
+     */
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         if (userId === this.client.getUserId()) {
             const beforeFirstThreadedReceipt = (this.lastReply()?.getTs() ?? 0) < this.room.oldestThreadedReceiptTs;
