@@ -539,7 +539,14 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
             for (let i = this.timeline?.length - 1; i >= 0; --i) {
                 const ev = this.timeline[i];
+                // If we encounter the `readUpToId` we do not need to look further
+                // there is no "more recent" unthreaded read receipt
                 if (ev.getId() === readUpToId) return readUpToId;
+
+                // Inspecting events from most recent to oldest, we're checking
+                // whether an unthreaded read receipt is more recent that the current event.
+                // We usually prefer relying on the order of the DAG but in this scenario
+                // it is not possible and we have to rely on timestamp
                 if (ev.getTs() < unthreadedReceipt.ts) return ev.getId() ?? readUpToId;
             }
         }
