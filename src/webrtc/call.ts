@@ -1370,7 +1370,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return this.isLocalVideoMuted();
         }
         if (this.opponentSupportsSDPStreamMetadata()) {
-            const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted, false);
+            const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
             await this.updateLocalUsermediaStream(stream);
         } else {
             this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
