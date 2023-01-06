@@ -601,9 +601,9 @@ interface IJoinRequestBody {
     third_party_signed?: IThirdPartySigned;
 }
 
-export interface ITagMetadata {
+interface ITagMetadata {
     [key: string]: any;
-    order?: number;
+    order: number;
 }
 
 interface IMessagesResponse {
