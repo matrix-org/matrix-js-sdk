@@ -544,7 +544,7 @@ describe("AutoDiscovery", function () {
                 .respond(200, {
                     versions: ["r0.0.1"],
                 });
-            httpBackend.when("GET", "/_matrix/identity/api/v1").respond(404, {});
+            httpBackend.when("GET", "/_matrix/identity/v2").respond(404, {});
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
                     // Note: we also expect this test to trim the trailing slash
@@ -591,7 +591,7 @@ describe("AutoDiscovery", function () {
                 .respond(200, {
                     versions: ["r0.0.1"],
                 });
-            httpBackend.when("GET", "/_matrix/identity/api/v1").respond(500, {});
+            httpBackend.when("GET", "/_matrix/identity/v2").respond(500, {});
             httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
                 "m.homeserver": {
                     // Note: we also expect this test to trim the trailing slash
@@ -636,9 +636,9 @@ describe("AutoDiscovery", function () {
                 versions: ["r0.0.1"],
             });
         httpBackend
-            .when("GET", "/_matrix/identity/api/v1")
+            .when("GET", "/_matrix/identity/v2")
             .check((req) => {
-                expect(req.path).toEqual("https://identity.example.org/_matrix/identity/api/v1");
+                expect(req.path).toEqual("https://identity.example.org/_matrix/identity/v2");
             })
             .respond(200, {});
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
@@ -682,9 +682,9 @@ describe("AutoDiscovery", function () {
                 versions: ["r0.0.1"],
             });
         httpBackend
-            .when("GET", "/_matrix/identity/api/v1")
+            .when("GET", "/_matrix/identity/v2")
             .check((req) => {
-                expect(req.path).toEqual("https://identity.example.org/_matrix/identity/api/v1");
+                expect(req.path).toEqual("https://identity.example.org/_matrix/identity/v2");
             })
             .respond(200, {});
         httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {

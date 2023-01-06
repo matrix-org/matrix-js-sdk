@@ -61,11 +61,12 @@ export enum EventType {
     KeyVerificationDone = "m.key.verification.done",
     KeyVerificationKey = "m.key.verification.key",
     KeyVerificationAccept = "m.key.verification.accept",
-    // XXX this event is not yet supported by js-sdk
+    // Not used directly - see READY_TYPE in VerificationRequest.
     KeyVerificationReady = "m.key.verification.ready",
     // use of this is discouraged https://matrix.org/docs/spec/client_server/r0.6.1#m-room-message-feedback
     RoomMessageFeedback = "m.room.message.feedback",
     Reaction = "m.reaction",
+    PollStart = "org.matrix.msc3381.poll.start",
 
     // Room ephemeral events
     Typing = "m.typing",
@@ -164,6 +165,15 @@ export const UNSTABLE_MSC3089_BRANCH = new UnstableValue("m.branch", "org.matrix
  * including its eventual removal.
  */
 export const UNSTABLE_MSC2716_MARKER = new UnstableValue("m.room.marker", "org.matrix.msc2716.marker");
+
+/**
+ * Name of the "with_relations" request property for relation based redactions.
+ * {@link https://github.com/matrix-org/matrix-spec-proposals/pull/3912}
+ */
+export const MSC3912_RELATION_BASED_REDACTIONS_PROP = new UnstableValue(
+    "with_relations",
+    "org.matrix.msc3912.with_relations",
+);
 
 /**
  * Functional members type for declaring a purpose of room members (e.g. helpful bots).

@@ -60,6 +60,9 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
             event.setThread(thread);
         }
 
+        // TODO: once we get rid of the old libolm-backed crypto, we can restrict this to room events (rather than
+        //   to-device events), because the rust implementation decrypts to-device messages at a higher level.
+        //   Generally we probably want to use a different eventMapper implementation for to-device events because
         if (event.isEncrypted()) {
             if (!preventReEmit) {
                 client.reEmitter.reEmit(event, [MatrixEventEvent.Decrypted]);

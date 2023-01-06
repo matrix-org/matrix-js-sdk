@@ -14,13 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { M_POLL_START } from "matrix-events-sdk";
+
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
-import { Relations } from "../../src/models/relations";
+import { Relations, RelationsEvent } from "../../src/models/relations";
 import { TestClient } from "../TestClient";
+import { RelationType } from "../../src";
+import { logger } from "../../src/logger";
 
 describe("Relations", function () {
+    afterEach(() => {
+        jest.spyOn(logger, "error").mockRestore();
+    });
+
     it("should deduplicate annotations", function () {
         const room = new Room("room123", null!, null!);
         const relations = new Relations("m.annotation", "m.reaction", room);
@@ -73,6 +81,92 @@ describe("Relations", function () {
             expect(key).toEqual("👍️");
             expect(events.size).toEqual(1);
         }
+    });
+
+    describe("addEvent()", () => {
+        const relationType = RelationType.Reference;
+        const eventType = M_POLL_START.stable!;
+        const altEventTypes = [M_POLL_START.unstable!];
+        const room = new Room("room123", null!, null!);
+
+        it("should not add events without a relation", async () => {
+            // dont pollute console
+            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const relations = new Relations(relationType, eventType, room);
+            const emitSpy = jest.spyOn(relations, "emit");
+            const event = new MatrixEvent({ type: eventType });
+
+            await relations.addEvent(event);
+            expect(logSpy).toHaveBeenCalledWith("Event must have relation info");
+            // event not added
+            expect(relations.getRelations().length).toBe(0);
+            expect(emitSpy).not.toHaveBeenCalled();
+        });
+
+        it("should not add events of incorrect event type", async () => {
+            // dont pollute console
+            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const relations = new Relations(relationType, eventType, room);
+            const emitSpy = jest.spyOn(relations, "emit");
+            const event = new MatrixEvent({
+                type: "different-event-type",
+                content: {
+                    "m.relates_to": {
+                        event_id: "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
+                        rel_type: relationType,
+                    },
+                },
+            });
+
+            await relations.addEvent(event);
+
+            expect(logSpy).toHaveBeenCalledWith(`Event relation info doesn't match this container`);
+            // event not added
+            expect(relations.getRelations().length).toBe(0);
+            expect(emitSpy).not.toHaveBeenCalled();
+        });
+
+        it("adds events that match alt event types", async () => {
+            const relations = new Relations(relationType, eventType, room, altEventTypes);
+            const emitSpy = jest.spyOn(relations, "emit");
+            const event = new MatrixEvent({
+                type: M_POLL_START.unstable!,
+                content: {
+                    "m.relates_to": {
+                        event_id: "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
+                        rel_type: relationType,
+                    },
+                },
+            });
+
+            await relations.addEvent(event);
+
+            // event added
+            expect(relations.getRelations()).toEqual([event]);
+            expect(emitSpy).toHaveBeenCalledWith(RelationsEvent.Add, event);
+        });
+
+        it("should not add events of incorrect relation type", async () => {
+            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const relations = new Relations(relationType, eventType, room);
+            const event = new MatrixEvent({
+                type: eventType,
+                content: {
+                    "m.relates_to": {
+                        event_id: "$2s4yYpEkVQrPglSCSqB_m6E8vDhWsg0yFNyOJdVIb_o",
+                        rel_type: "m.annotation",
+                    },
+                },
+            });
+
+            await relations.addEvent(event);
+            const emitSpy = jest.spyOn(relations, "emit");
+
+            expect(logSpy).toHaveBeenCalledWith(`Event relation info doesn't match this container`);
+            // event not added
+            expect(relations.getRelations().length).toBe(0);
+            expect(emitSpy).not.toHaveBeenCalled();
+        });
     });
 
     it("should emit created regardless of ordering", async function () {

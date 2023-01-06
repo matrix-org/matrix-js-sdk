@@ -828,17 +828,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     }
                 }
             } catch (e) {
-                if ((<Error>e).name !== "DecryptionError") {
-                    // not a decryption error: log the whole exception as an error
-                    // (and don't bother with a retry)
-                    const re = options.isRetry ? "re" : "";
-                    // For find results: this can produce "Error decrypting event (id=$ev)" and
-                    // "Error redecrypting event (id=$ev)".
-                    logger.error(`Error ${re}decrypting event (${this.getDetails()})`, e);
-                    this.decryptionPromise = null;
-                    this.retryDecryption = false;
-                    return;
-                }
+                const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
 
                 err = e as Error;
 
@@ -858,10 +848,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(
-                        `Error decrypting event (${this.getDetails()}), but retrying: ` +
-                            (<DecryptionError>e).detailedString,
-                    );
+                    logger.log(`Error decrypting event (${this.getDetails()}), but retrying: ${detailedError}`);
                     continue;
                 }
 
@@ -870,9 +857,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 // the detailedString already includes the name and message of the error, and the stack isn't much use,
                 // so we don't bother to log `e` separately.
-                logger.warn(`Error decrypting event (${this.getDetails()}): ` + (<DecryptionError>e).detailedString);
+                logger.warn(`Error decrypting event (${this.getDetails()}): ${detailedError}`);
 
-                res = this.badEncryptedMessage((<DecryptionError>e).message);
+                res = this.badEncryptedMessage(String(e));
             }
 
             // at this point, we've either successfully decrypted the event, or have given up

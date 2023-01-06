@@ -1543,6 +1543,52 @@ describe("MatrixClient syncing", () => {
                 });
             });
         });
+
+        it("only replays receipts relevant to the current context", async () => {
+            const THREAD_ID = "$unknownthread:localhost";
+
+            const receipt = {
+                type: "m.receipt",
+                room_id: "!foo:bar",
+                content: {
+                    "$event1:localhost": {
+                        [ReceiptType.Read]: {
+                            "@alice:localhost": { ts: 666, thread_id: THREAD_ID },
+                        },
+                    },
+                    "$otherevent:localhost": {
+                        [ReceiptType.Read]: {
+                            "@alice:localhost": { ts: 999, thread_id: "$otherthread:localhost" },
+                        },
+                    },
+                },
+            };
+            syncData.rooms.join[roomOne].ephemeral.events = [receipt];
+
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
+            client!.startClient();
+
+            return Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]).then(() => {
+                const room = client?.getRoom(roomOne);
+                expect(room).toBeInstanceOf(Room);
+
+                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(true);
+
+                const thread = room!.createThread(THREAD_ID, undefined, [], true);
+
+                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(false);
+
+                const receipt = thread.getReadReceiptForUserId("@alice:localhost");
+
+                expect(receipt).toStrictEqual({
+                    data: {
+                        thread_id: "$unknownthread:localhost",
+                        ts: 666,
+                    },
+                    eventId: "$event1:localhost",
+                });
+            });
+        });
     });
 
     describe("of a room", () => {

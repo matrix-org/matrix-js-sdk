@@ -20,7 +20,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult } from "../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -85,10 +85,11 @@ import { CryptoStore } from "./store/base";
 import { IVerificationChannel } from "./verification/request/Channel";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { IContent } from "../models/event";
-import { ISyncResponse } from "../sync-accumulator";
+import { ISyncResponse, IToDeviceEvent } from "../sync-accumulator";
 import { ISignatures } from "../@types/signed";
 import { IMessage } from "./algorithms/olm";
-import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
+import { RoomState, RoomStateEvent } from "../models/room-state";
 
 const DeviceVerification = DeviceInfo.DeviceVerification;
 
@@ -171,26 +172,6 @@ export interface IRoomKeyRequestBody extends IRoomKey {
     sender_key: string;
 }
 
-interface Extensible {
-    [key: string]: any;
-}
-
-export interface IMegolmSessionData extends Extensible {
-    // Sender's Curve25519 device key
-    sender_key: string;
-    // Devices which forwarded this session to us (normally empty).
-    forwarding_curve25519_key_chain: string[];
-    // Other keys the sender claims.
-    sender_claimed_keys: Record<string, string>;
-    // Room this session is used in
-    room_id: string;
-    // Unique id for the session
-    session_id: string;
-    // Base64'ed key data
-    session_key: string;
-    algorithm?: string;
-    untrusted?: boolean;
-}
 /* eslint-enable camelcase */
 
 interface IDeviceVerificationUpgrade {
@@ -2244,9 +2225,6 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                 await upload({ shouldEmit: true });
                 // XXX: we'll need to wait for the device list to be updated
             }
-
-            // redo key requests after verification
-            this.cancelAndResendAllOutgoingKeyRequests();
         }
 
         const deviceObj = DeviceInfo.fromStorage(dev, deviceId);
@@ -2626,14 +2604,23 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             await storeConfigPromise;
         }
 
-        if (!this.lazyLoadMembers) {
-            logger.log(
-                "Enabling encryption in " + roomId + "; " + "starting to track device lists for all users therein",
-            );
+        logger.log(`Enabling encryption in ${roomId}`);
 
+        // we don't want to force a download of the full membership list of this room, but as soon as we have that
+        // list we can start tracking the device list.
+        if (room.membersLoaded()) {
             await this.trackRoomDevicesImpl(room);
         } else {
-            logger.log("Enabling encryption in " + roomId);
+            // wait for the membership list to be loaded
+            const onState = (_state: RoomState): void => {
+                room.off(RoomStateEvent.Update, onState);
+                if (room.membersLoaded()) {
+                    this.trackRoomDevicesImpl(room).catch((e) => {
+                        logger.error(`Error enabling device tracking in ${roomId}`, e);
+                    });
+                }
+            };
+            room.on(RoomStateEvent.Update, onState);
         }
     }
 
@@ -2642,6 +2629,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param roomId - The room ID to start tracking devices in.
      * @returns when all devices for the room have been fetched and marked to track
+     * @deprecated there's normally no need to call this function: device list tracking
+     *    will be enabled as soon as we have the full membership list.
      */
     public trackRoomDevices(roomId: string): Promise<void> {
         const room = this.clientStore.getRoom(roomId);
@@ -2886,11 +2875,22 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
         if (event.isRedacted()) {
+            // Try to decrypt the redaction event, to support encrypted
+            // redaction reasons.  If we can't decrypt, just fall back to using
+            // the original redacted_because.
             const redactionEvent = new MatrixEvent({
                 room_id: event.getRoomId(),
                 ...event.getUnsigned().redacted_because,
             });
-            const decryptedEvent = await this.decryptEvent(redactionEvent);
+            let redactedBecause: IEvent = event.getUnsigned().redacted_because!;
+            if (redactionEvent.isEncrypted()) {
+                try {
+                    const decryptedEvent = await this.decryptEvent(redactionEvent);
+                    redactedBecause = decryptedEvent.clearEvent as IEvent;
+                } catch (e) {
+                    logger.warn("Decryption of redaction failed. Falling back to unencrypted event.", e);
+                }
+            }
 
             return {
                 clearEvent: {
@@ -2898,7 +2898,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
                     type: "m.room.message",
                     content: {},
                     unsigned: {
-                        redacted_because: decryptedEvent.clearEvent as IEvent,
+                        redacted_because: redactedBecause,
                     },
                 },
             };
@@ -3021,7 +3021,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      *
      * @param syncData -  the data from the 'MatrixClient.sync' event
      */
-    public async onSyncCompleted(syncData: ISyncStateData): Promise<void> {
+    public async onSyncCompleted(syncData: OnSyncCompletedData): Promise<void> {
         this.deviceList.setSyncToken(syncData.nextSyncToken ?? null);
         this.deviceList.saveIfDirty();
 
@@ -3194,6 +3194,21 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
             logger.error("Error handling membership change:", e);
         }
     };
+
+    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]> {
+        // all we do here is filter out encrypted to-device messages with the wrong algorithm. Decryption
+        // happens later in decryptEvent, via the EventMapper
+        return events.filter((toDevice) => {
+            if (
+                toDevice.type === EventType.RoomMessageEncrypted &&
+                !["m.olm.v1.curve25519-aes-sha2"].includes(toDevice.content?.algorithm)
+            ) {
+                logger.log("Ignoring invalid encrypted to-device event from " + toDevice.sender);
+                return false;
+            }
+            return true;
+        });
+    }
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
         try {
@@ -3894,5 +3909,5 @@ class IncomingRoomKeyRequestCancellation {
     }
 }
 
-// IEventDecryptionResult is re-exported for backwards compatibility, in case any applications are referencing it.
-export type { IEventDecryptionResult } from "../@types/crypto";
+// a number of types are re-exported for backwards compatibility, in case any applications are referencing it.
+export type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";

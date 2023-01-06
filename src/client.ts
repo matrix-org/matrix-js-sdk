@@ -20,7 +20,8 @@ limitations under the License.
 
 import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent, Optional } from "matrix-events-sdk";
 
-import { ISyncStateData, SyncApi, SyncState } from "./sync";
+import type { IMegolmSessionData } from "./@types/crypto";
+import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
 import {
     EventStatus,
     IContent,
@@ -74,7 +75,6 @@ import {
     ICryptoCallbacks,
     IBootstrapCrossSigningOpts,
     ICheckOwnCrossSigningTrustOpts,
-    IMegolmSessionData,
     isCryptoAvailable,
     VerificationMethod,
     IRoomKeyRequestBody,
@@ -154,6 +154,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    MSC3912_RELATION_BASED_REDACTIONS_PROP,
 } from "./@types/event";
 import { IdServerUnbindResult, IImageInfo, Preset, Visibility } from "./@types/partials";
 import { EventMapper, eventMapperFor, MapperOpts } from "./event-mapper";
@@ -455,17 +456,7 @@ export interface IStartClientOpts {
     slidingSync?: SlidingSync;
 }
 
-export interface IStoredClientOpts extends IStartClientOpts {
-    // Crypto manager
-    crypto?: Crypto;
-    /**
-     * A function which is called
-     * with a room ID and returns a boolean. It should return 'true' if the SDK can
-     * SAFELY remove events from this room. It may not be safe to remove events if
-     * there are other references to the timelines for this room.
-     */
-    canResetEntireTimeline: ResetTimelineCallback;
-}
+export interface IStoredClientOpts extends IStartClientOpts {}
 
 export enum RoomVersionStability {
     Stable = "stable",
@@ -840,6 +831,11 @@ interface IRoomHierarchy {
 interface ITimestampToEventResponse {
     event_id: string;
     origin_server_ts: string;
+}
+
+interface IWhoamiResponse {
+    user_id: string;
+    device_id?: string;
 }
 /* eslint-enable camelcase */
 
@@ -1427,20 +1423,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logger.error("Can't fetch server versions, continuing to initialise sync, this will be retried later", e);
         }
 
-        // shallow-copy the opts dict before modifying and storing it
-        this.clientOpts = Object.assign({}, opts) as IStoredClientOpts;
-        this.clientOpts.crypto = this.crypto;
-        this.clientOpts.canResetEntireTimeline = (roomId): boolean => {
-            if (!this.canResetTimelineCallback) {
-                return false;
-            }
-            return this.canResetTimelineCallback(roomId);
-        };
+        this.clientOpts = opts ?? {};
         if (this.clientOpts.slidingSync) {
-            this.syncApi = new SlidingSyncSdk(this.clientOpts.slidingSync, this, this.clientOpts);
+            this.syncApi = new SlidingSyncSdk(
+                this.clientOpts.slidingSync,
+                this,
+                this.clientOpts,
+                this.buildSyncApiOptions(),
+            );
         } else {
-            this.syncApi = new SyncApi(this, this.clientOpts);
+            this.syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
         }
+
         this.syncApi.sync();
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
@@ -1451,6 +1445,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.toDeviceMessageQueue.start();
+    }
+
+    /**
+     * Construct a SyncApiOptions for this client, suitable for passing into the SyncApi constructor
+     */
+    protected buildSyncApiOptions(): SyncApiOptions {
+        return {
+            crypto: this.crypto,
+            cryptoCallbacks: this.cryptoBackend,
+            canResetEntireTimeline: (roomId: string): boolean => {
+                if (!this.canResetTimelineCallback) {
+                    return false;
+                }
+                return this.canResetTimelineCallback(roomId);
+            },
+        };
     }
 
     /**
@@ -2138,7 +2148,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         const RustCrypto = await import("./rust-crypto");
-        this.cryptoBackend = await RustCrypto.initRustCrypto(userId, deviceId);
+        this.cryptoBackend = await RustCrypto.initRustCrypto(this.http, userId, deviceId);
     }
 
     /**
@@ -3033,10 +3043,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    session export objects
      */
     public exportRoomKeys(): Promise<IMegolmSessionData[]> {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             return Promise.reject(new Error("End-to-end encryption disabled"));
         }
-        return this.crypto.exportRoomKeys();
+        return this.cryptoBackend.exportRoomKeys();
     }
 
     /**
@@ -3948,7 +3958,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryString, data);
 
             const roomId = res.room_id;
-            const syncApi = new SyncApi(this, this.clientOpts);
+            const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
             const room = syncApi.createRoom(roomId);
             if (opts.syncRoom) {
                 // v2 will do this for us
@@ -4444,9 +4454,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * @param txnId -  transaction id. One will be made up if not supplied.
-     * @param opts - Options to pass on, may contain `reason`.
+     * @param opts - Options to pass on, may contain `reason` and `with_relations` (MSC3912)
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
+     * @throws Error if called with `with_relations` (MSC3912) but the server does not support it.
+     *         Callers should check whether the server supports MSC3912 via `MatrixClient.canSupport`.
      */
     public redactEvent(
         roomId: string,
@@ -4475,12 +4487,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
         const reason = opts?.reason;
+
+        if (
+            opts?.with_relations &&
+            this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Unsupported
+        ) {
+            throw new Error(
+                "Server does not support relation based redactions " +
+                    `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId ${threadId}`,
+            );
+        }
+
+        const withRelations = opts?.with_relations
+            ? {
+                  [this.canSupport.get(Feature.RelationBasedRedactions) === ServerSupport.Stable
+                      ? MSC3912_RELATION_BASED_REDACTIONS_PROP.stable!
+                      : MSC3912_RELATION_BASED_REDACTIONS_PROP.unstable!]: opts?.with_relations,
+              }
+            : {};
+
         return this.sendCompleteEvent(
             roomId,
             threadId,
             {
                 type: EventType.RoomRedaction,
-                content: { reason },
+                content: {
+                    ...withRelations,
+                    reason,
+                },
                 redacts: eventId,
             },
             txnId as string,
@@ -6059,7 +6093,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     this.processBeaconEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
-                        timelineEvents.filter((it) => it.isRelation(THREAD_RELATION_TYPE.name)),
+                        timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
                         false,
                     );
 
@@ -6124,7 +6158,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public peekInRoom(roomId: string): Promise<Room> {
         this.peekSync?.stopPeeking();
-        this.peekSync = new SyncApi(this, this.clientOpts);
+        this.peekSync = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
         return this.peekSync.peek(roomId);
     }
 
@@ -6631,7 +6665,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.syncLeftRoomsPromise) {
             return this.syncLeftRoomsPromise; // return the ongoing request
         }
-        const syncApi = new SyncApi(this, this.clientOpts);
+        const syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
         this.syncLeftRoomsPromise = syncApi.syncLeftRooms();
 
         // cleanup locks
@@ -9350,10 +9384,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetches the user_id of the configured access token.
+     * Fetches information about the user for the configured access token.
      */
-    public async whoami(): Promise<{ user_id: string }> {
-        // eslint-disable-line camelcase
+    public async whoami(): Promise<IWhoamiResponse> {
         return this.http.authedRequest(Method.Get, "/account/whoami");
     }
 
