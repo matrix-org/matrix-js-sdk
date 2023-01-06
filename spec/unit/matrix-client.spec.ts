@@ -100,7 +100,7 @@ type WrappedRoom = Room & {
     _state: Map<string, any>;
 };
 
-describe("convertQueryDictToStringRecord", () => {
+describe("convertQueryDictToMap", () => {
     it("returns an empty map when dict is undefined", () => {
         expect(convertQueryDictToMap(undefined)).toEqual(new Map());
     });
