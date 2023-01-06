@@ -116,7 +116,7 @@ describe("Thread", () => {
                     // last threaded receipt
                     "$event2:localhost": {
                         [ReceiptType.Read]: {
-                            [client.getUserId()!]: { ts: 300 },
+                            [client.getUserId()!]: { ts: 300, thread_id: "$threadId" },
                         },
                     },
                 },
@@ -137,9 +137,9 @@ describe("Thread", () => {
                 authorId: myUserId,
                 participantUserIds: [myUserId],
                 length: 2,
-                ts: 201,
             });
 
+            // The event is automatically considered read as the current user is the sender
             expect(thread.hasUserReadEvent(myUserId, events.at(-1)!.getId() ?? "")).toBeTruthy();
         });
 
