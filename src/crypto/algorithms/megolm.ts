@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2021, 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } fr
 import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
 import { MatrixError } from "../../http-api";
+import { immediate } from "../../utils";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -73,7 +74,6 @@ export interface IOlmDevice<T = DeviceInfo> {
     deviceInfo: T;
 }
 
-/* eslint-disable camelcase */
 export interface IOutboundGroupSessionKey {
     chain_index: number;
     key: string;
@@ -106,7 +106,6 @@ interface IPayload extends Partial<IMessage> {
     algorithm?: string;
     sender_key?: string;
 }
-/* eslint-enable camelcase */
 
 interface SharedWithData {
     // The identity key of the device we shared with
@@ -1213,6 +1212,10 @@ export class MegolmEncryption extends EncryptionAlgorithm {
                     continue;
                 }
 
+                // Yield prior to checking each device so that we don't block
+                // updating/rendering for too long.
+                // See https://github.com/vector-im/element-web/issues/21612
+                await immediate();
                 const deviceTrust = this.crypto.checkDeviceTrust(userId, deviceId);
 
                 if (
