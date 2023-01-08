@@ -587,6 +587,17 @@ describe("MegolmDecryption", function () {
             const callCount = mockCrypto.checkDeviceTrust.mock.calls.length;
             expect(callCount).toBeLessThan(9);
         });
+
+        it("is cancellable", async () => {
+            const stop = megolm.prepareToEncrypt(room);
+
+            const before = mockCrypto.checkDeviceTrust.mock.calls.length;
+            stop();
+
+            // Ensure that no more devices were checked after cancellation.
+            await sleep(10);
+            expect(mockCrypto.checkDeviceTrust).toHaveBeenCalledTimes(before);
+        });
     });
 
     it("notifies devices that have been blocked", async function () {
