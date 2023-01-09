@@ -2974,7 +2974,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *          this room has no predecessor.
      */
     public findPredecessorRoomId(): string | null {
-        const createEvent = this.currentState.getStateEvents(EventType.RoomCreate, "");
+        const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        if (!currentState) {
+            return null;
+        }
+
+        const createEvent = currentState.getStateEvents(EventType.RoomCreate, "");
         if (createEvent) {
             const predecessor = createEvent.getContent()["predecessor"];
             if (predecessor) {
