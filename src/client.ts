@@ -9423,10 +9423,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 // when Synapse is compliant with MSC3743.
                 ((<MatrixError>err).httpStatus === 400 ||
                     // This the correct standard status code for an unsupported
-                    // endpoint according to MSC3743.
+                    // endpoint according to MSC3743. Not Found and Method Not Allowed
+                    // both indicate that this endpoint+verb combination is
+                    // not supported.
                     (<MatrixError>err).httpStatus === 404 ||
-                    // This the correct standard status code for an invalid
-                    // method according to MSC3743.
                     (<MatrixError>err).httpStatus === 405)
             ) {
                 return await this.http.authedRequest(Method.Get, path, queryParams, undefined, {
