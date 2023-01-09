@@ -997,7 +997,6 @@ export class MegolmEncryption extends EncryptionAlgorithm {
             startTime: Date.now(),
             promise: (async (): Promise<void> => {
                 try {
-                    this.prefixedLogger.debug("Getting devices");
                     const [devicesInRoom, blocked] = await this.getDevicesInRoom(room);
 
                     if (this.crypto.globalErrorOnUnknownDevices) {
@@ -1178,6 +1177,11 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         forceDistributeToUnverified = false,
     ): Promise<[DeviceInfoMap, IBlockedMap]> {
         const members = await room.getEncryptionTargetMembers();
+        this.prefixedLogger.debug(
+            `Encrypting for users (shouldEncryptForInvitedMembers: ${room.shouldEncryptForInvitedMembers()}):`,
+            members.map((u) => `${u.userId} (${u.membership})`),
+        );
+
         const roomMembers = members.map(function (u) {
             return u.userId;
         });
