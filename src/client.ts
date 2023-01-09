@@ -5443,7 +5443,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
 
-                    this.processBeaconEvents(room, timelineEvents);
+                    this.processAggregatedTimelineEvents(room, timelineEvents);
                     room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
 
@@ -5558,7 +5558,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
-        this.processBeaconEvents(timelineSet.room, timelineEvents);
+        this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -5653,7 +5653,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(resNewer.next_batch ?? null, Direction.Forward);
-                this.processBeaconEvents(timelineSet.room, events);
+                this.processAggregatedTimelineEvents(timelineSet.room, events);
 
                 // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
                 // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -5710,7 +5710,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(null, Direction.Forward);
-                this.processBeaconEvents(timelineSet.room, events);
+                this.processAggregatedTimelineEvents(timelineSet.room, events);
 
                 return timeline;
             }
@@ -5963,7 +5963,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // in the notification timeline set
                     const timelineSet = eventTimeline.getTimelineSet();
                     timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(timelineSet.room, matrixEvents);
+                    this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
                     // if we've hit the end of the timeline, we need to stop trying to
                     // paginate. We need to keep the 'forwards' token though, to make sure
@@ -6005,7 +6005,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(room, matrixEvents);
+                    this.processAggregatedTimelineEvents(room, matrixEvents);
                     this.processThreadRoots(room, matrixEvents, backwards);
 
                     // if we've hit the end of the timeline, we need to stop trying to
@@ -6052,7 +6052,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         const originalEvent = await this.fetchRoomEvent(eventTimeline.getRoomId() ?? "", thread.id);
                         timelineSet.addEventsToTimeline([mapper(originalEvent)], true, eventTimeline, null);
                     }
-                    this.processBeaconEvents(timelineSet.room, matrixEvents);
+                    this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
                     // if we've hit the end of the timeline, we need to stop trying to
                     // paginate. We need to keep the 'forwards' token though, to make sure
@@ -6090,7 +6090,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
                     timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(room, timelineEvents);
+                    this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
                         timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
@@ -9377,12 +9377,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public processBeaconEvents(room?: Room, events?: MatrixEvent[]): void {
+        this.processAggregatedTimelineEvents(room, events);
+    }
+
+    public processAggregatedTimelineEvents(room?: Room, events?: MatrixEvent[]): void {
         if (!events?.length) return;
         if (!room) return;
 
         room.currentState.processBeaconEvents(events, this);
-
-        // @TODO(kerrya) obviously
         room.processPollEvents(events, this);
     }
 
