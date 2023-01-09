@@ -505,8 +505,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     }
 
     /**
-     * Get the ID of the event that a given user has read up to, or null if we
-     * have received no read receipts from them.
+     * Get the ID of the event that a given user has read up to within that thread,
+     * or null if we have received no read receipts from them.
      * @param userId - The user ID to get read receipt event ID for
      * @param ignoreSynthesized - If true, return only receipts that have been
      *                            sent by the server, not implicit ones generated
@@ -556,7 +556,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
 
     /**
      * Determines if the given user has read a particular event ID with the known
-     * history of the room. This is not a definitive check as it relies only on
+     * history of the thread. This is not a definitive check as it relies only on
      * what is available to the thread at the time of execution.
      * @param userId - The user ID to check the read state of.
      * @param eventId - The event ID to check if the user read.
@@ -564,6 +564,10 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      */
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         if (userId === this.client.getUserId()) {
+            // Consider an event read if it's part of a thread that has no
+            // read receipts and has no notifications. It is likely that it is
+            // part of a thread that was created before read receipts for threads
+            // were supported (via MSC3771)
             const beforeFirstThreadedReceipt =
                 (this.lastReply()?.getTs() ?? 0) < this.room.getOldestThreadedReceiptTs();
             const unthreadedReceiptTs = this.room.getLastUnthreadedReceiptFor(userId)?.ts ?? 0;
