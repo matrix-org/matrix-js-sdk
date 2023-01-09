@@ -521,7 +521,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
             // sent in the room (suggesting that it was sent before the user started
             // using a client that supported threaded read receipts), we want to
             // consider this thread as read.
-            const beforeFirstThreadedReceipt = (lastReply.getTs() ?? 0) < this.room.getOldestThreadedReceiptTs();
+            const beforeFirstThreadedReceipt = lastReply.getTs() < this.room.getOldestThreadedReceiptTs();
             if (beforeFirstThreadedReceipt) {
                 return this.timeline.at(-1)?.getId() ?? null;
             }
