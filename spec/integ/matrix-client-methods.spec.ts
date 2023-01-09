@@ -1181,7 +1181,6 @@ describe("MatrixClient", function () {
                         "body": "Body",
                         "formatted_body": "<h1>Body</h1>",
                         "format": "org.matrix.custom.html",
-                        "org.matrix.msc1767.message": expect.anything(),
                     });
                 })
                 .respond(200, { event_id: "$foobar" });
@@ -1201,7 +1200,6 @@ describe("MatrixClient", function () {
                         "body": "Body",
                         "formatted_body": "<h1>Body</h1>",
                         "format": "org.matrix.custom.html",
-                        "org.matrix.msc1767.message": expect.anything(),
                     });
                 })
                 .respond(200, { event_id: "$foobar" });
