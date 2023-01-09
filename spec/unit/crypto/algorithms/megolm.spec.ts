@@ -387,6 +387,7 @@ describe("MegolmDecryption", function () {
                 mockCrypto.baseApis = mockBaseApis;
 
                 mockRoom = {
+                    roomId: ROOM_ID,
                     getEncryptionTargetMembers: jest.fn().mockReturnValue([{ userId: "@alice:home.server" }]),
                     getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(false),
                 } as unknown as Room;
