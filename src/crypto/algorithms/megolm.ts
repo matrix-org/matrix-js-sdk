@@ -378,12 +378,25 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         await Promise.all([
             (async (): Promise<void> => {
                 // share keys with devices that we already have a session for
-                this.prefixedLogger.debug("Sharing keys with existing Olm sessions:", olmSessions);
+                const olmSessionList = Object.entries(olmSessions)
+                    .map(([userId, sessionsByUser]) =>
+                        Object.entries(sessionsByUser).map(
+                            ([deviceId, session]) => `${userId}/${deviceId}: ${session.sessionId}`,
+                        ),
+                    )
+                    .flat(1);
+                this.prefixedLogger.debug("Sharing keys with devices with existing Olm sessions:", olmSessionList);
                 await this.shareKeyWithOlmSessions(session, key, payload, olmSessions);
                 this.prefixedLogger.debug("Shared keys with existing Olm sessions");
             })(),
             (async (): Promise<void> => {
-                this.prefixedLogger.debug("Sharing keys (start phase 1) with new Olm sessions", devicesWithoutSession);
+                const deviceList = Object.entries(devicesWithoutSession)
+                    .map(([userId, devicesByUser]) => devicesByUser.map((device) => `${userId}/${device.deviceId}`))
+                    .flat(1);
+                this.prefixedLogger.debug(
+                    "Sharing keys (start phase 1) with devices without existing Olm sessions:",
+                    deviceList,
+                );
                 const errorDevices: IOlmDevice[] = [];
 
                 // meanwhile, establish olm sessions for devices that we don't
@@ -402,7 +415,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
                     singleOlmCreationPhase ? 10000 : 2000,
                     failedServers,
                 );
-                this.prefixedLogger.debug("Shared keys (end phase 1) with new Olm sessions");
+                this.prefixedLogger.debug("Shared keys (end phase 1) with devices without existing Olm sessions");
 
                 if (!singleOlmCreationPhase && Date.now() - start < 10000) {
                     // perform the second phase of olm session creation if requested,
@@ -431,25 +444,40 @@ export class MegolmEncryption extends EncryptionAlgorithm {
                             }
                         }
 
-                        this.prefixedLogger.debug(`Sharing keys (start phase 2) with new Olm sessions`);
-                        await this.shareKeyWithDevices(session, key, payload, retryDevices, failedDevices, 30000);
-                        this.prefixedLogger.debug(`Shared keys (end phase 2) with new Olm sessions`);
+                        const retryDeviceList = Object.entries(retryDevices)
+                            .map(([userId, devicesByUser]) =>
+                                devicesByUser.map((device) => `${userId}/${device.deviceId}`),
+                            )
+                            .flat(1);
+
+                        if (retryDeviceList.length > 0) {
+                            this.prefixedLogger.debug(
+                                "Sharing keys (start phase 2) with devices without existing Olm sessions:",
+                                retryDeviceList,
+                            );
+                            await this.shareKeyWithDevices(session, key, payload, retryDevices, failedDevices, 30000);
+                            this.prefixedLogger.debug(
+                                `Shared keys (end phase 2) with devices without existing Olm sessions`,
+                            );
+                        }
 
                         await this.notifyFailedOlmDevices(session, key, failedDevices);
                     })();
                 } else {
                     await this.notifyFailedOlmDevices(session, key, errorDevices);
                 }
-                this.prefixedLogger.debug(`Shared keys (all phases done) with new Olm sessions`);
             })(),
             (async (): Promise<void> => {
                 this.prefixedLogger.debug(
-                    `There are ${Object.entries(blocked).length} blocked devices`,
-                    Object.entries(blocked),
+                    `There are ${Object.entries(blocked).length} blocked devices:`,
+                    Object.entries(blocked)
+                        .map(([userId, blockedByUser]) =>
+                            Object.entries(blockedByUser).map(([deviceId, _deviceInfo]) => `${userId}/${deviceId}`),
+                        )
+                        .flat(1),
                 );
 
                 // also, notify newly blocked devices that they're blocked
-                this.prefixedLogger.debug("Notifying newly blocked devices");
                 const blockedMap: Record<string, Record<string, { device: IBlockedDevice }>> = {};
                 let blockedCount = 0;
                 for (const [userId, userBlockedDevices] of Object.entries(blocked)) {
@@ -465,8 +493,18 @@ export class MegolmEncryption extends EncryptionAlgorithm {
                     }
                 }
 
-                await this.notifyBlockedDevices(session, blockedMap);
-                this.prefixedLogger.debug(`Notified ${blockedCount} newly blocked devices`, blockedMap);
+                if (blockedCount) {
+                    this.prefixedLogger.debug(
+                        `Notifying ${blockedCount} newly blocked devices:`,
+                        Object.entries(blockedMap)
+                            .map(([userId, blockedByUser]) =>
+                                Object.entries(blockedByUser).map(([deviceId, _deviceInfo]) => `${userId}/${deviceId}`),
+                            )
+                            .flat(1),
+                    );
+                    await this.notifyBlockedDevices(session, blockedMap);
+                    this.prefixedLogger.debug(`Notified ${blockedCount} newly blocked devices`);
+                }
             })(),
         ]);
     }
@@ -808,7 +846,6 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         otkTimeout: number,
         failedServers?: string[],
     ): Promise<void> {
-        this.prefixedLogger.debug("Ensuring Olm sessions for devices");
         const devicemap = await olmlib.ensureOlmSessionsForDevices(
             this.olmDevice,
             this.baseApis,
@@ -818,13 +855,8 @@ export class MegolmEncryption extends EncryptionAlgorithm {
             failedServers,
             this.prefixedLogger,
         );
-        this.prefixedLogger.debug("Ensured Olm sessions for devices");
-
         this.getDevicesWithoutSessions(devicemap, devicesByUser, errorDevices);
-
-        this.prefixedLogger.debug("Sharing keys with newly created Olm sessions");
         await this.shareKeyWithOlmSessions(session, key, payload, devicemap);
-        this.prefixedLogger.debug("Shared keys with newly created Olm sessions");
     }
 
     private async shareKeyWithOlmSessions(
