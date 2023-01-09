@@ -131,9 +131,11 @@ describe("Poll", () => {
 
             it("sets poll end event with stable event type", async () => {
                 const poll = new Poll(basePollStartEvent, mockClient);
+                jest.spyOn(poll, "emit");
                 await poll.getResponses();
 
                 expect(poll.isEnded).toBe(true);
+                expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
             });
 
             it("sets poll end event with unstable event type", async () => {
@@ -141,9 +143,11 @@ describe("Poll", () => {
                     events: [unstablePollEndEvent],
                 });
                 const poll = new Poll(basePollStartEvent, mockClient);
+                jest.spyOn(poll, "emit");
                 await poll.getResponses();
 
                 expect(poll.isEnded).toBe(true);
+                expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
             });
 
             it("filters out responses that were sent after poll end", async () => {
@@ -154,6 +158,79 @@ describe("Poll", () => {
                 // and response with ts after poll end event is excluded
                 expect(responses.getRelations()).toEqual([responseEventAtEnd, responseEventBeforeEnd]);
             });
+        });
+    });
+
+    describe("onNewRelation()", () => {
+        it("discards response if poll responses have not been initialised", () => {
+            const poll = new Poll(basePollStartEvent, mockClient);
+            jest.spyOn(poll, "emit");
+            const responseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
+
+            poll.onNewRelation(responseEvent);
+
+            // did not add response -> no emit
+            expect(poll.emit).not.toHaveBeenCalled();
+        });
+
+        it("sets poll end event when responses are not initialised", () => {
+            const poll = new Poll(basePollStartEvent, mockClient);
+            jest.spyOn(poll, "emit");
+            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable! });
+
+            poll.onNewRelation(stablePollEndEvent);
+
+            expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
+        });
+
+        it("sets poll end event and refilters responses based on timestamp", async () => {
+            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable! });
+            const responseEventBeforeEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now - 1000);
+            const responseEventAtEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
+            const responseEventAfterEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now + 1000);
+            mockClient.relations.mockResolvedValue({
+                events: [responseEventAfterEnd, responseEventAtEnd, responseEventBeforeEnd],
+            });
+            const poll = new Poll(basePollStartEvent, mockClient);
+            const responses = await poll.getResponses();
+            jest.spyOn(poll, "emit");
+
+            expect(responses.getRelations().length).toEqual(3);
+            poll.onNewRelation(stablePollEndEvent);
+
+            expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
+            expect(poll.emit).toHaveBeenCalledWith(PollEvent.Responses, responses);
+            expect(responses.getRelations().length).toEqual(2);
+            // after end timestamp event is removed
+            expect(responses.getRelations()).toEqual([responseEventAtEnd, responseEventBeforeEnd]);
+        });
+
+        it("filters out irrelevant relations", async () => {
+            const poll = new Poll(basePollStartEvent, mockClient);
+            // init responses
+            const responses = await poll.getResponses();
+            jest.spyOn(poll, "emit");
+            const replyEvent = new MatrixEvent({ type: "m.room.message" });
+
+            poll.onNewRelation(replyEvent);
+
+            // did not add response -> no emit
+            expect(poll.emit).not.toHaveBeenCalled();
+            expect(responses.getRelations().length).toEqual(0);
+        });
+
+        it("adds poll response relations to responses", async () => {
+            const poll = new Poll(basePollStartEvent, mockClient);
+            // init responses
+            const responses = await poll.getResponses();
+            jest.spyOn(poll, "emit");
+            const responseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
+
+            poll.onNewRelation(responseEvent);
+
+            // did not add response -> no emit
+            expect(poll.emit).toHaveBeenCalledWith(PollEvent.Responses, responses);
+            expect(responses.getRelations()).toEqual([responseEvent]);
         });
     });
 });

@@ -16,7 +16,7 @@ limitations under the License.
 
 import { M_POLL_END, M_POLL_RESPONSE, PollStartEvent } from "matrix-events-sdk";
 
-import { MatrixClient } from "..";
+import { MatrixClient } from "../client";
 import { MatrixEvent } from "./event";
 import { Relations } from "./relations";
 import { TypedEventEmitter } from "./typed-event-emitter";
@@ -40,13 +40,11 @@ const filterResponseRelations = (
     relationEvents: MatrixEvent[],
     pollEndTimestamp: number,
 ): {
-    hasUndecryptableRelations: boolean;
     responseEvents: MatrixEvent[];
 } => {
-    let hasUndecryptableRelations = false;
     const responseEvents = relationEvents.filter((event) => {
         if (event.isDecryptionFailure()) {
-            hasUndecryptableRelations = true;
+            // @TODO(kerrya) PSG-1023 track and return these
             return;
         }
         return (
@@ -57,7 +55,7 @@ const filterResponseRelations = (
         );
     });
 
-    return { hasUndecryptableRelations, responseEvents };
+    return { responseEvents };
 };
 
 // https://github.com/matrix-org/matrix-spec-proposals/pull/3672
@@ -67,7 +65,6 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     private fetchingResponsesPromise: null | Promise<void> = null;
     private responses: null | Relations = null;
     private endEvent: MatrixEvent | undefined;
-    private hasUndecryptableRelations = false;
 
     public constructor(private rootEvent: MatrixEvent, private matrixClient: MatrixClient) {
         super();
@@ -80,7 +77,6 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     }
 
     public get isEnded(): boolean {
-        // @TODO(kerrya) should be false while responses are loading?
         return !!this.endEvent;
     }
 
@@ -107,22 +103,23 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
     /**
      *
-     * @param event event with a relation to the rootEvent
+     * @param event - event with a relation to the rootEvent
      * @returns void
      */
     public onNewRelation(event: MatrixEvent): void {
         if (M_POLL_END.matches(event.getType())) {
             this.endEvent = event;
+            this.refilterResponsesOnEnd();
             this.emit(PollEvent.End);
         }
 
-        // wait for poll to be initialised
+        // wait for poll responses to be initialised
         if (!this.responses) {
             return;
         }
 
-        const pollCloseTimestamp = this.endEvent?.getTs() || Number.MAX_SAFE_INTEGER;
-        const { hasUndecryptableRelations, responseEvents } = filterResponseRelations([event], pollCloseTimestamp);
+        const pollEndTimestamp = this.endEvent?.getTs() || Number.MAX_SAFE_INTEGER;
+        const { responseEvents } = filterResponseRelations([event], pollEndTimestamp);
 
         if (responseEvents.length) {
             responseEvents.forEach((event) => {
@@ -130,8 +127,6 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
             });
             this.emit(PollEvent.Responses, this.responses);
         }
-
-        this.hasUndecryptableRelations = this.hasUndecryptableRelations || hasUndecryptableRelations;
     }
 
     private async fetchResponses(): Promise<void> {
@@ -152,10 +147,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         const pollEndEvent = allRelations.events.find((event) => M_POLL_END.matches(event.getType()));
         const pollCloseTimestamp = pollEndEvent?.getTs() || Number.MAX_SAFE_INTEGER;
 
-        const { hasUndecryptableRelations, responseEvents } = filterResponseRelations(
-            allRelations.events,
-            pollCloseTimestamp,
-        );
+        const { responseEvents } = filterResponseRelations(allRelations.events, pollCloseTimestamp);
 
         responseEvents.forEach((event) => {
             responses.addEvent(event);
@@ -163,7 +155,24 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
         this.responses = responses;
         this.endEvent = pollEndEvent;
-        this.hasUndecryptableRelations = hasUndecryptableRelations;
+        if (this.endEvent) {
+            this.emit(PollEvent.End);
+        }
+        this.emit(PollEvent.Responses, this.responses);
+    }
+
+    private refilterResponsesOnEnd(): void {
+        if (!this.responses) {
+            return;
+        }
+
+        const pollEndTimestamp = this.endEvent?.getTs() || Number.MAX_SAFE_INTEGER;
+        this.responses.getRelations().forEach((event) => {
+            if (event.getTs() > pollEndTimestamp) {
+                this.responses?.removeEvent(event);
+            }
+        });
+
         this.emit(PollEvent.Responses, this.responses);
     }
 }

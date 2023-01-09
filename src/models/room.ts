@@ -287,7 +287,7 @@ export type RoomEventHandlerMap = {
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
     /**
      * Fires when a new poll instance is added to the room state
-     * @param poll
+     * @param poll - the new poll
      */
     [PollEvent.New]: (poll: Poll) => void;
 } & Pick<ThreadHandlerMap, ThreadEvent.Update | ThreadEvent.NewReply | ThreadEvent.Delete> &
@@ -1883,15 +1883,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     public processPollEvents(events: MatrixEvent[], matrixClient: MatrixClient): void {
-        const processPollStartEvent = (event: MatrixEvent) => {
+        const processPollStartEvent = (event: MatrixEvent): void => {
             if (!M_POLL_START.matches(event.getType())) return;
             const poll = new Poll(event, matrixClient);
             this.polls.set(event.getId()!, poll);
-            console.log("hhh processPollEvents", this.roomId, { poll });
             this.emit(PollEvent.New, poll);
         };
 
-        const processPollRelationEvent = (event: MatrixEvent) => {
+        const processPollRelationEvent = (event: MatrixEvent): void => {
             const relationEventId = event.getRelation()?.event_id;
             if (relationEventId && this.polls.has(relationEventId)) {
                 const poll = this.polls.get(relationEventId);
@@ -1899,7 +1898,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             }
         };
 
-        const processPollEvent = (event: MatrixEvent) => {
+        const processPollEvent = (event: MatrixEvent): void => {
             processPollStartEvent(event);
             processPollRelationEvent(event);
         };

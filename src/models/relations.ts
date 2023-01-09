@@ -122,7 +122,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *
      * @param event - The relation event to remove.
      */
-    private async removeEvent(event: MatrixEvent): Promise<void> {
+    public async removeEvent(event: MatrixEvent): Promise<void> {
         if (!this.relations.has(event)) {
             return;
         }

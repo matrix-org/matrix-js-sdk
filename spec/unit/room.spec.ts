@@ -19,6 +19,7 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
+import { M_POLL_KIND_DISCLOSED, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
 import { emitPromise } from "../test-utils/test-utils";
@@ -33,9 +34,11 @@ import {
     IRelationsRequestOpts,
     IStateEventWithRoomId,
     JoinRule,
+    MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
     PendingEventOrdering,
+    PollEvent,
     RelationType,
     RoomEvent,
     RoomMember,
@@ -49,6 +52,7 @@ import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { Crypto } from "../../src/crypto";
 import { mkThread } from "../test-utils/thread";
+import { getMockClientWithEventEmitter } from "../test-utils/client";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -3223,6 +3227,40 @@ describe("Room", function () {
         it("is updated by setBlacklistUnverifiedDevices", () => {
             room.setBlacklistUnverifiedDevices(false);
             expect(room.getBlacklistUnverifiedDevices()).toBe(false);
+        });
+    });
+
+    fdescribe("processPollEvents()", () => {
+        let room: Room;
+        let client: MatrixClient;
+
+        beforeEach(() => {
+            client = getMockClientWithEventEmitter({
+                decryptEventIfNeeded: jest.fn(),
+            });
+            room = new Room(roomId, client, userA);
+            jest.spyOn(room, "emit").mockClear();
+        });
+
+        const makePollStart = (id: string): MatrixEvent => {
+            const event = new MatrixEvent({
+                ...PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
+                room_id: roomId,
+            });
+            event.event.event_id = id;
+            return event;
+        };
+
+        it("adds poll models to room state for a poll start event ", () => {
+            const pollStartEvent = makePollStart("1");
+            const events = [pollStartEvent];
+
+            room.processPollEvents(events, client);
+            expect(client.decryptEventIfNeeded).toHaveBeenCalledWith(pollStartEvent);
+            const pollInstance = room.polls.get(pollStartEvent.getId()!);
+            expect(pollInstance).toBeTruthy();
+
+            expect(room.emit).toHaveBeenCalledWith(PollEvent.New, pollInstance);
         });
     });
 });
