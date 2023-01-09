@@ -312,7 +312,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     // Useful to know at what point the current user has started using threads in this room
     private oldestThreadedReceiptTs = Infinity;
     /**
-     * Keeping a record of the lastest unthread receipts per user
+     * A record of the latest unthread receipts per user
      * This is useful in determining whether a user has read a thread or not
      */
     private unthreadedReceipts = new Map<string, Receipt>();
@@ -3306,7 +3306,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Returns the most receipt unthreaded receipt for a given user
+     * Returns the most recent unthreaded receipt for a given user
      * @param userId - the MxID of the User
      * @returns an unthreaded Receipt
      */
