@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
-import { M_POLL_KIND_DISCLOSED, PollStartEvent } from "matrix-events-sdk";
+import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
 import { emitPromise } from "../test-utils/test-utils";
@@ -3230,7 +3230,7 @@ describe("Room", function () {
         });
     });
 
-    fdescribe("processPollEvents()", () => {
+    describe("processPollEvents()", () => {
         let room: Room;
         let client: MatrixClient;
 
@@ -3261,6 +3261,44 @@ describe("Room", function () {
             expect(pollInstance).toBeTruthy();
 
             expect(room.emit).toHaveBeenCalledWith(PollEvent.New, pollInstance);
+        });
+
+        it("adds related events to poll models", () => {
+            const pollStartEvent = makePollStart("1");
+            const pollStartEvent2 = makePollStart("2");
+            const events = [pollStartEvent, pollStartEvent2];
+            const pollResponseEvent = new MatrixEvent({
+                type: M_POLL_RESPONSE.name,
+                content: {
+                    "m.relates_to": {
+                        rel_type: RelationType.Reference,
+                        event_id: pollStartEvent.getId(),
+                    },
+                },
+            });
+            const messageEvent = new MatrixEvent({
+                type: "m.room.messsage",
+                content: {
+                    text: "hello",
+                },
+            });
+
+            // init poll
+            room.processPollEvents(events, client);
+
+            const poll = room.polls.get(pollStartEvent.getId()!)!;
+            const poll2 = room.polls.get(pollStartEvent2.getId()!)!;
+            jest.spyOn(poll, "onNewRelation");
+            jest.spyOn(poll2, "onNewRelation");
+
+            room.processPollEvents([pollResponseEvent, messageEvent], client);
+
+            // only called for relevant event
+            expect(poll.onNewRelation).toHaveBeenCalledTimes(1);
+            expect(poll.onNewRelation).toHaveBeenCalledWith(pollResponseEvent);
+
+            // only called on poll with relation
+            expect(poll2.onNewRelation).not.toHaveBeenCalled();
         });
     });
 });
