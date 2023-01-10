@@ -62,6 +62,7 @@ import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
 import { QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
+import { StubStore } from "../../src/store/stub";
 
 jest.useFakeTimers();
 
@@ -2194,6 +2195,84 @@ describe("MatrixClient", function () {
 
             // account data updated with empty content
             expect(requestSpy).toHaveBeenCalledWith(Method.Put, path, undefined, {});
+        });
+    });
+
+    describe("getVisibleRooms", () => {
+        function roomCreateEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
+            return new MatrixEvent({
+                content: {
+                    "creator": "@daryl:alexandria.example.com",
+                    "m.federate": true,
+                    "predecessor": {
+                        event_id: "spec_is_not_clear_what_id_this_is",
+                        room_id: predecessorRoomId,
+                    },
+                    "room_version": "9",
+                },
+                event_id: `create_event_id_pred_${predecessorRoomId}`,
+                origin_server_ts: 1432735824653,
+                room_id: newRoomId,
+                sender: "@daryl:alexandria.example.com",
+                state_key: "",
+                type: "m.room.create",
+            });
+        }
+
+        function tombstoneEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
+            return new MatrixEvent({
+                content: {
+                    body: "This room has been replaced",
+                    replacement_room: newRoomId,
+                },
+                event_id: `tombstone_event_id_pred_${predecessorRoomId}`,
+                origin_server_ts: 1432735824653,
+                room_id: predecessorRoomId,
+                sender: "@daryl:alexandria.example.com",
+                state_key: "",
+                type: "m.room.tombstone",
+            });
+        }
+
+        it("Returns an empty list if there are no rooms", () => {
+            client.store = new StubStore();
+            client.store.getRooms = () => [];
+            const rooms = client.getVisibleRooms();
+            expect(rooms).toHaveLength(0);
+        });
+
+        it("Returns all non-replaced rooms", () => {
+            const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+            const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
+            client.store = new StubStore();
+            client.store.getRooms = () => [room1, room2];
+            const rooms = client.getVisibleRooms();
+            expect(rooms).toContain(room1);
+            expect(rooms).toContain(room2);
+            expect(rooms).toHaveLength(2);
+        });
+
+        it("Does not return replaced rooms", () => {
+            // Given 4 rooms, 2 of which have been replaced
+            const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+            const replacedRoom1 = new Room("replacedRoom1", client, "@carol:alexandria.example.com");
+            const replacedRoom2 = new Room("replacedRoom2", client, "@carol:alexandria.example.com");
+            const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
+            client.store = new StubStore();
+            client.store.getRooms = () => [room1, replacedRoom1, replacedRoom2, room2];
+            room1.addLiveEvents([roomCreateEvent(room1.roomId, replacedRoom1.roomId)], {});
+            room2.addLiveEvents([roomCreateEvent(room2.roomId, replacedRoom2.roomId)], {});
+            replacedRoom1.addLiveEvents([tombstoneEvent(room1.roomId, replacedRoom1.roomId)], {});
+            replacedRoom2.addLiveEvents([tombstoneEvent(room2.roomId, replacedRoom2.roomId)], {});
+
+            // When we ask for the visible rooms
+            const rooms = client.getVisibleRooms();
+
+            // Then we only get the ones that have not been replaced
+            expect(rooms).not.toContain(replacedRoom1);
+            expect(rooms).not.toContain(replacedRoom2);
+            expect(rooms).toContain(room1);
+            expect(rooms).toContain(room2);
         });
     });
 });
