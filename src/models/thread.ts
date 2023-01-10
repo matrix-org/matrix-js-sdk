@@ -505,8 +505,8 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     }
 
     /**
-     * Get the ID of the event that a given user has read up to within that thread,
-     * or null if we have received no read receipts from them.
+     * Get the ID of the event that a given user has read up to within this thread,
+     * or null if we have received no read receipt (at all) from them.
      * @param userId - The user ID to get read receipt event ID for
      * @param ignoreSynthesized - If true, return only receipts that have been
      *                            sent by the server, not implicit ones generated
