@@ -861,10 +861,16 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     logger.debug("list modified during await call, not updating list");
                     doNotUpdateList = true;
                 }
-                // mark all these lists as having been sent as sticky so we don't keep sending sticky params
-                this.lists.forEach((l) => {
-                    l.setModified(false);
-                });
+
+                // Only mark the lists as sticky if our lists weren't modified during the call.
+                // This will result in us sending the lists again, but ensures they are correct.
+                if (!doNotUpdateList) {
+                    // mark all these lists as having been sent as sticky so we don't keep sending sticky params
+                    this.lists.forEach((l) => {
+                        l.setModified(false);
+                    });
+                }
+
                 // set default empty values so we don't need to null check
                 resp.lists = resp.lists || [];
                 resp.rooms = resp.rooms || {};
