@@ -1852,10 +1852,14 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             return true;
         }
 
-        this.prefixedLogger.debug("Retrying decryption on events", [...pending]);
+        const pendingList = [...pending];
+        this.prefixedLogger.debug(
+            "Retrying decryption on events:",
+            pendingList.map((e) => `${e.getId()}`),
+        );
 
         await Promise.all(
-            [...pending].map(async (ev) => {
+            pendingList.map(async (ev) => {
                 try {
                     await ev.attemptDecryption(this.crypto, { isRetry: true, forceRedecryptIfUntrusted });
                 } catch (e) {
