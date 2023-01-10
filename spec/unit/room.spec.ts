@@ -3242,7 +3242,7 @@ describe("Room", function () {
             };
             if (predecessorRoomId) {
                 content.predecessor = {
-                    event_id: "spec_is_not_clear_what_id_this_is",
+                    event_id: "id_of_last_known_event",
                     room_id: predecessorRoomId,
                 };
             }
