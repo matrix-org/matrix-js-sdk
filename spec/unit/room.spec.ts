@@ -50,7 +50,7 @@ import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { Crypto } from "../../src/crypto";
 import { mkThread } from "../test-utils/thread";
-import { getMockClientWithEventEmitter, mockClientMethodsEvents, mockClientMethodsUser } from "../test-utils/client";
+import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
