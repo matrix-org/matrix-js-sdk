@@ -3331,8 +3331,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Returns the most recent unthreaded receipt for a given user
      * @param userId - the MxID of the User
-     * @returns an unthreaded Receipt, can be undefined if receipts have been disabled
-     * or a user chooses to use private read receipts.
+     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
+     * or a user chooses to use private read receipts (or we have simply not received
+     * a receipt from this user yet).
      */
     public getLastUnthreadedReceiptFor(userId: string): Receipt | undefined {
         return this.unthreadedReceipts.get(userId);

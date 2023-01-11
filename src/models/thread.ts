@@ -557,9 +557,12 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     }
 
     /**
-     * Determines if the given user has read a particular event ID with the known
-     * history of the thread. This is not a definitive check as it relies only on
-     * what is available to the thread at the time of execution.
+     * Determine if the given user has read a particular event.
+     *
+     * It is invalid to call this method with an event that is not part of this thread.
+     *
+     * This is not a definitive check as it only checks the events that have been
+     * loaded client-side at the time of execution.
      * @param userId - The user ID to check the read state of.
      * @param eventId - The event ID to check if the user read.
      * @returns True if the user has read the event, false otherwise.
