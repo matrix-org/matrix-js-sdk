@@ -1888,10 +1888,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.threadsReady = true;
     }
 
-    public processPollEvents(events: MatrixEvent[], matrixClient: MatrixClient): void {
+    public processPollEvents(events: MatrixEvent[]): void {
         const processPollStartEvent = (event: MatrixEvent): void => {
             if (!M_POLL_START.matches(event.getType())) return;
-            const poll = new Poll(event, matrixClient);
+            const poll = new Poll(event, this.client);
             this.polls.set(event.getId()!, poll);
             this.emit(PollEvent.New, poll);
         };
@@ -1910,7 +1910,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         };
 
         events.forEach((event: MatrixEvent) => {
-            matrixClient.decryptEventIfNeeded(event);
+            this.client.decryptEventIfNeeded(event);
 
             if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
                 // add an event listener for once the event is decrypted.

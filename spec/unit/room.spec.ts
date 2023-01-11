@@ -3255,7 +3255,7 @@ describe("Room", function () {
             const pollStartEvent = makePollStart("1");
             const events = [pollStartEvent];
 
-            room.processPollEvents(events, client);
+            room.processPollEvents(events);
             expect(client.decryptEventIfNeeded).toHaveBeenCalledWith(pollStartEvent);
             const pollInstance = room.polls.get(pollStartEvent.getId()!);
             expect(pollInstance).toBeTruthy();
@@ -3284,14 +3284,14 @@ describe("Room", function () {
             });
 
             // init poll
-            room.processPollEvents(events, client);
+            room.processPollEvents(events);
 
             const poll = room.polls.get(pollStartEvent.getId()!)!;
             const poll2 = room.polls.get(pollStartEvent2.getId()!)!;
             jest.spyOn(poll, "onNewRelation");
             jest.spyOn(poll2, "onNewRelation");
 
-            room.processPollEvents([pollResponseEvent, messageEvent], client);
+            room.processPollEvents([pollResponseEvent, messageEvent]);
 
             // only called for relevant event
             expect(poll.onNewRelation).toHaveBeenCalledTimes(1);

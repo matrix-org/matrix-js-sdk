@@ -9385,7 +9385,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!room) return;
 
         room.currentState.processBeaconEvents(events, this);
-        room.processPollEvents(events, this);
+        room.processPollEvents(events);
     }
 
     /**
