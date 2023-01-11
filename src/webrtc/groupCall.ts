@@ -396,6 +396,7 @@ export class GroupCall extends TypedEventEmitter<
             roomId: this.room.roomId,
             userId: this.client.getUserId()!,
             deviceId: this.client.getDeviceId()!,
+            feedId: stream.id,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
             audioMuted: this.initWithAudioMuted || stream.getAudioTracks().length === 0 || this.isPtt,
@@ -419,12 +420,15 @@ export class GroupCall extends TypedEventEmitter<
             this.localCallFeed.setNewStream(stream);
             const micShouldBeMuted = this.localCallFeed.isAudioMuted();
             const vidShouldBeMuted = this.localCallFeed.isVideoMuted();
-            logger.log(
-                `groupCall ${this.groupCallId} updateLocalUsermediaStream oldStream ${oldStream.id} newStream ${stream.id} micShouldBeMuted ${micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`,
-            );
             setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
             setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
-            this.client.getMediaHandler().stopUserMediaStream(oldStream);
+
+            if (oldStream) {
+                this.client.getMediaHandler().stopUserMediaStream(oldStream);
+                logger.log(
+                    `groupCall ${this.groupCallId} updateLocalUsermediaStream oldStream ${oldStream.id} newStream ${stream.id} micShouldBeMuted ${micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`,
+                );
+            }
         }
     }
 
@@ -523,7 +527,9 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         if (this.localScreenshareFeed) {
-            this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
+            if (this.localScreenshareFeed.stream) {
+                this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
+            }
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
@@ -652,20 +658,26 @@ export class GroupCall extends TypedEventEmitter<
 
         if (this.localCallFeed) {
             logger.log(
-                `groupCall ${this.groupCallId} setMicrophoneMuted stream ${this.localCallFeed.stream.id} muted ${muted}`,
+                `groupCall ${this.groupCallId} setMicrophoneMuted stream ${this.localCallFeed.feedId} muted ${muted}`,
             );
             this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
             // are the one on the groupcall's own CallFeed and are cloned before being
             // given to any of the actual calls, so these tracks don't actually go
             // anywhere. Let's do it anyway to avoid confusion.
-            setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
+            if (this.localCallFeed.stream) {
+                setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
+            }
         } else {
             logger.log(`groupCall ${this.groupCallId} setMicrophoneMuted no stream muted ${muted}`);
             this.initWithAudioMuted = muted;
         }
 
-        this.forEachCall((call) => setTracksEnabled(call.localUsermediaFeed!.stream.getAudioTracks(), !muted));
+        this.forEachCall((call) => {
+            if (call.localUsermediaStream) {
+                setTracksEnabled(call.localUsermediaStream.getAudioTracks(), !muted);
+            }
+        });
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
@@ -688,10 +700,12 @@ export class GroupCall extends TypedEventEmitter<
 
         if (this.localCallFeed) {
             logger.log(
-                `groupCall ${this.groupCallId} setLocalVideoMuted stream ${this.localCallFeed.stream.id} muted ${muted}`,
+                `groupCall ${this.groupCallId} setLocalVideoMuted stream ${this.localCallFeed.feedId} muted ${muted}`,
             );
             this.localCallFeed.setAudioVideoMuted(null, muted);
-            setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+            if (this.localCallFeed.stream) {
+                setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+            }
         } else {
             logger.log(`groupCall ${this.groupCallId} setLocalVideoMuted no stream muted ${muted}`);
             this.initWithVideoMuted = muted;
@@ -733,6 +747,7 @@ export class GroupCall extends TypedEventEmitter<
                     roomId: this.room.roomId,
                     userId: this.client.getUserId()!,
                     deviceId: this.client.getDeviceId()!,
+                    feedId: stream.id,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Screenshare,
                     audioMuted: false,
@@ -768,7 +783,9 @@ export class GroupCall extends TypedEventEmitter<
             this.forEachCall((call) => {
                 if (call.localScreensharingFeed) call.removeLocalFeed(call.localScreensharingFeed);
             });
-            this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed!.stream);
+            if (this.localScreenshareFeed?.stream) {
+                this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
+            }
             // We have to remove the feed manually as MatrixCall has its clone,
             // so it won't be removed automatically
             this.removeScreenshareFeed(this.localScreenshareFeed!);
@@ -1100,7 +1117,7 @@ export class GroupCall extends TypedEventEmitter<
 
         if (state === CallState.Connected) {
             if (call.isFocus) {
-                call.subscribeToFocus();
+                call.subscribeToFocus(true);
             }
 
             const opponentUserId = call.getOpponentMember()?.userId;
