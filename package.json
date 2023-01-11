@@ -33,10 +33,11 @@
         "matrix-org"
     ],
     "main": "./src/index.ts",
-    "browser": "./lib/browser-index.ts",
+    "browser": "./src/browser-index.ts",
     "matrix_src_main": "./src/index.ts",
     "matrix_src_browser": "./src/browser-index.ts",
     "matrix_lib_main": "./lib/index.js",
+    "matrix_lib_browser": "./lib/browser-index.js",
     "matrix_lib_typings": "./lib/index.d.ts",
     "author": "matrix.org",
     "license": "Apache-2.0",
