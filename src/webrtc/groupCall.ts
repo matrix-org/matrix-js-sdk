@@ -1117,7 +1117,7 @@ export class GroupCall extends TypedEventEmitter<
 
         if (state === CallState.Connected) {
             if (call.isFocus) {
-                call.subscribeToFocus();
+                call.subscribeToFocus(true);
             }
 
             const opponentUserId = call.getOpponentMember()?.userId;

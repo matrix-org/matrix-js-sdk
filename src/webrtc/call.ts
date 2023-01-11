@@ -2053,15 +2053,31 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return;
     }
 
+    /**
+     * Send an m.call.track_subscription event to the focus. The method is
+     * throttled to avoid spamming the focus with events when scrolling or
+     * resizing the window.
+     * The m.call.track_subscription lets the focus know about the visibility
+     * and size of different tracks.
+     * @param force - whether or not to force the request to be sent immediately
+     */
     public subscribeToFocus(force = false): void {
-        // TODO: Can we do this better?
-        clearTimeout(this.subscribeToFocusTimeout);
-        if (!force) {
-            this.subscribeToFocusTimeout = setTimeout(() => {
-                this.subscribeToFocus(true);
-            }, SUBSCRIBE_TO_FOCUS_TIMEOUT);
+        // TODO: Can we do throttle this better?
+        if (force) {
+            this.sendSubscriptionFocusEvent();
             return;
         }
+
+        this.subscribeToFocusTimeout = setTimeout(() => {
+            this.sendSubscriptionFocusEvent();
+        }, SUBSCRIBE_TO_FOCUS_TIMEOUT);
+    }
+
+    /**
+     * This method should only ever be called by MatrixCall::subscribeToFocus()!
+     */
+    private sendSubscriptionFocusEvent(): void {
+        clearTimeout(this.subscribeToFocusTimeout);
 
         const subscribe: FocusTrackDescription[] = [];
         const unsubscribe: FocusTrackDescription[] = [];
