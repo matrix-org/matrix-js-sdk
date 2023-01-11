@@ -70,7 +70,7 @@ describe("Poll", () => {
         const poll = new Poll(basePollStartEvent, mockClient);
         expect(poll.roomId).toEqual(roomId);
         expect(poll.pollId).toEqual(basePollStartEvent.getId());
-        expect(poll.getPollStartEvent()).toEqual(basePollStartEvent.unstableExtensibleEvent);
+        expect(poll.pollEvent).toEqual(basePollStartEvent.unstableExtensibleEvent);
         expect(poll.isEnded).toBe(false);
     });
 

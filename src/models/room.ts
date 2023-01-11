@@ -1897,7 +1897,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         };
 
         const processPollRelationEvent = (event: MatrixEvent): void => {
-            const relationEventId = event.getRelation()?.event_id;
+            const relationEventId = event.relationEventId;
             if (relationEventId && this.polls.has(relationEventId)) {
                 const poll = this.polls.get(relationEventId);
                 poll?.onNewRelation(event);

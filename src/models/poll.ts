@@ -60,7 +60,7 @@ const filterResponseRelations = (
 
 export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, PollEventHandlerMap> {
     public readonly roomId: string;
-    public readonly pollEvent: PollStartEvent | undefined;
+    public readonly pollEvent: PollStartEvent;
     private fetchingResponsesPromise: null | Promise<void> = null;
     private responses: null | Relations = null;
     private endEvent: MatrixEvent | undefined;
@@ -150,6 +150,11 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         this.emit(PollEvent.Responses, this.responses);
     }
 
+    /**
+     * Only responses made before the poll ended are valid
+     * Refilter after an end event is recieved
+     * To ensure responses are valid
+     */
     private refilterResponsesOnEnd(): void {
         if (!this.responses) {
             return;
