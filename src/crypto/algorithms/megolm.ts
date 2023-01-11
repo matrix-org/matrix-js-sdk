@@ -457,7 +457,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
                             );
                             await this.shareKeyWithDevices(session, key, payload, retryDevices, failedDevices, 30000);
                             this.prefixedLogger.debug(
-                                `Shared keys (end phase 2) with devices without existing Olm sessions`,
+                                "Shared keys (end phase 2) with devices without existing Olm sessions",
                             );
                         }
 
@@ -991,7 +991,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
             return;
         }
 
-        this.prefixedLogger.debug(`Preparing to encrypt events`);
+        this.prefixedLogger.debug("Preparing to encrypt events");
 
         this.encryptionPreparation = {
             startTime: Date.now(),
@@ -1025,7 +1025,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      * @returns Promise which resolves to the new event body
      */
     public async encryptMessage(room: Room, eventType: string, content: IContent): Promise<IMegolmEncryptedContent> {
-        this.prefixedLogger.log(`Starting to encrypt event`);
+        this.prefixedLogger.log("Starting to encrypt event");
 
         if (this.encryptionPreparation != null) {
             // If we started sending keys, wait for it to be done.
