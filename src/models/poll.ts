@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -58,10 +58,9 @@ const filterResponseRelations = (
     return { responseEvents };
 };
 
-// https://github.com/matrix-org/matrix-spec-proposals/pull/3672
 export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, PollEventHandlerMap> {
     public readonly roomId: string;
-    private pollEvent: PollStartEvent | undefined;
+    public readonly pollEvent: PollStartEvent | undefined;
     private fetchingResponsesPromise: null | Promise<void> = null;
     private responses: null | Relations = null;
     private endEvent: MatrixEvent | undefined;
@@ -69,7 +68,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     public constructor(private rootEvent: MatrixEvent, private matrixClient: MatrixClient) {
         super();
         this.roomId = this.rootEvent.getRoomId()!;
-        this.setPollStartEvent(this.rootEvent);
+        this.pollEvent = this.rootEvent.unstableExtensibleEvent as PollStartEvent;
     }
 
     public get pollId(): string {
@@ -78,14 +77,6 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
     public get isEnded(): boolean {
         return !!this.endEvent;
-    }
-
-    public setPollStartEvent(event: MatrixEvent): void {
-        this.pollEvent = event.unstableExtensibleEvent as PollStartEvent;
-    }
-
-    public getPollStartEvent(): PollStartEvent {
-        return this.pollEvent!;
     }
 
     public async getResponses(): Promise<Relations> {
@@ -130,8 +121,6 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     }
 
     private async fetchResponses(): Promise<void> {
-        this.fetchingResponsesPromise = new Promise<void>(() => {});
-
         // we want:
         // - stable and unstable M_POLL_RESPONSE
         // - stable and unstable M_POLL_END
