@@ -1177,11 +1177,10 @@ describe("MatrixClient", function () {
                 .when("PUT", "/send")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
-                        "msgtype": "m.emote",
-                        "body": "Body",
-                        "formatted_body": "<h1>Body</h1>",
-                        "format": "org.matrix.custom.html",
-                        "org.matrix.msc1767.message": expect.anything(),
+                        msgtype: "m.emote",
+                        body: "Body",
+                        formatted_body: "<h1>Body</h1>",
+                        format: "org.matrix.custom.html",
                     });
                 })
                 .respond(200, { event_id: "$foobar" });
@@ -1197,11 +1196,10 @@ describe("MatrixClient", function () {
                 .when("PUT", "/send")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
-                        "msgtype": "m.text",
-                        "body": "Body",
-                        "formatted_body": "<h1>Body</h1>",
-                        "format": "org.matrix.custom.html",
-                        "org.matrix.msc1767.message": expect.anything(),
+                        msgtype: "m.text",
+                        body: "Body",
+                        formatted_body: "<h1>Body</h1>",
+                        format: "org.matrix.custom.html",
                     });
                 })
                 .respond(200, { event_id: "$foobar" });

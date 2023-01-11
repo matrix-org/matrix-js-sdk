@@ -18,7 +18,7 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  */
 
-import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent, Optional } from "matrix-events-sdk";
+import { Optional } from "matrix-events-sdk";
 
 import type { IMegolmSessionData } from "./@types/crypto";
 import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
@@ -3770,13 +3770,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const replacedRooms = new Set();
         for (const r of allRooms) {
-            const createEvent = r.currentState.getStateEvents(EventType.RoomCreate, "");
-            // invites are included in this list and we don't know their create events yet
-            if (createEvent) {
-                const predecessor = createEvent.getContent()["predecessor"];
-                if (predecessor && predecessor["room_id"]) {
-                    replacedRooms.add(predecessor["room_id"]);
-                }
+            const predecessor = r.findPredecessorRoomId();
+            if (predecessor) {
+                replacedRooms.add(predecessor);
             }
         }
 
@@ -4545,44 +4541,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
 
-        // Populate all outbound events with Extensible Events metadata to ensure there's a
-        // reasonably large pool of messages to parse.
-        let eventType: string = EventType.RoomMessage;
-        let sendContent: IContent = content as IContent;
-        const makeContentExtensible = (content: IContent = {}, recurse = true): IPartialEvent<object> | undefined => {
-            let newEvent: IPartialEvent<IContent> | undefined;
-
-            if (content["msgtype"] === MsgType.Text) {
-                newEvent = MessageEvent.from(content["body"], content["formatted_body"]).serialize();
-            } else if (content["msgtype"] === MsgType.Emote) {
-                newEvent = EmoteEvent.from(content["body"], content["formatted_body"]).serialize();
-            } else if (content["msgtype"] === MsgType.Notice) {
-                newEvent = NoticeEvent.from(content["body"], content["formatted_body"]).serialize();
-            }
-
-            if (newEvent && content["m.new_content"] && recurse) {
-                const newContent = makeContentExtensible(content["m.new_content"], false);
-                if (newContent) {
-                    newEvent.content["m.new_content"] = newContent.content;
-                }
-            }
-
-            if (newEvent) {
-                // copy over all other fields we don't know about
-                for (const [k, v] of Object.entries(content)) {
-                    if (!newEvent.content.hasOwnProperty(k)) {
-                        newEvent.content[k] = v;
-                    }
-                }
-            }
-
-            return newEvent;
-        };
-        const result = makeContentExtensible(sendContent);
-        if (result) {
-            eventType = result.type;
-            sendContent = result.content;
-        }
+        const eventType: string = EventType.RoomMessage;
+        const sendContent: IContent = content as IContent;
 
         return this.sendEvent(roomId, threadId as string | null, eventType, sendContent, txnId);
     }

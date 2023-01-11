@@ -2969,6 +2969,29 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.getType() === RoomType.ElementVideo;
     }
 
+    /**
+     * @returns the ID of the room that was this room's predecessor, or null if
+     *          this room has no predecessor.
+     */
+    public findPredecessorRoomId(): string | null {
+        const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        if (!currentState) {
+            return null;
+        }
+
+        const createEvent = currentState.getStateEvents(EventType.RoomCreate, "");
+        if (createEvent) {
+            const predecessor = createEvent.getContent()["predecessor"];
+            if (predecessor) {
+                const roomId = predecessor["room_id"];
+                if (roomId) {
+                    return roomId;
+                }
+            }
+        }
+        return null;
+    }
+
     private roomNameGenerator(state: RoomNameState): string {
         if (this.client.roomNameGenerator) {
             const name = this.client.roomNameGenerator(this.roomId, state);
