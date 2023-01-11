@@ -50,6 +50,7 @@ import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { Crypto } from "../../src/crypto";
 import { mkThread } from "../test-utils/thread";
+import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -3228,6 +3229,14 @@ describe("Room", function () {
     });
 
     describe("findPredecessorRoomId", () => {
+        let client: MatrixClient | null = null;
+        beforeEach(() => {
+            client = getMockClientWithEventEmitter({
+                ...mockClientMethodsUser(),
+                supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+            });
+        });
+
         function roomCreateEvent(newRoomId: string, predecessorRoomId: string | null): MatrixEvent {
             const content: {
                 creator: string;
@@ -3258,18 +3267,18 @@ describe("Room", function () {
         }
 
         it("Returns null if there is no create event", () => {
-            const room = new Room("roomid", null as unknown as MatrixClient, "@u:example.com");
+            const room = new Room("roomid", client!, "@u:example.com");
             expect(room.findPredecessorRoomId()).toBeNull();
         });
 
         it("Returns null if the create event has no predecessor", () => {
-            const room = new Room("roomid", null as unknown as MatrixClient, "@u:example.com");
+            const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([roomCreateEvent("roomid", null)]);
             expect(room.findPredecessorRoomId()).toBeNull();
         });
 
         it("Returns the predecessor ID if one is provided via create event", () => {
-            const room = new Room("roomid", null as unknown as MatrixClient, "@u:example.com");
+            const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([roomCreateEvent("roomid", "replacedroomid")]);
             expect(room.findPredecessorRoomId()).toBe("replacedroomid");
         });
