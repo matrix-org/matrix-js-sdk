@@ -1223,7 +1223,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const event = this.findEventById(eventId);
         const thread = this.findThreadForEvent(event);
         if (thread) {
-            return thread.timelineSet.getLiveTimeline();
+            return thread.timelineSet.getTimelineForEvent(eventId);
         } else {
             return this.getUnfilteredTimelineSet().getTimelineForEvent(eventId);
         }
