@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RELATES_TO_RELATIONSHIP, REFERENCE_RELATION } from "matrix-events-sdk";
-
+import { RELATES_TO_RELATIONSHIP, REFERENCE_RELATION } from "./extensible_events";
 import { UnstableValue } from "../NamespacedValue";
 import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
 

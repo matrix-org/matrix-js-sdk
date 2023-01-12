@@ -14,11 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { isProvided, REFERENCE_RELATION } from "matrix-events-sdk";
-
 import { MBeaconEventContent, MBeaconInfoContent, MBeaconInfoEventContent } from "./@types/beacon";
 import { MsgType } from "./@types/event";
-import { TEXT_NODE_TYPE } from "./@types/extensible_events";
+import { M_TEXT, REFERENCE_RELATION } from "./@types/extensible_events";
+import { isProvided } from "./extensible_events_v1/utilities";
 import {
     M_ASSET,
     LocationAssetType,
@@ -160,7 +159,7 @@ export const makeLocationContent = (
         [M_ASSET.name]: {
             type: assetType || LocationAssetType.Self,
         },
-        [TEXT_NODE_TYPE.name]: defaultedText,
+        [M_TEXT.name]: defaultedText,
         ...timestampEvent,
     } as LegacyLocationEventContent & MLocationEventContent;
 };
@@ -173,7 +172,7 @@ export const parseLocationEvent = (wireEventContent: LocationEventWireContent): 
     const location = M_LOCATION.findIn<MLocationContent>(wireEventContent);
     const asset = M_ASSET.findIn<MAssetContent>(wireEventContent);
     const timestamp = M_TIMESTAMP.findIn<number>(wireEventContent);
-    const text = TEXT_NODE_TYPE.findIn<string>(wireEventContent);
+    const text = M_TEXT.findIn<string>(wireEventContent);
 
     const geoUri = location?.uri ?? wireEventContent?.geo_uri;
     const description = location?.description;
