@@ -1888,7 +1888,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.threadsReady = true;
     }
 
-    public processPollEvents(events: MatrixEvent[]): void {
+    public async processPollEvents(events: MatrixEvent[]): Promise<void> {
         const processPollStartEvent = (event: MatrixEvent): void => {
             if (!M_POLL_START.matches(event.getType())) return;
             const poll = new Poll(event, this.client);
@@ -1909,18 +1909,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             processPollRelationEvent(event);
         };
 
-        events.forEach((event: MatrixEvent) => {
-            this.client.decryptEventIfNeeded(event);
-
-            if (event.isBeingDecrypted() || event.isDecryptionFailure()) {
-                // add an event listener for once the event is decrypted.
-                event.once(MatrixEventEvent.Decrypted, async () => {
-                    processPollEvent(event);
-                });
-            } else {
+        for (const event of events) {
+            try {
+                await this.client.decryptEventIfNeeded(event);
                 processPollEvent(event);
-            }
-        });
+            } catch {}
+        }
     }
 
     /**
