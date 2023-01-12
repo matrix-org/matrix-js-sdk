@@ -1614,6 +1614,9 @@ export class MegolmDecryption extends DecryptionAlgorithm {
 
         if (content.code === "m.no_olm") {
             await this.onNoOlmWithheldEvent(event);
+        } else if (content.code === "m.unavailable") {
+            // this simply means that the other device didn't have the key, which isn't very useful information. Don't
+            // record it in the storage
         } else {
             await this.olmDevice.addInboundGroupSessionWithheld(
                 content.room_id,
