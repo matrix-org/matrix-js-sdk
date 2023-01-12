@@ -21,7 +21,7 @@ import {
     M_TEXT,
     REFERENCE_RELATION,
 } from "../@types/extensible_events";
-import { M_POLL_END, M_POLL_END_EVENT_CONTENT } from "../@types/polls";
+import { M_POLL_END, PollEndEventContent } from "../@types/polls";
 import { ExtensibleEvent } from "./ExtensibleEvent";
 import { InvalidEventError } from "./InvalidEventError";
 import { MessageEvent } from "./MessageEvent";
@@ -29,7 +29,7 @@ import { MessageEvent } from "./MessageEvent";
 /**
  * Represents a poll end/closure event.
  */
-export class PollEndEvent extends ExtensibleEvent<M_POLL_END_EVENT_CONTENT> {
+export class PollEndEvent extends ExtensibleEvent<PollEndEventContent> {
     /**
      * The poll start event ID referenced by the response.
      */
@@ -45,7 +45,7 @@ export class PollEndEvent extends ExtensibleEvent<M_POLL_END_EVENT_CONTENT> {
      * parsed here: it will be treated as a literal m.poll.response primary typed event.
      * @param wireFormat - The event.
      */
-    public constructor(wireFormat: IPartialEvent<M_POLL_END_EVENT_CONTENT>) {
+    public constructor(wireFormat: IPartialEvent<PollEndEventContent>) {
         super(wireFormat);
 
         const rel = this.wireContent["m.relates_to"];

@@ -24,7 +24,7 @@ import {
     isEventTypeSame,
     M_HTML,
     M_MESSAGE,
-    M_MESSAGE_EVENT_CONTENT,
+    ExtensibleAnyMessageEventContent,
     M_TEXT,
 } from "../@types/extensible_events";
 import { isOptionalAString, isProvided } from "./utilities";
@@ -37,7 +37,7 @@ import { InvalidEventError } from "./InvalidEventError";
  * Message events can additionally be an Emote or Notice, though typically those
  * are represented as EmoteEvent and NoticeEvent respectively.
  */
-export class MessageEvent extends ExtensibleEvent<M_MESSAGE_EVENT_CONTENT> {
+export class MessageEvent extends ExtensibleEvent<ExtensibleAnyMessageEventContent> {
     /**
      * The default text for the event.
      */
@@ -62,7 +62,7 @@ export class MessageEvent extends ExtensibleEvent<M_MESSAGE_EVENT_CONTENT> {
      * typed event.
      * @param wireFormat - The event.
      */
-    public constructor(wireFormat: IPartialEvent<M_MESSAGE_EVENT_CONTENT>) {
+    public constructor(wireFormat: IPartialEvent<ExtensibleAnyMessageEventContent>) {
         super(wireFormat);
 
         const mmessage = M_MESSAGE.findIn(this.wireContent);
@@ -96,8 +96,8 @@ export class MessageEvent extends ExtensibleEvent<M_MESSAGE_EVENT_CONTENT> {
         return isEventTypeSame(primaryEventType, M_MESSAGE);
     }
 
-    protected serializeMMessageOnly(): M_MESSAGE_EVENT_CONTENT {
-        let messageRendering: M_MESSAGE_EVENT_CONTENT = {
+    protected serializeMMessageOnly(): ExtensibleAnyMessageEventContent {
+        let messageRendering: ExtensibleAnyMessageEventContent = {
             [M_MESSAGE.name]: this.renderings,
         };
 

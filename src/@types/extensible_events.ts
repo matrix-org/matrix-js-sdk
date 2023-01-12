@@ -55,7 +55,7 @@ export interface IMessageRendering {
 /**
  * The content for an m.message event
  */
-export type M_MESSAGE_EVENT = EitherAnd<
+export type ExtensibleMessageEventContent = EitherAnd<
     { [M_MESSAGE.name]: IMessageRendering[] },
     { [M_MESSAGE.altName]: IMessageRendering[] }
 >;
@@ -68,7 +68,7 @@ export const M_TEXT = new UnstableValue("m.text", "org.matrix.msc1767.text");
 /**
  * The content for an m.text event
  */
-export type M_TEXT_EVENT = EitherAnd<{ [M_TEXT.name]: string }, { [M_TEXT.altName]: string }>;
+export type TextEventContent = EitherAnd<{ [M_TEXT.name]: string }, { [M_TEXT.altName]: string }>;
 
 /**
  * The namespaced value for m.html
@@ -78,12 +78,12 @@ export const M_HTML = new UnstableValue("m.html", "org.matrix.msc1767.html");
 /**
  * The content for an m.html event
  */
-export type M_HTML_EVENT = EitherAnd<{ [M_HTML.name]: string }, { [M_HTML.altName]: string }>;
+export type HtmlEventContent = EitherAnd<{ [M_HTML.name]: string }, { [M_HTML.altName]: string }>;
 
 /**
  * The content for an m.message, m.text, or m.html event
  */
-export type M_MESSAGE_EVENT_CONTENT = M_MESSAGE_EVENT | M_TEXT_EVENT | M_HTML_EVENT;
+export type ExtensibleAnyMessageEventContent = ExtensibleMessageEventContent | TextEventContent | HtmlEventContent;
 
 /**
  * The namespaced value for an m.reference relation
@@ -93,15 +93,15 @@ export const REFERENCE_RELATION = new NamespacedValue("m.reference");
 /**
  * Represents any relation type
  */
-export type ANY_RELATION = TSNamespace<typeof REFERENCE_RELATION> | string;
+export type AnyRelation = TSNamespace<typeof REFERENCE_RELATION> | string;
 
 /**
  * An m.relates_to relationship
  */
-export type RELATES_TO_RELATIONSHIP<R = never, C = never> = {
+export type RelatesToRelationship<R = never, C = never> = {
     "m.relates_to": {
         // See https://github.com/microsoft/TypeScript/issues/23182#issuecomment-379091887 for array syntax
-        rel_type: [R] extends [never] ? ANY_RELATION : TSNamespace<R>;
+        rel_type: [R] extends [never] ? AnyRelation : TSNamespace<R>;
         event_id: string;
     } & DefaultNever<C, {}>;
 };

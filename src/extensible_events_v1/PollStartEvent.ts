@@ -19,13 +19,13 @@ import { NamespacedValue } from "matrix-events-sdk";
 import { MessageEvent } from "./MessageEvent";
 import { ExtensibleEventType, IPartialEvent, isEventTypeSame, M_TEXT } from "../@types/extensible_events";
 import {
-    KNOWN_POLL_KIND,
+    KnownPollKind,
     M_POLL_KIND_DISCLOSED,
     M_POLL_KIND_UNDISCLOSED,
     M_POLL_START,
-    M_POLL_START_EVENT_CONTENT,
-    M_POLL_START_SUBTYPE,
-    POLL_ANSWER,
+    PollStartEventContent,
+    PollStartSubtype,
+    PollAnswer,
 } from "../@types/polls";
 import { InvalidEventError } from "./InvalidEventError";
 import { ExtensibleEvent } from "./ExtensibleEvent";
@@ -41,7 +41,7 @@ export class PollAnswerSubevent extends MessageEvent {
      */
     public readonly id: string;
 
-    public constructor(wireFormat: IPartialEvent<POLL_ANSWER>) {
+    public constructor(wireFormat: IPartialEvent<PollAnswer>) {
         super(wireFormat);
 
         const id = wireFormat.content.id;
@@ -81,7 +81,7 @@ export class PollAnswerSubevent extends MessageEvent {
 /**
  * Represents a poll start event.
  */
-export class PollStartEvent extends ExtensibleEvent<M_POLL_START_EVENT_CONTENT> {
+export class PollStartEvent extends ExtensibleEvent<PollStartEventContent> {
     /**
      * The question being asked, as a MessageEvent node.
      */
@@ -94,7 +94,7 @@ export class PollStartEvent extends ExtensibleEvent<M_POLL_START_EVENT_CONTENT> 
      *
      * To get the raw kind, use rawKind.
      */
-    public readonly kind: KNOWN_POLL_KIND;
+    public readonly kind: KnownPollKind;
 
     /**
      * The true kind as provided by the event sender. Might not be valid.
@@ -116,10 +116,10 @@ export class PollStartEvent extends ExtensibleEvent<M_POLL_START_EVENT_CONTENT> 
      * parsed here: it will be treated as a literal m.poll.start primary typed event.
      * @param wireFormat - The event.
      */
-    public constructor(wireFormat: IPartialEvent<M_POLL_START_EVENT_CONTENT>) {
+    public constructor(wireFormat: IPartialEvent<PollStartEventContent>) {
         super(wireFormat);
 
-        const poll = M_POLL_START.findIn<M_POLL_START_SUBTYPE>(this.wireContent);
+        const poll = M_POLL_START.findIn<PollStartSubtype>(this.wireContent);
 
         if (!poll?.question) {
             throw new InvalidEventError("A question is required");
@@ -183,7 +183,7 @@ export class PollStartEvent extends ExtensibleEvent<M_POLL_START_EVENT_CONTENT> 
     public static from(
         question: string,
         answers: string[],
-        kind: KNOWN_POLL_KIND | string,
+        kind: KnownPollKind | string,
         maxSelections = 1,
     ): PollStartEvent {
         return new PollStartEvent({

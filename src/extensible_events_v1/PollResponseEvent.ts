@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { ExtensibleEvent } from "./ExtensibleEvent";
-import { M_POLL_RESPONSE, M_POLL_RESPONSE_EVENT_CONTENT, M_POLL_RESPONSE_SUBTYPE } from "../@types/polls";
+import { M_POLL_RESPONSE, PollResponseEventContent, PollResponseSubtype } from "../@types/polls";
 import { ExtensibleEventType, IPartialEvent, isEventTypeSame, REFERENCE_RELATION } from "../@types/extensible_events";
 import { InvalidEventError } from "./InvalidEventError";
 import { PollStartEvent } from "./PollStartEvent";
@@ -23,7 +23,7 @@ import { PollStartEvent } from "./PollStartEvent";
 /**
  * Represents a poll response event.
  */
-export class PollResponseEvent extends ExtensibleEvent<M_POLL_RESPONSE_EVENT_CONTENT> {
+export class PollResponseEvent extends ExtensibleEvent<PollResponseEventContent> {
     private internalAnswerIds: string[] = [];
     private internalSpoiled = false;
 
@@ -54,7 +54,7 @@ export class PollResponseEvent extends ExtensibleEvent<M_POLL_RESPONSE_EVENT_CON
      * To validate the response against a poll, call `validateAgainst` after creation.
      * @param wireFormat - The event.
      */
-    public constructor(wireFormat: IPartialEvent<M_POLL_RESPONSE_EVENT_CONTENT>) {
+    public constructor(wireFormat: IPartialEvent<PollResponseEventContent>) {
         super(wireFormat);
 
         const rel = this.wireContent["m.relates_to"];
@@ -72,7 +72,7 @@ export class PollResponseEvent extends ExtensibleEvent<M_POLL_RESPONSE_EVENT_CON
      * @param poll - The poll start event.
      */
     public validateAgainst(poll: PollStartEvent | null): void {
-        const response = M_POLL_RESPONSE.findIn<M_POLL_RESPONSE_SUBTYPE>(this.wireContent);
+        const response = M_POLL_RESPONSE.findIn<PollResponseSubtype>(this.wireContent);
         if (!Array.isArray(response?.answers)) {
             this.internalSpoiled = true;
             this.internalAnswerIds = [];
