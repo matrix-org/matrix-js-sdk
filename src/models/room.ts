@@ -1898,9 +1898,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public async processPollEvents(events: MatrixEvent[]): Promise<void> {
         const processPollStartEvent = (event: MatrixEvent): void => {
             if (!M_POLL_START.matches(event.getType())) return;
-            const poll = new Poll(event, this.client);
-            this.polls.set(event.getId()!, poll);
-            this.emit(PollEvent.New, poll);
+            try {
+                const poll = new Poll(event, this.client);
+                this.polls.set(event.getId()!, poll);
+                this.emit(PollEvent.New, poll);
+            } catch {}
+            // poll creation can fail for malformed poll start events
         };
 
         const processPollRelationEvent = (event: MatrixEvent): void => {

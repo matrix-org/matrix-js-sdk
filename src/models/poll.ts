@@ -67,6 +67,9 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
     public constructor(private rootEvent: MatrixEvent, private matrixClient: MatrixClient) {
         super();
+        if (!this.rootEvent.getRoomId() || !this.rootEvent.getId()) {
+            throw new Error("Invalid poll start event.");
+        }
         this.roomId = this.rootEvent.getRoomId()!;
         this.pollEvent = this.rootEvent.unstableExtensibleEvent as PollStartEvent;
     }

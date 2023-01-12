@@ -74,6 +74,21 @@ describe("Poll", () => {
         expect(poll.isEnded).toBe(false);
     });
 
+    it("throws when poll start has no room id", () => {
+        const pollStartEvent = new MatrixEvent(
+            PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
+        );
+        expect(() => new Poll(pollStartEvent, mockClient)).toThrowError("Invalid poll start event.");
+    });
+
+    it("throws when poll start has no event id", () => {
+        const pollStartEvent = new MatrixEvent({
+            ...PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
+            room_id: roomId,
+        });
+        expect(() => new Poll(pollStartEvent, mockClient)).toThrowError("Invalid poll start event.");
+    });
+
     describe("fetching responses", () => {
         it("calls relations api and emits", async () => {
             const poll = new Poll(basePollStartEvent, mockClient);
