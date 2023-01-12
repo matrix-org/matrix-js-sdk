@@ -1114,6 +1114,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const timelineSet of this.timelineSets) {
             timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);
         }
+        for (const thread of this.threads.values()) {
+            thread.resetLiveTimeline(backPaginationToken, forwardPaginationToken);
+        }
 
         this.fixUpLegacyTimelineFields();
     }

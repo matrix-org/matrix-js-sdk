@@ -358,6 +358,21 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.pendingReplyCount = pendingEvents.length;
     }
 
+    /**
+     * Reset the live timeline of all timelineSets, and start new ones.
+     *
+     * <p>This is used when /sync returns a 'limited' timeline.
+     *
+     * @param backPaginationToken -   token for back-paginating the new timeline
+     * @param forwardPaginationToken - token for forward-paginating the old live timeline,
+     * if absent or null, all timelines are reset, removing old ones (including the previous live
+     * timeline which would otherwise be unable to paginate forwards without this token).
+     * Removing just the old live timeline whilst preserving previous ones is not supported.
+     */
+    public resetLiveTimeline(backPaginationToken?: string | null, forwardPaginationToken?: string | null): void {
+        this.timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);
+    }
+
     private async updateThreadMetadata(): Promise<void> {
         this.updatePendingReplyCount();
 
