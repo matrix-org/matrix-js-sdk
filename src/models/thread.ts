@@ -1,5 +1,5 @@
 /*
-Copyright 2021-2022 The Matrix.org Foundation C.I.C.
+Copyright 2021 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import { RelationType } from "../@types/event";
 import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set";
-import { NotificationCountType, Room, RoomEvent } from "./room";
+import { Room, RoomEvent } from "./room";
 import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
@@ -504,17 +504,80 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         throw new Error("Unsupported function on the thread model");
     }
 
+    /**
+     * Get the ID of the event that a given user has read up to within this thread,
+     * or null if we have received no read receipt (at all) from them.
+     * @param userId - The user ID to get read receipt event ID for
+     * @param ignoreSynthesized - If true, return only receipts that have been
+     *                            sent by the server, not implicit ones generated
+     *                            by the JS SDK.
+     * @returns ID of the latest event that the given user has read, or null.
+     */
+    public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {
+        const isCurrentUser = userId === this.client.getUserId();
+        const lastReply = this.timeline.at(-1);
+        if (isCurrentUser && lastReply) {
+            // If the last activity in a thread is prior to the first threaded read receipt
+            // sent in the room (suggesting that it was sent before the user started
+            // using a client that supported threaded read receipts), we want to
+            // consider this thread as read.
+            const beforeFirstThreadedReceipt = lastReply.getTs() < this.room.getOldestThreadedReceiptTs();
+            const lastReplyId = lastReply.getId();
+            // Some unsent events do not have an ID, we do not want to consider them read
+            if (beforeFirstThreadedReceipt && lastReplyId) {
+                return lastReplyId;
+            }
+        }
+
+        const readUpToId = super.getEventReadUpTo(userId, ignoreSynthesized);
+
+        // Check whether the unthreaded read receipt for that user is more recent
+        // than the read receipt inside that thread.
+        if (lastReply) {
+            const unthreadedReceipt = this.room.getLastUnthreadedReceiptFor(userId);
+            if (!unthreadedReceipt) {
+                return readUpToId;
+            }
+
+            for (let i = this.timeline?.length - 1; i >= 0; --i) {
+                const ev = this.timeline[i];
+                // If we encounter the `readUpToId` we do not need to look further
+                // there is no "more recent" unthreaded read receipt
+                if (ev.getId() === readUpToId) return readUpToId;
+
+                // Inspecting events from most recent to oldest, we're checking
+                // whether an unthreaded read receipt is more recent that the current event.
+                // We usually prefer relying on the order of the DAG but in this scenario
+                // it is not possible and we have to rely on timestamp
+                if (ev.getTs() < unthreadedReceipt.ts) return ev.getId() ?? readUpToId;
+            }
+        }
+
+        return readUpToId;
+    }
+
+    /**
+     * Determine if the given user has read a particular event.
+     *
+     * It is invalid to call this method with an event that is not part of this thread.
+     *
+     * This is not a definitive check as it only checks the events that have been
+     * loaded client-side at the time of execution.
+     * @param userId - The user ID to check the read state of.
+     * @param eventId - The event ID to check if the user read.
+     * @returns True if the user has read the event, false otherwise.
+     */
     public hasUserReadEvent(userId: string, eventId: string): boolean {
         if (userId === this.client.getUserId()) {
-            const publicReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.Read);
-            const privateReadReceipt = this.getReadReceiptForUserId(userId, false, ReceiptType.ReadPrivate);
-            const hasUnreads = this.room.getThreadUnreadNotificationCount(this.id, NotificationCountType.Total) > 0;
-
-            if (!publicReadReceipt && !privateReadReceipt && !hasUnreads) {
-                // Consider an event read if it's part of a thread that has no
-                // read receipts and has no notifications. It is likely that it is
-                // part of a thread that was created before read receipts for threads
-                // were supported (via MSC3771)
+            // Consider an event read if it's part of a thread that is before the
+            // first threaded receipt sent in that room. It is likely that it is
+            // part of a thread that was created before MSC3771 was implemented.
+            // Or before the last unthreaded receipt for the logged in user
+            const beforeFirstThreadedReceipt =
+                (this.lastReply()?.getTs() ?? 0) < this.room.getOldestThreadedReceiptTs();
+            const unthreadedReceiptTs = this.room.getLastUnthreadedReceiptFor(userId)?.ts ?? 0;
+            const beforeLastUnthreadedReceipt = (this?.lastReply()?.getTs() ?? 0) < unthreadedReceiptTs;
+            if (beforeFirstThreadedReceipt || beforeLastUnthreadedReceipt) {
                 return true;
             }
         }
