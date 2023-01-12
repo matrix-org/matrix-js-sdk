@@ -16,6 +16,7 @@ limitations under the License.
 
 import { MatrixClient } from "./client";
 import { IEvent, MatrixEvent, MatrixEventEvent } from "./models/event";
+import { RelationType } from "./@types/event";
 
 export type EventMapper = (obj: Partial<IEvent>) => MatrixEvent;
 
@@ -53,6 +54,19 @@ export function eventMapperFor(client: MatrixClient, options: MapperOpts): Event
             event.setUnsigned({ ...event.getUnsigned(), ...plainOldJsObject.unsigned });
             // prevent doubling up re-emitters
             preventReEmit = true;
+        }
+
+        // if there is a complete edit bundled alongside the event, perform the replacement.
+        // (prior to MSC3925, events were automatically replaced on the server-side. MSC3925 proposes that that doesn't
+        // happen automatically but the server does provide us with the whole content of the edit event.)
+        const bundledEdit = event.getServerAggregatedRelation<Partial<IEvent>>(RelationType.Replace);
+        if (bundledEdit?.content) {
+            const replacement = mapper(bundledEdit);
+            // XXX: it's worth noting that the spec says we should only respect encrypted edits if, once decrypted, the
+            //   replacement has a `m.new_content` property. The problem is that we haven't yet decrypted the replacement
+            //   (it should be happening in the background), so we can't enforce this. Possibly we should for decryption
+            //   to complete, but that sounds a bit racy. For now, we just assume it's ok.
+            event.makeReplaced(replacement);
         }
 
         const thread = room?.findThreadForEvent(event);
