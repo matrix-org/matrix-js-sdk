@@ -18,7 +18,7 @@ import { Optional } from "matrix-events-sdk";
 
 /**
  * Determines if the given optional was provided a value.
- * @param s The optional to test.
+ * @param s - The optional to test.
  * @returns True if the value is defined.
  */
 export function isProvided<T>(s: Optional<T>): boolean {
@@ -27,7 +27,7 @@ export function isProvided<T>(s: Optional<T>): boolean {
 
 /**
  * Determines if the given optional string is a defined string.
- * @param s The input string.
+ * @param s - The input string.
  * @returns True if the input is a defined string.
  */
 export function isOptionalAString(s: Optional<string>): s is string {

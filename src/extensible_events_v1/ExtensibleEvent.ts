@@ -32,7 +32,7 @@ export abstract class ExtensibleEvent<TContent extends object = object> {
     /**
      * Serializes the event into a format which can be used to send the
      * event to the room.
-     * @returns {IPartialEvent<object>} The serialized event.
+     * @returns The serialized event.
      */
     public abstract serialize(): IPartialEvent<object>;
 
@@ -49,9 +49,9 @@ export abstract class ExtensibleEvent<TContent extends object = object> {
      *
      * Note that this only checks primary event types: legacy events, like
      * m.room.message, should/will fail this check.
-     * @param {ExtensibleEventType} primaryEventType The (potentially namespaced) event
+     * @param primaryEventType - The (potentially namespaced) event
      * type.
-     * @returns {boolean} True if this event *could* be represented as the
+     * @returns True if this event *could* be represented as the
      * given type.
      */
     public abstract isEquivalentTo(primaryEventType: ExtensibleEventType): boolean;

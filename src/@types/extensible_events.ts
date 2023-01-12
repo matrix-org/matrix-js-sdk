@@ -121,9 +121,9 @@ export type ExtensibleEventType = NamespacedValue<string, string> | string;
 
 /**
  * Determines if two event types are the same, including namespaces.
- * @param given The given event type. This will be compared
+ * @param given - The given event type. This will be compared
  * against the expected type.
- * @param expected The expected event type.
+ * @param expected - The expected event type.
  * @returns True if the given type matches the expected type.
  */
 export function isEventTypeSame(given: ExtensibleEventType, expected: ExtensibleEventType): boolean {

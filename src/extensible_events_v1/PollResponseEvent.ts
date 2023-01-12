@@ -52,7 +52,7 @@ export class PollResponseEvent extends ExtensibleEvent<M_POLL_RESPONSE_EVENT_CON
      * parsed here: it will be treated as a literal m.poll.response primary typed event.
      *
      * To validate the response against a poll, call `validateAgainst` after creation.
-     * @param wireFormat The event.
+     * @param wireFormat - The event.
      */
     public constructor(wireFormat: IPartialEvent<M_POLL_RESPONSE_EVENT_CONTENT>) {
         super(wireFormat);
@@ -69,9 +69,9 @@ export class PollResponseEvent extends ExtensibleEvent<M_POLL_RESPONSE_EVENT_CON
     /**
      * Validates the poll response using the poll start event as a frame of reference. This
      * is used to determine if the vote is spoiled, whether the answers are valid, etc.
-     * @param poll The poll start event.
+     * @param poll - The poll start event.
      */
-    public validateAgainst(poll: PollStartEvent | null) {
+    public validateAgainst(poll: PollStartEvent | null): void {
         const response = M_POLL_RESPONSE.findIn<M_POLL_RESPONSE_SUBTYPE>(this.wireContent);
         if (!Array.isArray(response?.answers)) {
             this.internalSpoiled = true;
@@ -122,8 +122,8 @@ export class PollResponseEvent extends ExtensibleEvent<M_POLL_RESPONSE_EVENT_CON
     /**
      * Creates a new PollResponseEvent from a set of answers. To spoil the vote, pass an empty
      * answers array.
-     * @param answers The user's answers. Should be valid from a poll's answer IDs.
-     * @param pollEventId The poll start event ID.
+     * @param answers - The user's answers. Should be valid from a poll's answer IDs.
+     * @param pollEventId - The poll start event ID.
      * @returns The representative poll response event.
      */
     public static from(answers: string[], pollEventId: string): PollResponseEvent {

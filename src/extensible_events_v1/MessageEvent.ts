@@ -60,7 +60,7 @@ export class MessageEvent extends ExtensibleEvent<M_MESSAGE_EVENT_CONTENT> {
      * Creates a new MessageEvent from a pure format. Note that the event is
      * *not* parsed here: it will be treated as a literal m.message primary
      * typed event.
-     * @param wireFormat The event.
+     * @param wireFormat - The event.
      */
     public constructor(wireFormat: IPartialEvent<M_MESSAGE_EVENT_CONTENT>) {
         super(wireFormat);
@@ -129,8 +129,8 @@ export class MessageEvent extends ExtensibleEvent<M_MESSAGE_EVENT_CONTENT> {
 
     /**
      * Creates a new MessageEvent from text and HTML.
-     * @param text The text.
-     * @param html Optional HTML.
+     * @param text - The text.
+     * @param html - Optional HTML.
      * @returns The representative message event.
      */
     public static from(text: string, html?: string): MessageEvent {

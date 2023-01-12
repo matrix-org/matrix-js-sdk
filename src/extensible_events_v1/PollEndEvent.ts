@@ -43,7 +43,7 @@ export class PollEndEvent extends ExtensibleEvent<M_POLL_END_EVENT_CONTENT> {
     /**
      * Creates a new PollEndEvent from a pure format. Note that the event is *not*
      * parsed here: it will be treated as a literal m.poll.response primary typed event.
-     * @param wireFormat The event.
+     * @param wireFormat - The event.
      */
     public constructor(wireFormat: IPartialEvent<M_POLL_END_EVENT_CONTENT>) {
         super(wireFormat);
@@ -77,8 +77,8 @@ export class PollEndEvent extends ExtensibleEvent<M_POLL_END_EVENT_CONTENT> {
 
     /**
      * Creates a new PollEndEvent from a poll event ID.
-     * @param pollEventId The poll start event ID.
-     * @param message A closing message, typically revealing the top answer.
+     * @param pollEventId - The poll start event ID.
+     * @param message - A closing message, typically revealing the top answer.
      * @returns The representative poll closure event.
      */
     public static from(pollEventId: string, message: string): PollEndEvent {

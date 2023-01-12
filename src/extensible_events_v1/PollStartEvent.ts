@@ -63,8 +63,8 @@ export class PollAnswerSubevent extends MessageEvent {
 
     /**
      * Creates a new PollAnswerSubevent from ID and text.
-     * @param id The answer ID (unique within the poll).
-     * @param text The text.
+     * @param id - The answer ID (unique within the poll).
+     * @param text - The text.
      * @returns The representative answer.
      */
     public static from(id: string, text: string): PollAnswerSubevent {
@@ -114,7 +114,7 @@ export class PollStartEvent extends ExtensibleEvent<M_POLL_START_EVENT_CONTENT> 
     /**
      * Creates a new PollStartEvent from a pure format. Note that the event is *not*
      * parsed here: it will be treated as a literal m.poll.start primary typed event.
-     * @param wireFormat The event.
+     * @param wireFormat - The event.
      */
     public constructor(wireFormat: IPartialEvent<M_POLL_START_EVENT_CONTENT>) {
         super(wireFormat);
@@ -174,10 +174,10 @@ export class PollStartEvent extends ExtensibleEvent<M_POLL_START_EVENT_CONTENT> 
 
     /**
      * Creates a new PollStartEvent from question, answers, and metadata.
-     * @param question The question to ask.
-     * @param answers The answers. Should be unique within each other.
-     * @param kind The kind of poll.
-     * @param maxSelections The maximum number of selections. Must be 1 or higher.
+     * @param question - The question to ask.
+     * @param answers - The answers. Should be unique within each other.
+     * @param kind - The kind of poll.
+     * @param maxSelections - The maximum number of selections. Must be 1 or higher.
      * @returns The representative poll start event.
      */
     public static from(
@@ -202,6 +202,6 @@ export class PollStartEvent extends ExtensibleEvent<M_POLL_START_EVENT_CONTENT> 
 }
 
 const LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-function makeId() {
+function makeId(): string {
     return [...Array(16)].map(() => LETTERS.charAt(Math.floor(Math.random() * LETTERS.length))).join("");
 }
