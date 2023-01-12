@@ -1690,12 +1690,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         resolve(0);
                     };
                     req.onerror = (e): void => {
-                        logger.error(`Failed to remove IndexedDB instance ${dbname}: ${e}`);
-                        reject(new Error(`Error clearing storage: ${e}`));
+                        // In private browsing, Firefox has a global.indexedDB, but attempts to delete an indexeddb
+                        // (even a non-existent one) fail with "DOMException: A mutation operation was attempted on a
+                        // database that did not allow mutations."
+                        //
+                        // it seems like the only thing we can really do is ignore the error.
+                        logger.warn(`Failed to remove IndexedDB instance ${dbname}:`, e);
+                        resolve(0);
                     };
                     req.onblocked = (e): void => {
                         logger.info(`cannot yet remove IndexedDB instance ${dbname}`);
-                        //reject(new Error(`Error clearing storage: ${e}`));
                     };
                 });
                 await prom;
