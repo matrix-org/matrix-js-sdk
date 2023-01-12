@@ -153,6 +153,8 @@ export class OlmDevice {
     // Used by olm to serialise prekey message decryptions
     public olmPrekeyPromise: Promise<any> = Promise.resolve(); // set by consumers
 
+    private sessionPickles = new Map<string, string>();
+
     public constructor(private readonly cryptoStore: CryptoStore) {}
 
     /**
@@ -333,6 +335,12 @@ export class OlmDevice {
         func: (unpickledSessionInfo: IUnpickledSessionInfo) => void,
     ): void {
         this.cryptoStore.getEndToEndSession(deviceKey, sessionId, txn, (sessionInfo: ISessionInfo | null) => {
+            const memoryPickle = this.sessionPickles.get(deviceKey + "/" + sessionId);
+            if (memoryPickle && memoryPickle != sessionInfo?.session) {
+                logger.error(
+                    `SESSION HAS BEEN MODIFIED SINCE LAST WRITE! Session ID ${sessionId} with device key ${deviceKey} expected to be ${memoryPickle} but got ${sessionInfo?.session}`,
+                );
+            }
             this.unpickleSession(sessionInfo!, func);
         });
     }
@@ -372,6 +380,7 @@ export class OlmDevice {
             session: sessionInfo.session.pickle(this.pickleKey),
         });
         this.cryptoStore.storeEndToEndSession(deviceKey, sessionId, pickledSessionInfo, txn);
+        this.sessionPickles.set(deviceKey + "/" + sessionId, pickledSessionInfo.session);
     }
 
     /**
@@ -520,6 +529,17 @@ export class OlmDevice {
                             // this session
                             lastReceivedMessageTs: Date.now(),
                         };
+
+                        const sessionDesc = sessionInfo.session.describe();
+                        logger.log(
+                            "created outbound session and storing: Olm Session ID " +
+                                newSessionId +
+                                " with " +
+                                theirIdentityKey +
+                                ": " +
+                                sessionDesc,
+                        );
+
                         this.saveSession(theirIdentityKey, sessionInfo, txn);
                     } finally {
                         session.free();
@@ -572,6 +592,17 @@ export class OlmDevice {
                             // to now
                             lastReceivedMessageTs: Date.now(),
                         };
+
+                        const sessionDesc = sessionInfo.session.describe();
+                        logger.log(
+                            "created inbound session and storing: Olm Session ID " +
+                                sessionInfo.sessionId +
+                                " with " +
+                                theirDeviceIdentityKey +
+                                ": " +
+                                sessionDesc,
+                        );
+
                         this.saveSession(theirDeviceIdentityKey, sessionInfo, txn);
 
                         result = {
@@ -748,7 +779,7 @@ export class OlmDevice {
                 this.getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo) => {
                     const sessionDesc = sessionInfo.session.describe();
                     logger.log(
-                        "encryptMessage: Olm Session ID " +
+                        "before encryptMessage: Olm Session ID " +
                             sessionId +
                             " to " +
                             theirDeviceIdentityKey +
@@ -756,6 +787,17 @@ export class OlmDevice {
                             sessionDesc,
                     );
                     res = sessionInfo.session.encrypt(payloadString);
+
+                    const sessionDescAfter = sessionInfo.session.describe();
+                    logger.log(
+                        "after encryptMessage: Olm Session ID " +
+                            sessionId +
+                            " with " +
+                            theirDeviceIdentityKey +
+                            ": " +
+                            sessionDescAfter,
+                    );
+
                     this.saveSession(theirDeviceIdentityKey, sessionInfo, txn);
                 });
             },
@@ -789,7 +831,7 @@ export class OlmDevice {
                 this.getSession(theirDeviceIdentityKey, sessionId, txn, (sessionInfo: IUnpickledSessionInfo) => {
                     const sessionDesc = sessionInfo.session.describe();
                     logger.log(
-                        "decryptMessage: Olm Session ID " +
+                        "before decryptMessage: Olm Session ID " +
                             sessionId +
                             " from " +
                             theirDeviceIdentityKey +
@@ -798,6 +840,17 @@ export class OlmDevice {
                     );
                     payloadString = sessionInfo.session.decrypt(messageType, ciphertext);
                     sessionInfo.lastReceivedMessageTs = Date.now();
+
+                    const sessionDescAfter = sessionInfo.session.describe();
+                    logger.log(
+                        "after decryptMessage: Olm Session ID " +
+                            sessionId +
+                            " with " +
+                            theirDeviceIdentityKey +
+                            ": " +
+                            sessionDescAfter,
+                    );
+
                     this.saveSession(theirDeviceIdentityKey, sessionInfo, txn);
                 });
             },
