@@ -256,7 +256,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.setEventMetadata(event);
 
         const lastReply = this.lastReply();
-        const isNewestReply = !lastReply || event.localTimestamp > lastReply!.localTimestamp;
+        const isNewestReply = !lastReply || event.localTimestamp >= lastReply!.localTimestamp;
 
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
