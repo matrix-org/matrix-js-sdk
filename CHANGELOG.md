@@ -1,3 +1,9 @@
+Changes in [23.1.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0-rc.2) (2023-01-12)
+============================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix browser entrypoint ([\#3051](https://github.com/matrix-org/matrix-js-sdk/pull/3051)). Fixes #3013.
+
 Changes in [23.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0-rc.1) (2023-01-11)
 ============================================================================================================
 
