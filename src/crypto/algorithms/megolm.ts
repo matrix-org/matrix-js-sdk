@@ -1613,67 +1613,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
         const senderKey = content.sender_key;
 
         if (content.code === "m.no_olm") {
-            const sender = event.getSender()!;
-            this.prefixedLogger.warn(`${sender}:${senderKey} was unable to establish an olm session with us`);
-            // if the sender says that they haven't been able to establish an olm
-            // session, let's proactively establish one
-
-            // Note: after we record that the olm session has had a problem, we
-            // trigger retrying decryption for all the messages from the sender's
-            // key, so that we can update the error message to indicate the olm
-            // session problem.
-
-            if (await this.olmDevice.getSessionIdForDevice(senderKey)) {
-                // a session has already been established, so we don't need to
-                // create a new one.
-                this.prefixedLogger.debug("New session already created.  Not creating a new one.");
-                await this.olmDevice.recordSessionProblem(senderKey, "no_olm", true);
-                this.retryDecryptionFromSender(senderKey);
-                return;
-            }
-            let device = this.crypto.deviceList.getDeviceByIdentityKey(content.algorithm, senderKey);
-            if (!device) {
-                // if we don't know about the device, fetch the user's devices again
-                // and retry before giving up
-                await this.crypto.downloadKeys([sender], false);
-                device = this.crypto.deviceList.getDeviceByIdentityKey(content.algorithm, senderKey);
-                if (!device) {
-                    this.prefixedLogger.info(
-                        "Couldn't find device for identity key " + senderKey + ": not establishing session",
-                    );
-                    await this.olmDevice.recordSessionProblem(senderKey, "no_olm", false);
-                    this.retryDecryptionFromSender(senderKey);
-                    return;
-                }
-            }
-
-            // XXX: switch this to use encryptAndSendToDevices() rather than duplicating it?
-
-            await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, { [sender]: [device] }, false);
-            const encryptedContent: IEncryptedContent = {
-                algorithm: olmlib.OLM_ALGORITHM,
-                sender_key: this.olmDevice.deviceCurve25519Key!,
-                ciphertext: {},
-                [ToDeviceMessageId]: uuidv4(),
-            };
-            await olmlib.encryptMessageForDevice(
-                encryptedContent.ciphertext,
-                this.userId,
-                undefined,
-                this.olmDevice,
-                sender,
-                device,
-                { type: "m.dummy" },
-            );
-
-            await this.olmDevice.recordSessionProblem(senderKey, "no_olm", true);
-            this.retryDecryptionFromSender(senderKey);
-
-            await this.baseApis.sendToDevice("m.room.encrypted", {
-                [sender]: {
-                    [device.deviceId]: encryptedContent,
-                },
-            });
+            await this.onNoOlmWithheldEvent(event);
         } else {
             await this.olmDevice.addInboundGroupSessionWithheld(
                 content.room_id,
@@ -1683,6 +1623,78 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 content.reason,
             );
         }
+
+        // Having recorded the problem, retry decryption on any affected messages.
+        // It's unlikely we'll be able to decrypt sucessfully now, but this will
+        // update the error message.
+        //
+        if (content.session_id) {
+            await this.retryDecryption(senderKey, content.session_id);
+        } else {
+            // no_olm messages aren't specific to a given megolm session, so
+            // we trigger retrying decryption for all the messages from the sender's
+            // key, so that we can update the error message to indicate the olm
+            // session problem.
+            await this.retryDecryptionFromSender(senderKey);
+        }
+    }
+
+    private async onNoOlmWithheldEvent(event: MatrixEvent): Promise<void> {
+        const content = event.getContent();
+        const senderKey = content.sender_key;
+        const sender = event.getSender()!;
+        this.prefixedLogger.warn(`${sender}:${senderKey} was unable to establish an olm session with us`);
+        // if the sender says that they haven't been able to establish an olm
+        // session, let's proactively establish one
+
+        if (await this.olmDevice.getSessionIdForDevice(senderKey)) {
+            // a session has already been established, so we don't need to
+            // create a new one.
+            this.prefixedLogger.debug("New session already created.  Not creating a new one.");
+            await this.olmDevice.recordSessionProblem(senderKey, "no_olm", true);
+            return;
+        }
+        let device = this.crypto.deviceList.getDeviceByIdentityKey(content.algorithm, senderKey);
+        if (!device) {
+            // if we don't know about the device, fetch the user's devices again
+            // and retry before giving up
+            await this.crypto.downloadKeys([sender], false);
+            device = this.crypto.deviceList.getDeviceByIdentityKey(content.algorithm, senderKey);
+            if (!device) {
+                this.prefixedLogger.info(
+                    "Couldn't find device for identity key " + senderKey + ": not establishing session",
+                );
+                await this.olmDevice.recordSessionProblem(senderKey, "no_olm", false);
+                return;
+            }
+        }
+
+        // XXX: switch this to use encryptAndSendToDevices() rather than duplicating it?
+
+        await olmlib.ensureOlmSessionsForDevices(this.olmDevice, this.baseApis, { [sender]: [device] }, false);
+        const encryptedContent: IEncryptedContent = {
+            algorithm: olmlib.OLM_ALGORITHM,
+            sender_key: this.olmDevice.deviceCurve25519Key!,
+            ciphertext: {},
+            [ToDeviceMessageId]: uuidv4(),
+        };
+        await olmlib.encryptMessageForDevice(
+            encryptedContent.ciphertext,
+            this.userId,
+            undefined,
+            this.olmDevice,
+            sender,
+            device,
+            { type: "m.dummy" },
+        );
+
+        await this.olmDevice.recordSessionProblem(senderKey, "no_olm", true);
+
+        await this.baseApis.sendToDevice("m.room.encrypted", {
+            [sender]: {
+                [device.deviceId]: encryptedContent,
+            },
+        });
     }
 
     public hasKeysForKeyRequest(keyRequest: IncomingRoomKeyRequest): Promise<boolean> {
