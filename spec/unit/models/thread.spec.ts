@@ -20,7 +20,7 @@ import { Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../../src/models/t
 import { mkThread } from "../../test-utils/thread";
 import { TestClient } from "../../TestClient";
 import { emitPromise, mkMessage, mock } from "../../test-utils/test-utils";
-import { EventStatus, MatrixEvent } from "../../../src";
+import { Direction, EventStatus, MatrixEvent } from "../../../src";
 import { ReceiptType } from "../../../src/@types/read_receipts";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 import { ReEmitter } from "../../../src/ReEmitter";
@@ -281,6 +281,108 @@ describe("Thread", () => {
 
             // Nothing has been read, this thread is after the first threaded receipt...
             expect(thread2.getEventReadUpTo(myUserId)).toBe(null);
+        });
+    });
+
+    describe("resetLiveTimeline", () => {
+        it("correctly resets the live timeline", async () => {
+            const myUserId = "@bob:example.org";
+            const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
+                timelineSupport: false,
+            });
+            const client = testClient.client;
+            const room = new Room("123", client, myUserId, {
+                pendingEventOrdering: PendingEventOrdering.Detached,
+            });
+
+            jest.spyOn(client, "getRoom").mockReturnValue(room);
+
+            const { thread } = mkThread({
+                room,
+                client,
+                authorId: myUserId,
+                participantUserIds: ["@alice:example.org"],
+                length: 3,
+            });
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread.length).toBe(2);
+
+            jest.spyOn(client, "createMessagesRequest").mockImplementation((_, token) =>
+                Promise.resolve({
+                    chunk: [],
+                    start: `${token}-new`,
+                    end: `${token}-new`,
+                }),
+            );
+
+            function timelines(): [string | null, string | null][] {
+                return thread.timelineSet
+                    .getTimelines()
+                    .map((it) => [it.getPaginationToken(Direction.Backward), it.getPaginationToken(Direction.Forward)]);
+            }
+
+            expect(timelines()).toEqual([[null, null]]);
+            const promise = thread.resetLiveTimeline("b1", "f1");
+            expect(timelines()).toEqual([
+                [null, "f1"],
+                ["b1", null],
+            ]);
+            await promise;
+            expect(timelines()).toEqual([
+                [null, "f1-new"],
+                ["b1-new", null],
+            ]);
+        });
+
+        it("does not modify changed tokens", async () => {
+            const myUserId = "@bob:example.org";
+            const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
+                timelineSupport: false,
+            });
+            const client = testClient.client;
+            const room = new Room("123", client, myUserId, {
+                pendingEventOrdering: PendingEventOrdering.Detached,
+            });
+
+            jest.spyOn(client, "getRoom").mockReturnValue(room);
+
+            const { thread } = mkThread({
+                room,
+                client,
+                authorId: myUserId,
+                participantUserIds: ["@alice:example.org"],
+                length: 3,
+            });
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread.length).toBe(2);
+
+            jest.spyOn(client, "createMessagesRequest").mockImplementation((_, token) =>
+                Promise.resolve({
+                    chunk: [],
+                    start: `${token}-new`,
+                    end: `${token}-new`,
+                }),
+            );
+
+            function timelines(): [string | null, string | null][] {
+                return thread.timelineSet
+                    .getTimelines()
+                    .map((it) => [it.getPaginationToken(Direction.Backward), it.getPaginationToken(Direction.Forward)]);
+            }
+
+            expect(timelines()).toEqual([[null, null]]);
+            const promise = thread.resetLiveTimeline("b1", "f1");
+            expect(timelines()).toEqual([
+                [null, "f1"],
+                ["b1", null],
+            ]);
+            thread.timelineSet.getTimelines()[0].setPaginationToken("f2", Direction.Forward);
+            thread.timelineSet.getTimelines()[1].setPaginationToken("b2", Direction.Backward);
+            await promise;
+            expect(timelines()).toEqual([
+                [null, "f2"],
+                ["b2", null],
+            ]);
         });
     });
 });
