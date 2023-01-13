@@ -2062,12 +2062,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param force - whether or not to force the request to be sent immediately
      */
     public subscribeToFocus(force = false): void {
-        // TODO: Can we do throttle this better?
+        // TODO: Can we throttle this better?
         if (force) {
             this.sendSubscriptionFocusEvent();
             return;
         }
 
+        clearTimeout(this.subscribeToFocusTimeout);
         this.subscribeToFocusTimeout = setTimeout(() => {
             this.sendSubscriptionFocusEvent();
         }, SUBSCRIBE_TO_FOCUS_TIMEOUT);
@@ -2077,8 +2078,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * This method should only ever be called by MatrixCall::subscribeToFocus()!
      */
     private sendSubscriptionFocusEvent(): void {
-        clearTimeout(this.subscribeToFocusTimeout);
-
         const subscribe: FocusTrackDescription[] = [];
         const unsubscribe: FocusTrackDescription[] = [];
         for (const { feedId, tracksMetadata, isVisible, width, height } of this.getRemoteFeeds()) {
