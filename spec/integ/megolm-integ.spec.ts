@@ -1702,4 +1702,79 @@ describe("megolm", () => {
             await Promise.all([sendPromise, megolmMessagePromise, aliceTestClient.httpBackend.flush("/keys/query", 1)]);
         });
     });
+
+    describe("m.room_key.withheld handling", () => {
+        // TODO: there are a bunch more tests for this sort of thing in spec/unit/crypto/algorithms/megolm.spec.ts.
+        //   They should be converted to integ tests and moved.
+
+        it("does not block decryption on an 'm.unavailable' report", async function () {
+            await aliceTestClient.start();
+
+            // there may be a key downloads for alice
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, {});
+            aliceTestClient.httpBackend.flush("/keys/query", 1, 5000);
+
+            // encrypt a message with a group session.
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+            const messageEncryptedEvent = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
+
+            // Alice gets the room message, but not the key
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: 1,
+                rooms: {
+                    join: { [ROOM_ID]: { timeline: { events: [messageEncryptedEvent] } } },
+                },
+            });
+            await aliceTestClient.flushSync();
+
+            // alice will (eventually) send a room-key request
+            aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key_request/").respond(200, {});
+            await aliceTestClient.httpBackend.flush("/sendToDevice/m.room_key_request/", 1, 1000);
+
+            // at this point, the message should be a decryption failure
+            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+            const event = room.getLiveTimeline().getEvents()[0];
+            expect(event.isDecryptionFailure()).toBeTruthy();
+
+            // we want to wait for the message to be updated, so create a promise for it
+            const retryPromise = new Promise((resolve) => {
+                event.once(MatrixEventEvent.Decrypted, (ev) => {
+                    resolve(ev);
+                });
+            });
+
+            // alice gets back a room-key-withheld notification
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: 2,
+                to_device: {
+                    events: [
+                        {
+                            type: "m.room_key.withheld",
+                            sender: "@bob:example.com",
+                            content: {
+                                algorithm: "m.megolm.v1.aes-sha2",
+                                room_id: ROOM_ID,
+                                session_id: groupSession.session_id(),
+                                sender_key: testSenderKey,
+                                code: "m.unavailable",
+                                reason: "",
+                            },
+                        },
+                    ],
+                },
+            });
+            await aliceTestClient.flushSync();
+
+            // the withheld notification should trigger a retry; wait for it
+            await retryPromise;
+
+            // finally: the message should still be a regular decryption failure, not a withheld notification.
+            expect(event.getContent().body).not.toContain("withheld");
+        });
+    });
 });
