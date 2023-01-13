@@ -32,7 +32,7 @@ import {
 } from "../../src/@types/event";
 import { MEGOLM_ALGORITHM } from "../../src/crypto/olmlib";
 import { Crypto } from "../../src/crypto";
-import { EventStatus, MatrixEvent } from "../../src/models/event";
+import { EventStatus, IContent, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
@@ -2131,6 +2131,71 @@ describe("MatrixClient", function () {
             });
 
             expect(client.getUseE2eForGroupCall()).toBe(false);
+        });
+    });
+
+    describe("sendMessage", () => {
+        describe("roomId,content,txnId signature", () => {
+            it("should translate these values to the correct request", async () => {
+                const roomId = "!room:example.org";
+                const content: IContent = {hello: "world"};
+                const txnId = "m.1234";
+                const response = {event_id: "$example"};
+
+                const sendSpy = jest.spyOn(client, "sendEvent").mockResolvedValue(response);
+
+                const result = await client.sendMessage(roomId, content, txnId);
+                expect(result).toEqual(response);
+                expect(sendSpy).toHaveBeenCalledWith(roomId, null, "m.room.message", content, txnId);
+            });
+        });
+
+        describe("roomId,threadId,content,txnId signature", () => {
+            it("should translate these values to the correct request", async () => {
+                const roomId = "!room:example.org";
+                const threadId = "$thread";
+                const content: IContent = {hello: "world"};
+                const txnId = "m.1234";
+                const response = {event_id: "$example"};
+
+                const sendSpy = jest.spyOn(client, "sendEvent").mockResolvedValue(response);
+
+                const result = await client.sendMessage(roomId, threadId, content, txnId);
+                expect(result).toEqual(response);
+                expect(sendSpy).toHaveBeenCalledWith(roomId, threadId, "m.room.message", content, txnId);
+            });
+        });
+
+        it.each(["m.text", "m.emote"])("should override %s msgtype events", async (msgtype) => {
+            const roomId = "!room:example.org";
+            const content: IContent = {
+                msgtype: msgtype,
+                body: "**test**",
+                format: "org.matrix.custom.html",
+                formatted_body: "<b>test</b>",
+            };
+            const expectedContent: IContent = {
+                "org.matrix.msc1767.markup": [
+                    {body: "**test**"},
+                    {body: "<b>test</b>", mimetype: "text/html"},
+                ],
+            };
+            const expectedEventType = msgtype === "m.emote" ? "org.matrix.msc1767.emote" : "org.matrix.msc1767.message";
+            const txnId = "m.1234";
+            const response = {event_id: "$example"};
+
+            client.getRoom = (rid) => {
+                if (rid === roomId) {
+                    // XXX: This is a really bad mock.
+                    return {unstableRequiresExtensibleEvents: () => true} as unknown as Room;
+                }
+                return null;
+            }
+            const sendSpy = jest.spyOn(client, "sendEvent").mockResolvedValue(response);
+
+            const result = await client.sendMessage(roomId, content, txnId);
+            expect(result).toEqual(response);
+            expect(sendSpy).toHaveBeenCalledWith(roomId, null, expectedEventType, expectedContent, txnId);
         });
     });
 

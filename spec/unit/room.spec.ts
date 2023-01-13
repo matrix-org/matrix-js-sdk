@@ -193,6 +193,22 @@ describe("Room", function () {
         });
     });
 
+    describe("unstableRequiresExtensibleEvents", () => {
+        it("should return true for MSC1767 room version prefixes", () => {
+            room.getVersion = () => "org.matrix.msc1767.10";
+            expect(room.unstableRequiresExtensibleEvents()).toBe(true);
+
+            room.getVersion = () => "org.matrix.msc1767.9";
+            expect(room.unstableRequiresExtensibleEvents()).toBe(true);
+
+            room.getVersion = () => "not.extensible.10";
+            expect(room.unstableRequiresExtensibleEvents()).toBe(false);
+
+            room.getVersion = () => "10";
+            expect(room.unstableRequiresExtensibleEvents()).toBe(false);
+        });
+    });
+
     describe("getAvatarUrl", function () {
         const hsUrl = "https://my.home.server";
 
