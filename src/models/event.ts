@@ -19,7 +19,7 @@ limitations under the License.
  * the public classes.
  */
 
-import { ExtensibleEvent, ExtensibleEvents, Optional } from "matrix-events-sdk";
+import { EventParser, Optional, RoomEvent } from "matrix-events-sdk";
 
 import type { IEventDecryptionResult } from "../@types/crypto";
 import { logger } from "../logger";
@@ -212,6 +212,12 @@ export type MatrixEventHandlerMap = {
 } & Pick<ThreadEventHandlerMap, ThreadEvent.Update>;
 
 export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap> {
+    /**
+     * The default shared event parser for Extensible Events. To register custom event types or content blocks
+     * with the parser, do so here before constructing a new MatrixEvent object (implicitly or explicitly).
+     */
+    public static readonly defaultExtensibleEventParser = new EventParser();
+
     private pushActions: IActionsObject | null = null;
     private _replacingEvent: MatrixEvent | null = null;
     private _localRedactionEvent: MatrixEvent | null = null;
@@ -228,7 +234,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     // addition to a falsy cached event value. We check the flag later on in
     // a public getter to decide if the cache is valid.
     private _hasCachedExtEv = false;
-    private _cachedExtEv: Optional<ExtensibleEvent> = undefined;
+    private _cachedExtEv: Optional<RoomEvent> = undefined;
 
     /* curve25519 key which we believe belongs to the sender of the event. See
      * getSenderKey()
@@ -334,8 +340,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * this property</b> directly unless you absolutely have to. Prefer the getter
      * methods defined on this class. Using the getter methods shields your app
      * from changes to event JSON between Matrix versions.
+     * @param extensibleEventParser - The event parser to use when attempting to
+     * handle this event as an extensible event. <b>This field is experimental
+     * and unstable - it may be removed without warning at any time.</b> Defaults
+     * to the static parser from MatrixEvent.
      */
-    public constructor(public event: Partial<IEvent> = {}) {
+    public constructor(
+        public event: Partial<IEvent> = {},
+        private extensibleEventParser: EventParser = MatrixEvent.defaultExtensibleEventParser,
+    ) {
         super();
 
         // intern the values of matrix events to force share strings and reduce the
@@ -371,9 +384,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * @deprecated Use stable functions where possible.
      */
-    public get unstableExtensibleEvent(): Optional<ExtensibleEvent> {
+    public get unstableExtensibleEvent(): Optional<RoomEvent> {
         if (!this._hasCachedExtEv) {
-            this._cachedExtEv = ExtensibleEvents.parse(this.getEffectiveEvent());
+            const effectiveEvent = this.getEffectiveEvent();
+            this._cachedExtEv = this.extensibleEventParser.parse({
+                ...effectiveEvent,
+                // XXX: This case should never happen, but MatrixEvent in the js-sdk
+                // covers room-less events, unlike the events-sdk.
+                room_id: effectiveEvent.room_id ?? "!unknown:localhost",
+            });
         }
         return this._cachedExtEv;
     }
