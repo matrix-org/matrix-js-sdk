@@ -375,7 +375,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly relations = new RelationsContainer(this.client, this);
 
     /**
-     * @experimental
+     * A collection of events known by the client
+     * This is not a comprehensive list of the threads that exist in this room
      */
     private threads = new Map<string, Thread>();
     public lastThread?: Thread;
@@ -475,7 +476,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return this.threadTimelineSetsPromise;
         }
 
-        if (this.client?.supportsExperimentalThreads()) {
+        if (this.client?.supportsThreads()) {
             try {
                 this.threadTimelineSetsPromise = Promise.all([
                     this.createThreadTimelineSet(),
@@ -1319,7 +1320,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Get one of the notification counts for a thread
      * @param threadId - the root event ID
      * @param type - The type of notification count to get. default: 'total'
@@ -1331,7 +1331,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Checks if the current room has unread thread notifications
      * @returns
      */
@@ -1345,7 +1344,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Swet one of the notification count for a thread
      * @param threadId - the root event ID
      * @param type - The type of notification count to get. default: 'total'
@@ -1366,7 +1364,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * @returns the notification count type for all the threads in the room
      */
     public get threadsAggregateNotificationType(): NotificationCountType | null {
@@ -1382,7 +1379,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Resets the thread notifications for this room
      */
     public resetThreadUnreadNotificationCount(notificationsToKeep?: string[]): void {
@@ -1542,14 +1538,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
+     * Get the instance of the thread associated with the current event
+     * @param eventId - the ID of the current event
+     * @returns a thread instance if known
      */
     public getThread(eventId: string): Thread | null {
         return this.threads.get(eventId) ?? null;
     }
 
     /**
-     * @experimental
+     * Get all the known threads in the room
      */
     public getThreads(): Thread[] {
         return Array.from(this.threads.values());
@@ -1816,7 +1814,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Without server support that means fetching as much at once as the server allows us to.
      */
     public async fetchRoomThreads(): Promise<void> {
-        if (this.threadsReady || !this.client.supportsExperimentalThreads()) {
+        if (this.threadsReady || !this.client.supportsThreads()) {
             return;
         }
 
@@ -1961,7 +1959,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (!this.client?.supportsExperimentalThreads()) {
+        if (!this.client?.supportsThreads()) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2030,7 +2028,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Adds events to a thread's timeline. Will fire "Thread.update"
-     * @experimental
      */
     public processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(this.applyRedaction);
@@ -2659,7 +2656,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
-        if (this.client.supportsExperimentalThreads()) {
+        if (this.client.supportsThreads()) {
             const threadRoots = this.findThreadRoots(events);
             return events.reduce(
                 (memo, event: MatrixEvent) => {

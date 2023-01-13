@@ -69,9 +69,6 @@ export function determineFeatureSupport(stable: boolean, unstable: boolean): Fea
     }
 }
 
-/**
- * @experimental
- */
 export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     public static hasServerSideSupport = FeatureSupport.None;
     public static hasServerSideListSupport = FeatureSupport.None;

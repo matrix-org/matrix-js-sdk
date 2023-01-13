@@ -1457,8 +1457,8 @@ describe("MatrixClient", function () {
 
     describe("threads", () => {
         it("partitions root events to room timeline and thread timeline", () => {
-            const supportsExperimentalThreads = client.supportsExperimentalThreads;
-            client.supportsExperimentalThreads = () => true;
+            const supportsThreads = client.supportsThreads;
+            client.supportsThreads = () => true;
             const room = new Room("!room1:matrix.org", client, userId);
 
             const rootEvent = new MatrixEvent({
@@ -1487,7 +1487,7 @@ describe("MatrixClient", function () {
             expect(threadEvents).toHaveLength(1);
 
             // Restore method
-            client.supportsExperimentalThreads = supportsExperimentalThreads;
+            client.supportsThreads = supportsThreads;
         });
     });
 

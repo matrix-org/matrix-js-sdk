@@ -1622,7 +1622,7 @@ describe("Room", function () {
     describe("addPendingEvent", function () {
         it("should add pending events to the pendingEventList if " + "pendingEventOrdering == 'detached'", function () {
             const client = new TestClient("@alice:example.com", "alicedevice").client;
-            client.supportsExperimentalThreads = () => true;
+            client.supportsThreads = () => true;
             const room = new Room(roomId, client, userA, {
                 pendingEventOrdering: PendingEventOrdering.Detached,
             });
@@ -2468,7 +2468,7 @@ describe("Room", function () {
         });
 
         it("Edits update the lastReply event", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
             const randomMessage = mkMessage();
@@ -2539,7 +2539,7 @@ describe("Room", function () {
         });
 
         it("Redactions to thread responses decrement the length", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
             const threadRoot = mkMessage();
@@ -2606,7 +2606,7 @@ describe("Room", function () {
         });
 
         it("Redactions to reactions in threads do not decrement the length", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
             const threadRoot = mkMessage();
@@ -2646,7 +2646,7 @@ describe("Room", function () {
         });
 
         it("should not decrement the length when the thread root is redacted", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
             const threadRoot = mkMessage();
@@ -2687,7 +2687,7 @@ describe("Room", function () {
         });
 
         it("Redacting the lastEvent finds a new lastEvent", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
 
@@ -2794,7 +2794,7 @@ describe("Room", function () {
 
     describe("eventShouldLiveIn", () => {
         const client = new TestClient(userA).client;
-        client.supportsExperimentalThreads = () => true;
+        client.supportsThreads = () => true;
         Thread.setServerSideSupport(FeatureSupport.Stable);
         const room = new Room(roomId, client, userA);
 
@@ -3233,7 +3233,7 @@ describe("Room", function () {
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
-                supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+                supportsThreads: jest.fn().mockReturnValue(true),
             });
         });
 
