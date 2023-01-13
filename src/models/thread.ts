@@ -369,8 +369,43 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * timeline which would otherwise be unable to paginate forwards without this token).
      * Removing just the old live timeline whilst preserving previous ones is not supported.
      */
-    public resetLiveTimeline(backPaginationToken?: string | null, forwardPaginationToken?: string | null): void {
+    public async resetLiveTimeline(backPaginationToken?: string | null, forwardPaginationToken?: string | null): Promise<void> {
+        const oldLive = this.liveTimeline;
         this.timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);
+        const newLive = this.liveTimeline;
+
+        // FIXME: Remove the following as soon as https://github.com/matrix-org/synapse/issues/14830 is resolved.
+        //
+        // The pagination API for thread timelines currently can't handle the type of pagination tokens returned by sync
+        //
+        // To make this work anyway, we'll have to transform them into one of the types that the API can handle.
+        // One option is passing the tokens to /messages, which can handle sync tokens, and returns the right format.
+        // /messages does not return new tokens on requests with a limit of 0.
+        // This means our timelines might overlap a slight bit, but that's not an issue, as we deduplicate messages
+        // anyway.
+
+        let newBackward: string | undefined;
+        let oldForward: string | undefined;
+        if (backPaginationToken) {
+            const res = await this.client.createMessagesRequest(
+                this.roomId, backPaginationToken, 1, Direction.Forward,
+            );
+            newBackward = res.end;
+        }
+        if (forwardPaginationToken) {
+            const res = await this.client.createMessagesRequest(
+                this.roomId, forwardPaginationToken, 1, Direction.Backward,
+            );
+            oldForward = res.start;
+        }
+        // Only replace the token if we don't have paginated away from this position already. This situation doesn't
+        // occur today, but if the above issue is resolved, we'd have to go down this path.
+        if (forwardPaginationToken && oldLive.getPaginationToken(Direction.Forward) === forwardPaginationToken) {
+            oldLive.setPaginationToken(oldForward ?? null, Direction.Forward);
+        }
+        if (backPaginationToken && newLive.getPaginationToken(Direction.Backward) === backPaginationToken) {
+            newLive.setPaginationToken(newBackward ?? null, Direction.Backward);
+        }
     }
 
     private async updateThreadMetadata(): Promise<void> {
