@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { ReceiptType } from "../../src/@types/read_receipts";
 import { Feature, ServerSupport } from "../../src/feature";
 import {
     EventType,
@@ -64,6 +65,30 @@ describe("fixNotificationCountOnDecryption", () => {
         });
 
         room = new Room(ROOM_ID, mockClient, mockClient.getUserId() ?? "");
+
+        const receipt = new MatrixEvent({
+            type: "m.receipt",
+            room_id: "!foo:bar",
+            content: {
+                "$event0:localhost": {
+                    [ReceiptType.Read]: {
+                        [mockClient.getUserId()!]: { ts: 123 },
+                    },
+                },
+                "$event1:localhost": {
+                    [ReceiptType.Read]: {
+                        [mockClient.getUserId()!]: { ts: 666, thread_id: THREAD_ID },
+                    },
+                },
+                "$otherevent:localhost": {
+                    [ReceiptType.Read]: {
+                        [mockClient.getUserId()!]: { ts: 999, thread_id: "$otherthread:localhost" },
+                    },
+                },
+            },
+        });
+        room.addReceipt(receipt);
+
         room.setUnreadNotificationCount(NotificationCountType.Total, 1);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
@@ -75,6 +100,7 @@ describe("fixNotificationCountOnDecryption", () => {
                     body: "Hello world!",
                 },
                 event: true,
+                ts: 1234,
             },
             mockClient,
         );
@@ -90,6 +116,7 @@ describe("fixNotificationCountOnDecryption", () => {
                 "msgtype": MsgType.Text,
                 "body": "Thread reply",
             },
+            ts: 5678,
             event: true,
         });
         room.createThread(THREAD_ID, event, [threadEvent], false);
@@ -155,6 +182,7 @@ describe("fixNotificationCountOnDecryption", () => {
                 "msgtype": MsgType.Text,
                 "body": "Thread reply",
             },
+            ts: 8901,
             event: true,
         });
 

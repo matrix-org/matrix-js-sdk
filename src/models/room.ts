@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -309,6 +309,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
     public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
+    // Useful to know at what point the current user has started using threads in this room
+    private oldestThreadedReceiptTs = Infinity;
+    /**
+     * A record of the latest unthread receipts per user
+     * This is useful in determining whether a user has read a thread or not
+     */
+    private unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
@@ -2727,6 +2734,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                             { eventId, receiptType, userId, receipt, synthetic },
                         ]);
                     }
+
+                    const me = this.client.getUserId();
+                    // Track the time of the current user's oldest threaded receipt in the room.
+                    if (userId === me && !receiptForMainTimeline && receipt.ts < this.oldestThreadedReceiptTs) {
+                        this.oldestThreadedReceiptTs = receipt.ts;
+                    }
+
+                    // Track each user's unthreaded read receipt.
+                    if (!receipt.thread_id && receipt.ts > (this.unthreadedReceipts.get(userId)?.ts ?? 0)) {
+                        this.unthreadedReceipts.set(userId, receipt);
+                    }
                 });
             });
         });
@@ -2967,6 +2985,29 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public isElementVideoRoom(): boolean {
         return this.getType() === RoomType.ElementVideo;
+    }
+
+    /**
+     * @returns the ID of the room that was this room's predecessor, or null if
+     *          this room has no predecessor.
+     */
+    public findPredecessorRoomId(): string | null {
+        const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        if (!currentState) {
+            return null;
+        }
+
+        const createEvent = currentState.getStateEvents(EventType.RoomCreate, "");
+        if (createEvent) {
+            const predecessor = createEvent.getContent()["predecessor"];
+            if (predecessor) {
+                const roomId = predecessor["room_id"];
+                if (roomId) {
+                    return roomId;
+                }
+            }
+        }
+        return null;
     }
 
     private roomNameGenerator(state: RoomNameState): string {
@@ -3276,6 +3317,26 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return;
         }
         event.applyVisibilityEvent(visibilityChange);
+    }
+
+    /**
+     * Find when a client has gained thread capabilities by inspecting the oldest
+     * threaded receipt
+     * @returns the timestamp of the oldest threaded receipt
+     */
+    public getOldestThreadedReceiptTs(): number {
+        return this.oldestThreadedReceiptTs;
+    }
+
+    /**
+     * Returns the most recent unthreaded receipt for a given user
+     * @param userId - the MxID of the User
+     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
+     * or a user chooses to use private read receipts (or we have simply not received
+     * a receipt from this user yet).
+     */
+    public getLastUnthreadedReceiptFor(userId: string): Receipt | undefined {
+        return this.unthreadedReceipts.get(userId);
     }
 }
 

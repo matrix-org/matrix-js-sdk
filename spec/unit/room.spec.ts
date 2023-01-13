@@ -33,6 +33,7 @@ import {
     IRelationsRequestOpts,
     IStateEventWithRoomId,
     JoinRule,
+    MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
     PendingEventOrdering,
@@ -49,6 +50,7 @@ import { ReceiptType, WrappedReceipt } from "../../src/@types/read_receipts";
 import { FeatureSupport, Thread, THREAD_RELATION_TYPE, ThreadEvent } from "../../src/models/thread";
 import { Crypto } from "../../src/crypto";
 import { mkThread } from "../test-utils/thread";
+import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../test-utils/client";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -3223,6 +3225,62 @@ describe("Room", function () {
         it("is updated by setBlacklistUnverifiedDevices", () => {
             room.setBlacklistUnverifiedDevices(false);
             expect(room.getBlacklistUnverifiedDevices()).toBe(false);
+        });
+    });
+
+    describe("findPredecessorRoomId", () => {
+        let client: MatrixClient | null = null;
+        beforeEach(() => {
+            client = getMockClientWithEventEmitter({
+                ...mockClientMethodsUser(),
+                supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+            });
+        });
+
+        function roomCreateEvent(newRoomId: string, predecessorRoomId: string | null): MatrixEvent {
+            const content: {
+                creator: string;
+                ["m.federate"]: boolean;
+                room_version: string;
+                predecessor: { event_id: string; room_id: string } | undefined;
+            } = {
+                "creator": "@daryl:alexandria.example.com",
+                "predecessor": undefined,
+                "m.federate": true,
+                "room_version": "9",
+            };
+            if (predecessorRoomId) {
+                content.predecessor = {
+                    event_id: "id_of_last_known_event",
+                    room_id: predecessorRoomId,
+                };
+            }
+            return new MatrixEvent({
+                content,
+                event_id: `create_event_id_pred_${predecessorRoomId}`,
+                origin_server_ts: 1432735824653,
+                room_id: newRoomId,
+                sender: "@daryl:alexandria.example.com",
+                state_key: "",
+                type: "m.room.create",
+            });
+        }
+
+        it("Returns null if there is no create event", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            expect(room.findPredecessorRoomId()).toBeNull();
+        });
+
+        it("Returns null if the create event has no predecessor", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([roomCreateEvent("roomid", null)]);
+            expect(room.findPredecessorRoomId()).toBeNull();
+        });
+
+        it("Returns the predecessor ID if one is provided via create event", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([roomCreateEvent("roomid", "replacedroomid")]);
+            expect(room.findPredecessorRoomId()).toBe("replacedroomid");
         });
     });
 });

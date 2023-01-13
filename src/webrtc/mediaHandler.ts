@@ -203,24 +203,30 @@ export class MediaHandler extends TypedEventEmitter<
 
         let canReuseStream = true;
         if (this.localUserMediaStream) {
+            // This figures out if we can reuse the current localUsermediaStream
+            // based on whether or not the "mute state" (presence of tracks of a
+            // given kind) matches what is being requested
+            if (shouldRequestAudio !== this.localUserMediaStream.getAudioTracks().length > 0) {
+                canReuseStream = false;
+            }
+            if (shouldRequestVideo !== this.localUserMediaStream.getVideoTracks().length > 0) {
+                canReuseStream = false;
+            }
+
             // This code checks that the device ID is the same as the localUserMediaStream stream, but we update
             // the localUserMediaStream whenever the device ID changes (apart from when restoring) so it's not
             // clear why this would ever be different, unless there's a race.
-            if (shouldRequestAudio) {
-                if (
-                    this.localUserMediaStream.getAudioTracks().length === 0 ||
-                    this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput
-                ) {
-                    canReuseStream = false;
-                }
+            if (
+                shouldRequestAudio &&
+                this.localUserMediaStream.getAudioTracks()[0]?.getSettings()?.deviceId !== this.audioInput
+            ) {
+                canReuseStream = false;
             }
-            if (shouldRequestVideo) {
-                if (
-                    this.localUserMediaStream.getVideoTracks().length === 0 ||
-                    this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput
-                ) {
-                    canReuseStream = false;
-                }
+            if (
+                shouldRequestVideo &&
+                this.localUserMediaStream.getVideoTracks()[0]?.getSettings()?.deviceId !== this.videoInput
+            ) {
+                canReuseStream = false;
             }
         } else {
             canReuseStream = false;
