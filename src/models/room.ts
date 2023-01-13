@@ -548,6 +548,18 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Unstable/experimental function to determine if the room requires MSC1767-style
+     * events or not.
+     *
+     * @deprecated Use stable functions where possible. This function may be removed or
+     * changed without notice.
+     */
+    public unstableRequiresExtensibleEvents(): boolean {
+        // TODO(TR): We need a better check for this that doesn't involve hardcoding supported room versions
+        return this.getVersion().startsWith("org.matrix.msc1767.");
+    }
+
+    /**
      * Gets the version of the room
      * @returns The version of the room, or null if it could not be determined
      */

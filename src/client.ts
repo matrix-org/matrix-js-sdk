@@ -18,7 +18,7 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  */
 
-import { Optional } from "matrix-events-sdk";
+import { EmoteEvent, MarkupBlock, Optional, WireMessageEvent, MessageEvent } from "matrix-events-sdk";
 
 import type { IMegolmSessionData } from "./@types/crypto";
 import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
@@ -4545,8 +4545,63 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
 
-        const eventType: string = EventType.RoomMessage;
-        const sendContent: IContent = content as IContent;
+        let eventType: string = EventType.RoomMessage;
+        let sendContent: IContent = content as IContent;
+
+        // Quickly check if we're about to send the event into an MSC1767-compatible room
+        const room = this.getRoom(roomId);
+        if (room?.unstableRequiresExtensibleEvents()) {
+            // This room supports extensible events! Override the details of the event and hope for the best.
+            const makeContentExtensible = (
+                content: IContent = {},
+                recurse = true,
+            ): [string | undefined, IContent | undefined] => {
+                let newContent: IContent | undefined = undefined;
+                let newEventType: string | undefined = undefined;
+
+                // Dev note: We exclude notices from this for now, at least while we figure out what to do with
+                // them at the spec level.
+                const textTypes: (string | undefined)[] = [MsgType.Text, MsgType.Emote];
+                if (textTypes.includes(content.msgtype)) {
+                    newContent = {
+                        [MarkupBlock.type.name]: [{ body: content.body }],
+                    } satisfies WireMessageEvent.ContentValue;
+                    if (content.format === "org.matrix.custom.html" && content.formatted_body) {
+                        newContent[MarkupBlock.type.name].push({ body: content.formatted_body, mimetype: "text/html" });
+                    }
+                    newEventType = content.msgtype === MsgType.Emote ? EmoteEvent.type.name : MessageEvent.type.name;
+
+                    // Remove the fields we processed, so we don't clone them in a later stage.
+                    delete content.body;
+                    delete content.format;
+                    delete content.formatted_body;
+                    delete content.msgtype;
+                }
+
+                // Deal with edits too: just a bit of recursion.
+                if (newContent && !!content["m.new_content"] && recurse) {
+                    const editContent = makeContentExtensible(content["m.new_content"], false);
+                    if (editContent) {
+                        newContent["m.new_content"] = editContent;
+                    }
+                }
+
+                if (newContent) {
+                    // copy over all other fields we don't know about (for safety)
+                    for (const [k, v] of Object.entries(content)) {
+                        if (!newContent.hasOwnProperty(k)) {
+                            newContent[k] = v;
+                        }
+                    }
+                }
+
+                return [newEventType, newContent];
+            };
+
+            const [newEventType, newContent] = makeContentExtensible(sendContent);
+            if (newEventType !== undefined) eventType = newEventType;
+            if (newContent !== undefined) sendContent = newContent;
+        }
 
         return this.sendEvent(roomId, threadId as string | null, eventType, sendContent, txnId);
     }
