@@ -369,7 +369,10 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      * timeline which would otherwise be unable to paginate forwards without this token).
      * Removing just the old live timeline whilst preserving previous ones is not supported.
      */
-    public async resetLiveTimeline(backPaginationToken?: string | null, forwardPaginationToken?: string | null): Promise<void> {
+    public async resetLiveTimeline(
+        backPaginationToken?: string | null,
+        forwardPaginationToken?: string | null,
+    ): Promise<void> {
         const oldLive = this.liveTimeline;
         this.timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);
         const newLive = this.liveTimeline;
@@ -387,14 +390,15 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         let newBackward: string | undefined;
         let oldForward: string | undefined;
         if (backPaginationToken) {
-            const res = await this.client.createMessagesRequest(
-                this.roomId, backPaginationToken, 1, Direction.Forward,
-            );
+            const res = await this.client.createMessagesRequest(this.roomId, backPaginationToken, 1, Direction.Forward);
             newBackward = res.end;
         }
         if (forwardPaginationToken) {
             const res = await this.client.createMessagesRequest(
-                this.roomId, forwardPaginationToken, 1, Direction.Backward,
+                this.roomId,
+                forwardPaginationToken,
+                1,
+                Direction.Backward,
             );
             oldForward = res.start;
         }
