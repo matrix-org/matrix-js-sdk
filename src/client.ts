@@ -18,7 +18,7 @@ limitations under the License.
  * This is an internal module. See {@link MatrixClient} for the public class.
  */
 
-import { EmoteEvent, IPartialEvent, MessageEvent, NoticeEvent, Optional } from "matrix-events-sdk";
+import { Optional } from "matrix-events-sdk";
 
 import type { IMegolmSessionData } from "./@types/crypto";
 import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
@@ -1710,12 +1710,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         resolve(0);
                     };
                     req.onerror = (e): void => {
-                        logger.error(`Failed to remove IndexedDB instance ${dbname}: ${e}`);
-                        reject(new Error(`Error clearing storage: ${e}`));
+                        // In private browsing, Firefox has a global.indexedDB, but attempts to delete an indexeddb
+                        // (even a non-existent one) fail with "DOMException: A mutation operation was attempted on a
+                        // database that did not allow mutations."
+                        //
+                        // it seems like the only thing we can really do is ignore the error.
+                        logger.warn(`Failed to remove IndexedDB instance ${dbname}:`, e);
+                        resolve(0);
                     };
                     req.onblocked = (e): void => {
                         logger.info(`cannot yet remove IndexedDB instance ${dbname}`);
-                        //reject(new Error(`Error clearing storage: ${e}`));
                     };
                 });
                 await prom;
@@ -3801,13 +3805,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const replacedRooms = new Set();
         for (const r of allRooms) {
-            const createEvent = r.currentState.getStateEvents(EventType.RoomCreate, "");
-            // invites are included in this list and we don't know their create events yet
-            if (createEvent) {
-                const predecessor = createEvent.getContent()["predecessor"];
-                if (predecessor && predecessor["room_id"]) {
-                    replacedRooms.add(predecessor["room_id"]);
-                }
+            const predecessor = r.findPredecessorRoomId();
+            if (predecessor) {
+                replacedRooms.add(predecessor);
             }
         }
 
@@ -4576,44 +4576,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId = null;
         }
 
-        // Populate all outbound events with Extensible Events metadata to ensure there's a
-        // reasonably large pool of messages to parse.
-        let eventType: string = EventType.RoomMessage;
-        let sendContent: IContent = content as IContent;
-        const makeContentExtensible = (content: IContent = {}, recurse = true): IPartialEvent<object> | undefined => {
-            let newEvent: IPartialEvent<IContent> | undefined;
-
-            if (content["msgtype"] === MsgType.Text) {
-                newEvent = MessageEvent.from(content["body"], content["formatted_body"]).serialize();
-            } else if (content["msgtype"] === MsgType.Emote) {
-                newEvent = EmoteEvent.from(content["body"], content["formatted_body"]).serialize();
-            } else if (content["msgtype"] === MsgType.Notice) {
-                newEvent = NoticeEvent.from(content["body"], content["formatted_body"]).serialize();
-            }
-
-            if (newEvent && content["m.new_content"] && recurse) {
-                const newContent = makeContentExtensible(content["m.new_content"], false);
-                if (newContent) {
-                    newEvent.content["m.new_content"] = newContent.content;
-                }
-            }
-
-            if (newEvent) {
-                // copy over all other fields we don't know about
-                for (const [k, v] of Object.entries(content)) {
-                    if (!newEvent.content.hasOwnProperty(k)) {
-                        newEvent.content[k] = v;
-                    }
-                }
-            }
-
-            return newEvent;
-        };
-        const result = makeContentExtensible(sendContent);
-        if (result) {
-            eventType = result.type;
-            sendContent = result.content;
-        }
+        const eventType: string = EventType.RoomMessage;
+        const sendContent: IContent = content as IContent;
 
         return this.sendEvent(roomId, threadId as string | null, eventType, sendContent, txnId);
     }
@@ -9423,27 +9387,50 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Find the event_id closest to the given timestamp in the given direction.
-     * @returns A promise of an object containing the event_id and
-     *    origin_server_ts of the closest event to the timestamp in the given
-     *    direction
+     * @returns Resolves: A promise of an object containing the event_id and
+     *    origin_server_ts of the closest event to the timestamp in the given direction
+     * @returns Rejects: when the request fails (module:http-api.MatrixError)
      */
-    public timestampToEvent(roomId: string, timestamp: number, dir: Direction): Promise<ITimestampToEventResponse> {
+    public async timestampToEvent(
+        roomId: string,
+        timestamp: number,
+        dir: Direction,
+    ): Promise<ITimestampToEventResponse> {
         const path = utils.encodeUri("/rooms/$roomId/timestamp_to_event", {
             $roomId: roomId,
         });
+        const queryParams = {
+            ts: timestamp.toString(),
+            dir: dir,
+        };
 
-        return this.http.authedRequest(
-            Method.Get,
-            path,
-            {
-                ts: timestamp.toString(),
-                dir: dir,
-            },
-            undefined,
-            {
-                prefix: "/_matrix/client/unstable/org.matrix.msc3030",
-            },
-        );
+        try {
+            return await this.http.authedRequest(Method.Get, path, queryParams, undefined, {
+                prefix: ClientPrefix.V1,
+            });
+        } catch (err) {
+            // Fallback to the prefixed unstable endpoint. Since the stable endpoint is
+            // new, we should also try the unstable endpoint before giving up. We can
+            // remove this fallback request in a year (remove after 2023-11-28).
+            if (
+                (<MatrixError>err).errcode === "M_UNRECOGNIZED" &&
+                // XXX: The 400 status code check should be removed in the future
+                // when Synapse is compliant with MSC3743.
+                ((<MatrixError>err).httpStatus === 400 ||
+                    // This the correct standard status code for an unsupported
+                    // endpoint according to MSC3743. Not Found and Method Not Allowed
+                    // both indicate that this endpoint+verb combination is
+                    // not supported.
+                    (<MatrixError>err).httpStatus === 404 ||
+                    (<MatrixError>err).httpStatus === 405)
+            ) {
+                return await this.http.authedRequest(Method.Get, path, queryParams, undefined, {
+                    prefix: "/_matrix/client/unstable/org.matrix.msc3030",
+                });
+            }
+
+            throw err;
+        }
     }
 }
 

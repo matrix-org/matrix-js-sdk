@@ -819,7 +819,10 @@ describe("Group Call", function () {
             it("should mute local video when calling setLocalVideoMuted()", async () => {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
 
-                groupCall.localCallFeed!.setAudioVideoMuted = jest.fn();
+                jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream");
+                jest.spyOn(groupCall, "updateLocalUsermediaStream");
+                jest.spyOn(groupCall.localCallFeed!, "setAudioVideoMuted");
+
                 const setAVMutedArray: ((audioMuted: boolean | null, videoMuted: boolean | null) => void)[] = [];
                 const tracksArray: MediaStreamTrack[] = [];
                 const sendMetadataUpdateArray: (() => Promise<void>)[] = [];

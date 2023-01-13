@@ -702,6 +702,9 @@ export class GroupCall extends TypedEventEmitter<
             logger.log(
                 `groupCall ${this.groupCallId} setLocalVideoMuted stream ${this.localCallFeed.feedId} muted ${muted}`,
             );
+
+            const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
+            await this.updateLocalUsermediaStream(stream);
             this.localCallFeed.setAudioVideoMuted(null, muted);
             if (this.localCallFeed.stream) {
                 setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);

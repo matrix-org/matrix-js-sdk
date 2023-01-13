@@ -1378,7 +1378,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         setTracksEnabled(stream.getAudioTracks(), audioEnabled);
         setTracksEnabled(stream.getVideoTracks(), videoEnabled);
 
-        // We want to keep the same stream id, so we replace the tracks rather than the whole stream
+        // We want to keep the same stream id, so we replace the tracks rather
+        // than the whole stream.
+
+        // Firstly, we replace the tracks in our localUsermediaStream.
         for (const track of this.localUsermediaStream!.getTracks()) {
             this.localUsermediaStream!.removeTrack(track);
             track.stop();
@@ -1387,10 +1390,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.localUsermediaStream!.addTrack(track);
         }
 
+        // Secondly, we remove tracks that we no longer need from the peer
+        // connection, if any. This only happens when we mute the video atm.
+        // This will change the transceiver direction to "inactive" and
+        // therefore cause re-negotiation.
+        for (const kind of ["audio", "video"]) {
+            const sender = this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, kind))?.sender;
+            // Only remove the track if we aren't going to immediately replace it
+            if (sender && !stream.getTracks().find((t) => t.kind === kind)) {
+                this.peerConn?.removeTrack(sender);
+            }
+        }
+        // Thirdly, we replace the old tracks, if possible.
         for (const track of stream.getTracks()) {
             const tKey = getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, track.kind);
 
-            const oldSender = this.transceivers.get(tKey)?.sender;
+            const transceiver = this.transceivers.get(tKey);
+            const oldSender = transceiver?.sender;
             let added = false;
             if (oldSender) {
                 try {
@@ -1404,6 +1420,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                             `) to peer connection`,
                     );
                     await oldSender.replaceTrack(track);
+                    // Set the direction to indicate we're going to be sending.
+                    // This is only necessary in the cases where we're upgrading
+                    // the call to video after downgrading it.
+                    transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
                     added = true;
                 } catch (error) {
                     logger.warn(`replaceTrack failed: adding new transceiver instead`, error);
@@ -1447,7 +1467,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
-        this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
+        if (this.opponentSupportsSDPStreamMetadata()) {
+            const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
+            await this.updateLocalUsermediaStream(stream);
+        } else {
+            this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
+        }
         this.updateMuteStatus();
         await this.sendMetadataUpdate();
         return this.isLocalVideoMuted();

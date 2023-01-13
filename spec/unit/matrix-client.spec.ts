@@ -40,6 +40,8 @@ import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
     ContentHelpers,
+    ClientPrefix,
+    Direction,
     EventTimeline,
     ICreateRoomOpts,
     IRequestOpts,
@@ -60,6 +62,7 @@ import { IOlmDevice } from "../../src/crypto/algorithms/megolm";
 import { QueryDict } from "../../src/utils";
 import { SyncState } from "../../src/sync";
 import * as featureUtils from "../../src/feature";
+import { StubStore } from "../../src/store/stub";
 
 jest.useFakeTimers();
 
@@ -68,9 +71,20 @@ jest.mock("../../src/webrtc/call", () => ({
     supportsMatrixCall: jest.fn(() => false),
 }));
 
+// Utility function to ease the transition from our QueryDict type to a Map
+// which we can use to build a URLSearchParams
+function convertQueryDictToMap(queryDict?: QueryDict): Map<string, string> {
+    if (!queryDict) {
+        return new Map();
+    }
+
+    return new Map(Object.entries(queryDict).map(([k, v]) => [k, String(v)]));
+}
+
 type HttpLookup = {
     method: string;
     path: string;
+    prefix?: string;
     data?: Record<string, any>;
     error?: object;
     expectBody?: Record<string, any>;
@@ -86,6 +100,42 @@ type WrappedRoom = Room & {
     _options: Options;
     _state: Map<string, any>;
 };
+
+describe("convertQueryDictToMap", () => {
+    it("returns an empty map when dict is undefined", () => {
+        expect(convertQueryDictToMap(undefined)).toEqual(new Map());
+    });
+
+    it("converts an empty QueryDict to an empty map", () => {
+        expect(convertQueryDictToMap({})).toEqual(new Map());
+    });
+
+    it("converts a QueryDict of strings to the equivalent map", () => {
+        expect(convertQueryDictToMap({ a: "b", c: "d" })).toEqual(
+            new Map([
+                ["a", "b"],
+                ["c", "d"],
+            ]),
+        );
+    });
+
+    it("converts the values of the supplied QueryDict to strings", () => {
+        expect(convertQueryDictToMap({ arr: ["b", "c"], num: 45, boo: true, und: undefined })).toEqual(
+            new Map([
+                ["arr", "b,c"],
+                ["num", "45"],
+                ["boo", "true"],
+                ["und", "undefined"],
+            ]),
+        );
+    });
+
+    it("produces sane URLSearchParams conversions", () => {
+        expect(new URLSearchParams(Array.from(convertQueryDictToMap({ a: "b", c: "d" }))).toString()).toEqual(
+            "a=b&c=d",
+        );
+    });
+});
 
 describe("MatrixClient", function () {
     const userId = "@alice:bar";
@@ -135,7 +185,14 @@ describe("MatrixClient", function () {
         method: string;
         path: string;
     } | null = null;
-    function httpReq(method: Method, path: string, qp?: QueryDict, data?: BodyInit, opts?: IRequestOpts) {
+    function httpReq(
+        method: Method,
+        path: string,
+        queryParams?: QueryDict,
+        body?: BodyInit,
+        requestOpts: IRequestOpts = {},
+    ) {
+        const { prefix } = requestOpts;
         if (path === KEEP_ALIVE_PATH && acceptKeepalives) {
             return Promise.resolve({
                 unstable_features: unstableFeatures,
@@ -171,14 +228,17 @@ describe("MatrixClient", function () {
             };
             return pendingLookup.promise;
         }
-        if (next.path === path && next.method === method) {
+        // Either we don't care about the prefix if it wasn't defined in the expected
+        // lookup or it should match.
+        const doesMatchPrefix = !next.prefix || next.prefix === prefix;
+        if (doesMatchPrefix && next.path === path && next.method === method) {
             logger.log("MatrixClient[UT] Matched. Returning " + (next.error ? "BAD" : "GOOD") + " response");
             if (next.expectBody) {
-                expect(data).toEqual(next.expectBody);
+                expect(body).toEqual(next.expectBody);
             }
             if (next.expectQueryParams) {
                 Object.keys(next.expectQueryParams).forEach(function (k) {
-                    expect(qp?.[k]).toEqual(next.expectQueryParams![k]);
+                    expect(queryParams?.[k]).toEqual(next.expectQueryParams![k]);
                 });
             }
 
@@ -198,12 +258,22 @@ describe("MatrixClient", function () {
             }
             return Promise.resolve(next.data);
         }
-        // Jest doesn't let us have custom expectation errors, so if you're seeing this then
-        // you forgot to handle at least 1 pending request. Check your tests to ensure your
-        // number of expectations lines up with your number of requests made, and that those
-        // requests match your expectations.
-        expect(true).toBe(false);
-        return new Promise(() => {});
+
+        const receivedRequestQueryString = new URLSearchParams(
+            Array.from(convertQueryDictToMap(queryParams)),
+        ).toString();
+        const receivedRequestDebugString = `${method} ${prefix}${path}${receivedRequestQueryString}`;
+        const expectedQueryString = new URLSearchParams(
+            Array.from(convertQueryDictToMap(next.expectQueryParams)),
+        ).toString();
+        const expectedRequestDebugString = `${next.method} ${next.prefix ?? ""}${next.path}${expectedQueryString}`;
+        // If you're seeing this then you forgot to handle at least 1 pending request.
+        throw new Error(
+            `A pending request was not handled: ${receivedRequestDebugString} ` +
+                `(next request expected was ${expectedRequestDebugString})\n` +
+                `Check your tests to ensure your number of expectations lines up with your number of requests ` +
+                `made, and that those requests match your expectations.`,
+        );
     }
 
     function makeClient() {
@@ -284,6 +354,166 @@ describe("MatrixClient", function () {
             return new Promise(() => {});
         });
         client.stopClient();
+    });
+
+    describe("timestampToEvent", () => {
+        const roomId = "!room:server.org";
+        const eventId = "$eventId:example.org";
+        const unstableMSC3030Prefix = "/_matrix/client/unstable/org.matrix.msc3030";
+
+        async function assertRequestsMade(
+            responses: {
+                prefix?: string;
+                error?: { httpStatus: Number; errcode: string };
+                data?: { event_id: string };
+            }[],
+            expectRejects = false,
+        ) {
+            const queryParams = {
+                ts: "0",
+                dir: "f",
+            };
+            const path = `/rooms/${encodeURIComponent(roomId)}/timestamp_to_event`;
+            // Set up the responses we are going to send back
+            httpLookups = responses.map((res) => {
+                return {
+                    method: "GET",
+                    path,
+                    expectQueryParams: queryParams,
+                    ...res,
+                };
+            });
+
+            // When we ask for the event timestamp (this is what we are testing)
+            const answer = client.timestampToEvent(roomId, 0, Direction.Forward);
+
+            if (expectRejects) {
+                await expect(answer).rejects.toBeDefined();
+            } else {
+                await answer;
+            }
+
+            // Then the number of requests me made matches our expectation
+            const calls = mocked(client.http.authedRequest).mock.calls;
+            expect(calls.length).toStrictEqual(responses.length);
+
+            // And each request was as we expected
+            let i = 0;
+            for (const call of calls) {
+                const response = responses[i];
+                const [callMethod, callPath, callQueryParams, , callOpts] = call;
+                const callPrefix = callOpts?.prefix;
+
+                expect(callMethod).toStrictEqual("GET");
+                if (response.prefix) {
+                    expect(callPrefix).toStrictEqual(response.prefix);
+                }
+                expect(callPath).toStrictEqual(path);
+                expect(callQueryParams).toStrictEqual(queryParams);
+                i++;
+            }
+        }
+
+        it("should call stable endpoint", async () => {
+            await assertRequestsMade([
+                {
+                    data: { event_id: eventId },
+                },
+            ]);
+        });
+
+        it("should fallback to unstable endpoint when stable endpoint 400s", async () => {
+            await assertRequestsMade([
+                {
+                    prefix: ClientPrefix.V1,
+                    error: {
+                        httpStatus: 400,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                },
+                {
+                    prefix: unstableMSC3030Prefix,
+                    data: { event_id: eventId },
+                },
+            ]);
+        });
+
+        it("should fallback to unstable endpoint when stable endpoint 404s", async () => {
+            await assertRequestsMade([
+                {
+                    prefix: ClientPrefix.V1,
+                    error: {
+                        httpStatus: 404,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                },
+                {
+                    prefix: unstableMSC3030Prefix,
+                    data: { event_id: eventId },
+                },
+            ]);
+        });
+
+        it("should fallback to unstable endpoint when stable endpoint 405s", async () => {
+            await assertRequestsMade([
+                {
+                    prefix: ClientPrefix.V1,
+                    error: {
+                        httpStatus: 405,
+                        errcode: "M_UNRECOGNIZED",
+                    },
+                },
+                {
+                    prefix: unstableMSC3030Prefix,
+                    data: { event_id: eventId },
+                },
+            ]);
+        });
+
+        it("should not fallback to unstable endpoint when stable endpoint returns an error (500)", async () => {
+            await assertRequestsMade(
+                [
+                    {
+                        prefix: ClientPrefix.V1,
+                        error: {
+                            httpStatus: 500,
+                            errcode: "Fake response error",
+                        },
+                    },
+                ],
+                true,
+            );
+        });
+
+        it("should not fallback to unstable endpoint when stable endpoint is rate-limiting (429)", async () => {
+            await assertRequestsMade(
+                [
+                    {
+                        prefix: ClientPrefix.V1,
+                        error: {
+                            httpStatus: 429,
+                            errcode: "M_UNRECOGNIZED", // Still refuses even if the errcode claims unrecognised
+                        },
+                    },
+                ],
+                true,
+            );
+        });
+
+        it("should not fallback to unstable endpoint when stable endpoint says bad gateway (502)", async () => {
+            await assertRequestsMade(
+                [
+                    {
+                        prefix: ClientPrefix.V1,
+                        error: {
+                            httpStatus: 502,
+                            errcode: "Fake response error",
+                        },
+                    },
+                ],
+                true,
+            );
+        });
     });
 
     describe("getSafeUserId()", () => {
@@ -1965,6 +2195,84 @@ describe("MatrixClient", function () {
 
             // account data updated with empty content
             expect(requestSpy).toHaveBeenCalledWith(Method.Put, path, undefined, {});
+        });
+    });
+
+    describe("getVisibleRooms", () => {
+        function roomCreateEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
+            return new MatrixEvent({
+                content: {
+                    "creator": "@daryl:alexandria.example.com",
+                    "m.federate": true,
+                    "predecessor": {
+                        event_id: "spec_is_not_clear_what_id_this_is",
+                        room_id: predecessorRoomId,
+                    },
+                    "room_version": "9",
+                },
+                event_id: `create_event_id_pred_${predecessorRoomId}`,
+                origin_server_ts: 1432735824653,
+                room_id: newRoomId,
+                sender: "@daryl:alexandria.example.com",
+                state_key: "",
+                type: "m.room.create",
+            });
+        }
+
+        function tombstoneEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
+            return new MatrixEvent({
+                content: {
+                    body: "This room has been replaced",
+                    replacement_room: newRoomId,
+                },
+                event_id: `tombstone_event_id_pred_${predecessorRoomId}`,
+                origin_server_ts: 1432735824653,
+                room_id: predecessorRoomId,
+                sender: "@daryl:alexandria.example.com",
+                state_key: "",
+                type: "m.room.tombstone",
+            });
+        }
+
+        it("Returns an empty list if there are no rooms", () => {
+            client.store = new StubStore();
+            client.store.getRooms = () => [];
+            const rooms = client.getVisibleRooms();
+            expect(rooms).toHaveLength(0);
+        });
+
+        it("Returns all non-replaced rooms", () => {
+            const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+            const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
+            client.store = new StubStore();
+            client.store.getRooms = () => [room1, room2];
+            const rooms = client.getVisibleRooms();
+            expect(rooms).toContain(room1);
+            expect(rooms).toContain(room2);
+            expect(rooms).toHaveLength(2);
+        });
+
+        it("Does not return replaced rooms", () => {
+            // Given 4 rooms, 2 of which have been replaced
+            const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+            const replacedRoom1 = new Room("replacedRoom1", client, "@carol:alexandria.example.com");
+            const replacedRoom2 = new Room("replacedRoom2", client, "@carol:alexandria.example.com");
+            const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
+            client.store = new StubStore();
+            client.store.getRooms = () => [room1, replacedRoom1, replacedRoom2, room2];
+            room1.addLiveEvents([roomCreateEvent(room1.roomId, replacedRoom1.roomId)], {});
+            room2.addLiveEvents([roomCreateEvent(room2.roomId, replacedRoom2.roomId)], {});
+            replacedRoom1.addLiveEvents([tombstoneEvent(room1.roomId, replacedRoom1.roomId)], {});
+            replacedRoom2.addLiveEvents([tombstoneEvent(room2.roomId, replacedRoom2.roomId)], {});
+
+            // When we ask for the visible rooms
+            const rooms = client.getVisibleRooms();
+
+            // Then we only get the ones that have not been replaced
+            expect(rooms).not.toContain(replacedRoom1);
+            expect(rooms).not.toContain(replacedRoom2);
+            expect(rooms).toContain(room1);
+            expect(rooms).toContain(room2);
         });
     });
 });
