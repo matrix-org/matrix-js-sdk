@@ -2138,9 +2138,9 @@ describe("MatrixClient", function () {
         describe("roomId,content,txnId signature", () => {
             it("should translate these values to the correct request", async () => {
                 const roomId = "!room:example.org";
-                const content: IContent = {hello: "world"};
+                const content: IContent = { hello: "world" };
                 const txnId = "m.1234";
-                const response = {event_id: "$example"};
+                const response = { event_id: "$example" };
 
                 const sendSpy = jest.spyOn(client, "sendEvent").mockResolvedValue(response);
 
@@ -2154,9 +2154,9 @@ describe("MatrixClient", function () {
             it("should translate these values to the correct request", async () => {
                 const roomId = "!room:example.org";
                 const threadId = "$thread";
-                const content: IContent = {hello: "world"};
+                const content: IContent = { hello: "world" };
                 const txnId = "m.1234";
-                const response = {event_id: "$example"};
+                const response = { event_id: "$example" };
 
                 const sendSpy = jest.spyOn(client, "sendEvent").mockResolvedValue(response);
 
@@ -2175,22 +2175,19 @@ describe("MatrixClient", function () {
                 formatted_body: "<b>test</b>",
             };
             const expectedContent: IContent = {
-                "org.matrix.msc1767.markup": [
-                    {body: "**test**"},
-                    {body: "<b>test</b>", mimetype: "text/html"},
-                ],
+                "org.matrix.msc1767.markup": [{ body: "**test**" }, { body: "<b>test</b>", mimetype: "text/html" }],
             };
             const expectedEventType = msgtype === "m.emote" ? "org.matrix.msc1767.emote" : "org.matrix.msc1767.message";
             const txnId = "m.1234";
-            const response = {event_id: "$example"};
+            const response = { event_id: "$example" };
 
             client.getRoom = (rid) => {
                 if (rid === roomId) {
                     // XXX: This is a really bad mock.
-                    return {unstableRequiresExtensibleEvents: () => true} as unknown as Room;
+                    return { unstableRequiresExtensibleEvents: () => true } as unknown as Room;
                 }
                 return null;
-            }
+            };
             const sendSpy = jest.spyOn(client, "sendEvent").mockResolvedValue(response);
 
             const result = await client.sendMessage(roomId, content, txnId);
