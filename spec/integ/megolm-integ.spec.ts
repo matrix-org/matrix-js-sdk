@@ -1,6 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
-Copyright 2019-2022 The Matrix.org Foundation C.I.C.
+Copyright 2019-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -59,13 +59,21 @@ interface ToDeviceEvent {
     type: string;
 }
 
-// encrypt an event with olm
+/** encrypt an event with an existing olm session */
 function encryptOlmEvent(opts: {
+    /** the sender's user id */
     sender?: string;
+    /** the sender's curve25519 key */
     senderKey: string;
+    /** the sender's ed25519 key */
+    senderSigningKey: string;
+    /** the olm session to use for encryption */
     p2pSession: Olm.Session;
+    /** the recipient client */
     recipient: TestClient;
+    /** the payload of the message */
     plaincontent?: object;
+    /** the event type of the payload */
     plaintype?: string;
 }): ToDeviceEvent {
     expect(opts.senderKey).toBeTruthy();
@@ -77,6 +85,9 @@ function encryptOlmEvent(opts: {
         recipient: opts.recipient.userId,
         recipient_keys: {
             ed25519: opts.recipient.getSigningKey(),
+        },
+        keys: {
+            ed25519: opts.senderSigningKey,
         },
         sender: opts.sender || "@bob:xyz",
         type: opts.plaintype || "m.test",
@@ -101,7 +112,7 @@ function encryptMegolmEvent(opts: {
     groupSession: Olm.OutboundGroupSession;
     plaintext?: Partial<IEvent>;
     room_id?: string;
-}): Pick<IEvent, "event_id" | "content" | "type"> {
+}): IEvent {
     expect(opts.senderKey).toBeTruthy();
     expect(opts.groupSession).toBeTruthy();
 
@@ -119,30 +130,44 @@ function encryptMegolmEvent(opts: {
         expect(opts.room_id).toBeTruthy();
         plaintext.room_id = opts.room_id;
     }
+    return encryptMegolmEventRawPlainText({ senderKey: opts.senderKey, groupSession: opts.groupSession, plaintext });
+}
 
+function encryptMegolmEventRawPlainText(opts: {
+    senderKey: string;
+    groupSession: Olm.OutboundGroupSession;
+    plaintext: Partial<IEvent>;
+}): IEvent {
     return {
-        event_id: "test_megolm_event_" + Math.random(),
+        event_id: "$test_megolm_event_" + Math.random(),
+        sender: "@not_the_real_sender:example.com",
+        origin_server_ts: 1672944778000,
         content: {
             algorithm: "m.megolm.v1.aes-sha2",
-            ciphertext: opts.groupSession.encrypt(JSON.stringify(plaintext)),
+            ciphertext: opts.groupSession.encrypt(JSON.stringify(opts.plaintext)),
             device_id: "testDevice",
             sender_key: opts.senderKey,
             session_id: opts.groupSession.session_id(),
         },
         type: "m.room.encrypted",
+        unsigned: {},
     };
 }
 
-// build an encrypted room_key event to share a group session
+/** build an encrypted room_key event to share a group session, using an existing olm session */
 function encryptGroupSessionKey(opts: {
-    senderKey: string;
     recipient: TestClient;
+    /** sender's olm account */
+    olmAccount: Olm.Account;
+    /** sender's olm session with the recipient */
     p2pSession: Olm.Session;
     groupSession: Olm.OutboundGroupSession;
     room_id?: string;
 }): Partial<IEvent> {
+    const senderKeys = JSON.parse(opts.olmAccount.identity_keys());
     return encryptOlmEvent({
-        senderKey: opts.senderKey,
+        senderKey: senderKeys.curve25519,
+        senderSigningKey: senderKeys.ed25519,
         recipient: opts.recipient,
         p2pSession: opts.p2pSession,
         plaincontent: {
@@ -219,6 +244,7 @@ async function establishOlmSession(testClient: TestClient, peerOlmAccount: Olm.A
     const p2pSession = await createOlmSession(peerOlmAccount, testClient);
     const olmEvent = encryptOlmEvent({
         senderKey: peerE2EKeys.curve25519,
+        senderSigningKey: peerE2EKeys.ed25519,
         recipient: testClient,
         p2pSession: p2pSession,
     });
@@ -392,7 +418,9 @@ describe("megolm", () => {
         testSenderKey = testE2eKeys.curve25519;
     });
 
-    afterEach(() => aliceTestClient.stop());
+    afterEach(async () => {
+        await aliceTestClient.stop();
+    });
 
     it("Alice receives a megolm message", async () => {
         await aliceTestClient.start();
@@ -405,8 +433,8 @@ describe("megolm", () => {
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -456,8 +484,8 @@ describe("megolm", () => {
 
         // make the room_key event, but don't send it yet
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -516,8 +544,8 @@ describe("megolm", () => {
 
         // make the room_key event
         const roomKeyEncrypted1 = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -533,8 +561,8 @@ describe("megolm", () => {
         // make a second room_key event now that we have advanced the group
         // session.
         const roomKeyEncrypted2 = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -958,8 +986,8 @@ describe("megolm", () => {
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -1088,8 +1116,8 @@ describe("megolm", () => {
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -1101,17 +1129,11 @@ describe("megolm", () => {
             room_id: ROOM_ID,
         };
 
-        const messageEncrypted = {
-            event_id: "test_megolm_event",
-            content: {
-                algorithm: "m.megolm.v1.aes-sha2",
-                ciphertext: groupSession.encrypt(JSON.stringify(plaintext)),
-                device_id: "testDevice",
-                sender_key: testSenderKey,
-                session_id: groupSession.session_id(),
-            },
-            type: "m.room.encrypted",
-        };
+        const messageEncrypted = encryptMegolmEventRawPlainText({
+            senderKey: testSenderKey,
+            groupSession: groupSession,
+            plaintext: plaintext,
+        });
 
         // Alice gets both the events in a single sync
         const syncResponse = {
@@ -1149,8 +1171,8 @@ describe("megolm", () => {
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -1268,6 +1290,7 @@ describe("megolm", () => {
         );
         const encryptedForwardedKey = encryptOlmEvent({
             sender: "@becca:localhost",
+            senderSigningKey: beccaTestClient.getSigningKey(),
             senderKey: beccaTestClient.getDeviceKey(),
             recipient: aliceTestClient,
             p2pSession: p2pSession,
@@ -1413,6 +1436,7 @@ describe("megolm", () => {
         const encryptedForwardedKey = encryptOlmEvent({
             sender: "@becca:localhost",
             senderKey: beccaTestClient.getDeviceKey(),
+            senderSigningKey: beccaTestClient.getSigningKey(),
             recipient: aliceTestClient,
             p2pSession: p2pSession,
             plaincontent: {
@@ -1676,6 +1700,81 @@ describe("megolm", () => {
             const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, "test");
 
             await Promise.all([sendPromise, megolmMessagePromise, aliceTestClient.httpBackend.flush("/keys/query", 1)]);
+        });
+    });
+
+    describe("m.room_key.withheld handling", () => {
+        // TODO: there are a bunch more tests for this sort of thing in spec/unit/crypto/algorithms/megolm.spec.ts.
+        //   They should be converted to integ tests and moved.
+
+        it("does not block decryption on an 'm.unavailable' report", async function () {
+            await aliceTestClient.start();
+
+            // there may be a key downloads for alice
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, {});
+            aliceTestClient.httpBackend.flush("/keys/query", 1, 5000);
+
+            // encrypt a message with a group session.
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+            const messageEncryptedEvent = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
+
+            // Alice gets the room message, but not the key
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: 1,
+                rooms: {
+                    join: { [ROOM_ID]: { timeline: { events: [messageEncryptedEvent] } } },
+                },
+            });
+            await aliceTestClient.flushSync();
+
+            // alice will (eventually) send a room-key request
+            aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key_request/").respond(200, {});
+            await aliceTestClient.httpBackend.flush("/sendToDevice/m.room_key_request/", 1, 1000);
+
+            // at this point, the message should be a decryption failure
+            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+            const event = room.getLiveTimeline().getEvents()[0];
+            expect(event.isDecryptionFailure()).toBeTruthy();
+
+            // we want to wait for the message to be updated, so create a promise for it
+            const retryPromise = new Promise((resolve) => {
+                event.once(MatrixEventEvent.Decrypted, (ev) => {
+                    resolve(ev);
+                });
+            });
+
+            // alice gets back a room-key-withheld notification
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: 2,
+                to_device: {
+                    events: [
+                        {
+                            type: "m.room_key.withheld",
+                            sender: "@bob:example.com",
+                            content: {
+                                algorithm: "m.megolm.v1.aes-sha2",
+                                room_id: ROOM_ID,
+                                session_id: groupSession.session_id(),
+                                sender_key: testSenderKey,
+                                code: "m.unavailable",
+                                reason: "",
+                            },
+                        },
+                    ],
+                },
+            });
+            await aliceTestClient.flushSync();
+
+            // the withheld notification should trigger a retry; wait for it
+            await retryPromise;
+
+            // finally: the message should still be a regular decryption failure, not a withheld notification.
+            expect(event.getContent().body).not.toContain("withheld");
         });
     });
 });

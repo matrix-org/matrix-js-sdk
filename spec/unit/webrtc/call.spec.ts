@@ -1385,7 +1385,7 @@ describe("Call", function () {
                 }),
             );
             // @ts-ignore Mock
-            expect(call.terminate).toHaveBeenCalledWith(CallParty.Local, CallErrorCode.Transfered, true);
+            expect(call.terminate).toHaveBeenCalledWith(CallParty.Local, CallErrorCode.Transferred, true);
         });
     });
 

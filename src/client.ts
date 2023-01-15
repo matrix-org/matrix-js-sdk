@@ -855,6 +855,7 @@ export enum ClientEvent {
     SyncUnexpectedError = "sync.unexpectedError",
     ClientWellKnown = "WellKnown.client",
     ReceivedVoipEvent = "received_voip_event",
+    UndecryptableToDeviceEvent = "toDeviceEvent.undecryptable",
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
 }
@@ -1063,6 +1064,18 @@ export type ClientEventHandlerMap = {
      * ```
      */
     [ClientEvent.ToDeviceEvent]: (event: MatrixEvent) => void;
+    /**
+     * Fires if a to-device event is received that cannot be decrypted.
+     * Encrypted to-device events will (generally) use plain Olm encryption,
+     * in which case decryption failures are fatal: the event will never be
+     * decryptable, unlike Megolm encrypted events where the key may simply
+     * arrive later.
+     *
+     * An undecryptable to-device event is therefore likley to indicate problems.
+     *
+     * @param event - The undecyptable to-device event
+     */
+    [ClientEvent.UndecryptableToDeviceEvent]: (event: MatrixEvent) => void;
     /**
      * Fires whenever new user-scoped account_data is added.
      * @param event - The event describing the account_data just added
@@ -1690,12 +1703,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         resolve(0);
                     };
                     req.onerror = (e): void => {
-                        logger.error(`Failed to remove IndexedDB instance ${dbname}: ${e}`);
-                        reject(new Error(`Error clearing storage: ${e}`));
+                        // In private browsing, Firefox has a global.indexedDB, but attempts to delete an indexeddb
+                        // (even a non-existent one) fail with "DOMException: A mutation operation was attempted on a
+                        // database that did not allow mutations."
+                        //
+                        // it seems like the only thing we can really do is ignore the error.
+                        logger.warn(`Failed to remove IndexedDB instance ${dbname}:`, e);
+                        resolve(0);
                     };
                     req.onblocked = (e): void => {
                         logger.info(`cannot yet remove IndexedDB instance ${dbname}`);
-                        //reject(new Error(`Error clearing storage: ${e}`));
                     };
                 });
                 await prom;

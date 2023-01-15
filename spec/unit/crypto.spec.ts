@@ -254,6 +254,7 @@ describe("Crypto", function () {
                 sendToDevice: jest.fn(),
                 getKeyBackupVersion: jest.fn(),
                 isGuest: jest.fn(),
+                emit: jest.fn(),
             } as unknown as MatrixClient;
             mockRoomList = {} as unknown as RoomList;
 

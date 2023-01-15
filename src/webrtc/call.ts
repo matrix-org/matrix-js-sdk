@@ -236,7 +236,7 @@ export enum CallErrorCode {
     /**
      * We transferred the call off to somewhere else
      */
-    Transfered = "transferred",
+    Transferred = "transferred",
 
     /**
      * A call from the same user was found with a new session id
@@ -786,9 +786,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     const newSender = this.peerConn!.addTrack(track, callFeed.stream);
 
                     // now go & fish for the new transceiver
-                    const newTransciever = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
-                    if (newTransciever) {
-                        this.transceivers.set(tKey, newTransciever);
+                    const newTransceiver = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
+                    if (newTransceiver) {
+                        this.transceivers.set(tKey, newTransceiver);
                     } else {
                         logger.warn("Didn't find a matching transceiver after adding track!");
                     }
@@ -1344,9 +1344,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 );
 
                 const newSender = this.peerConn!.addTrack(track, this.localUsermediaStream!);
-                const newTransciever = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
-                if (newTransciever) {
-                    this.transceivers.set(tKey, newTransciever);
+                const newTransceiver = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
+                if (newTransceiver) {
+                    this.transceivers.set(tKey, newTransceiver);
                 } else {
                     logger.warn("Couldn't find matching transceiver for newly added track!");
                 }
@@ -1610,25 +1610,25 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     continue;
                 }
 
-                const extraconfig: string[] = [];
+                const extraConfig: string[] = [];
                 if (mod.enableDtx !== undefined) {
-                    extraconfig.push(`usedtx=${mod.enableDtx ? "1" : "0"}`);
+                    extraConfig.push(`usedtx=${mod.enableDtx ? "1" : "0"}`);
                 }
                 if (mod.maxAverageBitrate !== undefined) {
-                    extraconfig.push(`maxaveragebitrate=${mod.maxAverageBitrate}`);
+                    extraConfig.push(`maxaveragebitrate=${mod.maxAverageBitrate}`);
                 }
 
                 let found = false;
                 for (const fmtp of media.fmtp) {
                     if (payloadTypeToCodecMap.get(fmtp.payload) === mod.codec) {
                         found = true;
-                        fmtp.config += ";" + extraconfig.join(";");
+                        fmtp.config += ";" + extraConfig.join(";");
                     }
                 }
                 if (!found) {
                     media.fmtp.push({
                         payload: codecToPayloadTypeMap.get(mod.codec)!,
-                        config: extraconfig.join(";"),
+                        config: extraConfig.join(";"),
                     });
                 }
             }
@@ -2417,7 +2417,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         await this.sendVoipEvent(EventType.CallReplaces, body);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transferred, true);
     }
 
     /*
@@ -2458,8 +2458,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
-        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transfered, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transferred, true);
+        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transferred, true);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean): Promise<void> {
@@ -2504,7 +2504,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         for (const feed of this.feeds) {
             // Slightly awkward as local feed need to go via the correct method on
-            // the mediahandler so they get removed from mediahandler (remote tracks
+            // the MediaHandler so they get removed from MediaHandler (remote tracks
             // don't)
             // NB. We clone local streams when passing them to individual calls in a group
             // call, so we can (and should) stop the clones once we no longer need them:
