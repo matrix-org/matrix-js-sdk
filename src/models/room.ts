@@ -1114,6 +1114,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const timelineSet of this.timelineSets) {
             timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);
         }
+        for (const thread of this.threads.values()) {
+            thread.resetLiveTimeline(backPaginationToken, forwardPaginationToken);
+        }
 
         this.fixUpLegacyTimelineFields();
     }
@@ -1223,7 +1226,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const event = this.findEventById(eventId);
         const thread = this.findThreadForEvent(event);
         if (thread) {
-            return thread.timelineSet.getLiveTimeline();
+            return thread.timelineSet.getTimelineForEvent(eventId);
         } else {
             return this.getUnfilteredTimelineSet().getTimelineForEvent(eventId);
         }
