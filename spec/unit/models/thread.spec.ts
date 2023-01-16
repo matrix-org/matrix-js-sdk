@@ -384,5 +384,33 @@ describe("Thread", () => {
                 ["b2", null],
             ]);
         });
+
+        it("is correctly called by the room", async () => {
+            const myUserId = "@bob:example.org";
+            const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
+                timelineSupport: false,
+            });
+            const client = testClient.client;
+            const room = new Room("123", client, myUserId, {
+                pendingEventOrdering: PendingEventOrdering.Detached,
+            });
+
+            jest.spyOn(client, "getRoom").mockReturnValue(room);
+
+            const { thread } = mkThread({
+                room,
+                client,
+                authorId: myUserId,
+                participantUserIds: ["@alice:example.org"],
+                length: 3,
+            });
+            await emitPromise(thread, ThreadEvent.Update);
+            expect(thread.length).toBe(2);
+            const mock = jest.spyOn(thread, "resetLiveTimeline");
+            mock.mockReturnValue(Promise.resolve());
+
+            room.resetLiveTimeline("b1", "f1");
+            expect(mock).toHaveBeenCalledWith("b1", "f1");
+        })
     });
 });
