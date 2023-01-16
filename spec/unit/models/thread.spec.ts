@@ -411,6 +411,6 @@ describe("Thread", () => {
 
             room.resetLiveTimeline("b1", "f1");
             expect(mock).toHaveBeenCalledWith("b1", "f1");
-        })
+        });
     });
 });
