@@ -14,15 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    PollStartEvent,
-    M_POLL_KIND_DISCLOSED,
-    M_POLL_RESPONSE,
-    REFERENCE_RELATION,
-    M_POLL_END,
-} from "matrix-events-sdk";
-
 import { IEvent, MatrixEvent, PollEvent } from "../../../src";
+import { REFERENCE_RELATION } from "../../../src/@types/extensible_events";
+import { M_POLL_END, M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE } from "../../../src/@types/polls";
+import { PollStartEvent } from "../../../src/extensible_events_v1/PollStartEvent";
 import { Poll } from "../../../src/models/poll";
 import { getMockClientWithEventEmitter } from "../../test-utils/client";
 

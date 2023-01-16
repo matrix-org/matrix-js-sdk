@@ -47,7 +47,7 @@ const filterResponseRelations = (
             return;
         }
         return (
-            M_POLL_END.matches(event.getType()) &&
+            M_POLL_RESPONSE.matches(event.getType()) &&
             // From MSC3381:
             // "Votes sent on or before the end event's timestamp are valid votes"
             event.getTs() <= pollEndTimestamp
