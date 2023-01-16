@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RELATES_TO_RELATIONSHIP, REFERENCE_RELATION } from "matrix-events-sdk";
-
+import { RelatesToRelationship, REFERENCE_RELATION } from "./extensible_events";
 import { UnstableValue } from "../NamespacedValue";
 import { MAssetEvent, MLocationEvent, MTimestampEvent } from "./location";
 
@@ -138,4 +137,4 @@ export type MBeaconEventContent = MLocationEvent &
     // timestamp when location was taken
     MTimestampEvent &
     // relates to a beacon_info event
-    RELATES_TO_RELATIONSHIP<typeof REFERENCE_RELATION>;
+    RelatesToRelationship<typeof REFERENCE_RELATION>;

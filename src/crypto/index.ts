@@ -3433,6 +3433,8 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
         const algorithm = content.algorithm;
         const deviceKey = content.sender_key;
 
+        this.baseApis.emit(ClientEvent.UndecryptableToDeviceEvent, event);
+
         // retry decryption for all events sent by the sender_key.  This will
         // update the events to show a message indicating that the olm session was
         // wedged.

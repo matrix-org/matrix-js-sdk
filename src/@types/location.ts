@@ -18,7 +18,7 @@ limitations under the License.
 import { EitherAnd } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue";
-import { TEXT_NODE_TYPE } from "./extensible_events";
+import { M_TEXT } from "./extensible_events";
 
 export enum LocationAssetType {
     Self = "m.self",
@@ -50,7 +50,7 @@ export type MLocationEvent = EitherAnd<
     { [M_LOCATION.altName]: MLocationContent }
 >;
 
-export type MTextEvent = EitherAnd<{ [TEXT_NODE_TYPE.name]: string }, { [TEXT_NODE_TYPE.altName]: string }>;
+export type MTextEvent = EitherAnd<{ [M_TEXT.name]: string }, { [M_TEXT.altName]: string }>;
 
 /* From the spec at:
  * https://github.com/matrix-org/matrix-doc/blob/matthew/location/proposals/3488-location.md
