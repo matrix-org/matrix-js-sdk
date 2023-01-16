@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_END, M_POLL_RESPONSE, PollStartEvent } from "matrix-events-sdk";
-
+import { M_POLL_END, M_POLL_RESPONSE, PollStartEvent } from "../@types/polls";
 import { MatrixClient } from "../client";
 import { MatrixEvent } from "./event";
 import { Relations } from "./relations";
@@ -48,7 +47,7 @@ const filterResponseRelations = (
             return;
         }
         return (
-            M_POLL_RESPONSE.matches(event.getType()) &&
+            M_POLL_END.matches(event.getType()) &&
             // From MSC3381:
             // "Votes sent on or before the end event's timestamp are valid votes"
             event.getTs() <= pollEndTimestamp
@@ -71,7 +70,8 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
             throw new Error("Invalid poll start event.");
         }
         this.roomId = this.rootEvent.getRoomId()!;
-        this.pollEvent = this.rootEvent.unstableExtensibleEvent as PollStartEvent;
+        // @TODO(kerrya) proper way to do this?
+        this.pollEvent = this.rootEvent.unstableExtensibleEvent as unknown as PollStartEvent;
     }
 
     public get pollId(): string {
