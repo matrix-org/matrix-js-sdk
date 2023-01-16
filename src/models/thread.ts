@@ -361,7 +361,10 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
     /**
      * Reset the live timeline of all timelineSets, and start new ones.
      *
-     * <p>This is used when /sync returns a 'limited' timeline.
+     * <p>This is used when /sync returns a 'limited' timeline. 'Limited' means that there's a gap between the messages
+     * /sync returned, and the last known message in our timeline. In such a case, our live timeline isn't live anymore
+     * and has to be replaced by a new one. To make sure we can continue paginating our timelines correctly, we have to
+     * set new pagination tokens on the old and the new timeline.
      *
      * @param backPaginationToken -   token for back-paginating the new timeline
      * @param forwardPaginationToken - token for forward-paginating the old live timeline,

@@ -285,7 +285,11 @@ describe("Thread", () => {
     });
 
     describe("resetLiveTimeline", () => {
-        it("correctly resets the live timeline", async () => {
+        // ResetLiveTimeline is used when we have missing messages between the current live timeline's end and newly
+        // received messages. In that case, we want to replace the existing live timeline. To ensure pagination
+        // continues working correctly, new pagination tokens need to be set on both the old live timeline (which is
+        // now a regular timeline) and the new live timeline.
+        it("replaces the live timeline and correctly sets pagination tokens", async () => {
             const myUserId = "@bob:example.org";
             const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
                 timelineSupport: false,
@@ -334,7 +338,12 @@ describe("Thread", () => {
             ]);
         });
 
-        it("does not modify changed tokens", async () => {
+        // As the pagination tokens cannot be used right now, resetLiveTimeline needs to replace them before they can
+        // be used. But if in the future the bug in synapse is fixed, and they can actually be used, we can get into a
+        // state where the client has paginated (and changed the tokens) while resetLiveTimeline tries to set the
+        // corrected tokens. To prevent such a race condition, we make sure that resetLiveTimeline respects any
+        // changes done to the pagination tokens.
+        it("replaces the live timeline but does not replace changed pagination tokens", async () => {
             const myUserId = "@bob:example.org";
             const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
                 timelineSupport: false,
