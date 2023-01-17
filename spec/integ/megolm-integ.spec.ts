@@ -424,12 +424,17 @@ describe("megolm", () => {
 
     it("Alice receives a megolm message", async () => {
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
-
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
@@ -472,15 +477,20 @@ describe("megolm", () => {
         expect(decryptedEvent.getContent().body).toEqual("42");
     });
 
-    it("Alice receives a megolm message before the session keys", async () => {
+    oldBackendOnly("Alice receives a megolm message before the session keys", async () => {
         // https://github.com/vector-im/element-web/issues/2273
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
-
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         // make the room_key event, but don't send it yet
         const roomKeyEncrypted = encryptGroupSessionKey({
@@ -535,12 +545,17 @@ describe("megolm", () => {
 
     it("Alice gets a second room_key message", async () => {
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
-
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         // make the room_key event
         const roomKeyEncrypted1 = encryptGroupSessionKey({
@@ -972,14 +987,19 @@ describe("megolm", () => {
         await Promise.all([downloadPromise, sendPromise]);
     });
 
-    it("Alice exports megolm keys and imports them to a new device", async () => {
+    oldBackendOnly("Alice exports megolm keys and imports them to a new device", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         // establish an olm session with alice
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
-
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
@@ -1031,7 +1051,11 @@ describe("megolm", () => {
         await aliceTestClient.client.importRoomKeys(exported);
         await aliceTestClient.start();
 
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
 
         const syncResponse = {
             next_batch: 1,
@@ -1107,12 +1131,17 @@ describe("megolm", () => {
 
     it("Alice can decrypt a message with falsey content", async () => {
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
-
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
@@ -1165,8 +1194,15 @@ describe("megolm", () => {
         await beccaTestClient.client.initCrypto();
 
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         await beccaTestClient.start();
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto!.deviceList.getDeviceByIdentityKey = () => device;
+            aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
+        }
 
         const beccaRoom = new Room(ROOM_ID, beccaTestClient.client, "@becca:localhost", {});
         beccaTestClient.client.store.storeRoom(beccaRoom);
@@ -1193,8 +1229,6 @@ describe("megolm", () => {
         event.claimedEd25519Key = null;
 
         const device = new DeviceInfo(beccaTestClient.client.deviceId!);
-        aliceTestClient.client.crypto!.deviceList.getDeviceByIdentityKey = () => device;
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
 
         // Create an olm session for Becca and Alice's devices
         const aliceOtks = await aliceTestClient.awaitOneTimeKeyUpload();
