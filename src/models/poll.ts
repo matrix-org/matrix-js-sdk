@@ -19,6 +19,7 @@ import { M_POLL_END, M_POLL_RESPONSE, PollStartEvent } from "../@types/polls";
 import { MatrixClient } from "../client";
 import { MatrixEvent } from "./event";
 import { Relations } from "./relations";
+import { Room } from "./room";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum PollEvent {
@@ -49,8 +50,7 @@ const filterResponseRelations = (
         }
         return (
             M_POLL_RESPONSE.matches(event.getType()) &&
-            // From MSC3381:
-            // "Votes sent on or before the end event's timestamp are valid votes"
+            // From MSC3381: "Votes sent on or before the end event's timestamp are valid votes"
             event.getTs() <= pollEndTimestamp
         );
     });
@@ -66,13 +66,12 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     private responses: null | Relations = null;
     private endEvent: MatrixEvent | undefined;
 
-    public constructor(private rootEvent: MatrixEvent, private matrixClient: MatrixClient) {
+    public constructor(private rootEvent: MatrixEvent, private matrixClient: MatrixClient, private room: Room) {
         super();
         if (!this.rootEvent.getRoomId() || !this.rootEvent.getId()) {
             throw new Error("Invalid poll start event.");
         }
         this.roomId = this.rootEvent.getRoomId()!;
-        // @TODO(kerrya) proper way to do this?
         this.pollEvent = this.rootEvent.unstableExtensibleEvent as unknown as PollStartEvent;
     }
 
@@ -110,7 +109,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
      * @returns void
      */
     public onNewRelation(event: MatrixEvent): void {
-        if (M_POLL_END.matches(event.getType())) {
+        if (M_POLL_END.matches(event.getType()) && this.validateEndEvent(event)) {
             this.endEvent = event;
             this.refilterResponsesOnEnd();
             this.emit(PollEvent.End);
@@ -159,8 +158,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         console.log('hhh', { responses});
 
         const pollEndEvent = allRelations.events.find((event) => M_POLL_END.matches(event.getType()));
-        // @TODO(kerrya) only emit on change not page
-        if (pollEndEvent) {
+        if (this.validateEndEvent(pollEndEvent)) {
             this.endEvent = pollEndEvent;
             this.refilterResponsesOnEnd();
             this.emit(PollEvent.End);
@@ -189,7 +187,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     }
 
     /**
-     * Only responses made before the poll ended are valid
+     * Only responses made before the poll ended are vali
      * Refilter after an end event is recieved
      * To ensure responses are valid
      */
@@ -206,5 +204,27 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         });
 
         this.emit(PollEvent.Responses, this.responses);
+    }
+
+    private validateEndEvent(endEvent?: MatrixEvent): boolean {
+        if (!endEvent) {
+            return false;
+        }
+        /**
+         * Repeated end events are ignored -
+         * only the first (valid) closure event by origin_server_ts is counted.
+         */
+        if (this.endEvent && this.endEvent.getTs() < endEvent.getTs()) {
+            return false;
+        }
+
+        /**
+         * MSC3381
+         * If a m.poll.end event is received from someone other than the poll creator or user with permission to redact
+         * other's messages in the room, the event must be ignored by clients due to being invalid.
+         */
+        const roomCurrentState = this.room.currentState;
+        const endEventSender = endEvent.getSender();
+        return !!endEventSender && roomCurrentState.maySendRedactionForEvent(this.rootEvent, endEventSender);
     }
 }
