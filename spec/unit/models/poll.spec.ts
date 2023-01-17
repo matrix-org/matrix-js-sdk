@@ -88,8 +88,17 @@ describe("Poll", () => {
         it("calls relations api and emits", async () => {
             const poll = new Poll(basePollStartEvent, mockClient);
             const emitSpy = jest.spyOn(poll, "emit");
-            const responses = await poll.getResponses();
-            expect(mockClient.relations).toHaveBeenCalledWith(roomId, basePollStartEvent.getId(), "m.reference");
+            const fetchResponsePromise = poll.getResponses();
+            expect(poll.isFetchingResponses).toBe(true);
+            const responses = await fetchResponsePromise;
+            expect(poll.isFetchingResponses).toBe(false);
+            expect(mockClient.relations).toHaveBeenCalledWith(
+                roomId,
+                basePollStartEvent.getId(),
+                "m.reference",
+                undefined,
+                { from: undefined }
+            );
             expect(emitSpy).toHaveBeenCalledWith(PollEvent.Responses, responses);
         });
 
@@ -124,6 +133,10 @@ describe("Poll", () => {
             const poll = new Poll(basePollStartEvent, mockClient);
             const responses = await poll.getResponses();
             expect(responses.getRelations()).toEqual([stableResponseEvent, unstableResponseEvent]);
+        });
+
+        describe('with multiple pages of relations', () => {
+            
         });
 
         describe("with poll end event", () => {
