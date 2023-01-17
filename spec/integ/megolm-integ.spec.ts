@@ -17,6 +17,8 @@ limitations under the License.
 
 import anotherjson from "another-json";
 import MockHttpBackend from "matrix-mock-request";
+import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
@@ -38,8 +40,16 @@ import {
 } from "../../src/matrix";
 import { IDeviceKeys } from "../../src/crypto/dehydration";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
+import { CRYPTO_BACKENDS, InitCrypto } from "../test-utils/test-utils";
 
 const ROOM_ID = "!room:id";
+
+afterEach(() => {
+    // reset fake-indexeddb after each test, to make sure we don't leak connections
+    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
+    // eslint-disable-next-line no-global-assign
+    indexedDB = new IDBFactory();
+});
 
 // start an Olm session with a given recipient
 async function createOlmSession(olmAccount: Olm.Account, recipientTestClient: TestClient): Promise<Olm.Session> {
@@ -341,11 +351,17 @@ async function expectSendMegolmMessage(
     return JSON.parse(r.plaintext);
 }
 
-describe("megolm", () => {
+describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, initCrypto: InitCrypto) => {
     if (!global.Olm) {
+        // currently we use libolm to implement the crypto in the tests, so need it to be present.
         logger.warn("not running megolm tests: Olm not present");
         return;
     }
+
+    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
+    // Rust backend. Once we have full support in the rust sdk, it will go away.
+    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+
     const Olm = global.Olm;
 
     let testOlmAccount = {} as unknown as Olm.Account;
@@ -410,8 +426,10 @@ describe("megolm", () => {
 
     beforeEach(async () => {
         aliceTestClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs");
-        await aliceTestClient.client.initCrypto();
+        await initCrypto(aliceTestClient.client);
 
+        // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
+        await Olm.init();
         testOlmAccount = new Olm.Account();
         testOlmAccount.create();
         const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
@@ -615,7 +633,7 @@ describe("megolm", () => {
         expect(event.getContent().body).toEqual("42");
     });
 
-    it("Alice sends a megolm message", async () => {
+    oldBackendOnly("Alice sends a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -658,7 +676,7 @@ describe("megolm", () => {
         ]);
     });
 
-    it("We shouldn't attempt to send to blocked devices", async () => {
+    oldBackendOnly("We shouldn't attempt to send to blocked devices", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
         await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -702,7 +720,7 @@ describe("megolm", () => {
             expect(() => aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toThrowError("encryption disabled");
         });
 
-        it("should permit sending to unknown devices", async () => {
+        oldBackendOnly("should permit sending to unknown devices", async () => {
             expect(aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toBeTruthy();
 
             aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -760,7 +778,7 @@ describe("megolm", () => {
             );
         });
 
-        it("should disable sending to unverified devices", async () => {
+        oldBackendOnly("should disable sending to unverified devices", async () => {
             aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await aliceTestClient.start();
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -818,7 +836,7 @@ describe("megolm", () => {
         });
     });
 
-    it("We should start a new megolm session when a device is blocked", async () => {
+    oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -876,7 +894,7 @@ describe("megolm", () => {
     });
 
     // https://github.com/vector-im/element-web/issues/2676
-    it("Alice should send to her other devices", async () => {
+    oldBackendOnly("Alice should send to her other devices", async () => {
         // for this test, we make the testOlmAccount be another of Alice's devices.
         // it ought to get included in messages Alice sends.
         await aliceTestClient.start();
@@ -957,7 +975,7 @@ describe("megolm", () => {
         expect(decrypted.content?.body).toEqual("test");
     });
 
-    it("Alice should wait for device list to complete when sending a megolm message", async () => {
+    oldBackendOnly("Alice should wait for device list to complete when sending a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
         await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -1047,7 +1065,7 @@ describe("megolm", () => {
         aliceTestClient.stop();
 
         aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
-        await aliceTestClient.client.initCrypto();
+        await initCrypto(aliceTestClient.client);
         await aliceTestClient.client.importRoomKeys(exported);
         await aliceTestClient.start();
 
@@ -1189,7 +1207,7 @@ describe("megolm", () => {
         expect(decryptedEvent.getClearContent()).toBeUndefined();
     });
 
-    it("Alice receives shared history before being invited to a room by the sharer", async () => {
+    oldBackendOnly("Alice receives shared history before being invited to a room by the sharer", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
         await beccaTestClient.client.initCrypto();
 
@@ -1341,7 +1359,7 @@ describe("megolm", () => {
         await beccaTestClient.stop();
     });
 
-    it("Alice receives shared history before being invited to a room by someone else", async () => {
+    oldBackendOnly("Alice receives shared history before being invited to a room by someone else", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
         await beccaTestClient.client.initCrypto();
 
@@ -1487,7 +1505,7 @@ describe("megolm", () => {
         await beccaTestClient.stop();
     });
 
-    it("allows sending an encrypted event as soon as room state arrives", async () => {
+    oldBackendOnly("allows sending an encrypted event as soon as room state arrives", async () => {
         /* Empirically, clients expect to be able to send encrypted events as soon as the
          * RoomStateEvent.NewMember notification is emitted, so test that works correctly.
          */
@@ -1612,7 +1630,7 @@ describe("megolm", () => {
             await aliceTestClient.httpBackend.flush(membersPath, 1);
         }
 
-        it("Sending an event initiates a member list sync", async () => {
+        oldBackendOnly("Sending an event initiates a member list sync", async () => {
             // we expect a call to the /members list...
             const memberListPromise = expectMembershipRequest(ROOM_ID, ["@bob:xyz"]);
 
@@ -1644,7 +1662,7 @@ describe("megolm", () => {
             ]);
         });
 
-        it("loading the membership list inhibits a later load", async () => {
+        oldBackendOnly("loading the membership list inhibits a later load", async () => {
             const room = aliceTestClient.client.getRoom(ROOM_ID)!;
             await Promise.all([room.loadMembersIfNeeded(), expectMembershipRequest(ROOM_ID, ["@bob:xyz"])]);
 
@@ -1676,7 +1694,7 @@ describe("megolm", () => {
         // TODO: there are a bunch more tests for this sort of thing in spec/unit/crypto/algorithms/megolm.spec.ts.
         //   They should be converted to integ tests and moved.
 
-        it("does not block decryption on an 'm.unavailable' report", async function () {
+        oldBackendOnly("does not block decryption on an 'm.unavailable' report", async function () {
             await aliceTestClient.start();
 
             // there may be a key downloads for alice
