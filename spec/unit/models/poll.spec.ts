@@ -14,20 +14,24 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { IEvent, MatrixEvent, PollEvent } from "../../../src";
+import { IEvent, MatrixEvent, PollEvent, Room } from "../../../src";
 import { REFERENCE_RELATION } from "../../../src/@types/extensible_events";
 import { M_POLL_END, M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE } from "../../../src/@types/polls";
 import { PollStartEvent } from "../../../src/extensible_events_v1/PollStartEvent";
 import { Poll } from "../../../src/models/poll";
-import { getMockClientWithEventEmitter } from "../../test-utils/client";
+import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
 
 jest.useFakeTimers();
 
 describe("Poll", () => {
+    const userId = "@alice:server.org";
     const mockClient = getMockClientWithEventEmitter({
+        ...mockClientMethodsUser(userId),
         relations: jest.fn(),
     });
     const roomId = "!room:server";
+    const room = new Room(roomId, mockClient, userId);
+    const maySendRedactionForEventSpy = jest.spyOn(room.currentState, "maySendRedactionForEvent");
     // 14.03.2022 16:15
     const now = 1647270879403;
 
@@ -42,6 +46,8 @@ describe("Poll", () => {
         jest.setSystemTime(now);
 
         mockClient.relations.mockResolvedValue({ events: [] });
+
+        maySendRedactionForEventSpy.mockClear().mockReturnValue(true);
     });
 
     let eventId = 1;
@@ -62,7 +68,7 @@ describe("Poll", () => {
     };
 
     it("initialises with root event", () => {
-        const poll = new Poll(basePollStartEvent, mockClient);
+        const poll = new Poll(basePollStartEvent, mockClient, room);
         expect(poll.roomId).toEqual(roomId);
         expect(poll.pollId).toEqual(basePollStartEvent.getId());
         expect(poll.pollEvent).toEqual(basePollStartEvent.unstableExtensibleEvent);
@@ -73,7 +79,7 @@ describe("Poll", () => {
         const pollStartEvent = new MatrixEvent(
             PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
         );
-        expect(() => new Poll(pollStartEvent, mockClient)).toThrowError("Invalid poll start event.");
+        expect(() => new Poll(pollStartEvent, mockClient, room)).toThrowError("Invalid poll start event.");
     });
 
     it("throws when poll start has no event id", () => {
@@ -81,12 +87,12 @@ describe("Poll", () => {
             ...PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
             room_id: roomId,
         });
-        expect(() => new Poll(pollStartEvent, mockClient)).toThrowError("Invalid poll start event.");
+        expect(() => new Poll(pollStartEvent, mockClient, room)).toThrowError("Invalid poll start event.");
     });
 
     describe("fetching responses", () => {
         it("calls relations api and emits", async () => {
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             const emitSpy = jest.spyOn(poll, "emit");
             const responses = await poll.getResponses();
             expect(mockClient.relations).toHaveBeenCalledWith(roomId, basePollStartEvent.getId(), "m.reference");
@@ -94,7 +100,7 @@ describe("Poll", () => {
         });
 
         it("returns existing responses object after initial fetch", async () => {
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             const responses = await poll.getResponses();
             const responses2 = await poll.getResponses();
             // only fetched relations once
@@ -104,7 +110,7 @@ describe("Poll", () => {
         });
 
         it("waits for existing relations request to finish when getting responses", async () => {
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             const firstResponsePromise = poll.getResponses();
             const secondResponsePromise = poll.getResponses();
             await firstResponsePromise;
@@ -121,14 +127,14 @@ describe("Poll", () => {
             mockClient.relations.mockResolvedValue({
                 events: [replyEvent, stableResponseEvent, unstableResponseEvent],
             });
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             const responses = await poll.getResponses();
             expect(responses.getRelations()).toEqual([stableResponseEvent, unstableResponseEvent]);
         });
 
         describe("with poll end event", () => {
-            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable! });
-            const unstablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.unstable! });
+            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: "@bob@server.org" });
+            const unstablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.unstable!, sender: "@bob@server.org" });
             const responseEventBeforeEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now - 1000);
             const responseEventAtEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
             const responseEventAfterEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now + 1000);
@@ -140,19 +146,31 @@ describe("Poll", () => {
             });
 
             it("sets poll end event with stable event type", async () => {
-                const poll = new Poll(basePollStartEvent, mockClient);
+                const poll = new Poll(basePollStartEvent, mockClient, room);
                 jest.spyOn(poll, "emit");
                 await poll.getResponses();
 
+                expect(maySendRedactionForEventSpy).toHaveBeenCalledWith(basePollStartEvent, "@bob@server.org");
                 expect(poll.isEnded).toBe(true);
                 expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
+            });
+
+            it("does not set poll end event when sent by invalid user", async () => {
+                const poll = new Poll(basePollStartEvent, mockClient, room);
+                maySendRedactionForEventSpy.mockReturnValue(false);
+                jest.spyOn(poll, "emit");
+                await poll.getResponses();
+
+                expect(maySendRedactionForEventSpy).toHaveBeenCalledWith(basePollStartEvent, "@bob@server.org");
+                expect(poll.isEnded).toBe(false);
+                expect(poll.emit).not.toHaveBeenCalledWith(PollEvent.End);
             });
 
             it("sets poll end event with unstable event type", async () => {
                 mockClient.relations.mockResolvedValue({
                     events: [unstablePollEndEvent],
                 });
-                const poll = new Poll(basePollStartEvent, mockClient);
+                const poll = new Poll(basePollStartEvent, mockClient, room);
                 jest.spyOn(poll, "emit");
                 await poll.getResponses();
 
@@ -161,7 +179,7 @@ describe("Poll", () => {
             });
 
             it("filters out responses that were sent after poll end", async () => {
-                const poll = new Poll(basePollStartEvent, mockClient);
+                const poll = new Poll(basePollStartEvent, mockClient, room);
                 const responses = await poll.getResponses();
 
                 // just response type events
@@ -173,7 +191,7 @@ describe("Poll", () => {
 
     describe("onNewRelation()", () => {
         it("discards response if poll responses have not been initialised", () => {
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             jest.spyOn(poll, "emit");
             const responseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
 
@@ -184,24 +202,107 @@ describe("Poll", () => {
         });
 
         it("sets poll end event when responses are not initialised", () => {
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             jest.spyOn(poll, "emit");
-            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable! });
+            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: userId });
 
             poll.onNewRelation(stablePollEndEvent);
 
             expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
         });
 
+        it("does not set poll end event when sent by invalid user", async () => {
+            maySendRedactionForEventSpy.mockReturnValue(false);
+            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: "@charlie:server.org" });
+            const responseEventAfterEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now + 1000);
+            mockClient.relations.mockResolvedValue({
+                events: [responseEventAfterEnd],
+            });
+            const poll = new Poll(basePollStartEvent, mockClient, room);
+            await poll.getResponses();
+            jest.spyOn(poll, "emit");
+
+            poll.onNewRelation(stablePollEndEvent);
+
+            // didn't end, didn't refilter responses
+            expect(poll.emit).not.toHaveBeenCalled();
+            expect(poll.isEnded).toBeFalsy();
+            expect(maySendRedactionForEventSpy).toHaveBeenCalledWith(basePollStartEvent, "@charlie:server.org");
+        });
+
+        it("does not set poll end event when an earlier end event already exists", async () => {
+            const earlierPollEndEvent = makeRelatedEvent(
+                { type: M_POLL_END.stable!, sender: "@valid:server.org" },
+                now,
+            );
+            const laterPollEndEvent = makeRelatedEvent(
+                { type: M_POLL_END.stable!, sender: "@valid:server.org" },
+                now + 2000,
+            );
+
+            const poll = new Poll(basePollStartEvent, mockClient, room);
+            await poll.getResponses();
+
+            poll.onNewRelation(earlierPollEndEvent);
+
+            // first end event set correctly
+            expect(poll.isEnded).toBeTruthy();
+
+            // reset spy count
+            jest.spyOn(poll, "emit").mockClear();
+
+            poll.onNewRelation(laterPollEndEvent);
+            // didn't set new end event, didn't refilter responses
+            expect(poll.emit).not.toHaveBeenCalled();
+            expect(poll.isEnded).toBeTruthy();
+        });
+
+        it("replaces poll end event and refilters when an older end event already exists", async () => {
+            const earlierPollEndEvent = makeRelatedEvent(
+                { type: M_POLL_END.stable!, sender: "@valid:server.org" },
+                now,
+            );
+            const laterPollEndEvent = makeRelatedEvent(
+                { type: M_POLL_END.stable!, sender: "@valid:server.org" },
+                now + 2000,
+            );
+            const responseEventBeforeEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now - 1000);
+            const responseEventAtEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
+            const responseEventAfterEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now + 1000);
+            mockClient.relations.mockResolvedValue({
+                events: [responseEventAfterEnd, responseEventAtEnd, responseEventBeforeEnd, laterPollEndEvent],
+            });
+
+            const poll = new Poll(basePollStartEvent, mockClient, room);
+            const responses = await poll.getResponses();
+
+            // all responses have a timestamp < laterPollEndEvent
+            expect(responses.getRelations().length).toEqual(3);
+            // first end event set correctly
+            expect(poll.isEnded).toBeTruthy();
+
+            // reset spy count
+            jest.spyOn(poll, "emit").mockClear();
+
+            // add a valid end event with earlier timestamp
+            poll.onNewRelation(earlierPollEndEvent);
+
+            // emitted new end event
+            expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
+            // filtered responses and emitted
+            expect(poll.emit).toHaveBeenCalledWith(PollEvent.Responses, responses);
+            expect(responses.getRelations()).toEqual([responseEventAtEnd, responseEventBeforeEnd]);
+        });
+
         it("sets poll end event and refilters responses based on timestamp", async () => {
-            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable! });
+            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: userId });
             const responseEventBeforeEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now - 1000);
             const responseEventAtEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
             const responseEventAfterEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now + 1000);
             mockClient.relations.mockResolvedValue({
                 events: [responseEventAfterEnd, responseEventAtEnd, responseEventBeforeEnd],
             });
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             const responses = await poll.getResponses();
             jest.spyOn(poll, "emit");
 
@@ -216,7 +317,7 @@ describe("Poll", () => {
         });
 
         it("filters out irrelevant relations", async () => {
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             // init responses
             const responses = await poll.getResponses();
             jest.spyOn(poll, "emit");
@@ -230,7 +331,7 @@ describe("Poll", () => {
         });
 
         it("adds poll response relations to responses", async () => {
-            const poll = new Poll(basePollStartEvent, mockClient);
+            const poll = new Poll(basePollStartEvent, mockClient, room);
             // init responses
             const responses = await poll.getResponses();
             jest.spyOn(poll, "emit");

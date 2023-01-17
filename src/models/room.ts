@@ -1899,7 +1899,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const processPollStartEvent = (event: MatrixEvent): void => {
             if (!M_POLL_START.matches(event.getType())) return;
             try {
-                const poll = new Poll(event, this.client);
+                const poll = new Poll(event, this.client, this);
                 this.polls.set(event.getId()!, poll);
                 this.emit(PollEvent.New, poll);
             } catch {}
