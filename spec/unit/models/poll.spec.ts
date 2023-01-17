@@ -45,7 +45,7 @@ describe("Poll", () => {
         jest.clearAllMocks();
         jest.setSystemTime(now);
 
-        mockClient.relations.mockResolvedValue({ events: [] });
+        mockClient.relations.mockReset().mockResolvedValue({ events: [] });
 
         maySendRedactionForEventSpy.mockClear().mockReturnValue(true);
     });
@@ -103,7 +103,7 @@ describe("Poll", () => {
                 basePollStartEvent.getId(),
                 "m.reference",
                 undefined,
-                { from: undefined }
+                { from: undefined },
             );
             expect(emitSpy).toHaveBeenCalledWith(PollEvent.Responses, responses);
         });
@@ -141,8 +141,46 @@ describe("Poll", () => {
             expect(responses.getRelations()).toEqual([stableResponseEvent, unstableResponseEvent]);
         });
 
-        describe('with multiple pages of relations', () => {
-            
+        describe("with multiple pages of relations", () => {
+            const makeResponses = (count = 1, timestamp = now): MatrixEvent[] =>
+                new Array(count)
+                    .fill("x")
+                    .map((_x, index) =>
+                        makeRelatedEvent(
+                            { type: M_POLL_RESPONSE.stable!, sender: "@bob@server.org" },
+                            timestamp + index,
+                        ),
+                    );
+
+            it("page relations responses", async () => {
+                const responseEvents = makeResponses(6);
+                mockClient.relations
+                    .mockResolvedValueOnce({
+                        events: responseEvents.slice(0, 2),
+                        nextBatch: "test-next-1",
+                    })
+                    .mockResolvedValueOnce({
+                        events: responseEvents.slice(2, 4),
+                        nextBatch: "test-next-2",
+                    })
+                    .mockResolvedValueOnce({
+                        events: responseEvents.slice(4),
+                    });
+
+                const poll = new Poll(basePollStartEvent, mockClient, room);
+                jest.spyOn(poll, "emit");
+                const responses = await poll.getResponses();
+
+                expect(mockClient.relations.mock.calls).toEqual([
+                    [roomId, basePollStartEvent.getId(), "m.reference", undefined, { from: undefined }],
+                    [roomId, basePollStartEvent.getId(), "m.reference", undefined, { from: "test-next-1" }],
+                    [roomId, basePollStartEvent.getId(), "m.reference", undefined, { from: "test-next-2" }],
+                ]);
+
+                expect(poll.emit).toHaveBeenCalledTimes(3);
+                expect(poll.isFetchingResponses).toBeFalsy();
+                expect(responses.getRelations().length).toEqual(6);
+            });
         });
 
         describe("with poll end event", () => {

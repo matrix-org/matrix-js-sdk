@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { toUnicode } from "punycode";
 import { M_POLL_END, M_POLL_RESPONSE, PollStartEvent } from "../@types/polls";
 import { MatrixClient } from "../client";
 import { MatrixEvent } from "./event";
@@ -61,7 +60,7 @@ const filterResponseRelations = (
 export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, PollEventHandlerMap> {
     public readonly roomId: string;
     public readonly pollEvent: PollStartEvent;
-    private _isFetchingResponses: boolean = false;
+    private _isFetchingResponses = false;
     private relationsNextBatch: string | undefined;
     private responses: null | Relations = null;
     private endEvent: MatrixEvent | undefined;
@@ -134,28 +133,23 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     private async fetchResponses(): Promise<void> {
         this._isFetchingResponses = true;
 
-        console.log('hhh', 'fetchResponses', this.relationsNextBatch);
         // we want:
         // - stable and unstable M_POLL_RESPONSE
         // - stable and unstable M_POLL_END
         // so make one api call and filter by event type client side
         const allRelations = await this.matrixClient.relations(
-            this.roomId, 
+            this.roomId,
             this.rootEvent.getId()!,
             "m.reference",
             undefined,
             {
-                from: this.relationsNextBatch || undefined
-            }
-            );
+                from: this.relationsNextBatch || undefined,
+            },
+        );
 
-        // @TODO(kerrya) paging results
-
-        const responses = this.responses || new Relations("m.reference", M_POLL_RESPONSE.name, this.matrixClient, [
-            M_POLL_RESPONSE.altName!,
-        ]);
-
-        console.log('hhh', { responses});
+        const responses =
+            this.responses ||
+            new Relations("m.reference", M_POLL_RESPONSE.name, this.matrixClient, [M_POLL_RESPONSE.altName!]);
 
         const pollEndEvent = allRelations.events.find((event) => M_POLL_END.matches(event.getType()));
         if (this.validateEndEvent(pollEndEvent)) {
@@ -175,10 +169,12 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         this.relationsNextBatch = allRelations.nextBatch ?? undefined;
         this.responses = responses;
         this.emit(PollEvent.Responses, this.responses);
-        
+
         // while there are more pages of relations
         // fetch them
         if (this.relationsNextBatch) {
+            // don't await
+            // we want to return the first page as soon as possible
             this.fetchResponses();
         } else {
             // no more pages
