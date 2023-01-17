@@ -82,7 +82,8 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     }
 
     public async getResponses(): Promise<Relations> {
-        // if we have already fetched the responses just return them
+        // if we have already fetched the responses
+        // just return them
         if (this.responses) {
             return this.responses;
         }
@@ -124,7 +125,8 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     private async fetchResponses(): Promise<void> {
         // we want:
         // - stable and unstable M_POLL_RESPONSE
-        // - stable and unstable M_POLL_END so make one api call and filter by event type client side
+        // - stable and unstable M_POLL_END
+        // so make one api call and filter by event type client side
         const allRelations = await this.matrixClient.relations(this.roomId, this.rootEvent.getId()!, "m.reference");
 
         // @TODO(kerrya) paging results
@@ -152,8 +154,9 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     }
 
     /**
-     * Only responses made before the poll ended are valid Refilter after an end event is recieved To ensure responses
-     * are valid
+     * Only responses made before the poll ended are vali
+     * Refilter after an end event is recieved
+     * To ensure responses are valid
      */
     private refilterResponsesOnEnd(): void {
         if (!this.responses) {
