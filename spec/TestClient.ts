@@ -115,13 +115,12 @@ export class TestClient {
     }
 
     /**
-     * Set up expectations that the client will upload device keys.
+     * Set up expectations that the client will upload device keys (and possibly one-time keys)
      */
     public expectDeviceKeyUpload() {
         this.httpBackend
             .when("POST", "/keys/upload")
             .respond<IKeysUploadResponse, IUploadKeysRequest>(200, (_path, content) => {
-                expect(content.one_time_keys).toBe(undefined);
                 expect(content.device_keys).toBeTruthy();
 
                 logger.log(this + ": received device keys");
@@ -129,7 +128,17 @@ export class TestClient {
                 expect(Object.keys(this.oneTimeKeys!).length).toEqual(0);
 
                 this.deviceKeys = content.device_keys;
-                return { one_time_key_counts: { signed_curve25519: 0 } };
+
+                // the first batch of one-time keys may be uploaded at the same time.
+                if (content.one_time_keys) {
+                    logger.log(`${this}: received ${Object.keys(content.one_time_keys).length} one-time keys`);
+                    this.oneTimeKeys = content.one_time_keys;
+                }
+                return {
+                    one_time_key_counts: {
+                        signed_curve25519: Object.keys(this.oneTimeKeys!).length,
+                    },
+                };
             });
     }
 
