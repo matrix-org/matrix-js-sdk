@@ -332,11 +332,7 @@ export type SlidingSyncEventHandlerMap = {
         resp: MSC3575SlidingSyncResponse | null,
         err?: Error,
     ) => void;
-    [SlidingSyncEvent.List]: (
-        listKey: string,
-        joinedCount: number,
-        roomIndexToRoomId: Record<number, string>,
-    ) => void;
+    [SlidingSyncEvent.List]: (listKey: string, joinedCount: number, roomIndexToRoomId: Record<number, string>) => void;
 };
 
 /**
@@ -948,12 +944,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                 if (!list) {
                     return;
                 }
-                this.emit(
-                    SlidingSyncEvent.List,
-                    listKey,
-                    list.joinedCount,
-                    Object.assign({}, list.roomIndexToRoomId),
-                );
+                this.emit(SlidingSyncEvent.List, listKey, list.joinedCount, Object.assign({}, list.roomIndexToRoomId));
             });
 
             this.resolveTransactionDefers(resp.txn_id);

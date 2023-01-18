@@ -137,7 +137,7 @@ describe("SlidingSync", () => {
                 .respond(200, function () {
                     return {
                         pos: "11",
-                        lists: { "a": { count: 5 } },
+                        lists: { a: { count: 5 } },
                         extensions: {},
                         txn_id: txnId,
                     };
@@ -161,7 +161,7 @@ describe("SlidingSync", () => {
                 .respond(200, function () {
                     return {
                         pos: "12",
-                        lists: { "a": { count: 5 } },
+                        lists: { a: { count: 5 } },
                         extensions: {},
                     };
                 });
@@ -193,7 +193,7 @@ describe("SlidingSync", () => {
                 .respond(200, function () {
                     return {
                         pos: "1",
-                        lists: { "a": { count: 6 } },
+                        lists: { a: { count: 6 } },
                         extensions: {},
                     };
                 });
@@ -414,7 +414,7 @@ describe("SlidingSync", () => {
                 .respond(200, {
                     pos: "a",
                     lists: {
-                        "a": {
+                        a: {
                             count: 500,
                             ops: [
                                 {
@@ -476,7 +476,7 @@ describe("SlidingSync", () => {
                 .respond(200, {
                     pos: "b",
                     lists: {
-                        "a": {
+                        a: {
                             count: 500,
                             ops: [
                                 {
@@ -521,10 +521,10 @@ describe("SlidingSync", () => {
                 .respond(200, {
                     pos: "c",
                     lists: {
-                        "a": {
+                        a: {
                             count: 500,
                         },
-                        "b": {
+                        b: {
                             count: 50,
                             ops: [
                                 {
@@ -559,7 +559,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "e",
                 lists: {
-                    "a": {
+                    a: {
                         count: 500,
                         ops: [
                             {
@@ -573,7 +573,7 @@ describe("SlidingSync", () => {
                             },
                         ],
                     },
-                    "b": {
+                    b: {
                         count: 50,
                     },
                 },
@@ -603,7 +603,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "f",
                 lists: {
-                    "a": {
+                    a: {
                         count: 500,
                         ops: [
                             {
@@ -617,7 +617,7 @@ describe("SlidingSync", () => {
                             },
                         ],
                     },
-                    "b": {
+                    b: {
                         count: 50,
                     },
                 },
@@ -644,7 +644,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "e",
                 lists: {
-                    "a": {
+                    a: {
                         count: 500,
                         ops: [
                             {
@@ -653,7 +653,7 @@ describe("SlidingSync", () => {
                             },
                         ],
                     },
-                    "b": {
+                    b: {
                         count: 50,
                     },
                 },
@@ -684,7 +684,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "g",
                 lists: {
-                    "a": {
+                    a: {
                         count: 42,
                         ops: [
                             {
@@ -698,7 +698,7 @@ describe("SlidingSync", () => {
                             },
                         ],
                     },
-                    "b": {
+                    b: {
                         count: 50,
                     },
                 },
@@ -742,7 +742,7 @@ describe("SlidingSync", () => {
                 pos: "f",
                 // currently the list is [B,C] so we will insert D then immediately delete it
                 lists: {
-                    "a": {
+                    a: {
                         count: 500,
                         ops: [
                             {
@@ -760,7 +760,7 @@ describe("SlidingSync", () => {
                             },
                         ],
                     },
-                    "b": {
+                    b: {
                         count: 50,
                     },
                 },
@@ -791,7 +791,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "g",
                 lists: {
-                    "a": {
+                    a: {
                         count: 499,
                         ops: [
                             {
@@ -800,7 +800,7 @@ describe("SlidingSync", () => {
                             },
                         ],
                     },
-                    "b": {
+                    b: {
                         count: 50,
                     },
                 },
@@ -832,7 +832,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "h",
                 lists: {
-                    "a": {
+                    a: {
                         count: 500,
                         ops: [
                             {
@@ -842,7 +842,7 @@ describe("SlidingSync", () => {
                             },
                         ],
                     },
-                    "b": {
+                    b: {
                         count: 50,
                     },
                 },
@@ -870,7 +870,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "h",
                 lists: {
-                    "a": {
+                    a: {
                         count: 501,
                         ops: [
                             {
@@ -880,7 +880,7 @@ describe("SlidingSync", () => {
                             },
                         ],
                     },
-                    "b": {
+                    b: {
                         count: 50,
                     },
                 },
@@ -909,11 +909,14 @@ describe("SlidingSync", () => {
         it("should handle insertions with a spurious DELETE correctly", async () => {
             slidingSync = new SlidingSync(
                 proxyBaseUrl,
-                new Map([["a",
-                    {
-                        ranges: [[0, 20]],
-                    },
-                ]]),
+                new Map([
+                    [
+                        "a",
+                        {
+                            ranges: [[0, 20]],
+                        },
+                    ],
+                ]),
                 {},
                 client!,
                 1,
@@ -922,7 +925,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "a",
                 lists: {
-                    "a": {
+                    a: {
                         count: 0,
                         ops: [],
                     },
@@ -936,7 +939,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "b",
                 lists: {
-                    "a": {
+                    a: {
                         count: 1,
                         ops: [
                             {
@@ -961,7 +964,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "c",
                 lists: {
-                    "a": {
+                    a: {
                         count: 1,
                         ops: [
                             {
@@ -987,7 +990,7 @@ describe("SlidingSync", () => {
             httpBackend!.when("POST", syncUrl).respond(200, {
                 pos: "c",
                 lists: {
-                    "a": {
+                    a: {
                         count: 1,
                         ops: [
                             {
@@ -1080,7 +1083,7 @@ describe("SlidingSync", () => {
                     return {
                         pos: "bbb",
                         txn_id: txnId,
-                        lists: { "a":{ count: 5 } },
+                        lists: { a: { count: 5 } },
                         extensions: {},
                     };
                 });
@@ -1107,7 +1110,7 @@ describe("SlidingSync", () => {
                     return {
                         pos: "ccc",
                         txn_id: txnId,
-                        lists: { "a":{ count: 5 } },
+                        lists: { a: { count: 5 } },
                         extensions: {},
                     };
                 });
@@ -1240,7 +1243,7 @@ describe("SlidingSync", () => {
                     return {
                         pos: "ccc",
                         txn_id: "bogus transaction id",
-                        lists: { "a":{ count: 5 } },
+                        lists: { a: { count: 5 } },
                         extensions: {},
                     };
                 });
