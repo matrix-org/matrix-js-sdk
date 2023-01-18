@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "23.0.0",
+    "version": "23.1.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=16.0.0"
@@ -143,5 +143,6 @@
         "outputDirectory": "coverage",
         "outputName": "jest-sonar-report.xml",
         "relativePaths": true
-    }
+    },
+    "typings": "./lib/index.d.ts"
 }

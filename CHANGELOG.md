@@ -1,3 +1,34 @@
+Changes in [23.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0) (2023-01-18)
+==================================================================================================
+
+## 🦖 Deprecations
+ * Remove extensible events v1 field population on legacy events ([\#3040](https://github.com/matrix-org/matrix-js-sdk/pull/3040)).
+
+## ✨ Features
+ * Improve hasUserReadEvent and getUserReadUpTo realibility with threads ([\#3031](https://github.com/matrix-org/matrix-js-sdk/pull/3031)). Fixes vector-im/element-web#24164.
+ * Remove video track when muting video ([\#3028](https://github.com/matrix-org/matrix-js-sdk/pull/3028)). Fixes vector-im/element-call#209.
+ * Make poll start event type available (PSG-962) ([\#3034](https://github.com/matrix-org/matrix-js-sdk/pull/3034)).
+ * Add alt event type matching in Relations model ([\#3018](https://github.com/matrix-org/matrix-js-sdk/pull/3018)).
+ * Remove usage of v1 Identity Server API ([\#3003](https://github.com/matrix-org/matrix-js-sdk/pull/3003)).
+ * Add `device_id` to `/account/whoami` types ([\#3005](https://github.com/matrix-org/matrix-js-sdk/pull/3005)).
+ * Implement MSC3912: Relation-based redactions ([\#2954](https://github.com/matrix-org/matrix-js-sdk/pull/2954)).
+ * Introduce a mechanism for using the rust-crypto-sdk ([\#2969](https://github.com/matrix-org/matrix-js-sdk/pull/2969)).
+ * Support MSC3391: Account data deletion ([\#2967](https://github.com/matrix-org/matrix-js-sdk/pull/2967)).
+
+## 🐛 Bug Fixes
+ * Fix threaded cache receipt when event holds multiple receipts ([\#3026](https://github.com/matrix-org/matrix-js-sdk/pull/3026)).
+ * Fix false key requests after verifying new device ([\#3029](https://github.com/matrix-org/matrix-js-sdk/pull/3029)). Fixes vector-im/element-web#24167 and vector-im/element-web#23333.
+ * Avoid triggering decryption errors when decrypting redacted events ([\#3004](https://github.com/matrix-org/matrix-js-sdk/pull/3004)). Fixes vector-im/element-web#24084.
+ * bugfix: upload OTKs in sliding sync mode ([\#3008](https://github.com/matrix-org/matrix-js-sdk/pull/3008)).
+ * Apply edits discovered from sync after thread is initialised ([\#3002](https://github.com/matrix-org/matrix-js-sdk/pull/3002)). Fixes vector-im/element-web#23921.
+ * Sliding sync: Fix issue where no unsubs are sent when switching rooms ([\#2991](https://github.com/matrix-org/matrix-js-sdk/pull/2991)).
+ * Threads are missing from the timeline ([\#2996](https://github.com/matrix-org/matrix-js-sdk/pull/2996)). Fixes vector-im/element-web#24036.
+ * Close all streams when a call ends ([\#2992](https://github.com/matrix-org/matrix-js-sdk/pull/2992)). Fixes vector-im/element-call#742.
+ * Resume to-device message queue after resumed sync ([\#2920](https://github.com/matrix-org/matrix-js-sdk/pull/2920)). Fixes matrix-org/element-web-rageshakes#17170.
+ * Fix browser entrypoint ([\#3051](https://github.com/matrix-org/matrix-js-sdk/pull/3051)). Fixes #3013.
+ * Fix failure to start in firefox private browser ([\#3058](https://github.com/matrix-org/matrix-js-sdk/pull/3058)). Fixes vector-im/element-web#24216.
+ * Correctly handle limited sync responses by resetting the thread timeline ([\#3056](https://github.com/matrix-org/matrix-js-sdk/pull/3056)). Fixes vector-im/element-web#23952.
+
 Changes in [23.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.0.0) (2022-12-21)
 ==================================================================================================
 
