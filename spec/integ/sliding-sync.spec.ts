@@ -137,7 +137,7 @@ describe("SlidingSync", () => {
                 .respond(200, function () {
                     return {
                         pos: "11",
-                        lists: {"a": { count: 5 }},
+                        lists: { "a": { count: 5 } },
                         extensions: {},
                         txn_id: txnId,
                     };
@@ -161,7 +161,7 @@ describe("SlidingSync", () => {
                 .respond(200, function () {
                     return {
                         pos: "12",
-                        lists: {"a": { count: 5 }},
+                        lists: { "a": { count: 5 } },
                         extensions: {},
                     };
                 });
@@ -193,7 +193,7 @@ describe("SlidingSync", () => {
                 .respond(200, function () {
                     return {
                         pos: "1",
-                        lists: {"a": { count: 6 }},
+                        lists: { "a": { count: 6 } },
                         extensions: {},
                     };
                 });
@@ -1080,7 +1080,7 @@ describe("SlidingSync", () => {
                     return {
                         pos: "bbb",
                         txn_id: txnId,
-                        lists: {"a":{ count: 5 }},
+                        lists: { "a":{ count: 5 } },
                         extensions: {},
                     };
                 });
@@ -1107,7 +1107,7 @@ describe("SlidingSync", () => {
                     return {
                         pos: "ccc",
                         txn_id: txnId,
-                        lists: {"a":{ count: 5 }},
+                        lists: { "a":{ count: 5 } },
                         extensions: {},
                     };
                 });
@@ -1240,7 +1240,7 @@ describe("SlidingSync", () => {
                     return {
                         pos: "ccc",
                         txn_id: "bogus transaction id",
-                        lists: {"a":{ count: 5 }},
+                        lists: { "a":{ count: 5 } },
                         extensions: {},
                     };
                 });

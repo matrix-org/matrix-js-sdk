@@ -468,7 +468,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     public setListRanges(key: string, ranges: number[][]): Promise<string> {
         const list = this.lists.get(key);
         if (!list) {
-            return Promise.reject("no list with key " + key);
+            return Promise.reject(new Error("no list with key " + key));
         }
         list.updateListRange(ranges);
         return this.resend();
@@ -666,7 +666,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     private processListOps(list: ListResponse, listKey: string): void {
         let gapIndex = -1;
-        let listData = this.lists.get(listKey);
+        const listData = this.lists.get(listKey);
         if (!listData) {
             return;
         }
