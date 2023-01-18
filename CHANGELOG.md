@@ -1,23 +1,5 @@
-Changes in [23.1.0-rc.4](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0-rc.4) (2023-01-17)
-============================================================================================================
-
-## 🐛 Bug Fixes
- * Correctly handle limited sync responses by resetting the thread timeline ([\#3056](https://github.com/matrix-org/matrix-js-sdk/pull/3056)). Fixes vector-im/element-web#23952.
-
-Changes in [23.1.0-rc.3](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0-rc.3) (2023-01-13)
-============================================================================================================
-
-## 🐛 Bug Fixes
- * Fix failure to start in firefox private browser ([\#3058](https://github.com/matrix-org/matrix-js-sdk/pull/3058)). Fixes vector-im/element-web#24216.
-
-Changes in [23.1.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0-rc.2) (2023-01-12)
-============================================================================================================
-
-## 🐛 Bug Fixes
- * Fix browser entrypoint ([\#3051](https://github.com/matrix-org/matrix-js-sdk/pull/3051)). Fixes #3013.
-
-Changes in [23.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0-rc.1) (2023-01-11)
-============================================================================================================
+Changes in [23.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0) (2023-01-18)
+==================================================================================================
 
 ## 🦖 Deprecations
  * Remove extensible events v1 field population on legacy events ([\#3040](https://github.com/matrix-org/matrix-js-sdk/pull/3040)).
@@ -39,10 +21,13 @@ Changes in [23.1.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
  * Avoid triggering decryption errors when decrypting redacted events ([\#3004](https://github.com/matrix-org/matrix-js-sdk/pull/3004)). Fixes vector-im/element-web#24084.
  * bugfix: upload OTKs in sliding sync mode ([\#3008](https://github.com/matrix-org/matrix-js-sdk/pull/3008)).
  * Apply edits discovered from sync after thread is initialised ([\#3002](https://github.com/matrix-org/matrix-js-sdk/pull/3002)). Fixes vector-im/element-web#23921.
- * sliding sync: Fix issue where no unsubs are sent when switching rooms ([\#2991](https://github.com/matrix-org/matrix-js-sdk/pull/2991)).
+ * Sliding sync: Fix issue where no unsubs are sent when switching rooms ([\#2991](https://github.com/matrix-org/matrix-js-sdk/pull/2991)).
  * Threads are missing from the timeline ([\#2996](https://github.com/matrix-org/matrix-js-sdk/pull/2996)). Fixes vector-im/element-web#24036.
  * Close all streams when a call ends ([\#2992](https://github.com/matrix-org/matrix-js-sdk/pull/2992)). Fixes vector-im/element-call#742.
  * Resume to-device message queue after resumed sync ([\#2920](https://github.com/matrix-org/matrix-js-sdk/pull/2920)). Fixes matrix-org/element-web-rageshakes#17170.
+ * Fix browser entrypoint ([\#3051](https://github.com/matrix-org/matrix-js-sdk/pull/3051)). Fixes #3013.
+ * Fix failure to start in firefox private browser ([\#3058](https://github.com/matrix-org/matrix-js-sdk/pull/3058)). Fixes vector-im/element-web#24216.
+ * Correctly handle limited sync responses by resetting the thread timeline ([\#3056](https://github.com/matrix-org/matrix-js-sdk/pull/3056)). Fixes vector-im/element-web#23952.
 
 Changes in [23.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.0.0) (2022-12-21)
 ==================================================================================================
