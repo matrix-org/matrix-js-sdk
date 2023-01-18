@@ -16,7 +16,9 @@ limitations under the License.
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IToDeviceEvent } from "../sync-accumulator";
+import type { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { MatrixEvent } from "../models/event";
+import { IEncryptedEventInfo } from "../crypto/api";
 
 /**
  * Common interface for the crypto implementations
@@ -55,12 +57,38 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
     userHasCrossSigningKeys(): Promise<boolean>;
 
     /**
+     * Get the verification level for a given user
+     *
+     * TODO: define this better
+     *
+     * @param userId - user to be checked
+     */
+    checkUserTrust(userId: string): UserTrustLevel;
+
+    /**
+     * Get the verification level for a given device
+     *
+     * TODO: define this better
+     *
+     * @param userId - user to be checked
+     * @param deviceId - device to be checked
+     */
+    checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel;
+
+    /**
      * Decrypt a received event
      *
      * @returns a promise which resolves once we have finished decrypting.
      * Rejects with an error if there is a problem decrypting the event.
      */
     decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult>;
+
+    /**
+     * Get information about the encryption of an event
+     *
+     * @param event - event to be checked
+     */
+    getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
 
     /**
      * Get a list containing all of the room keys
