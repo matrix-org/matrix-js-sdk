@@ -143,6 +143,5 @@
         "outputDirectory": "coverage",
         "outputName": "jest-sonar-report.xml",
         "relativePaths": true
-    },
-    "typings": "./lib/index.d.ts"
+    }
 }
