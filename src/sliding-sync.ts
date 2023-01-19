@@ -890,7 +890,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
                     l.setModified(false);
                 });
                 // set default empty values so we don't need to null check
-                resp.lists = resp.lists || [];
+                resp.lists = resp.lists || {};
                 resp.rooms = resp.rooms || {};
                 resp.extensions = resp.extensions || {};
                 Object.keys(resp.lists).forEach((key: string) => {
