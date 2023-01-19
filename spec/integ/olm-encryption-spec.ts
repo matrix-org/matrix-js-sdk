@@ -22,7 +22,7 @@ limitations under the License.
  *
  * Note that megolm (group) conversation is not tested here.
  *
- * See also `megolm.spec.js`.
+ * See also `crypto.spec.js`.
  */
 
 // load olm before the sdk if possible
