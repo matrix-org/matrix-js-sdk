@@ -347,7 +347,7 @@ export class GroupCall extends TypedEventEmitter<
         );
     }
 
-    public async initLocalCallFeed(): Promise<CallFeed> {
+    public async initLocalCallFeed(): Promise<void> {
         logger.log(`groupCall ${this.groupCallId} initLocalCallFeed`);
 
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
@@ -376,7 +376,11 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         // The call could've been disposed while we were waiting
-        if (disposed) throw new Error("Group call disposed");
+        if (disposed) {
+            logger.info("Group call disposed while gathering media stream");
+            this.client.getMediaHandler().stopUserMediaStream(stream);
+            return;
+        }
 
         const callFeed = new CallFeed({
             client: this.client,
@@ -396,8 +400,6 @@ export class GroupCall extends TypedEventEmitter<
         this.addUserMediaFeed(callFeed);
 
         this.state = GroupCallState.LocalCallFeedInitialized;
-
-        return callFeed;
     }
 
     public async updateLocalUsermediaStream(stream: MediaStream): Promise<void> {
