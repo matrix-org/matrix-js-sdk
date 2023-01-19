@@ -1437,8 +1437,9 @@ describe("MatrixClient", function () {
 
         it("should cancel an event which is encrypting", async () => {
             // @ts-ignore protected method access
-            client.encryptAndSendEvent(null, event);
+            client.encryptAndSendEvent(mockRoom, event);
             await testUtils.emitPromise(event, "Event.status");
+            expect(event.status).toBe(EventStatus.ENCRYPTING);
             client.cancelPendingEvent(event);
             assertCancelled();
         });

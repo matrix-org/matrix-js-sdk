@@ -4390,7 +4390,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return null;
         }
 
-        if (!this.isRoomEncrypted(event.getRoomId()!)) {
+        if (!room || !this.isRoomEncrypted(event.getRoomId()!)) {
             return null;
         }
 
