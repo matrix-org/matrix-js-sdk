@@ -1188,6 +1188,14 @@ export class GroupCall extends TypedEventEmitter<
      * Recalculates and updates the participant map to match the room state.
      */
     private updateParticipants(): void {
+        const localMember = this.room.getMember(this.client.getUserId()!)!;
+        if (!localMember) {
+            // The client hasn't fetched enough of the room state to get our own member
+            // event. This probably shouldn't happen, but sanity check & exit for now.
+            logger.warn("Tried to update participants before local room member is available");
+            return;
+        }
+
         if (this.participantsExpirationTimer !== null) {
             clearTimeout(this.participantsExpirationTimer);
             this.participantsExpirationTimer = null;
@@ -1242,7 +1250,6 @@ export class GroupCall extends TypedEventEmitter<
 
         // Apply local echo for the entered case
         if (entered) {
-            const localMember = this.room.getMember(this.client.getUserId()!)!;
             let deviceMap = participants.get(localMember);
             if (deviceMap === undefined) {
                 deviceMap = new Map();
