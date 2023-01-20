@@ -22,7 +22,9 @@ import {
     KeysClaimRequest,
     KeysQueryRequest,
     KeysUploadRequest,
+    RoomMessageRequest,
     SignatureUploadRequest,
+    ToDeviceRequest,
 } from "@matrix-org/matrix-sdk-crypto-js";
 
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
@@ -102,6 +104,58 @@ describe("OutgoingRequestProcessor", () => {
             httpBackend.verifyNoOutstandingRequests();
         });
     }
+
+    it("should handle ToDeviceRequests", async () => {
+        const testBody = '{ "foo": "bar" }';
+        const outgoingRequest = new ToDeviceRequest("1234", "test/type", "test/txnid", testBody);
+
+        const reqProm = processor.makeOutgoingRequest(outgoingRequest);
+
+        const testResponse = '{ "result": 1 }';
+        httpBackend
+            .when("PUT", "/_matrix")
+            .check((req) => {
+                expect(req.path).toEqual("https://example.com/_matrix/client/v3/sendToDevice/test%2Ftype/test%2Ftxnid");
+                expect(req.rawData).toEqual(testBody);
+                expect(req.headers["Accept"]).toEqual("application/json");
+                expect(req.headers["Content-Type"]).toEqual("application/json");
+            })
+            .respond(200, testResponse, true);
+
+        const markSentCallPromise = awaitCallToMarkAsSent();
+        await httpBackend.flushAllExpected();
+
+        await Promise.all([reqProm, markSentCallPromise]);
+        expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("1234", outgoingRequest.type, testResponse);
+        httpBackend.verifyNoOutstandingRequests();
+    });
+
+    it("should handle RoomMessageRequests", async () => {
+        const testBody = '{ "foo": "bar" }';
+        const outgoingRequest = new RoomMessageRequest("1234", "test/room", "test/txnid", "test/type", testBody);
+
+        const reqProm = processor.makeOutgoingRequest(outgoingRequest);
+
+        const testResponse = '{ "result": 1 }';
+        httpBackend
+            .when("PUT", "/_matrix")
+            .check((req) => {
+                expect(req.path).toEqual(
+                    "https://example.com/_matrix/client/v3/room/test%2Froom/send/test%2Ftype/test%2Ftxnid",
+                );
+                expect(req.rawData).toEqual(testBody);
+                expect(req.headers["Accept"]).toEqual("application/json");
+                expect(req.headers["Content-Type"]).toEqual("application/json");
+            })
+            .respond(200, testResponse, true);
+
+        const markSentCallPromise = awaitCallToMarkAsSent();
+        await httpBackend.flushAllExpected();
+
+        await Promise.all([reqProm, markSentCallPromise]);
+        expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("1234", outgoingRequest.type, testResponse);
+        httpBackend.verifyNoOutstandingRequests();
+    });
 
     it("does not explode with unknown requests", async () => {
         const outgoingRequest = { id: "5678", type: 987 };
