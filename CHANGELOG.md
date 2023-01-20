@@ -1,3 +1,9 @@
+Changes in [23.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.1) (2023-01-20)
+==================================================================================================
+
+## 🐛 Bug Fixes
+ * Fix backwards compability for environment not support Array.prototype.at ([\#3080](https://github.com/matrix-org/matrix-js-sdk/pull/3080)).
+
 Changes in [23.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.0) (2023-01-18)
 ==================================================================================================
 
