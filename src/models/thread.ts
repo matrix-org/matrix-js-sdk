@@ -572,7 +572,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {
         const isCurrentUser = userId === this.client.getUserId();
-        const lastReply = this.timeline.at(-1);
+        const lastReply = this.timeline[this.timeline.length - 1];
         if (isCurrentUser && lastReply) {
             // If the last activity in a thread is prior to the first threaded read receipt
             // sent in the room (suggesting that it was sent before the user started
