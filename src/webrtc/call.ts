@@ -2125,14 +2125,17 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     stream_id: feedId,
                 };
 
-                if (isVisible && trackMetadata.kind === "audio") {
+                if (trackMetadata.kind === "audio") {
+                    // We want audio from everyone
                     subscribe.push(trackDescription);
-                } else if (isVisible && trackMetadata.kind === "video" && width !== 0 && height !== 0) {
+                } else if (isVisible && width !== 0 && height !== 0) {
+                    // Subscribe to visible videos
                     trackDescription.width = width;
                     trackDescription.height = height;
 
                     subscribe.push(trackDescription);
                 } else {
+                    // Unsubscribe from invisible videos
                     unsubscribe.push(trackDescription);
                 }
             }
