@@ -403,3 +403,15 @@ export const mkPusher = (extra: Partial<IPusher> = {}): IPusher => ({
     pushkey: "pushpush",
     ...extra,
 });
+
+/**
+ * a list of the supported crypto implementations, each with a callback to initialise that implementation
+ * for the given client
+ */
+export const CRYPTO_BACKENDS: Record<string, InitCrypto> = {};
+export type InitCrypto = (_: MatrixClient) => Promise<void>;
+
+CRYPTO_BACKENDS["rust-sdk"] = (client: MatrixClient) => client.initRustCrypto();
+if (global.Olm) {
+    CRYPTO_BACKENDS["libolm"] = (client: MatrixClient) => client.initCrypto();
+}
