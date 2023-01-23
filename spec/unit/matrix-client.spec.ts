@@ -2198,7 +2198,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe("getVisibleRooms", () => {
+    describe("room lists and history", () => {
         function roomCreateEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
             return new MatrixEvent({
                 content: {
@@ -2234,45 +2234,127 @@ describe("MatrixClient", function () {
             });
         }
 
-        it("Returns an empty list if there are no rooms", () => {
-            client.store = new StubStore();
-            client.store.getRooms = () => [];
-            const rooms = client.getVisibleRooms();
-            expect(rooms).toHaveLength(0);
+        describe("getVisibleRooms", () => {
+            it("Returns an empty list if there are no rooms", () => {
+                client.store = new StubStore();
+                client.store.getRooms = () => [];
+                const rooms = client.getVisibleRooms();
+                expect(rooms).toHaveLength(0);
+            });
+
+            it("Returns all non-replaced rooms", () => {
+                const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+                const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
+                client.store = new StubStore();
+                client.store.getRooms = () => [room1, room2];
+                const rooms = client.getVisibleRooms();
+                expect(rooms).toContain(room1);
+                expect(rooms).toContain(room2);
+                expect(rooms).toHaveLength(2);
+            });
+
+            it("Does not return replaced rooms", () => {
+                // Given 4 rooms, 2 of which have been replaced
+                const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+                const replacedRoom1 = new Room("replacedRoom1", client, "@carol:alexandria.example.com");
+                const replacedRoom2 = new Room("replacedRoom2", client, "@carol:alexandria.example.com");
+                const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
+                client.store = new StubStore();
+                client.store.getRooms = () => [room1, replacedRoom1, replacedRoom2, room2];
+                room1.addLiveEvents([roomCreateEvent(room1.roomId, replacedRoom1.roomId)], {});
+                room2.addLiveEvents([roomCreateEvent(room2.roomId, replacedRoom2.roomId)], {});
+                replacedRoom1.addLiveEvents([tombstoneEvent(room1.roomId, replacedRoom1.roomId)], {});
+                replacedRoom2.addLiveEvents([tombstoneEvent(room2.roomId, replacedRoom2.roomId)], {});
+
+                // When we ask for the visible rooms
+                const rooms = client.getVisibleRooms();
+
+                // Then we only get the ones that have not been replaced
+                expect(rooms).not.toContain(replacedRoom1);
+                expect(rooms).not.toContain(replacedRoom2);
+                expect(rooms).toContain(room1);
+                expect(rooms).toContain(room2);
+            });
         });
 
-        it("Returns all non-replaced rooms", () => {
-            const room1 = new Room("room1", client, "@carol:alexandria.example.com");
-            const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
-            client.store = new StubStore();
-            client.store.getRooms = () => [room1, room2];
-            const rooms = client.getVisibleRooms();
-            expect(rooms).toContain(room1);
-            expect(rooms).toContain(room2);
-            expect(rooms).toHaveLength(2);
-        });
+        describe("getRoomUpgradeHistory", () => {
+            function createRoomHistory(): [Room, Room, Room, Room] {
+                const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+                const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
+                const room3 = new Room("room3", client, "@rick:helicopter.example.com");
+                const room4 = new Room("room4", client, "@michonne:hawthorne.example.com");
 
-        it("Does not return replaced rooms", () => {
-            // Given 4 rooms, 2 of which have been replaced
-            const room1 = new Room("room1", client, "@carol:alexandria.example.com");
-            const replacedRoom1 = new Room("replacedRoom1", client, "@carol:alexandria.example.com");
-            const replacedRoom2 = new Room("replacedRoom2", client, "@carol:alexandria.example.com");
-            const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
-            client.store = new StubStore();
-            client.store.getRooms = () => [room1, replacedRoom1, replacedRoom2, room2];
-            room1.addLiveEvents([roomCreateEvent(room1.roomId, replacedRoom1.roomId)], {});
-            room2.addLiveEvents([roomCreateEvent(room2.roomId, replacedRoom2.roomId)], {});
-            replacedRoom1.addLiveEvents([tombstoneEvent(room1.roomId, replacedRoom1.roomId)], {});
-            replacedRoom2.addLiveEvents([tombstoneEvent(room2.roomId, replacedRoom2.roomId)], {});
+                room1.addLiveEvents([tombstoneEvent(room2.roomId, room1.roomId)], {});
+                room2.addLiveEvents([roomCreateEvent(room2.roomId, room1.roomId)]);
 
-            // When we ask for the visible rooms
-            const rooms = client.getVisibleRooms();
+                room2.addLiveEvents([tombstoneEvent(room3.roomId, room2.roomId)], {});
+                room3.addLiveEvents([roomCreateEvent(room3.roomId, room2.roomId)]);
 
-            // Then we only get the ones that have not been replaced
-            expect(rooms).not.toContain(replacedRoom1);
-            expect(rooms).not.toContain(replacedRoom2);
-            expect(rooms).toContain(room1);
-            expect(rooms).toContain(room2);
+                room3.addLiveEvents([tombstoneEvent(room4.roomId, room3.roomId)], {});
+                room4.addLiveEvents([roomCreateEvent(room4.roomId, room3.roomId)]);
+
+                mocked(store.getRoom).mockImplementation((roomId: string) => {
+                    switch (roomId) {
+                        case "room1":
+                            return room1;
+                        case "room2":
+                            return room2;
+                        case "room3":
+                            return room3;
+                        case "room4":
+                            return room4;
+                        default:
+                            return null;
+                    }
+                });
+
+                return [room1, room2, room3, room4];
+            }
+
+            it("Returns an empty list if room does not exist", () => {
+                const history = client.getRoomUpgradeHistory("roomthatdoesnotexist");
+                expect(history).toHaveLength(0);
+            });
+
+            it("Returns just this room if there is no predecessor", () => {
+                const mainRoom = new Room("mainRoom", client, "@carol:alexandria.example.com");
+                mocked(store.getRoom).mockReturnValue(mainRoom);
+                const history = client.getRoomUpgradeHistory(mainRoom.roomId);
+                expect(history).toEqual([mainRoom]);
+            });
+
+            it("Returns the predecessors of this room", () => {
+                const [room1, room2, room3, room4] = createRoomHistory();
+                const history = client.getRoomUpgradeHistory(room4.roomId);
+                expect(history.map((room) => room.roomId)).toEqual([
+                    room1.roomId,
+                    room2.roomId,
+                    room3.roomId,
+                    room4.roomId,
+                ]);
+            });
+
+            it("Returns the subsequent rooms", () => {
+                const [room1, room2, room3, room4] = createRoomHistory();
+                const history = client.getRoomUpgradeHistory(room1.roomId);
+                expect(history.map((room) => room.roomId)).toEqual([
+                    room1.roomId,
+                    room2.roomId,
+                    room3.roomId,
+                    room4.roomId,
+                ]);
+            });
+
+            it("Returns the predecessors and subsequent rooms", () => {
+                const [room1, room2, room3, room4] = createRoomHistory();
+                const history = client.getRoomUpgradeHistory(room3.roomId);
+                expect(history.map((room) => room.roomId)).toEqual([
+                    room1.roomId,
+                    room2.roomId,
+                    room3.roomId,
+                    room4.roomId,
+                ]);
+            });
         });
     });
 });
