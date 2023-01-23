@@ -3780,14 +3780,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * This is essentially getRooms() with some rooms filtered out, eg. old versions
      * of rooms that have been replaced or (in future) other rooms that have been
      * marked at the protocol level as not to be displayed to the user.
+     *
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     *                                           m.room.predecessor state event and
+     *                                           use it if found (MSC3946).
      * @returns A list of rooms, or an empty list if there is no data store.
      */
-    public getVisibleRooms(): Room[] {
+    public getVisibleRooms(msc3946ProcessDynamicPredecessor = false): Room[] {
         const allRooms = this.store.getRooms();
 
         const replacedRooms = new Set();
         for (const r of allRooms) {
-            const predecessor = r.findPredecessorRoomId();
+            const predecessor = r.findPredecessorRoomId(msc3946ProcessDynamicPredecessor);
             if (predecessor) {
                 replacedRooms.add(predecessor);
             }

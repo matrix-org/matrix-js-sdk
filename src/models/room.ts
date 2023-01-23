@@ -2991,13 +2991,25 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     *                                           m.room.predecessor state event and
+     *                                           use it if found (MSC3946).
      * @returns the ID of the room that was this room's predecessor, or null if
      *          this room has no predecessor.
      */
-    public findPredecessorRoomId(): string | null {
+    public findPredecessorRoomId(msc3946ProcessDynamicPredecessor = false): string | null {
         const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!currentState) {
             return null;
+        }
+        if (msc3946ProcessDynamicPredecessor) {
+            const predecessorEvent = currentState.getStateEvents(EventType.RoomPredecessor, "");
+            if (predecessorEvent) {
+                const roomId = predecessorEvent.getContent()["predecessor_room_id"];
+                if (roomId) {
+                    return roomId;
+                }
+            }
         }
 
         const createEvent = currentState.getStateEvents(EventType.RoomCreate, "");

@@ -2234,7 +2234,78 @@ describe("MatrixClient", function () {
             });
         }
 
+        function predecessorEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
+            return new MatrixEvent({
+                content: {
+                    predecessor_room_id: predecessorRoomId,
+                },
+                event_id: `predecessor_event_id_pred_${predecessorRoomId}`,
+                origin_server_ts: 1432735824653,
+                room_id: newRoomId,
+                sender: "@daryl:alexandria.example.com",
+                state_key: "",
+                type: "org.matrix.msc3946.room_predecessor",
+            });
+        }
+
         describe("getVisibleRooms", () => {
+            function setUpReplacedRooms(): {
+                room1: Room;
+                room2: Room;
+                replacedByCreate1: Room;
+                replacedByCreate2: Room;
+                replacedByDynamicPredecessor1: Room;
+                replacedByDynamicPredecessor2: Room;
+            } {
+                const room1 = new Room("room1", client, "@carol:alexandria.example.com");
+                const replacedByCreate1 = new Room("replacedByCreate1", client, "@carol:alexandria.example.com");
+                const replacedByCreate2 = new Room("replacedByCreate2", client, "@carol:alexandria.example.com");
+                const replacedByDynamicPredecessor1 = new Room("dyn1", client, "@carol:alexandria.example.com");
+                const replacedByDynamicPredecessor2 = new Room("dyn2", client, "@carol:alexandria.example.com");
+                const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
+                client.store = new StubStore();
+                client.store.getRooms = () => [
+                    room1,
+                    replacedByCreate1,
+                    replacedByCreate2,
+                    replacedByDynamicPredecessor1,
+                    replacedByDynamicPredecessor2,
+                    room2,
+                ];
+                room1.addLiveEvents(
+                    [
+                        roomCreateEvent(room1.roomId, replacedByCreate1.roomId),
+                        predecessorEvent(room1.roomId, replacedByDynamicPredecessor1.roomId),
+                    ],
+                    {},
+                );
+                room2.addLiveEvents(
+                    [
+                        roomCreateEvent(room2.roomId, replacedByCreate2.roomId),
+                        predecessorEvent(room2.roomId, replacedByDynamicPredecessor2.roomId),
+                    ],
+                    {},
+                );
+                replacedByCreate1.addLiveEvents([tombstoneEvent(room1.roomId, replacedByCreate1.roomId)], {});
+                replacedByCreate2.addLiveEvents([tombstoneEvent(room2.roomId, replacedByCreate2.roomId)], {});
+                replacedByDynamicPredecessor1.addLiveEvents(
+                    [tombstoneEvent(room1.roomId, replacedByDynamicPredecessor1.roomId)],
+                    {},
+                );
+                replacedByDynamicPredecessor2.addLiveEvents(
+                    [tombstoneEvent(room2.roomId, replacedByDynamicPredecessor2.roomId)],
+                    {},
+                );
+
+                return {
+                    room1,
+                    room2,
+                    replacedByCreate1,
+                    replacedByCreate2,
+                    replacedByDynamicPredecessor1,
+                    replacedByDynamicPredecessor2,
+                };
+            }
             it("Returns an empty list if there are no rooms", () => {
                 client.store = new StubStore();
                 client.store.getRooms = () => [];
@@ -2272,6 +2343,82 @@ describe("MatrixClient", function () {
                 // Then we only get the ones that have not been replaced
                 expect(rooms).not.toContain(replacedRoom1);
                 expect(rooms).not.toContain(replacedRoom2);
+                expect(rooms).toContain(room1);
+                expect(rooms).toContain(room2);
+            });
+
+            it("Ignores m.predecessor if we don't ask to use it", () => {
+                // Given 6 rooms, 2 of which have been replaced, and 2 of which WERE
+                // replaced by create events, but are now NOT replaced, because an
+                // m.predecessor event has changed the room's predecessor.
+                const {
+                    room1,
+                    room2,
+                    replacedByCreate1,
+                    replacedByCreate2,
+                    replacedByDynamicPredecessor1,
+                    replacedByDynamicPredecessor2,
+                } = setUpReplacedRooms();
+
+                // When we ask for the visible rooms
+                const rooms = client.getVisibleRooms(); // Don't supply msc3946ProcessDynamicPredecessor
+
+                // Then we only get the ones that have not been replaced
+                expect(rooms).not.toContain(replacedByCreate1);
+                expect(rooms).not.toContain(replacedByCreate2);
+                expect(rooms).toContain(replacedByDynamicPredecessor1);
+                expect(rooms).toContain(replacedByDynamicPredecessor2);
+                expect(rooms).toContain(room1);
+                expect(rooms).toContain(room2);
+            });
+
+            it("Considers rooms replaced with m.predecessor events to be replaced", () => {
+                // Given 6 rooms, 2 of which have been replaced, and 2 of which WERE
+                // replaced by create events, but are now NOT replaced, because an
+                // m.predecessor event has changed the room's predecessor.
+                const {
+                    room1,
+                    room2,
+                    replacedByCreate1,
+                    replacedByCreate2,
+                    replacedByDynamicPredecessor1,
+                    replacedByDynamicPredecessor2,
+                } = setUpReplacedRooms();
+
+                // When we ask for the visible rooms
+                const useMsc3946 = true;
+                const rooms = client.getVisibleRooms(useMsc3946);
+
+                // Then we only get the ones that have not been replaced
+                expect(rooms).not.toContain(replacedByDynamicPredecessor1);
+                expect(rooms).not.toContain(replacedByDynamicPredecessor2);
+                expect(rooms).toContain(replacedByCreate1);
+                expect(rooms).toContain(replacedByCreate2);
+                expect(rooms).toContain(room1);
+                expect(rooms).toContain(room2);
+            });
+
+            it("Ignores m.predecessor if we don't ask to use it", () => {
+                // Given 6 rooms, 2 of which have been replaced, and 2 of which WERE
+                // replaced by create events, but are now NOT replaced, because an
+                // m.predecessor event has changed the room's predecessor.
+                const {
+                    room1,
+                    room2,
+                    replacedByCreate1,
+                    replacedByCreate2,
+                    replacedByDynamicPredecessor1,
+                    replacedByDynamicPredecessor2,
+                } = setUpReplacedRooms();
+
+                // When we ask for the visible rooms
+                const rooms = client.getVisibleRooms(); // Don't supply msc3946ProcessDynamicPredecessor
+
+                // Then we only get the ones that have not been replaced
+                expect(rooms).not.toContain(replacedByCreate1);
+                expect(rooms).not.toContain(replacedByCreate2);
+                expect(rooms).toContain(replacedByDynamicPredecessor1);
+                expect(rooms).toContain(replacedByDynamicPredecessor2);
                 expect(rooms).toContain(room1);
                 expect(rooms).toContain(room2);
             });
