@@ -102,6 +102,8 @@ describe("CallFeed", () => {
             [CallState.Connected, true],
             [CallState.Connecting, false],
         ])("should react to call state, when !isLocal()", (state: CallState, expected: Boolean) => {
+            feed.stream?.addTrack(new MockMediaStreamTrack("track1", "video").typed());
+            call.state = state;
             call.emit(CallEvent.State, state);
 
             expect(feed.connected).toBe(expected);

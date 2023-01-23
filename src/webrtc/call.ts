@@ -949,17 +949,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.deleteFeed(feed);
     }
 
-    private addRemoteFeed(feed: CallFeed): void {
+    private addRemoteFeed(feed: CallFeed, emit = true): void {
         this.feeds.push(feed);
         feed.addListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
-        this.emit(CallEvent.FeedsChanged, this.feeds);
+
+        if (emit) {
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
     }
 
-    private deleteFeed(feed: CallFeed): void {
+    private deleteFeed(feed: CallFeed, emit = true): void {
         feed.dispose();
         this.feeds.splice(this.feeds.indexOf(feed), 1);
         feed.removeListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
-        this.emit(CallEvent.FeedsChanged, this.feeds);
+
+        if (emit) {
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
     }
 
     // The typescript definitions have this type as 'any' :(
@@ -2170,7 +2176,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     videoMuted: streamMetadata.video_muted,
                     tracksMetadata: streamMetadata.tracks,
                 });
-                this.addRemoteFeed(feed);
+                this.addRemoteFeed(feed, false);
                 feedsChanged = true;
             }
             feed.setAudioVideoMuted(streamMetadata.audio_muted, streamMetadata.video_muted);
@@ -2179,7 +2185,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // Remove old feeds
         for (const feed of this.getRemoteFeeds()) {
             if (!Object.keys(metadata).includes(feed.feedId)) {
-                this.deleteFeed(feed);
+                this.deleteFeed(feed, false);
                 feedsChanged = true;
             }
         }
