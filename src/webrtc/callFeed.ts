@@ -1,5 +1,6 @@
 /*
-Copyright 2021 Šimon Brandner <simon.bra.ag@gmail.com>
+Copyright 2021 - 2022 Šimon Brandner <simon.bra.ag@gmail.com>
+Copyright 2021 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -100,8 +101,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     private _disposed = false;
     private _connected = false;
 
-    private _width?: number;
-    private _height?: number;
+    private _width = 0;
+    private _height = 0;
 
     private _isVisible = false;
 
@@ -127,8 +128,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         if (opts.call) {
             opts.call.addListener(CallEvent.State, this.onCallState);
-            this.onCallState(opts.call.state);
         }
+        this.updateConnected();
     }
 
     public get stream(): MediaStream | undefined {
@@ -166,12 +167,15 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
         if (oldStream) {
             oldStream.removeEventListener("addtrack", this.onAddTrack);
+            oldStream.removeEventListener("removetrack", this.onRemoveTrack);
             this.measureVolumeActivity(false);
         }
 
         this._stream = newStream;
         newStream?.addEventListener("addtrack", this.onAddTrack);
+        newStream?.addEventListener("removetrack", this.onRemoveTrack);
 
+        this.updateConnected();
         if (this.hasAudioTrack) {
             this.initVolumeMeasuring();
         } else {
@@ -197,17 +201,30 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     }
 
     private onAddTrack = (): void => {
-        if (!this.stream) return;
+        this.updateConnected();
         this.emit(CallFeedEvent.NewStream, this.stream);
     };
 
-    private onCallState = (state: CallState): void => {
-        if (state === CallState.Connected) {
-            this.connected = true;
-        } else if (state === CallState.Connecting) {
-            this.connected = false;
-        }
+    private onRemoveTrack = (): void => {
+        this.updateConnected();
+        this.emit(CallFeedEvent.NewStream, this.stream);
     };
+
+    private onCallState = (): void => {
+        this.updateConnected();
+    };
+
+    private updateConnected(): void {
+        if (this.call?.state === CallState.Connecting) {
+            this.connected = false;
+        } else if (!this.stream) {
+            this.connected = false;
+        } else if (this.stream.getTracks().length === 0) {
+            this.connected = false;
+        } else if (this.call?.state === CallState.Connected) {
+            this.connected = true;
+        }
+    }
 
     /**
      * Returns callRoom member
@@ -368,6 +385,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public dispose(): void {
         clearTimeout(this.volumeLooperTimeout);
         this.stream?.removeEventListener("addtrack", this.onAddTrack);
+        this.stream?.removeEventListener("removetrack", this.onRemoveTrack);
         this.call?.removeListener(CallEvent.State, this.onCallState);
         if (this.audioContext) {
             this.audioContext = undefined;
@@ -396,8 +414,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     }
 
     public setResolution(width: number, height: number): void {
-        this._width = width;
-        this._height = height;
+        this._width = Math.round(width);
+        this._height = Math.round(height);
 
         this.emit(CallFeedEvent.SizeChanged);
     }

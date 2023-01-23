@@ -949,10 +949,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.deleteFeed(feed);
     }
 
-    private deleteFeed(feed: CallFeed): void {
+    private addRemoteFeed(feed: CallFeed, emit = true): void {
+        this.feeds.push(feed);
+        feed.addListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
+
+        if (emit) {
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
+    }
+
+    private deleteFeed(feed: CallFeed, emit = true): void {
         feed.dispose();
         this.feeds.splice(this.feeds.indexOf(feed), 1);
-        this.emit(CallEvent.FeedsChanged, this.feeds);
+        feed.removeListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
+
+        if (emit) {
+            this.emit(CallEvent.FeedsChanged, this.feeds);
+        }
     }
 
     // The typescript definitions have this type as 'any' :(
@@ -2112,11 +2125,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     stream_id: feedId,
                 };
 
-                if (isVisible) {
-                    if (trackMetadata.kind === "video" && width && height) {
-                        trackDescription.width = Math.round(width);
-                        trackDescription.height = Math.round(height);
-                    }
+                if (isVisible && trackMetadata.kind === "audio") {
+                    subscribe.push(trackDescription);
+                } else if (isVisible && trackMetadata.kind === "video" && width !== 0 && height !== 0) {
+                    trackDescription.width = width;
+                    trackDescription.height = height;
 
                     subscribe.push(trackDescription);
                 } else {
@@ -2143,6 +2156,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this._opponentSupportsSDPStreamMetadata = true;
 
         let feedsChanged = false;
+
+        // Add new feeds and update existing ones
         for (const [streamId, streamMetadata] of Object.entries(metadata)) {
             let feed = this.getRemoteFeeds().find((f) => f.feedId === streamId);
             if (feed) {
@@ -2161,11 +2176,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     videoMuted: streamMetadata.video_muted,
                     tracksMetadata: streamMetadata.tracks,
                 });
-                feed.addListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
-                this.feeds.push(feed);
+                this.addRemoteFeed(feed, false);
                 feedsChanged = true;
             }
             feed.setAudioVideoMuted(streamMetadata.audio_muted, streamMetadata.video_muted);
+        }
+
+        // Remove old feeds
+        for (const feed of this.getRemoteFeeds()) {
+            if (!Object.keys(metadata).includes(feed.feedId)) {
+                this.deleteFeed(feed, false);
+                feedsChanged = true;
+            }
         }
 
         if (feedsChanged) {
@@ -2432,7 +2454,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const onRemoveTrack = (): void => {
                 if (stream.getTracks().length === 0) {
                     logger.info(`Call ${this.callId} removing track streamId: ${stream.id}`);
-                    this.deleteFeedByStream(stream);
                     stream.removeEventListener("removetrack", onRemoveTrack);
                     this.removeTrackListeners.delete(stream);
                 }
