@@ -52,9 +52,10 @@ describe("SlidingSyncSdk", () => {
     const selfAccessToken = "aseukfgwef";
 
     const mockifySlidingSync = (s: SlidingSync): SlidingSync => {
-        s.getListParams = jest.fn();
+        s.getList = jest.fn();
         s.getListData = jest.fn();
         s.getRoomSubscriptions = jest.fn();
+        s.listLength = jest.fn();
         s.modifyRoomSubscriptionInfo = jest.fn();
         s.modifyRoomSubscriptions = jest.fn();
         s.registerExtension = jest.fn();
@@ -114,7 +115,7 @@ describe("SlidingSyncSdk", () => {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         httpBackend = testClient.httpBackend;
         client = testClient.client;
-        mockSlidingSync = mockifySlidingSync(new SlidingSync("", new Map(), {}, client, 0));
+        mockSlidingSync = mockifySlidingSync(new SlidingSync("", [], {}, client, 0));
         if (testOpts.withCrypto) {
             httpBackend!.when("GET", "/room_keys/version").respond(404, {});
             await client!.initCrypto();
@@ -548,7 +549,7 @@ describe("SlidingSyncSdk", () => {
         it("emits SyncState.Reconnecting when < FAILED_SYNC_ERROR_THRESHOLD & SyncState.Error when over", async () => {
             mockSlidingSync!.emit(SlidingSyncEvent.Lifecycle, SlidingSyncState.Complete, {
                 pos: "h",
-                lists: {},
+                lists: [],
                 rooms: {},
                 extensions: {},
             });
@@ -576,7 +577,7 @@ describe("SlidingSyncSdk", () => {
         it("emits SyncState.Syncing after a previous SyncState.Error", async () => {
             mockSlidingSync!.emit(SlidingSyncEvent.Lifecycle, SlidingSyncState.Complete, {
                 pos: "i",
-                lists: {},
+                lists: [],
                 rooms: {},
                 extensions: {},
             });
