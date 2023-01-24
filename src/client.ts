@@ -4996,6 +4996,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const upgradeHistory = [currentRoom];
 
         // Work backwards first, looking at create events.
+        let successorRoomId = currentRoom.roomId;
         let createEvent = currentRoom.currentState.getStateEvents(EventType.RoomCreate, "");
         while (createEvent) {
             const predecessor = createEvent.getContent()["predecessor"];
@@ -5006,13 +5007,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 if (verifyLinks) {
                     const tombstone = refRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
 
-                    if (!tombstone || tombstone.getContent()["replacement_room"] !== refRoom.roomId) {
+                    if (!tombstone || tombstone.getContent()["replacement_room"] !== successorRoomId) {
                         break;
                     }
                 }
 
                 // Insert at the front because we're working backwards from the currentRoom
                 upgradeHistory.splice(0, 0, refRoom);
+                successorRoomId = refRoom.roomId;
                 createEvent = refRoom.currentState.getStateEvents(EventType.RoomCreate, "");
             } else {
                 // No further create events to look at
