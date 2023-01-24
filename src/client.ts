@@ -2507,10 +2507,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns
      */
     public checkUserTrust(userId: string): UserTrustLevel {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.checkUserTrust(userId);
+        return this.cryptoBackend.checkUserTrust(userId);
     }
 
     /**
@@ -2522,10 +2522,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param deviceId - The ID of the device to check
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.checkDeviceTrust(userId, deviceId);
+        return this.cryptoBackend.checkDeviceTrust(userId, deviceId);
     }
 
     /**
@@ -2689,10 +2689,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The event information.
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getEventEncryptionInfo(event);
+        return this.cryptoBackend.getEventEncryptionInfo(event);
     }
 
     /**
@@ -4996,6 +4996,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const upgradeHistory = [currentRoom];
 
         // Work backwards first, looking at create events.
+        let successorRoomId = currentRoom.roomId;
         let createEvent = currentRoom.currentState.getStateEvents(EventType.RoomCreate, "");
         while (createEvent) {
             const predecessor = createEvent.getContent()["predecessor"];
@@ -5006,13 +5007,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 if (verifyLinks) {
                     const tombstone = refRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
 
-                    if (!tombstone || tombstone.getContent()["replacement_room"] !== refRoom.roomId) {
+                    if (!tombstone || tombstone.getContent()["replacement_room"] !== successorRoomId) {
                         break;
                     }
                 }
 
                 // Insert at the front because we're working backwards from the currentRoom
                 upgradeHistory.splice(0, 0, refRoom);
+                successorRoomId = refRoom.roomId;
                 createEvent = refRoom.currentState.getStateEvents(EventType.RoomCreate, "");
             } else {
                 // No further create events to look at
