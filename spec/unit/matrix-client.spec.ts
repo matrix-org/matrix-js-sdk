@@ -2458,6 +2458,52 @@ describe("MatrixClient", function () {
                 return [room1, room2, room3, room4];
             }
 
+            /**
+             * Creates 2 alternate chains of room history: one using create
+             * events, and one using MSC2946 predecessor+tombstone events.
+             *
+             * Using create, history looks like:
+             * room1->room2->room3->room4 (but note we do not create tombstones)
+             *
+             * Using predecessor+tombstone, history looks like:
+             * dynRoom1->dynRoom2->room3->dynRoom4->dynRoom4
+             *
+             * @returns [room1, room2, room3, room4, dynRoom1, dynRoom2,
+             *          dynRoom4, dynRoom5].
+             */
+            function createDynamicRoomHistory(): [Room, Room, Room, Room, Room, Room, Room, Room] {
+                // Don't create tombstones for the old versions - we generally
+                // expect only one tombstone in a room, and we are confused by
+                // anything else.
+                const creates = true;
+                const tombstones = false;
+                const [room1, room2, room3, room4] = createRoomHistory(creates, tombstones);
+                const dynRoom1 = new Room("dynRoom1", client, "@rick:grimes.example.com");
+                const dynRoom2 = new Room("dynRoom2", client, "@rick:grimes.example.com");
+                const dynRoom4 = new Room("dynRoom4", client, "@rick:grimes.example.com");
+                const dynRoom5 = new Room("dynRoom5", client, "@rick:grimes.example.com");
+
+                dynRoom1.addLiveEvents([tombstoneEvent(dynRoom2.roomId, dynRoom1.roomId)], {});
+                dynRoom2.addLiveEvents([predecessorEvent(dynRoom2.roomId, dynRoom1.roomId)]);
+
+                dynRoom2.addLiveEvents([tombstoneEvent(room3.roomId, dynRoom2.roomId)], {});
+                room3.addLiveEvents([predecessorEvent(room3.roomId, dynRoom2.roomId)]);
+
+                room3.addLiveEvents([tombstoneEvent(dynRoom4.roomId, room3.roomId)], {});
+                dynRoom4.addLiveEvents([predecessorEvent(dynRoom4.roomId, room3.roomId)]);
+
+                dynRoom4.addLiveEvents([tombstoneEvent(dynRoom5.roomId, dynRoom4.roomId)], {});
+                dynRoom5.addLiveEvents([predecessorEvent(dynRoom5.roomId, dynRoom4.roomId)]);
+
+                mocked(store.getRoom)
+                    .mockClear()
+                    .mockImplementation((roomId: string) => {
+                        return { room1, room2, room3, room4, dynRoom1, dynRoom2, dynRoom4, dynRoom5 }[roomId] || null;
+                    });
+
+                return [room1, room2, room3, room4, dynRoom1, dynRoom2, dynRoom4, dynRoom5];
+            }
+
             it("Returns an empty list if room does not exist", () => {
                 const history = client.getRoomUpgradeHistory("roomthatdoesnotexist");
                 expect(history).toHaveLength(0);
@@ -2599,6 +2645,30 @@ describe("MatrixClient", function () {
                     room3.roomId,
                     room4.roomId,
                 ]);
+            });
+
+            it("Returns the predecessors and subsequent rooms using MSC3945 dynamic room predecessors", () => {
+                const [, , room3, , dynRoom1, dynRoom2, dynRoom4, dynRoom5] = createDynamicRoomHistory();
+                const useMsc3946 = true;
+                const verifyLinks = false;
+                const history = client.getRoomUpgradeHistory(room3.roomId, verifyLinks, useMsc3946);
+                expect(history.map((room) => room.roomId)).toEqual([
+                    dynRoom1.roomId,
+                    dynRoom2.roomId,
+                    room3.roomId,
+                    dynRoom4.roomId,
+                    dynRoom5.roomId,
+                ]);
+            });
+
+            it("When not asking for MSC3946, verified history without tombstones is empty", () => {
+                // There no tombstones to match the create events
+                const [, , room3] = createDynamicRoomHistory();
+                const useMsc3946 = false;
+                const verifyLinks = true;
+                const history = client.getRoomUpgradeHistory(room3.roomId, verifyLinks, useMsc3946);
+                // So we get no history back
+                expect(history.map((room) => room.roomId)).toEqual([room3.roomId]);
             });
         });
     });

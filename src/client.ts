@@ -4990,24 +4990,31 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * which can be proven to be linked. For example, rooms which have a create
      * event pointing to an old room which the client is not aware of or doesn't
      * have a matching tombstone would not be returned.
+     * @param msc3946ProcessDynamicPredecessor - if true, look for
+     * m.room.predecessor state events as well as create events, and prefer
+     * predecessor events where they exist (MSC3946).
      * @returns An array of rooms representing the upgrade
      * history.
      */
-    public getRoomUpgradeHistory(roomId: string, verifyLinks = false): Room[] {
+    public getRoomUpgradeHistory(
+        roomId: string,
+        verifyLinks = false,
+        msc3946ProcessDynamicPredecessor = false,
+    ): Room[] {
         const currentRoom = this.getRoom(roomId);
         if (!currentRoom) return [];
 
-        const before = this.findPredecessorRooms(currentRoom, verifyLinks);
-        const after = this.findSuccessorRooms(currentRoom, verifyLinks);
+        const before = this.findPredecessorRooms(currentRoom, verifyLinks, msc3946ProcessDynamicPredecessor);
+        const after = this.findSuccessorRooms(currentRoom, verifyLinks, msc3946ProcessDynamicPredecessor);
 
         return [...before, currentRoom, ...after];
     }
 
-    private findPredecessorRooms(room: Room, verifyLinks: boolean): Room[] {
+    private findPredecessorRooms(room: Room, verifyLinks: boolean, msc3946ProcessDynamicPredecessor: boolean): Room[] {
         const ret: Room[] = [];
 
         // Work backwards from newer to older rooms
-        let predecessorRoomId = room.findPredecessorRoomId();
+        let predecessorRoomId = room.findPredecessorRoomId(msc3946ProcessDynamicPredecessor);
         while (predecessorRoomId !== null) {
             const predecessorRoom = this.getRoom(predecessorRoomId);
             if (predecessorRoom === null) {
@@ -5024,12 +5031,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ret.splice(0, 0, predecessorRoom);
 
             room = predecessorRoom;
-            predecessorRoomId = room.findPredecessorRoomId();
+            predecessorRoomId = room.findPredecessorRoomId(msc3946ProcessDynamicPredecessor);
         }
         return ret;
     }
 
-    private findSuccessorRooms(room: Room, verifyLinks: boolean): Room[] {
+    private findSuccessorRooms(room: Room, verifyLinks: boolean, msc3946ProcessDynamicPredecessor: boolean): Room[] {
         const ret: Room[] = [];
 
         // Work forwards, looking at tombstone events
@@ -5037,10 +5044,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         while (tombstoneEvent) {
             const successorRoom = this.getRoom(tombstoneEvent.getContent()["replacement_room"]);
             if (!successorRoom) break; // end of the chain
-            if (successorRoom.roomId === room.roomId) break; // Tombstone is referencing it's own room
+            if (successorRoom.roomId === room.roomId) break; // Tombstone is referencing its own room
 
             if (verifyLinks) {
-                const predecessorRoomId = successorRoom.findPredecessorRoomId();
+                const predecessorRoomId = successorRoom.findPredecessorRoomId(msc3946ProcessDynamicPredecessor);
                 if (!predecessorRoomId || predecessorRoomId !== room.roomId) {
                     break;
                 }
