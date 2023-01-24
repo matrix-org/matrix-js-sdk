@@ -5003,8 +5003,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const ret: Room[] = [];
 
         // Work backwards from newer to older rooms
-        let successorRoom = room;
-        let predecessorRoomId = successorRoom.findPredecessorRoomId();
+        let predecessorRoomId = room.findPredecessorRoomId();
         while (predecessorRoomId !== null) {
             const predecessorRoom = this.getRoom(predecessorRoomId);
             if (predecessorRoom === null) {
@@ -5012,7 +5011,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             if (verifyLinks) {
                 const tombstone = predecessorRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
-                if (!tombstone || tombstone.getContent()["replacement_room"] !== successorRoom.roomId) {
+                if (!tombstone || tombstone.getContent()["replacement_room"] !== room.roomId) {
                     break;
                 }
             }
@@ -5020,8 +5019,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // Insert at the front because we're working backwards from the currentRoom
             ret.splice(0, 0, predecessorRoom);
 
-            successorRoom = predecessorRoom;
-            predecessorRoomId = successorRoom.findPredecessorRoomId();
+            room = predecessorRoom;
+            predecessorRoomId = room.findPredecessorRoomId();
         }
         return ret;
     }
@@ -5032,19 +5031,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // Work forwards, looking at tombstone events
         let tombstoneEvent = room.currentState.getStateEvents(EventType.RoomTombstone, "");
         while (tombstoneEvent) {
-            const refRoom = this.getRoom(tombstoneEvent.getContent()["replacement_room"]);
-            if (!refRoom) break; // end of the chain
-            if (refRoom.roomId === room.roomId) break; // Tombstone is referencing it's own room
+            const successorRoom = this.getRoom(tombstoneEvent.getContent()["replacement_room"]);
+            if (!successorRoom) break; // end of the chain
+            if (successorRoom.roomId === room.roomId) break; // Tombstone is referencing it's own room
 
             if (verifyLinks) {
-                const predecessorRoomId = refRoom.findPredecessorRoomId();
+                const predecessorRoomId = successorRoom.findPredecessorRoomId();
                 if (!predecessorRoomId || predecessorRoomId !== room.roomId) {
                     break;
                 }
             }
 
             // Push to the end because we're looking forwards
-            ret.push(refRoom);
+            ret.push(successorRoom);
             const roomIds = new Set(ret.map((ref) => ref.roomId));
             if (roomIds.size < ret.length) {
                 // The last room added to the list introduced a previous roomId
@@ -5053,7 +5052,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             // Set the current room to the reference room so we know where we're at
-            room = refRoom;
+            room = successorRoom;
             tombstoneEvent = room.currentState.getStateEvents(EventType.RoomTombstone, "");
         }
         return ret;
