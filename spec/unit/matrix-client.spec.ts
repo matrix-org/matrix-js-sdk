@@ -2205,7 +2205,7 @@ describe("MatrixClient", function () {
                     "creator": "@daryl:alexandria.example.com",
                     "m.federate": true,
                     "predecessor": {
-                        event_id: "spec_is_not_clear_what_id_this_is",
+                        event_id: "id_of_last_event",
                         room_id: predecessorRoomId,
                     },
                     "room_version": "9",
@@ -2278,34 +2278,34 @@ describe("MatrixClient", function () {
         });
 
         describe("getRoomUpgradeHistory", () => {
-            function createRoomHistory(): [Room, Room, Room, Room] {
+            /**
+             * Create a chain of room history with create events and tombstones.
+             *
+             * @param creates include create events (default=true)
+             * @param tombstones include tomstone events (default=true)
+             * @returns 4 rooms chained together with tombstones and create
+             *          events, in order from oldest to latest.
+             */
+            function createRoomHistory(creates = true, tombstones = true): [Room, Room, Room, Room] {
                 const room1 = new Room("room1", client, "@carol:alexandria.example.com");
                 const room2 = new Room("room2", client, "@daryl:alexandria.example.com");
                 const room3 = new Room("room3", client, "@rick:helicopter.example.com");
                 const room4 = new Room("room4", client, "@michonne:hawthorne.example.com");
 
-                room1.addLiveEvents([tombstoneEvent(room2.roomId, room1.roomId)], {});
-                room2.addLiveEvents([roomCreateEvent(room2.roomId, room1.roomId)]);
+                if (creates) {
+                    room2.addLiveEvents([roomCreateEvent(room2.roomId, room1.roomId)]);
+                    room3.addLiveEvents([roomCreateEvent(room3.roomId, room2.roomId)]);
+                    room4.addLiveEvents([roomCreateEvent(room4.roomId, room3.roomId)]);
+                }
 
-                room2.addLiveEvents([tombstoneEvent(room3.roomId, room2.roomId)], {});
-                room3.addLiveEvents([roomCreateEvent(room3.roomId, room2.roomId)]);
-
-                room3.addLiveEvents([tombstoneEvent(room4.roomId, room3.roomId)], {});
-                room4.addLiveEvents([roomCreateEvent(room4.roomId, room3.roomId)]);
+                if (tombstones) {
+                    room1.addLiveEvents([tombstoneEvent(room2.roomId, room1.roomId)], {});
+                    room2.addLiveEvents([tombstoneEvent(room3.roomId, room2.roomId)], {});
+                    room3.addLiveEvents([tombstoneEvent(room4.roomId, room3.roomId)], {});
+                }
 
                 mocked(store.getRoom).mockImplementation((roomId: string) => {
-                    switch (roomId) {
-                        case "room1":
-                            return room1;
-                        case "room2":
-                            return room2;
-                        case "room3":
-                            return room3;
-                        case "room4":
-                            return room4;
-                        default:
-                            return null;
-                    }
+                    return { room1, room2, room3, room4 }[roomId] || null;
                 });
 
                 return [room1, room2, room3, room4];
@@ -2334,6 +2334,49 @@ describe("MatrixClient", function () {
                 ]);
             });
 
+            it("Returns the predecessors of this room (with verify links)", () => {
+                const [room1, room2, room3, room4] = createRoomHistory();
+                const verifyLinks = true;
+                const history = client.getRoomUpgradeHistory(room4.roomId, verifyLinks);
+                expect(history.map((room) => room.roomId)).toEqual([
+                    room1.roomId,
+                    room2.roomId,
+                    room3.roomId,
+                    room4.roomId,
+                ]);
+            });
+
+            it("With verify links, rejects predecessors that don't point forwards", () => {
+                // Given successors point back with create events, but
+                // predecessors do not point forwards with tombstones
+                const [, , , room4] = createRoomHistory(true, false);
+
+                // When I ask for history with verifyLinks on
+                const verifyLinks = true;
+                const history = client.getRoomUpgradeHistory(room4.roomId, verifyLinks);
+
+                // Then the predecessors are not included in the history
+                expect(history.map((room) => room.roomId)).toEqual([room4.roomId]);
+            });
+
+            it("Without verify links, includes predecessors that don't point forwards", () => {
+                // Given successors point back with create events, but
+                // predecessors do not point forwards with tombstones
+                const [room1, room2, room3, room4] = createRoomHistory(true, false);
+
+                // When I ask for history with verifyLinks off
+                const verifyLinks = false;
+                const history = client.getRoomUpgradeHistory(room4.roomId, verifyLinks);
+
+                // Then the predecessors are included in the history
+                expect(history.map((room) => room.roomId)).toEqual([
+                    room1.roomId,
+                    room2.roomId,
+                    room3.roomId,
+                    room4.roomId,
+                ]);
+            });
+
             it("Returns the subsequent rooms", () => {
                 const [room1, room2, room3, room4] = createRoomHistory();
                 const history = client.getRoomUpgradeHistory(room1.roomId);
@@ -2345,9 +2388,64 @@ describe("MatrixClient", function () {
                 ]);
             });
 
+            it("Returns the subsequent rooms (with verify links)", () => {
+                const [room1, room2, room3, room4] = createRoomHistory();
+                const verifyLinks = true;
+                const history = client.getRoomUpgradeHistory(room1.roomId, verifyLinks);
+                expect(history.map((room) => room.roomId)).toEqual([
+                    room1.roomId,
+                    room2.roomId,
+                    room3.roomId,
+                    room4.roomId,
+                ]);
+            });
+
+            it("With verify links, rejects successors that don't point backwards", () => {
+                // Given predecessors point forwards with tombstones, but
+                // successors do not point back with create events.
+                const [room1, , ,] = createRoomHistory(false, true);
+
+                // When I ask for history with verifyLinks on
+                const verifyLinks = true;
+                const history = client.getRoomUpgradeHistory(room1.roomId, verifyLinks);
+
+                // Then the successors are not included in the history
+                expect(history.map((room) => room.roomId)).toEqual([room1.roomId]);
+            });
+
+            it("Without verify links, includes predecessors that don't point forwards", () => {
+                // Given predecessors point forwards with tombstones, but
+                // successors do not point back with create events.
+                const [room1, room2, room3, room4] = createRoomHistory(false, true);
+
+                // When I ask for history with verifyLinks off
+                const verifyLinks = false;
+                const history = client.getRoomUpgradeHistory(room1.roomId, verifyLinks);
+
+                // Then the successors are included in the history
+                expect(history.map((room) => room.roomId)).toEqual([
+                    room1.roomId,
+                    room2.roomId,
+                    room3.roomId,
+                    room4.roomId,
+                ]);
+            });
+
             it("Returns the predecessors and subsequent rooms", () => {
                 const [room1, room2, room3, room4] = createRoomHistory();
                 const history = client.getRoomUpgradeHistory(room3.roomId);
+                expect(history.map((room) => room.roomId)).toEqual([
+                    room1.roomId,
+                    room2.roomId,
+                    room3.roomId,
+                    room4.roomId,
+                ]);
+            });
+
+            it("Returns the predecessors and subsequent rooms (with verify links)", () => {
+                const [room1, room2, room3, room4] = createRoomHistory();
+                const verifyLinks = true;
+                const history = client.getRoomUpgradeHistory(room3.roomId, verifyLinks);
                 expect(history.map((room) => room.roomId)).toEqual([
                     room1.roomId,
                     room2.roomId,
