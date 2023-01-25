@@ -838,6 +838,55 @@ describe("Call", function () {
             await startVideoCall(client, call);
         });
 
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("should not remove video sender on video mute", async () => {
+            await call.setLocalVideoMuted(true);
+            expect((call as any).hasUserMediaVideoSender).toBe(true);
+        });
+
+        it("should release camera after short delay on video mute", async () => {
+            jest.useFakeTimers();
+
+            await call.setLocalVideoMuted(true);
+
+            jest.advanceTimersByTime(500);
+
+            expect(call.hasLocalUserMediaVideoTrack).toBe(false);
+        });
+
+        it("should re-request video feed on video unmute if it doesn't have one", async () => {
+            jest.useFakeTimers();
+
+            const mockGetUserMediaStream = jest
+                .fn()
+                .mockReturnValue(client.client.getMediaHandler().getUserMediaStream(true, true));
+
+            client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+            await call.setLocalVideoMuted(true);
+
+            jest.advanceTimersByTime(500);
+
+            await call.setLocalVideoMuted(false);
+
+            expect(mockGetUserMediaStream).toHaveBeenCalled();
+        });
+
+        it("should not release camera on fast mute and unmute", async () => {
+            const mockGetUserMediaStream = jest.fn();
+
+            client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+            await call.setLocalVideoMuted(true);
+            await call.setLocalVideoMuted(false);
+
+            expect(mockGetUserMediaStream).not.toHaveBeenCalled();
+            expect(call.hasLocalUserMediaVideoTrack).toBe(true);
+        });
+
         describe("sending sdp_stream_metadata_changed events", () => {
             it("should send sdp_stream_metadata_changed when muting audio", async () => {
                 await call.setMicrophoneMuted(true);
