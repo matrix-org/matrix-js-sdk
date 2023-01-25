@@ -1436,7 +1436,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return this.isMicrophoneMuted();
         }
 
-        if (!this.hasUserMediaAudioSender && !muted) {
+        if (!muted && (!this.hasUserMediaAudioSender || !this.hasLocalUserMediaAudioTrack)) {
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
