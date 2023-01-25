@@ -29,7 +29,6 @@ import {
 import {
     MCallAnswer,
     MCallHangupReject,
-    SDPStreamMetadata,
     SDPStreamMetadataKey,
     SDPStreamMetadataPurpose,
 } from "../../../src/webrtc/callEventTypes";
@@ -83,6 +82,7 @@ const fakeIncomingCall = async (client: TestClient, call: MatrixCall, version: s
             client: client.client,
             userId: "remote_user_id",
             deviceId: undefined,
+            feedId: "remote_stream_id",
             stream: new MockMediaStream("remote_stream_id", [
                 new MockMediaStreamTrack("remote_tack_id", "audio"),
             ]) as unknown as MediaStream,
@@ -316,13 +316,13 @@ describe("Call", function () {
             }),
         );
 
-        (call as any).pushRemoteFeed(
+        (call as any).pushRemoteStream(
             new MockMediaStream("remote_stream", [
                 new MockMediaStreamTrack("remote_audio_track", "audio"),
                 new MockMediaStreamTrack("remote_video_track", "video"),
             ]),
         );
-        const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream");
+        const feed = call.getFeeds().find((feed) => feed.stream?.id === "remote_stream");
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
         expect(feed?.isAudioMuted()).toBeTruthy();
         expect(feed?.isVideoMuted()).not.toBeTruthy();
@@ -439,8 +439,8 @@ describe("Call", function () {
                 video_muted: false,
             },
         });
-        (call as any).pushRemoteFeed(new MockMediaStream("remote_stream", []));
-        const feed = call.getFeeds().find((feed) => feed.stream.id === "remote_stream");
+        (call as any).pushRemoteStream(new MockMediaStream("remote_stream", []));
+        const feed = call.getFeeds().find((feed) => feed.stream?.id === "remote_stream");
 
         call.onSDPStreamMetadataChangedReceived(
             makeMockEvent("@test:foo", {
@@ -520,14 +520,14 @@ describe("Call", function () {
         it("if no video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-            (call as any).pushRemoteFeed(new MockMediaStream("remote_stream1", []));
+            (call as any).pushRemoteStream(new MockMediaStream("remote_stream1", []));
             expect(call.type).toBe(CallType.Voice);
         });
 
         it("if remote video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
-            (call as any).pushRemoteFeed(
+            (call as any).pushRemoteStream(
                 new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
             );
             expect(call.type).toBe(CallType.Video);
@@ -555,6 +555,7 @@ describe("Call", function () {
                 roomId: call.roomId,
                 userId: client.getUserId(),
                 deviceId: undefined,
+                feedId: "local_stream1",
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,
                 videoMuted: false,
@@ -597,6 +598,7 @@ describe("Call", function () {
                 client: client.client,
                 userId: client.getUserId(),
                 deviceId: undefined,
+                feedId: localUsermediaStream.id,
                 stream: localUsermediaStream as unknown as MediaStream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,
@@ -606,6 +608,7 @@ describe("Call", function () {
                 client: client.client,
                 userId: client.getUserId(),
                 deviceId: undefined,
+                feedId: localScreensharingStream.id,
                 stream: localScreensharingStream as unknown as MediaStream,
                 purpose: SDPStreamMetadataPurpose.Screenshare,
                 audioMuted: false,
@@ -629,8 +632,8 @@ describe("Call", function () {
                 video_muted: false,
             },
         });
-        (call as any).pushRemoteFeed(remoteUsermediaStream);
-        (call as any).pushRemoteFeed(remoteScreensharingStream);
+        (call as any).pushRemoteStream(remoteUsermediaStream);
+        (call as any).pushRemoteStream(remoteScreensharingStream);
 
         expect(call.localUsermediaFeed!.stream).toBe(localUsermediaStream);
         expect(call.localUsermediaStream).toBe(localUsermediaStream);
@@ -762,7 +765,7 @@ describe("Call", function () {
             call.off(CallEvent.FeedsChanged, FEEDS_CHANGED_CALLBACK);
         });
 
-        it("should ignore stream passed to pushRemoteFeed()", async () => {
+        it("should ignore stream passed to pushRemoteStream()", async () => {
             await call.onAnswerReceived(
                 makeMockEvent("@test:foo", {
                     version: 1,
@@ -779,16 +782,16 @@ describe("Call", function () {
                 }),
             );
 
-            (call as any).pushRemoteFeed(new MockMediaStream(STREAM_ID));
-            (call as any).pushRemoteFeed(new MockMediaStream(STREAM_ID));
+            (call as any).pushRemoteStream(new MockMediaStream(STREAM_ID));
+            (call as any).pushRemoteStream(new MockMediaStream(STREAM_ID));
 
             expect(call.getRemoteFeeds().length).toBe(1);
             expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
         });
 
-        it("should ignore stream passed to pushRemoteFeedWithoutMetadata()", async () => {
-            (call as any).pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
-            (call as any).pushRemoteFeedWithoutMetadata(new MockMediaStream(STREAM_ID));
+        it("should ignore stream passed to pushRemoteStreamWithoutMetadata()", async () => {
+            (call as any).pushRemoteStreamWithoutMetadata(new MockMediaStream(STREAM_ID));
+            (call as any).pushRemoteStreamWithoutMetadata(new MockMediaStream(STREAM_ID));
 
             expect(call.getRemoteFeeds().length).toBe(1);
             expect(FEEDS_CHANGED_CALLBACK).toHaveBeenCalledTimes(1);
@@ -858,18 +861,8 @@ describe("Call", function () {
         });
 
         describe("receiving sdp_stream_metadata_changed events", () => {
-            const setupCall = (audio: boolean, video: boolean): SDPStreamMetadata => {
-                const metadata = {
-                    stream: {
-                        user_id: "user",
-                        device_id: "device",
-                        purpose: SDPStreamMetadataPurpose.Usermedia,
-                        audio_muted: audio,
-                        video_muted: video,
-                        tracks: {},
-                    },
-                };
-                (call as any).pushRemoteFeed(
+            const setupCall = (audio: boolean, video: boolean): void => {
+                (call as any).pushRemoteStream(
                     new MockMediaStream("stream", [
                         new MockMediaStreamTrack("track1", "audio"),
                         new MockMediaStreamTrack("track1", "video"),
@@ -877,22 +870,30 @@ describe("Call", function () {
                 );
                 call.onSDPStreamMetadataChangedReceived({
                     getContent: () => ({
-                        [SDPStreamMetadataKey]: metadata,
+                        [SDPStreamMetadataKey]: {
+                            stream: {
+                                user_id: "user",
+                                device_id: "device",
+                                purpose: SDPStreamMetadataPurpose.Usermedia,
+                                audio_muted: audio,
+                                video_muted: video,
+                                tracks: {},
+                            },
+                        },
                     }),
                 } as MatrixEvent);
-                return metadata;
             };
 
             it("should handle incoming sdp_stream_metadata_changed with audio muted", async () => {
-                const metadata = setupCall(true, false);
-                expect((call as any).remoteSDPStreamMetadata).toStrictEqual(metadata);
+                setupCall(true, false);
+                expect(call.opponentSupportsSDPStreamMetadata()).toBe(true);
                 expect(call.getRemoteFeeds()[0].isAudioMuted()).toBe(true);
                 expect(call.getRemoteFeeds()[0].isVideoMuted()).toBe(false);
             });
 
             it("should handle incoming sdp_stream_metadata_changed with video muted", async () => {
-                const metadata = setupCall(false, true);
-                expect((call as any).remoteSDPStreamMetadata).toStrictEqual(metadata);
+                setupCall(false, true);
+                expect(call.opponentSupportsSDPStreamMetadata()).toBe(true);
                 expect(call.getRemoteFeeds()[0].isAudioMuted()).toBe(false);
                 expect(call.getRemoteFeeds()[0].isVideoMuted()).toBe(true);
             });
@@ -1394,8 +1395,8 @@ describe("Call", function () {
 
     describe("onTrack", () => {
         it("ignores streamless track", async () => {
-            // @ts-ignore Mock pushRemoteFeed() is private
-            jest.spyOn(call, "pushRemoteFeed");
+            // @ts-ignore Mock pushRemoteStream() is private
+            jest.spyOn(call, "pushRemoteStream");
 
             await call.placeVoiceCall();
 
@@ -1404,13 +1405,13 @@ describe("Call", function () {
                 track: new MockMediaStreamTrack("track_ev", "audio"),
             } as unknown as RTCTrackEvent);
 
-            // @ts-ignore Mock pushRemoteFeed() is private
-            expect(call.pushRemoteFeed).not.toHaveBeenCalled();
+            // @ts-ignore Mock pushRemoteStream() is private
+            expect(call.pushRemoteStream).not.toHaveBeenCalled();
         });
 
         it("correctly pushes", async () => {
-            // @ts-ignore Mock pushRemoteFeed() is private
-            jest.spyOn(call, "pushRemoteFeed");
+            // @ts-ignore Mock pushRemoteStream() is private
+            jest.spyOn(call, "pushRemoteStream");
 
             await call.placeVoiceCall();
             await call.onAnswerReceived(
@@ -1430,9 +1431,9 @@ describe("Call", function () {
                 track: stream.getAudioTracks()[0],
             } as unknown as RTCTrackEvent);
 
-            // @ts-ignore Mock pushRemoteFeed() is private
-            expect(call.pushRemoteFeed).toHaveBeenCalledWith(stream);
-            // @ts-ignore Mock pushRemoteFeed() is private
+            // @ts-ignore Mock pushRemoteStream() is private
+            expect(call.pushRemoteStream).toHaveBeenCalledWith(stream);
+            // @ts-ignore Mock pushRemoteStream() is private
             expect(call.removeTrackListeners.has(stream)).toBe(true);
         });
     });

@@ -266,6 +266,9 @@ export class MockRTCRtpSender {
     public replaceTrack(track: MockMediaStreamTrack) {
         this.track = track;
     }
+
+    public getParameters() {}
+    public setParameters() {}
 }
 
 export class MockRTCRtpReceiver {
@@ -292,7 +295,7 @@ export class MockMediaStreamTrack {
 
     public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
-    public settings?: MediaTrackSettings;
+    public settings: MediaTrackSettings = {};
 
     public getSettings(): MediaTrackSettings {
         return this.settings!;
@@ -592,6 +595,7 @@ export class MockCallFeed {
 export function installWebRTCMocks() {
     global.navigator = {
         mediaDevices: new MockMediaDevices().typed(),
+        userAgent: "This is definitely a user agent string",
     } as unknown as Navigator;
 
     global.window = {

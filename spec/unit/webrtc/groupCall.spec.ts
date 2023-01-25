@@ -807,7 +807,7 @@ describe("Group Call", function () {
 
                 await groupCall.setMicrophoneMuted(true);
 
-                groupCall.localCallFeed!.stream.getAudioTracks().forEach((track) => expect(track.enabled).toBe(false));
+                groupCall.localCallFeed!.stream!.getAudioTracks().forEach((track) => expect(track.enabled).toBe(false));
                 expect(groupCall.localCallFeed!.setAudioVideoMuted).toHaveBeenCalledWith(true, null);
                 setAVMutedArray.forEach((f) => expect(f).toHaveBeenCalledWith(true, null));
                 tracksArray.forEach((track) => expect(track.enabled).toBe(false));
@@ -835,9 +835,8 @@ describe("Group Call", function () {
 
                 await groupCall.setLocalVideoMuted(true);
 
-                groupCall.localCallFeed!.stream.getVideoTracks().forEach((track) => expect(track.enabled).toBe(false));
-                expect(mockClient.getMediaHandler().getUserMediaStream).toHaveBeenCalledWith(true, false);
-                expect(groupCall.updateLocalUsermediaStream).toHaveBeenCalled();
+                groupCall.localCallFeed!.stream!.getVideoTracks().forEach((track) => expect(track.enabled).toBe(false));
+                expect(groupCall.localCallFeed!.setAudioVideoMuted).toHaveBeenCalledWith(null, true);
                 setAVMutedArray.forEach((f) => expect(f).toHaveBeenCalledWith(null, true));
                 tracksArray.forEach((track) => expect(track.enabled).toBe(false));
                 sendMetadataUpdateArray.forEach((f) => expect(f).toHaveBeenCalled());
@@ -872,7 +871,7 @@ describe("Group Call", function () {
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
                 call.onSDPStreamMetadataChangedReceived(metadataEvent);
                 // @ts-ignore Mock
-                call.pushRemoteFeed(
+                call.pushRemoteStream(
                     // @ts-ignore Mock
                     new MockMediaStream("stream", [
                         new MockMediaStreamTrack("audio_track", "audio"),
@@ -899,7 +898,7 @@ describe("Group Call", function () {
                 call.getOpponentMember = () => ({ userId: call.invitee } as RoomMember);
                 call.onSDPStreamMetadataChangedReceived(metadataEvent);
                 // @ts-ignore Mock
-                call.pushRemoteFeed(
+                call.pushRemoteStream(
                     // @ts-ignore Mock
                     new MockMediaStream("stream", [
                         new MockMediaStreamTrack("audio_track", "audio"),
@@ -1157,7 +1156,7 @@ describe("Group Call", function () {
                 }),
             } as MatrixEvent);
             // @ts-ignore Mock
-            call.pushRemoteFeed(
+            call.pushRemoteStream(
                 // @ts-ignore Mock
                 new MockMediaStream("screensharing_stream", [new MockMediaStreamTrack("video_track", "video")]),
             );
@@ -1211,6 +1210,7 @@ describe("Group Call", function () {
                 roomId: FAKE_ROOM_ID,
                 userId: FAKE_USER_ID_2,
                 deviceId: FAKE_DEVICE_ID_1,
+                feedId: "foo",
                 stream: new MockMediaStream("foo", []).typed(),
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,
@@ -1223,6 +1223,7 @@ describe("Group Call", function () {
                 roomId: FAKE_ROOM_ID,
                 userId: FAKE_USER_ID_3,
                 deviceId: FAKE_DEVICE_ID_1,
+                feedId: "foo",
                 stream: new MockMediaStream("foo", []).typed(),
                 purpose: SDPStreamMetadataPurpose.Usermedia,
                 audioMuted: false,
