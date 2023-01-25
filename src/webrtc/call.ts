@@ -514,7 +514,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private get hasUserMediaVideoSender(): boolean {
-        return this.transceivers.has(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"));
+        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"))?.sender);
     }
 
     public get localUsermediaFeed(): CallFeed | undefined {

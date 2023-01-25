@@ -42,6 +42,7 @@ import {
     MockRTCPeerConnection,
     MockRTCRtpTransceiver,
     SCREENSHARE_STREAM_ID,
+    MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
@@ -539,13 +540,13 @@ describe("Call", function () {
 
             // since this is testing for the presence of a local sender, we need to add a transciever
             // rather than just a source track
-            (call as any).transceivers.set(
-                "m.usermedia:video",
-                new MockRTCRtpTransceiver(call.peerConn as unknown as MockRTCPeerConnection),
-            );
+            const mockTrack = new MockMediaStreamTrack("track_id", "video");
+            const mockTransceiver = new MockRTCRtpTransceiver(call.peerConn as unknown as MockRTCPeerConnection);
+            mockTransceiver.sender = new MockRTCRtpSender(mockTrack) as unknown as RTCRtpSender;
+            (call as any).transceivers.set("m.usermedia:video", mockTransceiver);
 
             (call as any).pushNewLocalFeed(
-                new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
+                new MockMediaStream("remote_stream1", [mockTrack]),
                 SDPStreamMetadataPurpose.Usermedia,
                 false,
             );
