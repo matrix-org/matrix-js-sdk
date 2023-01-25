@@ -1428,8 +1428,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                             `) to peer connection`,
                     );
 
-                    // this is what would allow us to use addTransceiver(), but it's not available
-                    // on Firefox yet. We call it anyway if we have it.
                     if (transceiver.sender.setStreams) transceiver.sender.setStreams(this.localUsermediaStream!);
 
                     await oldSender.replaceTrack(track);
