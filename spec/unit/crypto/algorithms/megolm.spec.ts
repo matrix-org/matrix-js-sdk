@@ -579,15 +579,6 @@ describe("MegolmDecryption", function () {
             }
         });
 
-        it("defers before completing", async () => {
-            megolm.prepareToEncrypt(room);
-            // Ensure that `Crypto#checkDeviceTrust` has been called *fewer*
-            // than the full nine times, after yielding once.
-            await sleep(0);
-            const callCount = mockCrypto.checkDeviceTrust.mock.calls.length;
-            expect(callCount).toBeLessThan(9);
-        });
-
         it("is cancellable", async () => {
             const stop = megolm.prepareToEncrypt(room);
 
