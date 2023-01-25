@@ -877,7 +877,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                         });
                     }
 
-                    // now go & fish for the new transceiver
                     this.transceivers.set(tKey, transceiver);
                 }
             }
