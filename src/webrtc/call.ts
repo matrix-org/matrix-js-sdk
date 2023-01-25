@@ -851,11 +851,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                     transceiver.sender.replaceTrack(track);
 
-                    const parameters = transceiver.sender.getParameters();
-                    transceiver.sender.setParameters({
-                        ...transceiver.sender.getParameters(),
-                        encodings: encodings ?? parameters.encodings,
-                    });
+                    if (this.isFocus) {
+                        const parameters = transceiver.sender.getParameters();
+                        transceiver.sender.setParameters({
+                            ...transceiver.sender.getParameters(),
+                            encodings: encodings ?? parameters.encodings,
+                        });
+                    }
 
                     // set the direction to indicate we're going to start sending again
                     // (this will trigger the re-negotiation)
@@ -864,11 +866,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     // create a new one
                     const transceiver = this.peerConn!.addTransceiver(track, {
                         streams: [callFeed.stream!],
-                        sendEncodings: isFirefox() ? undefined : encodings,
+                        sendEncodings: this.isFocus && isFirefox() ? undefined : encodings,
                     });
 
-                    const parameters = transceiver.sender.getParameters();
-                    if (isFirefox()) {
+                    if (this.isFocus && isFirefox()) {
+                        const parameters = transceiver.sender.getParameters();
                         transceiver.sender.setParameters({
                             ...transceiver.sender.getParameters(),
                             encodings: encodings ?? parameters.encodings,
@@ -1432,11 +1434,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                     await oldSender.replaceTrack(track);
 
-                    const parameters = transceiver.sender.getParameters();
-                    transceiver.sender.setParameters({
-                        ...transceiver.sender.getParameters(),
-                        encodings: encodings ?? parameters.encodings,
-                    });
+                    if (this.isFocus) {
+                        const parameters = transceiver.sender.getParameters();
+                        transceiver.sender.setParameters({
+                            ...transceiver.sender.getParameters(),
+                            encodings: encodings ?? parameters.encodings,
+                        });
+                    }
 
                     // Set the direction to indicate we're going to be sending.
                     // This is only necessary in the cases where we're upgrading
@@ -1461,11 +1465,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                 const newTransceiver = this.peerConn!.addTransceiver(track, {
                     streams: [this.localUsermediaStream!],
-                    sendEncodings: isFirefox() ? undefined : encodings,
+                    sendEncodings: this.isFocus && isFirefox() ? undefined : encodings,
                 });
 
-                const parameters = newTransceiver.sender.getParameters();
-                if (isFirefox()) {
+                if (this.isFocus && isFirefox()) {
+                    const parameters = newTransceiver.sender.getParameters();
                     newTransceiver.sender.setParameters({
                         ...newTransceiver.sender.getParameters(),
                         encodings: encodings ?? parameters.encodings,
