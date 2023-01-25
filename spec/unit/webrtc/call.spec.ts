@@ -40,6 +40,7 @@ import {
     MockMediaStreamTrack,
     installWebRTCMocks,
     MockRTCPeerConnection,
+    MockRTCRtpTransceiver,
     SCREENSHARE_STREAM_ID,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
@@ -535,6 +536,13 @@ describe("Call", function () {
 
         it("if local video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
+
+            // since this is testing for the presence of a local sender, we need to add a transciever
+            // rather than just a source track
+            (call as any).transceivers.set(
+                "m.usermedia:video",
+                new MockRTCRtpTransceiver(call.peerConn as unknown as MockRTCPeerConnection),
+            );
 
             (call as any).pushNewLocalFeed(
                 new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
