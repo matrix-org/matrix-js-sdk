@@ -2498,8 +2498,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean): Promise<void> {
         if (this.callHasEnded()) return;
 
-        if (this.stopVideoTrackTimer !== undefined) clearTimeout(this.stopVideoTrackTimer);
-
         this.hangupParty = hangupParty;
         this.hangupReason = hangupReason;
         this.state = CallState.Ended;
@@ -2511,6 +2509,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
             this.callLengthInterval = undefined;
+        }
+        if (this.stopVideoTrackTimer !== undefined) {
+            clearTimeout(this.stopVideoTrackTimer);
+            this.stopVideoTrackTimer = undefined;
         }
 
         for (const [stream, listener] of this.removeTrackListeners) {
