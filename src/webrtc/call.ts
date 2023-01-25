@@ -2116,7 +2116,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param force - whether or not to force the request to be sent immediately
      */
     public subscribeToFocus(force = false): void {
-        // TODO: Can we throttle this better?
+        // TODO: Can we throttle this better? Probably using lodash
         if (force) {
             this.sendSubscriptionFocusEvent();
             return;
