@@ -279,6 +279,29 @@ const ICE_DISCONNECTED_TIMEOUT = 30 * 1000; // ms
  */
 const SUBSCRIBE_TO_FOCUS_TIMEOUT = 2 * 1000;
 
+const SIMULCAST_ENCODINGS = [
+    // Order is important here: some browsers (e.g.
+    // Chrome) will only send some of the encodings, if
+    // the track has a resolution to low for it to send
+    // all, in that case the encoding higher in the list
+    // has priority and therefore we put full as first
+    // as we always want to send the full resolution
+    {
+        maxBitrate: 4_500_000,
+        rid: SimulcastResolution.Full,
+    },
+    {
+        maxBitrate: 1_500_000,
+        rid: SimulcastResolution.Half,
+        scaleResolutionDownBy: 2.0,
+    },
+    {
+        maxBitrate: 300_000,
+        rid: SimulcastResolution.Quarter,
+        scaleResolutionDownBy: 4.0,
+    },
+];
+
 export class CallError extends Error {
     public readonly code: string;
 
@@ -813,31 +836,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                         `) to peer connection`,
                 );
 
-                const encodings: RTCRtpEncodingParameters[] | undefined =
-                    track.kind === "video"
-                        ? [
-                              // Order is important here: some browsers (e.g.
-                              // Chrome) will only send some of the encodings, if
-                              // the track has a resolution to low for it to send
-                              // all, in that case the encoding higher in the list
-                              // has priority and therefore we put full as first
-                              // as we always want to send the full resolution
-                              {
-                                  maxBitrate: 4_500_000,
-                                  rid: SimulcastResolution.Full,
-                              },
-                              {
-                                  maxBitrate: 1_500_000,
-                                  rid: SimulcastResolution.Half,
-                                  scaleResolutionDownBy: 2.0,
-                              },
-                              {
-                                  maxBitrate: 300_000,
-                                  rid: SimulcastResolution.Quarter,
-                                  scaleResolutionDownBy: 4.0,
-                              },
-                          ]
-                        : undefined;
+                const encodings = track.kind === "video" ? SIMULCAST_ENCODINGS : undefined;
 
                 const tKey = getTransceiverKey(callFeed.purpose, track.kind);
                 if (this.transceivers.has(tKey)) {
@@ -1420,6 +1419,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             const transceiver = this.transceivers.get(tKey);
             const oldSender = transceiver?.sender;
+            const encodings = track.kind === "video" ? SIMULCAST_ENCODINGS : undefined;
+
             let added = false;
             if (oldSender) {
                 try {
@@ -1432,7 +1433,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                             `streamPurpose="${callFeed.purpose}"` +
                             `) to peer connection`,
                     );
+
+                    // this is what would allow us to use addTransceiver(), but it's not available
+                    // on Firefox yet. We call it anyway if we have it.
+                    if (transceiver.sender.setStreams) transceiver.sender.setStreams(this.localUsermediaStream!);
+
                     await oldSender.replaceTrack(track);
+
+                    const parameters = transceiver.sender.getParameters();
+                    transceiver.sender.setParameters({
+                        ...transceiver.sender.getParameters(),
+                        encodings: encodings ?? parameters.encodings,
+                    });
+
                     // Set the direction to indicate we're going to be sending.
                     // This is only necessary in the cases where we're upgrading
                     // the call to video after downgrading it.
@@ -1454,13 +1467,20 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                         `) to peer connection`,
                 );
 
-                const newSender = this.peerConn!.addTrack(track, this.localUsermediaStream!);
-                const newTransciever = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
-                if (newTransciever) {
-                    this.transceivers.set(tKey, newTransciever);
-                } else {
-                    logger.warn("Couldn't find matching transceiver for newly added track!");
+                const newTransceiver = this.peerConn!.addTransceiver(track, {
+                    streams: [this.localUsermediaStream!],
+                    sendEncodings: isFirefox() ? undefined : encodings,
+                });
+
+                const parameters = newTransceiver.sender.getParameters();
+                if (isFirefox()) {
+                    newTransceiver.sender.setParameters({
+                        ...newTransceiver.sender.getParameters(),
+                        encodings: encodings ?? parameters.encodings,
+                    });
                 }
+
+                this.transceivers.set(tKey, newTransceiver);
             }
         }
     }
