@@ -844,6 +844,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     // Matrix event.
                     const transceiver = this.transceivers.get(tKey)!;
 
+                    // RTCRtpSender::setStreams() is currently not supported by
+                    // Firefox but we try to use it at least in other browsers
                     if (transceiver.sender.setStreams) transceiver.sender.setStreams(callFeed.stream!);
 
                     transceiver.sender.replaceTrack(track);
@@ -1427,6 +1429,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                             `) to peer connection`,
                     );
 
+                    // RTCRtpSender::setStreams() is currently not supported by
+                    // Firefox but we try to use it at least in other browsers
                     if (transceiver.sender.setStreams) transceiver.sender.setStreams(this.localUsermediaStream!);
 
                     await oldSender.replaceTrack(track);
