@@ -210,6 +210,7 @@ export class GroupCall extends TypedEventEmitter<
     private resendMemberStateTimer: ReturnType<typeof setInterval> | null = null;
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
+    private initCallFeedPromise?: Promise<void>;
 
     public constructor(
         private client: MatrixClient,
@@ -360,36 +361,43 @@ export class GroupCall extends TypedEventEmitter<
         );
     }
 
-    public async initLocalCallFeed(): Promise<CallFeed> {
-        logger.log(`groupCall ${this.groupCallId} initLocalCallFeed`);
-
+    public async initLocalCallFeed(): Promise<void> {
         if (this.state !== GroupCallState.LocalCallFeedUninitialized) {
             throw new Error(`Cannot initialize local call feed in the "${this.state}" state.`);
         }
-
         this.state = GroupCallState.InitializingLocalCallFeed;
 
-        let stream: MediaStream;
+        // wraps the real method to serialise calls, because we don't want to try starting
+        // multiple call feeds at once
+        if (this.initCallFeedPromise) return this.initCallFeedPromise;
 
-        let disposed = false;
-        const onState = (state: GroupCallState): void => {
-            if (state === GroupCallState.LocalCallFeedUninitialized) {
-                disposed = true;
-            }
-        };
-        this.on(GroupCallEvent.GroupCallStateChanged, onState);
+        try {
+            this.initCallFeedPromise = this.initLocalCallFeedInternal();
+            await this.initCallFeedPromise;
+        } finally {
+            this.initCallFeedPromise = undefined;
+        }
+    }
+
+    private async initLocalCallFeedInternal(): Promise<void> {
+        logger.log(`groupCall ${this.groupCallId} initLocalCallFeed`);
+
+        let stream: MediaStream;
 
         try {
             stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === GroupCallType.Video);
         } catch (error) {
             this.state = GroupCallState.LocalCallFeedUninitialized;
             throw error;
-        } finally {
-            this.off(GroupCallEvent.GroupCallStateChanged, onState);
         }
 
-        // The call could've been disposed while we were waiting
-        if (disposed) throw new Error("Group call disposed");
+        // The call could've been disposed while we were waiting, and could
+        // also have been started back up again (hello, React 18) so if we're
+        // still in this 'initializing' state, carry on, otherwise bail.
+        if (this._state !== GroupCallState.InitializingLocalCallFeed) {
+            this.client.getMediaHandler().stopUserMediaStream(stream);
+            throw new Error("Group call disposed while gathering media stream");
+        }
 
         const callFeed = new CallFeed({
             client: this.client,
@@ -410,8 +418,6 @@ export class GroupCall extends TypedEventEmitter<
         this.addUserMediaFeed(callFeed);
 
         this.state = GroupCallState.LocalCallFeedInitialized;
-
-        return callFeed;
     }
 
     public async updateLocalUsermediaStream(stream: MediaStream): Promise<void> {
@@ -662,7 +668,7 @@ export class GroupCall extends TypedEventEmitter<
             );
             this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
-            // are the one on the groupcall's own CallFeed and are cloned before being
+            // are the one on the GroupCall's own CallFeed and are cloned before being
             // given to any of the actual calls, so these tracks don't actually go
             // anywhere. Let's do it anyway to avoid confusion.
             if (this.localCallFeed.stream) {
@@ -1285,6 +1291,14 @@ export class GroupCall extends TypedEventEmitter<
      * Recalculates and updates the participant map to match the room state.
      */
     private updateParticipants(): void {
+        const localMember = this.room.getMember(this.client.getUserId()!)!;
+        if (!localMember) {
+            // The client hasn't fetched enough of the room state to get our own member
+            // event. This probably shouldn't happen, but sanity check & exit for now.
+            logger.warn("Tried to update participants before local room member is available");
+            return;
+        }
+
         if (this.participantsExpirationTimer !== null) {
             clearTimeout(this.participantsExpirationTimer);
             this.participantsExpirationTimer = null;
@@ -1339,7 +1353,6 @@ export class GroupCall extends TypedEventEmitter<
 
         // Apply local echo for the entered case
         if (entered) {
-            const localMember = this.room.getMember(this.client.getUserId()!)!;
             let deviceMap = participants.get(localMember);
             if (deviceMap === undefined) {
                 deviceMap = new Map();

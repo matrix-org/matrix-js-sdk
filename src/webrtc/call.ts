@@ -251,7 +251,7 @@ export enum CallErrorCode {
     /**
      * We transferred the call off to somewhere else
      */
-    Transfered = "transferred",
+    Transferred = "transferred",
 
     /**
      * A call from the same user was found with a new session id
@@ -437,6 +437,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     private _opponentSupportsSDPStreamMetadata = false;
 
+    // Used to keep the timer for the delay before actually stopping our
+    // video track after muting (see setLocalVideoMuted)
+    private stopVideoTrackTimer?: ReturnType<typeof setTimeout>;
+
     /**
      * Construct a new Matrix Call.
      * @param opts - Config options.
@@ -531,7 +535,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public get type(): CallType {
-        return this.hasLocalUserMediaVideoTrack || this.hasRemoteUserMediaVideoTrack ? CallType.Video : CallType.Voice;
+        // we may want to look for a video receiver here rather than a track to match the
+        // sender behaviour, although in practice they should be the same thing
+        return this.hasUserMediaVideoSender || this.hasRemoteUserMediaVideoTrack ? CallType.Video : CallType.Voice;
     }
 
     public get hasLocalUserMediaVideoTrack(): boolean {
@@ -552,6 +558,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.getRemoteFeeds().some((feed) => {
             return feed.purpose === SDPStreamMetadataPurpose.Usermedia && !!feed.stream?.getAudioTracks().length;
         });
+    }
+
+    private get hasUserMediaAudioSender(): boolean {
+        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "audio"))?.sender);
+    }
+
+    private get hasUserMediaVideoSender(): boolean {
+        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"))?.sender);
     }
 
     public get localUsermediaFeed(): CallFeed | undefined {
@@ -1397,18 +1411,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.localUsermediaStream!.addTrack(track);
         }
 
-        // Secondly, we remove tracks that we no longer need from the peer
-        // connection, if any. This only happens when we mute the video atm.
-        // This will change the transceiver direction to "inactive" and
-        // therefore cause re-negotiation.
-        for (const kind of ["audio", "video"]) {
-            const sender = this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, kind))?.sender;
-            // Only remove the track if we aren't going to immediately replace it
-            if (sender && !stream.getTracks().find((t) => t.kind === kind)) {
-                this.peerConn?.removeTrack(sender);
-            }
-        }
-        // Thirdly, we replace the old tracks, if possible.
+        // Then replace the old tracks, if possible.
         for (const track of stream.getTracks()) {
             const tKey = getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, track.kind);
 
@@ -1489,22 +1492,51 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
         logger.log(`call ${this.callId} setLocalVideoMuted ${muted}`);
+
+        // if we were still thinking about stopping and removing the video
+        // track: don't, because we want it back.
+        if (!muted && this.stopVideoTrackTimer !== undefined) {
+            clearTimeout(this.stopVideoTrackTimer);
+            this.stopVideoTrackTimer = undefined;
+        }
+
         if (!(await this.client.getMediaHandler().hasVideoDevice())) {
             return this.isLocalVideoMuted();
         }
 
-        if (!this.hasLocalUserMediaVideoTrack && !muted) {
+        if (!this.hasUserMediaVideoSender && !muted) {
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
-        if (this.opponentSupportsSDPStreamMetadata()) {
-            const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
+
+        // we may not have a video track - if not, re-request usermedia
+        if (!muted && this.localUsermediaStream!.getVideoTracks().length === 0) {
+            const stream = await this.client.getMediaHandler().getUserMediaStream(true, true);
             await this.updateLocalUsermediaStream(stream);
-        } else {
-            this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
         }
+
+        this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
+
         this.updateMuteStatus();
         await this.sendMetadataUpdate();
+
+        // if we're muting video, set a timeout to stop & remove the video track so we release
+        // the camera. We wait a short time to do this because when we disable a track, WebRTC
+        // will send black video for it. If we just stop and remove it straight away, the video
+        // will just freeze which means that when we unmute video, the other side will briefly
+        // get a static frame of us from before we muted. This way, the still frame is just black.
+        // A very small delay is not always enough so the theory here is that it needs to be long
+        // enough for WebRTC to encode a frame: 120ms should be long enough even if we're only
+        // doing 10fps.
+        if (muted) {
+            this.stopVideoTrackTimer = setTimeout(() => {
+                for (const t of this.localUsermediaStream!.getVideoTracks()) {
+                    t.stop();
+                    this.localUsermediaStream!.removeTrack(t);
+                }
+            }, 120);
+        }
+
         return this.isLocalVideoMuted();
     }
 
@@ -1532,7 +1564,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return this.isMicrophoneMuted();
         }
 
-        if (!this.hasLocalUserMediaAudioTrack && !muted) {
+        if (!muted && (!this.hasUserMediaAudioSender || !this.hasLocalUserMediaAudioTrack)) {
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
@@ -1624,6 +1656,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.localUsermediaStream!.id
             } micShouldBeMuted ${micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`,
         );
+
         setTracksEnabled(this.localUsermediaStream!.getAudioTracks(), !micShouldBeMuted);
         setTracksEnabled(this.localUsermediaStream!.getVideoTracks(), !vidShouldBeMuted);
     }
@@ -1742,25 +1775,25 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     continue;
                 }
 
-                const extraconfig: string[] = [];
+                const extraConfig: string[] = [];
                 if (mod.enableDtx !== undefined) {
-                    extraconfig.push(`usedtx=${mod.enableDtx ? "1" : "0"}`);
+                    extraConfig.push(`usedtx=${mod.enableDtx ? "1" : "0"}`);
                 }
                 if (mod.maxAverageBitrate !== undefined) {
-                    extraconfig.push(`maxaveragebitrate=${mod.maxAverageBitrate}`);
+                    extraConfig.push(`maxaveragebitrate=${mod.maxAverageBitrate}`);
                 }
 
                 let found = false;
                 for (const fmtp of media.fmtp) {
                     if (payloadTypeToCodecMap.get(fmtp.payload) === mod.codec) {
                         found = true;
-                        fmtp.config += ";" + extraconfig.join(";");
+                        fmtp.config += ";" + extraConfig.join(";");
                     }
                 }
                 if (!found) {
                     media.fmtp.push({
                         payload: codecToPayloadTypeMap.get(mod.codec)!,
-                        config: extraconfig.join(";"),
+                        config: extraConfig.join(";"),
                     });
                 }
             }
@@ -2749,7 +2782,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         await this.sendVoipEvent(EventType.CallReplaces, body);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transferred, true);
     }
 
     /*
@@ -2790,8 +2823,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
-        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transfered, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transferred, true);
+        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transferred, true);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean): Promise<void> {
@@ -2812,6 +2845,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.subscribeToFocusTimeout) {
             clearTimeout(this.subscribeToFocusTimeout);
             this.subscribeToFocusTimeout = undefined;
+        }
+        if (this.stopVideoTrackTimer) {
+            clearTimeout(this.stopVideoTrackTimer);
+            this.stopVideoTrackTimer = undefined;
         }
 
         for (const [stream, listener] of this.removeTrackListeners) {
@@ -2841,7 +2878,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         for (const feed of this.feeds) {
             if (!feed.stream) continue;
             // Slightly awkward as local feed need to go via the correct method on
-            // the mediahandler so they get removed from mediahandler (remote tracks
+            // the MediaHandler so they get removed from MediaHandler (remote tracks
             // don't)
             // NB. We clone local streams when passing them to individual calls in a group
             // call, so we can (and should) stop the clones once we no longer need them:
