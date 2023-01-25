@@ -168,7 +168,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         if (oldStream) {
             oldStream.removeEventListener("addtrack", this.onAddTrack);
             oldStream.removeEventListener("removetrack", this.onRemoveTrack);
-            this.measureVolumeActivity(false);
+            clearTimeout(this.volumeLooperTimeout);
         }
 
         this._stream = newStream;
@@ -176,11 +176,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         newStream?.addEventListener("removetrack", this.onRemoveTrack);
 
         this.updateConnected();
-        if (this.hasAudioTrack) {
-            this.initVolumeMeasuring();
-        } else {
-            this.measureVolumeActivity(false);
-        }
+        this.initVolumeMeasuring();
+        this.volumeLooper();
 
         this.emit(CallFeedEvent.NewStream, this.stream);
     }
@@ -303,8 +300,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      */
     public measureVolumeActivity(enabled: boolean): void {
         if (enabled) {
-            if (!this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
-
+            clearTimeout(this.volumeLooperTimeout);
             this.measuringVolumeActivity = true;
             this.volumeLooper();
         } else {
@@ -320,7 +316,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
 
     private volumeLooper = (): void => {
         if (!this.analyser) return;
-
+        if (!this.hasAudioTrack) return;
+        if (!this.frequencyBinCount) return;
         if (!this.measuringVolumeActivity) return;
 
         this.analyser.getFloatFrequencyData(this.frequencyBinCount!);
