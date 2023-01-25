@@ -1438,14 +1438,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
                     await oldSender.replaceTrack(track);
 
-                    if (this.isFocus) {
-                        const parameters = transceiver.sender.getParameters();
-                        transceiver.sender.setParameters({
-                            ...transceiver.sender.getParameters(),
-                            encodings: encodings ?? parameters.encodings,
-                        });
-                    }
-
                     // Set the direction to indicate we're going to be sending.
                     // This is only necessary in the cases where we're upgrading
                     // the call to video after downgrading it.
