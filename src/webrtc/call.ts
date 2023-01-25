@@ -863,10 +863,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     // (this will trigger the re-negotiation)
                     transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
                 } else {
-                    // create a new one. We need to use addTrack rather addTransceiver for this because firefox
-                    // doesn't yet implement RTCRTPSender.setStreams()
-                    // (https://bugzilla.mozilla.org/show_bug.cgi?id=1510802) so we'd have no way to group the
-                    // two tracks together into a stream.
+                    // create a new one
                     const transceiver = this.peerConn!.addTransceiver(track, {
                         streams: [callFeed.stream!],
                         sendEncodings: isFirefox() ? undefined : encodings,
