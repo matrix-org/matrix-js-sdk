@@ -1,7 +1,7 @@
 {
-    "name": "matrix-js-sdk",
+    "name": "matrix-js-sdk-bastyon",
     "version": "23.1.1",
-    "description": "Matrix Client-Server SDK for Javascript",
+    "description": "Matrix Client-Server SDK for Javascript (Bastyon)",
     "engines": {
         "node": ">=16.0.0"
     },
@@ -27,7 +27,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "https://github.com/matrix-org/matrix-js-sdk"
+        "url": "https://github.com/maxgithubprofile/matrix-js-sdk"
     },
     "keywords": [
         "matrix-org"
@@ -114,7 +114,7 @@
         "jest-localstorage-mock": "^2.4.6",
         "jest-mock": "^29.0.0",
         "matrix-mock-request": "^2.5.0",
-        "prettier": "2.8.2",
+        "prettier": "2.8.0",
         "rimraf": "^3.0.2",
         "terser": "^5.5.1",
         "tsify": "^5.0.2",

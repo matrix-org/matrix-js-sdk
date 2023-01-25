@@ -862,6 +862,7 @@ export enum ClientEvent {
 
 type RoomEvents =
     | RoomEvent.Name
+    | RoomEvent.Avatar
     | RoomEvent.Redaction
     | RoomEvent.RedactionCancelled
     | RoomEvent.Receipt

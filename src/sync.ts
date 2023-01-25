@@ -1851,6 +1851,7 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
 
     client.reEmitter.reEmit(room, [
         RoomEvent.Name,
+        RoomEvent.Avatar,
         RoomEvent.Redaction,
         RoomEvent.RedactionCancelled,
         RoomEvent.Receipt,

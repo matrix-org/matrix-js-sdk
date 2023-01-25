@@ -135,6 +135,7 @@ export enum RoomEvent {
     AccountData = "Room.accountData",
     Receipt = "Room.receipt",
     Name = "Room.name",
+    Avatar = "Room.avater",
     Redaction = "Room.redaction",
     RedactionCancelled = "Room.redactionCancelled",
     LocalEchoUpdated = "Room.localEchoUpdated",
@@ -225,6 +226,16 @@ export type RoomEventHandlerMap = {
      * ```
      */
     [RoomEvent.Name]: (room: Room) => void;
+    /**
+     * Fires when an event we had previously received is redacted.
+     *
+     * (Note this is *not* fired when the redaction happens before we receive the
+     * event).
+     *
+     * @param event - The matrix redaction event
+     * @param room - The room containing the redacted event
+     */
+    [RoomEvent.Avatar]: (room: Room) => void;
     /**
      * Fires when an event we had previously received is redacted.
      *
