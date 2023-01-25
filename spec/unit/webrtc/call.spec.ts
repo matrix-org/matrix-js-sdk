@@ -541,7 +541,7 @@ describe("Call", function () {
             // since this is testing for the presence of a local sender, we need to add a transciever
             // rather than just a source track
             const mockTrack = new MockMediaStreamTrack("track_id", "video");
-            const mockTransceiver = new MockRTCRtpTransceiver(call.peerConn as unknown as MockRTCPeerConnection);
+            const mockTransceiver = new MockRTCRtpTransceiver(call.peerConn as unknown as MockRTCPeerConnection, "0");
             mockTransceiver.sender = new MockRTCRtpSender(mockTrack) as unknown as RTCRtpSender;
             (call as any).transceivers.set("m.usermedia:video", mockTransceiver);
 
