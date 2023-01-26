@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_END, M_POLL_RESPONSE, PollStartEvent } from "../@types/polls";
+import { M_POLL_END, M_POLL_RESPONSE } from "../@types/polls";
 import { MatrixClient } from "../client";
+import { PollStartEvent } from "../extensible_events_v1/PollStartEvent";
 import { MatrixEvent } from "./event";
 import { Relations } from "./relations";
 import { Room } from "./room";
