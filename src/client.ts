@@ -9366,9 +9366,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Calls aggregation functions for event types that are aggregated
      * Polls and location beacons
-     * @param room 
-     * @param events 
-     * @returns 
+     * @param room - room the events belong to
+     * @param events - timeline events to be processed
+     * @returns
      */
     public processAggregatedTimelineEvents(room?: Room, events?: MatrixEvent[]): void {
         if (!events?.length) return;
