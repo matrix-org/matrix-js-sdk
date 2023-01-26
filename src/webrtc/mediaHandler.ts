@@ -57,6 +57,9 @@ export class MediaHandler extends TypedEventEmitter<
     public userMediaStreams: MediaStream[] = [];
     public screensharingStreams: MediaStream[] = [];
 
+    // Promise chain to serialise calls to getMediaStream
+    private getMediaStreamPromise?: Promise<MediaStream>;
+
     public constructor(private client: MatrixClient) {
         super();
     }
@@ -196,6 +199,19 @@ export class MediaHandler extends TypedEventEmitter<
      * @returns based on passed parameters
      */
     public async getUserMediaStream(audio: boolean, video: boolean, reusable = true): Promise<MediaStream> {
+        // Serialise calls, othertwise we can't sensibly re-use the stream
+        if (this.getMediaStreamPromise) {
+            this.getMediaStreamPromise = this.getMediaStreamPromise.then(() => {
+                return this.getUserMediaStreamInternal(audio, video, reusable);
+            });
+        } else {
+            this.getMediaStreamPromise = this.getUserMediaStreamInternal(audio, video, reusable);
+        }
+
+        return this.getMediaStreamPromise;
+    }
+
+    private async getUserMediaStreamInternal(audio: boolean, video: boolean, reusable: boolean): Promise<MediaStream> {
         const shouldRequestAudio = audio && (await this.hasAudioDevice());
         const shouldRequestVideo = video && (await this.hasVideoDevice());
 

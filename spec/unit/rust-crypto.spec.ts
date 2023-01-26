@@ -32,6 +32,9 @@ import { RustCrypto } from "../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../src/rust-crypto";
 import { HttpApiEvent, HttpApiEventHandlerMap, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
+import { mkEvent } from "../test-utils/test-utils";
+import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { IEventDecryptionResult } from "../../src/@types/crypto";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -243,6 +246,35 @@ describe("RustCrypto", () => {
 
             // we sent three, so there should be 2 left
             expect(outgoingRequestQueue.length).toEqual(2);
+        });
+    });
+
+    describe(".getEventEncryptionInfo", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            const mockHttpApi = {} as MatrixClient["http"];
+            rustCrypto = (await initRustCrypto(mockHttpApi, TEST_USER, TEST_DEVICE_ID)) as RustCrypto;
+        });
+
+        it("should handle unencrypted events", () => {
+            const event = mkEvent({ event: true, type: "m.room.message", content: { body: "xyz" } });
+            const res = rustCrypto.getEventEncryptionInfo(event);
+            expect(res.encrypted).toBeFalsy();
+        });
+
+        it("should handle encrypted events", async () => {
+            const event = mkEvent({ event: true, type: "m.room.encrypted", content: { algorithm: "fake_alg" } });
+            const mockCryptoBackend = {
+                decryptEvent: () =>
+                    ({
+                        senderCurve25519Key: "1234",
+                    } as IEventDecryptionResult),
+            } as unknown as CryptoBackend;
+            await event.attemptDecryption(mockCryptoBackend);
+
+            const res = rustCrypto.getEventEncryptionInfo(event);
+            expect(res.encrypted).toBeTruthy();
         });
     });
 });

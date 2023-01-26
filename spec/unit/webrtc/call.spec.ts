@@ -40,7 +40,9 @@ import {
     MockMediaStreamTrack,
     installWebRTCMocks,
     MockRTCPeerConnection,
+    MockRTCRtpTransceiver,
     SCREENSHARE_STREAM_ID,
+    MockRTCRtpSender,
 } from "../../test-utils/webrtc";
 import { CallFeed } from "../../../src/webrtc/callFeed";
 import { EventType, IContent, ISendEventResponse, MatrixEvent, Room } from "../../../src";
@@ -536,8 +538,15 @@ describe("Call", function () {
         it("if local video", async () => {
             call.getOpponentMember = jest.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
+            // since this is testing for the presence of a local sender, we need to add a transciever
+            // rather than just a source track
+            const mockTrack = new MockMediaStreamTrack("track_id", "video");
+            const mockTransceiver = new MockRTCRtpTransceiver(call.peerConn as unknown as MockRTCPeerConnection);
+            mockTransceiver.sender = new MockRTCRtpSender(mockTrack) as unknown as RTCRtpSender;
+            (call as any).transceivers.set("m.usermedia:video", mockTransceiver);
+
             (call as any).pushNewLocalFeed(
-                new MockMediaStream("remote_stream1", [new MockMediaStreamTrack("track_id", "video")]),
+                new MockMediaStream("remote_stream1", [mockTrack]),
                 SDPStreamMetadataPurpose.Usermedia,
                 false,
             );
@@ -827,6 +836,55 @@ describe("Call", function () {
         beforeEach(async () => {
             (call as any).sendVoipEvent = mockSendVoipEvent = jest.fn();
             await startVideoCall(client, call);
+        });
+
+        afterEach(() => {
+            jest.useRealTimers();
+        });
+
+        it("should not remove video sender on video mute", async () => {
+            await call.setLocalVideoMuted(true);
+            expect((call as any).hasUserMediaVideoSender).toBe(true);
+        });
+
+        it("should release camera after short delay on video mute", async () => {
+            jest.useFakeTimers();
+
+            await call.setLocalVideoMuted(true);
+
+            jest.advanceTimersByTime(500);
+
+            expect(call.hasLocalUserMediaVideoTrack).toBe(false);
+        });
+
+        it("should re-request video feed on video unmute if it doesn't have one", async () => {
+            jest.useFakeTimers();
+
+            const mockGetUserMediaStream = jest
+                .fn()
+                .mockReturnValue(client.client.getMediaHandler().getUserMediaStream(true, true));
+
+            client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+            await call.setLocalVideoMuted(true);
+
+            jest.advanceTimersByTime(500);
+
+            await call.setLocalVideoMuted(false);
+
+            expect(mockGetUserMediaStream).toHaveBeenCalled();
+        });
+
+        it("should not release camera on fast mute and unmute", async () => {
+            const mockGetUserMediaStream = jest.fn();
+
+            client.client.getMediaHandler().getUserMediaStream = mockGetUserMediaStream;
+
+            await call.setLocalVideoMuted(true);
+            await call.setLocalVideoMuted(false);
+
+            expect(mockGetUserMediaStream).not.toHaveBeenCalled();
+            expect(call.hasLocalUserMediaVideoTrack).toBe(true);
         });
 
         describe("sending sdp_stream_metadata_changed events", () => {

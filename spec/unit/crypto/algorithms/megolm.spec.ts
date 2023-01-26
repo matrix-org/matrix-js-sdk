@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ limitations under the License.
 
 import { mocked, MockedObject } from "jest-mock";
 
+import type { DeviceInfoMap } from "../../../../src/crypto/DeviceList";
 import "../../../olm-loader";
 import type { OutboundGroupSession } from "@matrix-org/olm";
 import * as algorithms from "../../../../src/crypto/algorithms";
@@ -33,6 +34,7 @@ import { ClientEvent, MatrixClient, RoomMember } from "../../../../src";
 import { DeviceInfo, IDevice } from "../../../../src/crypto/deviceinfo";
 import { DeviceTrustLevel } from "../../../../src/crypto/CrossSigning";
 import { MegolmEncryption as MegolmEncryptionClass } from "../../../../src/crypto/algorithms/megolm";
+import { sleep } from "../../../../src/utils";
 
 const MegolmDecryption = algorithms.DECRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
 const MegolmEncryption = algorithms.ENCRYPTION_CLASSES.get("m.megolm.v1.aes-sha2")!;
@@ -58,6 +60,12 @@ describe("MegolmDecryption", function () {
 
     beforeEach(async function () {
         mockCrypto = testUtils.mock(Crypto, "Crypto") as MockedObject<Crypto>;
+
+        // @ts-ignore assigning to readonly prop
+        mockCrypto.backupManager = {
+            backupGroupSession: () => {},
+        };
+
         mockBaseApis = {
             claimOneTimeKeys: jest.fn(),
             sendToDevice: jest.fn(),
@@ -314,10 +322,6 @@ describe("MegolmDecryption", function () {
             let olmDevice: OlmDevice;
 
             beforeEach(async () => {
-                // @ts-ignore assigning to readonly prop
-                mockCrypto.backupManager = {
-                    backupGroupSession: () => {},
-                };
                 const cryptoStore = new MemoryCryptoStore();
 
                 olmDevice = new OlmDevice(cryptoStore);
@@ -512,6 +516,78 @@ describe("MegolmDecryption", function () {
                 const finalSetupPromise = await megolmEncryption.setupPromise;
                 expect(finalSetupPromise).toBe(null);
             });
+        });
+    });
+
+    describe("prepareToEncrypt", () => {
+        let megolm: MegolmEncryptionClass;
+        let room: jest.Mocked<Room>;
+
+        const deviceMap: DeviceInfoMap = {
+            "user-a": {
+                "device-a": new DeviceInfo("device-a"),
+                "device-b": new DeviceInfo("device-b"),
+                "device-c": new DeviceInfo("device-c"),
+            },
+            "user-b": {
+                "device-d": new DeviceInfo("device-d"),
+                "device-e": new DeviceInfo("device-e"),
+                "device-f": new DeviceInfo("device-f"),
+            },
+            "user-c": {
+                "device-g": new DeviceInfo("device-g"),
+                "device-h": new DeviceInfo("device-h"),
+                "device-i": new DeviceInfo("device-i"),
+            },
+        };
+
+        beforeEach(() => {
+            room = testUtils.mock(Room, "Room") as jest.Mocked<Room>;
+            room.getEncryptionTargetMembers.mockImplementation(async () => [
+                new RoomMember(room.roomId, "@user:example.org"),
+            ]);
+            room.getBlacklistUnverifiedDevices.mockReturnValue(false);
+
+            mockCrypto.downloadKeys.mockImplementation(async () => deviceMap);
+
+            mockCrypto.checkDeviceTrust.mockImplementation(() => new DeviceTrustLevel(true, true, true, true));
+
+            const olmDevice = new OlmDevice(new MemoryCryptoStore());
+            megolm = new MegolmEncryptionClass({
+                userId: "@user:id",
+                deviceId: "12345",
+                crypto: mockCrypto,
+                olmDevice,
+                baseApis: mockBaseApis,
+                roomId: room.roomId,
+                config: {
+                    algorithm: "m.megolm.v1.aes-sha2",
+                    rotation_period_ms: 9_999_999,
+                },
+            });
+        });
+
+        it("checks each device", async () => {
+            megolm.prepareToEncrypt(room);
+            //@ts-ignore private member access, gross
+            await megolm.encryptionPreparation?.promise;
+
+            for (const userId in deviceMap) {
+                for (const deviceId in deviceMap[userId]) {
+                    expect(mockCrypto.checkDeviceTrust).toHaveBeenCalledWith(userId, deviceId);
+                }
+            }
+        });
+
+        it("is cancellable", async () => {
+            const stop = megolm.prepareToEncrypt(room);
+
+            const before = mockCrypto.checkDeviceTrust.mock.calls.length;
+            stop();
+
+            // Ensure that no more devices were checked after cancellation.
+            await sleep(10);
+            expect(mockCrypto.checkDeviceTrust).toHaveBeenCalledTimes(before);
         });
     });
 
