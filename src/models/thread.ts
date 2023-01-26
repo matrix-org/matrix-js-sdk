@@ -256,7 +256,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         this.setEventMetadata(event);
 
         const lastReply = this.lastReply();
-        const isNewestReply = !lastReply || event.localTimestamp > lastReply!.localTimestamp;
+        const isNewestReply = !lastReply || event.localTimestamp >= lastReply!.localTimestamp;
 
         // Add all incoming events to the thread's timeline set when there's  no server support
         if (!Thread.hasServerSideSupport) {
@@ -356,6 +356,63 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         );
         this.lastPendingEvent = pendingEvents.length ? pendingEvents[pendingEvents.length - 1] : undefined;
         this.pendingReplyCount = pendingEvents.length;
+    }
+
+    /**
+     * Reset the live timeline of all timelineSets, and start new ones.
+     *
+     * <p>This is used when /sync returns a 'limited' timeline. 'Limited' means that there's a gap between the messages
+     * /sync returned, and the last known message in our timeline. In such a case, our live timeline isn't live anymore
+     * and has to be replaced by a new one. To make sure we can continue paginating our timelines correctly, we have to
+     * set new pagination tokens on the old and the new timeline.
+     *
+     * @param backPaginationToken -   token for back-paginating the new timeline
+     * @param forwardPaginationToken - token for forward-paginating the old live timeline,
+     * if absent or null, all timelines are reset, removing old ones (including the previous live
+     * timeline which would otherwise be unable to paginate forwards without this token).
+     * Removing just the old live timeline whilst preserving previous ones is not supported.
+     */
+    public async resetLiveTimeline(
+        backPaginationToken?: string | null,
+        forwardPaginationToken?: string | null,
+    ): Promise<void> {
+        const oldLive = this.liveTimeline;
+        this.timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);
+        const newLive = this.liveTimeline;
+
+        // FIXME: Remove the following as soon as https://github.com/matrix-org/synapse/issues/14830 is resolved.
+        //
+        // The pagination API for thread timelines currently can't handle the type of pagination tokens returned by sync
+        //
+        // To make this work anyway, we'll have to transform them into one of the types that the API can handle.
+        // One option is passing the tokens to /messages, which can handle sync tokens, and returns the right format.
+        // /messages does not return new tokens on requests with a limit of 0.
+        // This means our timelines might overlap a slight bit, but that's not an issue, as we deduplicate messages
+        // anyway.
+
+        let newBackward: string | undefined;
+        let oldForward: string | undefined;
+        if (backPaginationToken) {
+            const res = await this.client.createMessagesRequest(this.roomId, backPaginationToken, 1, Direction.Forward);
+            newBackward = res.end;
+        }
+        if (forwardPaginationToken) {
+            const res = await this.client.createMessagesRequest(
+                this.roomId,
+                forwardPaginationToken,
+                1,
+                Direction.Backward,
+            );
+            oldForward = res.start;
+        }
+        // Only replace the token if we don't have paginated away from this position already. This situation doesn't
+        // occur today, but if the above issue is resolved, we'd have to go down this path.
+        if (forwardPaginationToken && oldLive.getPaginationToken(Direction.Forward) === forwardPaginationToken) {
+            oldLive.setPaginationToken(oldForward ?? null, Direction.Forward);
+        }
+        if (backPaginationToken && newLive.getPaginationToken(Direction.Backward) === backPaginationToken) {
+            newLive.setPaginationToken(newBackward ?? null, Direction.Backward);
+        }
     }
 
     private async updateThreadMetadata(): Promise<void> {
@@ -515,7 +572,7 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
      */
     public getEventReadUpTo(userId: string, ignoreSynthesized?: boolean): string | null {
         const isCurrentUser = userId === this.client.getUserId();
-        const lastReply = this.timeline.at(-1);
+        const lastReply = this.timeline[this.timeline.length - 1];
         if (isCurrentUser && lastReply) {
             // If the last activity in a thread is prior to the first threaded read receipt
             // sent in the room (suggesting that it was sent before the user started
