@@ -59,3 +59,32 @@ jobs:
                   path: |
                       coverage
                       !coverage/lcov-report
+
+    # This is a workaround for https://github.com/SonarSource/SonarJS/issues/578
+    prepare:
+        name: Prepare
+        runs-on: ubuntu-latest
+        outputs:
+            reportPaths: ${{ steps.extra_args.outputs.reportPaths }}
+            testExecutionReportPaths: ${{ steps.extra_args.outputs.testExecutionReportPaths }}
+        steps:
+            - name: 📥 Download artifact
+              uses: actions/download-artifact@v3
+              with:
+                  name: coverage
+                  path: coverage
+            - id: extra_args
+              run: |
+                  coverage=$(find coverage -type f -name '*lcov.info' | tr '\n' ',' | sed 's/,$//g')
+                  echo "reportPaths=$coverage" >> $GITHUB_OUTPUT
+                  reports=$(find coverage -type f -name 'jest-sonar-report*.xml' | tr '\n' ',' | sed 's/,$//g')
+                  echo "testExecutionReportPaths=$reports" >> $GITHUB_OUTPUT
+
+    sonarqube:
+        name: 🩻 SonarQube
+        needs: prepare
+        uses: matrix-org/matrix-js-sdk/.github/workflows/sonarcloud.yml@develop
+        secrets:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+            extra_args: -Dsonar.javascript.lcov.reportPaths=${{ needs.prepare.outputs.reportPaths }} -Dsonar.testExecutionReportPaths=${{ needs.prepare.outputs.testExecutionReportPaths }}
