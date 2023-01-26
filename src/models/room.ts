@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk";
+import { M_POLL_START, Optional } from "matrix-events-sdk";
 
 import {
     EventTimelineSet,
@@ -65,6 +65,7 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
+import { Poll, PollEvent } from "./poll";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -162,7 +163,8 @@ export type RoomEmittedEvents =
     | BeaconEvent.New
     | BeaconEvent.Update
     | BeaconEvent.Destroy
-    | BeaconEvent.LivenessChange;
+    | BeaconEvent.LivenessChange
+    | PollEvent.New;
 
 export type RoomEventHandlerMap = {
     /**
@@ -289,6 +291,11 @@ export type RoomEventHandlerMap = {
     [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
+    /**
+     * Fires when a new poll instance is added to the room state
+     * @param poll - the new poll
+     */
+    [PollEvent.New]: (poll: Poll) => void;
 } & Pick<ThreadHandlerMap, ThreadEvent.Update | ThreadEvent.NewReply | ThreadEvent.Delete> &
     EventTimelineSetHandlerMap &
     Pick<MatrixEventHandlerMap, MatrixEventEvent.BeforeRedaction> &
@@ -317,6 +324,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     private unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
+    public readonly polls: Map<string, Poll> = new Map<string, Poll>();
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
@@ -1888,6 +1896,38 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.on(ThreadEvent.NewReply, this.onThreadNewReply);
         this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
+    }
+
+    public async processPollEvents(events: MatrixEvent[]): Promise<void> {
+        const processPollStartEvent = (event: MatrixEvent): void => {
+            if (!M_POLL_START.matches(event.getType())) return;
+            try {
+                const poll = new Poll(event, this.client);
+                this.polls.set(event.getId()!, poll);
+                this.emit(PollEvent.New, poll);
+            } catch {}
+            // poll creation can fail for malformed poll start events
+        };
+
+        const processPollRelationEvent = (event: MatrixEvent): void => {
+            const relationEventId = event.relationEventId;
+            if (relationEventId && this.polls.has(relationEventId)) {
+                const poll = this.polls.get(relationEventId);
+                poll?.onNewRelation(event);
+            }
+        };
+
+        const processPollEvent = (event: MatrixEvent): void => {
+            processPollStartEvent(event);
+            processPollRelationEvent(event);
+        };
+
+        for (const event of events) {
+            try {
+                await this.client.decryptEventIfNeeded(event);
+                processPollEvent(event);
+            } catch {}
+        }
     }
 
     /**
