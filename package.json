@@ -115,7 +115,7 @@
         "jest-mock": "^29.0.0",
         "matrix-mock-request": "^2.5.0",
         "prettier": "2.8.2",
-        "rimraf": "^3.0.2",
+        "rimraf": "^4.0.0",
         "terser": "^5.5.1",
         "tsify": "^5.0.2",
         "typedoc": "^0.23.20",
