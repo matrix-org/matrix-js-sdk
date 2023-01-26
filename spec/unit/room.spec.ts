@@ -3356,19 +3356,19 @@ describe("Room", function () {
 
         it("Returns null if there is no create event", () => {
             const room = new Room("roomid", client!, "@u:example.com");
-            expect(room.findPredecessorRoomId()).toBeNull();
+            expect(room.findPredecessor()).toBeNull();
         });
 
         it("Returns null if the create event has no predecessor", () => {
             const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([roomCreateEvent("roomid", null)]);
-            expect(room.findPredecessorRoomId()).toBeNull();
+            expect(room.findPredecessor()).toBeNull();
         });
 
         it("Returns the predecessor ID if one is provided via create event", () => {
             const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([roomCreateEvent("roomid", "replacedroomid")]);
-            expect(room.findPredecessorRoomId()).toBe("replacedroomid");
+            expect(room.findPredecessor()).toEqual({ roomId: "replacedroomid", eventId: "id_of_last_known_event" });
         });
 
         it("Prefers the m.predecessor event if one exists", () => {
@@ -3378,7 +3378,10 @@ describe("Room", function () {
                 predecessorEvent("roomid", "otherreplacedroomid"),
             ]);
             const useMsc3946 = true;
-            expect(room.findPredecessorRoomId(useMsc3946)).toBe("otherreplacedroomid");
+            expect(room.findPredecessor(useMsc3946)).toEqual({
+                roomId: "otherreplacedroomid",
+                eventId: null, // m.predecessor does not include an event_id
+            });
         });
 
         it("Ignores the m.predecessor event if we don't ask to use it", () => {
@@ -3389,7 +3392,7 @@ describe("Room", function () {
             ]);
             // Don't provide an argument for msc3946ProcessDynamicPredecessor -
             // we should ignore the predecessor event.
-            expect(room.findPredecessorRoomId()).toBe("replacedroomid");
+            expect(room.findPredecessor()).toEqual({ roomId: "replacedroomid", eventId: "id_of_last_known_event" });
         });
 
         it("Ignores the m.predecessor event and returns null if we don't ask to use it", () => {
@@ -3400,7 +3403,7 @@ describe("Room", function () {
             ]);
             // Don't provide an argument for msc3946ProcessDynamicPredecessor -
             // we should ignore the predecessor event.
-            expect(room.findPredecessorRoomId()).toBeNull();
+            expect(room.findPredecessor()).toBeNull();
         });
     });
 });

@@ -3032,12 +3032,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * @param msc3946ProcessDynamicPredecessor - if true, look for an
-     *                                           m.room.predecessor state event and
-     *                                           use it if found (MSC3946).
-     * @returns the ID of the room that was this room's predecessor, or null if
-     *          this room has no predecessor.
+     * m.room.predecessor state event and use it if found (MSC3946).
+     * @returns null if this room has no predecessor. Otherwise, returns
+     * the roomId and last eventId of the predecessor room.
+     * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
+     * as well as m.room.create events to find predecessors.
+     * Note: if an m.predecessor event is used, eventId is null since those
+     * events do not include an event_id property.
      */
-    public findPredecessorRoomId(msc3946ProcessDynamicPredecessor = false): string | null {
+    public findPredecessor(
+        msc3946ProcessDynamicPredecessor = false,
+    ): { roomId: string; eventId: string | null } | null {
         const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!currentState) {
             return null;
@@ -3047,7 +3052,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             if (predecessorEvent) {
                 const roomId = predecessorEvent.getContent()["predecessor_room_id"];
                 if (roomId) {
-                    return roomId;
+                    return { roomId, eventId: null };
                 }
             }
         }
@@ -3058,7 +3063,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             if (predecessor) {
                 const roomId = predecessor["room_id"];
                 if (roomId) {
-                    return roomId;
+                    const eventId = predecessor["event_id"] || null;
+                    return { roomId, eventId };
                 }
             }
         }

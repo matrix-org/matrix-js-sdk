@@ -3791,7 +3791,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const replacedRooms = new Set();
         for (const r of allRooms) {
-            const predecessor = r.findPredecessorRoomId(msc3946ProcessDynamicPredecessor);
+            const predecessor = r.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
             if (predecessor) {
                 replacedRooms.add(predecessor);
             }
@@ -5014,7 +5014,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const ret: Room[] = [];
 
         // Work backwards from newer to older rooms
-        let predecessorRoomId = room.findPredecessorRoomId(msc3946ProcessDynamicPredecessor);
+        let predecessorRoomId = room.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
         while (predecessorRoomId !== null) {
             const predecessorRoom = this.getRoom(predecessorRoomId);
             if (predecessorRoom === null) {
@@ -5031,7 +5031,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ret.splice(0, 0, predecessorRoom);
 
             room = predecessorRoom;
-            predecessorRoomId = room.findPredecessorRoomId(msc3946ProcessDynamicPredecessor);
+            predecessorRoomId = room.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
         }
         return ret;
     }
@@ -5047,7 +5047,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             if (successorRoom.roomId === room.roomId) break; // Tombstone is referencing its own room
 
             if (verifyLinks) {
-                const predecessorRoomId = successorRoom.findPredecessorRoomId(msc3946ProcessDynamicPredecessor);
+                const predecessorRoomId = successorRoom.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
                 if (!predecessorRoomId || predecessorRoomId !== room.roomId) {
                     break;
                 }
