@@ -62,7 +62,8 @@ jobs:
 
     # This is a workaround for https://github.com/SonarSource/SonarJS/issues/578
     prepare:
-        name: Prepare
+        name: Prepare coverage for SonarQube
+        needs: jest
         runs-on: ubuntu-latest
         outputs:
             reportPaths: ${{ steps.extra_args.outputs.reportPaths }}
