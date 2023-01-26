@@ -600,8 +600,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.remoteScreensharingFeed?.stream;
     }
 
-    private getFeedById(streamId: string): CallFeed | undefined {
-        return this.getFeeds().find((feed) => feed.feedId === streamId);
+    private getFeedById(feedId: string): CallFeed | undefined {
+        return this.getFeeds().find((feed) => feed.feedId === feedId);
     }
 
     /**
@@ -818,92 +818,121 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Pushes supplied feed to the call
-     * @param callFeed - to push
+     * @param feed - to push
      * @param addToPeerConnection - whether to add the tracks to the peer connection
      */
-    public pushLocalFeed(callFeed: CallFeed, addToPeerConnection = true): void {
-        if (!callFeed.stream) {
-            logger.warn(`Ignoring stream-less local feed ${callFeed.feedId} in call ${this.callId}`);
+    public pushLocalFeed(feed: CallFeed, addToPeerConnection = true): void {
+        if (this.getFeedById(feed.feedId)) {
+            logger.warn(`Call ${this.callId} pushLocalFeed() called with a feed we already have (id=${feed.feedId})`);
             return;
         }
 
-        if (this.feeds.some((feed) => callFeed.feedId === feed.feedId)) {
-            logger.info(`Ignoring duplicate local stream ${callFeed.feedId} in call ${this.callId}`);
-            return;
-        }
-
-        this.feeds.push(callFeed);
+        this.feeds.push(feed);
+        this.emit(CallEvent.FeedsChanged, this.feeds);
+        logger.info(`Call ${this.callId} pushLocalFeed() succeeded (id=${feed.feedId} purpose=${feed.purpose})`);
 
         if (addToPeerConnection) {
-            for (const track of callFeed.stream!.getTracks()) {
-                logger.info(
-                    `Call ${this.callId} ` +
-                        `Adding track (` +
-                        `id="${track.id}", ` +
-                        `kind="${track.kind}", ` +
-                        `streamId="${callFeed.feedId}", ` +
-                        `streamPurpose="${callFeed.purpose}", ` +
-                        `enabled=${track.enabled}` +
-                        `) to peer connection`,
-                );
+            this.addTracksOfFeedToPeerConnection(feed);
+        }
+    }
 
-                const encodings = track.kind === "video" ? SIMULCAST_ENCODINGS : undefined;
+    /**
+     * This method takes the feeds tracks and adds them to the peer connection.
+     * It tries to re-use transceivers/senders by using replaceTrack(), if
+     * possible.
+     * @param callFeed - feed whose tracks we add to the peer connection
+     */
+    private async addTracksOfFeedToPeerConnection(callFeed: CallFeed): Promise<void> {
+        const purpose = callFeed.purpose;
+        const feedId = callFeed.feedId;
+        const stream = callFeed.stream;
+        if (!stream) {
+            logger.warn(
+                `Call ${this.callId} addTracksOfFeedToPeerConnection() failed: no stream (feedId=${feedId} purpose=${purpose})`,
+            );
+            return;
+        }
 
-                const tKey = getTransceiverKey(callFeed.purpose, track.kind);
-                if (this.transceivers.has(tKey)) {
-                    // we already have a sender, so we re-use it. We try to re-use transceivers as much
-                    // as possible because they can't be removed once added, so otherwise they just
-                    // accumulate which makes the SDP very large very quickly: in fact it only takes
-                    // about 6 video tracks to exceed the maximum size of an Olm-encrypted
-                    // Matrix event.
-                    const transceiver = this.transceivers.get(tKey)!;
+        for (const track of stream.getTracks()) {
+            logger.info(
+                `Call ${this.callId} addTracksOfFeedToPeerConnection() running (feedId=${feedId} streamPurpose=${purpose} kind=${track.kind} enabled=${track.enabled})`,
+            );
 
-                    // RTCRtpSender::setStreams() is currently not supported by
-                    // Firefox but we try to use it at least in other browsers
-                    if (transceiver.sender.setStreams) transceiver.sender.setStreams(callFeed.stream!);
+            const encodings = track.kind === "video" ? SIMULCAST_ENCODINGS : undefined;
+            const transceiverKey = getTransceiverKey(purpose, track.kind);
+            const transceiver = this.transceivers.get(transceiverKey);
+            const sender = transceiver?.sender;
 
-                    transceiver.sender.replaceTrack(track);
+            let added = false;
+            if (sender) {
+                try {
+                    // We already have a sender, so we re-use it. We try to
+                    // re-use transceivers as much as possible because they
+                    // can't be removed once added, so otherwise they just
+                    // accumulate which makes the SDP very large very quickly:
+                    // in fact it only takes about 6 video tracks to exceed the
+                    // maximum size of an Olm-encrypted Matrix event - Dave
 
-                    if (this.isFocus) {
-                        const parameters = transceiver.sender.getParameters();
-                        transceiver.sender.setParameters({
-                            ...transceiver.sender.getParameters(),
-                            encodings: encodings ?? parameters.encodings,
-                        });
-                    }
+                    // setStreams() is currently not supported by Firefox but we
+                    // try to use it at least in other browsers (once we switch
+                    // to using mids and throw away streamIds we will be able to
+                    // throw this away)
+                    if (sender.setStreams) sender.setStreams(stream);
 
-                    // set the direction to indicate we're going to start sending again
-                    // (this will trigger the re-negotiation)
+                    sender.replaceTrack(track);
+
+                    // We don't need to set simulcast encodings in here since we
+                    // have already done that the first time we added the
+                    // transceiver
+
+                    // Set the direction of the transceiver to indicate we're
+                    // going to be sending. This may trigger re-negotiation, if
+                    // we weren't sending until now
                     transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
-                } else {
-                    // create a new one
-                    const transceiver = this.peerConn!.addTransceiver(track, {
-                        streams: [callFeed.stream!],
-                        sendEncodings: this.isFocus && isFirefox() ? undefined : encodings,
+
+                    added = true;
+                } catch (error) {
+                    logger.info(
+                        `Call ${this.callId} addTracksOfFeedToPeerConnection() failed to replaceTrack()`,
+                        error,
+                    );
+                }
+            }
+
+            if (!added) {
+                try {
+                    // We either don't have a sender or we failed to do
+                    // replaceTrack(), so we use addTransceiver() to add the
+                    // track
+                    const newTransceiver = this.peerConn!.addTransceiver(track, {
+                        streams: [stream],
+                        // Chrome does not allow us to change the encodings
+                        // later, so we have to use addTransceiver() to set them
+                        sendEncodings: this.isFocus ? undefined : encodings,
                     });
 
                     if (this.isFocus && isFirefox()) {
-                        const parameters = transceiver.sender.getParameters();
-                        transceiver.sender.setParameters({
-                            ...transceiver.sender.getParameters(),
+                        const parameters = newTransceiver.sender.getParameters();
+                        newTransceiver.sender.setParameters({
+                            ...parameters,
+                            // Firefox does not support the sendEncodings
+                            // parameter on addTransceiver(), so we use
+                            // setParameters() to set them
                             encodings: encodings ?? parameters.encodings,
                         });
                     }
 
-                    this.transceivers.set(tKey, transceiver);
+                    this.transceivers.set(transceiverKey, newTransceiver);
+
+                    added = true;
+                } catch (error) {
+                    logger.error(
+                        `Call ${this.callId} addTracksOfFeedToPeerConnection() failed to addTransceiver()`,
+                        error,
+                    );
                 }
             }
         }
-
-        logger.info(
-            `Call ${this.callId} ` +
-                `Pushed local stream ` +
-                `(id="${callFeed.feedId}", ` +
-                `active="${callFeed.stream!.active}", ` +
-                `purpose="${callFeed.purpose}")`,
-        );
-
-        this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
     /**
@@ -1383,98 +1412,46 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
     /**
      * Replaces/adds the tracks from the passed stream to the localUsermediaStream
-     * @param stream - to use a replacement for the local usermedia stream
+     * @param newStream - to use a replacement for the local usermedia stream
      */
     public async updateLocalUsermediaStream(
-        stream: MediaStream,
+        newStream: MediaStream,
         forceAudio = false,
         forceVideo = false,
     ): Promise<void> {
-        const callFeed = this.localUsermediaFeed!;
-        const audioEnabled = forceAudio || (!callFeed.isAudioMuted() && !this.remoteOnHold);
-        const videoEnabled = forceVideo || (!callFeed.isVideoMuted() && !this.remoteOnHold);
+        const feed = this.localUsermediaFeed;
+        if (!feed) {
+            logger.log(`Call ${this.callId} updateLocalUsermediaStream() failed: we do not have localUsermediaFeed`);
+            return;
+        }
+        const oldStream = this.localUsermediaStream;
+        if (!oldStream) {
+            logger.log(`Call ${this.callId} updateLocalUsermediaStream() failed: we do not have localUsermediaStream`);
+            return;
+        }
+
+        const audioEnabled = forceAudio || (!feed.isAudioMuted() && !this.remoteOnHold);
+        const videoEnabled = forceVideo || (!feed.isVideoMuted() && !this.remoteOnHold);
         logger.log(
-            `call ${this.callId} updateLocalUsermediaStream stream ${stream.id} audioEnabled ${audioEnabled} videoEnabled ${videoEnabled}`,
+            `call ${this.callId} updateLocalUsermediaStream stream ${newStream.id} audioEnabled ${audioEnabled} videoEnabled ${videoEnabled}`,
         );
-        setTracksEnabled(stream.getAudioTracks(), audioEnabled);
-        setTracksEnabled(stream.getVideoTracks(), videoEnabled);
 
-        // We want to keep the same stream id, so we replace the tracks rather
-        // than the whole stream.
+        // Firstly, make sure we keep the mute state
+        setTracksEnabled(newStream.getAudioTracks(), audioEnabled);
+        setTracksEnabled(newStream.getVideoTracks(), videoEnabled);
 
-        // Firstly, we replace the tracks in our localUsermediaStream.
-        for (const track of this.localUsermediaStream!.getTracks()) {
-            this.localUsermediaStream!.removeTrack(track);
+        // Secondly, we replace the tracks in our oldStream with the tracks from
+        // the newStream
+        for (const track of oldStream.getTracks()) {
+            oldStream.removeTrack(track);
             track.stop();
         }
-        for (const track of stream.getTracks()) {
-            this.localUsermediaStream!.addTrack(track);
+        for (const track of newStream.getTracks()) {
+            oldStream.addTrack(track);
         }
 
-        // Then replace the old tracks, if possible.
-        for (const track of stream.getTracks()) {
-            const tKey = getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, track.kind);
-
-            const transceiver = this.transceivers.get(tKey);
-            const oldSender = transceiver?.sender;
-            const encodings = track.kind === "video" ? SIMULCAST_ENCODINGS : undefined;
-
-            let added = false;
-            if (oldSender) {
-                try {
-                    logger.info(
-                        `Call ${this.callId} ` +
-                            `Replacing track (` +
-                            `id="${track.id}", ` +
-                            `kind="${track.kind}", ` +
-                            `streamId="${stream.id}", ` +
-                            `streamPurpose="${callFeed.purpose}"` +
-                            `) to peer connection`,
-                    );
-
-                    // RTCRtpSender::setStreams() is currently not supported by
-                    // Firefox but we try to use it at least in other browsers
-                    if (transceiver.sender.setStreams) transceiver.sender.setStreams(this.localUsermediaStream!);
-
-                    await oldSender.replaceTrack(track);
-
-                    // Set the direction to indicate we're going to be sending.
-                    // This is only necessary in the cases where we're upgrading
-                    // the call to video after downgrading it.
-                    transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
-                    added = true;
-                } catch (error) {
-                    logger.warn(`replaceTrack failed: adding new transceiver instead`, error);
-                }
-            }
-
-            if (!added) {
-                logger.info(
-                    `Call ${this.callId} ` +
-                        `Adding track (` +
-                        `id="${track.id}", ` +
-                        `kind="${track.kind}", ` +
-                        `streamId="${stream.id}", ` +
-                        `streamPurpose="${callFeed.purpose}"` +
-                        `) to peer connection`,
-                );
-
-                const newTransceiver = this.peerConn!.addTransceiver(track, {
-                    streams: [this.localUsermediaStream!],
-                    sendEncodings: this.isFocus && isFirefox() ? undefined : encodings,
-                });
-
-                if (this.isFocus && isFirefox()) {
-                    const parameters = newTransceiver.sender.getParameters();
-                    newTransceiver.sender.setParameters({
-                        ...newTransceiver.sender.getParameters(),
-                        encodings: encodings ?? parameters.encodings,
-                    });
-                }
-
-                this.transceivers.set(tKey, newTransceiver);
-            }
-        }
+        // Then, we add the feed's tracks to the peer connection
+        this.addTracksOfFeedToPeerConnection(feed);
     }
 
     /**
