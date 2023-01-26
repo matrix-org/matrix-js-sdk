@@ -49,7 +49,8 @@ const filterResponseRelations = (
         }
         return (
             M_POLL_RESPONSE.matches(event.getType()) &&
-            // From MSC3381: "Votes sent on or before the end event's timestamp are valid votes"
+            // From MSC3381:
+            // "Votes sent on or before the end event's timestamp are valid votes"
             event.getTs() <= pollEndTimestamp
         );
     });
@@ -154,7 +155,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     }
 
     /**
-     * Only responses made before the poll ended are vali
+     * Only responses made before the poll ended are valid
      * Refilter after an end event is recieved
      * To ensure responses are valid
      */

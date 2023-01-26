@@ -16,6 +16,7 @@ limitations under the License.
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 import {
+    DecryptedRoomEvent,
     KeysBackupRequest,
     KeysClaimRequest,
     KeysQueryRequest,
@@ -25,11 +26,13 @@ import {
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IToDeviceEvent } from "../sync-accumulator";
+import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
 import { QueryDict } from "../utils";
+import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 
 /**
  * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
@@ -74,8 +77,41 @@ export class RustCrypto implements CryptoBackend {
     }
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
-        await this.olmMachine.decryptRoomEvent("event", new RustSdkCryptoJs.RoomId("room"));
-        throw new Error("not implemented");
+        const res = (await this.olmMachine.decryptRoomEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getWireType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getWireContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+        )) as DecryptedRoomEvent;
+        return {
+            clearEvent: JSON.parse(res.event),
+            claimedEd25519Key: res.senderClaimedEd25519Key,
+            senderCurve25519Key: res.senderCurve25519Key,
+            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+        };
+    }
+
+    public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
+        // TODO: make this work properly. Or better, replace it.
+
+        const ret: Partial<IEncryptedEventInfo> = {};
+
+        ret.senderKey = event.getSenderKey() ?? undefined;
+        ret.algorithm = event.getWireContent().algorithm;
+
+        if (!ret.senderKey || !ret.algorithm) {
+            ret.encrypted = false;
+            return ret as IEncryptedEventInfo;
+        }
+        ret.encrypted = true;
+        ret.authenticated = true;
+        ret.mismatchedSender = true;
+        return ret as IEncryptedEventInfo;
     }
 
     public async userHasCrossSigningKeys(): Promise<boolean> {
@@ -86,6 +122,16 @@ export class RustCrypto implements CryptoBackend {
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
+    }
+
+    public checkUserTrust(userId: string): UserTrustLevel {
+        // TODO
+        return new UserTrustLevel(false, false, false);
+    }
+
+    public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
+        // TODO
+        return new DeviceTrustLevel(false, false, false, false);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

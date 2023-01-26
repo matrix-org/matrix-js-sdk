@@ -2507,10 +2507,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns
      */
     public checkUserTrust(userId: string): UserTrustLevel {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.checkUserTrust(userId);
+        return this.cryptoBackend.checkUserTrust(userId);
     }
 
     /**
@@ -2522,10 +2522,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param deviceId - The ID of the device to check
      */
     public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.checkDeviceTrust(userId, deviceId);
+        return this.cryptoBackend.checkDeviceTrust(userId, deviceId);
     }
 
     /**
@@ -2689,10 +2689,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The event information.
      */
     public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        return this.crypto.getEventEncryptionInfo(event);
+        return this.cryptoBackend.getEventEncryptionInfo(event);
     }
 
     /**
@@ -4990,66 +4990,72 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * history.
      */
     public getRoomUpgradeHistory(roomId: string, verifyLinks = false): Room[] {
-        let currentRoom = this.getRoom(roomId);
+        const currentRoom = this.getRoom(roomId);
         if (!currentRoom) return [];
 
-        const upgradeHistory = [currentRoom];
+        const before = this.findPredecessorRooms(currentRoom, verifyLinks);
+        const after = this.findSuccessorRooms(currentRoom, verifyLinks);
 
-        // Work backwards first, looking at create events.
-        let createEvent = currentRoom.currentState.getStateEvents(EventType.RoomCreate, "");
-        while (createEvent) {
-            const predecessor = createEvent.getContent()["predecessor"];
-            if (predecessor && predecessor["room_id"]) {
-                const refRoom = this.getRoom(predecessor["room_id"]);
-                if (!refRoom) break; // end of the chain
+        return [...before, currentRoom, ...after];
+    }
 
-                if (verifyLinks) {
-                    const tombstone = refRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
+    private findPredecessorRooms(room: Room, verifyLinks: boolean): Room[] {
+        const ret: Room[] = [];
 
-                    if (!tombstone || tombstone.getContent()["replacement_room"] !== refRoom.roomId) {
-                        break;
-                    }
-                }
-
-                // Insert at the front because we're working backwards from the currentRoom
-                upgradeHistory.splice(0, 0, refRoom);
-                createEvent = refRoom.currentState.getStateEvents(EventType.RoomCreate, "");
-            } else {
-                // No further create events to look at
+        // Work backwards from newer to older rooms
+        let predecessorRoomId = room.findPredecessorRoomId();
+        while (predecessorRoomId !== null) {
+            const predecessorRoom = this.getRoom(predecessorRoomId);
+            if (predecessorRoom === null) {
                 break;
             }
-        }
+            if (verifyLinks) {
+                const tombstone = predecessorRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
+                if (!tombstone || tombstone.getContent()["replacement_room"] !== room.roomId) {
+                    break;
+                }
+            }
 
-        // Work forwards next, looking at tombstone events
-        let tombstoneEvent = currentRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
+            // Insert at the front because we're working backwards from the currentRoom
+            ret.splice(0, 0, predecessorRoom);
+
+            room = predecessorRoom;
+            predecessorRoomId = room.findPredecessorRoomId();
+        }
+        return ret;
+    }
+
+    private findSuccessorRooms(room: Room, verifyLinks: boolean): Room[] {
+        const ret: Room[] = [];
+
+        // Work forwards, looking at tombstone events
+        let tombstoneEvent = room.currentState.getStateEvents(EventType.RoomTombstone, "");
         while (tombstoneEvent) {
-            const refRoom = this.getRoom(tombstoneEvent.getContent()["replacement_room"]);
-            if (!refRoom) break; // end of the chain
-            if (refRoom.roomId === currentRoom.roomId) break; // Tombstone is referencing it's own room
+            const successorRoom = this.getRoom(tombstoneEvent.getContent()["replacement_room"]);
+            if (!successorRoom) break; // end of the chain
+            if (successorRoom.roomId === room.roomId) break; // Tombstone is referencing it's own room
 
             if (verifyLinks) {
-                createEvent = refRoom.currentState.getStateEvents(EventType.RoomCreate, "");
-                if (!createEvent || !createEvent.getContent()["predecessor"]) break;
-
-                const predecessor = createEvent.getContent()["predecessor"];
-                if (predecessor["room_id"] !== currentRoom.roomId) break;
+                const predecessorRoomId = successorRoom.findPredecessorRoomId();
+                if (!predecessorRoomId || predecessorRoomId !== room.roomId) {
+                    break;
+                }
             }
 
             // Push to the end because we're looking forwards
-            upgradeHistory.push(refRoom);
-            const roomIds = new Set(upgradeHistory.map((ref) => ref.roomId));
-            if (roomIds.size < upgradeHistory.length) {
+            ret.push(successorRoom);
+            const roomIds = new Set(ret.map((ref) => ref.roomId));
+            if (roomIds.size < ret.length) {
                 // The last room added to the list introduced a previous roomId
                 // To avoid recursion, return the last rooms - 1
-                return upgradeHistory.slice(0, upgradeHistory.length - 1);
+                return ret.slice(0, ret.length - 1);
             }
 
             // Set the current room to the reference room so we know where we're at
-            currentRoom = refRoom;
-            tombstoneEvent = currentRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
+            room = successorRoom;
+            tombstoneEvent = room.currentState.getStateEvents(EventType.RoomTombstone, "");
         }
-
-        return upgradeHistory;
+        return ret;
     }
 
     /**
@@ -9357,6 +9363,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.processAggregatedTimelineEvents(room, events);
     }
 
+    /**
+     * Calls aggregation functions for event types that are aggregated
+     * Polls and location beacons
+     * @param room - room the events belong to
+     * @param events - timeline events to be processed
+     * @returns
+     */
     public processAggregatedTimelineEvents(room?: Room, events?: MatrixEvent[]): void {
         if (!events?.length) return;
         if (!room) return;
