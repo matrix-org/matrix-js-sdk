@@ -2335,11 +2335,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             const userId = this.invitee || this.getOpponentMember()!.userId;
             if (this.client.getUseE2eForGroupCall()) {
+                if (!this.opponentDeviceInfo) {
+                    logger.warn(`Call ${this.callId} sendVoipEvent() failed: we do not have opponentDeviceInfo`);
+                    return;
+                }
+
                 await this.client.encryptAndSendToDevices(
                     [
                         {
                             userId,
-                            deviceInfo: this.opponentDeviceInfo!,
+                            deviceInfo: this.opponentDeviceInfo,
                         },
                     ],
                     {
