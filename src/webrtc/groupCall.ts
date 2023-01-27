@@ -175,6 +175,7 @@ interface ICallHandlers {
 }
 
 const DEVICE_TIMEOUT = 1000 * 60 * 60; // 1 hour
+const FOCUS_SESSION_ID = "sfu";
 
 function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
@@ -468,43 +469,6 @@ export class GroupCall extends TypedEventEmitter<
         this.activeSpeaker = undefined;
         this.onActiveSpeakerLoop();
         this.activeSpeakerLoopInterval = setInterval(this.onActiveSpeakerLoop, this.activeSpeakerInterval);
-
-        if (this.foci[0]) {
-            const onError = (e?: unknown): void => {
-                logger.warn(`Failed to place call to ${this.foci[0].user_id}!`, e);
-                this.emit(
-                    GroupCallEvent.Error,
-                    new GroupCallError(
-                        GroupCallErrorCode.PlaceCallFailed,
-                        `Failed to place call to ${this.foci[0].user_id}.`,
-                    ),
-                );
-            };
-
-            const focusCall = createNewMatrixCall(this.client, this.room.roomId, {
-                invitee: this.foci[0].user_id,
-                opponentDeviceId: this.foci[0].device_id,
-                opponentSessionId: "sfu",
-                groupCallId: this.groupCallId,
-                isFocus: true,
-            });
-            if (!focusCall) {
-                onError();
-                return;
-            }
-
-            try {
-                focusCall.isPtt = this.isPtt;
-                await focusCall.placeCallWithCallFeeds(this.getLocalFeeds().map((feed) => feed.clone()));
-                focusCall.createDataChannel("datachannel", this.dataChannelOptions);
-            } catch (e) {
-                onError(e);
-                return;
-            }
-
-            this.calls.set(this.foci[0].user_id, new Map([[this.foci[0].device_id, focusCall]]));
-            this.initCall(focusCall);
-        }
     }
 
     private chooseFocus(): void {
@@ -523,7 +487,10 @@ export class GroupCall extends TypedEventEmitter<
             }
         }
 
-        this.foci = [focusOfAnotherMember ?? this.client.getFoci()[0]];
+        const focus = focusOfAnotherMember ?? this.client.getFoci()[0];
+        if (focus && !this.foci.some((f) => f.user_id === focus.user_id && f.device_id === focus.device_id)) {
+            this.foci.push(focus);
+        }
     }
 
     private dispose(): void {
@@ -882,79 +849,121 @@ export class GroupCall extends TypedEventEmitter<
      * Places calls to all participants that we're responsible for calling.
      */
     private placeOutgoingCalls(): void {
-        if (this.foci[0]) return;
-
         let callsChanged = false;
 
-        for (const [{ userId }, participantMap] of this.participants) {
-            const callMap = this.calls.get(userId) ?? new Map<string, MatrixCall>();
+        const onError = (
+            error: Error,
+            userId: string,
+            deviceId: string,
+            newCall: MatrixCall | null,
+            callMap: Map<string, MatrixCall>,
+        ): void => {
+            logger.warn(`Failed to place call to ${userId} ${deviceId}`, error);
 
-            for (const [deviceId, participant] of participantMap) {
-                const prevCall = callMap.get(deviceId);
-
-                if (
-                    prevCall?.getOpponentSessionId() !== participant.sessionId &&
-                    this.wantsOutgoingCall(userId, deviceId)
-                ) {
-                    callsChanged = true;
-
-                    if (prevCall !== undefined) {
-                        logger.debug(`Replacing call ${prevCall.callId} to ${userId} ${deviceId}`);
-                        this.disposeCall(prevCall, CallErrorCode.NewSession);
-                    }
-
-                    const newCall = createNewMatrixCall(this.client, this.room.roomId, {
-                        invitee: userId,
-                        opponentDeviceId: deviceId,
-                        opponentSessionId: participant.sessionId,
-                        groupCallId: this.groupCallId,
-                    });
-
-                    if (newCall === null) {
-                        logger.error(`Failed to create call with ${userId} ${deviceId}`);
-                        callMap.delete(deviceId);
-                    } else {
-                        this.initCall(newCall);
-                        callMap.set(deviceId, newCall);
-
-                        logger.debug(`Placing call to ${userId} ${deviceId} (session ${participant.sessionId})`);
-
-                        newCall
-                            .placeCallWithCallFeeds(
-                                this.getLocalFeeds().map((feed) => feed.clone()),
-                                participant.screensharing,
-                            )
-                            .then(() => {
-                                if (this.dataChannelsEnabled) {
-                                    newCall.createDataChannel("datachannel", this.dataChannelOptions);
-                                }
-                            })
-                            .catch((e) => {
-                                logger.warn(`Failed to place call to ${userId}`, e);
-
-                                if (e instanceof CallError && e.code === GroupCallErrorCode.UnknownDevice) {
-                                    this.emit(GroupCallEvent.Error, e);
-                                } else {
-                                    this.emit(
-                                        GroupCallEvent.Error,
-                                        new GroupCallError(
-                                            GroupCallErrorCode.PlaceCallFailed,
-                                            `Failed to place call to ${userId}`,
-                                        ),
-                                    );
-                                }
-
-                                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
-                                if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
-                            });
-                    }
-                }
+            if (error instanceof CallError && error.code === GroupCallErrorCode.UnknownDevice) {
+                this.emit(GroupCallEvent.Error, error);
+            } else {
+                this.emit(GroupCallEvent.Error, new GroupCallError(GroupCallErrorCode.PlaceCallFailed, error.message));
             }
+
+            if (newCall !== null) {
+                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
+                if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
+            }
+        };
+
+        const replaceSession = (
+            userId: string,
+            deviceId: string,
+            prevCall: MatrixCall | undefined,
+            opponentSessionId: string,
+            opponentIsScreensharing: boolean,
+            callMap: Map<string, MatrixCall>,
+        ): void => {
+            callsChanged = true;
+
+            if (prevCall) {
+                logger.debug(`Replacing call ${prevCall.callId} to ${userId} ${deviceId}`);
+                this.disposeCall(prevCall, CallErrorCode.NewSession);
+            }
+
+            const newCall = createNewMatrixCall(this.client, this.room.roomId, {
+                invitee: userId,
+                opponentDeviceId: deviceId,
+                opponentSessionId: opponentSessionId,
+                groupCallId: this.groupCallId,
+                isFocus: opponentSessionId === FOCUS_SESSION_ID,
+            });
+
+            if (newCall === null) {
+                onError(new Error("Failed to create new call"), userId, deviceId, newCall, callMap);
+                return;
+            }
+
+            this.initCall(newCall);
+            callMap.set(deviceId, newCall);
+
+            logger.debug(`Placing call to ${userId} ${deviceId} (session ${opponentSessionId})`);
+
+            newCall
+                .placeCallWithCallFeeds(
+                    this.getLocalFeeds().map((feed) => feed.clone()),
+                    opponentIsScreensharing,
+                )
+                .then(() => {
+                    if (this.dataChannelsEnabled || opponentSessionId === FOCUS_SESSION_ID) {
+                        newCall.createDataChannel("datachannel", this.dataChannelOptions);
+                    }
+                })
+                .catch((e) => {
+                    onError(e, userId, deviceId, newCall, callMap);
+                });
 
             if (callMap.size > 0) {
                 this.calls.set(userId, callMap);
             } else {
                 this.calls.delete(userId);
+            }
+        };
+
+        if (this.foci.length > 0) {
+            // We have a focus to call, so we call it
+            for (const { user_id: userId, device_id: deviceId } of this.foci) {
+                const callMap = this.calls.get(userId) ?? new Map<string, MatrixCall>();
+                const prevCall = callMap.get(deviceId);
+
+                if (prevCall && !prevCall.callHasEnded()) {
+                    continue;
+                }
+
+                callsChanged = true;
+                replaceSession(userId, deviceId, prevCall, FOCUS_SESSION_ID, false, callMap);
+            }
+        } else {
+            // There is no focus to call, so we connect full-mesh
+            for (const [{ userId }, participantMap] of this.participants) {
+                const callMap = this.calls.get(userId) ?? new Map<string, MatrixCall>();
+
+                for (const [deviceId, participant] of participantMap) {
+                    const prevCall = callMap.get(deviceId);
+
+                    if (
+                        prevCall?.getOpponentSessionId() === participant.sessionId ||
+                        !this.wantsOutgoingCall(userId, deviceId)
+                    ) {
+                        continue;
+                    }
+
+                    callsChanged = true;
+                    replaceSession(
+                        userId,
+                        deviceId,
+                        prevCall,
+                        participant.sessionId,
+                        participant.screensharing,
+                        callMap,
+                    );
+                }
             }
         }
 
@@ -996,6 +1005,21 @@ export class GroupCall extends TypedEventEmitter<
                     retriesMap.set(deviceId, retries + 1);
                     needsRetry = true;
                 }
+            }
+        }
+
+        for (const { user_id: userId, device_id: deviceId } of this.foci) {
+            const call = this.calls.get(userId)?.get(deviceId);
+            let retriesMap = this.retryCallCounts.get(userId);
+            const retries = retriesMap?.get(deviceId) ?? 0;
+
+            if ((!call || call.callHasEnded()) && retries < 3) {
+                if (retriesMap === undefined) {
+                    retriesMap = new Map();
+                    this.retryCallCounts.set(userId, retriesMap);
+                }
+                retriesMap.set(deviceId, retries + 1);
+                needsRetry = true;
             }
         }
 
@@ -1129,7 +1153,7 @@ export class GroupCall extends TypedEventEmitter<
                 call.subscribeToFocus(true);
             }
 
-            const opponentUserId = call.getOpponentMember()?.userId;
+            const opponentUserId = call.getOpponentMember()?.userId || call.invitee;
             if (opponentUserId) {
                 const retriesMap = this.retryCallCounts.get(opponentUserId);
                 retriesMap?.delete(call.getOpponentDeviceId()!);
