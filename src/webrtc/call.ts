@@ -908,7 +908,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                         streams: [stream],
                         // Chrome does not allow us to change the encodings
                         // later, so we have to use addTransceiver() to set them
-                        sendEncodings: this.isFocus ? undefined : encodings,
+                        sendEncodings: this.isFocus ? encodings : undefined,
                     });
 
                     if (this.isFocus && isFirefox()) {
