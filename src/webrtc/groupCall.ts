@@ -523,7 +523,10 @@ export class GroupCall extends TypedEventEmitter<
             }
         }
 
-        this.foci = [focusOfAnotherMember ?? this.client.getFoci()[0]];
+        const focus = focusOfAnotherMember ?? this.client.getFoci()[0];
+        if (focus && !this.foci.some((f) => f.user_id === focus.user_id && f.device_id === focus.device_id)) {
+            this.foci.push(focus);
+        }
     }
 
     private dispose(): void {
