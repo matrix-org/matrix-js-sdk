@@ -836,6 +836,32 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
+    private addNewTransceiver(transceiverKey: string, stream: MediaStream, track: MediaStreamTrack): void {
+        const encodings = track.kind === "video" ? SIMULCAST_ENCODINGS : undefined;
+
+        const newTransceiver = this.peerConn!.addTransceiver(track, {
+            streams: [stream],
+            // Chrome does not allow us to change the encodings
+            // later, so we have to use addTransceiver() to set them
+            // (It's fine to specify the parameter on Firefox too,
+            // it just won't work.)
+            sendEncodings: this.isFocus ? encodings : undefined,
+        });
+
+        if (this.isFocus && isFirefox()) {
+            const parameters = newTransceiver.sender.getParameters();
+            newTransceiver.sender.setParameters({
+                ...parameters,
+                // Firefox does not support the sendEncodings
+                // parameter on addTransceiver(), so we use
+                // setParameters() to set them
+                encodings: encodings ?? parameters.encodings,
+            });
+        }
+
+        this.transceivers.set(transceiverKey, newTransceiver);
+    }
+
     /**
      * This method takes the feeds tracks and adds them to the peer connection.
      * It tries to re-use transceivers/senders by using replaceTrack(), if
@@ -858,7 +884,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 `Call ${this.callId} addTracksOfFeedToPeerConnection() running (feedId=${feedId} streamPurpose=${purpose} kind=${track.kind} enabled=${track.enabled})`,
             );
 
-            const encodings = track.kind === "video" ? SIMULCAST_ENCODINGS : undefined;
             const transceiverKey = getTransceiverKey(purpose, track.kind);
             const transceiver = this.transceivers.get(transceiverKey);
             const sender = transceiver?.sender;
@@ -904,27 +929,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     // We either don't have a sender or we failed to do
                     // replaceTrack(), so we use addTransceiver() to add the
                     // track
-                    const newTransceiver = this.peerConn!.addTransceiver(track, {
-                        streams: [stream],
-                        // Chrome does not allow us to change the encodings
-                        // later, so we have to use addTransceiver() to set them
-                        // (It's fine to specify the parameter on Firefox too,
-                        // it just won't work.)
-                        sendEncodings: this.isFocus ? encodings : undefined,
-                    });
-
-                    if (this.isFocus && isFirefox()) {
-                        const parameters = newTransceiver.sender.getParameters();
-                        newTransceiver.sender.setParameters({
-                            ...parameters,
-                            // Firefox does not support the sendEncodings
-                            // parameter on addTransceiver(), so we use
-                            // setParameters() to set them
-                            encodings: encodings ?? parameters.encodings,
-                        });
-                    }
-
-                    this.transceivers.set(transceiverKey, newTransceiver);
+                    this.addNewTransceiver(transceiverKey, stream, track);
 
                     added = true;
                 } catch (error) {
