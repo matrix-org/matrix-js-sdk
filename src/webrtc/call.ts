@@ -279,7 +279,7 @@ const ICE_DISCONNECTED_TIMEOUT = 30 * 1000; // ms
  */
 const SUBSCRIBE_TO_FOCUS_TIMEOUT = 2 * 1000;
 
-const SIMULCAST_ENCODINGS = [
+const SIMULCAST_USERMEDIA_ENCODINGS: RTCRtpEncodingParameters[] = [
     // Order is important here: some browsers (e.g.
     // Chrome) will only send some of the encodings, if
     // the track has a resolution to low for it to send
@@ -287,16 +287,23 @@ const SIMULCAST_ENCODINGS = [
     // has priority and therefore we put full as first
     // as we always want to send the full resolution
     {
-        maxBitrate: 4_500_000,
+        // 720p (base)
+        maxFramerate: 30,
+        maxBitrate: 1_700_000,
         rid: SimulcastResolution.Full,
     },
     {
-        maxBitrate: 1_500_000,
+        // 360p
+        maxFramerate: 20,
+        maxBitrate: 300_000,
         rid: SimulcastResolution.Half,
         scaleResolutionDownBy: 2.0,
     },
     {
-        maxBitrate: 300_000,
+        // 180p
+        maxFramerate: 15,
+        maxBitrate: 120_000,
+
         rid: SimulcastResolution.Quarter,
         scaleResolutionDownBy: 4.0,
     },
@@ -312,6 +319,15 @@ export class CallError extends Error {
         this.code = code;
     }
 }
+
+export const getSimulcastEncodings = (purpose: SDPStreamMetadataPurpose): RTCRtpEncodingParameters[] => {
+    if (purpose === SDPStreamMetadataPurpose.Usermedia) {
+        return SIMULCAST_USERMEDIA_ENCODINGS;
+    }
+
+    // Fallback to usermedia encodings
+    return SIMULCAST_USERMEDIA_ENCODINGS;
+};
 
 export function genCallID(): string {
     return Date.now().toString() + randomString(16);
@@ -861,7 +877,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 `Call ${this.callId} addTracksOfFeedToPeerConnection() running (feedId=${feedId} streamPurpose=${purpose} kind=${track.kind} enabled=${track.enabled})`,
             );
 
-            const encodings = track.kind === "video" ? SIMULCAST_ENCODINGS : undefined;
+            const encodings = track.kind === "video" ? getSimulcastEncodings(callFeed.purpose) : undefined;
             const transceiverKey = getTransceiverKey(purpose, track.kind);
             const transceiver = this.transceivers.get(transceiverKey);
             const sender = transceiver?.sender;

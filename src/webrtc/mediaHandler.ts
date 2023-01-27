@@ -420,6 +420,7 @@ export class MediaHandler extends TypedEventEmitter<
                  */
                       width: isWebkit ? { exact: 1280 } : { ideal: 1280 },
                       height: isWebkit ? { exact: 720 } : { ideal: 720 },
+                      frameRate: isWebkit ? { exact: 30 } : { ideal: 30 },
                   }
                 : false,
         };
