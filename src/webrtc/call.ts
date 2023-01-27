@@ -287,13 +287,16 @@ const SIMULCAST_ENCODINGS = [
     // has priority and therefore we put full as first
     // as we always want to send the full resolution
     {
+        maxBitrate: 4_500_000,
         rid: SimulcastResolution.Full,
     },
     {
+        maxBitrate: 1_500_000,
         rid: SimulcastResolution.Half,
         scaleResolutionDownBy: 2.0,
     },
     {
+        maxBitrate: 300_000,
         rid: SimulcastResolution.Quarter,
         scaleResolutionDownBy: 4.0,
     },
