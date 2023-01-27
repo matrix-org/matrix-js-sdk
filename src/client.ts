@@ -3811,14 +3811,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * This is essentially getRooms() with some rooms filtered out, eg. old versions
      * of rooms that have been replaced or (in future) other rooms that have been
      * marked at the protocol level as not to be displayed to the user.
+     *
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     *                                           m.room.predecessor state event and
+     *                                           use it if found (MSC3946).
      * @returns A list of rooms, or an empty list if there is no data store.
      */
-    public getVisibleRooms(): Room[] {
+    public getVisibleRooms(msc3946ProcessDynamicPredecessor = false): Room[] {
         const allRooms = this.store.getRooms();
 
         const replacedRooms = new Set();
         for (const r of allRooms) {
-            const predecessor = r.findPredecessorRoomId();
+            const predecessor = r.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
             if (predecessor) {
                 replacedRooms.add(predecessor);
             }
@@ -5017,24 +5021,31 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * which can be proven to be linked. For example, rooms which have a create
      * event pointing to an old room which the client is not aware of or doesn't
      * have a matching tombstone would not be returned.
+     * @param msc3946ProcessDynamicPredecessor - if true, look for
+     * m.room.predecessor state events as well as create events, and prefer
+     * predecessor events where they exist (MSC3946).
      * @returns An array of rooms representing the upgrade
      * history.
      */
-    public getRoomUpgradeHistory(roomId: string, verifyLinks = false): Room[] {
+    public getRoomUpgradeHistory(
+        roomId: string,
+        verifyLinks = false,
+        msc3946ProcessDynamicPredecessor = false,
+    ): Room[] {
         const currentRoom = this.getRoom(roomId);
         if (!currentRoom) return [];
 
-        const before = this.findPredecessorRooms(currentRoom, verifyLinks);
-        const after = this.findSuccessorRooms(currentRoom, verifyLinks);
+        const before = this.findPredecessorRooms(currentRoom, verifyLinks, msc3946ProcessDynamicPredecessor);
+        const after = this.findSuccessorRooms(currentRoom, verifyLinks, msc3946ProcessDynamicPredecessor);
 
         return [...before, currentRoom, ...after];
     }
 
-    private findPredecessorRooms(room: Room, verifyLinks: boolean): Room[] {
+    private findPredecessorRooms(room: Room, verifyLinks: boolean, msc3946ProcessDynamicPredecessor: boolean): Room[] {
         const ret: Room[] = [];
 
         // Work backwards from newer to older rooms
-        let predecessorRoomId = room.findPredecessorRoomId();
+        let predecessorRoomId = room.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
         while (predecessorRoomId !== null) {
             const predecessorRoom = this.getRoom(predecessorRoomId);
             if (predecessorRoom === null) {
@@ -5051,12 +5062,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             ret.splice(0, 0, predecessorRoom);
 
             room = predecessorRoom;
-            predecessorRoomId = room.findPredecessorRoomId();
+            predecessorRoomId = room.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
         }
         return ret;
     }
 
-    private findSuccessorRooms(room: Room, verifyLinks: boolean): Room[] {
+    private findSuccessorRooms(room: Room, verifyLinks: boolean, msc3946ProcessDynamicPredecessor: boolean): Room[] {
         const ret: Room[] = [];
 
         // Work forwards, looking at tombstone events
@@ -5064,10 +5075,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         while (tombstoneEvent) {
             const successorRoom = this.getRoom(tombstoneEvent.getContent()["replacement_room"]);
             if (!successorRoom) break; // end of the chain
-            if (successorRoom.roomId === room.roomId) break; // Tombstone is referencing it's own room
+            if (successorRoom.roomId === room.roomId) break; // Tombstone is referencing its own room
 
             if (verifyLinks) {
-                const predecessorRoomId = successorRoom.findPredecessorRoomId();
+                const predecessorRoomId = successorRoom.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
                 if (!predecessorRoomId || predecessorRoomId !== room.roomId) {
                     break;
                 }
@@ -5457,7 +5468,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
 
-                    this.processBeaconEvents(room, timelineEvents);
+                    this.processAggregatedTimelineEvents(room, timelineEvents);
                     room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
 
@@ -5572,7 +5583,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
-        this.processBeaconEvents(timelineSet.room, timelineEvents);
+        this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -5667,7 +5678,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(resNewer.next_batch ?? null, Direction.Forward);
-                this.processBeaconEvents(timelineSet.room, events);
+                this.processAggregatedTimelineEvents(timelineSet.room, events);
 
                 // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
                 // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -5724,7 +5735,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(null, Direction.Forward);
-                this.processBeaconEvents(timelineSet.room, events);
+                this.processAggregatedTimelineEvents(timelineSet.room, events);
 
                 return timeline;
             }
@@ -5977,7 +5988,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // in the notification timeline set
                     const timelineSet = eventTimeline.getTimelineSet();
                     timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(timelineSet.room, matrixEvents);
+                    this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
                     // if we've hit the end of the timeline, we need to stop trying to
                     // paginate. We need to keep the 'forwards' token though, to make sure
@@ -6019,7 +6030,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(room, matrixEvents);
+                    this.processAggregatedTimelineEvents(room, matrixEvents);
                     this.processThreadRoots(room, matrixEvents, backwards);
 
                     // if we've hit the end of the timeline, we need to stop trying to
@@ -6066,7 +6077,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         const originalEvent = await this.fetchRoomEvent(eventTimeline.getRoomId() ?? "", thread.id);
                         timelineSet.addEventsToTimeline([mapper(originalEvent)], true, eventTimeline, null);
                     }
-                    this.processBeaconEvents(timelineSet.room, matrixEvents);
+                    this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
                     // if we've hit the end of the timeline, we need to stop trying to
                     // paginate. We need to keep the 'forwards' token though, to make sure
@@ -6104,7 +6115,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
                     timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(room, timelineEvents);
+                    this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
                         timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
@@ -9391,10 +9402,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public processBeaconEvents(room?: Room, events?: MatrixEvent[]): void {
+        this.processAggregatedTimelineEvents(room, events);
+    }
+
+    /**
+     * Calls aggregation functions for event types that are aggregated
+     * Polls and location beacons
+     * @param room - room the events belong to
+     * @param events - timeline events to be processed
+     * @returns
+     */
+    public processAggregatedTimelineEvents(room?: Room, events?: MatrixEvent[]): void {
         if (!events?.length) return;
         if (!room) return;
 
         room.currentState.processBeaconEvents(events, this);
+        room.processPollEvents(events);
     }
 
     /**

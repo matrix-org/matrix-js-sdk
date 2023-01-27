@@ -1,5 +1,5 @@
 /*
-Copyright 2019, 2021 The Matrix.org Foundation C.I.C.
+Copyright 2019, 2021, 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -122,7 +122,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *
      * @param event - The relation event to remove.
      */
-    private async removeEvent(event: MatrixEvent): Promise<void> {
+    public async removeEvent(event: MatrixEvent): Promise<void> {
         if (!this.relations.has(event)) {
             return;
         }
