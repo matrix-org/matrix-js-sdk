@@ -279,13 +279,13 @@ const ICE_DISCONNECTED_TIMEOUT = 30 * 1000; // ms
  */
 const SUBSCRIBE_TO_FOCUS_TIMEOUT = 2 * 1000;
 
+// Order is important here: some browsers (e.g.
+// Chrome) will only send some of the encodings, if
+// the track has a resolution to low for it to send
+// all, in that case the encoding higher in the list
+// has priority and therefore we put full as first
+// as we always want to send the full resolution
 const SIMULCAST_USERMEDIA_ENCODINGS: RTCRtpEncodingParameters[] = [
-    // Order is important here: some browsers (e.g.
-    // Chrome) will only send some of the encodings, if
-    // the track has a resolution to low for it to send
-    // all, in that case the encoding higher in the list
-    // has priority and therefore we put full as first
-    // as we always want to send the full resolution
     {
         // 720p (base)
         maxFramerate: 30,
@@ -309,6 +309,29 @@ const SIMULCAST_USERMEDIA_ENCODINGS: RTCRtpEncodingParameters[] = [
     },
 ];
 
+const SIMULCAST_SCREENSHARING_ENCODINGS: RTCRtpEncodingParameters[] = [
+    {
+        // 1080p (base)
+        maxFramerate: 30,
+        maxBitrate: 3_000_000,
+        rid: SimulcastResolution.Full,
+    },
+    {
+        // 720p
+        maxFramerate: 15,
+        maxBitrate: 1_000_000,
+        rid: SimulcastResolution.Half,
+        scaleResolutionDownBy: 1.5,
+    },
+    {
+        // 360p
+        maxFramerate: 3,
+        maxBitrate: 200_000,
+        rid: SimulcastResolution.Quarter,
+        scaleResolutionDownBy: 3,
+    },
+];
+
 export class CallError extends Error {
     public readonly code: string;
 
@@ -323,6 +346,9 @@ export class CallError extends Error {
 export const getSimulcastEncodings = (purpose: SDPStreamMetadataPurpose): RTCRtpEncodingParameters[] => {
     if (purpose === SDPStreamMetadataPurpose.Usermedia) {
         return SIMULCAST_USERMEDIA_ENCODINGS;
+    }
+    if (purpose === SDPStreamMetadataPurpose.Screenshare) {
+        return SIMULCAST_SCREENSHARING_ENCODINGS;
     }
 
     // Fallback to usermedia encodings
