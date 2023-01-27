@@ -350,12 +350,12 @@ describe("Media Handler", function () {
 
             expect(mockMediaDevices.getUserMedia).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    video: {
+                    video: expect.objectContaining({
                         mandatory: expect.objectContaining({
                             chromeMediaSource: "desktop",
                             chromeMediaSourceId: FAKE_DESKTOP_SOURCE_ID,
                         }),
-                    },
+                    }),
                 }),
             );
         });

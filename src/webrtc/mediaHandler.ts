@@ -22,6 +22,20 @@ import { GroupCallType, GroupCallState } from "../webrtc/groupCall";
 import { logger } from "../logger";
 import { MatrixClient } from "../client";
 
+const isWebkit = (): boolean => Boolean(navigator.webkitGetUserMedia);
+const getIdealOrExact = (value: number): ConstrainULong => (isWebkit() ? { exact: value } : { ideal: value });
+const getDimensionConstraints = (
+    width: number,
+    height: number,
+    framerate: number,
+): Pick<MediaTrackConstraintSet, "width" | "height" | "frameRate"> => ({
+    // Chrome will give it only if we ask exactly, FF refuses entirely if we ask
+    // exactly, so have to ask for ideal instead XXX: Is this still true?
+    width: getIdealOrExact(width),
+    height: getIdealOrExact(height),
+    frameRate: getIdealOrExact(framerate),
+});
+
 export enum MediaHandlerEvent {
     LocalStreamsChanged = "local_streams_changed",
 }
@@ -399,8 +413,6 @@ export class MediaHandler extends TypedEventEmitter<
     }
 
     private getUserMediaContraints(audio: boolean, video: boolean): MediaStreamConstraints {
-        const isWebkit = !!navigator.webkitGetUserMedia;
-
         return {
             audio: audio
                 ? {
@@ -412,39 +424,32 @@ export class MediaHandler extends TypedEventEmitter<
                 : false,
             video: video
                 ? {
+                      ...getDimensionConstraints(1280, 720, 30),
                       deviceId: this.videoInput ? { ideal: this.videoInput } : undefined,
-                      /* We want 640x360.  Chrome will give it only if we ask exactly,
-                   FF refuses entirely if we ask exactly, so have to ask for ideal
-                   instead
-                   XXX: Is this still true?
-                 */
-                      width: isWebkit ? { exact: 1280 } : { ideal: 1280 },
-                      height: isWebkit ? { exact: 720 } : { ideal: 720 },
-                      frameRate: isWebkit ? { exact: 30 } : { ideal: 30 },
                   }
                 : false,
         };
     }
 
-    private getScreenshareContraints(opts: IScreensharingOpts): DesktopCapturerConstraints {
+    private getScreenshareContraints(opts: IScreensharingOpts): ExtendedMediaStreamConstraints {
         const { desktopCapturerSourceId, audio } = opts;
         if (desktopCapturerSourceId) {
             logger.debug("Using desktop capturer source", desktopCapturerSourceId);
-            return {
-                audio: audio ?? false,
-                video: {
-                    mandatory: {
-                        chromeMediaSource: "desktop",
-                        chromeMediaSourceId: desktopCapturerSourceId,
-                    },
-                },
-            };
         } else {
             logger.debug("Not using desktop capturer source");
-            return {
-                audio: audio ?? false,
-                video: true,
-            };
         }
+
+        return {
+            audio: audio ?? false,
+            video: {
+                ...getDimensionConstraints(1920, 1080, 30),
+                mandatory: desktopCapturerSourceId
+                    ? {
+                          chromeMediaSource: "desktop",
+                          chromeMediaSourceId: desktopCapturerSourceId,
+                      }
+                    : undefined,
+            },
+        };
     }
 }
