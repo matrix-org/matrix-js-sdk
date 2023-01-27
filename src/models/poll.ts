@@ -170,7 +170,6 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
         this.relationsNextBatch = allRelations.nextBatch ?? undefined;
         this.responses = responses;
-        this.emit(PollEvent.Responses, this.responses);
 
         // while there are more pages of relations
         // fetch them
@@ -182,6 +181,9 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
             // no more pages
             this._isFetchingResponses = false;
         }
+
+        // emit after updating _isFetchingResponses state
+        this.emit(PollEvent.Responses, this.responses);
     }
 
     /**
