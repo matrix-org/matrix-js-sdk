@@ -442,7 +442,9 @@ export class MediaHandler extends TypedEventEmitter<
         return {
             audio: audio ?? false,
             video: {
-                ...getDimensionConstraints(1920, 1080, 30),
+                width: 1920,
+                height: 1080,
+                frameRate: 30,
                 mandatory: desktopCapturerSourceId
                     ? {
                           chromeMediaSource: "desktop",
