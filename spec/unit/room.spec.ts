@@ -3340,21 +3340,70 @@ describe("Room", function () {
             });
         }
 
+        function predecessorEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
+            return new MatrixEvent({
+                content: {
+                    predecessor_room_id: predecessorRoomId,
+                },
+                event_id: `predecessor_event_id_pred_${predecessorRoomId}`,
+                origin_server_ts: 1432735824653,
+                room_id: newRoomId,
+                sender: "@daryl:alexandria.example.com",
+                state_key: "",
+                type: "org.matrix.msc3946.room_predecessor",
+            });
+        }
+
         it("Returns null if there is no create event", () => {
             const room = new Room("roomid", client!, "@u:example.com");
-            expect(room.findPredecessorRoomId()).toBeNull();
+            expect(room.findPredecessor()).toBeNull();
         });
 
         it("Returns null if the create event has no predecessor", () => {
             const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([roomCreateEvent("roomid", null)]);
-            expect(room.findPredecessorRoomId()).toBeNull();
+            expect(room.findPredecessor()).toBeNull();
         });
 
         it("Returns the predecessor ID if one is provided via create event", () => {
             const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([roomCreateEvent("roomid", "replacedroomid")]);
-            expect(room.findPredecessorRoomId()).toBe("replacedroomid");
+            expect(room.findPredecessor()).toEqual({ roomId: "replacedroomid", eventId: "id_of_last_known_event" });
+        });
+
+        it("Prefers the m.predecessor event if one exists", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([
+                roomCreateEvent("roomid", "replacedroomid"),
+                predecessorEvent("roomid", "otherreplacedroomid"),
+            ]);
+            const useMsc3946 = true;
+            expect(room.findPredecessor(useMsc3946)).toEqual({
+                roomId: "otherreplacedroomid",
+                eventId: null, // m.predecessor does not include an event_id
+            });
+        });
+
+        it("Ignores the m.predecessor event if we don't ask to use it", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([
+                roomCreateEvent("roomid", "replacedroomid"),
+                predecessorEvent("roomid", "otherreplacedroomid"),
+            ]);
+            // Don't provide an argument for msc3946ProcessDynamicPredecessor -
+            // we should ignore the predecessor event.
+            expect(room.findPredecessor()).toEqual({ roomId: "replacedroomid", eventId: "id_of_last_known_event" });
+        });
+
+        it("Ignores the m.predecessor event and returns null if we don't ask to use it", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([
+                roomCreateEvent("roomid", null), // Create event has no predecessor
+                predecessorEvent("roomid", "otherreplacedroomid"),
+            ]);
+            // Don't provide an argument for msc3946ProcessDynamicPredecessor -
+            // we should ignore the predecessor event.
+            expect(room.findPredecessor()).toBeNull();
         });
     });
 });
