@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ describe("MatrixClient", function () {
     let store: MemoryStore | undefined;
 
     const defaultClientOpts: IStoredClientOpts = {
-        experimentalThreadSupport: false,
+        threadSupport: false,
     };
     const setupTests = (): [MatrixClient, HttpBackend, MemoryStore] => {
         const store = new MemoryStore();
@@ -671,7 +671,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollResponseReference = buildEventPollResponseReference();
@@ -702,7 +702,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -726,7 +726,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollResponseReference = buildEventPollResponseReference();
@@ -750,7 +750,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -774,7 +774,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
             // This is based on recording the events in a real room:
 
@@ -831,7 +831,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -857,7 +857,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -878,7 +878,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
