@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_START } from "matrix-events-sdk";
-
+import { M_POLL_START } from "../../src/@types/polls";
 import { EventTimelineSet } from "../../src/models/event-timeline-set";
 import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";

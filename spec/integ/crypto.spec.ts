@@ -1,6 +1,6 @@
 /*
 Copyright 2016 OpenMarket Ltd
-Copyright 2019-2022 The Matrix.org Foundation C.I.C.
+Copyright 2019-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,6 +17,8 @@ limitations under the License.
 
 import anotherjson from "another-json";
 import MockHttpBackend from "matrix-mock-request";
+import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
@@ -38,8 +40,16 @@ import {
 } from "../../src/matrix";
 import { IDeviceKeys } from "../../src/crypto/dehydration";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
+import { CRYPTO_BACKENDS, InitCrypto } from "../test-utils/test-utils";
 
 const ROOM_ID = "!room:id";
+
+afterEach(() => {
+    // reset fake-indexeddb after each test, to make sure we don't leak connections
+    // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
+    // eslint-disable-next-line no-global-assign
+    indexedDB = new IDBFactory();
+});
 
 // start an Olm session with a given recipient
 async function createOlmSession(olmAccount: Olm.Account, recipientTestClient: TestClient): Promise<Olm.Session> {
@@ -59,13 +69,21 @@ interface ToDeviceEvent {
     type: string;
 }
 
-// encrypt an event with olm
+/** encrypt an event with an existing olm session */
 function encryptOlmEvent(opts: {
+    /** the sender's user id */
     sender?: string;
+    /** the sender's curve25519 key */
     senderKey: string;
+    /** the sender's ed25519 key */
+    senderSigningKey: string;
+    /** the olm session to use for encryption */
     p2pSession: Olm.Session;
+    /** the recipient client */
     recipient: TestClient;
+    /** the payload of the message */
     plaincontent?: object;
+    /** the event type of the payload */
     plaintype?: string;
 }): ToDeviceEvent {
     expect(opts.senderKey).toBeTruthy();
@@ -77,6 +95,9 @@ function encryptOlmEvent(opts: {
         recipient: opts.recipient.userId,
         recipient_keys: {
             ed25519: opts.recipient.getSigningKey(),
+        },
+        keys: {
+            ed25519: opts.senderSigningKey,
         },
         sender: opts.sender || "@bob:xyz",
         type: opts.plaintype || "m.test",
@@ -101,7 +122,7 @@ function encryptMegolmEvent(opts: {
     groupSession: Olm.OutboundGroupSession;
     plaintext?: Partial<IEvent>;
     room_id?: string;
-}): Pick<IEvent, "event_id" | "content" | "type"> {
+}): IEvent {
     expect(opts.senderKey).toBeTruthy();
     expect(opts.groupSession).toBeTruthy();
 
@@ -119,30 +140,44 @@ function encryptMegolmEvent(opts: {
         expect(opts.room_id).toBeTruthy();
         plaintext.room_id = opts.room_id;
     }
+    return encryptMegolmEventRawPlainText({ senderKey: opts.senderKey, groupSession: opts.groupSession, plaintext });
+}
 
+function encryptMegolmEventRawPlainText(opts: {
+    senderKey: string;
+    groupSession: Olm.OutboundGroupSession;
+    plaintext: Partial<IEvent>;
+}): IEvent {
     return {
-        event_id: "test_megolm_event_" + Math.random(),
+        event_id: "$test_megolm_event_" + Math.random(),
+        sender: "@not_the_real_sender:example.com",
+        origin_server_ts: 1672944778000,
         content: {
             algorithm: "m.megolm.v1.aes-sha2",
-            ciphertext: opts.groupSession.encrypt(JSON.stringify(plaintext)),
+            ciphertext: opts.groupSession.encrypt(JSON.stringify(opts.plaintext)),
             device_id: "testDevice",
             sender_key: opts.senderKey,
             session_id: opts.groupSession.session_id(),
         },
         type: "m.room.encrypted",
+        unsigned: {},
     };
 }
 
-// build an encrypted room_key event to share a group session
+/** build an encrypted room_key event to share a group session, using an existing olm session */
 function encryptGroupSessionKey(opts: {
-    senderKey: string;
     recipient: TestClient;
+    /** sender's olm account */
+    olmAccount: Olm.Account;
+    /** sender's olm session with the recipient */
     p2pSession: Olm.Session;
     groupSession: Olm.OutboundGroupSession;
     room_id?: string;
 }): Partial<IEvent> {
+    const senderKeys = JSON.parse(opts.olmAccount.identity_keys());
     return encryptOlmEvent({
-        senderKey: opts.senderKey,
+        senderKey: senderKeys.curve25519,
+        senderSigningKey: senderKeys.ed25519,
         recipient: opts.recipient,
         p2pSession: opts.p2pSession,
         plaincontent: {
@@ -219,6 +254,7 @@ async function establishOlmSession(testClient: TestClient, peerOlmAccount: Olm.A
     const p2pSession = await createOlmSession(peerOlmAccount, testClient);
     const olmEvent = encryptOlmEvent({
         senderKey: peerE2EKeys.curve25519,
+        senderSigningKey: peerE2EKeys.ed25519,
         recipient: testClient,
         p2pSession: p2pSession,
     });
@@ -315,11 +351,17 @@ async function expectSendMegolmMessage(
     return JSON.parse(r.plaintext);
 }
 
-describe("megolm", () => {
+describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, initCrypto: InitCrypto) => {
     if (!global.Olm) {
+        // currently we use libolm to implement the crypto in the tests, so need it to be present.
         logger.warn("not running megolm tests: Olm not present");
         return;
     }
+
+    // oldBackendOnly is an alternative to `it` or `test` which will skip the test if we are running against the
+    // Rust backend. Once we have full support in the rust sdk, it will go away.
+    const oldBackendOnly = backend === "rust-sdk" ? test.skip : test;
+
     const Olm = global.Olm;
 
     let testOlmAccount = {} as unknown as Olm.Account;
@@ -384,29 +426,38 @@ describe("megolm", () => {
 
     beforeEach(async () => {
         aliceTestClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs");
-        await aliceTestClient.client.initCrypto();
+        await initCrypto(aliceTestClient.client);
 
+        // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
+        await Olm.init();
         testOlmAccount = new Olm.Account();
         testOlmAccount.create();
         const testE2eKeys = JSON.parse(testOlmAccount.identity_keys());
         testSenderKey = testE2eKeys.curve25519;
     });
 
-    afterEach(() => aliceTestClient.stop());
+    afterEach(async () => {
+        await aliceTestClient.stop();
+    });
 
     it("Alice receives a megolm message", async () => {
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
-
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -444,20 +495,25 @@ describe("megolm", () => {
         expect(decryptedEvent.getContent().body).toEqual("42");
     });
 
-    it("Alice receives a megolm message before the session keys", async () => {
+    oldBackendOnly("Alice receives a megolm message before the session keys", async () => {
         // https://github.com/vector-im/element-web/issues/2273
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
-
         // make the room_key event, but don't send it yet
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -507,17 +563,22 @@ describe("megolm", () => {
 
     it("Alice gets a second room_key message", async () => {
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
-
         // make the room_key event
         const roomKeyEncrypted1 = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -533,8 +594,8 @@ describe("megolm", () => {
         // make a second room_key event now that we have advanced the group
         // session.
         const roomKeyEncrypted2 = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -572,7 +633,7 @@ describe("megolm", () => {
         expect(event.getContent().body).toEqual("42");
     });
 
-    it("Alice sends a megolm message", async () => {
+    oldBackendOnly("Alice sends a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -615,7 +676,7 @@ describe("megolm", () => {
         ]);
     });
 
-    it("We shouldn't attempt to send to blocked devices", async () => {
+    oldBackendOnly("We shouldn't attempt to send to blocked devices", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
         await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -659,7 +720,7 @@ describe("megolm", () => {
             expect(() => aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toThrowError("encryption disabled");
         });
 
-        it("should permit sending to unknown devices", async () => {
+        oldBackendOnly("should permit sending to unknown devices", async () => {
             expect(aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toBeTruthy();
 
             aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
@@ -717,7 +778,7 @@ describe("megolm", () => {
             );
         });
 
-        it("should disable sending to unverified devices", async () => {
+        oldBackendOnly("should disable sending to unverified devices", async () => {
             aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await aliceTestClient.start();
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -775,7 +836,7 @@ describe("megolm", () => {
         });
     });
 
-    it("We should start a new megolm session when a device is blocked", async () => {
+    oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -833,7 +894,7 @@ describe("megolm", () => {
     });
 
     // https://github.com/vector-im/element-web/issues/2676
-    it("Alice should send to her other devices", async () => {
+    oldBackendOnly("Alice should send to her other devices", async () => {
         // for this test, we make the testOlmAccount be another of Alice's devices.
         // it ought to get included in messages Alice sends.
         await aliceTestClient.start();
@@ -914,7 +975,7 @@ describe("megolm", () => {
         expect(decrypted.content?.body).toEqual("test");
     });
 
-    it("Alice should wait for device list to complete when sending a megolm message", async () => {
+    oldBackendOnly("Alice should wait for device list to complete when sending a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
         await establishOlmSession(aliceTestClient, testOlmAccount);
@@ -944,22 +1005,27 @@ describe("megolm", () => {
         await Promise.all([downloadPromise, sendPromise]);
     });
 
-    it("Alice exports megolm keys and imports them to a new device", async () => {
+    oldBackendOnly("Alice exports megolm keys and imports them to a new device", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         // establish an olm session with alice
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
-
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
 
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -999,11 +1065,15 @@ describe("megolm", () => {
         aliceTestClient.stop();
 
         aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
-        await aliceTestClient.client.initCrypto();
+        await initCrypto(aliceTestClient.client);
         await aliceTestClient.client.importRoomKeys(exported);
         await aliceTestClient.start();
 
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
 
         const syncResponse = {
             next_batch: 1,
@@ -1079,17 +1149,22 @@ describe("megolm", () => {
 
     it("Alice can decrypt a message with falsey content", async () => {
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        }
+
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
-
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
             recipient: aliceTestClient,
+            olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
             room_id: ROOM_ID,
@@ -1101,17 +1176,11 @@ describe("megolm", () => {
             room_id: ROOM_ID,
         };
 
-        const messageEncrypted = {
-            event_id: "test_megolm_event",
-            content: {
-                algorithm: "m.megolm.v1.aes-sha2",
-                ciphertext: groupSession.encrypt(JSON.stringify(plaintext)),
-                device_id: "testDevice",
-                sender_key: testSenderKey,
-                session_id: groupSession.session_id(),
-            },
-            type: "m.room.encrypted",
-        };
+        const messageEncrypted = encryptMegolmEventRawPlainText({
+            senderKey: testSenderKey,
+            groupSession: groupSession,
+            plaintext: plaintext,
+        });
 
         // Alice gets both the events in a single sync
         const syncResponse = {
@@ -1138,78 +1207,20 @@ describe("megolm", () => {
         expect(decryptedEvent.getClearContent()).toBeUndefined();
     });
 
-    it("should successfully decrypt bundled redaction events that don't include a room_id in their /sync data", async () => {
-        await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
-        const groupSession = new Olm.OutboundGroupSession();
-        groupSession.create();
-
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => "@bob:xyz";
-
-        // make the room_key event
-        const roomKeyEncrypted = encryptGroupSessionKey({
-            senderKey: testSenderKey,
-            recipient: aliceTestClient,
-            p2pSession: p2pSession,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
-
-        // encrypt a message with the group session
-        const messageEncrypted = encryptMegolmEvent({
-            senderKey: testSenderKey,
-            groupSession: groupSession,
-            room_id: ROOM_ID,
-        });
-
-        const redactionEncrypted = encryptMegolmEvent({
-            senderKey: testSenderKey,
-            groupSession: groupSession,
-            plaintext: {
-                room_id: ROOM_ID,
-                type: "m.room.redaction",
-                redacts: messageEncrypted.event_id,
-                content: { reason: "redaction test" },
-            },
-        });
-
-        const messageEncryptedWithRedaction = {
-            ...messageEncrypted,
-            unsigned: { redacted_because: redactionEncrypted },
-        };
-
-        const syncResponse = {
-            next_batch: 1,
-            to_device: {
-                events: [roomKeyEncrypted],
-            },
-            rooms: {
-                join: {
-                    [ROOM_ID]: { timeline: { events: [messageEncryptedWithRedaction] } },
-                },
-            },
-        };
-
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-        await aliceTestClient.flushSync();
-
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
-        const event = room.getLiveTimeline().getEvents()[0];
-        expect(event.isEncrypted()).toBe(true);
-        await event.attemptDecryption(aliceTestClient.client.crypto!);
-        expect(event.getContent()).toEqual({});
-        const redactionEvent: any = event.getRedactionEvent();
-        expect(redactionEvent.content.reason).toEqual("redaction test");
-    });
-
-    it("Alice receives shared history before being invited to a room by the sharer", async () => {
+    oldBackendOnly("Alice receives shared history before being invited to a room by the sharer", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
         await beccaTestClient.client.initCrypto();
 
         await aliceTestClient.start();
-        aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
         await beccaTestClient.start();
+
+        // if we're using the old crypto impl, stub out some methods in the device manager.
+        // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
+        if (aliceTestClient.client.crypto) {
+            aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceTestClient.client.crypto!.deviceList.getDeviceByIdentityKey = () => device;
+            aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
+        }
 
         const beccaRoom = new Room(ROOM_ID, beccaTestClient.client, "@becca:localhost", {});
         beccaTestClient.client.store.storeRoom(beccaRoom);
@@ -1236,8 +1247,6 @@ describe("megolm", () => {
         event.claimedEd25519Key = null;
 
         const device = new DeviceInfo(beccaTestClient.client.deviceId!);
-        aliceTestClient.client.crypto!.deviceList.getDeviceByIdentityKey = () => device;
-        aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
 
         // Create an olm session for Becca and Alice's devices
         const aliceOtks = await aliceTestClient.awaitOneTimeKeyUpload();
@@ -1268,6 +1277,7 @@ describe("megolm", () => {
         );
         const encryptedForwardedKey = encryptOlmEvent({
             sender: "@becca:localhost",
+            senderSigningKey: beccaTestClient.getSigningKey(),
             senderKey: beccaTestClient.getDeviceKey(),
             recipient: aliceTestClient,
             p2pSession: p2pSession,
@@ -1349,7 +1359,7 @@ describe("megolm", () => {
         await beccaTestClient.stop();
     });
 
-    it("Alice receives shared history before being invited to a room by someone else", async () => {
+    oldBackendOnly("Alice receives shared history before being invited to a room by someone else", async () => {
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
         await beccaTestClient.client.initCrypto();
 
@@ -1413,6 +1423,7 @@ describe("megolm", () => {
         const encryptedForwardedKey = encryptOlmEvent({
             sender: "@becca:localhost",
             senderKey: beccaTestClient.getDeviceKey(),
+            senderSigningKey: beccaTestClient.getSigningKey(),
             recipient: aliceTestClient,
             p2pSession: p2pSession,
             plaincontent: {
@@ -1494,7 +1505,7 @@ describe("megolm", () => {
         await beccaTestClient.stop();
     });
 
-    it("allows sending an encrypted event as soon as room state arrives", async () => {
+    oldBackendOnly("allows sending an encrypted event as soon as room state arrives", async () => {
         /* Empirically, clients expect to be able to send encrypted events as soon as the
          * RoomStateEvent.NewMember notification is emitted, so test that works correctly.
          */
@@ -1619,7 +1630,7 @@ describe("megolm", () => {
             await aliceTestClient.httpBackend.flush(membersPath, 1);
         }
 
-        it("Sending an event initiates a member list sync", async () => {
+        oldBackendOnly("Sending an event initiates a member list sync", async () => {
             // we expect a call to the /members list...
             const memberListPromise = expectMembershipRequest(ROOM_ID, ["@bob:xyz"]);
 
@@ -1651,7 +1662,7 @@ describe("megolm", () => {
             ]);
         });
 
-        it("loading the membership list inhibits a later load", async () => {
+        oldBackendOnly("loading the membership list inhibits a later load", async () => {
             const room = aliceTestClient.client.getRoom(ROOM_ID)!;
             await Promise.all([room.loadMembersIfNeeded(), expectMembershipRequest(ROOM_ID, ["@bob:xyz"])]);
 
@@ -1676,6 +1687,81 @@ describe("megolm", () => {
             const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, "test");
 
             await Promise.all([sendPromise, megolmMessagePromise, aliceTestClient.httpBackend.flush("/keys/query", 1)]);
+        });
+    });
+
+    describe("m.room_key.withheld handling", () => {
+        // TODO: there are a bunch more tests for this sort of thing in spec/unit/crypto/algorithms/megolm.spec.ts.
+        //   They should be converted to integ tests and moved.
+
+        oldBackendOnly("does not block decryption on an 'm.unavailable' report", async function () {
+            await aliceTestClient.start();
+
+            // there may be a key downloads for alice
+            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, {});
+            aliceTestClient.httpBackend.flush("/keys/query", 1, 5000);
+
+            // encrypt a message with a group session.
+            const groupSession = new Olm.OutboundGroupSession();
+            groupSession.create();
+            const messageEncryptedEvent = encryptMegolmEvent({
+                senderKey: testSenderKey,
+                groupSession: groupSession,
+                room_id: ROOM_ID,
+            });
+
+            // Alice gets the room message, but not the key
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: 1,
+                rooms: {
+                    join: { [ROOM_ID]: { timeline: { events: [messageEncryptedEvent] } } },
+                },
+            });
+            await aliceTestClient.flushSync();
+
+            // alice will (eventually) send a room-key request
+            aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key_request/").respond(200, {});
+            await aliceTestClient.httpBackend.flush("/sendToDevice/m.room_key_request/", 1, 1000);
+
+            // at this point, the message should be a decryption failure
+            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+            const event = room.getLiveTimeline().getEvents()[0];
+            expect(event.isDecryptionFailure()).toBeTruthy();
+
+            // we want to wait for the message to be updated, so create a promise for it
+            const retryPromise = new Promise((resolve) => {
+                event.once(MatrixEventEvent.Decrypted, (ev) => {
+                    resolve(ev);
+                });
+            });
+
+            // alice gets back a room-key-withheld notification
+            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+                next_batch: 2,
+                to_device: {
+                    events: [
+                        {
+                            type: "m.room_key.withheld",
+                            sender: "@bob:example.com",
+                            content: {
+                                algorithm: "m.megolm.v1.aes-sha2",
+                                room_id: ROOM_ID,
+                                session_id: groupSession.session_id(),
+                                sender_key: testSenderKey,
+                                code: "m.unavailable",
+                                reason: "",
+                            },
+                        },
+                    ],
+                },
+            });
+            await aliceTestClient.flushSync();
+
+            // the withheld notification should trigger a retry; wait for it
+            await retryPromise;
+
+            // finally: the message should still be a regular decryption failure, not a withheld notification.
+            expect(event.getContent().body).not.toContain("withheld");
         });
     });
 });

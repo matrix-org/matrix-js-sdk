@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EitherAnd, IMessageRendering } from "matrix-events-sdk";
+import { EitherAnd } from "matrix-events-sdk";
 
 import { UnstableValue } from "../NamespacedValue";
+import { IMessageRendering } from "./extensible_events";
 
 /**
  * Extensible topic event type based on MSC3765
