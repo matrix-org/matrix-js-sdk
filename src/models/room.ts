@@ -64,7 +64,6 @@ import {
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
-import { Feature, ServerSupport } from "../feature";
 import { Poll, PollEvent } from "./poll";
 
 // These constants are used as sane defaults when the homeserver doesn't support
@@ -1299,10 +1298,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getUnreadNotificationCount(type = NotificationCountType.Total): number {
         let count = this.getRoomUnreadNotificationCount(type);
-        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
-            for (const threadNotification of this.threadNotifications.values()) {
-                count += threadNotification[type] ?? 0;
-            }
+        for (const threadNotification of this.threadNotifications.values()) {
+            count += threadNotification[type] ?? 0;
         }
         return count;
     }
