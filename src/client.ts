@@ -209,7 +209,6 @@ import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
