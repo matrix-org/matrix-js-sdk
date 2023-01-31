@@ -387,6 +387,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentSessionId?: string;
     public groupCallId?: string;
 
+    // Used to keep the timer for the delay before actually stopping our
+    // video track after muting (see setLocalVideoMuted)
+    private stopVideoTrackTimer?: ReturnType<typeof setTimeout>;
+
     /**
      * Construct a new Matrix Call.
      * @param opts - Config options.
@@ -480,7 +484,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public get type(): CallType {
-        return this.hasLocalUserMediaVideoTrack || this.hasRemoteUserMediaVideoTrack ? CallType.Video : CallType.Voice;
+        // we may want to look for a video receiver here rather than a track to match the
+        // sender behaviour, although in practice they should be the same thing
+        return this.hasUserMediaVideoSender || this.hasRemoteUserMediaVideoTrack ? CallType.Video : CallType.Voice;
     }
 
     public get hasLocalUserMediaVideoTrack(): boolean {
@@ -501,6 +507,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.getRemoteFeeds().some((feed) => {
             return feed.purpose === SDPStreamMetadataPurpose.Usermedia && !!feed.stream?.getAudioTracks().length;
         });
+    }
+
+    private get hasUserMediaAudioSender(): boolean {
+        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "audio"))?.sender);
+    }
+
+    private get hasUserMediaVideoSender(): boolean {
+        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"))?.sender);
     }
 
     public get localUsermediaFeed(): CallFeed | undefined {
@@ -1292,18 +1306,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.localUsermediaStream!.addTrack(track);
         }
 
-        // Secondly, we remove tracks that we no longer need from the peer
-        // connection, if any. This only happens when we mute the video atm.
-        // This will change the transceiver direction to "inactive" and
-        // therefore cause re-negotiation.
-        for (const kind of ["audio", "video"]) {
-            const sender = this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, kind))?.sender;
-            // Only remove the track if we aren't going to immediately replace it
-            if (sender && !stream.getTracks().find((t) => t.kind === kind)) {
-                this.peerConn?.removeTrack(sender);
-            }
-        }
-        // Thirdly, we replace the old tracks, if possible.
+        // Then replace the old tracks, if possible.
         for (const track of stream.getTracks()) {
             const tKey = getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, track.kind);
 
@@ -1361,22 +1364,51 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
         logger.log(`call ${this.callId} setLocalVideoMuted ${muted}`);
+
+        // if we were still thinking about stopping and removing the video
+        // track: don't, because we want it back.
+        if (!muted && this.stopVideoTrackTimer !== undefined) {
+            clearTimeout(this.stopVideoTrackTimer);
+            this.stopVideoTrackTimer = undefined;
+        }
+
         if (!(await this.client.getMediaHandler().hasVideoDevice())) {
             return this.isLocalVideoMuted();
         }
 
-        if (!this.hasLocalUserMediaVideoTrack && !muted) {
+        if (!this.hasUserMediaVideoSender && !muted) {
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
-        if (this.opponentSupportsSDPStreamMetadata()) {
-            const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
+
+        // we may not have a video track - if not, re-request usermedia
+        if (!muted && this.localUsermediaStream!.getVideoTracks().length === 0) {
+            const stream = await this.client.getMediaHandler().getUserMediaStream(true, true);
             await this.updateLocalUsermediaStream(stream);
-        } else {
-            this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
         }
+
+        this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
+
         this.updateMuteStatus();
         await this.sendMetadataUpdate();
+
+        // if we're muting video, set a timeout to stop & remove the video track so we release
+        // the camera. We wait a short time to do this because when we disable a track, WebRTC
+        // will send black video for it. If we just stop and remove it straight away, the video
+        // will just freeze which means that when we unmute video, the other side will briefly
+        // get a static frame of us from before we muted. This way, the still frame is just black.
+        // A very small delay is not always enough so the theory here is that it needs to be long
+        // enough for WebRTC to encode a frame: 120ms should be long enough even if we're only
+        // doing 10fps.
+        if (muted) {
+            this.stopVideoTrackTimer = setTimeout(() => {
+                for (const t of this.localUsermediaStream!.getVideoTracks()) {
+                    t.stop();
+                    this.localUsermediaStream!.removeTrack(t);
+                }
+            }, 120);
+        }
+
         return this.isLocalVideoMuted();
     }
 
@@ -1404,7 +1436,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return this.isMicrophoneMuted();
         }
 
-        if (!this.hasLocalUserMediaAudioTrack && !muted) {
+        if (!muted && (!this.hasUserMediaAudioSender || !this.hasLocalUserMediaAudioTrack)) {
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
@@ -1496,6 +1528,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.localUsermediaStream!.id
             } micShouldBeMuted ${micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`,
         );
+
         setTracksEnabled(this.localUsermediaStream!.getAudioTracks(), !micShouldBeMuted);
         setTracksEnabled(this.localUsermediaStream!.getVideoTracks(), !vidShouldBeMuted);
     }
@@ -2302,11 +2335,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             const userId = this.invitee || this.getOpponentMember()!.userId;
             if (this.client.getUseE2eForGroupCall()) {
+                if (!this.opponentDeviceInfo) {
+                    logger.warn(`Call ${this.callId} sendVoipEvent() failed: we do not have opponentDeviceInfo`);
+                    return;
+                }
+
                 await this.client.encryptAndSendToDevices(
                     [
                         {
                             userId,
-                            deviceInfo: this.opponentDeviceInfo!,
+                            deviceInfo: this.opponentDeviceInfo,
                         },
                     ],
                     {
@@ -2476,6 +2514,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
             this.callLengthInterval = undefined;
+        }
+        if (this.stopVideoTrackTimer !== undefined) {
+            clearTimeout(this.stopVideoTrackTimer);
+            this.stopVideoTrackTimer = undefined;
         }
 
         for (const [stream, listener] of this.removeTrackListeners) {

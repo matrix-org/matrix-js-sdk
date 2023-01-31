@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk";
+import { M_POLL_START, Optional } from "matrix-events-sdk";
 
 import {
     EventTimelineSet,
@@ -65,6 +65,7 @@ import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
 import { Feature, ServerSupport } from "../feature";
+import { Poll, PollEvent } from "./poll";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -162,7 +163,8 @@ export type RoomEmittedEvents =
     | BeaconEvent.New
     | BeaconEvent.Update
     | BeaconEvent.Destroy
-    | BeaconEvent.LivenessChange;
+    | BeaconEvent.LivenessChange
+    | PollEvent.New;
 
 export type RoomEventHandlerMap = {
     /**
@@ -289,6 +291,11 @@ export type RoomEventHandlerMap = {
     [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
+    /**
+     * Fires when a new poll instance is added to the room state
+     * @param poll - the new poll
+     */
+    [PollEvent.New]: (poll: Poll) => void;
 } & Pick<ThreadHandlerMap, ThreadEvent.Update | ThreadEvent.NewReply | ThreadEvent.Delete> &
     EventTimelineSetHandlerMap &
     Pick<MatrixEventHandlerMap, MatrixEventEvent.BeforeRedaction> &
@@ -317,6 +324,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     private unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
+    public readonly polls: Map<string, Poll> = new Map<string, Poll>();
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
@@ -375,7 +383,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly relations = new RelationsContainer(this.client, this);
 
     /**
-     * @experimental
+     * A collection of events known by the client
+     * This is not a comprehensive list of the threads that exist in this room
      */
     private threads = new Map<string, Thread>();
     public lastThread?: Thread;
@@ -475,7 +484,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return this.threadTimelineSetsPromise;
         }
 
-        if (this.client?.supportsExperimentalThreads()) {
+        if (this.client?.supportsThreads()) {
             try {
                 this.threadTimelineSetsPromise = Promise.all([
                     this.createThreadTimelineSet(),
@@ -1322,7 +1331,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Get one of the notification counts for a thread
      * @param threadId - the root event ID
      * @param type - The type of notification count to get. default: 'total'
@@ -1334,7 +1342,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Checks if the current room has unread thread notifications
      * @returns
      */
@@ -1348,7 +1355,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Swet one of the notification count for a thread
      * @param threadId - the root event ID
      * @param type - The type of notification count to get. default: 'total'
@@ -1369,7 +1375,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * @returns the notification count type for all the threads in the room
      */
     public get threadsAggregateNotificationType(): NotificationCountType | null {
@@ -1385,7 +1390,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Resets the thread notifications for this room
      */
     public resetThreadUnreadNotificationCount(notificationsToKeep?: string[]): void {
@@ -1545,14 +1549,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
+     * Get the instance of the thread associated with the current event
+     * @param eventId - the ID of the current event
+     * @returns a thread instance if known
      */
     public getThread(eventId: string): Thread | null {
         return this.threads.get(eventId) ?? null;
     }
 
     /**
-     * @experimental
+     * Get all the known threads in the room
      */
     public getThreads(): Thread[] {
         return Array.from(this.threads.values());
@@ -1819,7 +1825,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Without server support that means fetching as much at once as the server allows us to.
      */
     public async fetchRoomThreads(): Promise<void> {
-        if (this.threadsReady || !this.client.supportsExperimentalThreads()) {
+        if (this.threadsReady || !this.client.supportsThreads()) {
             return;
         }
 
@@ -1888,6 +1894,38 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.on(ThreadEvent.NewReply, this.onThreadNewReply);
         this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
+    }
+
+    public async processPollEvents(events: MatrixEvent[]): Promise<void> {
+        const processPollStartEvent = (event: MatrixEvent): void => {
+            if (!M_POLL_START.matches(event.getType())) return;
+            try {
+                const poll = new Poll(event, this.client);
+                this.polls.set(event.getId()!, poll);
+                this.emit(PollEvent.New, poll);
+            } catch {}
+            // poll creation can fail for malformed poll start events
+        };
+
+        const processPollRelationEvent = (event: MatrixEvent): void => {
+            const relationEventId = event.relationEventId;
+            if (relationEventId && this.polls.has(relationEventId)) {
+                const poll = this.polls.get(relationEventId);
+                poll?.onNewRelation(event);
+            }
+        };
+
+        const processPollEvent = (event: MatrixEvent): void => {
+            processPollStartEvent(event);
+            processPollRelationEvent(event);
+        };
+
+        for (const event of events) {
+            try {
+                await this.client.decryptEventIfNeeded(event);
+                processPollEvent(event);
+            } catch {}
+        }
     }
 
     /**
@@ -1964,7 +2002,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (!this.client?.supportsExperimentalThreads()) {
+        if (!this.client?.supportsThreads()) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2033,7 +2071,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Adds events to a thread's timeline. Will fire "Thread.update"
-     * @experimental
      */
     public processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(this.applyRedaction);
@@ -2662,7 +2699,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
-        if (this.client.supportsExperimentalThreads()) {
+        if (this.client.supportsThreads()) {
             const threadRoots = this.findThreadRoots(events);
             return events.reduce(
                 (memo, event: MatrixEvent) => {
@@ -2991,13 +3028,30 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @returns the ID of the room that was this room's predecessor, or null if
-     *          this room has no predecessor.
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     * m.room.predecessor state event and use it if found (MSC3946).
+     * @returns null if this room has no predecessor. Otherwise, returns
+     * the roomId and last eventId of the predecessor room.
+     * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
+     * as well as m.room.create events to find predecessors.
+     * Note: if an m.predecessor event is used, eventId is null since those
+     * events do not include an event_id property.
      */
-    public findPredecessorRoomId(): string | null {
+    public findPredecessor(
+        msc3946ProcessDynamicPredecessor = false,
+    ): { roomId: string; eventId: string | null } | null {
         const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!currentState) {
             return null;
+        }
+        if (msc3946ProcessDynamicPredecessor) {
+            const predecessorEvent = currentState.getStateEvents(EventType.RoomPredecessor, "");
+            if (predecessorEvent) {
+                const roomId = predecessorEvent.getContent()["predecessor_room_id"];
+                if (roomId) {
+                    return { roomId, eventId: null };
+                }
+            }
         }
 
         const createEvent = currentState.getStateEvents(EventType.RoomCreate, "");
@@ -3006,7 +3060,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             if (predecessor) {
                 const roomId = predecessor["room_id"];
                 if (roomId) {
-                    return roomId;
+                    const eventId = predecessor["event_id"] || null;
+                    return { roomId, eventId };
                 }
             }
         }

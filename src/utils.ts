@@ -1,6 +1,5 @@
 /*
-Copyright 2015, 2016 OpenMarket Ltd
-Copyright 2019 The Matrix.org Foundation C.I.C.
+Copyright 2015, 2016, 2019, 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -392,11 +391,20 @@ export function ensureNoTrailingSlash(url?: string): string | undefined {
     }
 }
 
-// Returns a promise which resolves with a given value after the given number of ms
+/**
+ * Returns a promise which resolves with a given value after the given number of ms
+ */
 export function sleep<T>(ms: number, value?: T): Promise<T> {
     return new Promise((resolve) => {
         setTimeout(resolve, ms, value);
     });
+}
+
+/**
+ * Promise/async version of {@link setImmediate}.
+ */
+export function immediate(): Promise<void> {
+    return new Promise(setImmediate);
 }
 
 export function isNullOrUndefined(val: any): boolean {
