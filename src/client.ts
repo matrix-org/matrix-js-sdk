@@ -7044,8 +7044,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const serverVersions = await this.serverVersionsPromise;
         this.canSupport = await buildFeatureSupportMap(serverVersions);
 
-        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(false);
-
         return this.serverVersionsPromise;
     }
 
