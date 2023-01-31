@@ -189,7 +189,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         /**
          * MSC3381
          * If a m.poll.end event is received from someone other than the poll creator or user with permission to redact
-         * other's messages in the room, the event must be ignored by clients due to being invalid.
+         * others' messages in the room, the event must be ignored by clients due to being invalid.
          */
         const roomCurrentState = this.room.currentState;
         const endEventSender = endEvent.getSender();
