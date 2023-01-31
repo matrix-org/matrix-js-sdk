@@ -209,7 +209,6 @@ import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
@@ -4840,8 +4839,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        const supportsThreadRR = this.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported;
-        if (supportsThreadRR && !unthreaded) {
+        if (!unthreaded) {
             const isThread = !!event.threadRootId;
             body = {
                 ...body,
@@ -7044,10 +7042,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const serverVersions = await this.serverVersionsPromise;
         this.canSupport = await buildFeatureSupportMap(serverVersions);
-
-        // We can set flag values to use their stable or unstable version
-        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
-        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
 
         return this.serverVersionsPromise;
     }
