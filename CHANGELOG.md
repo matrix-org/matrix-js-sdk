@@ -1,5 +1,5 @@
-Changes in [23.2.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.2.0-rc.1) (2023-01-24)
-============================================================================================================
+Changes in [23.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.2.0) (2023-01-31)
+==================================================================================================
 
 ## ✨ Features
  * Implement decryption via the rust sdk ([\#3074](https://github.com/matrix-org/matrix-js-sdk/pull/3074)).
