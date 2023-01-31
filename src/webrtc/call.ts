@@ -676,6 +676,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private async initOpponentCrypto(): Promise<void> {
         if (!this.opponentDeviceId) return;
         if (!this.client.getUseE2eForGroupCall()) return;
+        // We (currently) don't speak e2e with foci. It's debateable whether there would be
+        // any benefit in doing so.
+        if (this.isFocus) return;
         // It's possible to want E2EE and yet not have the means to manage E2EE
         // ourselves (for example if the client is a RoomWidgetClient)
         if (!this.client.isCryptoEnabled()) {
