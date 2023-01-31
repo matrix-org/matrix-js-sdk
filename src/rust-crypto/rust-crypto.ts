@@ -77,6 +77,15 @@ export class RustCrypto implements CryptoBackend {
     }
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
+        const roomId = event.getRoomId();
+        if (!roomId) {
+            // presumably, a to-device message. These are normally decrypted in preprocessToDeviceMessages
+            // so the fact it has come back here suggests that decryption failed.
+            //
+            // once we drop support for the libolm crypto implementation, we can stop passing to-device messages
+            // through decryptEvent and hence get rid of this case.
+            throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
+        }
         const res = (await this.olmMachine.decryptRoomEvent(
             JSON.stringify({
                 event_id: event.getId(),
