@@ -38,6 +38,7 @@ describe("Poll", () => {
     const basePollStartEvent = new MatrixEvent({
         ...PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
         room_id: roomId,
+        sender: userId,
     });
     basePollStartEvent.event.event_id = "$12345";
 
@@ -155,7 +156,7 @@ describe("Poll", () => {
                 expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
             });
 
-            it("does not set poll end event when sent by invalid user", async () => {
+            it("does not set poll end event when sent by a user without redaction rights", async () => {
                 const poll = new Poll(basePollStartEvent, mockClient, room);
                 maySendRedactionForEventSpy.mockReturnValue(false);
                 jest.spyOn(poll, "emit");
@@ -164,6 +165,21 @@ describe("Poll", () => {
                 expect(maySendRedactionForEventSpy).toHaveBeenCalledWith(basePollStartEvent, "@bob@server.org");
                 expect(poll.isEnded).toBe(false);
                 expect(poll.emit).not.toHaveBeenCalledWith(PollEvent.End);
+            });
+
+            it("sets poll end event when current user created the poll, but does not have redaction rights", async () => {
+                const poll = new Poll(basePollStartEvent, mockClient, room);
+                const pollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: userId });
+                mockClient.relations.mockResolvedValue({
+                    events: [pollEndEvent],
+                });
+                maySendRedactionForEventSpy.mockReturnValue(false);
+                jest.spyOn(poll, "emit");
+                await poll.getResponses();
+
+                expect(maySendRedactionForEventSpy).not.toHaveBeenCalled();
+                expect(poll.isEnded).toBe(true);
+                expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
             });
 
             it("sets poll end event with unstable event type", async () => {
