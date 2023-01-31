@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -590,7 +590,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should handle thread replies with server support by fetching a contiguous thread timeline", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             await client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -647,7 +647,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -680,7 +680,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -709,7 +709,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return undefined when event is within a thread but timelineSet is not", () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -1127,7 +1127,7 @@ describe("MatrixClient event timelines", function () {
         };
 
         // @ts-ignore
-        client.clientOpts.experimentalThreadSupport = true;
+        client.clientOpts.threadSupport = true;
         Thread.setServerSideSupport(FeatureSupport.Stable);
         Thread.setServerSideListSupport(FeatureSupport.Stable);
         Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1263,7 +1263,7 @@ describe("MatrixClient event timelines", function () {
         describe("with server compatibility", function () {
             beforeEach(() => {
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Stable);
                 Thread.setServerSideListSupport(FeatureSupport.Stable);
                 Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1421,7 +1421,7 @@ describe("MatrixClient event timelines", function () {
                 };
 
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Stable);
                 Thread.setServerSideListSupport(FeatureSupport.Stable);
                 Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1473,7 +1473,7 @@ describe("MatrixClient event timelines", function () {
         describe("without server compatibility", function () {
             beforeEach(() => {
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Experimental);
                 Thread.setServerSideListSupport(FeatureSupport.None);
             });
@@ -1539,7 +1539,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should add lazy loading filter", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
             // @ts-ignore
@@ -1567,7 +1567,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should correctly pass pagination token", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
 
@@ -1892,7 +1892,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in stable mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1902,7 +1902,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in backwards compatible unstable mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Experimental);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.Experimental);
@@ -1912,7 +1912,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in backwards compatible mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.None);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.None);

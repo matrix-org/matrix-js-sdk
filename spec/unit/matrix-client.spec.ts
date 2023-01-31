@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,7 +17,7 @@ limitations under the License.
 import { mocked } from "jest-mock";
 
 import { logger } from "../../src/logger";
-import { ClientEvent, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
+import { ClientEvent, IMatrixClientCreateOpts, ITurnServerResponse, MatrixClient, Store } from "../../src/client";
 import { Filter } from "../../src/filter";
 import { DEFAULT_TREE_POWER_LEVELS_TEMPLATE } from "../../src/models/MSC3089TreeSpace";
 import {
@@ -276,7 +276,7 @@ describe("MatrixClient", function () {
         );
     }
 
-    function makeClient() {
+    function makeClient(opts?: Partial<IMatrixClientCreateOpts>) {
         client = new MatrixClient({
             baseUrl: "https://my.home.server",
             idBaseUrl: identityServerUrl,
@@ -285,6 +285,7 @@ describe("MatrixClient", function () {
             store: store,
             scheduler: scheduler,
             userId: userId,
+            ...(opts || {}),
         });
         // FIXME: We shouldn't be yanking http like this.
         client.http = (["authedRequest", "getContentUri", "request", "uploadContent"] as const).reduce((r, k) => {
@@ -1456,9 +1457,20 @@ describe("MatrixClient", function () {
     });
 
     describe("threads", () => {
+        it.each([
+            { startOpts: {}, hasThreadSupport: false },
+            { startOpts: { threadSupport: true }, hasThreadSupport: true },
+            { startOpts: { threadSupport: false }, hasThreadSupport: false },
+            { startOpts: { experimentalThreadSupport: true }, hasThreadSupport: true },
+            { startOpts: { experimentalThreadSupport: true, threadSupport: false }, hasThreadSupport: false },
+        ])("enabled thread support for the SDK instance ", async ({ startOpts, hasThreadSupport }) => {
+            await client.startClient(startOpts);
+            expect(client.supportsThreads()).toBe(hasThreadSupport);
+        });
+
         it("partitions root events to room timeline and thread timeline", () => {
-            const supportsExperimentalThreads = client.supportsExperimentalThreads;
-            client.supportsExperimentalThreads = () => true;
+            const supportsThreads = client.supportsThreads;
+            client.supportsThreads = () => true;
             const room = new Room("!room1:matrix.org", client, userId);
 
             const rootEvent = new MatrixEvent({
@@ -1487,7 +1499,7 @@ describe("MatrixClient", function () {
             expect(threadEvents).toHaveLength(1);
 
             // Restore method
-            client.supportsExperimentalThreads = supportsExperimentalThreads;
+            client.supportsThreads = supportsThreads;
         });
     });
 
