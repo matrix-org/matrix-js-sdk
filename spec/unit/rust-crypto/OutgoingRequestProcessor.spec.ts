@@ -45,7 +45,6 @@ describe("OutgoingRequestProcessor", () => {
     function awaitCallToMarkAsSent(): Promise<void> {
         return new Promise((resolve, _reject) => {
             olmMachine.markRequestAsSent.mockImplementationOnce(async () => {
-                console.log("received call to markAsSent");
                 resolve(undefined);
             });
         });
@@ -70,47 +69,57 @@ describe("OutgoingRequestProcessor", () => {
     });
 
     /* simple requests that map directly to the request body */
-    const tests: Array<[any, "POST" | "PUT", string]> = [
-        [KeysUploadRequest, "POST", "https://example.com/_matrix/client/v3/keys/upload"],
-        [KeysQueryRequest, "POST", "https://example.com/_matrix/client/v3/keys/query"],
-        [KeysClaimRequest, "POST", "https://example.com/_matrix/client/v3/keys/claim"],
-        [SignatureUploadRequest, "POST", "https://example.com/_matrix/client/v3/keys/signatures/upload"],
-        [KeysBackupRequest, "PUT", "https://example.com/_matrix/client/v3/room_keys/keys"],
+    const tests: Array<[string, any, "POST" | "PUT", string]> = [
+        ["KeysUploadRequest", KeysUploadRequest, "POST", "https://example.com/_matrix/client/v3/keys/upload"],
+        ["KeysQueryRequest", KeysQueryRequest, "POST", "https://example.com/_matrix/client/v3/keys/query"],
+        ["KeysClaimRequest", KeysClaimRequest, "POST", "https://example.com/_matrix/client/v3/keys/claim"],
+        [
+            "SignatureUploadRequest",
+            SignatureUploadRequest,
+            "POST",
+            "https://example.com/_matrix/client/v3/keys/signatures/upload",
+        ],
+        ["KeysBackupRequest", KeysBackupRequest, "PUT", "https://example.com/_matrix/client/v3/room_keys/keys"],
     ];
 
-    for (const [RequestClass, expectedMethod, expectedPath] of tests) {
-        it(`should handle ${RequestClass.name}s`, async () => {
-            const testBody = '{ "foo": "bar" }';
-            const outgoingRequest = new RequestClass("1234", testBody);
+    test.each(tests)(`should handle %ss`, async (_, RequestClass, expectedMethod, expectedPath) => {
+        // first, mock up a request as we might expect to receive it from the Rust layer ...
+        const testBody = '{ "foo": "bar" }';
+        const outgoingRequest = new RequestClass("1234", testBody);
 
-            const reqProm = processor.makeOutgoingRequest(outgoingRequest);
+        // ... then poke it into the OutgoingRequestProcessor under test.
+        const reqProm = processor.makeOutgoingRequest(outgoingRequest);
 
-            const testResponse = '{ "result": 1 }';
-            httpBackend
-                .when(expectedMethod, "/_matrix")
-                .check((req) => {
-                    expect(req.path).toEqual(expectedPath);
-                    expect(req.rawData).toEqual(testBody);
-                    expect(req.headers["Accept"]).toEqual("application/json");
-                    expect(req.headers["Content-Type"]).toEqual("application/json");
-                })
-                .respond(200, testResponse, true);
+        // Now: check that it makes a matching HTTP request ...
+        const testResponse = '{ "result": 1 }';
+        httpBackend
+            .when(expectedMethod, "/_matrix")
+            .check((req) => {
+                expect(req.path).toEqual(expectedPath);
+                expect(req.rawData).toEqual(testBody);
+                expect(req.headers["Accept"]).toEqual("application/json");
+                expect(req.headers["Content-Type"]).toEqual("application/json");
+            })
+            .respond(200, testResponse, true);
 
-            const markSentCallPromise = awaitCallToMarkAsSent();
-            await httpBackend.flushAllExpected();
+        // ... and that it calls OlmMachine.markAsSent.
+        const markSentCallPromise = awaitCallToMarkAsSent();
+        await httpBackend.flushAllExpected();
 
-            await Promise.all([reqProm, markSentCallPromise]);
-            expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("1234", outgoingRequest.type, testResponse);
-            httpBackend.verifyNoOutstandingRequests();
-        });
-    }
+        await Promise.all([reqProm, markSentCallPromise]);
+        expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("1234", outgoingRequest.type, testResponse);
+        httpBackend.verifyNoOutstandingRequests();
+    });
 
     it("should handle ToDeviceRequests", async () => {
+        // first, mock up the ToDeviceRequest as we might expect to receive it from the Rust layer ...
         const testBody = '{ "foo": "bar" }';
         const outgoingRequest = new ToDeviceRequest("1234", "test/type", "test/txnid", testBody);
 
+        // ... then poke it into the OutgoingRequestProcessor under test.
         const reqProm = processor.makeOutgoingRequest(outgoingRequest);
 
+        // Now: check that it makes a matching HTTP request ...
         const testResponse = '{ "result": 1 }';
         httpBackend
             .when("PUT", "/_matrix")
@@ -122,6 +131,7 @@ describe("OutgoingRequestProcessor", () => {
             })
             .respond(200, testResponse, true);
 
+        // ... and that it calls OlmMachine.markAsSent.
         const markSentCallPromise = awaitCallToMarkAsSent();
         await httpBackend.flushAllExpected();
 
@@ -131,11 +141,14 @@ describe("OutgoingRequestProcessor", () => {
     });
 
     it("should handle RoomMessageRequests", async () => {
+        // first, mock up the RoomMessageRequest as we might expect to receive it from the Rust layer ...
         const testBody = '{ "foo": "bar" }';
         const outgoingRequest = new RoomMessageRequest("1234", "test/room", "test/txnid", "test/type", testBody);
 
+        // ... then poke it into the OutgoingRequestProcessor under test.
         const reqProm = processor.makeOutgoingRequest(outgoingRequest);
 
+        // Now: check that it makes a matching HTTP request ...
         const testResponse = '{ "result": 1 }';
         httpBackend
             .when("PUT", "/_matrix")
@@ -149,6 +162,7 @@ describe("OutgoingRequestProcessor", () => {
             })
             .respond(200, testResponse, true);
 
+        // ... and that it calls OlmMachine.markAsSent.
         const markSentCallPromise = awaitCallToMarkAsSent();
         await httpBackend.flushAllExpected();
 
