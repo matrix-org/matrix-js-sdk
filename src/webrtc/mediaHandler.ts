@@ -23,17 +23,19 @@ import { logger } from "../logger";
 import { MatrixClient } from "../client";
 
 const isWebkit = (): boolean => Boolean(navigator.webkitGetUserMedia);
+// Chrome will give it only if we ask exactly, FF refuses entirely if we ask
+// exactly, so have to ask for ideal instead XXX: Is this still true?
 const getIdealOrExact = (value: number): ConstrainULong => (isWebkit() ? { exact: value } : { ideal: value });
+const getIdealAndMax = (value: number): ConstrainULong => ({ ideal: value, max: value });
 const getDimensionConstraints = (
+    func: (value: number) => ConstrainULong,
     width: number,
     height: number,
     framerate: number,
 ): Pick<MediaTrackConstraintSet, "width" | "height" | "frameRate"> => ({
-    // Chrome will give it only if we ask exactly, FF refuses entirely if we ask
-    // exactly, so have to ask for ideal instead XXX: Is this still true?
-    width: getIdealOrExact(width),
-    height: getIdealOrExact(height),
-    frameRate: getIdealOrExact(framerate),
+    width: func(width),
+    height: func(height),
+    frameRate: func(framerate),
 });
 
 export enum MediaHandlerEvent {
@@ -424,7 +426,7 @@ export class MediaHandler extends TypedEventEmitter<
                 : false,
             video: video
                 ? {
-                      ...getDimensionConstraints(1280, 720, 30),
+                      ...getDimensionConstraints(getIdealOrExact, 1280, 720, 30),
                       deviceId: this.videoInput ? { ideal: this.videoInput } : undefined,
                   }
                 : false,
@@ -442,7 +444,7 @@ export class MediaHandler extends TypedEventEmitter<
         return {
             audio: audio ?? false,
             video: {
-                ...getDimensionConstraints(1920, 1080, 30),
+                ...getDimensionConstraints(getIdealAndMax, 1920, 1080, 30),
                 mandatory: desktopCapturerSourceId
                     ? {
                           chromeMediaSource: "desktop",
