@@ -25,6 +25,7 @@ import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
+import { KeyClaimManager } from "./KeyClaimManager";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -39,6 +40,7 @@ export class RustCrypto implements CryptoBackend {
     /** whether {@link outgoingRequestLoop} is currently running */
     private outgoingRequestLoopRunning = false;
 
+    private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
 
     public constructor(
@@ -48,6 +50,7 @@ export class RustCrypto implements CryptoBackend {
         _deviceId: string,
     ) {
         this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
+        this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
     }
 
     public stop(): void {
@@ -57,6 +60,8 @@ export class RustCrypto implements CryptoBackend {
             return;
         }
         this.stopped = true;
+
+        this.keyClaimManager.stop();
 
         // make sure we close() the OlmMachine; doing so means that all the Rust objects will be
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
