@@ -195,7 +195,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         const endEventSender = endEvent.getSender();
         return (
             !!endEventSender &&
-            (endEventSender === this.matrixClient.getSafeUserId() ||
+            (endEventSender === this.rootEvent.getSender() ||
                 roomCurrentState.maySendRedactionForEvent(this.rootEvent, endEventSender))
         );
     }

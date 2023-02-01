@@ -167,9 +167,15 @@ describe("Poll", () => {
                 expect(poll.emit).not.toHaveBeenCalledWith(PollEvent.End);
             });
 
-            it("sets poll end event when current user created the poll, but does not have redaction rights", async () => {
-                const poll = new Poll(basePollStartEvent, mockClient, room);
-                const pollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: userId });
+            it("sets poll end event when endevent sender also created the poll, but does not have redaction rights", async () => {
+                const pollStartEvent = new MatrixEvent({
+                    ...PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
+                    room_id: roomId,
+                    sender: "@bob:domain.org",
+                });
+                pollStartEvent.event.event_id = "$6789";
+                const poll = new Poll(pollStartEvent, mockClient, room);
+                const pollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: "@bob:domain.org" });
                 mockClient.relations.mockResolvedValue({
                     events: [pollEndEvent],
                 });
