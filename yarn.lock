@@ -1398,7 +1398,7 @@
   dependencies:
     lodash "^4.17.21"
 
-"@matrix-org/matrix-sdk-crypto-js@^0.1.0-alpha.2":
+"@matrix-org/matrix-sdk-crypto-js@^0.1.0-alpha.3":
   version "0.1.0-alpha.3"
   resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-js/-/matrix-sdk-crypto-js-0.1.0-alpha.3.tgz#829ea03bcad8051dc1e4f0da18a66d4ba273f78f"
   integrity sha512-KpEddjC34aobFlUYf2mIaXqkjLC0goRmYnbDZLTd0MwiFtau4b1TrPptQ8XFc90Z2VeAcvf18CBqA2otmZzUKQ==

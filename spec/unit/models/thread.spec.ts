@@ -84,7 +84,7 @@ describe("Thread", () => {
                 ...mockClientMethodsUser(),
                 getRoom: jest.fn().mockImplementation(() => room),
                 decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
-                supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+                supportsThreads: jest.fn().mockReturnValue(true),
             });
             client.reEmitter = mock(ReEmitter, "ReEmitter");
             client.canSupport = new Map();
@@ -195,7 +195,7 @@ describe("Thread", () => {
                 ...mockClientMethodsUser(),
                 getRoom: jest.fn().mockImplementation(() => room),
                 decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
-                supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+                supportsThreads: jest.fn().mockReturnValue(true),
             });
             client.reEmitter = mock(ReEmitter, "ReEmitter");
             client.canSupport = new Map();

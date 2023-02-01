@@ -1,5 +1,5 @@
 /*
-Copyright 2015-2022 The Matrix.org Foundation C.I.C.
+Copyright 2015-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -209,7 +209,6 @@ import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
@@ -446,9 +445,15 @@ export interface IStartClientOpts {
     clientWellKnownPollPeriod?: number;
 
     /**
-     * @experimental
+     * @deprecated use `threadSupport` instead
      */
     experimentalThreadSupport?: boolean;
+
+    /**
+     * Will organises events in threaded conversations when
+     * a thread relation is encountered
+     */
+    threadSupport?: boolean;
 
     /**
      * @experimental
@@ -1446,6 +1451,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             );
         } else {
             this.syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
+        }
+
+        if (this.clientOpts.hasOwnProperty("experimentalThreadSupport")) {
+            logger.warn("`experimentalThreadSupport` has been deprecated, use `threadSupport` instead");
+        }
+
+        // If `threadSupport` is omitted and the deprecated `experimentalThreadSupport` has been passed
+        // We should fallback to that value for backwards compatibility purposes
+        if (
+            !this.clientOpts.hasOwnProperty("threadSupport") &&
+            this.clientOpts.hasOwnProperty("experimentalThreadSupport")
+        ) {
+            this.clientOpts.threadSupport = this.clientOpts.experimentalThreadSupport;
         }
 
         this.syncApi.sync();
@@ -4821,8 +4839,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        const supportsThreadRR = this.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported;
-        if (supportsThreadRR && !unthreaded) {
+        if (!unthreaded) {
             const isThread = !!event.threadRootId;
             body = {
                 ...body,
@@ -5498,7 +5515,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return timelineSet.getTimelineForEvent(eventId);
         }
 
-        if (timelineSet.thread && this.supportsExperimentalThreads()) {
+        if (timelineSet.thread && this.supportsThreads()) {
             return this.getThreadTimeline(timelineSet, eventId);
         }
 
@@ -5565,7 +5582,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public async getThreadTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline | undefined> {
-        if (!this.supportsExperimentalThreads()) {
+        if (!this.supportsThreads()) {
             throw new Error("could not get thread timeline: no client support");
         }
 
@@ -7025,10 +7042,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const serverVersions = await this.serverVersionsPromise;
         this.canSupport = await buildFeatureSupportMap(serverVersions);
-
-        // We can set flag values to use their stable or unstable version
-        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
-        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
 
         return this.serverVersionsPromise;
     }
@@ -9337,10 +9350,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @experimental
+     * @deprecated use supportsThreads() instead
      */
     public supportsExperimentalThreads(): boolean {
+        logger.warn(`supportsExperimentalThreads() is deprecated, use supportThreads() instead`);
         return this.clientOpts?.experimentalThreadSupport || false;
+    }
+
+    /**
+     * A helper to determine thread support
+     * @returns a boolean to determine if threads are enabled
+     */
+    public supportsThreads(): boolean {
+        return this.clientOpts?.threadSupport || false;
     }
 
     /**
@@ -9357,14 +9379,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @experimental
+     * Processes a list of threaded events and adds them to their respective timelines
+     * @param room - the room the adds the threaded events
+     * @param threadedEvents - an array of the threaded events
+     * @param toStartOfTimeline - the direction in which we want to add the events
      */
     public processThreadEvents(room: Room, threadedEvents: MatrixEvent[], toStartOfTimeline: boolean): void {
         room.processThreadedEvents(threadedEvents, toStartOfTimeline);
     }
 
     /**
-     * @experimental
+     * Processes a list of thread roots and creates a thread model
+     * @param room - the room to create the threads in
+     * @param threadedEvents - an array of thread roots
+     * @param toStartOfTimeline - the direction
      */
     public processThreadRoots(room: Room, threadedEvents: MatrixEvent[], toStartOfTimeline: boolean): void {
         room.processThreadRoots(threadedEvents, toStartOfTimeline);

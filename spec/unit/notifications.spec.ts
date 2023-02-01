@@ -56,7 +56,7 @@ describe("fixNotificationCountOnDecryption", () => {
             getPushActionsForEvent: jest.fn().mockReturnValue(mkPushAction(true, true)),
             getRoom: jest.fn().mockImplementation(() => room),
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
-            supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+            supportsThreads: jest.fn().mockReturnValue(true),
         });
         mockClient.reEmitter = mock(ReEmitter, "ReEmitter");
         mockClient.canSupport = new Map();

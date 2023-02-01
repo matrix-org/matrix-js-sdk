@@ -18,7 +18,6 @@ import MockHttpBackend from "matrix-mock-request";
 
 import { MAIN_ROOM_TIMELINE, ReceiptType } from "../../src/@types/read_receipts";
 import { MatrixClient } from "../../src/client";
-import { Feature, ServerSupport } from "../../src/feature";
 import { EventType } from "../../src/matrix";
 import { synthesizeReceipt } from "../../src/models/read-receipt";
 import { encodeUri } from "../../src/utils";
@@ -70,10 +69,6 @@ const roomEvent = utils.mkEvent({
     },
 });
 
-function mockServerSideSupport(client: MatrixClient, serverSideSupport: ServerSupport) {
-    client.canSupport.set(Feature.ThreadUnreadNotifications, serverSideSupport);
-}
-
 describe("Read receipt", () => {
     beforeEach(() => {
         httpBackend = new MockHttpBackend();
@@ -101,7 +96,6 @@ describe("Read receipt", () => {
                 })
                 .respond(200, {});
 
-            mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReceipt(threadEvent, ReceiptType.Read, {});
 
             await httpBackend.flushAllExpected();
@@ -123,7 +117,6 @@ describe("Read receipt", () => {
                 })
                 .respond(200, {});
 
-            mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReadReceipt(threadEvent, ReceiptType.Read, true);
 
             await httpBackend.flushAllExpected();
@@ -145,52 +138,7 @@ describe("Read receipt", () => {
                 })
                 .respond(200, {});
 
-            mockServerSideSupport(client, ServerSupport.Stable);
             client.sendReceipt(roomEvent, ReceiptType.Read, {});
-
-            await httpBackend.flushAllExpected();
-            await flushPromises();
-        });
-
-        it("sends a room read receipt when there's no server support", async () => {
-            httpBackend
-                .when(
-                    "POST",
-                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                        $roomId: ROOM_ID,
-                        $receiptType: ReceiptType.Read,
-                        $eventId: threadEvent.getId()!,
-                    }),
-                )
-                .check((request) => {
-                    expect(request.data.thread_id).toBeUndefined();
-                })
-                .respond(200, {});
-
-            mockServerSideSupport(client, ServerSupport.Unsupported);
-            client.sendReceipt(threadEvent, ReceiptType.Read, {});
-
-            await httpBackend.flushAllExpected();
-            await flushPromises();
-        });
-
-        it("sends a valid room read receipt even when body omitted", async () => {
-            httpBackend
-                .when(
-                    "POST",
-                    encodeUri("/rooms/$roomId/receipt/$receiptType/$eventId", {
-                        $roomId: ROOM_ID,
-                        $receiptType: ReceiptType.Read,
-                        $eventId: threadEvent.getId()!,
-                    }),
-                )
-                .check((request) => {
-                    expect(request.data).toEqual({});
-                })
-                .respond(200, {});
-
-            mockServerSideSupport(client, ServerSupport.Unsupported);
-            client.sendReceipt(threadEvent, ReceiptType.Read, undefined);
 
             await httpBackend.flushAllExpected();
             await flushPromises();

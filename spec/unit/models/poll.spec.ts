@@ -207,20 +207,15 @@ describe("Poll", () => {
                 expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
             });
 
-            it("does not set poll end event when sent by a user without redaction rights", async () => {
-                const poll = new Poll(basePollStartEvent, mockClient, room);
-                maySendRedactionForEventSpy.mockReturnValue(false);
-                jest.spyOn(poll, "emit");
-                await poll.getResponses();
-
-                expect(maySendRedactionForEventSpy).toHaveBeenCalledWith(basePollStartEvent, "@bob@server.org");
-                expect(poll.isEnded).toBe(false);
-                expect(poll.emit).not.toHaveBeenCalledWith(PollEvent.End);
-            });
-
-            it("sets poll end event when current user created the poll, but does not have redaction rights", async () => {
-                const poll = new Poll(basePollStartEvent, mockClient, room);
-                const pollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: userId });
+            it("sets poll end event when endevent sender also created the poll, but does not have redaction rights", async () => {
+                const pollStartEvent = new MatrixEvent({
+                    ...PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
+                    room_id: roomId,
+                    sender: "@bob:domain.org",
+                });
+                pollStartEvent.event.event_id = "$6789";
+                const poll = new Poll(pollStartEvent, mockClient, room);
+                const pollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: "@bob:domain.org" });
                 mockClient.relations.mockResolvedValue({
                     events: [pollEndEvent],
                 });
@@ -276,6 +271,89 @@ describe("Poll", () => {
             poll.onNewRelation(stablePollEndEvent);
 
             expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
+        });
+
+        it("does not set poll end event when sent by invalid user", async () => {
+            maySendRedactionForEventSpy.mockReturnValue(false);
+            const stablePollEndEvent = makeRelatedEvent({ type: M_POLL_END.stable!, sender: "@charlie:server.org" });
+            const responseEventAfterEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now + 1000);
+            mockClient.relations.mockResolvedValue({
+                events: [responseEventAfterEnd],
+            });
+            const poll = new Poll(basePollStartEvent, mockClient, room);
+            await poll.getResponses();
+            jest.spyOn(poll, "emit");
+
+            poll.onNewRelation(stablePollEndEvent);
+
+            // didn't end, didn't refilter responses
+            expect(poll.emit).not.toHaveBeenCalled();
+            expect(poll.isEnded).toBeFalsy();
+            expect(maySendRedactionForEventSpy).toHaveBeenCalledWith(basePollStartEvent, "@charlie:server.org");
+        });
+
+        it("does not set poll end event when an earlier end event already exists", async () => {
+            const earlierPollEndEvent = makeRelatedEvent(
+                { type: M_POLL_END.stable!, sender: "@valid:server.org" },
+                now,
+            );
+            const laterPollEndEvent = makeRelatedEvent(
+                { type: M_POLL_END.stable!, sender: "@valid:server.org" },
+                now + 2000,
+            );
+
+            const poll = new Poll(basePollStartEvent, mockClient, room);
+            await poll.getResponses();
+
+            poll.onNewRelation(earlierPollEndEvent);
+
+            // first end event set correctly
+            expect(poll.isEnded).toBeTruthy();
+
+            // reset spy count
+            jest.spyOn(poll, "emit").mockClear();
+
+            poll.onNewRelation(laterPollEndEvent);
+            // didn't set new end event, didn't refilter responses
+            expect(poll.emit).not.toHaveBeenCalled();
+            expect(poll.isEnded).toBeTruthy();
+        });
+
+        it("replaces poll end event and refilters when an older end event already exists", async () => {
+            const earlierPollEndEvent = makeRelatedEvent(
+                { type: M_POLL_END.stable!, sender: "@valid:server.org" },
+                now,
+            );
+            const laterPollEndEvent = makeRelatedEvent(
+                { type: M_POLL_END.stable!, sender: "@valid:server.org" },
+                now + 2000,
+            );
+            const responseEventBeforeEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now - 1000);
+            const responseEventAtEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now);
+            const responseEventAfterEnd = makeRelatedEvent({ type: M_POLL_RESPONSE.name }, now + 1000);
+            mockClient.relations.mockResolvedValue({
+                events: [responseEventAfterEnd, responseEventAtEnd, responseEventBeforeEnd, laterPollEndEvent],
+            });
+
+            const poll = new Poll(basePollStartEvent, mockClient, room);
+            const responses = await poll.getResponses();
+
+            // all responses have a timestamp < laterPollEndEvent
+            expect(responses.getRelations().length).toEqual(3);
+            // first end event set correctly
+            expect(poll.isEnded).toBeTruthy();
+
+            // reset spy count
+            jest.spyOn(poll, "emit").mockClear();
+
+            // add a valid end event with earlier timestamp
+            poll.onNewRelation(earlierPollEndEvent);
+
+            // emitted new end event
+            expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
+            // filtered responses and emitted
+            expect(poll.emit).toHaveBeenCalledWith(PollEvent.Responses, responses);
+            expect(responses.getRelations()).toEqual([responseEventAtEnd, responseEventBeforeEnd]);
         });
 
         it("does not set poll end event when sent by invalid user", async () => {
