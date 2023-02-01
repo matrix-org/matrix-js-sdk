@@ -3340,11 +3340,18 @@ describe("Room", function () {
             });
         }
 
-        function predecessorEvent(newRoomId: string, predecessorRoomId: string): MatrixEvent {
+        function predecessorEvent(
+            newRoomId: string,
+            predecessorRoomId: string,
+            tombstoneEventId: string | null = null,
+        ): MatrixEvent {
+            const content =
+                tombstoneEventId === null
+                    ? { predecessor_room_id: predecessorRoomId }
+                    : { predecessor_room_id: predecessorRoomId, last_known_event_id: tombstoneEventId };
+
             return new MatrixEvent({
-                content: {
-                    predecessor_room_id: predecessorRoomId,
-                },
+                content,
                 event_id: `predecessor_event_id_pred_${predecessorRoomId}`,
                 origin_server_ts: 1432735824653,
                 room_id: newRoomId,
@@ -3380,7 +3387,20 @@ describe("Room", function () {
             const useMsc3946 = true;
             expect(room.findPredecessor(useMsc3946)).toEqual({
                 roomId: "otherreplacedroomid",
-                eventId: null, // m.predecessor does not include an event_id
+                eventId: null, // m.predecessor did not include an event_id
+            });
+        });
+
+        it("uses the m.predecessor event ID if provided", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([
+                roomCreateEvent("roomid", "replacedroomid"),
+                predecessorEvent("roomid", "otherreplacedroomid", "lstevtid"),
+            ]);
+            const useMsc3946 = true;
+            expect(room.findPredecessor(useMsc3946)).toEqual({
+                roomId: "otherreplacedroomid",
+                eventId: "lstevtid",
             });
         });
 
@@ -3399,7 +3419,7 @@ describe("Room", function () {
             const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([
                 roomCreateEvent("roomid", null), // Create event has no predecessor
-                predecessorEvent("roomid", "otherreplacedroomid"),
+                predecessorEvent("roomid", "otherreplacedroomid", "lastevtid"),
             ]);
             // Don't provide an argument for msc3946ProcessDynamicPredecessor -
             // we should ignore the predecessor event.

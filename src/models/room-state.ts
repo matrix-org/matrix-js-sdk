@@ -986,8 +986,12 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const predecessorEvent = this.getStateEvents(EventType.RoomPredecessor, "");
             if (predecessorEvent) {
                 const roomId = predecessorEvent.getContent()["predecessor_room_id"];
+                let eventId = predecessorEvent.getContent()["last_known_event_id"];
+                if (typeof eventId !== "string") {
+                    eventId = null;
+                }
                 if (typeof roomId === "string") {
-                    return { roomId, eventId: null };
+                    return { roomId, eventId };
                 }
             }
         }
