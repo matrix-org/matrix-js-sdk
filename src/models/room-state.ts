@@ -964,6 +964,55 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         return guestAccessContent["guest_access"] || GuestAccess.Forbidden;
     }
 
+    /**
+     * Find the predecessor room based on this room state.
+     *
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     * m.room.predecessor state event and use it if found (MSC3946).
+     * @returns null if this room has no predecessor. Otherwise, returns
+     * the roomId and last eventId of the predecessor room.
+     * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
+     * as well as m.room.create events to find predecessors.
+     * Note: if an m.predecessor event is used, eventId is null since those
+     * events do not include an event_id property.
+     */
+    public findPredecessor(
+        msc3946ProcessDynamicPredecessor = false,
+    ): { roomId: string; eventId: string | null } | null {
+        // Note: the tests for this function are against Room.findPredecessor,
+        // which just calls through to here.
+
+        if (msc3946ProcessDynamicPredecessor) {
+            const predecessorEvent = this.getStateEvents(EventType.RoomPredecessor, "");
+            if (predecessorEvent) {
+                const roomId = predecessorEvent.getContent()["predecessor_room_id"];
+                let eventId = predecessorEvent.getContent()["last_known_event_id"];
+                if (typeof eventId !== "string") {
+                    eventId = null;
+                }
+                if (typeof roomId === "string") {
+                    return { roomId, eventId };
+                }
+            }
+        }
+
+        const createEvent = this.getStateEvents(EventType.RoomCreate, "");
+        if (createEvent) {
+            const predecessor = createEvent.getContent()["predecessor"];
+            if (predecessor) {
+                const roomId = predecessor["room_id"];
+                if (typeof roomId === "string") {
+                    let eventId = predecessor["event_id"];
+                    if (typeof eventId !== "string" || eventId === "") {
+                        eventId = null;
+                    }
+                    return { roomId, eventId };
+                }
+            }
+        }
+        return null;
+    }
+
     private updateThirdPartyTokenCache(memberEvent: MatrixEvent): void {
         if (!memberEvent.getContent().third_party_invite) {
             return;
