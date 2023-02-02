@@ -912,7 +912,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const sender = transceiver?.sender;
 
             let added = false;
-            if (sender) {
+            // XXX: We don't re-use transceivers with the SFU: this is to work around
+            // https://github.com/matrix-org/waterfall/issues/98 - see the bug for more.
+            if (sender && !this.isFocus) {
                 try {
                     // We already have a sender, so we re-use it. We try to
                     // re-use transceivers as much as possible because they
@@ -959,6 +961,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                         // (It's fine to specify the parameter on Firefox too,
                         // it just won't work.)
                         sendEncodings: this.isFocus ? encodings : undefined,
+                        direction: callFeed.purpose === SDPStreamMetadataPurpose.Usermedia ? "sendrecv" : "sendonly",
                     });
 
                     if (this.isFocus && isFirefox()) {
