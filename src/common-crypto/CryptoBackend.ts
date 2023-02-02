@@ -77,6 +77,26 @@ export interface CryptoBackend extends SyncCryptoCallbacks {
     checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel;
 
     /**
+     * Perform any background tasks that can be done before a message is ready to
+     * send, in order to speed up sending of the message.
+     *
+     * @param room - the room the event is in
+     */
+    prepareToEncrypt(room: Room): void;
+
+    /**
+     * Encrypt an event according to the configuration of the room.
+     *
+     * @param event -  event to be sent
+     *
+     * @param room - destination room.
+     *
+     * @returns Promise which resolves when the event has been
+     *     encrypted, or null if nothing was needed
+     */
+    encryptEvent(event: MatrixEvent, room: Room): Promise<void>;
+
+    /**
      * Decrypt a received event
      *
      * @returns a promise which resolves once we have finished decrypting.

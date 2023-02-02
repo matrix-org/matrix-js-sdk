@@ -1415,7 +1415,7 @@ describe("MatrixClient", function () {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
             };
-            client.crypto = {
+            client.crypto = client["cryptoBackend"] = {
                 // mock crypto
                 encryptEvent: () => new Promise(() => {}),
                 stop: jest.fn(),

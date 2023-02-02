@@ -2606,10 +2606,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param room - the room the event is in
      */
     public prepareToEncrypt(room: Room): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.prepareToEncrypt(room);
+        this.cryptoBackend.prepareToEncrypt(room);
     }
 
     /**
@@ -4394,7 +4394,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return null;
         }
 
-        if (!this.crypto && this.usingExternalCrypto) {
+        if (!this.cryptoBackend && this.usingExternalCrypto) {
             // The client has opted to allow sending messages to encrypted
             // rooms even if the room is encrypted, and we haven't setup
             // crypto. This is useful for users of matrix-org/pantalaimon
@@ -4415,13 +4415,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return null;
         }
 
-        if (!this.crypto) {
-            throw new Error(
-                "This room is configured to use encryption, but your client does " + "not support encryption.",
-            );
+        if (!this.cryptoBackend) {
+            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
         }
 
-        return this.crypto.encryptEvent(event, room);
+        return this.cryptoBackend.encryptEvent(event, room);
     }
 
     /**

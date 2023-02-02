@@ -58,6 +58,12 @@ export class RustCrypto implements CryptoBackend {
         this.keyClaimManager = new KeyClaimManager(olmMachine, this.outgoingRequestProcessor);
     }
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // CryptoBackend implementation
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
     public stop(): void {
         // stop() may be called multiple times, but attempting to close() the OlmMachine twice
         // will cause an error.
@@ -72,6 +78,25 @@ export class RustCrypto implements CryptoBackend {
         // cleaned up; in particular, the indexeddb connections will be closed, which means they
         // can then be deleted.
         this.olmMachine.close();
+    }
+
+    public prepareToEncrypt(room: Room): void {
+        const encryptor = this.roomEncryptors[room.roomId];
+
+        if (encryptor) {
+            encryptor.ensureEncryptionSession();
+        }
+    }
+
+    public async encryptEvent(event: MatrixEvent, _room: Room): Promise<void> {
+        const roomId = event.getRoomId()!;
+        const encryptor = this.roomEncryptors[roomId];
+
+        if (!encryptor) {
+            throw new Error(`Cannot encrypt event in unconfigured room ${roomId}`);
+        }
+
+        await encryptor.encryptEvent(event);
     }
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {

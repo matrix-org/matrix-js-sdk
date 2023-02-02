@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
+import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-js";
 
-import { IContent } from "../models/event";
+import { IContent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { logger, PrefixedLogger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
@@ -51,5 +51,58 @@ export class RoomEncryptor {
         if (JSON.stringify(this.encryptionSettings) != JSON.stringify(config)) {
             this.prefixedLogger.error(`Ignoring m.room.encryption event which requests a change of config`);
         }
+    }
+
+    /**
+     * Prepare to encrypt events in this room.
+     *
+     * This ensures that we have a megolm session ready to use and that we have shared its key with all the devices
+     * in the room.
+     */
+    public async ensureEncryptionSession(): Promise<void> {
+        if (this.encryptionSettings.algorithm !== "m.megolm.v1.aes-sha2") {
+            throw new Error(
+                `Cannot encrypt in ${this.room.roomId} for unsupported algorithm '${this.encryptionSettings.algorithm}'`,
+            );
+        }
+
+        const members = await this.room.getEncryptionTargetMembers();
+        this.prefixedLogger.debug(
+            `Encrypting for users (shouldEncryptForInvitedMembers: ${this.room.shouldEncryptForInvitedMembers()}):`,
+            members.map((u) => `${u.userId} (${u.membership})`),
+        );
+
+        const userList = members.map((u) => new UserId(u.userId));
+        await this.keyClaimManager.ensureSessionsForUsers(userList);
+
+        const rustEncryptionSettings = new EncryptionSettings();
+        /* FIXME historyVisibility, rotation, etc */
+
+        await this.olmMachine.shareRoomKey(new RoomId(this.room.roomId), userList, rustEncryptionSettings);
+    }
+
+    /**
+     * Encrypt an event for this room
+     *
+     * This will ensure that we have a megolm session for this room, share it with the devices in the room, and
+     * then encrypt the event using the session.
+     *
+     * @param event - Event to be encrypted.
+     */
+    public async encryptEvent(event: MatrixEvent): Promise<void> {
+        await this.ensureEncryptionSession();
+
+        const encryptedContent = await this.olmMachine.encryptRoomEvent(
+            new RoomId(this.room.roomId),
+            event.getType(),
+            JSON.stringify(event.getContent()),
+        );
+
+        event.makeEncrypted(
+            "m.room.encrypted",
+            JSON.parse(encryptedContent),
+            this.olmMachine.identityKeys.curve25519.toBase64(),
+            this.olmMachine.identityKeys.ed25519.toBase64(),
+        );
     }
 }
