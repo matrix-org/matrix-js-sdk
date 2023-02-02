@@ -1254,11 +1254,12 @@ export class SyncApi {
 
             const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId()!)?.getSender();
 
-            if (client.isCryptoEnabled()) {
-                const parkedHistory = await client.crypto!.cryptoStore.takeParkedSharedHistory(room.roomId);
+            const crypto = client.crypto;
+            if (crypto) {
+                const parkedHistory = await crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
                 for (const parked of parkedHistory) {
                     if (parked.senderId === inviter) {
-                        await client.crypto!.olmDevice.addInboundGroupSession(
+                        await crypto.olmDevice.addInboundGroupSession(
                             room.roomId,
                             parked.senderKey,
                             parked.forwardingCurve25519KeyChain,
