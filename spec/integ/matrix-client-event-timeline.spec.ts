@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -590,7 +590,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should handle thread replies with server support by fetching a contiguous thread timeline", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             await client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -647,7 +647,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return relevant timeline from non-thread timelineSet when asking for the thread root", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -680,7 +680,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return undefined when event is not in the thread that the given timelineSet is representing", () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -709,7 +709,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should return undefined when event is within a thread but timelineSet is not", () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
@@ -1016,6 +1016,152 @@ describe("MatrixClient event timelines", function () {
                 httpBackend.flushAllExpected(),
             ]);
         });
+
+        it("should create threads for thread roots discovered", function () {
+            const room = client.getRoom(roomId)!;
+            const timelineSet = room.getTimelineSets()[0];
+
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(EVENTS[0].event_id!))
+                .respond(200, function () {
+                    return {
+                        start: "start_token0",
+                        events_before: [],
+                        event: EVENTS[0],
+                        events_after: [],
+                        end: "end_token0",
+                        state: [],
+                    };
+                });
+
+            httpBackend
+                .when("GET", "/rooms/!foo%3Abar/messages")
+                .check(function (req) {
+                    const params = req.queryParams!;
+                    expect(params.dir).toEqual("b");
+                    expect(params.from).toEqual("start_token0");
+                    expect(params.limit).toEqual("30");
+                })
+                .respond(200, function () {
+                    return {
+                        chunk: [EVENTS[1], EVENTS[2], THREAD_ROOT],
+                        end: "start_token1",
+                    };
+                });
+
+            let tl: EventTimeline;
+            return Promise.all([
+                client
+                    .getEventTimeline(timelineSet, EVENTS[0].event_id!)
+                    .then(function (tl0) {
+                        tl = tl0!;
+                        return client.paginateEventTimeline(tl, { backwards: true });
+                    })
+                    .then(function (success) {
+                        expect(success).toBeTruthy();
+                        expect(tl!.getEvents().length).toEqual(4);
+                        expect(tl!.getEvents()[0].event).toEqual(THREAD_ROOT);
+                        expect(tl!.getEvents()[1].event).toEqual(EVENTS[2]);
+                        expect(tl!.getEvents()[2].event).toEqual(EVENTS[1]);
+                        expect(tl!.getEvents()[3].event).toEqual(EVENTS[0]);
+                        expect(room.getThreads().map((it) => it.id)).toEqual([THREAD_ROOT.event_id!]);
+                        expect(tl!.getPaginationToken(EventTimeline.BACKWARDS)).toEqual("start_token1");
+                        expect(tl!.getPaginationToken(EventTimeline.FORWARDS)).toEqual("end_token0");
+                    }),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+    });
+
+    it("should ensure thread events are ordered correctly", async () => {
+        // Test data for a second reply to the first thread
+        const THREAD_REPLY2 = utils.mkEvent({
+            room: roomId,
+            user: userId,
+            type: "m.room.message",
+            content: {
+                "body": "thread reply 2",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    // We can't use the const here because we change server support mode for test
+                    rel_type: "io.element.thread",
+                    event_id: THREAD_ROOT.event_id,
+                },
+            },
+            event: true,
+        });
+        THREAD_REPLY2.localTimestamp += 1000;
+
+        // Test data for a second reply to the first thread
+        const THREAD_REPLY3 = utils.mkEvent({
+            room: roomId,
+            user: userId,
+            type: "m.room.message",
+            content: {
+                "body": "thread reply 3",
+                "msgtype": "m.text",
+                "m.relates_to": {
+                    // We can't use the const here because we change server support mode for test
+                    rel_type: "io.element.thread",
+                    event_id: THREAD_ROOT.event_id,
+                },
+            },
+            event: true,
+        });
+        THREAD_REPLY3.localTimestamp += 2000;
+
+        // Test data for the first thread, with the second reply
+        const THREAD_ROOT_UPDATED = {
+            ...THREAD_ROOT,
+            unsigned: {
+                ...THREAD_ROOT.unsigned,
+                "m.relations": {
+                    ...THREAD_ROOT.unsigned!["m.relations"],
+                    "io.element.thread": {
+                        ...THREAD_ROOT.unsigned!["m.relations"]!["io.element.thread"],
+                        count: 3,
+                        latest_event: THREAD_REPLY3.event,
+                    },
+                },
+            },
+        };
+
+        // @ts-ignore
+        client.clientOpts.threadSupport = true;
+        Thread.setServerSideSupport(FeatureSupport.Stable);
+        Thread.setServerSideListSupport(FeatureSupport.Stable);
+        Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
+
+        client.fetchRoomEvent = () => Promise.resolve(THREAD_ROOT_UPDATED);
+
+        await client.stopClient(); // we don't need the client to be syncing at this time
+        const room = client.getRoom(roomId)!;
+
+        const prom = emitPromise(room, ThreadEvent.Update);
+        // Assume we're seeing the reply while loading backlog
+        room.addLiveEvents([THREAD_REPLY2]);
+        httpBackend
+            .when(
+                "GET",
+                "/_matrix/client/v1/rooms/!foo%3Abar/relations/" +
+                    encodeURIComponent(THREAD_ROOT_UPDATED.event_id!) +
+                    "/" +
+                    encodeURIComponent(THREAD_RELATION_TYPE.name),
+            )
+            .respond(200, {
+                chunk: [THREAD_REPLY3.event, THREAD_REPLY2.event, THREAD_REPLY],
+            });
+        await flushHttp(prom);
+        // but while loading the metadata, a new reply has arrived
+        room.addLiveEvents([THREAD_REPLY3]);
+        const thread = room.getThread(THREAD_ROOT_UPDATED.event_id!)!;
+        // then the events should still be all in the right order
+        expect(thread.events.map((it) => it.getId())).toEqual([
+            THREAD_ROOT.event_id,
+            THREAD_REPLY.event_id,
+            THREAD_REPLY2.getId(),
+            THREAD_REPLY3.getId(),
+        ]);
     });
 
     describe("paginateEventTimeline for thread list timeline", function () {
@@ -1117,7 +1263,7 @@ describe("MatrixClient event timelines", function () {
         describe("with server compatibility", function () {
             beforeEach(() => {
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Stable);
                 Thread.setServerSideListSupport(FeatureSupport.Stable);
                 Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1275,7 +1421,7 @@ describe("MatrixClient event timelines", function () {
                 };
 
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Stable);
                 Thread.setServerSideListSupport(FeatureSupport.Stable);
                 Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1327,7 +1473,7 @@ describe("MatrixClient event timelines", function () {
         describe("without server compatibility", function () {
             beforeEach(() => {
                 // @ts-ignore
-                client.clientOpts.experimentalThreadSupport = true;
+                client.clientOpts.threadSupport = true;
                 Thread.setServerSideSupport(FeatureSupport.Experimental);
                 Thread.setServerSideListSupport(FeatureSupport.None);
             });
@@ -1393,7 +1539,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should add lazy loading filter", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
             // @ts-ignore
@@ -1421,7 +1567,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should correctly pass pagination token", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
 
@@ -1746,7 +1892,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in stable mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.Stable);
@@ -1756,7 +1902,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in backwards compatible unstable mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.Experimental);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.Experimental);
@@ -1766,7 +1912,7 @@ describe("MatrixClient event timelines", function () {
 
         it("in backwards compatible mode", async () => {
             // @ts-ignore
-            client.clientOpts.experimentalThreadSupport = true;
+            client.clientOpts.threadSupport = true;
             Thread.setServerSideSupport(FeatureSupport.Experimental);
             Thread.setServerSideListSupport(FeatureSupport.None);
             Thread.setServerSideFwdPaginationSupport(FeatureSupport.None);

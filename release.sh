@@ -184,7 +184,7 @@ for i in main typings
 do
     lib_value=$(jq -r ".matrix_lib_$i" package.json)
     if [ "$lib_value" != "null" ]; then
-        jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json
+        jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
     fi
 done
 

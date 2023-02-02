@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -35,9 +35,7 @@ describe("MatrixClient", function () {
     let store: MemoryStore | undefined;
 
     const defaultClientOpts: IStoredClientOpts = {
-        canResetEntireTimeline: (roomId) => false,
-        experimentalThreadSupport: false,
-        crypto: {} as unknown as IStoredClientOpts["crypto"],
+        threadSupport: false,
     };
     const setupTests = (): [MatrixClient, HttpBackend, MemoryStore] => {
         const store = new MemoryStore();
@@ -659,7 +657,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollResponseReference = buildEventPollResponseReference();
@@ -690,7 +688,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -714,7 +712,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollResponseReference = buildEventPollResponseReference();
@@ -738,7 +736,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const eventPollStartThreadRoot = buildEventPollStartThreadRoot();
@@ -762,7 +760,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
             // This is based on recording the events in a real room:
 
@@ -819,7 +817,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -845,7 +843,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -866,7 +864,7 @@ describe("MatrixClient", function () {
             // @ts-ignore setting private property
             client!.clientOpts = {
                 ...defaultClientOpts,
-                experimentalThreadSupport: true,
+                threadSupport: true,
             };
 
             const threadRootEvent = buildEventPollStartThreadRoot();
@@ -1165,11 +1163,10 @@ describe("MatrixClient", function () {
                 .when("PUT", "/send")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
-                        "msgtype": "m.emote",
-                        "body": "Body",
-                        "formatted_body": "<h1>Body</h1>",
-                        "format": "org.matrix.custom.html",
-                        "org.matrix.msc1767.message": expect.anything(),
+                        msgtype: "m.emote",
+                        body: "Body",
+                        formatted_body: "<h1>Body</h1>",
+                        format: "org.matrix.custom.html",
                     });
                 })
                 .respond(200, { event_id: "$foobar" });
@@ -1185,11 +1182,10 @@ describe("MatrixClient", function () {
                 .when("PUT", "/send")
                 .check((req) => {
                     expect(req.data).toStrictEqual({
-                        "msgtype": "m.text",
-                        "body": "Body",
-                        "formatted_body": "<h1>Body</h1>",
-                        "format": "org.matrix.custom.html",
-                        "org.matrix.msc1767.message": expect.anything(),
+                        msgtype: "m.text",
+                        body: "Body",
+                        formatted_body: "<h1>Body</h1>",
+                        format: "org.matrix.custom.html",
                     });
                 })
                 .respond(200, { event_id: "$foobar" });

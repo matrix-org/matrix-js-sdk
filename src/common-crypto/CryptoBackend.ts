@@ -14,13 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { IEventDecryptionResult } from "../@types/crypto";
+import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { IToDeviceEvent } from "../sync-accumulator";
+import type { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { MatrixEvent } from "../models/event";
+import { IEncryptedEventInfo } from "../crypto/api";
 
 /**
  * Common interface for the crypto implementations
  */
-export interface CryptoBackend {
+export interface CryptoBackend extends SyncCryptoCallbacks {
     /**
      * Global override for whether the client should ever send encrypted
      * messages to unverified devices. This provides the default for rooms which
@@ -54,10 +57,84 @@ export interface CryptoBackend {
     userHasCrossSigningKeys(): Promise<boolean>;
 
     /**
+     * Get the verification level for a given user
+     *
+     * TODO: define this better
+     *
+     * @param userId - user to be checked
+     */
+    checkUserTrust(userId: string): UserTrustLevel;
+
+    /**
+     * Get the verification level for a given device
+     *
+     * TODO: define this better
+     *
+     * @param userId - user to be checked
+     * @param deviceId - device to be checked
+     */
+    checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel;
+
+    /**
      * Decrypt a received event
      *
      * @returns a promise which resolves once we have finished decrypting.
      * Rejects with an error if there is a problem decrypting the event.
      */
     decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult>;
+
+    /**
+     * Get information about the encryption of an event
+     *
+     * @param event - event to be checked
+     */
+    getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo;
+
+    /**
+     * Get a list containing all of the room keys
+     *
+     * This should be encrypted before returning it to the user.
+     *
+     * @returns a promise which resolves to a list of
+     *    session export objects
+     */
+    exportRoomKeys(): Promise<IMegolmSessionData[]>;
+}
+
+/** The methods which crypto implementations should expose to the Sync api */
+export interface SyncCryptoCallbacks {
+    /**
+     * Called by the /sync loop whenever there are incoming to-device messages.
+     *
+     * The implementation may preprocess the received messages (eg, decrypt them) and return an
+     * updated list of messages for dispatch to the rest of the system.
+     *
+     * Note that, unlike {@link ClientEvent.ToDeviceEvent} events, this is called on the raw to-device
+     * messages, rather than the results of any decryption attempts.
+     *
+     * @param events - the received to-device messages
+     * @returns A list of preprocessed to-device messages.
+     */
+    preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
+
+    /**
+     * Called by the /sync loop after each /sync response is processed.
+     *
+     * Used to complete batch processing, or to initiate background processes
+     *
+     * @param syncState - information about the completed sync.
+     */
+    onSyncCompleted(syncState: OnSyncCompletedData): void;
+}
+
+export interface OnSyncCompletedData {
+    /**
+     * The 'next_batch' result from /sync, which will become the 'since' token for the next call to /sync.
+     */
+    nextSyncToken?: string;
+
+    /**
+     * True if we are working our way through a backlog of events after connecting.
+     */
+    catchingUp?: boolean;
 }

@@ -236,7 +236,7 @@ export enum CallErrorCode {
     /**
      * We transferred the call off to somewhere else
      */
-    Transfered = "transferred",
+    Transferred = "transferred",
 
     /**
      * A call from the same user was found with a new session id
@@ -387,6 +387,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private opponentSessionId?: string;
     public groupCallId?: string;
 
+    // Used to keep the timer for the delay before actually stopping our
+    // video track after muting (see setLocalVideoMuted)
+    private stopVideoTrackTimer?: ReturnType<typeof setTimeout>;
+
     /**
      * Construct a new Matrix Call.
      * @param opts - Config options.
@@ -480,7 +484,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     public get type(): CallType {
-        return this.hasLocalUserMediaVideoTrack || this.hasRemoteUserMediaVideoTrack ? CallType.Video : CallType.Voice;
+        // we may want to look for a video receiver here rather than a track to match the
+        // sender behaviour, although in practice they should be the same thing
+        return this.hasUserMediaVideoSender || this.hasRemoteUserMediaVideoTrack ? CallType.Video : CallType.Voice;
     }
 
     public get hasLocalUserMediaVideoTrack(): boolean {
@@ -501,6 +507,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.getRemoteFeeds().some((feed) => {
             return feed.purpose === SDPStreamMetadataPurpose.Usermedia && !!feed.stream?.getAudioTracks().length;
         });
+    }
+
+    private get hasUserMediaAudioSender(): boolean {
+        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "audio"))?.sender);
+    }
+
+    private get hasUserMediaVideoSender(): boolean {
+        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"))?.sender);
     }
 
     public get localUsermediaFeed(): CallFeed | undefined {
@@ -786,9 +800,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     const newSender = this.peerConn!.addTrack(track, callFeed.stream);
 
                     // now go & fish for the new transceiver
-                    const newTransciever = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
-                    if (newTransciever) {
-                        this.transceivers.set(tKey, newTransciever);
+                    const newTransceiver = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
+                    if (newTransceiver) {
+                        this.transceivers.set(tKey, newTransceiver);
                     } else {
                         logger.warn("Didn't find a matching transceiver after adding track!");
                     }
@@ -1280,7 +1294,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         setTracksEnabled(stream.getAudioTracks(), audioEnabled);
         setTracksEnabled(stream.getVideoTracks(), videoEnabled);
 
-        // We want to keep the same stream id, so we replace the tracks rather than the whole stream
+        // We want to keep the same stream id, so we replace the tracks rather
+        // than the whole stream.
+
+        // Firstly, we replace the tracks in our localUsermediaStream.
         for (const track of this.localUsermediaStream!.getTracks()) {
             this.localUsermediaStream!.removeTrack(track);
             track.stop();
@@ -1289,10 +1306,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.localUsermediaStream!.addTrack(track);
         }
 
+        // Then replace the old tracks, if possible.
         for (const track of stream.getTracks()) {
             const tKey = getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, track.kind);
 
-            const oldSender = this.transceivers.get(tKey)?.sender;
+            const transceiver = this.transceivers.get(tKey);
+            const oldSender = transceiver?.sender;
             let added = false;
             if (oldSender) {
                 try {
@@ -1306,6 +1325,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                             `) to peer connection`,
                     );
                     await oldSender.replaceTrack(track);
+                    // Set the direction to indicate we're going to be sending.
+                    // This is only necessary in the cases where we're upgrading
+                    // the call to video after downgrading it.
+                    transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
                     added = true;
                 } catch (error) {
                     logger.warn(`replaceTrack failed: adding new transceiver instead`, error);
@@ -1324,9 +1347,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 );
 
                 const newSender = this.peerConn!.addTrack(track, this.localUsermediaStream!);
-                const newTransciever = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
-                if (newTransciever) {
-                    this.transceivers.set(tKey, newTransciever);
+                const newTransceiver = this.peerConn!.getTransceivers().find((t) => t.sender === newSender);
+                if (newTransceiver) {
+                    this.transceivers.set(tKey, newTransceiver);
                 } else {
                     logger.warn("Couldn't find matching transceiver for newly added track!");
                 }
@@ -1341,17 +1364,51 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
         logger.log(`call ${this.callId} setLocalVideoMuted ${muted}`);
+
+        // if we were still thinking about stopping and removing the video
+        // track: don't, because we want it back.
+        if (!muted && this.stopVideoTrackTimer !== undefined) {
+            clearTimeout(this.stopVideoTrackTimer);
+            this.stopVideoTrackTimer = undefined;
+        }
+
         if (!(await this.client.getMediaHandler().hasVideoDevice())) {
             return this.isLocalVideoMuted();
         }
 
-        if (!this.hasLocalUserMediaVideoTrack && !muted) {
+        if (!this.hasUserMediaVideoSender && !muted) {
             await this.upgradeCall(false, true);
             return this.isLocalVideoMuted();
         }
+
+        // we may not have a video track - if not, re-request usermedia
+        if (!muted && this.localUsermediaStream!.getVideoTracks().length === 0) {
+            const stream = await this.client.getMediaHandler().getUserMediaStream(true, true);
+            await this.updateLocalUsermediaStream(stream);
+        }
+
         this.localUsermediaFeed?.setAudioVideoMuted(null, muted);
+
         this.updateMuteStatus();
         await this.sendMetadataUpdate();
+
+        // if we're muting video, set a timeout to stop & remove the video track so we release
+        // the camera. We wait a short time to do this because when we disable a track, WebRTC
+        // will send black video for it. If we just stop and remove it straight away, the video
+        // will just freeze which means that when we unmute video, the other side will briefly
+        // get a static frame of us from before we muted. This way, the still frame is just black.
+        // A very small delay is not always enough so the theory here is that it needs to be long
+        // enough for WebRTC to encode a frame: 120ms should be long enough even if we're only
+        // doing 10fps.
+        if (muted) {
+            this.stopVideoTrackTimer = setTimeout(() => {
+                for (const t of this.localUsermediaStream!.getVideoTracks()) {
+                    t.stop();
+                    this.localUsermediaStream!.removeTrack(t);
+                }
+            }, 120);
+        }
+
         return this.isLocalVideoMuted();
     }
 
@@ -1379,7 +1436,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return this.isMicrophoneMuted();
         }
 
-        if (!this.hasLocalUserMediaAudioTrack && !muted) {
+        if (!muted && (!this.hasUserMediaAudioSender || !this.hasLocalUserMediaAudioTrack)) {
             await this.upgradeCall(true, false);
             return this.isMicrophoneMuted();
         }
@@ -1471,6 +1528,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this.localUsermediaStream!.id
             } micShouldBeMuted ${micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`,
         );
+
         setTracksEnabled(this.localUsermediaStream!.getAudioTracks(), !micShouldBeMuted);
         setTracksEnabled(this.localUsermediaStream!.getVideoTracks(), !vidShouldBeMuted);
     }
@@ -1585,25 +1643,25 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     continue;
                 }
 
-                const extraconfig: string[] = [];
+                const extraConfig: string[] = [];
                 if (mod.enableDtx !== undefined) {
-                    extraconfig.push(`usedtx=${mod.enableDtx ? "1" : "0"}`);
+                    extraConfig.push(`usedtx=${mod.enableDtx ? "1" : "0"}`);
                 }
                 if (mod.maxAverageBitrate !== undefined) {
-                    extraconfig.push(`maxaveragebitrate=${mod.maxAverageBitrate}`);
+                    extraConfig.push(`maxaveragebitrate=${mod.maxAverageBitrate}`);
                 }
 
                 let found = false;
                 for (const fmtp of media.fmtp) {
                     if (payloadTypeToCodecMap.get(fmtp.payload) === mod.codec) {
                         found = true;
-                        fmtp.config += ";" + extraconfig.join(";");
+                        fmtp.config += ";" + extraConfig.join(";");
                     }
                 }
                 if (!found) {
                     media.fmtp.push({
                         payload: codecToPayloadTypeMap.get(mod.codec)!,
-                        config: extraconfig.join(";"),
+                        config: extraConfig.join(";"),
                     });
                 }
             }
@@ -2277,11 +2335,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
             const userId = this.invitee || this.getOpponentMember()!.userId;
             if (this.client.getUseE2eForGroupCall()) {
+                if (!this.opponentDeviceInfo) {
+                    logger.warn(`Call ${this.callId} sendVoipEvent() failed: we do not have opponentDeviceInfo`);
+                    return;
+                }
+
                 await this.client.encryptAndSendToDevices(
                     [
                         {
                             userId,
-                            deviceInfo: this.opponentDeviceInfo!,
+                            deviceInfo: this.opponentDeviceInfo,
                         },
                     ],
                     {
@@ -2392,7 +2455,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         await this.sendVoipEvent(EventType.CallReplaces, body);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transferred, true);
     }
 
     /*
@@ -2433,8 +2496,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         await this.sendVoipEvent(EventType.CallReplaces, bodyToTransferee);
 
-        await this.terminate(CallParty.Local, CallErrorCode.Transfered, true);
-        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transfered, true);
+        await this.terminate(CallParty.Local, CallErrorCode.Transferred, true);
+        await transferTargetCall.terminate(CallParty.Local, CallErrorCode.Transferred, true);
     }
 
     private async terminate(hangupParty: CallParty, hangupReason: CallErrorCode, shouldEmit: boolean): Promise<void> {
@@ -2451,6 +2514,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
             this.callLengthInterval = undefined;
+        }
+        if (this.stopVideoTrackTimer !== undefined) {
+            clearTimeout(this.stopVideoTrackTimer);
+            this.stopVideoTrackTimer = undefined;
         }
 
         for (const [stream, listener] of this.removeTrackListeners) {
@@ -2475,18 +2542,20 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private stopAllMedia(): void {
-        logger.debug(
-            !this.groupCallId
-                ? `Call ${this.callId} stopping all media`
-                : `Call ${this.callId} stopping all media except local feeds`,
-        );
+        logger.debug(`Call ${this.callId} stopping all media`);
 
         for (const feed of this.feeds) {
-            if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia && !this.groupCallId) {
+            // Slightly awkward as local feed need to go via the correct method on
+            // the MediaHandler so they get removed from MediaHandler (remote tracks
+            // don't)
+            // NB. We clone local streams when passing them to individual calls in a group
+            // call, so we can (and should) stop the clones once we no longer need them:
+            // the other clones will continue fine.
+            if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
                 this.client.getMediaHandler().stopUserMediaStream(feed.stream);
-            } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare && !this.groupCallId) {
+            } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
                 this.client.getMediaHandler().stopScreensharingStream(feed.stream);
-            } else if (!feed.isLocal() || !this.groupCallId) {
+            } else if (!feed.isLocal()) {
                 logger.debug("Stopping remote stream", feed.stream.id);
                 for (const track of feed.stream.getTracks()) {
                     track.stop();

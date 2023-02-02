@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { Optional } from "matrix-events-sdk";
+import { M_POLL_START, Optional } from "matrix-events-sdk";
 
 import {
     EventTimelineSet,
@@ -54,11 +54,17 @@ import {
     FILTER_RELATED_BY_SENDERS,
     ThreadFilterType,
 } from "./thread";
-import { MAIN_ROOM_TIMELINE, Receipt, ReceiptContent, ReceiptType } from "../@types/read_receipts";
+import {
+    CachedReceiptStructure,
+    MAIN_ROOM_TIMELINE,
+    Receipt,
+    ReceiptContent,
+    ReceiptType,
+} from "../@types/read_receipts";
 import { IStateEventWithRoomId } from "../@types/search";
 import { RelationsContainer } from "./relations-container";
 import { ReadReceipt, synthesizeReceipt } from "./read-receipt";
-import { Feature, ServerSupport } from "../feature";
+import { Poll, PollEvent } from "./poll";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -156,7 +162,8 @@ export type RoomEmittedEvents =
     | BeaconEvent.New
     | BeaconEvent.Update
     | BeaconEvent.Destroy
-    | BeaconEvent.LivenessChange;
+    | BeaconEvent.LivenessChange
+    | PollEvent.New;
 
 export type RoomEventHandlerMap = {
     /**
@@ -283,6 +290,11 @@ export type RoomEventHandlerMap = {
     [RoomEvent.UnreadNotifications]: (unreadNotifications?: NotificationCount, threadId?: string) => void;
     [RoomEvent.TimelineRefresh]: (room: Room, eventTimelineSet: EventTimelineSet) => void;
     [ThreadEvent.New]: (thread: Thread, toStartOfTimeline: boolean) => void;
+    /**
+     * Fires when a new poll instance is added to the room state
+     * @param poll - the new poll
+     */
+    [PollEvent.New]: (poll: Poll) => void;
 } & Pick<ThreadHandlerMap, ThreadEvent.Update | ThreadEvent.NewReply | ThreadEvent.Delete> &
     EventTimelineSetHandlerMap &
     Pick<MatrixEventHandlerMap, MatrixEventEvent.BeforeRedaction> &
@@ -302,8 +314,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private txnToEvent: Record<string, MatrixEvent> = {}; // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private readonly threadNotifications = new Map<string, NotificationCount>();
-    public readonly cachedThreadReadReceipts = new Map<string, { event: MatrixEvent; synthetic: boolean }[]>();
+    public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
+    // Useful to know at what point the current user has started using threads in this room
+    private oldestThreadedReceiptTs = Infinity;
+    /**
+     * A record of the latest unthread receipts per user
+     * This is useful in determining whether a user has read a thread or not
+     */
+    private unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
+    public readonly polls: Map<string, Poll> = new Map<string, Poll>();
     public readonly threadsTimelineSets: EventTimelineSet[] = [];
     // any filtered timeline sets we're maintaining for this room
     private readonly filteredTimelineSets: Record<string, EventTimelineSet> = {}; // filter_id: timelineSet
@@ -362,7 +382,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly relations = new RelationsContainer(this.client, this);
 
     /**
-     * @experimental
+     * A collection of events known by the client
+     * This is not a comprehensive list of the threads that exist in this room
      */
     private threads = new Map<string, Thread>();
     public lastThread?: Thread;
@@ -441,9 +462,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 });
                 events.forEach(async (serializedEvent: Partial<IEvent>) => {
                     const event = mapper(serializedEvent);
-                    if (event.getType() === EventType.RoomMessageEncrypted && this.client.isCryptoEnabled()) {
-                        await event.attemptDecryption(this.client.crypto!);
-                    }
+                    await client.decryptEventIfNeeded(event);
                     event.setStatus(EventStatus.NOT_SENT);
                     this.addPendingEvent(event, event.getTxnId()!);
                 });
@@ -464,7 +483,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return this.threadTimelineSetsPromise;
         }
 
-        if (this.client?.supportsExperimentalThreads()) {
+        if (this.client?.supportsThreads()) {
             try {
                 this.threadTimelineSetsPromise = Promise.all([
                     this.createThreadTimelineSet(),
@@ -503,9 +522,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         const decryptionPromises = events
             .slice(readReceiptTimelineIndex)
-            .filter((event) => event.shouldAttemptDecryption())
             .reverse()
-            .map((event) => event.attemptDecryption(this.client.crypto!, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
 
         await Promise.allSettled(decryptionPromises);
     }
@@ -521,9 +539,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const decryptionPromises = this.getUnfilteredTimelineSet()
             .getLiveTimeline()
             .getEvents()
-            .filter((event) => event.shouldAttemptDecryption())
+            .slice(0) // copy before reversing
             .reverse()
-            .map((event) => event.attemptDecryption(this.client.crypto!, { isRetry: true }));
+            .map((event) => this.client.decryptEventIfNeeded(event, { isRetry: true }));
 
         await Promise.allSettled(decryptionPromises);
     }
@@ -889,6 +907,20 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * Check if loading of out-of-band-members has completed
+     *
+     * @returns true if the full membership list of this room has been loaded (including if lazy-loading is disabled).
+     *    False if the load is not started or is in progress.
+     */
+    public membersLoaded(): boolean {
+        if (!this.opts.lazyLoadMembers) {
+            return true;
+        }
+
+        return this.currentState.outOfBandMembersReady();
+    }
+
+    /**
      * Preloads the member list in case lazy loading
      * of memberships is in use. Can be called multiple times,
      * it will only preload once.
@@ -909,10 +941,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const inMemoryUpdate = this.loadMembers()
             .then((result) => {
                 this.currentState.setOutOfBandMembers(result.memberEvents);
-                // now the members are loaded, start to track the e2e devices if needed
-                if (this.client.isCryptoEnabled() && this.client.isRoomEncrypted(this.roomId)) {
-                    this.client.crypto!.trackRoomDevices(this.roomId);
-                }
                 return result.fromServer;
             })
             .catch((err) => {
@@ -1094,6 +1122,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const timelineSet of this.timelineSets) {
             timelineSet.resetLiveTimeline(backPaginationToken ?? undefined, forwardPaginationToken ?? undefined);
         }
+        for (const thread of this.threads.values()) {
+            thread.resetLiveTimeline(backPaginationToken, forwardPaginationToken);
+        }
 
         this.fixUpLegacyTimelineFields();
     }
@@ -1203,7 +1234,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const event = this.findEventById(eventId);
         const thread = this.findThreadForEvent(event);
         if (thread) {
-            return thread.timelineSet.getLiveTimeline();
+            return thread.timelineSet.getTimelineForEvent(eventId);
         } else {
             return this.getUnfilteredTimelineSet().getTimelineForEvent(eventId);
         }
@@ -1267,10 +1298,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getUnreadNotificationCount(type = NotificationCountType.Total): number {
         let count = this.getRoomUnreadNotificationCount(type);
-        if (this.client.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported) {
-            for (const threadNotification of this.threadNotifications.values()) {
-                count += threadNotification[type] ?? 0;
-            }
+        for (const threadNotification of this.threadNotifications.values()) {
+            count += threadNotification[type] ?? 0;
         }
         return count;
     }
@@ -1299,7 +1328,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Get one of the notification counts for a thread
      * @param threadId - the root event ID
      * @param type - The type of notification count to get. default: 'total'
@@ -1311,7 +1339,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Checks if the current room has unread thread notifications
      * @returns
      */
@@ -1325,7 +1352,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Swet one of the notification count for a thread
      * @param threadId - the root event ID
      * @param type - The type of notification count to get. default: 'total'
@@ -1346,7 +1372,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * @returns the notification count type for all the threads in the room
      */
     public get threadsAggregateNotificationType(): NotificationCountType | null {
@@ -1362,7 +1387,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
      * Resets the thread notifications for this room
      */
     public resetThreadUnreadNotificationCount(notificationsToKeep?: string[]): void {
@@ -1522,14 +1546,16 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * @experimental
+     * Get the instance of the thread associated with the current event
+     * @param eventId - the ID of the current event
+     * @returns a thread instance if known
      */
     public getThread(eventId: string): Thread | null {
         return this.threads.get(eventId) ?? null;
     }
 
     /**
-     * @experimental
+     * Get all the known threads in the room
      */
     public getThreads(): Thread[] {
         return Array.from(this.threads.values());
@@ -1796,7 +1822,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Without server support that means fetching as much at once as the server allows us to.
      */
     public async fetchRoomThreads(): Promise<void> {
-        if (this.threadsReady || !this.client.supportsExperimentalThreads()) {
+        if (this.threadsReady || !this.client.supportsThreads()) {
             return;
         }
 
@@ -1865,6 +1891,38 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.on(ThreadEvent.NewReply, this.onThreadNewReply);
         this.on(ThreadEvent.Delete, this.onThreadDelete);
         this.threadsReady = true;
+    }
+
+    public async processPollEvents(events: MatrixEvent[]): Promise<void> {
+        const processPollStartEvent = (event: MatrixEvent): void => {
+            if (!M_POLL_START.matches(event.getType())) return;
+            try {
+                const poll = new Poll(event, this.client, this);
+                this.polls.set(event.getId()!, poll);
+                this.emit(PollEvent.New, poll);
+            } catch {}
+            // poll creation can fail for malformed poll start events
+        };
+
+        const processPollRelationEvent = (event: MatrixEvent): void => {
+            const relationEventId = event.relationEventId;
+            if (relationEventId && this.polls.has(relationEventId)) {
+                const poll = this.polls.get(relationEventId);
+                poll?.onNewRelation(event);
+            }
+        };
+
+        const processPollEvent = (event: MatrixEvent): void => {
+            processPollStartEvent(event);
+            processPollRelationEvent(event);
+        };
+
+        for (const event of events) {
+            try {
+                await this.client.decryptEventIfNeeded(event);
+                processPollEvent(event);
+            } catch {}
+        }
     }
 
     /**
@@ -1941,7 +1999,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         shouldLiveInThread: boolean;
         threadId?: string;
     } {
-        if (!this.client?.supportsExperimentalThreads()) {
+        if (!this.client?.supportsThreads()) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2010,7 +2068,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     /**
      * Adds events to a thread's timeline. Will fire "Thread.update"
-     * @experimental
      */
     public processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(this.applyRedaction);
@@ -2639,7 +2696,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // Indices to the events array, for readability
         const ROOM = 0;
         const THREAD = 1;
-        if (this.client.supportsExperimentalThreads()) {
+        if (this.client.supportsThreads()) {
             const threadRoots = this.findThreadRoots(events);
             return events.reduce(
                 (memo, event: MatrixEvent) => {
@@ -2711,8 +2768,19 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         // when the thread is created
                         this.cachedThreadReadReceipts.set(receipt.thread_id!, [
                             ...(this.cachedThreadReadReceipts.get(receipt.thread_id!) ?? []),
-                            { event, synthetic },
+                            { eventId, receiptType, userId, receipt, synthetic },
                         ]);
+                    }
+
+                    const me = this.client.getUserId();
+                    // Track the time of the current user's oldest threaded receipt in the room.
+                    if (userId === me && !receiptForMainTimeline && receipt.ts < this.oldestThreadedReceiptTs) {
+                        this.oldestThreadedReceiptTs = receipt.ts;
+                    }
+
+                    // Track each user's unthreaded read receipt.
+                    if (!receipt.thread_id && receipt.ts > (this.unthreadedReceipts.get(userId)?.ts ?? 0)) {
+                        this.unthreadedReceipts.set(userId, receipt);
                     }
                 });
             });
@@ -2954,6 +3022,28 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public isElementVideoRoom(): boolean {
         return this.getType() === RoomType.ElementVideo;
+    }
+
+    /**
+     * Find the predecessor of this room.
+     *
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     * m.room.predecessor state event and use it if found (MSC3946).
+     * @returns null if this room has no predecessor. Otherwise, returns
+     * the roomId and last eventId of the predecessor room.
+     * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
+     * as well as m.room.create events to find predecessors.
+     * Note: if an m.predecessor event is used, eventId is null since those
+     * events do not include an event_id property.
+     */
+    public findPredecessor(
+        msc3946ProcessDynamicPredecessor = false,
+    ): { roomId: string; eventId: string | null } | null {
+        const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
+        if (!currentState) {
+            return null;
+        }
+        return currentState.findPredecessor(msc3946ProcessDynamicPredecessor);
     }
 
     private roomNameGenerator(state: RoomNameState): string {
@@ -3263,6 +3353,26 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             return;
         }
         event.applyVisibilityEvent(visibilityChange);
+    }
+
+    /**
+     * Find when a client has gained thread capabilities by inspecting the oldest
+     * threaded receipt
+     * @returns the timestamp of the oldest threaded receipt
+     */
+    public getOldestThreadedReceiptTs(): number {
+        return this.oldestThreadedReceiptTs;
+    }
+
+    /**
+     * Returns the most recent unthreaded receipt for a given user
+     * @param userId - the MxID of the User
+     * @returns an unthreaded Receipt. Can be undefined if receipts have been disabled
+     * or a user chooses to use private read receipts (or we have simply not received
+     * a receipt from this user yet).
+     */
+    public getLastUnthreadedReceiptFor(userId: string): Receipt | undefined {
+        return this.unthreadedReceipts.get(userId);
     }
 }
 

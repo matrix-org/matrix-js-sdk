@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -267,7 +267,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     private txnId?: string;
 
     /**
-     * @experimental
      * A reference to the thread this event belongs to
      */
     private thread?: Thread;
@@ -546,7 +545,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
      * Get the event ID of the thread head
      */
     public get threadRootId(): string | undefined {
@@ -559,7 +557,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
+     * A helper to check if an event is a thread's head or not
      */
     public get isThreadRoot(): boolean {
         const threadDetails = this.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
@@ -828,17 +826,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     }
                 }
             } catch (e) {
-                if ((<Error>e).name !== "DecryptionError") {
-                    // not a decryption error: log the whole exception as an error
-                    // (and don't bother with a retry)
-                    const re = options.isRetry ? "re" : "";
-                    // For find results: this can produce "Error decrypting event (id=$ev)" and
-                    // "Error redecrypting event (id=$ev)".
-                    logger.error(`Error ${re}decrypting event (${this.getDetails()})`, e);
-                    this.decryptionPromise = null;
-                    this.retryDecryption = false;
-                    return;
-                }
+                const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
 
                 err = e as Error;
 
@@ -858,10 +846,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(
-                        `Error decrypting event (${this.getDetails()}), but retrying: ` +
-                            (<DecryptionError>e).detailedString,
-                    );
+                    logger.log(`Error decrypting event (${this.getDetails()}), but retrying: ${detailedError}`);
                     continue;
                 }
 
@@ -870,9 +855,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 // the detailedString already includes the name and message of the error, and the stack isn't much use,
                 // so we don't bother to log `e` separately.
-                logger.warn(`Error decrypting event (${this.getDetails()}): ` + (<DecryptionError>e).detailedString);
+                logger.warn(`Error decrypting event (${this.getDetails()}): ${detailedError}`);
 
-                res = this.badEncryptedMessage((<DecryptionError>e).message);
+                res = this.badEncryptedMessage(String(e));
             }
 
             // at this point, we've either successfully decrypted the event, or have given up
@@ -1570,7 +1555,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
+     * Set the instance of a thread associated with the current event
+     * @param thread - the thread
      */
     public setThread(thread?: Thread): void {
         if (this.thread) {
@@ -1584,7 +1570,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
+     * Get the instance of the thread associated with the current event
      */
     public getThread(): Thread | undefined {
         return this.thread;

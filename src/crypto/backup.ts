@@ -18,6 +18,7 @@ limitations under the License.
  * Classes for dealing with key backup.
  */
 
+import type { IMegolmSessionData } from "../@types/crypto";
 import { MatrixClient } from "../client";
 import { logger } from "../logger";
 import { MEGOLM_ALGORITHM, verifySignature } from "./olmlib";
@@ -36,7 +37,7 @@ import {
     IKeyBackupSession,
 } from "./keybackup";
 import { UnstableValue } from "../NamespacedValue";
-import { CryptoEvent, IMegolmSessionData } from "./index";
+import { CryptoEvent } from "./index";
 import { crypto } from "./crypto";
 import { HTTPError, MatrixError } from "../http-api";
 
