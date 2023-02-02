@@ -21,6 +21,7 @@ import type { IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
+import { RoomMember } from "../models/room-member";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
@@ -225,6 +226,27 @@ export class RustCrypto implements CryptoBackend {
         // Processing the /sync may have produced new outgoing requests which need sending, so kick off the outgoing
         // request loop, if it's not already running.
         this.outgoingRequestLoop();
+    }
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Other public functions
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /** called by the MatrixClient on a room membership event
+     *
+     * @param event - The matrix event which caused this event to fire.
+     * @param member - The member whose RoomMember.membership changed.
+     * @param oldMembership - The previous membership state. Null if it's a new member.
+     */
+    public onRoomMembership(event: MatrixEvent, member: RoomMember, oldMembership?: string): void {
+        const enc = this.roomEncryptors[event.getRoomId()!];
+        if (!enc) {
+            // not encrypting in this room
+            return;
+        }
+        enc.onRoomMembership(member);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////

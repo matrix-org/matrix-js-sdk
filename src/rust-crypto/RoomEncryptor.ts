@@ -20,6 +20,7 @@ import { IContent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { logger, PrefixedLogger } from "../logger";
 import { KeyClaimManager } from "./KeyClaimManager";
+import { RoomMember } from "../models/room-member";
 
 /**
  * RoomEncryptor: responsible for encrypting messages to a given room
@@ -51,6 +52,26 @@ export class RoomEncryptor {
         if (JSON.stringify(this.encryptionSettings) != JSON.stringify(config)) {
             this.prefixedLogger.error(`Ignoring m.room.encryption event which requests a change of config`);
         }
+    }
+
+    /**
+     * Handle a new `m.room.member` event in this room
+     *
+     * @param member - new membership state
+     */
+    public onRoomMembership(member: RoomMember): void {
+        this.prefixedLogger.debug(`${member.membership} event for ${member.userId}`);
+
+        if (
+            member.membership == "join" ||
+            (member.membership == "invite" && this.room.shouldEncryptForInvitedMembers())
+        ) {
+            // make sure we are tracking the deviceList for this user
+            this.prefixedLogger.debug(`starting to track devices for: ${member.userId}`);
+            this.olmMachine.updateTrackedUsers([new UserId(member.userId)]);
+        }
+
+        // TODO: handle leaves (including our own)
     }
 
     /**
