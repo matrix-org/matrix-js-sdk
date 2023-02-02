@@ -912,7 +912,14 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const sender = transceiver?.sender;
 
             let added = false;
-            if (sender) {
+            // XXX: We don't re-use transceivers with the SFU: this is to work around
+            // https://github.com/matrix-org/waterfall/issues/98 - see the bug for more.
+            // Since we use WebRTC data channels to renegotiate with the SFU, we're not
+            // limited to the size of a Matrix event, so it's 'ok' if the SDP grows
+            // indefinitely (although presumably this would break if we tried to do
+            // an ICE restart over to-device messages after you'd turned screen sharing
+            // on & off too many times...)
+            if (sender && !this.isFocus) {
                 try {
                     // We already have a sender, so we re-use it. We try to
                     // re-use transceivers as much as possible because they
@@ -959,6 +966,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                         // (It's fine to specify the parameter on Firefox too,
                         // it just won't work.)
                         sendEncodings: this.isFocus ? encodings : undefined,
+                        direction: callFeed.purpose === SDPStreamMetadataPurpose.Usermedia ? "sendrecv" : "sendonly",
                     });
 
                     if (this.isFocus && isFirefox()) {
