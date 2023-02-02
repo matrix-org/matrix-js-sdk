@@ -1,0 +1,55 @@
+/*
+Copyright 2023 The Matrix.org Foundation C.I.C.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
+
+import { IContent } from "../models/event";
+import { Room } from "../models/room";
+import { logger, PrefixedLogger } from "../logger";
+import { KeyClaimManager } from "./KeyClaimManager";
+
+/**
+ * RoomEncryptor: responsible for encrypting messages to a given room
+ */
+export class RoomEncryptor {
+    private readonly prefixedLogger: PrefixedLogger;
+
+    /**
+     * @param olmMachine - The rust-sdk's OlmMachine
+     * @param keyClaimManager - Our KeyClaimManager, which manages the queue of one-time-key claim requests
+     * @param room - The room we want to encrypt for
+     * @param encryptionSettings - body of the m.room.encryption event currently in force in this room
+     */
+    public constructor(
+        private readonly olmMachine: OlmMachine,
+        private readonly keyClaimManager: KeyClaimManager,
+        private readonly room: Room,
+        private encryptionSettings: IContent,
+    ) {
+        this.prefixedLogger = logger.withPrefix(`[${room.roomId} encryption]`);
+    }
+
+    /**
+     * Handle a new `m.room.encryption` event in this room
+     *
+     * @param config - The content of the encryption event
+     */
+    public onCryptoEvent(config: IContent): void {
+        if (JSON.stringify(this.encryptionSettings) != JSON.stringify(config)) {
+            this.prefixedLogger.error(`Ignoring m.room.encryption event which requests a change of config`);
+        }
+    }
+}

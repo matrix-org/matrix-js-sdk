@@ -20,10 +20,12 @@ import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypt
 import type { IToDeviceEvent } from "../sync-accumulator";
 import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
+import { Room } from "../models/room";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
+import { RoomEncryptor } from "./RoomEncryptor";
 import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 import { KeyClaimManager } from "./KeyClaimManager";
 
@@ -39,6 +41,9 @@ export class RustCrypto implements CryptoBackend {
 
     /** whether {@link outgoingRequestLoop} is currently running */
     private outgoingRequestLoopRunning = false;
+
+    /** mapping of roomId → encryptor class */
+    private roomEncryptors: Record<string, RoomEncryptor> = {};
 
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
@@ -159,6 +164,30 @@ export class RustCrypto implements CryptoBackend {
 
         // receiveSyncChanges returns a JSON-encoded list of decrypted to-device messages.
         return JSON.parse(result);
+    }
+
+    /** called by the sync loop on m.room.encrypted events
+     *
+     * @param room - in which the event was received
+     * @param event - encryption event to be processed
+     */
+    public async onCryptoEvent(room: Room, event: MatrixEvent): Promise<void> {
+        const config = event.getContent();
+
+        const existingEncryptor = this.roomEncryptors[room.roomId];
+        if (existingEncryptor) {
+            existingEncryptor.onCryptoEvent(config);
+        } else {
+            this.roomEncryptors[room.roomId] = new RoomEncryptor(this.olmMachine, this.keyClaimManager, room, config);
+        }
+
+        // start tracking devices for any users already known to be in this room.
+        const members = await room.getEncryptionTargetMembers();
+        logger.debug(
+            `[${room.roomId} encryption] starting to track devices for: `,
+            members.map((u) => `${u.userId} (${u.membership})`),
+        );
+        await this.olmMachine.updateTrackedUsers(members.map((u) => new RustSdkCryptoJs.UserId(u.userId)));
     }
 
     /** called by the sync loop after processing each sync.

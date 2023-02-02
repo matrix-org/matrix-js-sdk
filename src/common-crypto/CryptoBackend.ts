@@ -18,6 +18,7 @@ import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypt
 import type { IToDeviceEvent } from "../sync-accumulator";
 import type { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
 import { MatrixEvent } from "../models/event";
+import { Room } from "../models/room";
 import { IEncryptedEventInfo } from "../crypto/api";
 
 /**
@@ -116,6 +117,20 @@ export interface SyncCryptoCallbacks {
      * @returns A list of preprocessed to-device messages.
      */
     preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<IToDeviceEvent[]>;
+
+    /**
+     * Called by the /sync loop whenever an m.room.encryption event is received.
+     *
+     * This is called before RoomStateEvents are emitted for any of the events in the /sync
+     * response (even if the other events technically happened first). This works around a problem
+     * if the client uses a RoomStateEvent (typically a membership event) as a trigger to send a message
+     * in a new room (or one where encryption has been newly enabled): that would otherwise leave the
+     * crypto layer confused because it expects crypto to be set up, but it has not yet been.
+     *
+     * @param room - in which the event was received
+     * @param event - encryption event to be processed
+     */
+    onCryptoEvent(room: Room, event: MatrixEvent): Promise<void>;
 
     /**
      * Called by the /sync loop after each /sync response is processed.
