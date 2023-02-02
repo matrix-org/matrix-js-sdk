@@ -3255,7 +3255,7 @@ describe("Room", function () {
             return event;
         };
 
-        it("adds poll models to room state for a poll start event ", async () => {
+        it("adds poll models to room state for a poll start event", async () => {
             const pollStartEvent = makePollStart("1");
             const events = [pollStartEvent];
 

@@ -147,7 +147,7 @@ describe("Group Call", function () {
             async (state: GroupCallState) => {
                 // @ts-ignore
                 groupCall.state = state;
-                await expect(groupCall.initLocalCallFeed()).rejects.toThrowError();
+                await expect(groupCall.initLocalCallFeed()).rejects.toThrow();
             },
         );
 

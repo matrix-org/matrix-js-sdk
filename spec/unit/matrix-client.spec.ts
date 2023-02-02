@@ -1365,7 +1365,7 @@ describe("MatrixClient", function () {
                     client.redactEvent(roomId, eventId, txnId, {
                         with_relations: [RelationType.Reference],
                     });
-                }).toThrowError(
+                }).toThrow(
                     new Error(
                         "Server does not support relation based redactions " +
                             `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId null`,
@@ -1494,7 +1494,7 @@ describe("MatrixClient", function () {
             { startOpts: { threadSupport: false }, hasThreadSupport: false },
             { startOpts: { experimentalThreadSupport: true }, hasThreadSupport: true },
             { startOpts: { experimentalThreadSupport: true, threadSupport: false }, hasThreadSupport: false },
-        ])("enabled thread support for the SDK instance ", async ({ startOpts, hasThreadSupport }) => {
+        ])("enabled thread support for the SDK instance", async ({ startOpts, hasThreadSupport }) => {
             await client.startClient(startOpts);
             expect(client.supportsThreads()).toBe(hasThreadSupport);
         });
@@ -2440,31 +2440,6 @@ describe("MatrixClient", function () {
                 expect(rooms).toContain(room1);
                 expect(rooms).toContain(room2);
             });
-
-            it("Ignores m.predecessor if we don't ask to use it", () => {
-                // Given 6 rooms, 2 of which have been replaced, and 2 of which WERE
-                // replaced by create events, but are now NOT replaced, because an
-                // m.predecessor event has changed the room's predecessor.
-                const {
-                    room1,
-                    room2,
-                    replacedByCreate1,
-                    replacedByCreate2,
-                    replacedByDynamicPredecessor1,
-                    replacedByDynamicPredecessor2,
-                } = setUpReplacedRooms();
-
-                // When we ask for the visible rooms
-                const rooms = client.getVisibleRooms(); // Don't supply msc3946ProcessDynamicPredecessor
-
-                // Then we only get the ones that have not been replaced
-                expect(rooms).not.toContain(replacedByCreate1);
-                expect(rooms).not.toContain(replacedByCreate2);
-                expect(rooms).toContain(replacedByDynamicPredecessor1);
-                expect(rooms).toContain(replacedByDynamicPredecessor2);
-                expect(rooms).toContain(room1);
-                expect(rooms).toContain(room2);
-            });
         });
 
         describe("getRoomUpgradeHistory", () => {
@@ -2649,7 +2624,7 @@ describe("MatrixClient", function () {
                 expect(history.map((room) => room.roomId)).toEqual([room1.roomId]);
             });
 
-            it("Without verify links, includes predecessors that don't point forwards", () => {
+            it("Without verify links, includes successors that don't point backwards", () => {
                 // Given predecessors point forwards with tombstones, but
                 // successors do not point back with create events.
                 const [room1, room2, room3, room4] = createRoomHistory(false, true);
