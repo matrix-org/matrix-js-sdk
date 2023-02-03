@@ -1399,13 +1399,12 @@
     lodash "^4.17.21"
 
 "@matrix-org/matrix-sdk-crypto-js@^0.1.0-alpha.3":
-  version "0.1.0-alpha.3"
-  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-js/-/matrix-sdk-crypto-js-0.1.0-alpha.3.tgz#829ea03bcad8051dc1e4f0da18a66d4ba273f78f"
-  integrity sha512-KpEddjC34aobFlUYf2mIaXqkjLC0goRmYnbDZLTd0MwiFtau4b1TrPptQ8XFc90Z2VeAcvf18CBqA2otmZzUKQ==
+  version "0.1.0-alpha.4"
+  resolved "https://registry.yarnpkg.com/@matrix-org/matrix-sdk-crypto-js/-/matrix-sdk-crypto-js-0.1.0-alpha.4.tgz#1b20294e0354c3dcc9c7dc810d883198a4042f04"
+  integrity sha512-mdaDKrw3P5ZVCpq0ioW0pV6ihviDEbS8ZH36kpt9stLKHwwDSopPogE6CkQhi0B1jn1yBUtOYi32mBV/zcOR7g==
 
 "@matrix-org/olm@https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.14.tgz":
   version "3.2.14"
-  uid acd96c00a881d0f462e1f97a56c73742c8dbc984
   resolved "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.14.tgz#acd96c00a881d0f462e1f97a56c73742c8dbc984"
 
 "@microsoft/tsdoc-config@0.16.2":
