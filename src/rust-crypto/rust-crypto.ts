@@ -15,29 +15,16 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
-import {
-    KeysBackupRequest,
-    KeysClaimRequest,
-    KeysQueryRequest,
-    KeysUploadRequest,
-    SignatureUploadRequest,
-} from "@matrix-org/matrix-sdk-crypto-js";
 
 import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
 import type { IToDeviceEvent } from "../sync-accumulator";
+import type { IEncryptedEventInfo } from "../crypto/api";
 import { MatrixEvent } from "../models/event";
 import { CryptoBackend, OnSyncCompletedData } from "../common-crypto/CryptoBackend";
 import { logger } from "../logger";
-import { IHttpOpts, MatrixHttpApi, Method } from "../http-api";
-import { QueryDict } from "../utils";
-
-/**
- * Common interface for all the request types returned by `OlmMachine.outgoingRequests`.
- */
-interface OutgoingRequest {
-    readonly id: string | undefined;
-    readonly type: number;
-}
+import { IHttpOpts, MatrixHttpApi } from "../http-api";
+import { DeviceTrustLevel, UserTrustLevel } from "../crypto/CrossSigning";
+import { OutgoingRequest, OutgoingRequestProcessor } from "./OutgoingRequestProcessor";
 
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
@@ -52,12 +39,16 @@ export class RustCrypto implements CryptoBackend {
     /** whether {@link outgoingRequestLoop} is currently running */
     private outgoingRequestLoopRunning = false;
 
+    private outgoingRequestProcessor: OutgoingRequestProcessor;
+
     public constructor(
         private readonly olmMachine: RustSdkCryptoJs.OlmMachine,
-        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         _userId: string,
         _deviceId: string,
-    ) {}
+    ) {
+        this.outgoingRequestProcessor = new OutgoingRequestProcessor(olmMachine, http);
+    }
 
     public stop(): void {
         // stop() may be called multiple times, but attempting to close() the OlmMachine twice
@@ -74,8 +65,50 @@ export class RustCrypto implements CryptoBackend {
     }
 
     public async decryptEvent(event: MatrixEvent): Promise<IEventDecryptionResult> {
-        await this.olmMachine.decryptRoomEvent("event", new RustSdkCryptoJs.RoomId("room"));
-        throw new Error("not implemented");
+        const roomId = event.getRoomId();
+        if (!roomId) {
+            // presumably, a to-device message. These are normally decrypted in preprocessToDeviceMessages
+            // so the fact it has come back here suggests that decryption failed.
+            //
+            // once we drop support for the libolm crypto implementation, we can stop passing to-device messages
+            // through decryptEvent and hence get rid of this case.
+            throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
+        }
+        const res = (await this.olmMachine.decryptRoomEvent(
+            JSON.stringify({
+                event_id: event.getId(),
+                type: event.getWireType(),
+                sender: event.getSender(),
+                state_key: event.getStateKey(),
+                content: event.getWireContent(),
+                origin_server_ts: event.getTs(),
+            }),
+            new RustSdkCryptoJs.RoomId(event.getRoomId()!),
+        )) as RustSdkCryptoJs.DecryptedRoomEvent;
+        return {
+            clearEvent: JSON.parse(res.event),
+            claimedEd25519Key: res.senderClaimedEd25519Key,
+            senderCurve25519Key: res.senderCurve25519Key,
+            forwardingCurve25519KeyChain: res.forwardingCurve25519KeyChain,
+        };
+    }
+
+    public getEventEncryptionInfo(event: MatrixEvent): IEncryptedEventInfo {
+        // TODO: make this work properly. Or better, replace it.
+
+        const ret: Partial<IEncryptedEventInfo> = {};
+
+        ret.senderKey = event.getSenderKey() ?? undefined;
+        ret.algorithm = event.getWireContent().algorithm;
+
+        if (!ret.senderKey || !ret.algorithm) {
+            ret.encrypted = false;
+            return ret as IEncryptedEventInfo;
+        }
+        ret.encrypted = true;
+        ret.authenticated = true;
+        ret.mismatchedSender = true;
+        return ret as IEncryptedEventInfo;
     }
 
     public async userHasCrossSigningKeys(): Promise<boolean> {
@@ -86,6 +119,16 @@ export class RustCrypto implements CryptoBackend {
     public async exportRoomKeys(): Promise<IMegolmSessionData[]> {
         // TODO
         return [];
+    }
+
+    public checkUserTrust(userId: string): UserTrustLevel {
+        // TODO
+        return new UserTrustLevel(false, false, false);
+    }
+
+    public checkDeviceTrust(userId: string, deviceId: string): DeviceTrustLevel {
+        // TODO
+        return new DeviceTrustLevel(false, false, false, false);
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -144,7 +187,7 @@ export class RustCrypto implements CryptoBackend {
                     return;
                 }
                 for (const msg of outgoingRequests) {
-                    await this.doOutgoingRequest(msg as OutgoingRequest);
+                    await this.outgoingRequestProcessor.makeOutgoingRequest(msg as OutgoingRequest);
                 }
             }
         } catch (e) {
@@ -152,50 +195,5 @@ export class RustCrypto implements CryptoBackend {
         } finally {
             this.outgoingRequestLoopRunning = false;
         }
-    }
-
-    private async doOutgoingRequest(msg: OutgoingRequest): Promise<void> {
-        let resp: string;
-
-        /* refer https://docs.rs/matrix-sdk-crypto/0.6.0/matrix_sdk_crypto/requests/enum.OutgoingRequests.html
-         * for the complete list of request types
-         */
-        if (msg instanceof KeysUploadRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
-        } else if (msg instanceof KeysQueryRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
-        } else if (msg instanceof KeysClaimRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/claim", {}, msg.body);
-        } else if (msg instanceof SignatureUploadRequest) {
-            resp = await this.rawJsonRequest(Method.Post, "/_matrix/client/v3/keys/signatures/upload", {}, msg.body);
-        } else if (msg instanceof KeysBackupRequest) {
-            resp = await this.rawJsonRequest(Method.Put, "/_matrix/client/v3/room_keys/keys", {}, msg.body);
-        } else {
-            // TODO: ToDeviceRequest, RoomMessageRequest
-            logger.warn("Unsupported outgoing message", Object.getPrototypeOf(msg));
-            resp = "";
-        }
-
-        if (msg.id) {
-            await this.olmMachine.markRequestAsSent(msg.id, msg.type, resp);
-        }
-    }
-
-    private async rawJsonRequest(method: Method, path: string, queryParams: QueryDict, body: string): Promise<string> {
-        const opts = {
-            // inhibit the JSON stringification and parsing within HttpApi.
-            json: false,
-
-            // nevertheless, we are sending, and accept, JSON.
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-
-            // we use the full prefix
-            prefix: "",
-        };
-
-        return await this.http.authedRequest<string>(method, path, queryParams, body, opts);
     }
 }

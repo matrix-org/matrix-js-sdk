@@ -33,6 +33,7 @@ export enum EventType {
     RoomGuestAccess = "m.room.guest_access",
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
+    RoomPredecessor = "org.matrix.msc3946.room_predecessor",
 
     SpaceChild = "m.space.child",
     SpaceParent = "m.space.parent",
