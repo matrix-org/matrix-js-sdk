@@ -573,6 +573,8 @@ export interface IWellKnownConfig {
     error?: Error | string;
     // eslint-disable-next-line
     base_url?: string | null;
+    // XXX: this is undocumented
+    server_name?: string;
 }
 
 export interface IDelegatedAuthConfig {
