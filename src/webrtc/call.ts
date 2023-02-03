@@ -287,12 +287,6 @@ const SUBSCRIBE_TO_FOCUS_TIMEOUT = 2 * 1000;
 // as we always want to send the full resolution
 const SIMULCAST_USERMEDIA_ENCODINGS: RTCRtpEncodingParameters[] = [
     {
-        // 720p (base)
-        maxFramerate: 30,
-        maxBitrate: 1_700_000,
-        rid: SimulcastResolution.Full,
-    },
-    {
         // 360p
         maxFramerate: 20,
         maxBitrate: 300_000,
@@ -310,12 +304,6 @@ const SIMULCAST_USERMEDIA_ENCODINGS: RTCRtpEncodingParameters[] = [
 ];
 
 const SIMULCAST_SCREENSHARING_ENCODINGS: RTCRtpEncodingParameters[] = [
-    {
-        // 1080p (base)
-        maxFramerate: 30,
-        maxBitrate: 3_000_000,
-        rid: SimulcastResolution.Full,
-    },
     {
         // 720p
         maxFramerate: 15,
