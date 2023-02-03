@@ -215,7 +215,7 @@ describe("SAS verification", function () {
             ]);
 
             // make sure that it uses the preferred method
-            expect(macMethod).toBe("org.matrix.msc3783.hkdf-hmac-sha256");
+            expect(macMethod).toBe("hkdf-hmac-sha256.v2");
             expect(keyAgreement).toBe("curve25519-hkdf-sha256");
 
             // make sure Alice and Bob verified each other

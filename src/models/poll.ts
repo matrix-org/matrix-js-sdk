@@ -14,10 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { M_POLL_END, M_POLL_RESPONSE, PollStartEvent } from "../@types/polls";
+import { M_POLL_END, M_POLL_RESPONSE } from "../@types/polls";
 import { MatrixClient } from "../client";
+import { PollStartEvent } from "../extensible_events_v1/PollStartEvent";
 import { MatrixEvent } from "./event";
 import { Relations } from "./relations";
+import { Room } from "./room";
 import { TypedEventEmitter } from "./typed-event-emitter";
 
 export enum PollEvent {
@@ -60,17 +62,17 @@ const filterResponseRelations = (
 export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, PollEventHandlerMap> {
     public readonly roomId: string;
     public readonly pollEvent: PollStartEvent;
-    private fetchingResponsesPromise: null | Promise<void> = null;
+    private _isFetchingResponses = false;
+    private relationsNextBatch: string | undefined;
     private responses: null | Relations = null;
     private endEvent: MatrixEvent | undefined;
 
-    public constructor(private rootEvent: MatrixEvent, private matrixClient: MatrixClient) {
+    public constructor(public readonly rootEvent: MatrixEvent, private matrixClient: MatrixClient, private room: Room) {
         super();
         if (!this.rootEvent.getRoomId() || !this.rootEvent.getId()) {
             throw new Error("Invalid poll start event.");
         }
         this.roomId = this.rootEvent.getRoomId()!;
-        // @TODO(kerrya) proper way to do this?
         this.pollEvent = this.rootEvent.unstableExtensibleEvent as unknown as PollStartEvent;
     }
 
@@ -82,16 +84,23 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         return !!this.endEvent;
     }
 
+    public get isFetchingResponses(): boolean {
+        return this._isFetchingResponses;
+    }
+
     public async getResponses(): Promise<Relations> {
-        // if we have already fetched the responses
+        // if we have already fetched some responses
         // just return them
         if (this.responses) {
             return this.responses;
         }
-        if (!this.fetchingResponsesPromise) {
-            this.fetchingResponsesPromise = this.fetchResponses();
+
+        // if there is no fetching in progress
+        // start fetching
+        if (!this.isFetchingResponses) {
+            await this.fetchResponses();
         }
-        await this.fetchingResponsesPromise;
+        // return whatever responses we got from the first page
         return this.responses!;
     }
 
@@ -101,7 +110,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
      * @returns void
      */
     public onNewRelation(event: MatrixEvent): void {
-        if (M_POLL_END.matches(event.getType())) {
+        if (M_POLL_END.matches(event.getType()) && this.validateEndEvent(event)) {
             this.endEvent = event;
             this.refilterResponsesOnEnd();
             this.emit(PollEvent.End);
@@ -124,20 +133,34 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     }
 
     private async fetchResponses(): Promise<void> {
+        this._isFetchingResponses = true;
+
         // we want:
         // - stable and unstable M_POLL_RESPONSE
         // - stable and unstable M_POLL_END
         // so make one api call and filter by event type client side
-        const allRelations = await this.matrixClient.relations(this.roomId, this.rootEvent.getId()!, "m.reference");
+        const allRelations = await this.matrixClient.relations(
+            this.roomId,
+            this.rootEvent.getId()!,
+            "m.reference",
+            undefined,
+            {
+                from: this.relationsNextBatch || undefined,
+            },
+        );
 
-        // @TODO(kerrya) paging results
-
-        const responses = new Relations("m.reference", M_POLL_RESPONSE.name, this.matrixClient, [
-            M_POLL_RESPONSE.altName!,
-        ]);
+        const responses =
+            this.responses ||
+            new Relations("m.reference", M_POLL_RESPONSE.name, this.matrixClient, [M_POLL_RESPONSE.altName!]);
 
         const pollEndEvent = allRelations.events.find((event) => M_POLL_END.matches(event.getType()));
-        const pollCloseTimestamp = pollEndEvent?.getTs() || Number.MAX_SAFE_INTEGER;
+        if (this.validateEndEvent(pollEndEvent)) {
+            this.endEvent = pollEndEvent;
+            this.refilterResponsesOnEnd();
+            this.emit(PollEvent.End);
+        }
+
+        const pollCloseTimestamp = this.endEvent?.getTs() || Number.MAX_SAFE_INTEGER;
 
         const { responseEvents } = filterResponseRelations(allRelations.events, pollCloseTimestamp);
 
@@ -145,11 +168,21 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
             responses.addEvent(event);
         });
 
+        this.relationsNextBatch = allRelations.nextBatch ?? undefined;
         this.responses = responses;
-        this.endEvent = pollEndEvent;
-        if (this.endEvent) {
-            this.emit(PollEvent.End);
+
+        // while there are more pages of relations
+        // fetch them
+        if (this.relationsNextBatch) {
+            // don't await
+            // we want to return the first page as soon as possible
+            this.fetchResponses();
+        } else {
+            // no more pages
+            this._isFetchingResponses = false;
         }
+
+        // emit after updating _isFetchingResponses state
         this.emit(PollEvent.Responses, this.responses);
     }
 
@@ -171,5 +204,31 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         });
 
         this.emit(PollEvent.Responses, this.responses);
+    }
+
+    private validateEndEvent(endEvent?: MatrixEvent): boolean {
+        if (!endEvent) {
+            return false;
+        }
+        /**
+         * Repeated end events are ignored -
+         * only the first (valid) closure event by origin_server_ts is counted.
+         */
+        if (this.endEvent && this.endEvent.getTs() < endEvent.getTs()) {
+            return false;
+        }
+
+        /**
+         * MSC3381
+         * If a m.poll.end event is received from someone other than the poll creator or user with permission to redact
+         * others' messages in the room, the event must be ignored by clients due to being invalid.
+         */
+        const roomCurrentState = this.room.currentState;
+        const endEventSender = endEvent.getSender();
+        return (
+            !!endEventSender &&
+            (endEventSender === this.rootEvent.getSender() ||
+                roomCurrentState.maySendRedactionForEvent(this.rootEvent, endEventSender))
+        );
     }
 }

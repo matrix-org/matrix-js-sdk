@@ -17,24 +17,16 @@ limitations under the License.
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
-import {
-    KeysBackupRequest,
-    KeysClaimRequest,
-    KeysQueryRequest,
-    KeysUploadRequest,
-    OlmMachine,
-    SignatureUploadRequest,
-} from "@matrix-org/matrix-sdk-crypto-js";
+import { KeysQueryRequest, OlmMachine } from "@matrix-org/matrix-sdk-crypto-js";
 import { Mocked } from "jest-mock";
-import MockHttpBackend from "matrix-mock-request";
 
-import { RustCrypto } from "../../src/rust-crypto/rust-crypto";
-import { initRustCrypto } from "../../src/rust-crypto";
-import { HttpApiEvent, HttpApiEventHandlerMap, IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../src";
-import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
-import { mkEvent } from "../test-utils/test-utils";
-import { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
-import { IEventDecryptionResult } from "../../src/@types/crypto";
+import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
+import { initRustCrypto } from "../../../src/rust-crypto";
+import { IToDeviceEvent, MatrixClient, MatrixHttpApi } from "../../../src";
+import { mkEvent } from "../../test-utils/test-utils";
+import { CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
+import { IEventDecryptionResult } from "../../../src/@types/crypto";
+import { OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
@@ -106,8 +98,8 @@ describe("RustCrypto", () => {
         /** the RustCrypto implementation under test */
         let rustCrypto: RustCrypto;
 
-        /** A mock http backend which rustCrypto is connected to */
-        let httpBackend: MockHttpBackend;
+        /** A mock OutgoingRequestProcessor which rustCrypto is connected to */
+        let outgoingRequestProcessor: Mocked<OutgoingRequestProcessor>;
 
         /** a mocked-up OlmMachine which rustCrypto is connected to */
         let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
@@ -116,27 +108,24 @@ describe("RustCrypto", () => {
          *  the front of the queue, until it is empty. */
         let outgoingRequestQueue: Array<Array<any>>;
 
-        /** wait for a call to olmMachine.markRequestAsSent */
-        function awaitCallToMarkAsSent(): Promise<void> {
-            return new Promise((resolve, _reject) => {
-                olmMachine.markRequestAsSent.mockImplementationOnce(async () => {
-                    resolve(undefined);
+        /** wait for a call to outgoingRequestProcessor.makeOutgoingRequest.
+         *
+         * The promise resolves to a callback: the makeOutgoingRequest call will not complete until the returned
+         * callback is called.
+         */
+        function awaitCallToMakeOutgoingRequest(): Promise<() => void> {
+            return new Promise<() => void>((resolveCalledPromise, _reject) => {
+                outgoingRequestProcessor.makeOutgoingRequest.mockImplementationOnce(async () => {
+                    const completePromise = new Promise<void>((resolveCompletePromise, _reject) => {
+                        resolveCalledPromise(resolveCompletePromise);
+                    });
+                    return completePromise;
                 });
             });
         }
 
         beforeEach(async () => {
-            httpBackend = new MockHttpBackend();
-
             await RustSdkCryptoJs.initAsync();
-
-            const dummyEventEmitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-            const httpApi = new MatrixHttpApi(dummyEventEmitter, {
-                baseUrl: "https://example.com",
-                prefix: "/_matrix",
-                fetchFn: httpBackend.fetchFn as typeof global.fetch,
-                onlyData: true,
-            });
 
             // for these tests we use a mock OlmMachine, with an implementation of outgoingRequests that
             // returns objects from outgoingRequestQueue
@@ -145,91 +134,55 @@ describe("RustCrypto", () => {
                 outgoingRequests: jest.fn().mockImplementation(() => {
                     return Promise.resolve(outgoingRequestQueue.shift() ?? []);
                 }),
-                markRequestAsSent: jest.fn(),
                 close: jest.fn(),
             } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
-            rustCrypto = new RustCrypto(olmMachine, httpApi, TEST_USER, TEST_DEVICE_ID);
+            outgoingRequestProcessor = {
+                makeOutgoingRequest: jest.fn(),
+            } as unknown as Mocked<OutgoingRequestProcessor>;
+
+            rustCrypto = new RustCrypto(olmMachine, {} as MatrixHttpApi<any>, TEST_USER, TEST_DEVICE_ID);
+            rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
         });
 
-        it("should poll for outgoing messages", () => {
+        it("should poll for outgoing messages and send them", async () => {
+            const testReq = new KeysQueryRequest("1234", "{}");
+            outgoingRequestQueue.push([testReq]);
+
+            const makeRequestPromise = awaitCallToMakeOutgoingRequest();
             rustCrypto.onSyncCompleted({});
+
+            await makeRequestPromise;
             expect(olmMachine.outgoingRequests).toHaveBeenCalled();
-        });
-
-        /* simple requests that map directly to the request body */
-        const tests: Array<[any, "POST" | "PUT", string]> = [
-            [KeysUploadRequest, "POST", "https://example.com/_matrix/client/v3/keys/upload"],
-            [KeysQueryRequest, "POST", "https://example.com/_matrix/client/v3/keys/query"],
-            [KeysClaimRequest, "POST", "https://example.com/_matrix/client/v3/keys/claim"],
-            [SignatureUploadRequest, "POST", "https://example.com/_matrix/client/v3/keys/signatures/upload"],
-            [KeysBackupRequest, "PUT", "https://example.com/_matrix/client/v3/room_keys/keys"],
-        ];
-
-        for (const [RequestClass, expectedMethod, expectedPath] of tests) {
-            it(`should handle ${RequestClass.name}s`, async () => {
-                const testBody = '{ "foo": "bar" }';
-                const outgoingRequest = new RequestClass("1234", testBody);
-                outgoingRequestQueue.push([outgoingRequest]);
-
-                const testResponse = '{ "result": 1 }';
-                httpBackend
-                    .when(expectedMethod, "/_matrix")
-                    .check((req) => {
-                        expect(req.path).toEqual(expectedPath);
-                        expect(req.rawData).toEqual(testBody);
-                        expect(req.headers["Accept"]).toEqual("application/json");
-                        expect(req.headers["Content-Type"]).toEqual("application/json");
-                    })
-                    .respond(200, testResponse, true);
-
-                rustCrypto.onSyncCompleted({});
-
-                expect(olmMachine.outgoingRequests).toHaveBeenCalledTimes(1);
-
-                const markSentCallPromise = awaitCallToMarkAsSent();
-                await httpBackend.flushAllExpected();
-
-                await markSentCallPromise;
-                expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("1234", outgoingRequest.type, testResponse);
-                httpBackend.verifyNoOutstandingRequests();
-            });
-        }
-
-        it("does not explode with unknown requests", async () => {
-            const outgoingRequest = { id: "5678", type: 987 };
-            outgoingRequestQueue.push([outgoingRequest]);
-
-            rustCrypto.onSyncCompleted({});
-
-            await awaitCallToMarkAsSent();
-            expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith("5678", 987, "");
+            expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledWith(testReq);
         });
 
         it("stops looping when stop() is called", async () => {
-            const testResponse = '{ "result": 1 }';
-
             for (let i = 0; i < 5; i++) {
                 outgoingRequestQueue.push([new KeysQueryRequest("1234", "{}")]);
-                httpBackend.when("POST", "/_matrix").respond(200, testResponse, true);
             }
+
+            let makeRequestPromise = awaitCallToMakeOutgoingRequest();
 
             rustCrypto.onSyncCompleted({});
 
             expect(rustCrypto["outgoingRequestLoopRunning"]).toBeTruthy();
 
             // go a couple of times round the loop
-            await httpBackend.flush("/_matrix", 1);
-            await awaitCallToMarkAsSent();
+            let resolveMakeRequest = await makeRequestPromise;
+            makeRequestPromise = awaitCallToMakeOutgoingRequest();
+            resolveMakeRequest();
 
-            await httpBackend.flush("/_matrix", 1);
-            await awaitCallToMarkAsSent();
+            resolveMakeRequest = await makeRequestPromise;
+            makeRequestPromise = awaitCallToMakeOutgoingRequest();
+            resolveMakeRequest();
 
             // a second sync while this is going on shouldn't make any difference
             rustCrypto.onSyncCompleted({});
 
-            await httpBackend.flush("/_matrix", 1);
-            await awaitCallToMarkAsSent();
+            resolveMakeRequest = await makeRequestPromise;
+            outgoingRequestProcessor.makeOutgoingRequest.mockReset();
+            resolveMakeRequest();
 
             // now stop...
             rustCrypto.stop();
@@ -241,7 +194,7 @@ describe("RustCrypto", () => {
                 setTimeout(resolve, 100);
             });
             expect(rustCrypto["outgoingRequestLoopRunning"]).toBeFalsy();
-            httpBackend.verifyNoOutstandingRequests();
+            expect(outgoingRequestProcessor.makeOutgoingRequest).not.toHaveBeenCalled();
             expect(olmMachine.outgoingRequests).not.toHaveBeenCalled();
 
             // we sent three, so there should be 2 left

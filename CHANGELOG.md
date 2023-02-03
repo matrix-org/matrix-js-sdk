@@ -1,3 +1,18 @@
+Changes in [23.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.2.0) (2023-01-31)
+==================================================================================================
+
+## ✨ Features
+ * Implement decryption via the rust sdk ([\#3074](https://github.com/matrix-org/matrix-js-sdk/pull/3074)).
+ * Handle edits which are bundled with an event, per MSC3925 ([\#3045](https://github.com/matrix-org/matrix-js-sdk/pull/3045)).
+
+## 🐛 Bug Fixes
+ * Add null check for our own member event ([\#3082](https://github.com/matrix-org/matrix-js-sdk/pull/3082)).
+ * Handle group call getting initialised twice in quick succession ([\#3078](https://github.com/matrix-org/matrix-js-sdk/pull/3078)). Fixes vector-im/element-call#847.
+ * Correctly handle limited sync responses by resetting the thread timeline ([\#3056](https://github.com/matrix-org/matrix-js-sdk/pull/3056)). Fixes vector-im/element-web#23952. Contributed by @justjanne.
+ * Fix failure to start in firefox private browser ([\#3058](https://github.com/matrix-org/matrix-js-sdk/pull/3058)). Fixes vector-im/element-web#24216.
+ * Fix spurious "Decryption key withheld" messages ([\#3061](https://github.com/matrix-org/matrix-js-sdk/pull/3061)). Fixes vector-im/element-web#23803.
+ * Fix browser entrypoint ([\#3051](https://github.com/matrix-org/matrix-js-sdk/pull/3051)). Fixes #3013.
+
 Changes in [23.1.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.1.1) (2023-01-20)
 ==================================================================================================
 

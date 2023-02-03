@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -198,7 +198,7 @@ export function defaultClientOpts(opts?: IStoredClientOpts): IStoredClientOpts {
         resolveInvitesToProfiles: false,
         pollTimeout: 30 * 1000,
         pendingEventOrdering: PendingEventOrdering.Chronological,
-        experimentalThreadSupport: false,
+        threadSupport: false,
         ...opts,
     };
 }
@@ -1254,11 +1254,12 @@ export class SyncApi {
 
             const inviter = room.currentState.getStateEvents(EventType.RoomMember, client.getUserId()!)?.getSender();
 
-            if (client.isCryptoEnabled()) {
-                const parkedHistory = await client.crypto!.cryptoStore.takeParkedSharedHistory(room.roomId);
+            const crypto = client.crypto;
+            if (crypto) {
+                const parkedHistory = await crypto.cryptoStore.takeParkedSharedHistory(room.roomId);
                 for (const parked of parkedHistory) {
                     if (parked.senderId === inviter) {
-                        await client.crypto!.olmDevice.addInboundGroupSession(
+                        await crypto.olmDevice.addInboundGroupSession(
                             room.roomId,
                             parked.senderKey,
                             parked.forwardingCurve25519KeyChain,
