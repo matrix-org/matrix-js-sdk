@@ -16,6 +16,7 @@ limitations under the License.
 
 import { EncryptionSettings, OlmMachine, RoomId, UserId } from "@matrix-org/matrix-sdk-crypto-js";
 
+import { EventType } from "../@types/event";
 import { IContent, MatrixEvent } from "../models/event";
 import { Room } from "../models/room";
 import { logger, PrefixedLogger } from "../logger";
@@ -120,7 +121,7 @@ export class RoomEncryptor {
         );
 
         event.makeEncrypted(
-            "m.room.encrypted",
+            EventType.RoomMessageEncrypted,
             JSON.parse(encryptedContent),
             this.olmMachine.identityKeys.curve25519.toBase64(),
             this.olmMachine.identityKeys.ed25519.toBase64(),
