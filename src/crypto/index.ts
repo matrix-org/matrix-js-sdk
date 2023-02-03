@@ -2808,11 +2808,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns Promise which resolves when the event has been
      *     encrypted, or null if nothing was needed
      */
-    public async encryptEvent(event: MatrixEvent, room?: Room): Promise<void> {
-        if (!room) {
-            throw new Error("Cannot send encrypted messages in unknown rooms");
-        }
-
+    public async encryptEvent(event: MatrixEvent, room: Room): Promise<void> {
         const roomId = event.getRoomId()!;
 
         const alg = this.roomEncryptors.get(roomId);
