@@ -426,7 +426,7 @@ export class MediaHandler extends TypedEventEmitter<
                 : false,
             video: video
                 ? {
-                      ...getDimensionConstraints(getIdealOrExact, 1280, 720, 30),
+                      ...getDimensionConstraints(getIdealOrExact, 640, 360, 30),
                       deviceId: this.videoInput ? { ideal: this.videoInput } : undefined,
                   }
                 : false,
@@ -444,7 +444,7 @@ export class MediaHandler extends TypedEventEmitter<
         return {
             audio: audio ?? false,
             video: {
-                ...getDimensionConstraints(getIdealAndMax, 1920, 1080, 30),
+                ...getDimensionConstraints(getIdealAndMax, 1280, 720, 30),
                 mandatory: desktopCapturerSourceId
                     ? {
                           chromeMediaSource: "desktop",

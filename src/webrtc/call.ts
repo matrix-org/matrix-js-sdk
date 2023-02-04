@@ -291,7 +291,7 @@ const SIMULCAST_USERMEDIA_ENCODINGS: RTCRtpEncodingParameters[] = [
         maxFramerate: 20,
         maxBitrate: 300_000,
         rid: SimulcastResolution.Half,
-        scaleResolutionDownBy: 2.0,
+        scaleResolutionDownBy: 1.0,
     },
     {
         // 180p
@@ -299,7 +299,7 @@ const SIMULCAST_USERMEDIA_ENCODINGS: RTCRtpEncodingParameters[] = [
         maxBitrate: 120_000,
 
         rid: SimulcastResolution.Quarter,
-        scaleResolutionDownBy: 4.0,
+        scaleResolutionDownBy: 2.0,
     },
 ];
 
@@ -309,14 +309,14 @@ const SIMULCAST_SCREENSHARING_ENCODINGS: RTCRtpEncodingParameters[] = [
         maxFramerate: 15,
         maxBitrate: 1_000_000,
         rid: SimulcastResolution.Half,
-        scaleResolutionDownBy: 1.5,
+        scaleResolutionDownBy: 1.0,
     },
     {
         // 360p
         maxFramerate: 3,
         maxBitrate: 200_000,
         rid: SimulcastResolution.Quarter,
-        scaleResolutionDownBy: 3,
+        scaleResolutionDownBy: 2.0,
     },
 ];
 
