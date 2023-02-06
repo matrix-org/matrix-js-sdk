@@ -79,8 +79,12 @@ function encryptOlmEvent(opts: {
     senderSigningKey: string;
     /** the olm session to use for encryption */
     p2pSession: Olm.Session;
-    /** the recipient client */
-    recipient: TestClient;
+    /** the recipient's user id */
+    recipient: string;
+    /** the recipient's curve25519 key */
+    recipientCurve25519Key: string;
+    /** the recipient's ed25519 key */
+    recipientEd25519Key: string;
     /** the payload of the message */
     plaincontent?: object;
     /** the event type of the payload */
@@ -92,9 +96,9 @@ function encryptOlmEvent(opts: {
 
     const plaintext = {
         content: opts.plaincontent || {},
-        recipient: opts.recipient.userId,
+        recipient: opts.recipient,
         recipient_keys: {
-            ed25519: opts.recipient.getSigningKey(),
+            ed25519: opts.recipientEd25519Key,
         },
         keys: {
             ed25519: opts.senderSigningKey,
@@ -107,7 +111,7 @@ function encryptOlmEvent(opts: {
         content: {
             algorithm: "m.olm.v1.curve25519-aes-sha2",
             ciphertext: {
-                [opts.recipient.getDeviceKey()]: opts.p2pSession.encrypt(JSON.stringify(plaintext)),
+                [opts.recipientCurve25519Key]: opts.p2pSession.encrypt(JSON.stringify(plaintext)),
             },
             sender_key: opts.senderKey,
         },
@@ -166,7 +170,12 @@ function encryptMegolmEventRawPlainText(opts: {
 
 /** build an encrypted room_key event to share a group session, using an existing olm session */
 function encryptGroupSessionKey(opts: {
-    recipient: TestClient;
+    /** recipient's user id */
+    recipient: string;
+    /** the recipient's curve25519 key */
+    recipientCurve25519Key: string;
+    /** the recipient's ed25519 key */
+    recipientEd25519Key: string;
     /** sender's olm account */
     olmAccount: Olm.Account;
     /** sender's olm session with the recipient */
@@ -179,6 +188,8 @@ function encryptGroupSessionKey(opts: {
         senderKey: senderKeys.curve25519,
         senderSigningKey: senderKeys.ed25519,
         recipient: opts.recipient,
+        recipientCurve25519Key: opts.recipientCurve25519Key,
+        recipientEd25519Key: opts.recipientEd25519Key,
         p2pSession: opts.p2pSession,
         plaincontent: {
             algorithm: "m.megolm.v1.aes-sha2",
@@ -255,7 +266,9 @@ async function establishOlmSession(testClient: TestClient, peerOlmAccount: Olm.A
     const olmEvent = encryptOlmEvent({
         senderKey: peerE2EKeys.curve25519,
         senderSigningKey: peerE2EKeys.ed25519,
-        recipient: testClient,
+        recipient: testClient.userId!,
+        recipientCurve25519Key: testClient.getDeviceKey(),
+        recipientEd25519Key: testClient.getSigningKey(),
         p2pSession: p2pSession,
     });
     testClient.httpBackend.when("GET", "/sync").respond(200, {
@@ -456,7 +469,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            recipient: aliceTestClient,
+            recipient: aliceTestClient.userId!,
+            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
+            recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -512,7 +527,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
         // make the room_key event, but don't send it yet
         const roomKeyEncrypted = encryptGroupSessionKey({
-            recipient: aliceTestClient,
+            recipient: aliceTestClient.userId!,
+            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
+            recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -577,7 +594,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
         // make the room_key event
         const roomKeyEncrypted1 = encryptGroupSessionKey({
-            recipient: aliceTestClient,
+            recipient: aliceTestClient.userId!,
+            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
+            recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -594,7 +613,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         // make a second room_key event now that we have advanced the group
         // session.
         const roomKeyEncrypted2 = encryptGroupSessionKey({
-            recipient: aliceTestClient,
+            recipient: aliceTestClient.userId!,
+            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
+            recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -1053,7 +1074,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            recipient: aliceTestClient,
+            recipient: aliceTestClient.userId!,
+            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
+            recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -1192,7 +1215,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            recipient: aliceTestClient,
+            recipient: aliceTestClient.userId!,
+            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
+            recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -1308,7 +1333,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             sender: "@becca:localhost",
             senderSigningKey: beccaTestClient.getSigningKey(),
             senderKey: beccaTestClient.getDeviceKey(),
-            recipient: aliceTestClient,
+            recipient: aliceTestClient.userId!,
+            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
+            recipientEd25519Key: aliceTestClient.getSigningKey(),
             p2pSession: p2pSession,
             plaincontent: {
                 "algorithm": "m.megolm.v1.aes-sha2",
@@ -1453,7 +1480,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             sender: "@becca:localhost",
             senderKey: beccaTestClient.getDeviceKey(),
             senderSigningKey: beccaTestClient.getSigningKey(),
-            recipient: aliceTestClient,
+            recipient: aliceTestClient.userId!,
+            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
+            recipientEd25519Key: aliceTestClient.getSigningKey(),
             p2pSession: p2pSession,
             plaincontent: {
                 "algorithm": "m.megolm.v1.aes-sha2",
