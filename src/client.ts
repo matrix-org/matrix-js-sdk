@@ -9430,58 +9430,72 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
 
     const oldActions = event.getPushActions();
     const actions = cli.getPushActionsForEvent(event, true);
+
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 
-    const currentCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
+    const currentHighlightCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
+    
+    // Total count is used to typically increment a room notification counter, but not loudly highlight it.
+    const currentTotalCount =
+            (isThreadEvent
+                ? room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total)
+                : room.getRoomUnreadNotificationCount(NotificationCountType.Total)) ?? 0;
 
     // Ensure the unread counts are kept up to date if the event is encrypted
     // We also want to make sure that the notification count goes up if we already
     // have encrypted events to avoid other code from resetting 'highlight' to zero.
     const oldHighlight = !!oldActions?.tweaks?.highlight;
     const newHighlight = !!actions?.tweaks?.highlight;
-    if (oldHighlight !== newHighlight || currentCount > 0) {
+
+    let hasReadEvent;
+    if (isThreadEvent) {
+        const thread = room.getThread(event.threadRootId);
+        hasReadEvent = thread
+            ? thread.hasUserReadEvent(ourUserId, eventId)
+            : // If the thread object does not exist in the room yet, we don't
+              // want to calculate notification for this event yet. We have not
+              // restored the read receipts yet and can't accurately calculate
+              // notifications at this stage.
+              //
+              // This issue can likely go away when MSC3874 is implemented
+              true;
+    } else {
+        hasReadEvent = room.hasUserReadEvent(ourUserId, eventId);
+    }
+
+    if (hasReadEvent) {
+        // If the event has been read, ignore it.
+        return;
+    }
+
+    if (oldHighlight !== newHighlight || currentHighlightCount > 0) {
         // TODO: Handle mentions received while the client is offline
         // See also https://github.com/vector-im/element-web/issues/9069
-        let hasReadEvent;
+        let newCount = currentHighlightCount;
+        if (newHighlight && !oldHighlight) newCount++;
+        if (!newHighlight && oldHighlight) newCount--;
+
         if (isThreadEvent) {
-            const thread = room.getThread(event.threadRootId);
-            hasReadEvent = thread
-                ? thread.hasUserReadEvent(cli.getUserId()!, event.getId()!)
-                : // If the thread object does not exist in the room yet, we don't
-                  // want to calculate notification for this event yet. We have not
-                  // restored the read receipts yet and can't accurately calculate
-                  // highlight notifications at this stage.
-                  //
-                  // This issue can likely go away when MSC3874 is implemented
-                  true;
+            room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Highlight, newCount);
         } else {
-            hasReadEvent = room.hasUserReadEvent(cli.getUserId()!, event.getId()!);
+            room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
         }
+    }
 
-        if (!hasReadEvent) {
-            let newCount = currentCount;
-            if (newHighlight && !oldHighlight) newCount++;
-            if (!newHighlight && oldHighlight) newCount--;
+    // `notify` is used in practice for incrementing the total count
+    const oldNotfy = !!oldActions?.notify;
+    const newNotify = !!actions?.notify;
 
-            if (isThreadEvent) {
-                room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Highlight, newCount);
-            } else {
-                room.setUnreadNotificationCount(NotificationCountType.Highlight, newCount);
-            }
+    if (oldNotfy !== newNotify || currentTotalCount > 0) {
+        // We've recalculated that the event should or should not notify, and the total is > 0
+        let newCount = currentTotalCount;
+        if (newNotify && !oldNotfy) newCount++;
+        if (!newNotify && oldNotfy) newCount--;
 
-            // Fix 'Mentions Only' rooms from not having the right badge count
-            const totalCount =
-                (isThreadEvent
-                    ? room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total)
-                    : room.getRoomUnreadNotificationCount(NotificationCountType.Total)) ?? 0;
-
-            if (totalCount < newCount) {
-                if (isThreadEvent) {
-                    room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total, newCount);
-                } else {
-                    room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
-                }
-            }
+        if (isThreadEvent) {
+            room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total, newCount);
+        } else {
+            room.setUnreadNotificationCount(NotificationCountType.Total, newCount);
         }
     }
 }
