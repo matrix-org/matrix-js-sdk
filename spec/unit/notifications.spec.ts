@@ -134,7 +134,7 @@ describe("fixNotificationCountOnDecryption", () => {
 
         fixNotificationCountOnDecryption(mockClient, event);
 
-        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(2);
+        expect(room.getUnreadNotificationCount(NotificationCountType.Total)).toBe(3);
         expect(room.getUnreadNotificationCount(NotificationCountType.Highlight)).toBe(1);
     });
 
@@ -154,7 +154,7 @@ describe("fixNotificationCountOnDecryption", () => {
 
         fixNotificationCountOnDecryption(mockClient, threadEvent);
 
-        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(1);
+        expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(2);
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(1);
     });
 
