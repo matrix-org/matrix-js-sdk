@@ -20,7 +20,7 @@ limitations under the License.
 
 import { Optional } from "matrix-events-sdk";
 
-import type { IMegolmSessionData } from "./@types/crypto";
+import type { IDeviceKeys, IMegolmSessionData, IOneTimeKey } from "./@types/crypto";
 import { ISyncStateData, SyncApi, SyncApiOptions, SyncState } from "./sync";
 import {
     EventStatus,
@@ -85,13 +85,7 @@ import { keyFromAuthData } from "./crypto/key_passphrase";
 import { User, UserEvent, UserEventHandlerMap } from "./models/user";
 import { getHttpUriForMxc } from "./content-repo";
 import { SearchResult } from "./models/search-result";
-import {
-    DEHYDRATION_ALGORITHM,
-    IDehydratedDevice,
-    IDehydratedDeviceKeyInfo,
-    IDeviceKeys,
-    IOneTimeKey,
-} from "./crypto/dehydration";
+import { DEHYDRATION_ALGORITHM, IDehydratedDevice, IDehydratedDeviceKeyInfo } from "./crypto/dehydration";
 import {
     IKeyBackupInfo,
     IKeyBackupPrepareOpts,

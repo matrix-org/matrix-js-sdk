@@ -20,6 +20,7 @@ import MockHttpBackend from "matrix-mock-request";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 
+import type { IDeviceKeys } from "../../src/@types/crypto";
 import * as testUtils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
@@ -38,7 +39,6 @@ import {
     RoomMember,
     RoomStateEvent,
 } from "../../src/matrix";
-import { IDeviceKeys } from "../../src/crypto/dehydration";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
 import { CRYPTO_BACKENDS, InitCrypto } from "../test-utils/test-utils";
 

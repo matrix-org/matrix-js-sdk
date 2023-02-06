@@ -21,6 +21,7 @@ import "./olm-loader";
 
 import MockHttpBackend from "matrix-mock-request";
 
+import type { IDeviceKeys, IOneTimeKey } from "../src/@types/crypto";
 import { LocalStorageCryptoStore } from "../src/crypto/store/localStorage-crypto-store";
 import { logger } from "../src/logger";
 import { syncPromise } from "./test-utils/test-utils";
@@ -28,7 +29,6 @@ import { createClient, IStartClientOpts } from "../src/matrix";
 import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
 import { MockStorageApi } from "./MockStorageApi";
 import { encodeUri } from "../src/utils";
-import { IDeviceKeys, IOneTimeKey } from "../src/crypto/dehydration";
 import { IKeyBackupSession } from "../src/crypto/keybackup";
 import { IKeysUploadResponse, IUploadKeysRequest } from "../src/client";
 
