@@ -9422,12 +9422,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
  * accurate notification_count
  */
 export function fixNotificationCountOnDecryption(cli: MatrixClient, event: MatrixEvent): void {
-    const oldActions = event.getPushActions();
-    const actions = cli.getPushActionsForEvent(event, true);
+    const ourUserId = cli.getUserId();
+    const eventId = event.getId();
 
     const room = cli.getRoom(event.getRoomId());
-    if (!room || !cli.getUserId()) return;
+    if (!room || !ourUserId || !eventId) return;
 
+    const oldActions = event.getPushActions();
+    const actions = cli.getPushActionsForEvent(event, true);
     const isThreadEvent = !!event.threadRootId && !event.isThreadRoot;
 
     const currentCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
