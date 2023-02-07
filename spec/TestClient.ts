@@ -240,8 +240,22 @@ export class TestClient {
         return this.deviceKeys!.keys[keyId];
     }
 
+    /** Next time we see a sync request (or immediately, if there is one waiting), send the given response
+     *
+     * Calling this will register a response for `/sync`, and then, in the background, flush a single `/sync` request.
+     * Try calling {@link syncPromise} to wait for the sync to complete.
+     *
+     * @param response - response to /sync request
+     */
+    public sendOrQueueSyncResponse(syncResponse: object): void {
+        this.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+        this.httpBackend.flush("/sync", 1);
+    }
+
     /**
      * flush a single /sync request, and wait for the syncing event
+     *
+     * @deprecated: prefer to use {@link #sendOrQueueSyncResponse} followed by {@link syncPromise}.
      */
     public flushSync(): Promise<void> {
         logger.log(`${this}: flushSync`);

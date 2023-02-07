@@ -273,11 +273,11 @@ async function establishOlmSession(testClient: TestClient, peerOlmAccount: Olm.A
         recipientEd25519Key: testClient.getSigningKey(),
         p2pSession: p2pSession,
     });
-    testClient.httpBackend.when("GET", "/sync").respond(200, {
+    testClient.sendOrQueueSyncResponse({
         next_batch: 1,
         to_device: { events: [olmEvent] },
     });
-    await testClient.flushSync();
+    await syncPromise(testClient.client);
     return p2pSession;
 }
 
@@ -366,7 +366,7 @@ async function expectSendMegolmMessage(
     return JSON.parse(r.plaintext);
 }
 
-describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, initCrypto: InitCrypto) => {
+describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, initCrypto: InitCrypto) => {
     if (!global.Olm) {
         // currently we use libolm to implement the crypto in the tests, so need it to be present.
         logger.warn("not running megolm tests: Olm not present");
@@ -395,7 +395,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
         // we let the client do a very basic initial sync, which it needs before
         // it will upload one-time keys.
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, { next_batch: 1 });
+        aliceTestClient.sendOrQueueSyncResponse({ next_batch: 1 });
 
         aliceTestClient.client.startClient({
             // set this so that we can get hold of failed events
@@ -542,8 +542,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             },
         };
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceTestClient.client);
 
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
@@ -588,23 +588,23 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         });
 
         // Alice just gets the message event to start with
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 1,
             rooms: { join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } } },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         expect(room.getLiveTimeline().getEvents()[0].getContent().msgtype).toEqual("m.bad.encrypted");
 
         // now she gets the room_key event
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 2,
             to_device: {
                 events: [roomKeyEncrypted],
             },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         const event = room.getLiveTimeline().getEvents()[0];
 
@@ -667,17 +667,18 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         });
 
         // on the first sync, send the best room key
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 1,
             to_device: {
                 events: [roomKeyEncrypted1],
             },
         });
+        await syncPromise(aliceTestClient.client);
 
         // on the second sync, send the advanced room key, along with the
         // message.  This simulates the situation where Alice has been sent a
         // later copy of the room key and is reloading the client.
-        const syncResponse2 = {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 2,
             to_device: {
                 events: [roomKeyEncrypted2],
@@ -685,12 +686,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             rooms: {
                 join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } },
             },
-        };
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse2);
-
-        // flush both syncs
-        await aliceTestClient.flushSync();
-        await aliceTestClient.flushSync();
+        });
+        await syncPromise(aliceTestClient.client);
 
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         await room.decryptCriticalEvents();
@@ -704,8 +701,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
 
         // tell alice she is sharing a room with bob
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceTestClient.client);
 
         // we expect alice first to query bob's keys...
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
@@ -732,8 +729,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceTestClient.client);
 
         // start out with the device unknown - the send should be rejected.
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
@@ -775,8 +772,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         await startClientAndAwaitFirstSync();
         await establishOlmSession(aliceTestClient, testOlmAccount);
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceTestClient.client);
 
         logger.log("Forcing alice to download our device keys");
 
@@ -821,8 +818,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
-            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
-            await aliceTestClient.flushSync();
+            aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            await syncPromise(aliceTestClient.client);
 
             // start out with the device unknown - the send should be rejected.
             aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
@@ -878,8 +875,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
             // tell alice we share a room with bob
-            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
-            await aliceTestClient.flushSync();
+            aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+            await syncPromise(aliceTestClient.client);
 
             logger.log("Forcing alice to download our device keys");
             aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
@@ -935,8 +932,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceTestClient.client);
 
         logger.log("Fetching bob's devices and marking known");
 
@@ -1015,7 +1012,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
                 },
             },
         };
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+        aliceTestClient.sendOrQueueSyncResponse(syncResponse);
 
         // the completion of the first initialsync should make Alice
         // invalidate the device cache for all members in e2e rooms (ie,
@@ -1074,8 +1071,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         await startClientAndAwaitFirstSync();
         await establishOlmSession(aliceTestClient, testOlmAccount);
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
+        await syncPromise(aliceTestClient.client);
 
         // this will block
         logger.log("Forcing alice to download our device keys");
@@ -1135,7 +1132,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         });
 
         // Alice gets both the events in a single sync
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 1,
             to_device: {
                 events: [roomKeyEncrypted],
@@ -1144,7 +1141,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
                 join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } },
             },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         await room.decryptCriticalEvents();
@@ -1179,8 +1176,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             },
         };
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceTestClient.client);
 
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.getContent().body).toEqual("42");
@@ -1292,8 +1289,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             },
         };
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, syncResponse);
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceTestClient.client);
 
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
@@ -1397,14 +1394,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         });
 
         // Alice receives shared history
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 1,
             to_device: { events: [encryptedForwardedKey] },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         // Alice is invited to the room by Becca
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 2,
             rooms: {
                 invite: {
@@ -1433,15 +1430,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
                 },
             },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         // Alice has joined the room
-        aliceTestClient.httpBackend
-            .when("GET", "/sync")
-            .respond(200, getSyncResponse(["@alice:localhost", "@becca:localhost"]));
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@alice:localhost", "@becca:localhost"]));
+        await syncPromise(aliceTestClient.client);
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 4,
             rooms: {
                 join: {
@@ -1449,7 +1444,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
                 },
             },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
         const roomEvent = room.getLiveTimeline().getEvents()[0];
@@ -1544,14 +1539,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         });
 
         // Alice receives forwarded history from Becca
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 1,
             to_device: { events: [encryptedForwardedKey] },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         // Alice is invited to the room by Charlie
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 2,
             rooms: {
                 invite: {
@@ -1580,15 +1575,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
                 },
             },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         // Alice has joined the room
-        aliceTestClient.httpBackend
-            .when("GET", "/sync")
-            .respond(200, getSyncResponse(["@alice:localhost", "@becca:localhost", "@charlie:localhost"]));
-        await aliceTestClient.flushSync();
+        aliceTestClient.sendOrQueueSyncResponse(
+            getSyncResponse(["@alice:localhost", "@becca:localhost", "@charlie:localhost"]),
+        );
+        await syncPromise(aliceTestClient.client);
 
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 4,
             rooms: {
                 join: {
@@ -1596,7 +1591,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
                 },
             },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         // Decryption should fail, because Alice hasn't received any keys she can trust
         const room = aliceTestClient.client.getRoom(ROOM_ID)!;
@@ -1637,7 +1632,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         ]);
 
         /* The sync arrives in two parts; first the m.room.create... */
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             rooms: {
                 join: {
                     [testRoomId]: {
@@ -1660,10 +1655,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
                 },
             },
         });
-        await aliceTestClient.flushSync();
+        await syncPromise(aliceTestClient.client);
 
         // ... and then the e2e event and an invite ...
-        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+        aliceTestClient.sendOrQueueSyncResponse({
             rooms: {
                 join: {
                     [testRoomId]: {
@@ -1700,7 +1695,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             .when("PUT", "/send/m.room.encrypted/")
             .respond(200, (_path, _content) => ({ event_id: "asdfgh" }));
         await Promise.all([
-            aliceTestClient.flushSync(),
+            syncPromise(aliceTestClient.client),
             aliceTestClient.httpBackend.flush("/send/m.room.encrypted/", 1),
         ]);
     });
@@ -1714,8 +1709,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             await startClientAndAwaitFirstSync({ lazyLoadMembers: true });
             aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
 
-            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse([]));
-            await aliceTestClient.flushSync();
+            aliceTestClient.sendOrQueueSyncResponse(getSyncResponse([]));
+            await syncPromise(aliceTestClient.client);
 
             p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
         });
@@ -1814,13 +1809,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             });
 
             // Alice gets the room message, but not the key
-            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            aliceTestClient.sendOrQueueSyncResponse({
                 next_batch: 1,
                 rooms: {
                     join: { [ROOM_ID]: { timeline: { events: [messageEncryptedEvent] } } },
                 },
             });
-            await aliceTestClient.flushSync();
+            await syncPromise(aliceTestClient.client);
 
             // alice will (eventually) send a room-key request
             aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key_request/").respond(200, {});
@@ -1839,7 +1834,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             });
 
             // alice gets back a room-key-withheld notification
-            aliceTestClient.httpBackend.when("GET", "/sync").respond(200, {
+            aliceTestClient.sendOrQueueSyncResponse({
                 next_batch: 2,
                 to_device: {
                     events: [
@@ -1858,7 +1853,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
                     ],
                 },
             });
-            await aliceTestClient.flushSync();
+            await syncPromise(aliceTestClient.client);
 
             // the withheld notification should trigger a retry; wait for it
             await retryPromise;
