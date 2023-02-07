@@ -9436,10 +9436,7 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     const currentHighlightCount = room.getUnreadCountForEventContext(NotificationCountType.Highlight, event);
 
     // Total count is used to typically increment a room notification counter, but not loudly highlight it.
-    const currentTotalCount =
-        (isThreadEvent
-            ? room.getThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total)
-            : room.getRoomUnreadNotificationCount(NotificationCountType.Total)) ?? 0;
+    const currentTotalCount = room.getUnreadCountForEventContext(NotificationCountType.Total, event);
 
     // Ensure the unread counts are kept up to date if the event is encrypted
     // We also want to make sure that the notification count goes up if we already
@@ -9483,7 +9480,8 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     }
 
     // `notify` is used in practice for incrementing the total count
-    const oldNotfy = !!oldActions?.notify;
+    // If `oldActions` is not defined, we assume `notify` is true.
+    const oldNotfy = oldActions === null || oldActions?.notify === true;
     const newNotify = !!actions?.notify;
 
     if (oldNotfy !== newNotify || currentTotalCount > 0) {
