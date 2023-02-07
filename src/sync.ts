@@ -1298,6 +1298,7 @@ export class SyncApi {
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
 
             const encrypted = client.isRoomEncrypted(room.roomId);
+            // We store the server-provided value first so it's correct when any of the events fire.
             if (joinObj.unread_notifications) {
                 /**
                  * We track unread notifications ourselves in encrypted rooms, so don't
@@ -1307,7 +1308,6 @@ export class SyncApi {
                  * 
                  * @see import("./client").fixNotificationCountOnDecryption
                  */
-                // We store the server-provided value first so it's correct when any of the events fire
                 if (!encrypted || joinObj.unread_notifications.notification_count === 0) {
                     // In an encrypted room, if the room has notifications enabled then it's typical for
                     // the server to flag all new messages as unread. However, some push rules calculate
@@ -1337,11 +1337,14 @@ export class SyncApi {
                 // decryption
                 room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
                 for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
-                    room.setThreadUnreadNotificationCount(
-                        threadId,
-                        NotificationCountType.Total,
-                        unreadNotification.notification_count ?? 0,
-                    );
+                    if (!encrypted || unreadNotification.notification_count === 0) {
+
+                        room.setThreadUnreadNotificationCount(
+                            threadId,
+                            NotificationCountType.Total,
+                            unreadNotification.notification_count ?? 0,
+                        );
+                    }
 
                     const hasNoNotifications =
                         room.getThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight) <= 0;

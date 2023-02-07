@@ -9482,9 +9482,9 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     // `notify` is used in practice for incrementing the total count
     const newNotify = !!actions?.notify;
 
-    // The room total count is NEVER incremented by the server for encrypted rooms.
+    // The room total count is NEVER incremented by the server for encrypted rooms. We basically ignore
+    // the server here as it's always going to tell us to increment for encrypted events.
     if (newNotify) {
-        // We've recalculated that the event should or should not notify, and the total is > 0
         if (isThreadEvent) {
             room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total, currentTotalCount+1);
         } else {
