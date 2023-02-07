@@ -1344,7 +1344,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 errorCode = "OLM_UNKNOWN_MESSAGE_INDEX";
             }
 
-            throw new DecryptionError(errorCode, e ? e.toString() : "Unknown Error: Error is undefined", {
+            throw new DecryptionError(errorCode, e instanceof Error ? e.message : "Unknown Error: Error is undefined", {
                 session: content.sender_key + "|" + content.session_id,
             });
         }
@@ -1367,7 +1367,8 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             if (problem) {
                 this.prefixedLogger.info(
                     `When handling UISI from ${event.getSender()} (sender key ${content.sender_key}): ` +
-                        `recent session problem with that sender: ${problem}`,
+                        `recent session problem with that sender:`,
+                    problem,
                 );
                 let problemDescription = PROBLEM_DESCRIPTIONS[problem.type as "no_olm"] || PROBLEM_DESCRIPTIONS.unknown;
                 if (problem.fixed) {

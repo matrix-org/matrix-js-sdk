@@ -18,7 +18,6 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-js";
 
 import { RustCrypto } from "./rust-crypto";
 import { logger } from "../logger";
-import { CryptoBackend } from "../common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./constants";
 import { IHttpOpts, MatrixHttpApi } from "../http-api";
 
@@ -26,7 +25,7 @@ export async function initRustCrypto(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
     userId: string,
     deviceId: string,
-): Promise<CryptoBackend> {
+): Promise<RustCrypto> {
     // initialise the rust matrix-sdk-crypto-js, if it hasn't already been done
     await RustSdkCryptoJs.initAsync();
 

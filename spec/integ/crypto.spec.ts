@@ -633,6 +633,35 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         expect(event.getContent().body).toEqual("42");
     });
 
+    oldBackendOnly("prepareToEncrypt", async () => {
+        aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        await aliceTestClient.start();
+        aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
+
+        // tell alice she is sharing a room with bob
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
+        await aliceTestClient.flushSync();
+
+        // we expect alice first to query bob's keys...
+        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+        aliceTestClient.httpBackend.flush("/keys/query", 1);
+
+        // ... and then claim one of his OTKs
+        aliceTestClient.httpBackend.when("POST", "/keys/claim").respond(200, getTestKeysClaimResponse("@bob:xyz"));
+        aliceTestClient.httpBackend.flush("/keys/claim", 1);
+
+        // fire off the prepare request
+        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        expect(room).toBeTruthy();
+        const p = aliceTestClient.client.prepareToEncrypt(room!);
+
+        // we expect to get a room key message
+        await expectSendRoomKey(aliceTestClient.httpBackend, "@bob:xyz", testOlmAccount);
+
+        // the prepare request should complete successfully.
+        await p;
+    });
+
     oldBackendOnly("Alice sends a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await aliceTestClient.start();
