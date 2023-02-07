@@ -1338,7 +1338,6 @@ export class SyncApi {
                 room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
                 for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
                     if (!encrypted || unreadNotification.notification_count === 0) {
-
                         room.setThreadUnreadNotificationCount(
                             threadId,
                             NotificationCountType.Total,

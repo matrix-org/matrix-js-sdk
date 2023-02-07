@@ -193,9 +193,8 @@ describe("fixNotificationCountOnDecryption", () => {
     });
 
     it("does not change the total room count when an event is marked as non-notifying", () => {
-        // Server sets the value to 1
-        // This was in the main timeline
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
+        room.setUnreadNotificationCount(NotificationCountType.Total, 0);
         room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
 
         event.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
@@ -207,10 +206,8 @@ describe("fixNotificationCountOnDecryption", () => {
     });
 
     it("does not change the total room count when a threaded event is marked as non-notifying", () => {
-        // Server sets the value to 1
-        // This was in the main thread
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
-        room.setUnreadNotificationCount(NotificationCountType.Highlight, 0);
+        room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 
         threadEvent.getPushActions = jest.fn().mockReturnValue(mkPushAction(true, false));
         mockClient.getPushActionsForEvent = jest.fn().mockReturnValue(mkPushAction(false, false));
