@@ -292,7 +292,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
             );
     };
 
-    private disableQueue(queueName: string) {
+    private disableQueue(queueName: string): void {
         // queue is empty. Mark as inactive and stop recursing.
         const index = this.activeQueues.indexOf(queueName);
         if (index >= 0) {
@@ -301,10 +301,10 @@ export class MatrixScheduler<T = ISendEventResponse> {
         debuglog("Stopping queue '%s' as it is now empty", queueName);
     }
 
-    private clearQueue(queueName: string, err: unknown) {
+    private clearQueue(queueName: string, err: unknown): void {
         debuglog("clearing queue '%s'", queueName);
         let obj: IQueueEntry<T> | undefined;
-        while (obj = this.removeNextEvent(queueName)) {
+        while ((obj = this.removeNextEvent(queueName))) {
             obj.defer.reject(err);
         }
         this.disableQueue(queueName);
