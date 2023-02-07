@@ -1300,15 +1300,20 @@ export class SyncApi {
             const encrypted = client.isRoomEncrypted(room.roomId);
             // we do this first so it's correct when any of the events fire
             if (joinObj.unread_notifications) {
-                room.setUnreadNotificationCount(
-                    NotificationCountType.Total,
-                    joinObj.unread_notifications.notification_count ?? 0,
-                );
+                /**
+                 * We track unread notifications ourselves in encrypted rooms, so don't
+                 * bother setting it here. We trust our calculations better than the
+                 * server's for this case, and therefore will assume that our non-zero
+                 * count is accurate.
+                 * @see import("./client").fixNotificationCountOnDecryption
+                 */
+                if (!encrypted || room.getUnreadNotificationCount(NotificationCountType.Total) <= 0) {
+                    room.setUnreadNotificationCount(
+                        NotificationCountType.Total,
+                        joinObj.unread_notifications.notification_count ?? 0,
+                    );
+                }
 
-                // We track unread notifications ourselves in encrypted rooms, so don't
-                // bother setting it here. We trust our calculations better than the
-                // server's for this case, and therefore will assume that our non-zero
-                // count is accurate.
                 if (!encrypted || room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0) {
                     room.setUnreadNotificationCount(
                         NotificationCountType.Highlight,
