@@ -433,6 +433,14 @@ export class PushProcessor {
         return PushProcessor.cachedGlobToRegex[glob];
     }
 
+    /**
+     * For a dotted field and event, fetch the value at that position, if one
+     * exists.
+     *
+     * @param key - The key of the push rule condition: a dotted field to fetch.
+     * @param ev - The matrix event to fetch the field from.
+     * @returns The value at the dotted path given by key.
+     */
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
         const parts = key.split(".");
         let val: any;
