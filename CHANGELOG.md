@@ -1,3 +1,25 @@
+Changes in [23.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.3.0-rc.1) (2023-02-07)
+============================================================================================================
+
+## ✨ Features
+ * Element-R: implement encryption of outgoing events ([\#3122](https://github.com/matrix-org/matrix-js-sdk/pull/3122)).
+ * Poll model - page /relations results ([\#3073](https://github.com/matrix-org/matrix-js-sdk/pull/3073)). Contributed by @kerryarchibald.
+ * Poll model - validate end events ([\#3072](https://github.com/matrix-org/matrix-js-sdk/pull/3072)). Contributed by @kerryarchibald.
+ * Handle optional last_known_event_id property in m.predecessor ([\#3119](https://github.com/matrix-org/matrix-js-sdk/pull/3119)). Contributed by @andybalaam.
+ * Add support for stable identifier for fixed MAC in SAS verification ([\#3101](https://github.com/matrix-org/matrix-js-sdk/pull/3101)).
+ * Provide eventId as well as roomId from Room.findPredecessor ([\#3095](https://github.com/matrix-org/matrix-js-sdk/pull/3095)). Contributed by @andybalaam.
+ * MSC3946 Dynamic room predecessors ([\#3042](https://github.com/matrix-org/matrix-js-sdk/pull/3042)). Contributed by @andybalaam.
+ * Poll model ([\#3036](https://github.com/matrix-org/matrix-js-sdk/pull/3036)). Contributed by @kerryarchibald.
+ * Remove video tracks on video mute without renegotiating ([\#3091](https://github.com/matrix-org/matrix-js-sdk/pull/3091)).
+ * Introduces a backwards-compatible API change. `MegolmEncrypter#prepareToEncrypt`'s return type has changed from `void` to `() => void`. ([\#3035](https://github.com/matrix-org/matrix-js-sdk/pull/3035)). Contributed by @clarkf.
+
+## 🐛 Bug Fixes
+ * Element-R: fix a bug which prevented encryption working after a reload ([\#3126](https://github.com/matrix-org/matrix-js-sdk/pull/3126)).
+ * Element-R: Fix invite processing ([\#3121](https://github.com/matrix-org/matrix-js-sdk/pull/3121)).
+ * Don't throw with no `opponentDeviceInfo` ([\#3107](https://github.com/matrix-org/matrix-js-sdk/pull/3107)).
+ * Remove flaky megolm test ([\#3098](https://github.com/matrix-org/matrix-js-sdk/pull/3098)). Contributed by @clarkf.
+ * Fix "verifyLinks" functionality of getRoomUpgradeHistory ([\#3089](https://github.com/matrix-org/matrix-js-sdk/pull/3089)). Contributed by @andybalaam.
+
 Changes in [23.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.2.0) (2023-01-31)
 ==================================================================================================
 
