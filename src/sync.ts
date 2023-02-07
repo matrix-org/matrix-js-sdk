@@ -1306,7 +1306,7 @@ export class SyncApi {
                  * bother setting it here. We trust our calculations better than the
                  * server's for this case, and therefore will assume that our non-zero
                  * count is accurate.
-                 * 
+                 *
                  * @see import("./client").fixNotificationCountOnDecryption
                  */
                 if (!encrypted || joinObj.unread_notifications.notification_count === 0) {

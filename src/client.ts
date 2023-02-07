@@ -9547,9 +9547,13 @@ export function fixNotificationCountOnDecryption(cli: MatrixClient, event: Matri
     // the server here as it's always going to tell us to increment for encrypted events.
     if (newNotify) {
         if (isThreadEvent) {
-            room.setThreadUnreadNotificationCount(event.threadRootId, NotificationCountType.Total, currentTotalCount+1);
+            room.setThreadUnreadNotificationCount(
+                event.threadRootId,
+                NotificationCountType.Total,
+                currentTotalCount + 1,
+            );
         } else {
-            room.setUnreadNotificationCount(NotificationCountType.Total, currentTotalCount+1);
+            room.setUnreadNotificationCount(NotificationCountType.Total, currentTotalCount + 1);
         }
     }
 }
