@@ -98,7 +98,7 @@
         "browserify": "^17.0.0",
         "docdash": "^2.0.0",
         "domexception": "^4.0.0",
-        "eslint": "8.32.0",
+        "eslint": "8.33.0",
         "eslint-config-google": "^0.14.0",
         "eslint-config-prettier": "^8.5.0",
         "eslint-import-resolver-typescript": "^3.5.1",
