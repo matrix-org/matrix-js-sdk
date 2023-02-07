@@ -3440,9 +3440,10 @@ eslint-plugin-jsdoc@^39.6.4:
     semver "^7.3.8"
     spdx-expression-parse "^3.0.1"
 
-"eslint-plugin-matrix-org@https://github.com/matrix-org/eslint-plugin-matrix-org.git#63ba4c640207a8a112b92beba663c1f44e267b19":
-  version "0.10.0"
-  resolved "https://github.com/matrix-org/eslint-plugin-matrix-org.git#63ba4c640207a8a112b92beba663c1f44e267b19"
+eslint-plugin-matrix-org@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-matrix-org/-/eslint-plugin-matrix-org-1.0.0.tgz#cead71391e2a36d63cb8f8018a38305ecf81b4b8"
+  integrity sha512-JSjw+hswEcFR+N4N2JXZttK65cK6huykZKkbnwcITxPTelsaOfZ8qXG0Az9BfmVADaLgY3MGmHK1YYKbykUfBQ==
 
 eslint-plugin-tsdoc@^0.2.17:
   version "0.2.17"
