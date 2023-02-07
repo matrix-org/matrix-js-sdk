@@ -1310,7 +1310,7 @@ export class SyncApi {
                  */
                 if (!encrypted || joinObj.unread_notifications.notification_count === 0) {
                     // In an encrypted room, if the room has notifications enabled then it's typical for
-                    // the server to flag all new messages as unread. However, some push rules calculate
+                    // the server to flag all new messages as notifying. However, some push rules calculate
                     // events as ignored based on their event contents (e.g. ignoring msgtype=m.notice messages)
                     // so we want to calculate this figure on the client in all cases.
                     room.setUnreadNotificationCount(
