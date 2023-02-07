@@ -1,5 +1,5 @@
 /*
-Copyright 2015-2022 The Matrix.org Foundation C.I.C.
+Copyright 2015-2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -209,7 +209,6 @@ import { ToDeviceBatch } from "./models/ToDeviceMessage";
 import { IgnoredInvites } from "./models/invites-ignorer";
 import { UIARequest, UIAResponse } from "./@types/uia";
 import { LocalNotificationSettings } from "./@types/local_notifications";
-import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync";
 import { buildFeatureSupportMap, Feature, ServerSupport } from "./feature";
 import { CryptoBackend } from "./common-crypto/CryptoBackend";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants";
@@ -446,9 +445,15 @@ export interface IStartClientOpts {
     clientWellKnownPollPeriod?: number;
 
     /**
-     * @experimental
+     * @deprecated use `threadSupport` instead
      */
     experimentalThreadSupport?: boolean;
+
+    /**
+     * Will organises events in threaded conversations when
+     * a thread relation is encountered
+     */
+    threadSupport?: boolean;
 
     /**
      * @experimental
@@ -568,6 +573,8 @@ export interface IWellKnownConfig {
     error?: Error | string;
     // eslint-disable-next-line
     base_url?: string | null;
+    // XXX: this is undocumented
+    server_name?: string;
 }
 
 export interface IDelegatedAuthConfig {
@@ -1448,6 +1455,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
         }
 
+        if (this.clientOpts.hasOwnProperty("experimentalThreadSupport")) {
+            logger.warn("`experimentalThreadSupport` has been deprecated, use `threadSupport` instead");
+        }
+
+        // If `threadSupport` is omitted and the deprecated `experimentalThreadSupport` has been passed
+        // We should fallback to that value for backwards compatibility purposes
+        if (
+            !this.clientOpts.hasOwnProperty("threadSupport") &&
+            this.clientOpts.hasOwnProperty("experimentalThreadSupport")
+        ) {
+            this.clientOpts.threadSupport = this.clientOpts.experimentalThreadSupport;
+        }
+
         this.syncApi.sync();
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
@@ -2165,7 +2185,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         const RustCrypto = await import("./rust-crypto");
-        this.cryptoBackend = await RustCrypto.initRustCrypto(this.http, userId, deviceId);
+        const rustCrypto = await RustCrypto.initRustCrypto(this.http, userId, deviceId);
+        this.cryptoBackend = rustCrypto;
+
+        // attach the event listeners needed by RustCrypto
+        this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
     }
 
     /**
@@ -2588,10 +2612,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param room - the room the event is in
      */
     public prepareToEncrypt(room: Room): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.prepareToEncrypt(room);
+        this.cryptoBackend.prepareToEncrypt(room);
     }
 
     /**
@@ -3780,14 +3804,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * This is essentially getRooms() with some rooms filtered out, eg. old versions
      * of rooms that have been replaced or (in future) other rooms that have been
      * marked at the protocol level as not to be displayed to the user.
+     *
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     *                                           m.room.predecessor state event and
+     *                                           use it if found (MSC3946).
      * @returns A list of rooms, or an empty list if there is no data store.
      */
-    public getVisibleRooms(): Room[] {
+    public getVisibleRooms(msc3946ProcessDynamicPredecessor = false): Room[] {
         const allRooms = this.store.getRooms();
 
         const replacedRooms = new Set();
         for (const r of allRooms) {
-            const predecessor = r.findPredecessorRoomId();
+            const predecessor = r.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
             if (predecessor) {
                 replacedRooms.add(predecessor);
             }
@@ -4368,11 +4396,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return null;
         }
 
-        if (!this.isRoomEncrypted(event.getRoomId()!)) {
+        if (!room || !this.isRoomEncrypted(event.getRoomId()!)) {
             return null;
         }
 
-        if (!this.crypto && this.usingExternalCrypto) {
+        if (!this.cryptoBackend && this.usingExternalCrypto) {
             // The client has opted to allow sending messages to encrypted
             // rooms even if the room is encrypted, and we haven't setup
             // crypto. This is useful for users of matrix-org/pantalaimon
@@ -4393,13 +4421,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return null;
         }
 
-        if (!this.crypto) {
-            throw new Error(
-                "This room is configured to use encryption, but your client does " + "not support encryption.",
-            );
+        if (!this.cryptoBackend) {
+            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
         }
 
-        return this.crypto.encryptEvent(event, room);
+        return this.cryptoBackend.encryptEvent(event, room);
     }
 
     /**
@@ -4817,8 +4843,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $eventId: event.getId()!,
         });
 
-        const supportsThreadRR = this.canSupport.get(Feature.ThreadUnreadNotifications) !== ServerSupport.Unsupported;
-        if (supportsThreadRR && !unthreaded) {
+        if (!unthreaded) {
             const isThread = !!event.threadRootId;
             body = {
                 ...body,
@@ -4986,70 +5011,83 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * which can be proven to be linked. For example, rooms which have a create
      * event pointing to an old room which the client is not aware of or doesn't
      * have a matching tombstone would not be returned.
+     * @param msc3946ProcessDynamicPredecessor - if true, look for
+     * m.room.predecessor state events as well as create events, and prefer
+     * predecessor events where they exist (MSC3946).
      * @returns An array of rooms representing the upgrade
      * history.
      */
-    public getRoomUpgradeHistory(roomId: string, verifyLinks = false): Room[] {
-        let currentRoom = this.getRoom(roomId);
+    public getRoomUpgradeHistory(
+        roomId: string,
+        verifyLinks = false,
+        msc3946ProcessDynamicPredecessor = false,
+    ): Room[] {
+        const currentRoom = this.getRoom(roomId);
         if (!currentRoom) return [];
 
-        const upgradeHistory = [currentRoom];
+        const before = this.findPredecessorRooms(currentRoom, verifyLinks, msc3946ProcessDynamicPredecessor);
+        const after = this.findSuccessorRooms(currentRoom, verifyLinks, msc3946ProcessDynamicPredecessor);
 
-        // Work backwards first, looking at create events.
-        let createEvent = currentRoom.currentState.getStateEvents(EventType.RoomCreate, "");
-        while (createEvent) {
-            const predecessor = createEvent.getContent()["predecessor"];
-            if (predecessor && predecessor["room_id"]) {
-                const refRoom = this.getRoom(predecessor["room_id"]);
-                if (!refRoom) break; // end of the chain
+        return [...before, currentRoom, ...after];
+    }
 
-                if (verifyLinks) {
-                    const tombstone = refRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
+    private findPredecessorRooms(room: Room, verifyLinks: boolean, msc3946ProcessDynamicPredecessor: boolean): Room[] {
+        const ret: Room[] = [];
 
-                    if (!tombstone || tombstone.getContent()["replacement_room"] !== refRoom.roomId) {
-                        break;
-                    }
-                }
-
-                // Insert at the front because we're working backwards from the currentRoom
-                upgradeHistory.splice(0, 0, refRoom);
-                createEvent = refRoom.currentState.getStateEvents(EventType.RoomCreate, "");
-            } else {
-                // No further create events to look at
+        // Work backwards from newer to older rooms
+        let predecessorRoomId = room.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
+        while (predecessorRoomId !== null) {
+            const predecessorRoom = this.getRoom(predecessorRoomId);
+            if (predecessorRoom === null) {
                 break;
             }
-        }
+            if (verifyLinks) {
+                const tombstone = predecessorRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
+                if (!tombstone || tombstone.getContent()["replacement_room"] !== room.roomId) {
+                    break;
+                }
+            }
 
-        // Work forwards next, looking at tombstone events
-        let tombstoneEvent = currentRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
+            // Insert at the front because we're working backwards from the currentRoom
+            ret.splice(0, 0, predecessorRoom);
+
+            room = predecessorRoom;
+            predecessorRoomId = room.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
+        }
+        return ret;
+    }
+
+    private findSuccessorRooms(room: Room, verifyLinks: boolean, msc3946ProcessDynamicPredecessor: boolean): Room[] {
+        const ret: Room[] = [];
+
+        // Work forwards, looking at tombstone events
+        let tombstoneEvent = room.currentState.getStateEvents(EventType.RoomTombstone, "");
         while (tombstoneEvent) {
-            const refRoom = this.getRoom(tombstoneEvent.getContent()["replacement_room"]);
-            if (!refRoom) break; // end of the chain
-            if (refRoom.roomId === currentRoom.roomId) break; // Tombstone is referencing it's own room
+            const successorRoom = this.getRoom(tombstoneEvent.getContent()["replacement_room"]);
+            if (!successorRoom) break; // end of the chain
+            if (successorRoom.roomId === room.roomId) break; // Tombstone is referencing its own room
 
             if (verifyLinks) {
-                createEvent = refRoom.currentState.getStateEvents(EventType.RoomCreate, "");
-                if (!createEvent || !createEvent.getContent()["predecessor"]) break;
-
-                const predecessor = createEvent.getContent()["predecessor"];
-                if (predecessor["room_id"] !== currentRoom.roomId) break;
+                const predecessorRoomId = successorRoom.findPredecessor(msc3946ProcessDynamicPredecessor)?.roomId;
+                if (!predecessorRoomId || predecessorRoomId !== room.roomId) {
+                    break;
+                }
             }
 
             // Push to the end because we're looking forwards
-            upgradeHistory.push(refRoom);
-            const roomIds = new Set(upgradeHistory.map((ref) => ref.roomId));
-            if (roomIds.size < upgradeHistory.length) {
+            ret.push(successorRoom);
+            const roomIds = new Set(ret.map((ref) => ref.roomId));
+            if (roomIds.size < ret.length) {
                 // The last room added to the list introduced a previous roomId
                 // To avoid recursion, return the last rooms - 1
-                return upgradeHistory.slice(0, upgradeHistory.length - 1);
+                return ret.slice(0, ret.length - 1);
             }
 
             // Set the current room to the reference room so we know where we're at
-            currentRoom = refRoom;
-            tombstoneEvent = currentRoom.currentState.getStateEvents(EventType.RoomTombstone, "");
+            room = successorRoom;
+            tombstoneEvent = room.currentState.getStateEvents(EventType.RoomTombstone, "");
         }
-
-        return upgradeHistory;
+        return ret;
     }
 
     /**
@@ -5420,7 +5458,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const [timelineEvents, threadedEvents] = room.partitionThreadedEvents(matrixEvents);
 
-                    this.processBeaconEvents(room, timelineEvents);
+                    this.processAggregatedTimelineEvents(room, timelineEvents);
                     room.addEventsToTimeline(timelineEvents, true, room.getLiveTimeline());
                     this.processThreadEvents(room, threadedEvents, true);
 
@@ -5481,7 +5519,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return timelineSet.getTimelineForEvent(eventId);
         }
 
-        if (timelineSet.thread && this.supportsExperimentalThreads()) {
+        if (timelineSet.thread && this.supportsThreads()) {
             return this.getThreadTimeline(timelineSet, eventId);
         }
 
@@ -5535,7 +5573,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         timelineSet.addEventsToTimeline(timelineEvents, true, timeline, res.start);
         // The target event is not in a thread but process the contextual events, so we can show any threads around it.
         this.processThreadEvents(timelineSet.room, threadedEvents, true);
-        this.processBeaconEvents(timelineSet.room, timelineEvents);
+        this.processAggregatedTimelineEvents(timelineSet.room, timelineEvents);
 
         // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
         // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -5548,7 +5586,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public async getThreadTimeline(timelineSet: EventTimelineSet, eventId: string): Promise<EventTimeline | undefined> {
-        if (!this.supportsExperimentalThreads()) {
+        if (!this.supportsThreads()) {
             throw new Error("could not get thread timeline: no client support");
         }
 
@@ -5630,7 +5668,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(resNewer.next_batch ?? null, Direction.Forward);
-                this.processBeaconEvents(timelineSet.room, events);
+                this.processAggregatedTimelineEvents(timelineSet.room, events);
 
                 // There is no guarantee that the event ended up in "timeline" (we might have switched to a neighbouring
                 // timeline) - so check the room's index again. On the other hand, there's no guarantee the event ended up
@@ -5687,7 +5725,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 timeline.setPaginationToken(resOlder.next_batch ?? null, Direction.Backward);
                 timeline.setPaginationToken(null, Direction.Forward);
-                this.processBeaconEvents(timelineSet.room, events);
+                this.processAggregatedTimelineEvents(timelineSet.room, events);
 
                 return timeline;
             }
@@ -5940,7 +5978,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // in the notification timeline set
                     const timelineSet = eventTimeline.getTimelineSet();
                     timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(timelineSet.room, matrixEvents);
+                    this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
                     // if we've hit the end of the timeline, we need to stop trying to
                     // paginate. We need to keep the 'forwards' token though, to make sure
@@ -5982,7 +6020,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     timelineSet.addEventsToTimeline(matrixEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(room, matrixEvents);
+                    this.processAggregatedTimelineEvents(room, matrixEvents);
                     this.processThreadRoots(room, matrixEvents, backwards);
 
                     // if we've hit the end of the timeline, we need to stop trying to
@@ -6029,7 +6067,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         const originalEvent = await this.fetchRoomEvent(eventTimeline.getRoomId() ?? "", thread.id);
                         timelineSet.addEventsToTimeline([mapper(originalEvent)], true, eventTimeline, null);
                     }
-                    this.processBeaconEvents(timelineSet.room, matrixEvents);
+                    this.processAggregatedTimelineEvents(timelineSet.room, matrixEvents);
 
                     // if we've hit the end of the timeline, we need to stop trying to
                     // paginate. We need to keep the 'forwards' token though, to make sure
@@ -6067,7 +6105,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents] = room.partitionThreadedEvents(matrixEvents);
                     timelineSet.addEventsToTimeline(timelineEvents, backwards, eventTimeline, token);
-                    this.processBeaconEvents(room, timelineEvents);
+                    this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
                         timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
@@ -7008,10 +7046,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const serverVersions = await this.serverVersionsPromise;
         this.canSupport = await buildFeatureSupportMap(serverVersions);
-
-        // We can set flag values to use their stable or unstable version
-        const support = this.canSupport.get(Feature.ThreadUnreadNotifications);
-        UNREAD_THREAD_NOTIFICATIONS.setPreferUnstable(support === ServerSupport.Unstable);
 
         return this.serverVersionsPromise;
     }
@@ -9320,10 +9354,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @experimental
+     * @deprecated use supportsThreads() instead
      */
     public supportsExperimentalThreads(): boolean {
+        logger.warn(`supportsExperimentalThreads() is deprecated, use supportThreads() instead`);
         return this.clientOpts?.experimentalThreadSupport || false;
+    }
+
+    /**
+     * A helper to determine thread support
+     * @returns a boolean to determine if threads are enabled
+     */
+    public supportsThreads(): boolean {
+        return this.clientOpts?.threadSupport || false;
     }
 
     /**
@@ -9340,24 +9383,42 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @experimental
+     * Processes a list of threaded events and adds them to their respective timelines
+     * @param room - the room the adds the threaded events
+     * @param threadedEvents - an array of the threaded events
+     * @param toStartOfTimeline - the direction in which we want to add the events
      */
     public processThreadEvents(room: Room, threadedEvents: MatrixEvent[], toStartOfTimeline: boolean): void {
         room.processThreadedEvents(threadedEvents, toStartOfTimeline);
     }
 
     /**
-     * @experimental
+     * Processes a list of thread roots and creates a thread model
+     * @param room - the room to create the threads in
+     * @param threadedEvents - an array of thread roots
+     * @param toStartOfTimeline - the direction
      */
     public processThreadRoots(room: Room, threadedEvents: MatrixEvent[], toStartOfTimeline: boolean): void {
         room.processThreadRoots(threadedEvents, toStartOfTimeline);
     }
 
     public processBeaconEvents(room?: Room, events?: MatrixEvent[]): void {
+        this.processAggregatedTimelineEvents(room, events);
+    }
+
+    /**
+     * Calls aggregation functions for event types that are aggregated
+     * Polls and location beacons
+     * @param room - room the events belong to
+     * @param events - timeline events to be processed
+     * @returns
+     */
+    public processAggregatedTimelineEvents(room?: Room, events?: MatrixEvent[]): void {
         if (!events?.length) return;
         if (!room) return;
 
         room.currentState.processBeaconEvents(events, this);
+        room.processPollEvents(events);
     }
 
     /**

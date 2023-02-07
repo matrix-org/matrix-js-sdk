@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,6 +19,7 @@ limitations under the License.
  */
 
 import { mocked } from "jest-mock";
+import { M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE, PollStartEvent } from "matrix-events-sdk";
 
 import * as utils from "../test-utils/test-utils";
 import { emitPromise } from "../test-utils/test-utils";
@@ -37,6 +38,7 @@ import {
     MatrixEvent,
     MatrixEventEvent,
     PendingEventOrdering,
+    PollEvent,
     RelationType,
     RoomEvent,
     RoomMember,
@@ -1622,7 +1624,7 @@ describe("Room", function () {
     describe("addPendingEvent", function () {
         it("should add pending events to the pendingEventList if " + "pendingEventOrdering == 'detached'", function () {
             const client = new TestClient("@alice:example.com", "alicedevice").client;
-            client.supportsExperimentalThreads = () => true;
+            client.supportsThreads = () => true;
             const room = new Room(roomId, client, userA, {
                 pendingEventOrdering: PendingEventOrdering.Detached,
             });
@@ -2468,7 +2470,7 @@ describe("Room", function () {
         });
 
         it("Edits update the lastReply event", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
             const randomMessage = mkMessage();
@@ -2539,7 +2541,7 @@ describe("Room", function () {
         });
 
         it("Redactions to thread responses decrement the length", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
             const threadRoot = mkMessage();
@@ -2606,7 +2608,7 @@ describe("Room", function () {
         });
 
         it("Redactions to reactions in threads do not decrement the length", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
             const threadRoot = mkMessage();
@@ -2646,7 +2648,7 @@ describe("Room", function () {
         });
 
         it("should not decrement the length when the thread root is redacted", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
 
             const threadRoot = mkMessage();
@@ -2687,7 +2689,7 @@ describe("Room", function () {
         });
 
         it("Redacting the lastEvent finds a new lastEvent", async () => {
-            room.client.supportsExperimentalThreads = () => true;
+            room.client.supportsThreads = () => true;
             Thread.setServerSideSupport(FeatureSupport.Stable);
             Thread.setServerSideListSupport(FeatureSupport.Stable);
 
@@ -2794,7 +2796,7 @@ describe("Room", function () {
 
     describe("eventShouldLiveIn", () => {
         const client = new TestClient(userA).client;
-        client.supportsExperimentalThreads = () => true;
+        client.supportsThreads = () => true;
         Thread.setServerSideSupport(FeatureSupport.Stable);
         const room = new Room(roomId, client, userA);
 
@@ -3228,12 +3230,84 @@ describe("Room", function () {
         });
     });
 
+    describe("processPollEvents()", () => {
+        let room: Room;
+        let client: MatrixClient;
+
+        beforeEach(() => {
+            client = getMockClientWithEventEmitter({
+                decryptEventIfNeeded: jest.fn(),
+            });
+            room = new Room(roomId, client, userA);
+            jest.spyOn(room, "emit").mockClear();
+        });
+
+        const makePollStart = (id: string): MatrixEvent => {
+            const event = new MatrixEvent({
+                ...PollStartEvent.from("What?", ["a", "b"], M_POLL_KIND_DISCLOSED.name).serialize(),
+                room_id: roomId,
+            });
+            event.event.event_id = id;
+            return event;
+        };
+
+        it("adds poll models to room state for a poll start event ", async () => {
+            const pollStartEvent = makePollStart("1");
+            const events = [pollStartEvent];
+
+            await room.processPollEvents(events);
+            expect(client.decryptEventIfNeeded).toHaveBeenCalledWith(pollStartEvent);
+            const pollInstance = room.polls.get(pollStartEvent.getId()!);
+            expect(pollInstance).toBeTruthy();
+
+            expect(room.emit).toHaveBeenCalledWith(PollEvent.New, pollInstance);
+        });
+
+        it("adds related events to poll models", async () => {
+            const pollStartEvent = makePollStart("1");
+            const pollStartEvent2 = makePollStart("2");
+            const events = [pollStartEvent, pollStartEvent2];
+            const pollResponseEvent = new MatrixEvent({
+                type: M_POLL_RESPONSE.name,
+                content: {
+                    "m.relates_to": {
+                        rel_type: RelationType.Reference,
+                        event_id: pollStartEvent.getId(),
+                    },
+                },
+            });
+            const messageEvent = new MatrixEvent({
+                type: "m.room.messsage",
+                content: {
+                    text: "hello",
+                },
+            });
+
+            // init poll
+            await room.processPollEvents(events);
+
+            const poll = room.polls.get(pollStartEvent.getId()!)!;
+            const poll2 = room.polls.get(pollStartEvent2.getId()!)!;
+            jest.spyOn(poll, "onNewRelation");
+            jest.spyOn(poll2, "onNewRelation");
+
+            await room.processPollEvents([pollResponseEvent, messageEvent]);
+
+            // only called for relevant event
+            expect(poll.onNewRelation).toHaveBeenCalledTimes(1);
+            expect(poll.onNewRelation).toHaveBeenCalledWith(pollResponseEvent);
+
+            // only called on poll with relation
+            expect(poll2.onNewRelation).not.toHaveBeenCalled();
+        });
+    });
+
     describe("findPredecessorRoomId", () => {
         let client: MatrixClient | null = null;
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
-                supportsExperimentalThreads: jest.fn().mockReturnValue(true),
+                supportsThreads: jest.fn().mockReturnValue(true),
             });
         });
 
@@ -3266,21 +3340,90 @@ describe("Room", function () {
             });
         }
 
+        function predecessorEvent(
+            newRoomId: string,
+            predecessorRoomId: string,
+            tombstoneEventId: string | null = null,
+        ): MatrixEvent {
+            const content =
+                tombstoneEventId === null
+                    ? { predecessor_room_id: predecessorRoomId }
+                    : { predecessor_room_id: predecessorRoomId, last_known_event_id: tombstoneEventId };
+
+            return new MatrixEvent({
+                content,
+                event_id: `predecessor_event_id_pred_${predecessorRoomId}`,
+                origin_server_ts: 1432735824653,
+                room_id: newRoomId,
+                sender: "@daryl:alexandria.example.com",
+                state_key: "",
+                type: "org.matrix.msc3946.room_predecessor",
+            });
+        }
+
         it("Returns null if there is no create event", () => {
             const room = new Room("roomid", client!, "@u:example.com");
-            expect(room.findPredecessorRoomId()).toBeNull();
+            expect(room.findPredecessor()).toBeNull();
         });
 
         it("Returns null if the create event has no predecessor", () => {
             const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([roomCreateEvent("roomid", null)]);
-            expect(room.findPredecessorRoomId()).toBeNull();
+            expect(room.findPredecessor()).toBeNull();
         });
 
         it("Returns the predecessor ID if one is provided via create event", () => {
             const room = new Room("roomid", client!, "@u:example.com");
             room.addLiveEvents([roomCreateEvent("roomid", "replacedroomid")]);
-            expect(room.findPredecessorRoomId()).toBe("replacedroomid");
+            expect(room.findPredecessor()).toEqual({ roomId: "replacedroomid", eventId: "id_of_last_known_event" });
+        });
+
+        it("Prefers the m.predecessor event if one exists", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([
+                roomCreateEvent("roomid", "replacedroomid"),
+                predecessorEvent("roomid", "otherreplacedroomid"),
+            ]);
+            const useMsc3946 = true;
+            expect(room.findPredecessor(useMsc3946)).toEqual({
+                roomId: "otherreplacedroomid",
+                eventId: null, // m.predecessor did not include an event_id
+            });
+        });
+
+        it("uses the m.predecessor event ID if provided", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([
+                roomCreateEvent("roomid", "replacedroomid"),
+                predecessorEvent("roomid", "otherreplacedroomid", "lstevtid"),
+            ]);
+            const useMsc3946 = true;
+            expect(room.findPredecessor(useMsc3946)).toEqual({
+                roomId: "otherreplacedroomid",
+                eventId: "lstevtid",
+            });
+        });
+
+        it("Ignores the m.predecessor event if we don't ask to use it", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([
+                roomCreateEvent("roomid", "replacedroomid"),
+                predecessorEvent("roomid", "otherreplacedroomid"),
+            ]);
+            // Don't provide an argument for msc3946ProcessDynamicPredecessor -
+            // we should ignore the predecessor event.
+            expect(room.findPredecessor()).toEqual({ roomId: "replacedroomid", eventId: "id_of_last_known_event" });
+        });
+
+        it("Ignores the m.predecessor event and returns null if we don't ask to use it", () => {
+            const room = new Room("roomid", client!, "@u:example.com");
+            room.addLiveEvents([
+                roomCreateEvent("roomid", null), // Create event has no predecessor
+                predecessorEvent("roomid", "otherreplacedroomid", "lastevtid"),
+            ]);
+            // Don't provide an argument for msc3946ProcessDynamicPredecessor -
+            // we should ignore the predecessor event.
+            expect(room.findPredecessor()).toBeNull();
         });
     });
 });

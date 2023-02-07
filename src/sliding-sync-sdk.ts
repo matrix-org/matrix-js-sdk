@@ -736,8 +736,8 @@ export class SlidingSyncSdk {
 
         const processRoomEvent = async (e: MatrixEvent): Promise<void> => {
             client.emit(ClientEvent.Event, e);
-            if (e.isState() && e.getType() == EventType.RoomEncryption && this.syncOpts.crypto) {
-                await this.syncOpts.crypto.onCryptoEvent(room, e);
+            if (e.isState() && e.getType() == EventType.RoomEncryption && this.syncOpts.cryptoCallbacks) {
+                await this.syncOpts.cryptoCallbacks.onCryptoEvent(room, e);
             }
         };
 

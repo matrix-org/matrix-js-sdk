@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2021 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2021, 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -43,6 +43,7 @@ import { IMegolmEncryptedContent, IncomingRoomKeyRequest, IEncryptedContent } fr
 import { RoomKeyRequestState } from "../OutgoingRoomKeyRequestManager";
 import { OlmGroupSessionExtraData } from "../../@types/crypto";
 import { MatrixError } from "../../http-api";
+import { immediate } from "../../utils";
 
 // determine whether the key can be shared with invitees
 export function isRoomSharedHistory(room: Room): boolean {
@@ -73,7 +74,6 @@ export interface IOlmDevice<T = DeviceInfo> {
     deviceInfo: T;
 }
 
-/* eslint-disable camelcase */
 export interface IOutboundGroupSessionKey {
     chain_index: number;
     key: string;
@@ -106,7 +106,6 @@ interface IPayload extends Partial<IMessage> {
     algorithm?: string;
     sender_key?: string;
 }
-/* eslint-enable camelcase */
 
 interface SharedWithData {
     // The identity key of the device we shared with
@@ -223,6 +222,7 @@ export class MegolmEncryption extends EncryptionAlgorithm {
     private encryptionPreparation?: {
         promise: Promise<void>;
         startTime: number;
+        cancel: () => void;
     };
 
     protected readonly roomId: string;
@@ -974,30 +974,36 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      * send, in order to speed up sending of the message.
      *
      * @param room - the room the event is in
+     * @returns A function that, when called, will stop the preparation
      */
-    public prepareToEncrypt(room: Room): void {
+    public prepareToEncrypt(room: Room): () => void {
         if (room.roomId !== this.roomId) {
             throw new Error("MegolmEncryption.prepareToEncrypt called on unexpected room");
         }
 
         if (this.encryptionPreparation != null) {
             // We're already preparing something, so don't do anything else.
-            // FIXME: check if we need to restart
-            // (https://github.com/matrix-org/matrix-js-sdk/issues/1255)
             const elapsedTime = Date.now() - this.encryptionPreparation.startTime;
             this.prefixedLogger.debug(
                 `Already started preparing to encrypt for this room ${elapsedTime}ms ago, skipping`,
             );
-            return;
+            return this.encryptionPreparation.cancel;
         }
 
         this.prefixedLogger.debug("Preparing to encrypt events");
+
+        let cancelled = false;
+        const isCancelled = (): boolean => cancelled;
 
         this.encryptionPreparation = {
             startTime: Date.now(),
             promise: (async (): Promise<void> => {
                 try {
-                    const [devicesInRoom, blocked] = await this.getDevicesInRoom(room);
+                    // Attempt to enumerate the devices in room, and gracefully
+                    // handle cancellation if it occurs.
+                    const getDevicesResult = await this.getDevicesInRoom(room, false, isCancelled);
+                    if (getDevicesResult === null) return;
+                    const [devicesInRoom, blocked] = getDevicesResult;
 
                     if (this.crypto.globalErrorOnUnknownDevices) {
                         // Drop unknown devices for now.  When the message gets sent, we'll
@@ -1016,7 +1022,16 @@ export class MegolmEncryption extends EncryptionAlgorithm {
                     delete this.encryptionPreparation;
                 }
             })(),
+
+            cancel: (): void => {
+                // The caller has indicated that the process should be cancelled,
+                // so tell the promise that we'd like to halt, and reset the preparation state.
+                cancelled = true;
+                delete this.encryptionPreparation;
+            },
         };
+
+        return this.encryptionPreparation.cancel;
     }
 
     /**
@@ -1165,17 +1180,32 @@ export class MegolmEncryption extends EncryptionAlgorithm {
      *
      * @param forceDistributeToUnverified - if set to true will include the unverified devices
      * even if setting is set to block them (useful for verification)
+     * @param isCancelled - will cause the procedure to abort early if and when it starts
+     * returning `true`. If omitted, cancellation won't happen.
      *
-     * @returns Promise which resolves to an array whose
-     *     first element is a map from userId to deviceId to deviceInfo indicating
+     * @returns Promise which resolves to `null`, or an array whose
+     *     first element is a {@link DeviceInfoMap} indicating
      *     the devices that messages should be encrypted to, and whose second
      *     element is a map from userId to deviceId to data indicating the devices
-     *     that are in the room but that have been blocked
+     *     that are in the room but that have been blocked.
+     *     If `isCancelled` is provided and returns `true` while processing, `null`
+     *     will be returned.
+     *     If `isCancelled` is not provided, the Promise will never resolve to `null`.
      */
     private async getDevicesInRoom(
         room: Room,
+        forceDistributeToUnverified?: boolean,
+    ): Promise<[DeviceInfoMap, IBlockedMap]>;
+    private async getDevicesInRoom(
+        room: Room,
+        forceDistributeToUnverified?: boolean,
+        isCancelled?: () => boolean,
+    ): Promise<null | [DeviceInfoMap, IBlockedMap]>;
+    private async getDevicesInRoom(
+        room: Room,
         forceDistributeToUnverified = false,
-    ): Promise<[DeviceInfoMap, IBlockedMap]> {
+        isCancelled?: () => boolean,
+    ): Promise<null | [DeviceInfoMap, IBlockedMap]> {
         const members = await room.getEncryptionTargetMembers();
         this.prefixedLogger.debug(
             `Encrypting for users (shouldEncryptForInvitedMembers: ${room.shouldEncryptForInvitedMembers()}):`,
@@ -1201,6 +1231,11 @@ export class MegolmEncryption extends EncryptionAlgorithm {
         // See https://github.com/vector-im/element-web/issues/2305 for details.
         const devices = await this.crypto.downloadKeys(roomMembers, false);
         const blocked: IBlockedMap = {};
+
+        if (isCancelled?.() === true) {
+            return null;
+        }
+
         // remove any blocked devices
         for (const userId in devices) {
             if (!devices.hasOwnProperty(userId)) {
@@ -1213,6 +1248,11 @@ export class MegolmEncryption extends EncryptionAlgorithm {
                     continue;
                 }
 
+                // Yield prior to checking each device so that we don't block
+                // updating/rendering for too long.
+                // See https://github.com/vector-im/element-web/issues/21612
+                if (isCancelled !== undefined) await immediate();
+                if (isCancelled?.() === true) return null;
                 const deviceTrust = this.crypto.checkDeviceTrust(userId, deviceId);
 
                 if (
@@ -1304,7 +1344,7 @@ export class MegolmDecryption extends DecryptionAlgorithm {
                 errorCode = "OLM_UNKNOWN_MESSAGE_INDEX";
             }
 
-            throw new DecryptionError(errorCode, e ? e.toString() : "Unknown Error: Error is undefined", {
+            throw new DecryptionError(errorCode, e instanceof Error ? e.message : "Unknown Error: Error is undefined", {
                 session: content.sender_key + "|" + content.session_id,
             });
         }
@@ -1327,7 +1367,8 @@ export class MegolmDecryption extends DecryptionAlgorithm {
             if (problem) {
                 this.prefixedLogger.info(
                     `When handling UISI from ${event.getSender()} (sender key ${content.sender_key}): ` +
-                        `recent session problem with that sender: ${problem}`,
+                        `recent session problem with that sender:`,
+                    problem,
                 );
                 let problemDescription = PROBLEM_DESCRIPTIONS[problem.type as "no_olm"] || PROBLEM_DESCRIPTIONS.unknown;
                 if (problem.fixed) {
