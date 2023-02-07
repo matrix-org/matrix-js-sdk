@@ -287,6 +287,7 @@ describe("NotificationService", function () {
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
+    // TODO: This is not spec compliant behaviour.
     it("should bing on character group ([abc]) bing words.", function () {
         testEvent.event.content!.body = "Ping!";
         let actions = pushProcessor.actionsForEvent(testEvent);
@@ -296,12 +297,14 @@ describe("NotificationService", function () {
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
+    // TODO: This is not spec compliant behaviour.
     it("should bing on character range ([a-z]) bing words.", function () {
         testEvent.event.content!.body = "I ate 6 pies";
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
+    // TODO: This is not spec compliant behaviour.
     it("should bing on character negation ([!a]) bing words.", function () {
         testEvent.event.content!.body = "boke";
         let actions = pushProcessor.actionsForEvent(testEvent);
@@ -330,6 +333,8 @@ describe("NotificationService", function () {
     // invalid
 
     it("should gracefully handle bad input.", function () {
+        // The following body is an object (not a string) and thus is invalid
+        // for matching against.
         testEvent.event.content!.body = { foo: "bar" };
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
