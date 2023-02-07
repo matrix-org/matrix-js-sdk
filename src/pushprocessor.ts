@@ -434,6 +434,62 @@ export class PushProcessor {
     }
 
     /**
+     * Parse a dotted key into parts following the escape rules.
+     *
+     * @param str - The key of the push rule condition: a dotted field.
+     * @returns The unescaped parts to fetch.
+     */
+    private partsFotDottedKey(str: string): string[] {
+        const result = [];
+
+        // The current field and whether the previous character was the escape
+        // character (a backslash).
+        let part = "";
+        let escaped = false;
+
+        // Iterate over each character, and decide whether to append to the current
+        // part (following the escape rules) or to start a new part (based on the
+        // field separator).
+        for (let i = 0; i < str.length; ++i) {
+            const c = str[i];
+
+            // If the previous character was the escape character (a backslash)
+            // then decide what to append to the current part.
+            if (escaped) {
+                if (c === "\\" || c === ".") {
+                    // An escaped backslash or dot just gets added.
+                    part += c;
+                } else {
+                    // A character that shouldn't be escaped gets the backslash prepended.
+                    part += "\\" + c;
+                }
+                // This always resets being escaped.
+                escaped = false;
+                continue;
+            }
+
+            if (c == ".") {
+                // The field separator creates a new part.
+                result.push(part);
+                part = "";
+            } else if (c == "\\") {
+                // A backslash adds no characters, but starts an escape sequence.
+                escaped = true;
+            } else {
+                // Otherwise, just add the current character.
+                part += c;
+            }
+        }
+
+        // Ensure the final part is included, if there is one.
+        if (part.length) {
+            result.push(part);
+        }
+
+        return result;
+    }
+
+    /**
      * For a dotted field and event, fetch the value at that position, if one
      * exists.
      *
@@ -442,7 +498,9 @@ export class PushProcessor {
      * @returns The value at the dotted path given by key.
      */
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
-        const parts = key.split(".");
+        // Parse the key into the separate fields to search by splitting on
+        // unescaped ".", and then removing any escape characters.
+        const parts = this.partsFotDottedKey(key);
         let val: any;
 
         // special-case the first component to deal with encrypted messages

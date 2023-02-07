@@ -1,6 +1,6 @@
 import * as utils from "../test-utils/test-utils";
 import { IActionsObject, PushProcessor } from "../../src/pushprocessor";
-import { EventType, IContent, MatrixClient, MatrixEvent } from "../../src";
+import { ConditionKind, EventType, IContent, MatrixClient, MatrixEvent } from "../../src";
 
 describe("NotificationService", function () {
     const testUserId = "@ali:matrix.org";
@@ -492,5 +492,78 @@ describe("NotificationService", function () {
                 );
             });
         });
+    });
+
+    it("test against escaped dotted paths", function () {
+        testEvent = utils.mkEvent({
+            type: "m.room.message",
+            room: testRoomId,
+            user: "@alfred:localhost",
+            event: true,
+            content: {
+                // A dot in the field name.
+                "m.test": { foo: "bar" },
+                // A backslash in a field name.
+                "m\\example": "baz",
+            },
+        });
+
+        expect(
+            pushProcessor.ruleMatchesEvent(
+                {
+                    rule_id: "rule1",
+                    actions: [],
+                    conditions: [
+                        {
+                            kind: ConditionKind.EventMatch,
+                            key: "content.m\\.test.foo",
+                            pattern: "bar",
+                        },
+                    ],
+                    default: false,
+                    enabled: true,
+                },
+                testEvent,
+            ),
+        ).toBe(true);
+
+        expect(
+            pushProcessor.ruleMatchesEvent(
+                {
+                    rule_id: "rule1",
+                    actions: [],
+                    conditions: [
+                        {
+                            kind: ConditionKind.EventMatch,
+                            key: "content.m\\\\example",
+                            pattern: "baz",
+                        },
+                    ],
+                    default: false,
+                    enabled: true,
+                },
+                testEvent,
+            ),
+        ).toBe(true);
+
+        expect(
+            pushProcessor.ruleMatchesEvent(
+                {
+                    rule_id: "rule1",
+                    actions: [],
+                    conditions: [
+                        {
+                            kind: ConditionKind.EventMatch,
+                            // An incorrect escape sequence leaves the backslash.
+                            key: "content.m\\example",
+                            pattern: "baz",
+                        },
+                    ],
+                    default: false,
+                    enabled: true,
+                },
+                testEvent,
+            ),
+        ).toBe(true);
     });
 });
