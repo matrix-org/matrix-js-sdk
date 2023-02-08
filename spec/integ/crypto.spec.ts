@@ -31,6 +31,7 @@ import {
     IEvent,
     IJoinedRoom,
     IndexedDBCryptoStore,
+    IStartClientOpts,
     ISyncResponse,
     IUploadKeysRequest,
     MatrixEvent,
@@ -381,6 +382,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     let testSenderKey = "";
     let aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
 
+    async function startClientAndAwaitFirstSync(opts: IStartClientOpts = {}): Promise<void> {
+        await aliceTestClient.start(opts);
+    }
+
     /**
      * Get the device keys for testOlmAccount in a format suitable for a
      * response to /keys/query
@@ -454,7 +459,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     it("Alice receives a megolm message", async () => {
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
@@ -512,7 +517,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
     oldBackendOnly("Alice receives a megolm message before the session keys", async () => {
         // https://github.com/vector-im/element-web/issues/2273
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
@@ -579,7 +584,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     it("Alice gets a second room_key message", async () => {
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
@@ -656,7 +661,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
     oldBackendOnly("prepareToEncrypt", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
         aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
 
         // tell alice she is sharing a room with bob
@@ -685,7 +690,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
     oldBackendOnly("Alice sends a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
         aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
@@ -728,7 +733,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
     oldBackendOnly("We shouldn't attempt to send to blocked devices", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
         await establishOlmSession(aliceTestClient, testOlmAccount);
 
         aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
@@ -774,7 +779,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
             expect(aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toBeTruthy();
 
             aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-            await aliceTestClient.start();
+            await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
@@ -830,7 +835,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
         oldBackendOnly("should disable sending to unverified devices", async () => {
             aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-            await aliceTestClient.start();
+            await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
             // tell alice we share a room with bob
@@ -888,7 +893,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
     oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
         aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
@@ -947,7 +952,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     oldBackendOnly("Alice should send to her other devices", async () => {
         // for this test, we make the testOlmAccount be another of Alice's devices.
         // it ought to get included in messages Alice sends.
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
         // an encrypted room with just alice
         const syncResponse = {
             next_batch: 1,
@@ -1027,7 +1032,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
     oldBackendOnly("Alice should wait for device list to complete when sending a megolm message", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
         await establishOlmSession(aliceTestClient, testOlmAccount);
 
         aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse(["@bob:xyz"]));
@@ -1057,7 +1062,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
     oldBackendOnly("Alice exports megolm keys and imports them to a new device", async () => {
         aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
@@ -1119,7 +1124,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
         await initCrypto(aliceTestClient.client);
         await aliceTestClient.client.importRoomKeys(exported);
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
@@ -1200,7 +1205,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     it("Alice can decrypt a message with falsey content", async () => {
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
@@ -1265,7 +1270,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
         await beccaTestClient.client.initCrypto();
 
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
         await beccaTestClient.start();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
@@ -1419,7 +1424,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         const beccaTestClient = new TestClient("@becca:localhost", "foobar", "bazquux");
         await beccaTestClient.client.initCrypto();
 
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
         await beccaTestClient.start();
 
         const beccaRoom = new Room(ROOM_ID, beccaTestClient.client, "@becca:localhost", {});
@@ -1568,7 +1573,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
          * RoomStateEvent.NewMember notification is emitted, so test that works correctly.
          */
         const testRoomId = "!testRoom:id";
-        await aliceTestClient.start();
+        await startClientAndAwaitFirstSync();
 
         aliceTestClient.httpBackend
             .when("POST", "/keys/query")
@@ -1666,7 +1671,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         beforeEach(async () => {
             // set up the aliceTestClient so that it is a room with no known members
             aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
-            await aliceTestClient.start({ lazyLoadMembers: true });
+            await startClientAndAwaitFirstSync({ lazyLoadMembers: true });
             aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
 
             aliceTestClient.httpBackend.when("GET", "/sync").respond(200, getSyncResponse([]));
@@ -1753,7 +1758,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         //   They should be converted to integ tests and moved.
 
         oldBackendOnly("does not block decryption on an 'm.unavailable' report", async function () {
-            await aliceTestClient.start();
+            await startClientAndAwaitFirstSync();
 
             // there may be a key downloads for alice
             aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, {});
