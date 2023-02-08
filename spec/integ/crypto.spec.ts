@@ -22,6 +22,7 @@ import { IDBFactory } from "fake-indexeddb";
 
 import type { IDeviceKeys } from "../../src/@types/crypto";
 import * as testUtils from "../test-utils/test-utils";
+import { CRYPTO_BACKENDS, InitCrypto, syncPromise } from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { logger } from "../../src/logger";
 import {
@@ -36,12 +37,12 @@ import {
     IUploadKeysRequest,
     MatrixEvent,
     MatrixEventEvent,
+    PendingEventOrdering,
     Room,
     RoomMember,
     RoomStateEvent,
 } from "../../src/matrix";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
-import { CRYPTO_BACKENDS, InitCrypto } from "../test-utils/test-utils";
 
 const ROOM_ID = "!room:id";
 
@@ -383,7 +384,28 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     let aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
 
     async function startClientAndAwaitFirstSync(opts: IStartClientOpts = {}): Promise<void> {
-        await aliceTestClient.start(opts);
+        logger.log(aliceTestClient + ": starting");
+        aliceTestClient.httpBackend.when("GET", "/versions").respond(200, {
+            // we have tests that rely on support for lazy-loading members
+            versions: ["r0.5.0"],
+        });
+        aliceTestClient.httpBackend.when("GET", "/pushrules").respond(200, {});
+        aliceTestClient.httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+        aliceTestClient.expectDeviceKeyUpload();
+
+        // we let the client do a very basic initial sync, which it needs before
+        // it will upload one-time keys.
+        aliceTestClient.httpBackend.when("GET", "/sync").respond(200, { next_batch: 1 });
+
+        aliceTestClient.client.startClient({
+            // set this so that we can get hold of failed events
+            pendingEventOrdering: PendingEventOrdering.Detached,
+
+            ...opts,
+        });
+
+        await Promise.all([aliceTestClient.httpBackend.flushAllExpected(), syncPromise(aliceTestClient.client)]);
+        logger.log(aliceTestClient + ": started");
     }
 
     /**
