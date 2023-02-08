@@ -2776,7 +2776,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         // logic to run whilst the room is being initialised
                         if (this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
                             const lastEvent = receiptDestination.timeline[receiptDestination.timeline.length - 1];
-                            if (eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
+                            if (lastEvent && eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
                                 receiptDestination.setUnread(NotificationCountType.Total, 0);
                                 receiptDestination.setUnread(NotificationCountType.Highlight, 0);
                             }

@@ -237,7 +237,7 @@ export abstract class ReadReceipt<
         const receipt = this.getReadReceiptForUserId(userId, false);
 
         const lastEvent = this.timeline[this.timeline.length - 1];
-        if (receipt?.eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
+        if (lastEvent && receipt?.eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
             this.setUnread(NotificationCountType.Total, 0);
             this.setUnread(NotificationCountType.Highlight, 0);
         }
