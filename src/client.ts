@@ -6831,7 +6831,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     private fixupRoomNotifications = (): void => {
         if (this.isInitialSyncComplete()) {
-            const unreadRooms = this.getRooms().filter((room) => {
+            const unreadRooms = (this.getRooms() ?? []).filter((room) => {
                 return room.getUnreadNotificationCount(NotificationCountType.Total) > 0;
             });
 

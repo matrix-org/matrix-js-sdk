@@ -2774,7 +2774,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         // from synapse
                         // This needs to be done after the initial sync as we do not want this
                         // logic to run whilst the room is being initialised
-                        if (this.client.isInitialSyncComplete() && userId === this.client.getSafeUserId()) {
+                        if (this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
                             const lastEvent = receiptDestination.timeline[receiptDestination.timeline.length - 1];
                             if (eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
                                 receiptDestination.setUnread(NotificationCountType.Total, 0);

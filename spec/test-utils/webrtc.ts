@@ -450,6 +450,10 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
         ]
     >();
 
+    public isInitialSyncComplete(): boolean {
+        return false;
+    }
+
     public getMediaHandler(): MediaHandler {
         return this.mediaHandler.typed();
     }
