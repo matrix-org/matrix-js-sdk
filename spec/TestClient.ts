@@ -32,11 +32,12 @@ import { MockStorageApi } from "./MockStorageApi";
 import { encodeUri } from "../src/utils";
 import { IKeyBackupSession } from "../src/crypto/keybackup";
 import { IKeysUploadResponse, IUploadKeysRequest } from "../src/client";
+import { ISyncResponder } from "./test-utils/SyncResponder";
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
  */
-export class TestClient implements IE2EKeyReceiver {
+export class TestClient implements IE2EKeyReceiver, ISyncResponder {
     public readonly httpBackend: MockHttpBackend;
     public readonly client: MatrixClient;
     public deviceKeys?: IDeviceKeys | null;
