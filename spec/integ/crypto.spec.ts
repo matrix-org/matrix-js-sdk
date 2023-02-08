@@ -415,7 +415,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
         aliceHttpBackend.when("GET", "/pushrules").respond(200, {});
         aliceHttpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
-        aliceTestClient.expectDeviceKeyUpload();
 
         // we let the client do a very basic initial sync, which it needs before
         // it will upload one-time keys.
@@ -514,6 +513,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         syncResponder = aliceTestClient;
 
         await initCrypto(aliceClient);
+
+        // catch the device key upload
+        aliceTestClient.expectDeviceKeyUpload();
 
         // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
         await Olm.init();
