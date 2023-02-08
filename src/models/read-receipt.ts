@@ -25,6 +25,7 @@ import * as utils from "../utils";
 import { MatrixEvent } from "./event";
 import { EventType } from "../@types/event";
 import { EventTimelineSet } from "./event-timeline-set";
+import { NotificationCountType } from "./room";
 
 export function synthesizeReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType): MatrixEvent {
     return new MatrixEvent({
@@ -218,6 +219,18 @@ export abstract class ReadReceipt<
     }
 
     public abstract addReceipt(event: MatrixEvent, synthetic: boolean): void;
+
+    public abstract setUnread(type: NotificationCountType, count: number): void;
+
+    public clearNotificationsIfNeeded(userId: string): void {
+        const receipt = this.getReadReceiptForUserId(userId, false);
+
+        const lastEvent = this.timeline[this.timeline.length - 1];
+        if (receipt?.eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
+            this.setUnread(NotificationCountType.Total, 0);
+            this.setUnread(NotificationCountType.Highlight, 0);
+        }
+    }
 
     /**
      * Add a temporary local-echo receipt to the room to reflect in the

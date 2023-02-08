@@ -1307,6 +1307,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.on(ClientEvent.Sync, this.startCallEventHandler);
         }
 
+        this.on(ClientEvent.Sync, this.clearNotificationForSynthesizedReceipts);
+
         this.timelineSupport = Boolean(opts.timelineSupport);
 
         this.cryptoStore = opts.cryptoStore;
@@ -6812,6 +6814,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.callEventHandler!.start();
             this.groupCallEventHandler!.start();
             this.off(ClientEvent.Sync, this.startCallEventHandler);
+        }
+    };
+
+    private clearNotificationForSynthesizedReceipts = (): void => {
+        if (this.isInitialSyncComplete()) {
+            const unreadRooms = this.getRooms().filter((room) => {
+                return room.getUnreadNotificationCount(NotificationCountType.Total) > 0;
+            });
+
+            for (const room of unreadRooms) {
+                const currentUserId = this.getSafeUserId();
+                room.clearNotificationsIfNeeded(currentUserId);
+            }
+
+            this.off(ClientEvent.Sync, this.clearNotificationForSynthesizedReceipts);
         }
     };
 
