@@ -520,7 +520,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            recipient: aliceTestClient.userId!,
+            recipient: aliceClient.getUserId()!,
             recipientCurve25519Key: aliceTestClient.getDeviceKey(),
             recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
@@ -578,7 +578,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // make the room_key event, but don't send it yet
         const roomKeyEncrypted = encryptGroupSessionKey({
-            recipient: aliceTestClient.userId!,
+            recipient: aliceClient.getUserId()!,
             recipientCurve25519Key: aliceTestClient.getDeviceKey(),
             recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
@@ -645,7 +645,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // make the room_key event
         const roomKeyEncrypted1 = encryptGroupSessionKey({
-            recipient: aliceTestClient.userId!,
+            recipient: aliceClient.getUserId()!,
             recipientCurve25519Key: aliceTestClient.getDeviceKey(),
             recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
@@ -664,7 +664,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // make a second room_key event now that we have advanced the group
         // session.
         const roomKeyEncrypted2 = encryptGroupSessionKey({
-            recipient: aliceTestClient.userId!,
+            recipient: aliceClient.getUserId()!,
             recipientCurve25519Key: aliceTestClient.getDeviceKey(),
             recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
@@ -1002,7 +1002,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                 }),
                                 testUtils.mkMembership({
                                     mship: "join",
-                                    sender: aliceTestClient.userId,
+                                    sender: aliceClient.getUserId()!,
                                 }),
                             ],
                         },
@@ -1015,7 +1015,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // the completion of the first initialsync should make Alice
         // invalidate the device cache for all members in e2e rooms (ie,
         // herself), and do a key query.
-        expectAliceKeyQuery(getTestKeysQueryResponse(aliceTestClient.userId!));
+        expectAliceKeyQuery(getTestKeysQueryResponse(aliceClient.getUserId()!));
 
         await aliceTestClient.httpBackend.flushAllExpected();
 
@@ -1025,22 +1025,22 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             throw new Error("sendTextMessage succeeded on an unknown device");
         } catch (e) {
             expect((e as any).name).toEqual("UnknownDeviceError");
-            expect(Object.keys((e as any).devices)).toEqual([aliceTestClient.userId!]);
-            expect(Object.keys((e as any)?.devices[aliceTestClient.userId!])).toEqual(["DEVICE_ID"]);
+            expect(Object.keys((e as any).devices)).toEqual([aliceClient.getUserId()!]);
+            expect(Object.keys((e as any)?.devices[aliceClient.getUserId()!])).toEqual(["DEVICE_ID"]);
         }
 
         // mark the device as known, and resend.
-        aliceClient.setDeviceKnown(aliceTestClient.userId!, "DEVICE_ID");
+        aliceClient.setDeviceKnown(aliceClient.getUserId()!, "DEVICE_ID");
         aliceTestClient.httpBackend
             .when("POST", "/keys/claim")
             .respond(200, function (_path, content: IClaimOTKsResult) {
-                expect(content.one_time_keys[aliceTestClient.userId!].DEVICE_ID).toEqual("signed_curve25519");
-                return getTestKeysClaimResponse(aliceTestClient.userId!);
+                expect(content.one_time_keys[aliceClient.getUserId()!].DEVICE_ID).toEqual("signed_curve25519");
+                return getTestKeysClaimResponse(aliceClient.getUserId()!);
             });
 
         const inboundGroupSessionPromise = expectSendRoomKey(
             aliceTestClient.httpBackend,
-            aliceTestClient.userId!,
+            aliceClient.getUserId()!,
             testOlmAccount,
         );
 
@@ -1113,7 +1113,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            recipient: aliceTestClient.userId!,
+            recipient: aliceClient.getUserId()!,
             recipientCurve25519Key: aliceTestClient.getDeviceKey(),
             recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
@@ -1256,7 +1256,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
-            recipient: aliceTestClient.userId!,
+            recipient: aliceClient.getUserId()!,
             recipientCurve25519Key: aliceTestClient.getDeviceKey(),
             recipientEd25519Key: aliceTestClient.getSigningKey(),
             olmAccount: testOlmAccount,
@@ -1374,7 +1374,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             sender: "@becca:localhost",
             senderSigningKey: beccaTestClient.getSigningKey(),
             senderKey: beccaTestClient.getDeviceKey(),
-            recipient: aliceTestClient.userId!,
+            recipient: aliceClient.getUserId()!,
             recipientCurve25519Key: aliceTestClient.getDeviceKey(),
             recipientEd25519Key: aliceTestClient.getSigningKey(),
             p2pSession: p2pSession,
@@ -1519,7 +1519,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             sender: "@becca:localhost",
             senderKey: beccaTestClient.getDeviceKey(),
             senderSigningKey: beccaTestClient.getSigningKey(),
-            recipient: aliceTestClient.userId!,
+            recipient: aliceClient.getUserId()!,
             recipientCurve25519Key: aliceTestClient.getDeviceKey(),
             recipientEd25519Key: aliceTestClient.getSigningKey(),
             p2pSession: p2pSession,
@@ -1644,7 +1644,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                                 },
                                 {
                                     type: "m.room.member",
-                                    state_key: aliceTestClient.getUserId(),
+                                    state_key: aliceClient.getUserId(),
                                     content: { membership: "join" },
                                     event_id: "$alijoin",
                                 },
