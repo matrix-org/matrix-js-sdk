@@ -395,9 +395,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     /** the MatrixClient under test */
     let aliceClient: MatrixClient;
 
-    /** a wrapper around {@link #aliceClient} */
-    let aliceTestClient: TestClient;
-
     /** the mock http backend that {@link #aliceClient} is wired up to */
     let aliceHttpBackend: MockHttpBackend;
 
@@ -504,7 +501,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     }
 
     beforeEach(async () => {
-        aliceTestClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs");
+        const aliceTestClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs");
         aliceClient = aliceTestClient.client;
         aliceHttpBackend = aliceTestClient.httpBackend;
 
@@ -1161,7 +1158,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         aliceClient.stopClient();
         aliceHttpBackend.stop();
 
-        aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
+        const aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
         aliceClient = aliceTestClient.client;
         aliceHttpBackend = aliceTestClient.httpBackend;
         syncResponder = aliceTestClient;
