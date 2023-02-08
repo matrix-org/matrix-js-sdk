@@ -477,7 +477,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     afterEach(async () => {
-        await aliceTestClient.stop();
+        aliceTestClient.client.stopClient();
+        await aliceTestClient.httpBackend.stop();
     });
 
     it("Alice receives a megolm message", async () => {
@@ -1141,7 +1142,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         const exported = await aliceTestClient.client.exportRoomKeys();
 
         // start a new client
-        aliceTestClient.stop();
+        aliceTestClient.client.stopClient();
+        aliceTestClient.httpBackend.stop();
 
         aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
         await initCrypto(aliceTestClient.client);
