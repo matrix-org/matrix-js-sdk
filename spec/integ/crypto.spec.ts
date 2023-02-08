@@ -732,7 +732,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await syncPromise(aliceClient);
 
         // we expect alice first to query bob's keys...
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
         aliceTestClient.httpBackend.flush("/keys/query", 1);
 
         // ... and then claim one of his OTKs
@@ -760,8 +760,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await syncPromise(aliceClient);
 
         // start out with the device unknown - the send should be rejected.
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
         await Promise.all([
             aliceClient.sendTextMessage(ROOM_ID, "test").then(
@@ -804,8 +804,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         logger.log("Forcing alice to download our device keys");
 
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
         await Promise.all([
             aliceClient.downloadKeys(["@bob:xyz"]),
@@ -847,8 +847,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await syncPromise(aliceClient);
 
             // start out with the device unknown - the send should be rejected.
-            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
-            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
             await Promise.all([
                 aliceClient.sendTextMessage(ROOM_ID, "test").then(
@@ -900,8 +900,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await syncPromise(aliceClient);
 
             logger.log("Forcing alice to download our device keys");
-            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
-            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
             await Promise.all([
                 aliceClient.downloadKeys(["@bob:xyz"]),
@@ -958,8 +958,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         logger.log("Fetching bob's devices and marking known");
 
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
         await Promise.all([aliceClient.downloadKeys(["@bob:xyz"]), aliceTestClient.httpBackend.flushAllExpected()]);
         await aliceClient.setDeviceKnown("@bob:xyz", "DEVICE_ID");
@@ -1096,7 +1096,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         logger.log("Forcing alice to download our device keys");
         const downloadPromise = aliceClient.downloadKeys(["@bob:xyz"]);
 
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
         // so will this.
         const sendPromise = aliceClient.sendTextMessage(ROOM_ID, "test").then(
@@ -1108,7 +1108,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             },
         );
 
-        aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+        expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
         await aliceTestClient.httpBackend.flushAllExpected();
         await Promise.all([downloadPromise, sendPromise]);
@@ -1750,7 +1750,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const memberListPromise = expectMembershipRequest(ROOM_ID, ["@bob:xyz"]);
 
             // then a request for bob's devices...
-            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
             // then a to-device with the room_key
             const inboundGroupSessionPromise = expectSendRoomKey(
@@ -1782,7 +1782,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await Promise.all([room.loadMembersIfNeeded(), expectMembershipRequest(ROOM_ID, ["@bob:xyz"])]);
 
             // expect a request for bob's devices...
-            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
+            expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
             // then a to-device with the room_key
             const inboundGroupSessionPromise = expectSendRoomKey(
@@ -1813,7 +1813,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             await startClientAndAwaitFirstSync();
 
             // there may be a key downloads for alice
-            aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, {});
+            expectAliceKeyQuery({ device_keys: {}, failures: {} });
             aliceTestClient.httpBackend.flush("/keys/query", 1, 5000);
 
             // encrypt a message with a group session.
