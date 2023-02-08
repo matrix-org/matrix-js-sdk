@@ -3380,7 +3380,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
     [EventStatus.ENCRYPTING]: [EventStatus.SENDING, EventStatus.NOT_SENT, EventStatus.CANCELLED],
     [EventStatus.SENDING]: [EventStatus.ENCRYPTING, EventStatus.QUEUED, EventStatus.NOT_SENT, EventStatus.SENT],
-    [EventStatus.QUEUED]: [EventStatus.SENDING, EventStatus.CANCELLED],
+    [EventStatus.QUEUED]: [EventStatus.SENDING, EventStatus.NOT_SENT, EventStatus.CANCELLED],
     [EventStatus.SENT]: [],
     [EventStatus.NOT_SENT]: [EventStatus.SENDING, EventStatus.QUEUED, EventStatus.CANCELLED],
     [EventStatus.CANCELLED]: [],
