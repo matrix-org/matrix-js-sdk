@@ -222,7 +222,18 @@ export abstract class ReadReceipt<
 
     public abstract setUnread(type: NotificationCountType, count: number): void;
 
-    public clearNotificationsIfNeeded(userId: string): void {
+    /**
+     * This issue should also be addressed on synapse's side and is tracked as part
+     * of https://github.com/matrix-org/synapse/issues/14837
+     *
+     * Retrieves the read receipt for the logged in user and checks if it matches
+     * the last event in the room and whether that event originated from the logged
+     * in user.
+     * Under those conditions we can consider the context as read. This is useful
+     * because we never send read receipts against our own events
+     * @param userId - the logged in user
+     */
+    public fixupNotifications(userId: string): void {
         const receipt = this.getReadReceiptForUserId(userId, false);
 
         const lastEvent = this.timeline[this.timeline.length - 1];

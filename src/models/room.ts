@@ -3394,15 +3394,26 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.unthreadedReceipts.get(userId);
     }
 
-    public clearNotificationsIfNeeded(userId: string): void {
-        super.clearNotificationsIfNeeded(userId);
+    /**
+     * This issue should also be addressed on synapse's side and is tracked as part
+     * of https://github.com/matrix-org/synapse/issues/14837
+     *
+     *
+     * We consider a room  fully read if the current user has sent
+     * the last event in the live timeline of that context and if the read receipt
+     * we have on record matches.
+     * This also detects all unread threads and applies the same logic to those
+     * contexts
+     */
+    public fixupNotifications(userId: string): void {
+        super.fixupNotifications(userId);
 
         const unreadThreads = this.getThreads().filter(
-            (thread) => this.getThreadUnreadNotificationCount(NotificationCountType.Total) > 0,
+            (thread) => this.getThreadUnreadNotificationCount(thread.id, NotificationCountType.Total) > 0,
         );
 
         for (const thread of unreadThreads) {
-            thread.clearNotificationsIfNeeded(userId);
+            thread.fixupNotifications(userId);
         }
     }
 }
