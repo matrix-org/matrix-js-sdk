@@ -261,14 +261,14 @@ function getSyncResponse(roomMembers: string[]): ISyncResponse {
  * Waits for the test user to upload their keys, then sends a /sync response with a to-device message which will
  * establish an Olm session.
  *
- * @param testClient: a TestClient for the user under test, which we expect to upload account keys, and to make a
+ * @param testClient - the MatrixClient under test, which we expect to upload account keys, and to make a
  *    /sync request which we will respond to.
  * @param keyReceiver - an IE2EKeyReceiver which will intercept the /keys/upload request from the client under test
  * @param syncResponder - an ISyncResponder which will intercept /sync requests from the client under test
  * @param peerOlmAccount: an OlmAccount which will be used to initiate the Olm session.
  */
 async function establishOlmSession(
-    testClient: TestClient,
+    testClient: MatrixClient,
     keyReceiver: IE2EKeyReceiver,
     syncResponder: ISyncResponder,
     peerOlmAccount: Olm.Account,
@@ -278,7 +278,7 @@ async function establishOlmSession(
     const olmEvent = encryptOlmEvent({
         senderKey: peerE2EKeys.curve25519,
         senderSigningKey: peerE2EKeys.ed25519,
-        recipient: testClient.userId!,
+        recipient: testClient.getUserId()!,
         recipientCurve25519Key: keyReceiver.getDeviceKey(),
         recipientEd25519Key: keyReceiver.getSigningKey(),
         p2pSession: p2pSession,
@@ -287,7 +287,7 @@ async function establishOlmSession(
         next_batch: 1,
         to_device: { events: [olmEvent] },
     });
-    await syncPromise(testClient.client);
+    await syncPromise(testClient);
     return p2pSession;
 }
 
@@ -754,7 +754,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("Alice sends a megolm message", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        const p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, syncResponder, testOlmAccount);
+        const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
@@ -797,7 +797,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("We shouldn't attempt to send to blocked devices", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        await establishOlmSession(aliceTestClient, keyReceiver, syncResponder, testOlmAccount);
+        await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
@@ -841,7 +841,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
-            const p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, syncResponder, testOlmAccount);
+            const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
             syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
             await syncPromise(aliceClient);
@@ -893,7 +893,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         oldBackendOnly("should disable sending to unverified devices", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
-            const p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, syncResponder, testOlmAccount);
+            const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
             // tell alice we share a room with bob
             syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
@@ -951,7 +951,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        const p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, syncResponder, testOlmAccount);
+        const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
@@ -1087,7 +1087,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("Alice should wait for device list to complete when sending a megolm message", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        await establishOlmSession(aliceTestClient, keyReceiver, syncResponder, testOlmAccount);
+        await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
         syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
@@ -1729,7 +1729,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([]));
             await syncPromise(aliceClient);
 
-            p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, syncResponder, testOlmAccount);
+            p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
         });
 
         async function expectMembershipRequest(roomId: string, members: string[]): Promise<void> {
