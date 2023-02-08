@@ -22,6 +22,7 @@ import "./olm-loader";
 import MockHttpBackend from "matrix-mock-request";
 
 import type { IDeviceKeys, IOneTimeKey } from "../src/@types/crypto";
+import type { IE2EKeyReceiver } from "./test-utils/E2EKeyReceiver";
 import { LocalStorageCryptoStore } from "../src/crypto/store/localStorage-crypto-store";
 import { logger } from "../src/logger";
 import { syncPromise } from "./test-utils/test-utils";
@@ -35,7 +36,7 @@ import { IKeysUploadResponse, IUploadKeysRequest } from "../src/client";
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
  */
-export class TestClient {
+export class TestClient implements IE2EKeyReceiver {
     public readonly httpBackend: MockHttpBackend;
     public readonly client: MatrixClient;
     public deviceKeys?: IDeviceKeys | null;

@@ -44,6 +44,7 @@ import {
     RoomStateEvent,
 } from "../../src/matrix";
 import { DeviceInfo } from "../../src/crypto/deviceinfo";
+import { IE2EKeyReceiver } from "../test-utils/E2EKeyReceiver";
 
 const ROOM_ID = "!room:id";
 
@@ -55,7 +56,7 @@ afterEach(() => {
 });
 
 // start an Olm session with a given recipient
-async function createOlmSession(olmAccount: Olm.Account, recipientTestClient: TestClient): Promise<Olm.Session> {
+async function createOlmSession(olmAccount: Olm.Account, recipientTestClient: IE2EKeyReceiver): Promise<Olm.Session> {
     const keys = await recipientTestClient.awaitOneTimeKeyUpload();
     const otkId = Object.keys(keys)[0];
     const otk = keys[otkId];
@@ -261,17 +262,22 @@ function getSyncResponse(roomMembers: string[]): ISyncResponse {
  *
  * @param testClient: a TestClient for the user under test, which we expect to upload account keys, and to make a
  *    /sync request which we will respond to.
+ * @param keyReceiver - an IE2EKeyReceiver which will intercept the /keys/upload request from the client under test
  * @param peerOlmAccount: an OlmAccount which will be used to initiate the Olm session.
  */
-async function establishOlmSession(testClient: TestClient, peerOlmAccount: Olm.Account): Promise<Olm.Session> {
+async function establishOlmSession(
+    testClient: TestClient,
+    keyReceiver: IE2EKeyReceiver,
+    peerOlmAccount: Olm.Account,
+): Promise<Olm.Session> {
     const peerE2EKeys = JSON.parse(peerOlmAccount.identity_keys());
-    const p2pSession = await createOlmSession(peerOlmAccount, testClient);
+    const p2pSession = await createOlmSession(peerOlmAccount, keyReceiver);
     const olmEvent = encryptOlmEvent({
         senderKey: peerE2EKeys.curve25519,
         senderSigningKey: peerE2EKeys.ed25519,
         recipient: testClient.userId!,
-        recipientCurve25519Key: testClient.getDeviceKey(),
-        recipientEd25519Key: testClient.getSigningKey(),
+        recipientCurve25519Key: keyReceiver.getDeviceKey(),
+        recipientEd25519Key: keyReceiver.getSigningKey(),
         p2pSession: p2pSession,
     });
     testClient.sendOrQueueSyncResponse({
@@ -389,6 +395,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     /** a wrapper around {@link #aliceClient} */
     let aliceTestClient: TestClient;
 
+    /** an object which intercepts `/keys/upload` requests from {@link #aliceClient} to catch the uploaded keys */
+    let keyReceiver: IE2EKeyReceiver;
+
     async function startClientAndAwaitFirstSync(opts: IStartClientOpts = {}): Promise<void> {
         logger.log(aliceTestClient + ": starting");
         aliceTestClient.httpBackend.when("GET", "/versions").respond(200, {
@@ -489,6 +498,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     beforeEach(async () => {
         aliceTestClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs");
         aliceClient = aliceTestClient.client;
+
+        // for now the TestClient acts as a keyReceiver
+        keyReceiver = aliceTestClient;
+
         await initCrypto(aliceClient);
 
         // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
@@ -514,15 +527,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+        const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
             recipient: aliceClient.getUserId()!,
-            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
-            recipientEd25519Key: aliceTestClient.getSigningKey(),
+            recipientCurve25519Key: keyReceiver.getDeviceKey(),
+            recipientEd25519Key: keyReceiver.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -572,15 +585,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+        const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
         // make the room_key event, but don't send it yet
         const roomKeyEncrypted = encryptGroupSessionKey({
             recipient: aliceClient.getUserId()!,
-            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
-            recipientEd25519Key: aliceTestClient.getSigningKey(),
+            recipientCurve25519Key: keyReceiver.getDeviceKey(),
+            recipientEd25519Key: keyReceiver.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -639,15 +652,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+        const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
         // make the room_key event
         const roomKeyEncrypted1 = encryptGroupSessionKey({
             recipient: aliceClient.getUserId()!,
-            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
-            recipientEd25519Key: aliceTestClient.getSigningKey(),
+            recipientCurve25519Key: keyReceiver.getDeviceKey(),
+            recipientEd25519Key: keyReceiver.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -665,8 +678,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // session.
         const roomKeyEncrypted2 = encryptGroupSessionKey({
             recipient: aliceClient.getUserId()!,
-            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
-            recipientEd25519Key: aliceTestClient.getSigningKey(),
+            recipientCurve25519Key: keyReceiver.getDeviceKey(),
+            recipientEd25519Key: keyReceiver.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -734,7 +747,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("Alice sends a megolm message", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
+        const p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, testOlmAccount);
 
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
@@ -777,7 +790,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("We shouldn't attempt to send to blocked devices", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        await establishOlmSession(aliceTestClient, testOlmAccount);
+        await establishOlmSession(aliceTestClient, keyReceiver, testOlmAccount);
 
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
@@ -821,7 +834,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
-            const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
+            const p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, testOlmAccount);
 
             aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
             await syncPromise(aliceClient);
@@ -873,7 +886,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         oldBackendOnly("should disable sending to unverified devices", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
-            const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
+            const p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, testOlmAccount);
 
             // tell alice we share a room with bob
             aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
@@ -931,7 +944,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
+        const p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, testOlmAccount);
 
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
@@ -1067,7 +1080,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("Alice should wait for device list to complete when sending a megolm message", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        await establishOlmSession(aliceTestClient, testOlmAccount);
+        await establishOlmSession(aliceTestClient, keyReceiver, testOlmAccount);
 
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
         await syncPromise(aliceClient);
@@ -1106,7 +1119,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         }
 
         // establish an olm session with alice
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+        const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
 
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
@@ -1114,8 +1127,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
             recipient: aliceClient.getUserId()!,
-            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
-            recipientEd25519Key: aliceTestClient.getSigningKey(),
+            recipientCurve25519Key: keyReceiver.getDeviceKey(),
+            recipientEd25519Key: keyReceiver.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -1250,15 +1263,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
-        const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
+        const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
         const groupSession = new Olm.OutboundGroupSession();
         groupSession.create();
 
         // make the room_key event
         const roomKeyEncrypted = encryptGroupSessionKey({
             recipient: aliceClient.getUserId()!,
-            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
-            recipientEd25519Key: aliceTestClient.getSigningKey(),
+            recipientCurve25519Key: keyReceiver.getDeviceKey(),
+            recipientEd25519Key: keyReceiver.getSigningKey(),
             olmAccount: testOlmAccount,
             p2pSession: p2pSession,
             groupSession: groupSession,
@@ -1344,7 +1357,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const device = new DeviceInfo(beccaTestClient.client.deviceId!);
 
         // Create an olm session for Becca and Alice's devices
-        const aliceOtks = await aliceTestClient.awaitOneTimeKeyUpload();
+        const aliceOtks = await keyReceiver.awaitOneTimeKeyUpload();
         const aliceOtkId = Object.keys(aliceOtks)[0];
         const aliceOtk = aliceOtks[aliceOtkId];
         const p2pSession = new global.Olm.Session();
@@ -1356,7 +1369,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     const account = new global.Olm.Account();
                     try {
                         account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
-                        p2pSession.create_outbound(account, aliceTestClient.getDeviceKey(), aliceOtk.key);
+                        p2pSession.create_outbound(account, keyReceiver.getDeviceKey(), aliceOtk.key);
                     } finally {
                         account.free();
                     }
@@ -1375,8 +1388,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             senderSigningKey: beccaTestClient.getSigningKey(),
             senderKey: beccaTestClient.getDeviceKey(),
             recipient: aliceClient.getUserId()!,
-            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
-            recipientEd25519Key: aliceTestClient.getSigningKey(),
+            recipientCurve25519Key: keyReceiver.getDeviceKey(),
+            recipientEd25519Key: keyReceiver.getSigningKey(),
             p2pSession: p2pSession,
             plaincontent: {
                 "algorithm": "m.megolm.v1.aes-sha2",
@@ -1489,7 +1502,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         aliceClient.crypto!.deviceList.getDeviceByIdentityKey = () => device;
 
         // Create an olm session for Becca and Alice's devices
-        const aliceOtks = await aliceTestClient.awaitOneTimeKeyUpload();
+        const aliceOtks = await keyReceiver.awaitOneTimeKeyUpload();
         const aliceOtkId = Object.keys(aliceOtks)[0];
         const aliceOtk = aliceOtks[aliceOtkId];
         const p2pSession = new global.Olm.Session();
@@ -1501,7 +1514,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     const account = new global.Olm.Account();
                     try {
                         account.unpickle(beccaTestClient.client.crypto!.olmDevice.pickleKey, pickledAccount!);
-                        p2pSession.create_outbound(account, aliceTestClient.getDeviceKey(), aliceOtk.key);
+                        p2pSession.create_outbound(account, keyReceiver.getDeviceKey(), aliceOtk.key);
                     } finally {
                         account.free();
                     }
@@ -1520,8 +1533,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             senderKey: beccaTestClient.getDeviceKey(),
             senderSigningKey: beccaTestClient.getSigningKey(),
             recipient: aliceClient.getUserId()!,
-            recipientCurve25519Key: aliceTestClient.getDeviceKey(),
-            recipientEd25519Key: aliceTestClient.getSigningKey(),
+            recipientCurve25519Key: keyReceiver.getDeviceKey(),
+            recipientEd25519Key: keyReceiver.getSigningKey(),
             p2pSession: p2pSession,
             plaincontent: {
                 "algorithm": "m.megolm.v1.aes-sha2",
@@ -1708,7 +1721,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             aliceTestClient.sendOrQueueSyncResponse(getSyncResponse([]));
             await syncPromise(aliceClient);
 
-            p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
+            p2pSession = await establishOlmSession(aliceTestClient, keyReceiver, testOlmAccount);
         });
 
         async function expectMembershipRequest(roomId: string, members: string[]): Promise<void> {
