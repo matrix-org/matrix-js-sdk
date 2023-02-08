@@ -112,7 +112,7 @@ describe("MatrixScheduler", function () {
         expect(procCount).toEqual(2);
     });
 
-    it("should give up if the retryFn on failure returns -1 and try the next event", async function () {
+    it("should give up if the retryFn on failure returns -1", async function () {
         // Queue A & B.
         // Reject A and return -1 on retry.
         // Expect B to be tried next and the promise for A to be rejected.
@@ -139,19 +139,15 @@ describe("MatrixScheduler", function () {
             return new Promise<Record<string, boolean>>(() => {});
         });
 
-        const globalA = scheduler.queueEvent(eventA);
-        scheduler.queueEvent(eventB);
+        const queuedA = scheduler.queueEvent(eventA);
+        const queuedB = scheduler.queueEvent(eventB);
+        await Promise.resolve();
+        deferA.reject(new Error("Testerror"));
         // as queueing doesn't start processing synchronously anymore (see commit bbdb5ac)
         // wait just long enough before it does
-        await Promise.resolve();
+        await expect(queuedA).rejects.toThrow("Testerror");
+        await expect(queuedB).rejects.toThrow("Testerror");
         expect(procCount).toEqual(1);
-        deferA.reject({});
-        try {
-            await globalA;
-        } catch (err) {
-            await Promise.resolve();
-            expect(procCount).toEqual(2);
-        }
     });
 
     it("should treat each queue separately", async () => {
