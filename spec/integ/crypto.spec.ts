@@ -408,7 +408,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     let syncResponder: ISyncResponder;
 
     async function startClientAndAwaitFirstSync(opts: IStartClientOpts = {}): Promise<void> {
-        logger.log(aliceTestClient + ": starting");
+        logger.log(aliceClient.getUserId() + ": starting");
         aliceHttpBackend.when("GET", "/versions").respond(200, {
             // we have tests that rely on support for lazy-loading members
             versions: ["r0.5.0"],
@@ -428,7 +428,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         await Promise.all([aliceHttpBackend.flushAllExpected(), syncPromise(aliceClient)]);
-        logger.log(aliceTestClient + ": started");
+        logger.log(aliceClient.getUserId() + ": started");
     }
 
     /**
