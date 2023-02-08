@@ -35,6 +35,7 @@ import {
     IStartClientOpts,
     ISyncResponse,
     IUploadKeysRequest,
+    MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
     PendingEventOrdering,
@@ -381,7 +382,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     let testOlmAccount = {} as unknown as Olm.Account;
     let testSenderKey = "";
-    let aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
+
+    /** the MatrixClient under test */
+    let aliceClient: MatrixClient;
+
+    /** a wrapper around {@link #aliceClient} */
+    let aliceTestClient: TestClient;
 
     async function startClientAndAwaitFirstSync(opts: IStartClientOpts = {}): Promise<void> {
         logger.log(aliceTestClient + ": starting");
@@ -397,14 +403,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         // it will upload one-time keys.
         aliceTestClient.sendOrQueueSyncResponse({ next_batch: 1 });
 
-        aliceTestClient.client.startClient({
+        aliceClient.startClient({
             // set this so that we can get hold of failed events
             pendingEventOrdering: PendingEventOrdering.Detached,
 
             ...opts,
         });
 
-        await Promise.all([aliceTestClient.httpBackend.flushAllExpected(), syncPromise(aliceTestClient.client)]);
+        await Promise.all([aliceTestClient.httpBackend.flushAllExpected(), syncPromise(aliceClient)]);
         logger.log(aliceTestClient + ": started");
     }
 
@@ -482,7 +488,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     beforeEach(async () => {
         aliceTestClient = new TestClient("@alice:localhost", "xzcvb", "akjgkrgjs");
-        await initCrypto(aliceTestClient.client);
+        aliceClient = aliceTestClient.client;
+        await initCrypto(aliceClient);
 
         // create a test olm device which we will use to communicate with alice. We use libolm to implement this.
         await Olm.init();
@@ -493,7 +500,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     });
 
     afterEach(async () => {
-        aliceTestClient.client.stopClient();
+        aliceClient.stopClient();
         await aliceTestClient.httpBackend.stop();
     });
 
@@ -502,9 +509,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
-        if (aliceTestClient.client.crypto) {
-            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
-            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        if (aliceClient.crypto) {
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
@@ -543,9 +550,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         };
 
         aliceTestClient.sendOrQueueSyncResponse(syncResponse);
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.isEncrypted()).toBe(true);
 
@@ -560,9 +567,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
-        if (aliceTestClient.client.crypto) {
-            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
-            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        if (aliceClient.crypto) {
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
@@ -592,9 +599,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             next_batch: 1,
             rooms: { join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } } },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         expect(room.getLiveTimeline().getEvents()[0].getContent().msgtype).toEqual("m.bad.encrypted");
 
         // now she gets the room_key event
@@ -604,7 +611,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 events: [roomKeyEncrypted],
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         const event = room.getLiveTimeline().getEvents()[0];
 
@@ -627,9 +634,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
-        if (aliceTestClient.client.crypto) {
-            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
-            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        if (aliceClient.crypto) {
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
@@ -673,7 +680,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 events: [roomKeyEncrypted1],
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // on the second sync, send the advanced room key, along with the
         // message.  This simulates the situation where Alice has been sent a
@@ -687,9 +694,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } },
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         await room.decryptCriticalEvents();
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.getContent().body).toEqual("42");
@@ -698,11 +705,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     oldBackendOnly("prepareToEncrypt", async () => {
         expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
-        aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
+        aliceClient.setGlobalErrorOnUnknownDevices(false);
 
         // tell alice she is sharing a room with bob
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // we expect alice first to query bob's keys...
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
@@ -713,9 +720,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         aliceTestClient.httpBackend.flush("/keys/claim", 1);
 
         // fire off the prepare request
-        const room = aliceTestClient.client.getRoom(ROOM_ID);
+        const room = aliceClient.getRoom(ROOM_ID);
         expect(room).toBeTruthy();
-        const p = aliceTestClient.client.prepareToEncrypt(room!);
+        const p = aliceClient.prepareToEncrypt(room!);
 
         // we expect to get a room key message
         await expectSendRoomKey(aliceTestClient.httpBackend, "@bob:xyz", testOlmAccount);
@@ -730,14 +737,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // start out with the device unknown - the send should be rejected.
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
 
         await Promise.all([
-            aliceTestClient.client.sendTextMessage(ROOM_ID, "test").then(
+            aliceClient.sendTextMessage(ROOM_ID, "test").then(
                 () => {
                     throw new Error("sendTextMessage failed on an unknown device");
                 },
@@ -749,9 +756,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         ]);
 
         // mark the device as known, and resend.
-        aliceTestClient.client.setDeviceKnown("@bob:xyz", "DEVICE_ID");
+        aliceClient.setDeviceKnown("@bob:xyz", "DEVICE_ID");
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         const pendingMsg = room.getPendingEvents()[0];
 
         const inboundGroupSessionPromise = expectSendRoomKey(
@@ -762,7 +769,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         );
 
         await Promise.all([
-            aliceTestClient.client.resendEvent(pendingMsg, room),
+            aliceClient.resendEvent(pendingMsg, room),
             expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise),
         ]);
     });
@@ -773,7 +780,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await establishOlmSession(aliceTestClient, testOlmAccount);
 
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         logger.log("Forcing alice to download our device keys");
 
@@ -781,12 +788,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
 
         await Promise.all([
-            aliceTestClient.client.downloadKeys(["@bob:xyz"]),
+            aliceClient.downloadKeys(["@bob:xyz"]),
             aliceTestClient.httpBackend.flush("/keys/query", 2),
         ]);
 
         logger.log("Telling alice to block our device");
-        aliceTestClient.client.setDeviceBlocked("@bob:xyz", "DEVICE_ID");
+        aliceClient.setDeviceBlocked("@bob:xyz", "DEVICE_ID");
 
         logger.log("Telling alice to send a megolm message");
         aliceTestClient.httpBackend.when("PUT", "/send/").respond(200, {
@@ -795,7 +802,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key.withheld/").respond(200, {});
 
         await Promise.all([
-            aliceTestClient.client.sendTextMessage(ROOM_ID, "test"),
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
 
             // the crypto stuff can take a while, so give the requests a whole second.
             aliceTestClient.httpBackend.flushAllExpected({ timeout: 1000 }),
@@ -804,29 +811,27 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("get|setGlobalErrorOnUnknownDevices", () => {
         it("should raise an error if crypto is disabled", () => {
-            aliceTestClient.client["cryptoBackend"] = undefined;
-            expect(() => aliceTestClient.client.setGlobalErrorOnUnknownDevices(true)).toThrowError(
-                "encryption disabled",
-            );
-            expect(() => aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toThrowError("encryption disabled");
+            aliceClient["cryptoBackend"] = undefined;
+            expect(() => aliceClient.setGlobalErrorOnUnknownDevices(true)).toThrowError("encryption disabled");
+            expect(() => aliceClient.getGlobalErrorOnUnknownDevices()).toThrowError("encryption disabled");
         });
 
         oldBackendOnly("should permit sending to unknown devices", async () => {
-            expect(aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toBeTruthy();
+            expect(aliceClient.getGlobalErrorOnUnknownDevices()).toBeTruthy();
 
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
             aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-            await syncPromise(aliceTestClient.client);
+            await syncPromise(aliceClient);
 
             // start out with the device unknown - the send should be rejected.
             aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
             aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
 
             await Promise.all([
-                aliceTestClient.client.sendTextMessage(ROOM_ID, "test").then(
+                aliceClient.sendTextMessage(ROOM_ID, "test").then(
                     () => {
                         throw new Error("sendTextMessage failed on an unknown device");
                     },
@@ -838,10 +843,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             ]);
 
             // enable sending to unknown devices, and resend
-            aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
-            expect(aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toBeFalsy();
+            aliceClient.setGlobalErrorOnUnknownDevices(false);
+            expect(aliceClient.getGlobalErrorOnUnknownDevices()).toBeFalsy();
 
-            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+            const room = aliceClient.getRoom(ROOM_ID)!;
             const pendingMsg = room.getPendingEvents()[0];
 
             const inboundGroupSessionPromise = expectSendRoomKey(
@@ -852,7 +857,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             );
 
             await Promise.all([
-                aliceTestClient.client.resendEvent(pendingMsg, room),
+                aliceClient.resendEvent(pendingMsg, room),
                 expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise),
             ]);
         });
@@ -860,13 +865,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     describe("get|setGlobalBlacklistUnverifiedDevices", () => {
         it("should raise an error if crypto is disabled", () => {
-            aliceTestClient.client["cryptoBackend"] = undefined;
-            expect(() => aliceTestClient.client.setGlobalBlacklistUnverifiedDevices(true)).toThrowError(
-                "encryption disabled",
-            );
-            expect(() => aliceTestClient.client.getGlobalBlacklistUnverifiedDevices()).toThrowError(
-                "encryption disabled",
-            );
+            aliceClient["cryptoBackend"] = undefined;
+            expect(() => aliceClient.setGlobalBlacklistUnverifiedDevices(true)).toThrowError("encryption disabled");
+            expect(() => aliceClient.getGlobalBlacklistUnverifiedDevices()).toThrowError("encryption disabled");
         });
 
         oldBackendOnly("should disable sending to unverified devices", async () => {
@@ -876,28 +877,28 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             // tell alice we share a room with bob
             aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-            await syncPromise(aliceTestClient.client);
+            await syncPromise(aliceClient);
 
             logger.log("Forcing alice to download our device keys");
             aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
             aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
 
             await Promise.all([
-                aliceTestClient.client.downloadKeys(["@bob:xyz"]),
+                aliceClient.downloadKeys(["@bob:xyz"]),
                 aliceTestClient.httpBackend.flush("/keys/query", 2),
             ]);
 
             logger.log("Telling alice to block messages to unverified devices");
-            expect(aliceTestClient.client.getGlobalBlacklistUnverifiedDevices()).toBeFalsy();
-            aliceTestClient.client.setGlobalBlacklistUnverifiedDevices(true);
-            expect(aliceTestClient.client.getGlobalBlacklistUnverifiedDevices()).toBeTruthy();
+            expect(aliceClient.getGlobalBlacklistUnverifiedDevices()).toBeFalsy();
+            aliceClient.setGlobalBlacklistUnverifiedDevices(true);
+            expect(aliceClient.getGlobalBlacklistUnverifiedDevices()).toBeTruthy();
 
             logger.log("Telling alice to send a megolm message");
             aliceTestClient.httpBackend.when("PUT", "/send/").respond(200, { event_id: "$event_id" });
             aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key.withheld/").respond(200, {});
 
             await Promise.all([
-                aliceTestClient.client.sendTextMessage(ROOM_ID, "test"),
+                aliceClient.sendTextMessage(ROOM_ID, "test"),
                 aliceTestClient.httpBackend.flushAllExpected({ timeout: 1000 }),
             ]);
 
@@ -905,9 +906,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
             logger.log("Marking the device as verified");
             // XXX: this is an integration test; we really ought to do this via the cross-signing dance
-            const d = aliceTestClient.client.crypto!.deviceList.getStoredDevice("@bob:xyz", "DEVICE_ID")!;
+            const d = aliceClient.crypto!.deviceList.getStoredDevice("@bob:xyz", "DEVICE_ID")!;
             d.verified = DeviceInfo.DeviceVerification.VERIFIED;
-            aliceTestClient.client.crypto?.deviceList.storeDevicesForUser("@bob:xyz", { DEVICE_ID: d });
+            aliceClient.crypto?.deviceList.storeDevicesForUser("@bob:xyz", { DEVICE_ID: d });
 
             const inboundGroupSessionPromise = expectSendRoomKey(
                 aliceTestClient.httpBackend,
@@ -922,7 +923,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     expect(decrypted.type).toEqual("m.room.message");
                     expect(decrypted.content!.body).toEqual("test");
                 }),
-                aliceTestClient.client.sendTextMessage(ROOM_ID, "test"),
+                aliceClient.sendTextMessage(ROOM_ID, "test"),
             ]);
         });
     });
@@ -933,18 +934,15 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         logger.log("Fetching bob's devices and marking known");
 
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
 
-        await Promise.all([
-            aliceTestClient.client.downloadKeys(["@bob:xyz"]),
-            aliceTestClient.httpBackend.flushAllExpected(),
-        ]);
-        await aliceTestClient.client.setDeviceKnown("@bob:xyz", "DEVICE_ID");
+        await Promise.all([aliceClient.downloadKeys(["@bob:xyz"]), aliceTestClient.httpBackend.flushAllExpected()]);
+        await aliceClient.setDeviceKnown("@bob:xyz", "DEVICE_ID");
 
         logger.log("Telling alice to send a megolm message");
 
@@ -960,12 +958,12 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         await Promise.all([
-            aliceTestClient.client.sendTextMessage(ROOM_ID, "test"),
+            aliceClient.sendTextMessage(ROOM_ID, "test"),
             expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise),
         ]);
 
         logger.log("Telling alice to block our device");
-        aliceTestClient.client.setDeviceBlocked("@bob:xyz", "DEVICE_ID");
+        aliceClient.setDeviceBlocked("@bob:xyz", "DEVICE_ID");
 
         logger.log("Telling alice to send another megolm message");
         aliceTestClient.httpBackend.when("PUT", "/send/").respond(200, function (_path, content) {
@@ -979,7 +977,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key.withheld/").respond(200, {});
 
         await Promise.all([
-            aliceTestClient.client.sendTextMessage(ROOM_ID, "test2"),
+            aliceClient.sendTextMessage(ROOM_ID, "test2"),
             aliceTestClient.httpBackend.flushAllExpected(),
         ]);
     });
@@ -1023,7 +1021,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // start out with the device unknown - the send should be rejected.
         try {
-            await aliceTestClient.client.sendTextMessage(ROOM_ID, "test");
+            await aliceClient.sendTextMessage(ROOM_ID, "test");
             throw new Error("sendTextMessage succeeded on an unknown device");
         } catch (e) {
             expect((e as any).name).toEqual("UnknownDeviceError");
@@ -1032,7 +1030,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         }
 
         // mark the device as known, and resend.
-        aliceTestClient.client.setDeviceKnown(aliceTestClient.userId!, "DEVICE_ID");
+        aliceClient.setDeviceKnown(aliceTestClient.userId!, "DEVICE_ID");
         aliceTestClient.httpBackend
             .when("POST", "/keys/claim")
             .respond(200, function (_path, content: IClaimOTKsResult) {
@@ -1049,7 +1047,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         let decrypted: Partial<IEvent> = {};
 
         // Grab the event that we'll need to resend
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         const pendingEvents = room.getPendingEvents();
         expect(pendingEvents.length).toEqual(1);
         const unsentEvent = pendingEvents[0];
@@ -1059,7 +1057,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expectSendMegolmMessage(aliceTestClient.httpBackend, inboundGroupSessionPromise).then((d) => {
                 decrypted = d;
             }),
-            aliceTestClient.client.resendEvent(unsentEvent, room),
+            aliceClient.resendEvent(unsentEvent, room),
         ]);
 
         expect(decrypted.type).toEqual("m.room.message");
@@ -1072,16 +1070,16 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         await establishOlmSession(aliceTestClient, testOlmAccount);
 
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"]));
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // this will block
         logger.log("Forcing alice to download our device keys");
-        const downloadPromise = aliceTestClient.client.downloadKeys(["@bob:xyz"]);
+        const downloadPromise = aliceClient.downloadKeys(["@bob:xyz"]);
 
         aliceTestClient.httpBackend.when("POST", "/keys/query").respond(200, getTestKeysQueryResponse("@bob:xyz"));
 
         // so will this.
-        const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, "test").then(
+        const sendPromise = aliceClient.sendTextMessage(ROOM_ID, "test").then(
             () => {
                 throw new Error("sendTextMessage failed on an unknown device");
             },
@@ -1102,9 +1100,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
-        if (aliceTestClient.client.crypto) {
-            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
-            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        if (aliceClient.crypto) {
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
         // establish an olm session with alice
@@ -1141,9 +1139,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 join: { [ROOM_ID]: { timeline: { events: [messageEncrypted] } } },
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         await room.decryptCriticalEvents();
 
         // it probably won't be decrypted yet, because it takes a while to process the olm keys
@@ -1152,21 +1150,22 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
         expect(decryptedEvent.getContent().body).toEqual("42");
 
-        const exported = await aliceTestClient.client.exportRoomKeys();
+        const exported = await aliceClient.exportRoomKeys();
 
         // start a new client
-        aliceTestClient.client.stopClient();
+        aliceClient.stopClient();
         aliceTestClient.httpBackend.stop();
 
         aliceTestClient = new TestClient("@alice:localhost", "device2", "access_token2");
-        await initCrypto(aliceTestClient.client);
-        await aliceTestClient.client.importRoomKeys(exported);
+        aliceClient = aliceTestClient.client;
+        await initCrypto(aliceClient);
+        await aliceClient.importRoomKeys(exported);
         await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
-        if (aliceTestClient.client.crypto) {
-            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        if (aliceClient.crypto) {
+            aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
         const syncResponse = {
@@ -1177,7 +1176,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         };
 
         aliceTestClient.sendOrQueueSyncResponse(syncResponse);
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.getContent().body).toEqual("42");
@@ -1246,9 +1245,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
-        if (aliceTestClient.client.crypto) {
-            aliceTestClient.client.crypto.deviceList.downloadKeys = () => Promise.resolve({});
-            aliceTestClient.client.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
+        if (aliceClient.crypto) {
+            aliceClient.crypto.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto.deviceList.getUserByIdentityKey = () => "@bob:xyz";
         }
 
         const p2pSession = await createOlmSession(testOlmAccount, aliceTestClient);
@@ -1290,9 +1289,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         };
 
         aliceTestClient.sendOrQueueSyncResponse(syncResponse);
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         const event = room.getLiveTimeline().getEvents()[0];
         expect(event.isEncrypted()).toBe(true);
 
@@ -1312,10 +1311,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
         // TODO: replace this with intercepts of the /keys/query endpoint to make it impl agnostic.
-        if (aliceTestClient.client.crypto) {
-            aliceTestClient.client.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
-            aliceTestClient.client.crypto!.deviceList.getDeviceByIdentityKey = () => device;
-            aliceTestClient.client.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
+        if (aliceClient.crypto) {
+            aliceClient.crypto!.deviceList.downloadKeys = () => Promise.resolve({});
+            aliceClient.crypto!.deviceList.getDeviceByIdentityKey = () => device;
+            aliceClient.crypto!.deviceList.getUserByIdentityKey = () => beccaTestClient.client.getUserId()!;
         }
 
         const beccaRoom = new Room(ROOM_ID, beccaTestClient.client, "@becca:localhost", {});
@@ -1398,7 +1397,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             next_batch: 1,
             to_device: { events: [encryptedForwardedKey] },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // Alice is invited to the room by Becca
         aliceTestClient.sendOrQueueSyncResponse({
@@ -1430,11 +1429,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 },
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // Alice has joined the room
         aliceTestClient.sendOrQueueSyncResponse(getSyncResponse(["@alice:localhost", "@becca:localhost"]));
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 4,
@@ -1444,9 +1443,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 },
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         const roomEvent = room.getLiveTimeline().getEvents()[0];
         expect(roomEvent.isEncrypted()).toBe(true);
         const decryptedEvent = await testUtils.awaitDecryption(roomEvent);
@@ -1487,7 +1486,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         event.claimedEd25519Key = null;
 
         const device = new DeviceInfo(beccaTestClient.client.deviceId!);
-        aliceTestClient.client.crypto!.deviceList.getDeviceByIdentityKey = () => device;
+        aliceClient.crypto!.deviceList.getDeviceByIdentityKey = () => device;
 
         // Create an olm session for Becca and Alice's devices
         const aliceOtks = await aliceTestClient.awaitOneTimeKeyUpload();
@@ -1543,7 +1542,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             next_batch: 1,
             to_device: { events: [encryptedForwardedKey] },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // Alice is invited to the room by Charlie
         aliceTestClient.sendOrQueueSyncResponse({
@@ -1575,13 +1574,13 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 },
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // Alice has joined the room
         aliceTestClient.sendOrQueueSyncResponse(
             getSyncResponse(["@alice:localhost", "@becca:localhost", "@charlie:localhost"]),
         );
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         aliceTestClient.sendOrQueueSyncResponse({
             next_batch: 4,
@@ -1591,10 +1590,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 },
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // Decryption should fail, because Alice hasn't received any keys she can trust
-        const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+        const room = aliceClient.getRoom(ROOM_ID)!;
         const roomEvent = room.getLiveTimeline().getEvents()[0];
         expect(roomEvent.isEncrypted()).toBe(true);
         const decryptedEvent = await testUtils.awaitDecryption(roomEvent);
@@ -1619,7 +1618,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         /* Alice makes the /createRoom call */
         aliceTestClient.httpBackend.when("POST", "/createRoom").respond(200, { room_id: testRoomId });
         await Promise.all([
-            aliceTestClient.client.createRoom({
+            aliceClient.createRoom({
                 initial_state: [
                     {
                         type: "m.room.encryption",
@@ -1655,7 +1654,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                 },
             },
         });
-        await syncPromise(aliceTestClient.client);
+        await syncPromise(aliceClient);
 
         // ... and then the e2e event and an invite ...
         aliceTestClient.sendOrQueueSyncResponse({
@@ -1684,9 +1683,9 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         // as soon as the roomMember arrives, try to send a message
-        aliceTestClient.client.on(RoomStateEvent.NewMember, (_e, _s, member: RoomMember) => {
+        aliceClient.on(RoomStateEvent.NewMember, (_e, _s, member: RoomMember) => {
             if (member.userId == "@other:user") {
-                aliceTestClient.client.sendMessage(testRoomId, { msgtype: "m.text", body: "Hello, World" });
+                aliceClient.sendMessage(testRoomId, { msgtype: "m.text", body: "Hello, World" });
             }
         });
 
@@ -1694,10 +1693,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         aliceTestClient.httpBackend
             .when("PUT", "/send/m.room.encrypted/")
             .respond(200, (_path, _content) => ({ event_id: "asdfgh" }));
-        await Promise.all([
-            syncPromise(aliceTestClient.client),
-            aliceTestClient.httpBackend.flush("/send/m.room.encrypted/", 1),
-        ]);
+        await Promise.all([syncPromise(aliceClient), aliceTestClient.httpBackend.flush("/send/m.room.encrypted/", 1)]);
     });
 
     describe("Lazy-loading member lists", () => {
@@ -1707,10 +1703,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             // set up the aliceTestClient so that it is a room with no known members
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync({ lazyLoadMembers: true });
-            aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
+            aliceClient.setGlobalErrorOnUnknownDevices(false);
 
             aliceTestClient.sendOrQueueSyncResponse(getSyncResponse([]));
-            await syncPromise(aliceTestClient.client);
+            await syncPromise(aliceClient);
 
             p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
         });
@@ -1750,7 +1746,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             );
 
             // kick it off
-            const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, "test");
+            const sendPromise = aliceClient.sendTextMessage(ROOM_ID, "test");
 
             await Promise.all([
                 sendPromise,
@@ -1761,7 +1757,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         });
 
         oldBackendOnly("loading the membership list inhibits a later load", async () => {
-            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+            const room = aliceClient.getRoom(ROOM_ID)!;
             await Promise.all([room.loadMembersIfNeeded(), expectMembershipRequest(ROOM_ID, ["@bob:xyz"])]);
 
             // expect a request for bob's devices...
@@ -1782,7 +1778,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             );
 
             // kick it off
-            const sendPromise = aliceTestClient.client.sendTextMessage(ROOM_ID, "test");
+            const sendPromise = aliceClient.sendTextMessage(ROOM_ID, "test");
 
             await Promise.all([sendPromise, megolmMessagePromise, aliceTestClient.httpBackend.flush("/keys/query", 1)]);
         });
@@ -1815,14 +1811,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     join: { [ROOM_ID]: { timeline: { events: [messageEncryptedEvent] } } },
                 },
             });
-            await syncPromise(aliceTestClient.client);
+            await syncPromise(aliceClient);
 
             // alice will (eventually) send a room-key request
             aliceTestClient.httpBackend.when("PUT", "/sendToDevice/m.room_key_request/").respond(200, {});
             await aliceTestClient.httpBackend.flush("/sendToDevice/m.room_key_request/", 1, 1000);
 
             // at this point, the message should be a decryption failure
-            const room = aliceTestClient.client.getRoom(ROOM_ID)!;
+            const room = aliceClient.getRoom(ROOM_ID)!;
             const event = room.getLiveTimeline().getEvents()[0];
             expect(event.isDecryptionFailure()).toBeTruthy();
 
@@ -1853,7 +1849,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
                     ],
                 },
             });
-            await syncPromise(aliceTestClient.client);
+            await syncPromise(aliceClient);
 
             // the withheld notification should trigger a retry; wait for it
             await retryPromise;
