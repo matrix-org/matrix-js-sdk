@@ -409,6 +409,22 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     }
 
     /**
+     * Set up expectations that the client will query device keys.
+     *
+     * We check that the query contains each of the users in `response`.
+     *
+     * @param response -   response to the query.
+     */
+    function expectAliceKeyQuery(response: IDownloadKeyResult) {
+        aliceTestClient.httpBackend.when("POST", "/keys/query").respond<IDownloadKeyResult>(200, (_path, content) => {
+            Object.keys(response.device_keys).forEach((userId) => {
+                expect((content.device_keys! as Record<string, any>)[userId]).toEqual([]);
+            });
+            return response;
+        });
+    }
+
+    /**
      * Get the device keys for testOlmAccount in a format suitable for a
      * response to /keys/query
      *
@@ -683,7 +699,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     oldBackendOnly("prepareToEncrypt", async () => {
-        aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
 
@@ -712,7 +728,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     oldBackendOnly("Alice sends a megolm message", async () => {
-        aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
@@ -755,7 +771,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     oldBackendOnly("We shouldn't attempt to send to blocked devices", async () => {
-        aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         await establishOlmSession(aliceTestClient, testOlmAccount);
 
@@ -801,7 +817,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         oldBackendOnly("should permit sending to unknown devices", async () => {
             expect(aliceTestClient.client.getGlobalErrorOnUnknownDevices()).toBeTruthy();
 
-            aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
@@ -857,7 +873,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         });
 
         oldBackendOnly("should disable sending to unverified devices", async () => {
-            aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
@@ -915,7 +931,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     oldBackendOnly("We should start a new megolm session when a device is blocked", async () => {
-        aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         const p2pSession = await establishOlmSession(aliceTestClient, testOlmAccount);
 
@@ -1004,7 +1020,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
         // the completion of the first initialsync should make Alice
         // invalidate the device cache for all members in e2e rooms (ie,
         // herself), and do a key query.
-        aliceTestClient.expectKeyQuery(getTestKeysQueryResponse(aliceTestClient.userId!));
+        expectAliceKeyQuery(getTestKeysQueryResponse(aliceTestClient.userId!));
 
         await aliceTestClient.httpBackend.flushAllExpected();
 
@@ -1054,7 +1070,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     oldBackendOnly("Alice should wait for device list to complete when sending a megolm message", async () => {
-        aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
         await establishOlmSession(aliceTestClient, testOlmAccount);
 
@@ -1084,7 +1100,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
     });
 
     oldBackendOnly("Alice exports megolm keys and imports them to a new device", async () => {
-        aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+        expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
         await startClientAndAwaitFirstSync();
 
         // if we're using the old crypto impl, stub out some methods in the device manager.
@@ -1694,7 +1710,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("megolm (%s)", (backend: string, 
 
         beforeEach(async () => {
             // set up the aliceTestClient so that it is a room with no known members
-            aliceTestClient.expectKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync({ lazyLoadMembers: true });
             aliceTestClient.client.setGlobalErrorOnUnknownDevices(false);
 
