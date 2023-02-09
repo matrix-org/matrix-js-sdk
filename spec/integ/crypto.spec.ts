@@ -16,7 +16,6 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
-import MockHttpBackend from "matrix-mock-request";
 import fetchMock from "fetch-mock-jest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
@@ -299,8 +298,6 @@ async function establishOlmSession(
  * Waits for an HTTP request to send the encrypted m.room_key to-device message; decrypts it and uses it
  * to establish an Olm InboundGroupSession.
  *
- * @param senderMockHttpBackend - MockHttpBackend for the sender
- *
  * @param recipientUserID - the user id of the expected recipient
  *
  * @param recipientOlmAccount - Olm.Account for the recipient
@@ -311,7 +308,6 @@ async function establishOlmSession(
  * @returns the established inbound group session
  */
 async function expectSendRoomKey(
-    senderMockHttpBackend: MockHttpBackend,
     recipientUserID: string,
     recipientOlmAccount: Olm.Account,
     recipientOlmSession: Olm.Session | null = null,
@@ -354,15 +350,12 @@ async function expectSendRoomKey(
  *
  * Waits for an HTTP request to send an encrypted message in the test room.
  *
- * @param senderMockHttpBackend - MockHttpBackend for the sender
- *
  * @param inboundGroupSessionPromise - a promise for an Olm InboundGroupSession, which will
  *    be used to decrypt the event. We will wait for this to resolve once the HTTP request has been processed.
  *
  * @returns The content of the successfully-decrypted event
  */
 async function expectSendMegolmMessage(
-    senderMockHttpBackend: MockHttpBackend,
     inboundGroupSessionPromise: Promise<Olm.InboundGroupSession>,
 ): Promise<Partial<IEvent>> {
     const encryptedMessageContent = await new Promise<IContent>((resolve) => {
@@ -400,9 +393,6 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
 
     /** the MatrixClient under test */
     let aliceClient: MatrixClient;
-
-    /** the mock http backend that {@link #aliceClient} is wired up to */
-    let aliceHttpBackend: MockHttpBackend;
 
     /** an object which intercepts `/keys/upload` requests from {@link #aliceClient} to catch the uploaded keys */
     let keyReceiver: IE2EKeyReceiver;
@@ -772,7 +762,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const p = aliceClient.prepareToEncrypt(room!);
 
         // we expect to get a room key message
-        await expectSendRoomKey(aliceHttpBackend, "@bob:xyz", testOlmAccount);
+        await expectSendRoomKey("@bob:xyz", testOlmAccount);
 
         // the prepare request should complete successfully.
         await p;
@@ -805,11 +795,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const room = aliceClient.getRoom(ROOM_ID)!;
         const pendingMsg = room.getPendingEvents()[0];
 
-        const inboundGroupSessionPromise = expectSendRoomKey(aliceHttpBackend, "@bob:xyz", testOlmAccount, p2pSession);
+        const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
 
         await Promise.all([
             aliceClient.resendEvent(pendingMsg, room),
-            expectSendMegolmMessage(aliceHttpBackend, inboundGroupSessionPromise),
+            expectSendMegolmMessage(inboundGroupSessionPromise),
         ]);
     });
 
@@ -879,16 +869,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             const room = aliceClient.getRoom(ROOM_ID)!;
             const pendingMsg = room.getPendingEvents()[0];
 
-            const inboundGroupSessionPromise = expectSendRoomKey(
-                aliceHttpBackend,
-                "@bob:xyz",
-                testOlmAccount,
-                p2pSession,
-            );
+            const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
 
             await Promise.all([
                 aliceClient.resendEvent(pendingMsg, room),
-                expectSendMegolmMessage(aliceHttpBackend, inboundGroupSessionPromise),
+                expectSendMegolmMessage(inboundGroupSessionPromise),
             ]);
         });
     });
@@ -934,16 +919,11 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             d.verified = DeviceInfo.DeviceVerification.VERIFIED;
             aliceClient.crypto?.deviceList.storeDevicesForUser("@bob:xyz", { DEVICE_ID: d });
 
-            const inboundGroupSessionPromise = expectSendRoomKey(
-                aliceHttpBackend,
-                "@bob:xyz",
-                testOlmAccount,
-                p2pSession,
-            );
+            const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
 
             logger.log("Asking alice to re-send");
             await Promise.all([
-                expectSendMegolmMessage(aliceHttpBackend, inboundGroupSessionPromise).then((decrypted) => {
+                expectSendMegolmMessage(inboundGroupSessionPromise).then((decrypted) => {
                     expect(decrypted.type).toEqual("m.room.message");
                     expect(decrypted.content!.body).toEqual("test");
                 }),
@@ -971,14 +951,14 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         logger.log("Telling alice to send a megolm message");
 
         let megolmSessionId: string;
-        const inboundGroupSessionPromise = expectSendRoomKey(aliceHttpBackend, "@bob:xyz", testOlmAccount, p2pSession);
+        const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
         inboundGroupSessionPromise.then((igs) => {
             megolmSessionId = igs.session_id();
         });
 
         await Promise.all([
             aliceClient.sendTextMessage(ROOM_ID, "test"),
-            expectSendMegolmMessage(aliceHttpBackend, inboundGroupSessionPromise),
+            expectSendMegolmMessage(inboundGroupSessionPromise),
         ]);
 
         logger.log("Telling alice to block our device");
@@ -1062,11 +1042,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             },
         );
 
-        const inboundGroupSessionPromise = expectSendRoomKey(
-            aliceHttpBackend,
-            aliceClient.getUserId()!,
-            testOlmAccount,
-        );
+        const inboundGroupSessionPromise = expectSendRoomKey(aliceClient.getUserId()!, testOlmAccount);
 
         let decrypted: Partial<IEvent> = {};
 
@@ -1077,7 +1053,7 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
         const unsentEvent = pendingEvents[0];
 
         await Promise.all([
-            expectSendMegolmMessage(aliceHttpBackend, inboundGroupSessionPromise).then((d) => {
+            expectSendMegolmMessage(inboundGroupSessionPromise).then((d) => {
                 decrypted = d;
             }),
             aliceClient.resendEvent(unsentEvent, room),
@@ -1770,15 +1746,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
             // then a to-device with the room_key
-            const inboundGroupSessionPromise = expectSendRoomKey(
-                aliceHttpBackend,
-                "@bob:xyz",
-                testOlmAccount,
-                p2pSession,
-            );
+            const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
 
             // and finally the megolm message
-            const megolmMessagePromise = expectSendMegolmMessage(aliceHttpBackend, inboundGroupSessionPromise);
+            const megolmMessagePromise = expectSendMegolmMessage(inboundGroupSessionPromise);
 
             // kick it off
             const sendPromise = aliceClient.sendTextMessage(ROOM_ID, "test");
@@ -1794,15 +1765,10 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
             expectAliceKeyQuery(getTestKeysQueryResponse("@bob:xyz"));
 
             // then a to-device with the room_key
-            const inboundGroupSessionPromise = expectSendRoomKey(
-                aliceHttpBackend,
-                "@bob:xyz",
-                testOlmAccount,
-                p2pSession,
-            );
+            const inboundGroupSessionPromise = expectSendRoomKey("@bob:xyz", testOlmAccount, p2pSession);
 
             // and finally the megolm message
-            const megolmMessagePromise = expectSendMegolmMessage(aliceHttpBackend, inboundGroupSessionPromise);
+            const megolmMessagePromise = expectSendMegolmMessage(inboundGroupSessionPromise);
 
             // kick it off
             const sendPromise = aliceClient.sendTextMessage(ROOM_ID, "test");
