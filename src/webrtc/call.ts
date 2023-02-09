@@ -993,12 +993,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 }
             }
         }
-
-        logger.info(
-            `Call ${this.callId} pushLocalFeed() pushed stream (id=${callFeed.stream.id}, active=${callFeed.stream.active}, purpose=${callFeed.purpose})`,
-        );
-
-        this.emit(CallEvent.FeedsChanged, this.feeds);
     }
 
     /**
