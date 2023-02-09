@@ -3311,6 +3311,7 @@ describe("Room", function () {
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
+                isInitialSyncComplete: jest.fn().mockReturnValue(false),
                 supportsThreads: jest.fn().mockReturnValue(true),
             });
         });

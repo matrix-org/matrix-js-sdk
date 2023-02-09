@@ -53,6 +53,7 @@ describe("fixNotificationCountOnDecryption", () => {
     beforeEach(() => {
         mockClient = getMockClientWithEventEmitter({
             ...mockClientMethodsUser(),
+            isInitialSyncComplete: jest.fn().mockReturnValue(false),
             getPushActionsForEvent: jest.fn().mockReturnValue(mkPushAction(true, true)),
             getRoom: jest.fn().mockImplementation(() => room),
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
