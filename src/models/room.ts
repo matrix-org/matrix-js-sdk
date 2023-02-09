@@ -1412,6 +1412,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.emit(RoomEvent.UnreadNotifications, this.notificationCounts);
     }
 
+    public setUnread(type: NotificationCountType, count: number): void {
+        return this.setUnreadNotificationCount(type, count);
+    }
+
     public setSummary(summary: IRoomSummary): void {
         const heroes = summary["m.heroes"];
         const joinedCount = summary["m.joined_member_count"];
@@ -2762,6 +2766,21 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                             receipt,
                             synthetic,
                         );
+
+                        // If the read receipt sent for the logged in user matches
+                        // the last event of the live timeline, then we know for a fact
+                        // that the user has read that message.
+                        // We can mark the room as read and not wait for the local echo
+                        // from synapse
+                        // This needs to be done after the initial sync as we do not want this
+                        // logic to run whilst the room is being initialised
+                        if (this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
+                            const lastEvent = receiptDestination.timeline[receiptDestination.timeline.length - 1];
+                            if (lastEvent && eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
+                                receiptDestination.setUnread(NotificationCountType.Total, 0);
+                                receiptDestination.setUnread(NotificationCountType.Highlight, 0);
+                            }
+                        }
                     } else {
                         // The thread does not exist locally, keep the read receipt
                         // in a cache locally, and re-apply  the `addReceipt` logic
@@ -3374,13 +3393,36 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public getLastUnthreadedReceiptFor(userId: string): Receipt | undefined {
         return this.unthreadedReceipts.get(userId);
     }
+
+    /**
+     * This issue should also be addressed on synapse's side and is tracked as part
+     * of https://github.com/matrix-org/synapse/issues/14837
+     *
+     *
+     * We consider a room  fully read if the current user has sent
+     * the last event in the live timeline of that context and if the read receipt
+     * we have on record matches.
+     * This also detects all unread threads and applies the same logic to those
+     * contexts
+     */
+    public fixupNotifications(userId: string): void {
+        super.fixupNotifications(userId);
+
+        const unreadThreads = this.getThreads().filter(
+            (thread) => this.getThreadUnreadNotificationCount(thread.id, NotificationCountType.Total) > 0,
+        );
+
+        for (const thread of unreadThreads) {
+            thread.fixupNotifications(userId);
+        }
+    }
 }
 
 // a map from current event status to a list of allowed next statuses
 const ALLOWED_TRANSITIONS: Record<EventStatus, EventStatus[]> = {
     [EventStatus.ENCRYPTING]: [EventStatus.SENDING, EventStatus.NOT_SENT, EventStatus.CANCELLED],
     [EventStatus.SENDING]: [EventStatus.ENCRYPTING, EventStatus.QUEUED, EventStatus.NOT_SENT, EventStatus.SENT],
-    [EventStatus.QUEUED]: [EventStatus.SENDING, EventStatus.CANCELLED],
+    [EventStatus.QUEUED]: [EventStatus.SENDING, EventStatus.NOT_SENT, EventStatus.CANCELLED],
     [EventStatus.SENT]: [],
     [EventStatus.NOT_SENT]: [EventStatus.SENDING, EventStatus.QUEUED, EventStatus.CANCELLED],
     [EventStatus.CANCELLED]: [],

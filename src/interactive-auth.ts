@@ -24,7 +24,7 @@ import { MatrixError } from "./http-api";
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
 
-interface IFlow {
+export interface UIAFlow {
     stages: AuthType[];
 }
 
@@ -48,8 +48,8 @@ export interface IAuthData {
     session?: string;
     type?: string;
     completed?: string[];
-    flows?: IFlow[];
-    available_flows?: IFlow[];
+    flows?: UIAFlow[];
+    available_flows?: UIAFlow[];
     stages?: string[];
     required_stages?: AuthType[];
     params?: Record<string, Record<string, any>>;
@@ -101,7 +101,7 @@ class NoAuthFlowFoundError extends Error {
     public name = "NoAuthFlowFoundError";
 
     // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
-    public constructor(m: string, public readonly required_stages: string[], public readonly flows: IFlow[]) {
+    public constructor(m: string, public readonly required_stages: string[], public readonly flows: UIAFlow[]) {
         super(m);
     }
 }
@@ -198,7 +198,7 @@ export class InteractiveAuth {
     private emailSid?: string;
     private requestingEmailToken = false;
     private attemptAuthDeferred: IDeferred<IAuthData> | null = null;
-    private chosenFlow: IFlow | null = null;
+    private chosenFlow: UIAFlow | null = null;
     private currentStage: string | null = null;
 
     private emailAttempt = 1;
@@ -320,7 +320,7 @@ export class InteractiveAuth {
         return this.data.params?.[loginType];
     }
 
-    public getChosenFlow(): IFlow | null {
+    public getChosenFlow(): UIAFlow | null {
         return this.chosenFlow;
     }
 
@@ -573,7 +573,7 @@ export class InteractiveAuth {
      * @returns flow
      * @throws {@link NoAuthFlowFoundError} If no suitable authentication flow can be found
      */
-    private chooseFlow(): IFlow {
+    private chooseFlow(): UIAFlow {
         const flows = this.data.flows || [];
 
         // we've been given an email or we've already done an email part
@@ -610,7 +610,7 @@ export class InteractiveAuth {
      * @internal
      * @returns login type
      */
-    private firstUncompletedStage(flow: IFlow): AuthType | undefined {
+    private firstUncompletedStage(flow: UIAFlow): AuthType | undefined {
         const completed = this.data.completed || [];
         return flow.stages.find((stageType) => !completed.includes(stageType));
     }

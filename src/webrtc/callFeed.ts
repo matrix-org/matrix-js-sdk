@@ -357,7 +357,7 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         let stream: MediaStream | undefined;
         if (this.stream) {
             stream = this.stream.clone();
-            logger.log(`callFeed cloning stream ${this.stream.id} newStream ${stream.id}`);
+            logger.log(`CallFeed clone() cloning stream (originalStreamId=${this.stream.id}, newStreamId${stream.id})`);
 
             if (this.purpose === SDPStreamMetadataPurpose.Usermedia) {
                 mediaHandler.userMediaStreams.push(stream);

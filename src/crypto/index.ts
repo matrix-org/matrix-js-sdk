@@ -1202,6 +1202,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      */
     public async storeSessionBackupPrivateKey(key: ArrayLike<number>): Promise<void> {
         if (!(key instanceof Uint8Array)) {
+            // eslint-disable-next-line @typescript-eslint/no-base-to-string
             throw new Error(`storeSessionBackupPrivateKey expects Uint8Array, got ${key}`);
         }
         const pickleKey = Buffer.from(this.olmDevice.pickleKey);
@@ -2808,11 +2809,7 @@ export class Crypto extends TypedEventEmitter<CryptoEvent, CryptoEventHandlerMap
      * @returns Promise which resolves when the event has been
      *     encrypted, or null if nothing was needed
      */
-    public async encryptEvent(event: MatrixEvent, room?: Room): Promise<void> {
-        if (!room) {
-            throw new Error("Cannot send encrypted messages in unknown rooms");
-        }
-
+    public async encryptEvent(event: MatrixEvent, room: Room): Promise<void> {
         const roomId = event.getRoomId()!;
 
         const alg = this.roomEncryptors.get(roomId);

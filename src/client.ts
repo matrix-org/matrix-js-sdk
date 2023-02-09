@@ -583,6 +583,8 @@ export interface IWellKnownConfig {
     error?: Error | string;
     // eslint-disable-next-line
     base_url?: string | null;
+    // XXX: this is undocumented
+    server_name?: string;
 }
 
 export interface IDelegatedAuthConfig {
@@ -1324,6 +1326,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // with encrypted events that might never get decrypted
             this.on(ClientEvent.Sync, this.startCallEventHandler);
         }
+
+        this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
         this.timelineSupport = Boolean(opts.timelineSupport);
 
@@ -2214,7 +2218,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // importing rust-crypto will download the webassembly, so we delay it until we know it will be
         // needed.
         const RustCrypto = await import("./rust-crypto");
-        this.cryptoBackend = await RustCrypto.initRustCrypto(this.http, userId, deviceId);
+        const rustCrypto = await RustCrypto.initRustCrypto(this.http, userId, deviceId);
+        this.cryptoBackend = rustCrypto;
+
+        // attach the event listeners needed by RustCrypto
+        this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
     }
 
     /**
@@ -2637,10 +2645,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param room - the room the event is in
      */
     public prepareToEncrypt(room: Room): void {
-        if (!this.crypto) {
+        if (!this.cryptoBackend) {
             throw new Error("End-to-end encryption disabled");
         }
-        this.crypto.prepareToEncrypt(room);
+        this.cryptoBackend.prepareToEncrypt(room);
     }
 
     /**
@@ -4421,11 +4429,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return null;
         }
 
-        if (!this.isRoomEncrypted(event.getRoomId()!)) {
+        if (!room || !this.isRoomEncrypted(event.getRoomId()!)) {
             return null;
         }
 
-        if (!this.crypto && this.usingExternalCrypto) {
+        if (!this.cryptoBackend && this.usingExternalCrypto) {
             // The client has opted to allow sending messages to encrypted
             // rooms even if the room is encrypted, and we haven't setup
             // crypto. This is useful for users of matrix-org/pantalaimon
@@ -4446,13 +4454,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             return null;
         }
 
-        if (!this.crypto) {
-            throw new Error(
-                "This room is configured to use encryption, but your client does " + "not support encryption.",
-            );
+        if (!this.cryptoBackend) {
+            throw new Error("This room is configured to use encryption, but your client does not support encryption.");
         }
 
-        return this.crypto.encryptEvent(event, room);
+        return this.cryptoBackend.encryptEvent(event, room);
     }
 
     /**
@@ -6841,6 +6847,31 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.callEventHandler!.start();
             this.groupCallEventHandler!.start();
             this.off(ClientEvent.Sync, this.startCallEventHandler);
+        }
+    };
+
+    /**
+     * Once the client has been initialised, we want to clear notifications we
+     * know for a fact should be here.
+     * This issue should also be addressed on synapse's side and is tracked as part
+     * of https://github.com/matrix-org/synapse/issues/14837
+     *
+     * We consider a room or a thread as fully read if the current user has sent
+     * the last event in the live timeline of that context and if the read receipt
+     * we have on record matches.
+     */
+    private fixupRoomNotifications = (): void => {
+        if (this.isInitialSyncComplete()) {
+            const unreadRooms = (this.getRooms() ?? []).filter((room) => {
+                return room.getUnreadNotificationCount(NotificationCountType.Total) > 0;
+            });
+
+            for (const room of unreadRooms) {
+                const currentUserId = this.getSafeUserId();
+                room.fixupNotifications(currentUserId);
+            }
+
+            this.off(ClientEvent.Sync, this.fixupRoomNotifications);
         }
     };
 

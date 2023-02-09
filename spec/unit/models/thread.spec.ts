@@ -82,6 +82,7 @@ describe("Thread", () => {
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
+                isInitialSyncComplete: jest.fn().mockReturnValue(false),
                 getRoom: jest.fn().mockImplementation(() => room),
                 decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
                 supportsThreads: jest.fn().mockReturnValue(true),
@@ -193,6 +194,7 @@ describe("Thread", () => {
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
+                isInitialSyncComplete: jest.fn().mockReturnValue(false),
                 getRoom: jest.fn().mockImplementation(() => room),
                 decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
                 supportsThreads: jest.fn().mockReturnValue(true),
