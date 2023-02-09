@@ -22,7 +22,7 @@ import { RelationType } from "../@types/event";
 import { IThreadBundledRelationship, MatrixEvent, MatrixEventEvent } from "./event";
 import { Direction, EventTimeline } from "./event-timeline";
 import { EventTimelineSet, EventTimelineSetHandlerMap } from "./event-timeline-set";
-import { Room, RoomEvent } from "./room";
+import { NotificationCountType, Room, RoomEvent } from "./room";
 import { RoomState } from "./room-state";
 import { ServerControlledNamespacedValue } from "../NamespacedValue";
 import { logger } from "../logger";
@@ -637,6 +637,10 @@ export class Thread extends ReadReceipt<EmittedEvents, EventHandlerMap> {
         }
 
         return super.hasUserReadEvent(userId, eventId);
+    }
+
+    public setUnread(type: NotificationCountType, count: number): void {
+        return this.room.setThreadUnreadNotificationCount(this.id, type, count);
     }
 }
 
