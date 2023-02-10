@@ -914,14 +914,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             const sender = transceiver?.sender;
 
             let added = false;
-            // XXX: We don't re-use transceivers with the SFU: this is to work around
+            // XXX: We don't re-use transceivers for screen shares with the SFU: this is to work around
             // https://github.com/matrix-org/waterfall/issues/98 - see the bug for more.
             // Since we use WebRTC data channels to renegotiate with the SFU, we're not
             // limited to the size of a Matrix event, so it's 'ok' if the SDP grows
             // indefinitely (although presumably this would break if we tried to do
             // an ICE restart over to-device messages after you'd turned screen sharing
             // on & off too many times...)
-            if (sender && !this.isFocus) {
+            // The reason we're OK re-using transceivers for user media is that we establish
+            // usermedia transceivers in sendrecv mode anyway and let the SFU use the other
+            // direction to send us some other media (for better or worse) so the same bug
+            // doesn't occur.
+            if (sender && (!this.isFocus || callFeed.purpose == SDPStreamMetadataPurpose.Usermedia)) {
                 try {
                     // We already have a sender, so we re-use it. We try to
                     // re-use transceivers as much as possible because they
