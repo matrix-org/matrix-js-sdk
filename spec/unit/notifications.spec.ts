@@ -159,7 +159,7 @@ describe("fixNotificationCountOnDecryption", () => {
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(1);
     });
 
-    it("does not change the room count when there's no unread count", () => {
+    it("does not change the thread count when there's no unread count", () => {
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 

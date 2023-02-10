@@ -150,26 +150,6 @@ describe("PollResponseEvent", () => {
             expect(response.spoiled).toBe(true);
         });
 
-        it("should spoil the vote when answers are empty", () => {
-            const input: IPartialEvent<PollResponseEventContent> = {
-                type: M_POLL_RESPONSE.name,
-                content: {
-                    "m.relates_to": {
-                        rel_type: REFERENCE_RELATION.name,
-                        event_id: "$poll",
-                    },
-                    [M_POLL_RESPONSE.name]: {
-                        answers: [],
-                    },
-                },
-            };
-            const response = new PollResponseEvent(input);
-            expect(response.spoiled).toBe(true);
-
-            response.validateAgainst(SAMPLE_POLL);
-            expect(response.spoiled).toBe(true);
-        });
-
         it("should spoil the vote when answers are not strings", () => {
             const input: IPartialEvent<PollResponseEventContent> = {
                 type: M_POLL_RESPONSE.name,

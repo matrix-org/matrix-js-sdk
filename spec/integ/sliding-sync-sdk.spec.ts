@@ -153,11 +153,11 @@ describe("SlidingSyncSdk", () => {
             const hasSynced = sdk!.sync();
             await httpBackend!.flushAllExpected();
             await hasSynced;
-            expect(mockSlidingSync!.start).toBeCalled();
+            expect(mockSlidingSync!.start).toHaveBeenCalled();
         });
         it("can stop()", async () => {
             sdk!.stop();
-            expect(mockSlidingSync!.stop).toBeCalled();
+            expect(mockSlidingSync!.stop).toHaveBeenCalled();
         });
     });
 
@@ -584,7 +584,7 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("emits SyncState.Error immediately when receiving M_UNKNOWN_TOKEN and stops syncing", async () => {
-            expect(mockSlidingSync!.stop).not.toBeCalled();
+            expect(mockSlidingSync!.stop).not.toHaveBeenCalled();
             mockSlidingSync!.emit(
                 SlidingSyncEvent.Lifecycle,
                 SlidingSyncState.RequestFinished,
@@ -595,7 +595,7 @@ describe("SlidingSyncSdk", () => {
                 }),
             );
             expect(sdk!.getSyncState()).toEqual(SyncState.Error);
-            expect(mockSlidingSync!.stop).toBeCalled();
+            expect(mockSlidingSync!.stop).toHaveBeenCalled();
         });
     });
 

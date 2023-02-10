@@ -550,7 +550,7 @@ describe("Crypto", function () {
             aliceClient.crypto!.outgoingRoomKeyRequestManager.sendQueuedRequests();
             jest.runAllTimers();
             await Promise.resolve();
-            expect(aliceSendToDevice).toBeCalledTimes(1);
+            expect(aliceSendToDevice).toHaveBeenCalledTimes(1);
             const txnId = aliceSendToDevice.mock.calls[0][2];
 
             // give the room key request manager time to update the state
@@ -564,7 +564,7 @@ describe("Crypto", function () {
             // cancelAndResend will call sendToDevice twice:
             // the first call to sendToDevice will be the cancellation
             // the second call to sendToDevice will be the key request
-            expect(aliceSendToDevice).toBeCalledTimes(3);
+            expect(aliceSendToDevice).toHaveBeenCalledTimes(3);
             expect(aliceSendToDevice.mock.calls[2][2]).not.toBe(txnId);
         });
 

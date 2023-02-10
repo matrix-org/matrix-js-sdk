@@ -893,7 +893,7 @@ describe("MatrixClient", function () {
     describe("getOrCreateFilter", function () {
         it("should POST createFilter if no id is present in localStorage", function () {});
         it("should use an existing filter if id is present in localStorage", function () {});
-        it("should handle localStorage filterId missing from the server", function (done) {
+        it("should handle localStorage filterId missing from the server", async () => {
             function getFilterName(userId: string, suffix?: string) {
                 // scope this on the user ID because people may login on many accounts
                 // and they all need to be stored!
@@ -919,10 +919,8 @@ describe("MatrixClient", function () {
             client.store.setFilterIdByName(filterName, invalidFilterId);
             const filter = new Filter(client.credentials.userId);
 
-            client.getOrCreateFilter(filterName, filter).then(function (filterId) {
-                expect(filterId).toEqual(FILTER_RESPONSE.data?.filter_id);
-                done();
-            });
+            const filterId = await client.getOrCreateFilter(filterName, filter);
+            expect(filterId).toEqual(FILTER_RESPONSE.data?.filter_id);
         });
     });
 
@@ -933,7 +931,7 @@ describe("MatrixClient", function () {
             expect(client.retryImmediately()).toBe(false);
         });
 
-        it("should work on /filter", function (done) {
+        it("should work on /filter", async () => {
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push({
@@ -944,23 +942,26 @@ describe("MatrixClient", function () {
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
 
-            client.on(ClientEvent.Sync, function syncListener(state) {
-                if (state === "ERROR" && httpLookups.length > 0) {
-                    expect(httpLookups.length).toEqual(2);
-                    expect(client.retryImmediately()).toBe(true);
-                    jest.advanceTimersByTime(1);
-                } else if (state === "PREPARED" && httpLookups.length === 0) {
-                    client.removeListener(ClientEvent.Sync, syncListener);
-                    done();
-                } else {
-                    // unexpected state transition!
-                    expect(state).toEqual(null);
-                }
+            const wasPreparedPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, function syncListener(state) {
+                    if (state === "ERROR" && httpLookups.length > 0) {
+                        expect(httpLookups.length).toEqual(2);
+                        expect(client.retryImmediately()).toBe(true);
+                        jest.advanceTimersByTime(1);
+                    } else if (state === "PREPARED" && httpLookups.length === 0) {
+                        client.removeListener(ClientEvent.Sync, syncListener);
+                        resolve(null);
+                    } else {
+                        // unexpected state transition!
+                        expect(state).toEqual(null);
+                    }
+                });
             });
-            client.startClient();
+            await client.startClient();
+            await wasPreparedPromise;
         });
 
-        it("should work on /sync", function (done) {
+        it("should work on /sync", async () => {
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
@@ -972,22 +973,25 @@ describe("MatrixClient", function () {
                 data: SYNC_DATA,
             });
 
-            client.on(ClientEvent.Sync, function syncListener(state) {
-                if (state === "ERROR" && httpLookups.length > 0) {
-                    expect(httpLookups.length).toEqual(1);
-                    expect(client.retryImmediately()).toBe(true);
-                    jest.advanceTimersByTime(1);
-                } else if (state === "RECONNECTING" && httpLookups.length > 0) {
-                    jest.advanceTimersByTime(10000);
-                } else if (state === "SYNCING" && httpLookups.length === 0) {
-                    client.removeListener(ClientEvent.Sync, syncListener);
-                    done();
-                }
+            const isSyncingPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, function syncListener(state) {
+                    if (state === "ERROR" && httpLookups.length > 0) {
+                        expect(httpLookups.length).toEqual(1);
+                        expect(client.retryImmediately()).toBe(true);
+                        jest.advanceTimersByTime(1);
+                    } else if (state === "RECONNECTING" && httpLookups.length > 0) {
+                        jest.advanceTimersByTime(10000);
+                    } else if (state === "SYNCING" && httpLookups.length === 0) {
+                        client.removeListener(ClientEvent.Sync, syncListener);
+                        resolve(null);
+                    }
+                });
             });
-            client.startClient();
+            await client.startClient();
+            await isSyncingPromise;
         });
 
-        it("should work on /pushrules", function (done) {
+        it("should work on /pushrules", async () => {
             httpLookups = [];
             httpLookups.push({
                 method: "GET",
@@ -998,20 +1002,23 @@ describe("MatrixClient", function () {
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
 
-            client.on(ClientEvent.Sync, function syncListener(state) {
-                if (state === "ERROR" && httpLookups.length > 0) {
-                    expect(httpLookups.length).toEqual(3);
-                    expect(client.retryImmediately()).toBe(true);
-                    jest.advanceTimersByTime(1);
-                } else if (state === "PREPARED" && httpLookups.length === 0) {
-                    client.removeListener(ClientEvent.Sync, syncListener);
-                    done();
-                } else {
-                    // unexpected state transition!
-                    expect(state).toEqual(null);
-                }
+            const wasPreparedPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, function syncListener(state) {
+                    if (state === "ERROR" && httpLookups.length > 0) {
+                        expect(httpLookups.length).toEqual(3);
+                        expect(client.retryImmediately()).toBe(true);
+                        jest.advanceTimersByTime(1);
+                    } else if (state === "PREPARED" && httpLookups.length === 0) {
+                        client.removeListener(ClientEvent.Sync, syncListener);
+                        resolve(null);
+                    } else {
+                        // unexpected state transition!
+                        expect(state).toEqual(null);
+                    }
+                });
             });
-            client.startClient();
+            await client.startClient();
+            await wasPreparedPromise;
         });
     });
 
@@ -1035,14 +1042,17 @@ describe("MatrixClient", function () {
             };
         }
 
-        it("should transition null -> PREPARED after the first /sync", function (done) {
+        it("should transition null -> PREPARED after the first /sync", async () => {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
-            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
-            client.startClient();
+            const didSyncPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
+            });
+            await client.startClient();
+            await didSyncPromise;
         });
 
-        it("should transition null -> ERROR after a failed /filter", function (done) {
+        it("should transition null -> ERROR after a failed /filter", async () => {
             const expectedStates: [string, string | null][] = [];
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
@@ -1052,14 +1062,17 @@ describe("MatrixClient", function () {
                 error: { errcode: "NOPE_NOPE_NOPE" },
             });
             expectedStates.push(["ERROR", null]);
-            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
-            client.startClient();
+            const didSyncPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
+            });
+            await client.startClient();
+            await didSyncPromise;
         });
 
         // Disabled because now `startClient` makes a legit call to `/versions`
         // And those tests are really unhappy about it... Not possible to figure
         // out what a good resolution would look like
-        xit("should transition ERROR -> CATCHUP after /sync if prev failed", function (done) {
+        it.skip("should transition ERROR -> CATCHUP after /sync if prev failed", async () => {
             const expectedStates: [string, string | null][] = [];
             acceptKeepalives = false;
             httpLookups = [];
@@ -1089,19 +1102,25 @@ describe("MatrixClient", function () {
             expectedStates.push(["RECONNECTING", null]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["CATCHUP", "ERROR"]);
-            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
-            client.startClient();
+            const didSyncPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
+            });
+            await client.startClient();
+            await didSyncPromise;
         });
 
-        it("should transition PREPARED -> SYNCING after /sync", function (done) {
+        it("should transition PREPARED -> SYNCING after /sync", async () => {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
-            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
-            client.startClient();
+            const didSyncPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
+            });
+            await client.startClient();
+            await didSyncPromise;
         });
 
-        xit("should transition SYNCING -> ERROR after a failed /sync", function (done) {
+        it.skip("should transition SYNCING -> ERROR after a failed /sync", async () => {
             acceptKeepalives = false;
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
@@ -1119,11 +1138,14 @@ describe("MatrixClient", function () {
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
-            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
-            client.startClient();
+            const didSyncPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
+            });
+            await client.startClient();
+            await didSyncPromise;
         });
 
-        xit("should transition ERROR -> SYNCING after /sync if prev failed", function (done) {
+        it.skip("should transition ERROR -> SYNCING after /sync if prev failed", async () => {
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
                 method: "GET",
@@ -1135,11 +1157,14 @@ describe("MatrixClient", function () {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["ERROR", "SYNCING"]);
-            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
-            client.startClient();
+            const didSyncPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
+            });
+            await client.startClient();
+            await didSyncPromise;
         });
 
-        it("should transition SYNCING -> SYNCING on subsequent /sync successes", function (done) {
+        it("should transition SYNCING -> SYNCING on subsequent /sync successes", async () => {
             const expectedStates: [string, string | null][] = [];
             httpLookups.push(SYNC_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
@@ -1147,11 +1172,14 @@ describe("MatrixClient", function () {
             expectedStates.push(["PREPARED", null]);
             expectedStates.push(["SYNCING", "PREPARED"]);
             expectedStates.push(["SYNCING", "SYNCING"]);
-            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
-            client.startClient();
+            const didSyncPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
+            });
+            await client.startClient();
+            await didSyncPromise;
         });
 
-        xit("should transition ERROR -> ERROR if keepalive keeps failing", function (done) {
+        it.skip("should transition ERROR -> ERROR if keepalive keeps failing", async () => {
             acceptKeepalives = false;
             const expectedStates: [string, string | null][] = [];
             httpLookups.push({
@@ -1175,8 +1203,11 @@ describe("MatrixClient", function () {
             expectedStates.push(["RECONNECTING", "SYNCING"]);
             expectedStates.push(["ERROR", "RECONNECTING"]);
             expectedStates.push(["ERROR", "ERROR"]);
-            client.on(ClientEvent.Sync, syncChecker(expectedStates, done));
-            client.startClient();
+            const didSyncPromise = new Promise((resolve) => {
+                client.on(ClientEvent.Sync, syncChecker(expectedStates, resolve));
+            });
+            await client.startClient();
+            await didSyncPromise;
         });
     });
 
@@ -1214,7 +1245,7 @@ describe("MatrixClient", function () {
             expect(httpLookups.length).toBe(0);
         });
 
-        xit("should be able to peek into a room using peekInRoom", function (done) {});
+        it.skip("should be able to peek into a room using peekInRoom", function () {});
     });
 
     describe("getPresence", function () {
@@ -1334,7 +1365,7 @@ describe("MatrixClient", function () {
                     client.redactEvent(roomId, eventId, txnId, {
                         with_relations: [RelationType.Reference],
                     });
-                }).toThrowError(
+                }).toThrow(
                     new Error(
                         "Server does not support relation based redactions " +
                             `roomId ${roomId} eventId ${eventId} txnId: ${txnId} threadId null`,
@@ -1464,7 +1495,7 @@ describe("MatrixClient", function () {
             { startOpts: { threadSupport: false }, hasThreadSupport: false },
             { startOpts: { experimentalThreadSupport: true }, hasThreadSupport: true },
             { startOpts: { experimentalThreadSupport: true, threadSupport: false }, hasThreadSupport: false },
-        ])("enabled thread support for the SDK instance ", async ({ startOpts, hasThreadSupport }) => {
+        ])("enabled thread support for the SDK instance", async ({ startOpts, hasThreadSupport }) => {
             await client.startClient(startOpts);
             expect(client.supportsThreads()).toBe(hasThreadSupport);
         });
@@ -2410,31 +2441,6 @@ describe("MatrixClient", function () {
                 expect(rooms).toContain(room1);
                 expect(rooms).toContain(room2);
             });
-
-            it("Ignores m.predecessor if we don't ask to use it", () => {
-                // Given 6 rooms, 2 of which have been replaced, and 2 of which WERE
-                // replaced by create events, but are now NOT replaced, because an
-                // m.predecessor event has changed the room's predecessor.
-                const {
-                    room1,
-                    room2,
-                    replacedByCreate1,
-                    replacedByCreate2,
-                    replacedByDynamicPredecessor1,
-                    replacedByDynamicPredecessor2,
-                } = setUpReplacedRooms();
-
-                // When we ask for the visible rooms
-                const rooms = client.getVisibleRooms(); // Don't supply msc3946ProcessDynamicPredecessor
-
-                // Then we only get the ones that have not been replaced
-                expect(rooms).not.toContain(replacedByCreate1);
-                expect(rooms).not.toContain(replacedByCreate2);
-                expect(rooms).toContain(replacedByDynamicPredecessor1);
-                expect(rooms).toContain(replacedByDynamicPredecessor2);
-                expect(rooms).toContain(room1);
-                expect(rooms).toContain(room2);
-            });
         });
 
         describe("getRoomUpgradeHistory", () => {
@@ -2619,7 +2625,7 @@ describe("MatrixClient", function () {
                 expect(history.map((room) => room.roomId)).toEqual([room1.roomId]);
             });
 
-            it("Without verify links, includes predecessors that don't point forwards", () => {
+            it("Without verify links, includes successors that don't point backwards", () => {
                 // Given predecessors point forwards with tombstones, but
                 // successors do not point back with create events.
                 const [room1, room2, room3, room4] = createRoomHistory(false, true);
