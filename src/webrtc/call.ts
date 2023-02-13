@@ -2174,6 +2174,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // chrome doesn't implement any of the 'onstarted' events yet
         if (["connected", "completed"].includes(this.peerConn?.iceConnectionState ?? "")) {
             clearTimeout(this.iceDisconnectedTimeout);
+            this.iceDisconnectedTimeout = undefined;
             this.state = CallState.Connected;
 
             if (!this.callLengthInterval && !this.callStartTime) {
@@ -2545,6 +2546,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         if (this.inviteTimeout) {
             clearTimeout(this.inviteTimeout);
             this.inviteTimeout = undefined;
+        }
+        if (this.iceDisconnectedTimeout !== undefined) {
+            clearTimeout(this.iceDisconnectedTimeout);
+            this.iceDisconnectedTimeout = undefined;
         }
         if (this.callLengthInterval) {
             clearInterval(this.callLengthInterval);
