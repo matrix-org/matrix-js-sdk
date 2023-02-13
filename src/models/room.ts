@@ -2467,6 +2467,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(remoteEvent);
         const thread = threadId ? this.getThread(threadId) : null;
+        thread?.setEventMetadata(localEvent);
         thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
         if (shouldLiveInRoom) {
@@ -2548,6 +2549,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(event);
             const thread = threadId ? this.getThread(threadId) : undefined;
+            thread?.setEventMetadata(event);
             thread?.timelineSet.replaceEventId(oldEventId, newEventId!);
 
             if (shouldLiveInRoom) {
