@@ -1881,7 +1881,7 @@
     semver "^7.3.7"
     tsutils "^3.21.0"
 
-"@typescript-eslint/utils@5.51.0":
+"@typescript-eslint/utils@5.51.0", "@typescript-eslint/utils@^5.10.0":
   version "5.51.0"
   resolved "https://registry.yarnpkg.com/@typescript-eslint/utils/-/utils-5.51.0.tgz#074f4fabd5b12afe9c8aa6fdee881c050f8b4d47"
   integrity sha512-76qs+5KWcaatmwtwsDJvBk4H76RJQBFe+Gext0EfJdC3Vd2kpY2Pf//OHHzHp84Ciw0/rYoGTDnIAr3uWhhJYw==
@@ -3426,6 +3426,13 @@ eslint-plugin-import@^2.26.0:
     semver "^6.3.0"
     tsconfig-paths "^3.14.1"
 
+eslint-plugin-jest@^27.1.6:
+  version "27.2.1"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-jest/-/eslint-plugin-jest-27.2.1.tgz#b85b4adf41c682ea29f1f01c8b11ccc39b5c672c"
+  integrity sha512-l067Uxx7ZT8cO9NJuf+eJHvt6bqJyz2Z29wykyEdz/OtmcELQl2MQGQLX8J94O1cSJWAwUSEvCjwjA7KEK3Hmg==
+  dependencies:
+    "@typescript-eslint/utils" "^5.10.0"
+
 eslint-plugin-jsdoc@^39.6.4:
   version "39.8.0"
   resolved "https://registry.yarnpkg.com/eslint-plugin-jsdoc/-/eslint-plugin-jsdoc-39.8.0.tgz#9ca38ae31fb6e6de6268c5c041fa175fe1190469"
@@ -3439,10 +3446,10 @@ eslint-plugin-jsdoc@^39.6.4:
     semver "^7.3.8"
     spdx-expression-parse "^3.0.1"
 
-eslint-plugin-matrix-org@^0.10.0:
-  version "0.10.0"
-  resolved "https://registry.yarnpkg.com/eslint-plugin-matrix-org/-/eslint-plugin-matrix-org-0.10.0.tgz#8d0998641a4d276343cae2abf253a01bb4d4cc60"
-  integrity sha512-L7ail0x1yUlF006kn4mHc+OT8/aYZI++i852YXPHxCbM1EY7jeg/fYAQ8tCx5+x08LyqXeS7inAVSL784m0C6Q==
+eslint-plugin-matrix-org@^1.0.0:
+  version "1.0.0"
+  resolved "https://registry.yarnpkg.com/eslint-plugin-matrix-org/-/eslint-plugin-matrix-org-1.0.0.tgz#cead71391e2a36d63cb8f8018a38305ecf81b4b8"
+  integrity sha512-JSjw+hswEcFR+N4N2JXZttK65cK6huykZKkbnwcITxPTelsaOfZ8qXG0Az9BfmVADaLgY3MGmHK1YYKbykUfBQ==
 
 eslint-plugin-tsdoc@^0.2.17:
   version "0.2.17"

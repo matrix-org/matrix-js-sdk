@@ -220,7 +220,7 @@ describe("Rendezvous", function () {
         await bobStartPromise;
     });
 
-    it("new device declines protocol", async function () {
+    it("new device declines protocol with outcome unsupported", async function () {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
@@ -278,7 +278,7 @@ describe("Rendezvous", function () {
         expect(aliceOnFailure).toHaveBeenCalledWith(RendezvousFailureReason.UnsupportedAlgorithm);
     });
 
-    it("new device declines protocol", async function () {
+    it("new device requests an invalid protocol", async function () {
         const aliceTransport = makeTransport("Alice", "https://test.rz/123456");
         const bobTransport = makeTransport("Bob", "https://test.rz/999999");
         transports.push(aliceTransport, bobTransport);
@@ -570,7 +570,7 @@ describe("Rendezvous", function () {
 
     it("device not online within timeout", async function () {
         const { aliceRz } = await completeLogin({});
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError();
+        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
     });
 
     it("device appears online within timeout", async function () {
@@ -594,7 +594,7 @@ describe("Rendezvous", function () {
                 getFingerprint: () => "bbbb",
             };
         }, 1500);
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError();
+        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow();
     });
 
     it("mismatched device key", async function () {
@@ -603,6 +603,6 @@ describe("Rendezvous", function () {
                 getFingerprint: () => "XXXX",
             },
         });
-        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrowError(/different key/);
+        expect(aliceRz.verifyNewDeviceOnExistingDevice(1000)).rejects.toThrow(/different key/);
     });
 });

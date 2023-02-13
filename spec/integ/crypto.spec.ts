@@ -835,8 +835,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     describe("get|setGlobalErrorOnUnknownDevices", () => {
         it("should raise an error if crypto is disabled", () => {
             aliceClient["cryptoBackend"] = undefined;
-            expect(() => aliceClient.setGlobalErrorOnUnknownDevices(true)).toThrowError("encryption disabled");
-            expect(() => aliceClient.getGlobalErrorOnUnknownDevices()).toThrowError("encryption disabled");
+            expect(() => aliceClient.setGlobalErrorOnUnknownDevices(true)).toThrow("encryption disabled");
+            expect(() => aliceClient.getGlobalErrorOnUnknownDevices()).toThrow("encryption disabled");
         });
 
         oldBackendOnly("should permit sending to unknown devices", async () => {
@@ -881,8 +881,8 @@ describe.each(Object.entries(CRYPTO_BACKENDS))("crypto (%s)", (backend: string, 
     describe("get|setGlobalBlacklistUnverifiedDevices", () => {
         it("should raise an error if crypto is disabled", () => {
             aliceClient["cryptoBackend"] = undefined;
-            expect(() => aliceClient.setGlobalBlacklistUnverifiedDevices(true)).toThrowError("encryption disabled");
-            expect(() => aliceClient.getGlobalBlacklistUnverifiedDevices()).toThrowError("encryption disabled");
+            expect(() => aliceClient.setGlobalBlacklistUnverifiedDevices(true)).toThrow("encryption disabled");
+            expect(() => aliceClient.getGlobalBlacklistUnverifiedDevices()).toThrow("encryption disabled");
         });
 
         oldBackendOnly("should disable sending to unverified devices", async () => {

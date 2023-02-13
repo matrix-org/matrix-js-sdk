@@ -146,7 +146,7 @@ describe("ECDHv1", function () {
 
             // send a message without encryption
             await aliceTransport.send({ iv: "dummy", ciphertext: "dummy" });
-            expect(bob.receive()).rejects.toThrowError();
+            expect(bob.receive()).rejects.toThrow();
 
             await alice.cancel(RendezvousFailureReason.Unknown);
             await bob.cancel(RendezvousFailureReason.Unknown);
@@ -164,7 +164,7 @@ describe("ECDHv1", function () {
 
             await bobTransport.send({ iv: "dummy", ciphertext: "dummy" });
 
-            expect(alice.receive()).rejects.toThrowError();
+            expect(alice.receive()).rejects.toThrow();
 
             await alice.cancel(RendezvousFailureReason.Unknown);
         });

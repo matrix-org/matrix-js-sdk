@@ -205,19 +205,17 @@ describe("MatrixClient", function () {
     describe("getFilter", function () {
         const filterId = "f1lt3r1d";
 
-        it("should return a filter from the store if allowCached", function (done) {
+        it("should return a filter from the store if allowCached", async () => {
             const filter = Filter.fromJson(userId, filterId, {
                 event_format: "client",
             });
             store!.storeFilter(filter);
-            client!.getFilter(userId, filterId, true).then(function (gotFilter) {
-                expect(gotFilter).toEqual(filter);
-                done();
-            });
+            const gotFilter = await client!.getFilter(userId, filterId, true);
+            expect(gotFilter).toEqual(filter);
             httpBackend!.verifyNoOutstandingRequests();
         });
 
-        it("should do an HTTP request if !allowCached even if one exists", function (done) {
+        it("should do an HTTP request if !allowCached even if one exists", async () => {
             const httpFilterDefinition = {
                 event_format: "federation",
             };
@@ -230,15 +228,11 @@ describe("MatrixClient", function () {
                 event_format: "client",
             });
             store!.storeFilter(storeFilter);
-            client!.getFilter(userId, filterId, false).then(function (gotFilter) {
-                expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
-                done();
-            });
-
-            httpBackend!.flush("");
+            const [gotFilter] = await Promise.all([client!.getFilter(userId, filterId, false), httpBackend!.flush("")]);
+            expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
         });
 
-        it("should do an HTTP request if nothing is in the cache and then store it", function (done) {
+        it("should do an HTTP request if nothing is in the cache and then store it", async () => {
             const httpFilterDefinition = {
                 event_format: "federation",
             };
@@ -247,20 +241,16 @@ describe("MatrixClient", function () {
             httpBackend!
                 .when("GET", "/user/" + encodeURIComponent(userId) + "/filter/" + filterId)
                 .respond(200, httpFilterDefinition);
-            client!.getFilter(userId, filterId, true).then(function (gotFilter) {
-                expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
-                expect(store!.getFilter(userId, filterId)).toBeTruthy();
-                done();
-            });
-
-            httpBackend!.flush("");
+            const [gotFilter] = await Promise.all([client!.getFilter(userId, filterId, true), httpBackend!.flush("")]);
+            expect(gotFilter.getDefinition()).toEqual(httpFilterDefinition);
+            expect(store!.getFilter(userId, filterId)).toBeTruthy();
         });
     });
 
     describe("createFilter", function () {
         const filterId = "f1llllllerid";
 
-        it("should do an HTTP request and then store the filter", function (done) {
+        it("should do an HTTP request and then store the filter", async () => {
             expect(store!.getFilter(userId, filterId)).toBe(null);
 
             const filterDefinition = {
@@ -276,13 +266,9 @@ describe("MatrixClient", function () {
                     filter_id: filterId,
                 });
 
-            client!.createFilter(filterDefinition).then(function (gotFilter) {
-                expect(gotFilter.getDefinition()).toEqual(filterDefinition);
-                expect(store!.getFilter(userId, filterId)).toEqual(gotFilter);
-                done();
-            });
-
-            httpBackend!.flush("");
+            const [gotFilter] = await Promise.all([client!.createFilter(filterDefinition), httpBackend!.flush("")]);
+            expect(gotFilter.getDefinition()).toEqual(filterDefinition);
+            expect(store!.getFilter(userId, filterId)).toEqual(gotFilter);
         });
     });
 
