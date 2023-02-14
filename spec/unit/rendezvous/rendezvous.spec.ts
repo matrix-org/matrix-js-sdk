@@ -143,7 +143,7 @@ describe("Rendezvous", function () {
         const code = JSON.parse(aliceRz.code!) as RendezvousCode;
 
         expect(code.intent).toEqual(RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE);
-        expect(code.rendezvous?.algorithm).toEqual("org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256");
+        expect(code.rendezvous?.algorithm).toEqual("org.matrix.msc3903.rendezvous.v2.curve25519-aes-sha256");
         expect(code.rendezvous?.transport.type).toEqual("org.matrix.msc3886.http.v1");
         expect((code.rendezvous?.transport as MSC3886SimpleHttpRendezvousTransportDetails).uri).toEqual(
             "https://fallbackserver/rz/123",
