@@ -450,9 +450,7 @@ export class PushProcessor {
         // Iterate over each character, and decide whether to append to the current
         // part (following the escape rules) or to start a new part (based on the
         // field separator).
-        for (let i = 0; i < str.length; ++i) {
-            const c = str[i];
-
+        for (const c of str) {
             // If the previous character was the escape character (a backslash)
             // then decide what to append to the current part.
             if (escaped) {
