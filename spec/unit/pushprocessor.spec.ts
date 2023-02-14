@@ -519,104 +519,39 @@ describe("NotificationService", function () {
             },
         });
 
-        // The properly escaped key works.
-        expect(
-            pushProcessor.ruleMatchesEvent(
-                {
-                    rule_id: "rule1",
-                    actions: [],
-                    conditions: [
-                        {
-                            kind: ConditionKind.EventMatch,
-                            key: "content.m\\.test.foo",
-                            pattern: "bar",
-                        },
-                    ],
-                    default: false,
-                    enabled: true,
-                },
-                testEvent,
-            ),
-        ).toBe(true);
+        // Each test is a (key, pattern, expected match) tuple.
+        const testCases = [
+            // The properly escaped key works.
+            { key: "content.m\\.test.foo", pattern: "bar", expected: true },
+            // An unescaped version does not match.
+            { key: "content.m.test.foo", pattern: "bar", expected: false },
+            // Over escaping does not match.
+            { key: "content.m\\.test\\.foo", pattern: "bar", expected: false },
+            // Escaping backslashes should match.
+            { key: "content.m\\\\example", pattern: "baz", expected: true },
+            // An unnecessary escape sequence leaves the backslash and still matches.
+            { key: "content.m\\example", pattern: "baz", expected: true },
+        ];
 
-        // An unescaped version does not match.
-        expect(
-            pushProcessor.ruleMatchesEvent(
-                {
-                    rule_id: "rule1",
-                    actions: [],
-                    conditions: [
-                        {
-                            kind: ConditionKind.EventMatch,
-                            key: "content.m.test.foo",
-                            pattern: "bar",
-                        },
-                    ],
-                    default: false,
-                    enabled: true,
-                },
-                testEvent,
-            ),
-        ).toBe(false);
-
-        // Over escaping does not match.
-        expect(
-            pushProcessor.ruleMatchesEvent(
-                {
-                    rule_id: "rule1",
-                    actions: [],
-                    conditions: [
-                        {
-                            kind: ConditionKind.EventMatch,
-                            key: "content.m\\.test\\.foo",
-                            pattern: "bar",
-                        },
-                    ],
-                    default: false,
-                    enabled: true,
-                },
-                testEvent,
-            ),
-        ).toBe(false);
-
-        // Escaping backslashes should match.
-        expect(
-            pushProcessor.ruleMatchesEvent(
-                {
-                    rule_id: "rule1",
-                    actions: [],
-                    conditions: [
-                        {
-                            kind: ConditionKind.EventMatch,
-                            key: "content.m\\\\example",
-                            pattern: "baz",
-                        },
-                    ],
-                    default: false,
-                    enabled: true,
-                },
-                testEvent,
-            ),
-        ).toBe(true);
-
-        // An unnecessary escape sequence leaves the backslash and still matches.
-        expect(
-            pushProcessor.ruleMatchesEvent(
-                {
-                    rule_id: "rule1",
-                    actions: [],
-                    conditions: [
-                        {
-                            kind: ConditionKind.EventMatch,
-                            key: "content.m\\example",
-                            pattern: "baz",
-                        },
-                    ],
-                    default: false,
-                    enabled: true,
-                },
-                testEvent,
-            ),
-        ).toBe(true);
+        for (const testCase of testCases) {
+            expect(
+                pushProcessor.ruleMatchesEvent(
+                    {
+                        rule_id: "rule1",
+                        actions: [],
+                        conditions: [
+                            {
+                                kind: ConditionKind.EventMatch,
+                                key: testCase.key,
+                                pattern: testCase.pattern,
+                            },
+                        ],
+                        default: false,
+                        enabled: true,
+                    },
+                    testEvent,
+                ),
+            ).toBe(testCase.expected);
+        }
     });
 });
