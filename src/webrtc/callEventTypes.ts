@@ -24,12 +24,12 @@ export interface SDPStreamMetadataTracks {
 }
 
 export interface SDPStreamMetadataObject {
-    user_id: string;
-    device_id: string;
+    user_id?: string;
+    device_id?: string;
     purpose: SDPStreamMetadataPurpose;
-    audio_muted: boolean;
-    video_muted: boolean;
-    tracks: SDPStreamMetadataTracks;
+    audio_muted?: boolean;
+    video_muted?: boolean;
+    tracks?: SDPStreamMetadataTracks;
 }
 
 export interface SDPStreamMetadata {

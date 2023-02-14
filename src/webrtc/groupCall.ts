@@ -24,6 +24,7 @@ import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
+import { LocalCallFeed } from "./localCallFeed";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -192,8 +193,8 @@ export class GroupCall extends TypedEventEmitter<
     public pttMaxTransmitTime = 1000 * 20;
 
     public activeSpeaker?: CallFeed;
-    public localCallFeed?: CallFeed;
-    public localScreenshareFeed?: CallFeed;
+    public localCallFeed?: LocalCallFeed;
+    public localScreenshareFeed?: LocalCallFeed;
     public localDesktopCapturerSourceId?: string;
     public readonly userMediaFeeds: CallFeed[] = [];
     public readonly screenshareFeeds: CallFeed[] = [];
@@ -346,8 +347,8 @@ export class GroupCall extends TypedEventEmitter<
         return isUsingPreferredFocus ? [] : preferredFoci;
     }
 
-    public getLocalFeeds(): CallFeed[] {
-        const feeds: CallFeed[] = [];
+    public getLocalFeeds(): LocalCallFeed[] {
+        const feeds: LocalCallFeed[] = [];
 
         if (this.localCallFeed) feeds.push(this.localCallFeed);
         if (this.localScreenshareFeed) feeds.push(this.localScreenshareFeed);
@@ -400,12 +401,9 @@ export class GroupCall extends TypedEventEmitter<
             throw new Error("Group call disposed while gathering media stream");
         }
 
-        const callFeed = new CallFeed({
+        const callFeed = new LocalCallFeed({
             client: this.client,
             roomId: this.room.roomId,
-            userId: this.client.getUserId()!,
-            deviceId: this.client.getDeviceId()!,
-            feedId: stream.id,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
             audioMuted: this.initWithAudioMuted || stream.getAudioTracks().length === 0 || this.isPtt,
@@ -636,7 +634,7 @@ export class GroupCall extends TypedEventEmitter<
 
         if (this.localCallFeed) {
             logger.log(
-                `GroupCall ${this.groupCallId} setMicrophoneMuted() (feedId=${this.localCallFeed.feedId}, muted=${muted})`,
+                `GroupCall ${this.groupCallId} setMicrophoneMuted() (feedId=${this.localCallFeed.id}, muted=${muted})`,
             );
             this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
@@ -678,7 +676,7 @@ export class GroupCall extends TypedEventEmitter<
 
         if (this.localCallFeed) {
             logger.log(
-                `GroupCall ${this.groupCallId} setLocalVideoMuted() (feedId=${this.localCallFeed.feedId}, muted=${muted})`,
+                `GroupCall ${this.groupCallId} setLocalVideoMuted() running (feedId=${this.localCallFeed.id}, muted=${muted})`,
             );
 
             const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
@@ -727,12 +725,9 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 this.localDesktopCapturerSourceId = opts.desktopCapturerSourceId;
-                this.localScreenshareFeed = new CallFeed({
+                this.localScreenshareFeed = new LocalCallFeed({
                     client: this.client,
                     roomId: this.room.roomId,
-                    userId: this.client.getUserId()!,
-                    deviceId: this.client.getDeviceId()!,
-                    feedId: stream.id,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Screenshare,
                     audioMuted: false,
@@ -1271,7 +1266,7 @@ export class GroupCall extends TypedEventEmitter<
         let nextActiveSpeaker: CallFeed | undefined = undefined;
 
         for (const callFeed of this.userMediaFeeds) {
-            if (callFeed.isLocal() && this.userMediaFeeds.length > 1) continue;
+            if (callFeed.isLocal && this.userMediaFeeds.length > 1) continue;
 
             const total = callFeed.speakingVolumeSamples.reduce(
                 (acc, volume) => acc + Math.max(volume, SPEAKING_THRESHOLD),
