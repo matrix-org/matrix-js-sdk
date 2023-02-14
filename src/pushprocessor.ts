@@ -439,7 +439,7 @@ export class PushProcessor {
      * @param str - The key of the push rule condition: a dotted field.
      * @returns The unescaped parts to fetch.
      */
-    private partsFotDottedKey(str: string): string[] {
+    private partsForDottedKey(str: string): string[] {
         const result = [];
 
         // The current field and whether the previous character was the escape
@@ -500,7 +500,7 @@ export class PushProcessor {
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
         // Parse the key into the separate fields to search by splitting on
         // unescaped ".", and then removing any escape characters.
-        const parts = this.partsFotDottedKey(key);
+        const parts = this.partsForDottedKey(key);
         let val: any;
 
         // special-case the first component to deal with encrypted messages
