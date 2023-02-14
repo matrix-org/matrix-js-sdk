@@ -342,6 +342,13 @@ export interface ICreateClientOpts {
     verificationMethods?: Array<VerificationMethod>;
 
     /**
+     * Set to false to disable the VoIP functionality of the client.
+     *
+     * Default true.
+     */
+    voipSupport?: boolean;
+
+    /**
      * Whether relaying calls through a TURN server should be forced. Default false.
      */
     forceTURN?: boolean;
@@ -1297,7 +1304,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
         }
 
-        if (supportsMatrixCall()) {
+        if (opts.voipSupport !== false && supportsMatrixCall()) {
             this.callEventHandler = new CallEventHandler(this);
             this.groupCallEventHandler = new GroupCallEventHandler(this);
             this.canSupportVoip = true;
