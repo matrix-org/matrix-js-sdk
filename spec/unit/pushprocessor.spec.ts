@@ -519,6 +519,7 @@ describe("NotificationService", function () {
             },
         });
 
+        // The properly escaped key works.
         expect(
             pushProcessor.ruleMatchesEvent(
                 {
@@ -538,6 +539,47 @@ describe("NotificationService", function () {
             ),
         ).toBe(true);
 
+        // An unescaped version does not match.
+        expect(
+            pushProcessor.ruleMatchesEvent(
+                {
+                    rule_id: "rule1",
+                    actions: [],
+                    conditions: [
+                        {
+                            kind: ConditionKind.EventMatch,
+                            key: "content.m.test.foo",
+                            pattern: "bar",
+                        },
+                    ],
+                    default: false,
+                    enabled: true,
+                },
+                testEvent,
+            ),
+        ).toBe(false);
+
+        // Over escaping does not match.
+        expect(
+            pushProcessor.ruleMatchesEvent(
+                {
+                    rule_id: "rule1",
+                    actions: [],
+                    conditions: [
+                        {
+                            kind: ConditionKind.EventMatch,
+                            key: "content.m\\.test\\.foo",
+                            pattern: "bar",
+                        },
+                    ],
+                    default: false,
+                    enabled: true,
+                },
+                testEvent,
+            ),
+        ).toBe(false);
+
+        // Escaping backslashes should match.
         expect(
             pushProcessor.ruleMatchesEvent(
                 {
@@ -557,6 +599,7 @@ describe("NotificationService", function () {
             ),
         ).toBe(true);
 
+        // An unnecessary escape sequence leaves the backslash and still matches.
         expect(
             pushProcessor.ruleMatchesEvent(
                 {
@@ -565,7 +608,6 @@ describe("NotificationService", function () {
                     conditions: [
                         {
                             kind: ConditionKind.EventMatch,
-                            // An incorrect escape sequence leaves the backslash.
                             key: "content.m\\example",
                             pattern: "baz",
                         },
