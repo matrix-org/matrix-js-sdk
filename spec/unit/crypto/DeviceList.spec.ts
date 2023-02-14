@@ -148,6 +148,10 @@ describe("DeviceList", function () {
         dl.invalidateUserDeviceList("@test1:sw1v.org");
         dl.refreshOutdatedDeviceLists();
 
+        // TODO: Fix this test so we actually await the call and assertions and remove
+        // the eslint disable, https://github.com/matrix-org/matrix-js-sdk/issues/2977
+        //
+        // eslint-disable-next-line jest/valid-expect-in-promise
         dl.saveIfDirty()
             .then(() => {
                 // the first request completes
@@ -196,7 +200,7 @@ describe("DeviceList", function () {
         downloadSpy.mockReturnValueOnce(queryDefer2.promise);
 
         const prom1 = dl.refreshOutdatedDeviceLists();
-        expect(downloadSpy).toBeCalledTimes(2);
+        expect(downloadSpy).toHaveBeenCalledTimes(2);
         expect(downloadSpy).toHaveBeenNthCalledWith(1, ["@test1:sw1v.org"], {});
         expect(downloadSpy).toHaveBeenNthCalledWith(2, ["@test2:sw1v.org"], {});
         queryDefer1.resolve(utils.deepCopy(signedDeviceList));

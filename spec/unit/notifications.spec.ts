@@ -53,6 +53,7 @@ describe("fixNotificationCountOnDecryption", () => {
     beforeEach(() => {
         mockClient = getMockClientWithEventEmitter({
             ...mockClientMethodsUser(),
+            isInitialSyncComplete: jest.fn().mockReturnValue(false),
             getPushActionsForEvent: jest.fn().mockReturnValue(mkPushAction(true, true)),
             getRoom: jest.fn().mockImplementation(() => room),
             decryptEventIfNeeded: jest.fn().mockResolvedValue(void 0),
@@ -158,7 +159,7 @@ describe("fixNotificationCountOnDecryption", () => {
         expect(room.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight)).toBe(1);
     });
 
-    it("does not change the room count when there's no unread count", () => {
+    it("does not change the thread count when there's no unread count", () => {
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total, 0);
         room.setThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Highlight, 0);
 

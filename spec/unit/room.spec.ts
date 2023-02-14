@@ -788,8 +788,12 @@ describe("Room", function () {
         });
     };
 
-    describe("resetLiveTimeline with timeline support enabled", resetTimelineTests.bind(null, true));
-    describe("resetLiveTimeline with timeline support disabled", resetTimelineTests.bind(null, false));
+    describe("resetLiveTimeline with timeline support enabled", () => {
+        resetTimelineTests.bind(null, true);
+    });
+    describe("resetLiveTimeline with timeline support disabled", () => {
+        resetTimelineTests.bind(null, false);
+    });
 
     describe("compareEventOrdering", function () {
         beforeEach(function () {
@@ -3251,7 +3255,7 @@ describe("Room", function () {
             return event;
         };
 
-        it("adds poll models to room state for a poll start event ", async () => {
+        it("adds poll models to room state for a poll start event", async () => {
             const pollStartEvent = makePollStart("1");
             const events = [pollStartEvent];
 
@@ -3307,6 +3311,7 @@ describe("Room", function () {
         beforeEach(() => {
             client = getMockClientWithEventEmitter({
                 ...mockClientMethodsUser(),
+                isInitialSyncComplete: jest.fn().mockReturnValue(false),
                 supportsThreads: jest.fn().mockReturnValue(true),
             });
         });

@@ -1148,6 +1148,6 @@ describe("userHasCrossSigningKeys", function () {
 
     it("throws an error if crypto is disabled", () => {
         aliceClient["cryptoBackend"] = undefined;
-        expect(() => aliceClient.userHasCrossSigningKeys()).toThrowError("encryption disabled");
+        expect(() => aliceClient.userHasCrossSigningKeys()).toThrow("encryption disabled");
     });
 });

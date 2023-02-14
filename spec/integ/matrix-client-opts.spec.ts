@@ -94,16 +94,16 @@ describe("MatrixClient opts", function () {
             client.stopClient();
         });
 
-        it("should be able to send messages", function (done) {
+        it("should be able to send messages", async () => {
             const eventId = "$flibble:wibble";
             httpBackend.when("PUT", "/txn1").respond(200, {
                 event_id: eventId,
             });
-            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function (res) {
-                expect(res.event_id).toEqual(eventId);
-                done();
-            });
-            httpBackend.flush("/txn1", 1);
+            const [res] = await Promise.all([
+                client.sendTextMessage("!foo:bar", "a body", "txn1"),
+                httpBackend.flush("/txn1", 1),
+            ]);
+            expect(res.event_id).toEqual(eventId);
         });
 
         it("should be able to sync / get new events", async function () {
@@ -149,7 +149,7 @@ describe("MatrixClient opts", function () {
             client.stopClient();
         });
 
-        it("shouldn't retry sending events", function (done) {
+        it("shouldn't retry sending events", async () => {
             httpBackend.when("PUT", "/txn1").respond(
                 500,
                 new MatrixError({
@@ -157,19 +157,17 @@ describe("MatrixClient opts", function () {
                     error: "Ruh roh",
                 }),
             );
-            client.sendTextMessage("!foo:bar", "a body", "txn1").then(
-                function (res) {
-                    expect(false).toBe(true);
-                },
-                function (err) {
-                    expect(err.errcode).toEqual("M_SOMETHING");
-                    done();
-                },
-            );
-            httpBackend.flush("/txn1", 1);
+            try {
+                await Promise.all([
+                    expect(client.sendTextMessage("!foo:bar", "a body", "txn1")).rejects.toThrow(),
+                    httpBackend.flush("/txn1", 1),
+                ]);
+            } catch (err) {
+                expect((<MatrixError>err).errcode).toEqual("M_SOMETHING");
+            }
         });
 
-        it("shouldn't queue events", function (done) {
+        it("shouldn't queue events", async () => {
             httpBackend.when("PUT", "/txn1").respond(200, {
                 event_id: "AAA",
             });
@@ -178,30 +176,38 @@ describe("MatrixClient opts", function () {
             });
             let sentA = false;
             let sentB = false;
-            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function (res) {
+            const messageASendPromise = client.sendTextMessage("!foo:bar", "a body", "txn1").then(function (res) {
                 sentA = true;
+                // We expect messageB to be sent before messageA to ensure as we're
+                // testing that there is no queueing that blocks each other
                 expect(sentB).toBe(true);
             });
-            client.sendTextMessage("!foo:bar", "b body", "txn2").then(function (res) {
+            const messageBSendPromise = client.sendTextMessage("!foo:bar", "b body", "txn2").then(function (res) {
                 sentB = true;
+                // We expect messageB to be sent before messageA to ensure as we're
+                // testing that there is no queueing that blocks each other
                 expect(sentA).toBe(false);
             });
-            httpBackend.flush("/txn2", 1).then(function () {
-                httpBackend.flush("/txn1", 1).then(function () {
-                    done();
-                });
-            });
+            // Allow messageB to succeed first
+            await httpBackend.flush("/txn2", 1);
+            // Then allow messageA to succeed
+            await httpBackend.flush("/txn1", 1);
+
+            // Now await the message send promises to
+            await messageBSendPromise;
+            await messageASendPromise;
         });
 
-        it("should be able to send messages", function (done) {
+        it("should be able to send messages", async () => {
             httpBackend.when("PUT", "/txn1").respond(200, {
                 event_id: "foo",
             });
-            client.sendTextMessage("!foo:bar", "a body", "txn1").then(function (res) {
-                expect(res.event_id).toEqual("foo");
-                done();
-            });
-            httpBackend.flush("/txn1", 1);
+            const [res] = await Promise.all([
+                client.sendTextMessage("!foo:bar", "a body", "txn1"),
+                httpBackend.flush("/txn1", 1),
+            ]);
+
+            expect(res.event_id).toEqual("foo");
         });
     });
 });

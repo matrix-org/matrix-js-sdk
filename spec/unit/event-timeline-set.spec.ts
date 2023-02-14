@@ -179,7 +179,7 @@ describe("EventTimelineSet", () => {
                 eventTimelineSet.addEventToTimeline(messageEvent, liveTimeline2, {
                     toStartOfTimeline: true,
                 });
-            }).toThrowError();
+            }).toThrow();
         });
 
         it("should not add a threaded reply to the main room timeline", () => {
@@ -399,7 +399,7 @@ describe("EventTimelineSet", () => {
 
         it("should throw if timeline set has no room", () => {
             const eventTimelineSet = new EventTimelineSet(undefined, {}, client);
-            expect(() => eventTimelineSet.canContain(messageEvent)).toThrowError();
+            expect(() => eventTimelineSet.canContain(messageEvent)).toThrow();
         });
 
         it("should return false if timeline set is for thread but event is not threaded", () => {

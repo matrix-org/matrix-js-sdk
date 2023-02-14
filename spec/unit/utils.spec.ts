@@ -145,9 +145,11 @@ describe("utils", function () {
     describe("deepCompare", function () {
         const assert = {
             isTrue: function (x: any) {
+                // eslint-disable-next-line jest/no-standalone-expect
                 expect(x).toBe(true);
             },
             isFalse: function (x: any) {
+                // eslint-disable-next-line jest/no-standalone-expect
                 expect(x).toBe(false);
             },
         };

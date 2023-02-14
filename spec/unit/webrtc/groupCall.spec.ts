@@ -147,9 +147,16 @@ describe("Group Call", function () {
             async (state: GroupCallState) => {
                 // @ts-ignore
                 groupCall.state = state;
-                await expect(groupCall.initLocalCallFeed()).rejects.toThrowError();
+                await expect(groupCall.initLocalCallFeed()).rejects.toThrow();
             },
         );
+
+        it.each([0, 3, 5, 10, 5000])("sets correct creation timestamp when creating a call", async (time: number) => {
+            jest.spyOn(Date, "now").mockReturnValue(time);
+            await groupCall.create();
+
+            expect(groupCall.creationTs).toBe(time);
+        });
 
         it("does not initialize local call feed, if it already is", async () => {
             await groupCall.initLocalCallFeed();
@@ -159,6 +166,25 @@ describe("Group Call", function () {
             expect(groupCall.initLocalCallFeed).not.toHaveBeenCalled();
 
             groupCall.leave();
+        });
+
+        it("does not start initializing local call feed twice", () => {
+            const promise1 = groupCall.initLocalCallFeed();
+            // @ts-ignore Mock
+            groupCall.state = GroupCallState.LocalCallFeedUninitialized;
+            const promise2 = groupCall.initLocalCallFeed();
+
+            expect(promise1).toEqual(promise2);
+        });
+
+        it("sets state to local call feed uninitialized when getUserMedia() fails", async () => {
+            jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream").mockRejectedValue("Error");
+
+            try {
+                await groupCall.initLocalCallFeed();
+            } catch (e) {}
+
+            expect(groupCall.state).toBe(GroupCallState.LocalCallFeedUninitialized);
         });
 
         it("stops initializing local call feed when leaving", async () => {
@@ -317,6 +343,20 @@ describe("Group Call", function () {
             }
         });
 
+        it("does not throw when calling updateLocalUsermediaStream() without local usermedia stream", () => {
+            expect(async () => await groupCall.updateLocalUsermediaStream({} as MediaStream)).not.toThrow();
+        });
+
+        it.each([GroupCallState.Ended, GroupCallState.Entered, GroupCallState.InitializingLocalCallFeed])(
+            "throws when entering call in the wrong state",
+            async (state: GroupCallState) => {
+                // @ts-ignore Mock
+                groupCall.state = state;
+
+                await expect(groupCall.enter()).rejects.toThrow();
+            },
+        );
+
         describe("hasLocalParticipant()", () => {
             it("should return false, if we don't have a local participant", () => {
                 expect(groupCall.hasLocalParticipant()).toBeFalsy();
@@ -349,7 +389,7 @@ describe("Group Call", function () {
                 jest.spyOn(call, "getOpponentMember").mockReturnValue({ userId: undefined });
 
                 // @ts-ignore Mock
-                expect(() => groupCall.onCallFeedsChanged(call)).toThrowError();
+                expect(() => groupCall.onCallFeedsChanged(call)).toThrow();
             });
 
             describe("usermedia feeds", () => {
@@ -834,6 +874,18 @@ describe("Group Call", function () {
                 sendMetadataUpdateArray.forEach((f) => expect(f).toHaveBeenCalled());
 
                 groupCall.terminate();
+            });
+
+            it("returns false when unmuting audio with no audio device", async () => {
+                const groupCall = await createAndEnterGroupCall(mockClient, room);
+                jest.spyOn(mockClient.getMediaHandler(), "hasAudioDevice").mockResolvedValue(false);
+                expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
+            });
+
+            it("returns false when unmuting video with no video device", async () => {
+                const groupCall = await createAndEnterGroupCall(mockClient, room);
+                jest.spyOn(mockClient.getMediaHandler(), "hasVideoDevice").mockResolvedValue(false);
+                expect(await groupCall.setLocalVideoMuted(false)).toBe(false);
             });
         });
 
