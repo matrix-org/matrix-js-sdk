@@ -1,5 +1,5 @@
-Changes in [23.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.3.0-rc.1) (2023-02-07)
-============================================================================================================
+Changes in [23.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.3.0) (2023-02-14)
+==================================================================================================
 
 ## ✨ Features
  * Element-R: implement encryption of outgoing events ([\#3122](https://github.com/matrix-org/matrix-js-sdk/pull/3122)).
@@ -14,6 +14,9 @@ Changes in [23.3.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/ta
  * Introduces a backwards-compatible API change. `MegolmEncrypter#prepareToEncrypt`'s return type has changed from `void` to `() => void`. ([\#3035](https://github.com/matrix-org/matrix-js-sdk/pull/3035)). Contributed by @clarkf.
 
 ## 🐛 Bug Fixes
+ * Stop the ICE disconnected timer on call terminate ([\#3147](https://github.com/matrix-org/matrix-js-sdk/pull/3147)).
+ * Clear notifications when we can infer read status from receipts ([\#3139](https://github.com/matrix-org/matrix-js-sdk/pull/3139)). Fixes vector-im/element-web#23991.
+ * Messages sent out of order after one message fails ([\#3131](https://github.com/matrix-org/matrix-js-sdk/pull/3131)). Fixes vector-im/element-web#22885 and vector-im/element-web#18942. Contributed by @justjanne.
  * Element-R: fix a bug which prevented encryption working after a reload ([\#3126](https://github.com/matrix-org/matrix-js-sdk/pull/3126)).
  * Element-R: Fix invite processing ([\#3121](https://github.com/matrix-org/matrix-js-sdk/pull/3121)).
  * Don't throw with no `opponentDeviceInfo` ([\#3107](https://github.com/matrix-org/matrix-js-sdk/pull/3107)).
