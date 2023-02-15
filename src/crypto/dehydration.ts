@@ -16,6 +16,7 @@ limitations under the License.
 
 import anotherjson from "another-json";
 
+import type { IDeviceKeys, IOneTimeKey } from "../@types/crypto";
 import { decodeBase64, encodeBase64 } from "./olmlib";
 import { IndexedDBCryptoStore } from "../crypto/store/indexeddb-crypto-store";
 import { decryptAES, encryptAES } from "./aes";
@@ -23,7 +24,6 @@ import { logger } from "../logger";
 import { ISecretStorageKeyInfo } from "./api";
 import { Crypto } from "./index";
 import { Method } from "../http-api";
-import { ISignatures } from "../@types/signed";
 
 export interface IDehydratedDevice {
     device_id: string; // eslint-disable-line camelcase
@@ -36,20 +36,6 @@ export interface IDehydratedDevice {
 
 export interface IDehydratedDeviceKeyInfo {
     passphrase?: string;
-}
-
-export interface IDeviceKeys {
-    algorithms: Array<string>;
-    device_id: string; // eslint-disable-line camelcase
-    user_id: string; // eslint-disable-line camelcase
-    keys: Record<string, string>;
-    signatures?: ISignatures;
-}
-
-export interface IOneTimeKey {
-    key: string;
-    fallback?: boolean;
-    signatures?: ISignatures;
 }
 
 export const DEHYDRATION_ALGORITHM = "org.matrix.msc2697.v1.olm.libolm_pickle";
