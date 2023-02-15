@@ -20,7 +20,6 @@ import { M_POLL_END, M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE } from "../../../src
 import { PollStartEvent } from "../../../src/extensible_events_v1/PollStartEvent";
 import { Poll } from "../../../src/models/poll";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
-import { flushPromises } from "../../test-utils/flushPromises";
 
 jest.useFakeTimers();
 
@@ -28,7 +27,6 @@ describe("Poll", () => {
     const userId = "@alice:server.org";
     const mockClient = getMockClientWithEventEmitter({
         ...mockClientMethodsUser(userId),
-        decryptEventIfNeeded: jest.fn().mockResolvedValue(true),
         relations: jest.fn(),
     });
     const roomId = "!room:server";
@@ -173,8 +171,6 @@ describe("Poll", () => {
                 const poll = new Poll(basePollStartEvent, mockClient, room);
                 jest.spyOn(poll, "emit");
                 const responses = await poll.getResponses();
-
-                await flushPromises();
 
                 expect(mockClient.relations.mock.calls).toEqual([
                     [roomId, basePollStartEvent.getId(), "m.reference", undefined, { from: undefined }],
