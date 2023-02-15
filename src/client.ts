@@ -4131,12 +4131,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         userId: string | string[],
         powerLevel: number,
-        event: MatrixEvent,
+        event: MatrixEvent | null,
     ): Promise<ISendEventResponse> {
         let content = {
             users: {} as Record<string, number>,
         };
-        if (event.getType() === EventType.RoomPowerLevels) {
+        if (event?.getType() === EventType.RoomPowerLevels) {
             // take a copy of the content to ensure we don't corrupt
             // existing client state with a failed power level change
             content = utils.deepCopy(event.getContent());

@@ -151,7 +151,7 @@ export interface ICryptoCallbacks {
         requestId: string,
         secretName: string,
         deviceTrust: DeviceTrustLevel,
-    ) => Promise<string>;
+    ) => Promise<string | undefined>;
     getDehydrationKey?: (keyInfo: ISecretStorageKeyInfo, checkFunc: (key: Uint8Array) => void) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
 }
