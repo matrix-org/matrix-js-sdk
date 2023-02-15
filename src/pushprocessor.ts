@@ -480,7 +480,11 @@ export class PushProcessor {
             }
         }
 
-        // Ensure the final part is included.
+        // Ensure the final part is included. If there's an open escape sequence
+        // it should be included.
+        if (escaped) {
+            part += "\\";
+        }
         result.push(part);
 
         return result;
