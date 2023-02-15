@@ -441,35 +441,10 @@ export class PushProcessor {
      * @internal
      */
     public static partsForDottedKey(str: string): string[] {
-        // This complicated regular expression matches:
-        //
-        // (?<=^|\.)  Lookbehind to ensure we're starting with the beginning of
-        //            the string or at a dot. This avoids capturing empty groups
-        //            per dot.
-        //
-        // (?:        A non-capturing group which repeats 0 or more times
-        //
-        //   \\.?     An escape character followed by any character (or nothing,
-        //            for the end of strings).
-        //
-        //   |        Or
-        //
-        //   [^.\\]   Any character except a dot or backslash.
-        //
-        // )*
-        const regexp = /(?<=^|\.)(?:\\.?|[^.\\])*/g;
-        const parts = str.match(regexp);
-        if (parts === null) {
-            // Or error? Should this happen?
-            return [];
-        }
-        // If the last entry is empty & the second to last entry ends with a .
-        // then the regular expression creates an extra final group.
-        if (parts.length > 2 && parts[parts.length - 1] === "" && parts[parts.length - 2].endsWith(".")) {
-            parts.pop();
-        }
+        // Split on a dot that is after any 0 or even sets of backslashes.
+        const regexp = /(?<=[^\\](?:\\\\)+|[^\\]|^)\./g;
         // Unescape each part individually.
-        return parts.map((p) => p.replace(/\\([\\.])/g, "$1"));
+        return str.split(regexp).map((p) => p.replace(/\\([\\.])/g, "$1"));
     }
 
     /**
