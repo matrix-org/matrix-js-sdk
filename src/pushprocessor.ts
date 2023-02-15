@@ -441,53 +441,35 @@ export class PushProcessor {
      * @internal
      */
     public static partsForDottedKey(str: string): string[] {
-        const result = [];
-
-        // The current field and whether the previous character was the escape
-        // character (a backslash).
-        let part = "";
-        let escaped = false;
-
-        // Iterate over each character, and decide whether to append to the current
-        // part (following the escape rules) or to start a new part (based on the
-        // field separator).
-        for (const c of str) {
-            // If the previous character was the escape character (a backslash)
-            // then decide what to append to the current part.
-            if (escaped) {
-                if (c === "\\" || c === ".") {
-                    // An escaped backslash or dot just gets added.
-                    part += c;
-                } else {
-                    // A character that shouldn't be escaped gets the backslash prepended.
-                    part += "\\" + c;
-                }
-                // This always resets being escaped.
-                escaped = false;
-                continue;
-            }
-
-            if (c == ".") {
-                // The field separator creates a new part.
-                result.push(part);
-                part = "";
-            } else if (c == "\\") {
-                // A backslash adds no characters, but starts an escape sequence.
-                escaped = true;
-            } else {
-                // Otherwise, just add the current character.
-                part += c;
-            }
+        // This complicated regular expression matches:
+        //
+        // (?<=^|\.)  Lookbehind to ensure we're starting with the beginning of
+        //            the string or at a dot. This avoids capturing empty groups
+        //            per dot.
+        //
+        // (?:        A non-capturing group which repeats 0 or more times
+        //
+        //   \\.?     An escape character followed by any character (or nothing,
+        //            for the end of strings).
+        //
+        //   |        Or
+        //
+        //   [^.\\]   Any character except a dot or backslash.
+        //
+        // )*
+        const regexp = /(?<=^|\.)(?:\\.?|[^.\\])*/g;
+        const parts = str.match(regexp);
+        if (parts === null) {
+            // Or error? Should this happen?
+            return [];
         }
-
-        // Ensure the final part is included. If there's an open escape sequence
-        // it should be included.
-        if (escaped) {
-            part += "\\";
+        // If the last entry is empty & the second to last entry ends with a .
+        // then the regular expression creates an extra final group.
+        if (parts.length > 2 && parts[parts.length - 1] === "" && parts[parts.length - 2].endsWith(".")) {
+            parts.pop();
         }
-        result.push(part);
-
-        return result;
+        // Unescape each part individually.
+        return parts.map((p) => p.replace(/\\([\\.])/g, "$1"));
     }
 
     /**
