@@ -442,7 +442,7 @@ export class PushProcessor {
      */
     public static partsForDottedKey(str: string): string[] {
         // Split on a dot that is after any 0 or even sets of backslashes.
-        const regexp = /(?<=[^\\](?:\\\\)*|^)\./g;
+        const regexp = /(?<=[^\\](?:\\\\)*|^)\./gy;
         // Unescape each part individually.
         return str.split(regexp).map((p) => p.replace(/\\([\\.])/g, "$1"));
     }
