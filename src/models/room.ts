@@ -3055,9 +3055,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Note: if an m.predecessor event is used, eventId is null since those
      * events do not include an event_id property.
      */
-    public findPredecessor(
-        msc3946ProcessDynamicPredecessor = false,
-    ): { roomId: string; eventId: string | null } | null {
+    public findPredecessor(msc3946ProcessDynamicPredecessor = false): { roomId: string; eventId?: string } | null {
         const currentState = this.getLiveTimeline().getState(EventTimeline.FORWARDS);
         if (!currentState) {
             return null;
