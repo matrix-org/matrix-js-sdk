@@ -555,3 +555,21 @@ describe("NotificationService", function () {
         }
     });
 });
+
+describe("Test PushProcessor.partsForDottedKey", function () {
+    it.each([
+        ["m.foo", ["m", "foo"]],
+        ["m.foo.bar", ["m", "foo", "bar"]],
+        // Backslash is used as an escape character.
+        ["m\\.foo", ["m.foo"]],
+        ["m\\\\foo", ["m\\foo"]],
+        ["m\\\\.foo", ["m\\", "foo"]],
+        // Extraneous escapes leave the backslash.
+        ["m\\foo", ["m\\foo"]],
+        // Empty parts (corresponding to properties which are an empty string) are allowed.
+        ["m.", ["m", ""]],
+        ["m..", ["m", "", ""]],
+    ])("partsFotDottedKey for %s", (path: string, expected: string[]) => {
+        expect(PushProcessor.partsForDottedKey(path)).toStrictEqual(expected);
+    });
+});
