@@ -2,7 +2,7 @@ name: Tests
 on:
     pull_request: {}
     merge_group:
-      types: [checks_requested]
+        types: [checks_requested]
     push:
         branches: [develop, master]
 concurrency:
@@ -63,8 +63,8 @@ jobs:
                       !coverage/lcov-report
 
     matrix-react-sdk:
-      name: Downstream test matrix-react-sdk
-      # if: github.event_name == 'merge_group'
-      uses: matrix-org/matrix-org-sdk/.github/workflows/tests.yml@t3chguy/downstreamtests
-      with:
-        matrix-js-sdk-sha: ${{ github.sha }}
+        name: Downstream test matrix-react-sdk
+        # if: github.event_name == 'merge_group'
+        uses: matrix-org/matrix-org-sdk/.github/workflows/tests.yml@t3chguy/downstreamtests
+        with:
+            matrix-js-sdk-sha: ${{ github.sha }}
