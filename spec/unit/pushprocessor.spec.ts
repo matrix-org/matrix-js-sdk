@@ -505,7 +505,18 @@ describe("NotificationService", function () {
         });
     });
 
-    it("test against escaped dotted paths", function () {
+    it.each([
+        // The properly escaped key works.
+        { key: "content.m\\.test.foo", pattern: "bar", expected: true },
+        // An unescaped version does not match.
+        { key: "content.m.test.foo", pattern: "bar", expected: false },
+        // Over escaping does not match.
+        { key: "content.m\\.test\\.foo", pattern: "bar", expected: false },
+        // Escaping backslashes should match.
+        { key: "content.m\\\\example", pattern: "baz", expected: true },
+        // An unnecessary escape sequence leaves the backslash and still matches.
+        { key: "content.m\\example", pattern: "baz", expected: true },
+    ])("test against escaped dotted paths '$key'", ({ key, pattern, expected }) => {
         testEvent = utils.mkEvent({
             type: "m.room.message",
             room: testRoomId,
@@ -519,40 +530,24 @@ describe("NotificationService", function () {
             },
         });
 
-        // Each test is a (key, pattern, expected match) tuple.
-        const testCases = [
-            // The properly escaped key works.
-            { key: "content.m\\.test.foo", pattern: "bar", expected: true },
-            // An unescaped version does not match.
-            { key: "content.m.test.foo", pattern: "bar", expected: false },
-            // Over escaping does not match.
-            { key: "content.m\\.test\\.foo", pattern: "bar", expected: false },
-            // Escaping backslashes should match.
-            { key: "content.m\\\\example", pattern: "baz", expected: true },
-            // An unnecessary escape sequence leaves the backslash and still matches.
-            { key: "content.m\\example", pattern: "baz", expected: true },
-        ];
-
-        for (const testCase of testCases) {
-            expect(
-                pushProcessor.ruleMatchesEvent(
-                    {
-                        rule_id: "rule1",
-                        actions: [],
-                        conditions: [
-                            {
-                                kind: ConditionKind.EventMatch,
-                                key: testCase.key,
-                                pattern: testCase.pattern,
-                            },
-                        ],
-                        default: false,
-                        enabled: true,
-                    },
-                    testEvent,
-                ),
-            ).toBe(testCase.expected);
-        }
+        expect(
+            pushProcessor.ruleMatchesEvent(
+                {
+                    rule_id: "rule1",
+                    actions: [],
+                    conditions: [
+                        {
+                            kind: ConditionKind.EventMatch,
+                            key: key,
+                            pattern: pattern,
+                        },
+                    ],
+                    default: false,
+                    enabled: true,
+                },
+                testEvent,
+            ),
+        ).toBe(expected);
     });
 });
 
