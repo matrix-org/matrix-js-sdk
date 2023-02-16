@@ -187,6 +187,7 @@ export class GroupCallEventHandler {
             content?.dataChannelsEnabled,
             dataChannelOptions,
         );
+        groupCall.initCallWithoutVideoAndAudio = this.client.isVoipWithNoMediaAllowed;
 
         this.groupCalls.set(room.roomId, groupCall);
         this.client.emit(GroupCallEventHandlerEvent.Incoming, groupCall);

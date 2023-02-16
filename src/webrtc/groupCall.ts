@@ -209,6 +209,7 @@ export class GroupCall extends TypedEventEmitter<
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
+    private allowCallWithOutVideoAndAudio = false;
 
     public constructor(
         private client: MatrixClient,
@@ -374,8 +375,14 @@ export class GroupCall extends TypedEventEmitter<
         try {
             stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === GroupCallType.Video);
         } catch (error) {
-            this.state = GroupCallState.LocalCallFeedUninitialized;
-            throw error;
+            // If is allowed to join a call without a media stream, then we add an empty stream.
+            // @FIXME: Attention this could break with Mute and Unmute logic!
+            if (this.allowCallWithOutVideoAndAudio) {
+                stream = new MediaStream();
+            } else {
+                this.state = GroupCallState.LocalCallFeedUninitialized;
+                throw error;
+            }
         }
 
         // The call could've been disposed while we were waiting, and could
@@ -1461,4 +1468,19 @@ export class GroupCall extends TypedEventEmitter<
             );
         }
     };
+
+    /**
+     * allowCallWithOutVideoAndAudio should be a GroupCall property. However, I make it as runtime configurable
+     * property because this additional behavior has a big impact on other features and is a big API change.
+     * Joining without a camera and video should only be explicitly allowed, because there can be unexpected behavior
+     * when later querying the media access rights from browser that the client cannot intercept. Join without came
+     * and audio should be a property like PTT.
+     */
+    public get initCallWithoutVideoAndAudio(): boolean {
+        return this.allowCallWithOutVideoAndAudio;
+    }
+
+    public set initCallWithoutVideoAndAudio(allowCallWithOutVideoAndAudio: boolean) {
+        this.allowCallWithOutVideoAndAudio = allowCallWithOutVideoAndAudio;
+    }
 }
