@@ -132,7 +132,7 @@ describe("Poll", () => {
         });
 
         it("filters relations for relevent response events", async () => {
-            const replyEvent = new MatrixEvent({ type: "m.room.message" });
+            const replyEvent = makeRelatedEvent({ type: "m.room.message" });
             const stableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.stable! });
             const unstableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
 
@@ -185,6 +185,47 @@ describe("Poll", () => {
                 expect(poll.emit).toHaveBeenCalledTimes(3);
                 expect(poll.isFetchingResponses).toBeFalsy();
                 expect(responses.getRelations().length).toEqual(6);
+            });
+        });
+
+        describe("undecryptable relations", () => {
+            it("counts undecryptable relation events when getting responses", async () => {
+                const replyEvent = makeRelatedEvent({ type: "m.room.message" });
+                const stableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.stable! });
+                const undecryptableEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
+                jest.spyOn(undecryptableEvent, "isDecryptionFailure").mockReturnValue(true);
+
+                mockClient.relations.mockResolvedValue({
+                    events: [replyEvent, stableResponseEvent, undecryptableEvent],
+                });
+                const poll = new Poll(basePollStartEvent, mockClient, room);
+                jest.spyOn(poll, "emit");
+                await poll.getResponses();
+                expect(poll.undecryptableRelationsCount).toBe(1);
+                expect(poll.emit).toHaveBeenCalledWith(PollEvent.UndecryptableRelations, 1);
+            });
+
+            it("adds to undercryptable event count when new relation is undecryptable", async () => {
+                const replyEvent = makeRelatedEvent({ type: "m.room.message" });
+                const stableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.stable! });
+                const undecryptableEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
+                const undecryptableEvent2 = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
+                jest.spyOn(undecryptableEvent, "isDecryptionFailure").mockReturnValue(true);
+                jest.spyOn(undecryptableEvent2, "isDecryptionFailure").mockReturnValue(true);
+
+                mockClient.relations.mockResolvedValue({
+                    events: [replyEvent, stableResponseEvent, undecryptableEvent],
+                });
+                const poll = new Poll(basePollStartEvent, mockClient, room);
+                jest.spyOn(poll, "emit");
+                await poll.getResponses();
+                expect(poll.undecryptableRelationsCount).toBe(1);
+
+                await poll.onNewRelation(undecryptableEvent2);
+
+                expect(poll.undecryptableRelationsCount).toBe(2);
+
+                expect(poll.emit).toHaveBeenCalledWith(PollEvent.UndecryptableRelations, 2);
             });
         });
 

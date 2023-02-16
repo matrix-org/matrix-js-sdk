@@ -28,7 +28,7 @@ export enum PollEvent {
     Update = "Poll.update",
     Responses = "Poll.Responses",
     Destroy = "Poll.Destroy",
-    UndecryptableRelations = "Poll.UndecryptableRelations"
+    UndecryptableRelations = "Poll.UndecryptableRelations",
 }
 
 export type PollEventHandlerMap = {
@@ -145,10 +145,8 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
                 this.responses!.addEvent(event);
             });
 
-
             this.emit(PollEvent.Responses, this.responses);
         }
-
     }
 
     private async fetchResponses(): Promise<void> {
@@ -229,8 +227,10 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         this.emit(PollEvent.Responses, this.responses);
     }
 
-    private countUndecryptableEvents = (events: MatrixEvent[]) => {
-        const undecryptableEventIds = events.filter(event => event.isDecryptionFailure()).map(event => event.getId()!);
+    private countUndecryptableEvents = (events: MatrixEvent[]): void => {
+        const undecryptableEventIds = events
+            .filter((event) => event.isDecryptionFailure())
+            .map((event) => event.getId()!);
 
         const previousCount = this.undecryptableRelationsCount;
         this.undecryptableRelationEventIds = new Set([...this.undecryptableRelationEventIds, ...undecryptableEventIds]);
@@ -238,7 +238,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         if (this.undecryptableRelationsCount !== previousCount) {
             this.emit(PollEvent.UndecryptableRelations, this.undecryptableRelationsCount);
         }
-    }
+    };
 
     private validateEndEvent(endEvent?: MatrixEvent): boolean {
         if (!endEvent) {
