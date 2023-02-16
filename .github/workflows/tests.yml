@@ -72,10 +72,10 @@ jobs:
     # Hook for branch protection to work outside merge queues
     downstream:
         name: Downstream tests
+        if: always()
         runs-on: ubuntu-latest
         needs:
             - matrix-react-sdk
-        if: always()
         steps:
             - if: needs.matrix-react-sdk.result != 'skipped' && needs.matrix-react-sdk.result != 'success'
               run: exit 1
