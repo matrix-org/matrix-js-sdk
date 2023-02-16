@@ -80,6 +80,10 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         return this.rootEvent.getId()!;
     }
 
+    public get endEventId(): string | undefined {
+        return this.endEvent?.getId();
+    }
+
     public get isEnded(): boolean {
         return !!this.endEvent;
     }
