@@ -73,8 +73,8 @@ jobs:
         name: Downstream tests
         needs:
             - matrix-react-sdk
-        # if: always()
+        if: always()
         runs-on: ubuntu-latest
         steps:
-            - if: needs.matrix-react-sdk.result == 'failure'
+            - if: needs.matrix-react-sdk.result != 'skipped'
               run: exit 1
