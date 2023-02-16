@@ -124,6 +124,12 @@ export class PushProcessor {
     public constructor(private readonly client: MatrixClient) {}
 
     /**
+     * Maps the original key from the push rules to a list of property names
+     * after unescaping.
+     */
+    private readonly parsedKeys = new Map<string, string[]>();
+
+    /**
      * Convert a list of actions into a object with the actions as keys and their values
      * @example
      * eg. `[ 'notify', { set_tweak: 'sound', value: 'default' } ]`
@@ -434,7 +440,8 @@ export class PushProcessor {
     }
 
     /**
-     * Parse a dotted key into parts following the escape rules.
+     * Parse the key into the separate fields to search by splitting on
+     * unescaped ".", and then removing any escape characters.
      *
      * @param str - The key of the push rule condition: a dotted field.
      * @returns The unescaped parts to fetch.
@@ -499,26 +506,31 @@ export class PushProcessor {
      * @returns The value at the dotted path given by key.
      */
     private valueForDottedKey(key: string, ev: MatrixEvent): any {
-        // Parse the key into the separate fields to search by splitting on
-        // unescaped ".", and then removing any escape characters.
-        const parts = PushProcessor.partsForDottedKey(key);
+        // Cache the parsed key since it is per rule, not per event (and there's
+        // no reason to keep calculating it).
+        let parts = this.parsedKeys.get(key);
+        if (parts === undefined) {
+            parts = PushProcessor.partsForDottedKey(key);
+            this.parsedKeys.set(key, parts);
+        }
         let val: any;
 
         // special-case the first component to deal with encrypted messages
         const firstPart = parts[0];
+        let currentIndex = 0;
         if (firstPart === "content") {
             val = ev.getContent();
-            parts.shift();
+            ++currentIndex;
         } else if (firstPart === "type") {
             val = ev.getType();
-            parts.shift();
+            ++currentIndex;
         } else {
             // use the raw event for any other fields
             val = ev.event;
         }
 
-        while (parts.length > 0) {
-            const thisPart = parts.shift()!;
+        for (; currentIndex < parts.length; ++currentIndex) {
+            const thisPart = parts[currentIndex];
             if (isNullOrUndefined(val[thisPart])) {
                 return null;
             }
