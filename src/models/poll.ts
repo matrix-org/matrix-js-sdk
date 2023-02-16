@@ -81,7 +81,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     }
 
     public get isEnded(): boolean {
-        return true || !!this.endEvent;
+        return !!this.endEvent;
     }
 
     public get isFetchingResponses(): boolean {
