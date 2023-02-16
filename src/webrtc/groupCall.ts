@@ -375,8 +375,9 @@ export class GroupCall extends TypedEventEmitter<
         try {
             stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === GroupCallType.Video);
         } catch (error) {
-            // If is allowed to join a call without a media stream, then we add an empty stream.
-            // @FIXME: Attention this could break with Mute and Unmute logic!
+            // If is allowed to join a call without a media stream, then we
+            // don't throw an error here. But we need an empty Local Feed to establish
+            // a connection later.
             if (this.allowCallWithOutVideoAndAudio) {
                 stream = new MediaStream();
             } else {
@@ -616,6 +617,11 @@ export class GroupCall extends TypedEventEmitter<
      * @returns Whether muting/unmuting was successful
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
+        // Because we need a Local Call Feed to establish a call connection, we avoid muting video in case of empty
+        // video track. In this way we go sure if a client implements muting we don't raise an error.
+        if (this.allowCallWithOutVideoAndAudio && this.localCallFeed?.stream.getVideoTracks().length === 0) {
+            return false;
+        }
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through

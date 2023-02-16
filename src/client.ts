@@ -1889,6 +1889,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error(`Cannot find room ${roomId}`);
         }
 
+        // Because without Media section a WebRTC connection is not possible, so need a RTCDataChannel to set up a
+        // no media WebRTC connection anyway.
         return new GroupCall(
             this,
             room,
@@ -1896,7 +1898,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             isPtt,
             intent,
             undefined,
-            dataChannelsEnabled,
+            dataChannelsEnabled || this.isVoipWithNoMediaAllowed,
             dataChannelOptions,
         )
             .create()
