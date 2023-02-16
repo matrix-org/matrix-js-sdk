@@ -3392,7 +3392,7 @@ describe("Room", function () {
             const useMsc3946 = true;
             expect(room.findPredecessor(useMsc3946)).toEqual({
                 roomId: "otherreplacedroomid",
-                eventId: null, // m.predecessor did not include an event_id
+                eventId: undefined, // m.predecessor did not include an event_id
             });
         });
 
