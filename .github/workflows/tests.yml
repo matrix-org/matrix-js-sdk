@@ -64,7 +64,7 @@ jobs:
 
     matrix-react-sdk:
       name: Downstream test matrix-react-sdk
-      if: github.event_name == 'merge_group'
+      # if: github.event_name == 'merge_group'
       uses: matrix-org/matrix-org-sdk/.github/workflows/tests.yml@t3chguy/downstreamtests
       with:
         matrix-js-sdk-sha: ${{ github.sha }}
