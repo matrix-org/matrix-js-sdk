@@ -973,8 +973,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * the roomId and last eventId of the predecessor room.
      * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
      * as well as m.room.create events to find predecessors.
-     * Note: if an m.predecessor event is used, eventId is null since those
-     * events do not include an event_id property.
+     * Note: if an m.predecessor event is used, eventId may be undefined
+     * since last_known_event_id is optional.
      */
     public findPredecessor(msc3946ProcessDynamicPredecessor = false): { roomId: string; eventId?: string } | null {
         // Note: the tests for this function are against Room.findPredecessor,
