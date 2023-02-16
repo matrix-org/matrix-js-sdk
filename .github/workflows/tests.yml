@@ -69,6 +69,7 @@ jobs:
         with:
             matrix-js-sdk-sha: ${{ github.sha }}
 
+    # Hook for branch protection to work outside of merge queues
     downstream:
         name: Downstream tests
         needs:
