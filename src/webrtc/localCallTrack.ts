@@ -179,10 +179,29 @@ export class LocalCallTrack extends CallTrack {
             throw new Error("Cannot publish already published track");
         }
 
-        try {
-            this._transceiver = call.publishTrack(this);
-        } finally {
-            this.call = call;
+        const oldCall = this.call;
+
+        // We try to re-use transceivers here
+        const transceiver = call.getFreeTransceiverByKind(this.kind);
+        if (transceiver) {
+            try {
+                this._transceiver = transceiver;
+                this.call = call;
+                this.replaceTrackOnPeerConnection();
+            } catch (error) {
+                this._transceiver = undefined;
+                this.call = oldCall;
+            }
+        } else {
+            try {
+                this.call = call;
+                this.addTrackToPeerConnection();
+            } catch (error) {
+                this.call = undefined;
+                logger.warn(
+                    `LocalCallTrack ${this.id} publish() failed to publish track to call (callId${call.callId})`,
+                );
+            }
         }
     }
 
@@ -194,36 +213,68 @@ export class LocalCallTrack extends CallTrack {
 
         try {
             call.unpublishTrack(this);
-        } finally {
             this.call = undefined;
             this._transceiver = undefined;
+        } catch (error) {
+            logger.warn(
+                `LocalCallTrack ${this.id} unpublish() failed to publish track to call (callId${call.callId})`,
+                error,
+            );
         }
     }
 
     public setNewTrack(track: MediaStreamTrack): void {
+        logger.log(`LocalCallTrack ${this.id} setNewTrack() running (${this.logInfo})`);
+
+        const oldTrack = this._track;
         this._track = track;
+
+        // If the track is not published, we don't need to try to publish the
+        // new one either
+        if (!this.published || !this.call) return;
+
+        try {
+            // XXX: We don't re-use transceivers with the SFU: this is to work around
+            // https://github.com/matrix-org/waterfall/issues/98 - see the bug for more.
+            // Since we use WebRTC data channels to renegotiate with the SFU, we're not
+            // limited to the size of a Matrix event, so it's 'ok' if the SDP grows
+            // indefinitely (although presumably this would break if we tried to do
+            // an ICE restart over to-device messages after you'd turned screen sharing
+            // on & off too many times...)
+            if (!this.sender || (this.call.isFocus && this.purpose === SDPStreamMetadataPurpose.Screenshare)) {
+                this.unpublish();
+                this.addTrackToPeerConnection();
+            } else {
+                this.replaceTrackOnPeerConnection();
+            }
+
+            logger.log(`LocalCallTrack ${this.id} setNewTrack() updated published track (${this.logInfo})`);
+        } catch (error) {
+            this._track = oldTrack;
+            logger.log(
+                `LocalCallTrack ${this.id} setNewTrack() failed to update published track (${this.logInfo})`,
+                error,
+            );
+        }
+    }
+
+    private addTrackToPeerConnection(): void {
+        if (!this.call) {
+            throw new Error("Called without a call");
+        }
+        this._transceiver = this.call.publishTrack(this);
+    }
+
+    private replaceTrackOnPeerConnection(): void {
         const stream = this.stream;
         const sender = this.sender;
         const transceiver = this._transceiver;
 
-        logger.log(`LocalCallTrack ${this.id} setNewTrack() running (${this.logInfo})`);
-
-        if (!this.call) return;
-        // XXX: We don't re-use transceivers with the SFU: this is to work around
-        // https://github.com/matrix-org/waterfall/issues/98 - see the bug for more.
-        // Since we use WebRTC data channels to renegotiate with the SFU, we're not
-        // limited to the size of a Matrix event, so it's 'ok' if the SDP grows
-        // indefinitely (although presumably this would break if we tried to do
-        // an ICE restart over to-device messages after you'd turned screen sharing
-        // on & off too many times...)
-        if (!transceiver || !sender || (this.call.isFocus && this.purpose === SDPStreamMetadataPurpose.Screenshare)) {
-            const call = this.call;
-            this.unpublish();
-            this.publish(call);
-            return;
+        if (!stream || !transceiver || !sender || !this.track) {
+            throw new Error("Called without");
         }
 
-        logger.log(`LocalCallTrack LocalCallTrack ${this.id} setNewTrack() replacing track (${this.logInfo})`);
+        logger.log(`LocalCallTrack LocalCallTrack ${this.id} replaceTrack() running (${this.logInfo})`);
 
         try {
             // We already have a sender, so we re-use it. We try to
@@ -239,7 +290,7 @@ export class LocalCallTrack extends CallTrack {
             // throw this away)
             if (sender.setStreams && stream) sender.setStreams(stream);
 
-            sender.replaceTrack(track);
+            sender.replaceTrack(this.track);
 
             // We don't need to set simulcast encodings in here since we
             // have already done that the first time we added the
@@ -251,11 +302,10 @@ export class LocalCallTrack extends CallTrack {
             transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
         } catch (error) {
             logger.warn(
-                `LocalCallTrack ${this.id} setNewTrack() failed to replace track: falling back to publishing a new one (${this.logInfo})`,
+                `LocalCallTrack ${this.id} setNewTrack() failed to replace track: falling back to adding a new one (${this.logInfo})`,
+                error,
             );
-            if (this.call) {
-                this.publish(this.call);
-            }
+            this.addTrackToPeerConnection();
         }
     }
 }

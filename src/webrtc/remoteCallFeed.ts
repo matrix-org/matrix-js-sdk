@@ -56,7 +56,7 @@ export class RemoteCallFeed extends CallFeed {
         this.call = opts.call;
         this.metadata = opts.metadata;
 
-        this._stream = opts.stream || new MediaStream();
+        this._stream = opts.stream || new window.MediaStream();
 
         if (opts.call) {
             opts.call.addListener(CallEvent.State, this.onCallState);

@@ -406,9 +406,11 @@ export class GroupCall extends TypedEventEmitter<
             roomId: this.room.roomId,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: this.initWithAudioMuted || stream.getAudioTracks().length === 0 || this.isPtt,
-            videoMuted: this.initWithVideoMuted || stream.getVideoTracks().length === 0,
         });
+        callFeed.setAudioVideoMuted(
+            this.initWithAudioMuted || stream.getAudioTracks().length === 0 || this.isPtt,
+            this.initWithVideoMuted || stream.getVideoTracks().length === 0,
+        );
 
         setTracksEnabled(stream.getAudioTracks(), !callFeed.isAudioMuted());
         setTracksEnabled(stream.getVideoTracks(), !callFeed.isVideoMuted());
@@ -730,8 +732,6 @@ export class GroupCall extends TypedEventEmitter<
                     roomId: this.room.roomId,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Screenshare,
-                    audioMuted: false,
-                    videoMuted: false,
                 });
                 this.addScreenshareFeed(this.localScreenshareFeed);
 

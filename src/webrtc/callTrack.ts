@@ -20,10 +20,11 @@ import { SDPStreamMetadataTrack } from "./callEventTypes";
 export interface CallTrackOpts {}
 
 export abstract class CallTrack {
-    public abstract readonly id?: string;
-    public abstract readonly track?: MediaStreamTrack;
-    public abstract readonly trackId?: string;
-    public abstract metadata?: SDPStreamMetadataTrack;
+    public abstract get id(): string | undefined;
+    public abstract get track(): MediaStreamTrack | undefined;
+    public abstract get trackId(): string | undefined;
+    public abstract get metadata(): SDPStreamMetadataTrack | undefined;
+    public abstract get kind(): string | undefined;
 
     protected readonly _id: string;
     protected _transceiver?: RTCRtpTransceiver;
@@ -34,10 +35,6 @@ export abstract class CallTrack {
 
     public get transceiver(): RTCRtpTransceiver | undefined {
         return this._transceiver;
-    }
-
-    public get kind(): string | undefined {
-        return this.track?.kind;
     }
 
     public get isAudio(): boolean {

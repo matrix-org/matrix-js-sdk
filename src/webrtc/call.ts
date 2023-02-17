@@ -579,8 +579,22 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.remoteScreensharingFeed?.stream;
     }
 
+    public getFreeTransceiverByKind(kind: string): RTCRtpTransceiver | undefined {
+        return this.peerConn?.getTransceivers().find((transceiver) => {
+            if (transceiver.sender.track) return false;
+            if (!transceiver.mid) return false;
+            if (this.getLocalMediaTypeByMid(transceiver.mid) !== kind) return false;
+
+            return true;
+        });
+    }
+
     public getLocalMediaLineByMid(mid: string): SessionDescription["media"][number] | undefined {
         return this.localSDP?.media?.find((m) => m.mid == mid);
+    }
+
+    public getLocalMediaTypeByMid(mid: string): string | undefined {
+        return this.getLocalMediaLineByMid(mid)?.type;
     }
 
     public getLocalMSIDByMid(mid: string): string[] | undefined {
@@ -621,8 +635,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         )}, mid=${mid}, kind=${this.getRemoteMediaTypeByMid(mid)}`;
     }
 
-    private getLocalFeedById(feedId: string): CallFeed | undefined {
-        return this.getFeeds().find((feed) => feed.id === feedId);
+    private getLocalFeedById(feedId: string): LocalCallFeed | undefined {
+        return this.getLocalFeeds().find((feed) => feed.id === feedId);
+    }
+
+    private getLocalFeedByStream(stream: MediaStream): LocalCallFeed | undefined {
+        return this.getLocalFeeds().find((feed) => feed.stream === stream);
     }
 
     /**
@@ -703,6 +721,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         purpose: SDPStreamMetadataPurpose,
         addToPeerConnection = true,
     ): void {
+        if (this.getLocalFeedByStream(stream)) {
+            logger.warn(
+                `Call ${this.callId} addLocalFeedFromStream() ignoring stream for which we already have a feed (streamId=${stream.id})`,
+            );
+            return;
+        }
+
         // Tracks don't always start off enabled, eg. chrome will give a disabled
         // audio track if you ask for user media audio and already had one that
         // you'd set to disabled (presumably because it clones them internally).
@@ -713,8 +738,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             new LocalCallFeed({
                 client: this.client,
                 roomId: this.roomId,
-                audioMuted: false,
-                videoMuted: false,
                 stream,
                 purpose,
             }),
@@ -824,7 +847,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private deleteFeedByStream(stream: MediaStream): void {
-        const feed = this.getLocalFeedById(stream.id);
+        const feed = this.getLocalFeedByStream(stream);
         if (!feed) {
             logger.warn(
                 `Call ${this.callId} deleteFeedByStream() didn't find the feed to delete (streamId=${stream.id})`,
@@ -1029,8 +1052,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     roomId: this.roomId,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
-                    audioMuted: false,
-                    videoMuted: false,
                 });
 
                 const feeds = [usermediaFeed];
@@ -2075,8 +2096,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 roomId: this.roomId,
                 stream: stream,
                 streamId: stream.id,
-                audioMuted: false,
-                videoMuted: false,
             }),
         );
     }
@@ -2103,8 +2122,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                     roomId: this.roomId,
                     streamId: streamId,
                     metadata: streamMetadata,
-                    audioMuted: streamMetadata.audio_muted ?? false,
-                    videoMuted: streamMetadata.video_muted ?? false,
                 }),
                 false,
             );
@@ -2897,8 +2914,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 roomId: this.roomId,
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
-                audioMuted: false,
-                videoMuted: false,
             });
             await this.placeCallWithCallFeeds([callFeed]);
         } catch (e) {

@@ -99,14 +99,14 @@ export class LocalCallFeed extends CallFeed {
             mediaHandler.screensharingStreams.push(stream);
         }
 
-        return new LocalCallFeed({
+        const feed = new LocalCallFeed({
             client: this.client,
             roomId: this.roomId,
             stream,
             purpose: this.purpose,
-            audioMuted: this.audioMuted,
-            videoMuted: this.videoMuted,
         });
+        feed.setAudioVideoMuted(this.audioMuted, this.videoMuted);
+        return feed;
     }
 
     public setNewStream(newStream: MediaStream): void {

@@ -26,19 +26,23 @@ export interface RemoteCallTrackOpts extends CallTrackOpts {
 }
 
 export class RemoteCallTrack extends CallTrack {
+    private readonly _trackId?: string;
     private _metadata?: SDPStreamMetadataTrack;
     private call: MatrixCall;
-    public readonly trackId?: string;
 
     public constructor(opts: RemoteCallTrackOpts) {
         super(opts);
 
         this.call = opts.call;
-        this.trackId = opts.trackId;
+        this._trackId = opts.trackId;
     }
 
     public get id(): string | undefined {
-        return this.trackId;
+        return this._trackId;
+    }
+
+    public get trackId(): string | undefined {
+        return this._trackId;
     }
 
     public get metadata(): SDPStreamMetadataTrack | undefined {
@@ -55,14 +59,14 @@ export class RemoteCallTrack extends CallTrack {
     }
 
     public get kind(): string | undefined {
-        return super.kind ?? this._metadata?.kind;
+        return this.track?.kind ?? this._metadata?.kind;
     }
 
     public canSetTransceiver(transceiver: RTCRtpTransceiver): boolean {
-        if (!this.trackId) return true;
+        if (!this._trackId) return true;
 
         if (!transceiver.mid) return false;
-        if (this.call.getRemoteTrackIdByMid(transceiver.mid) !== this.trackId) return false;
+        if (this.call.getRemoteTrackIdByMid(transceiver.mid) !== this._trackId) return false;
 
         return true;
     }

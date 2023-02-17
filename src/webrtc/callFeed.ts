@@ -32,14 +32,6 @@ const SPEAKING_SAMPLE_COUNT = 8; // samples
 export interface ICallFeedOpts {
     client: MatrixClient;
     roomId?: string;
-    /**
-     * Whether or not the remote SDPStreamMetadata says audio is muted
-     */
-    audioMuted: boolean;
-    /**
-     * Whether or not the remote SDPStreamMetadata says video is muted
-     */
-    videoMuted: boolean;
 }
 
 export enum CallFeedEvent {
@@ -65,12 +57,12 @@ type EventHandlerMap = {
 };
 
 export abstract class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
-    public abstract readonly id?: string;
-    public abstract readonly streamId?: string;
-    public abstract readonly purpose: SDPStreamMetadataPurpose;
-    public abstract readonly connected: boolean;
-    public abstract readonly userId: string;
-    public abstract readonly deviceId?: string;
+    public abstract get id(): string | undefined;
+    public abstract get streamId(): string | undefined;
+    public abstract get purpose(): SDPStreamMetadataPurpose;
+    public abstract get connected(): boolean;
+    public abstract get userId(): string;
+    public abstract get deviceId(): string | undefined;
 
     public abstract isLocal: boolean;
     public abstract isRemote: boolean;
@@ -83,8 +75,8 @@ export abstract class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHan
     protected call?: MatrixCall;
     protected roomId?: string;
     protected client: MatrixClient;
-    protected audioMuted: boolean;
-    protected videoMuted: boolean;
+    protected audioMuted = false;
+    protected videoMuted = false;
 
     private localVolume = 1;
     private measuringVolumeActivity = false;
@@ -105,8 +97,6 @@ export abstract class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHan
         this._id = randomString(32);
         this.client = opts.client;
         this.roomId = opts.roomId;
-        this.audioMuted = opts.audioMuted;
-        this.videoMuted = opts.videoMuted;
         this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
 
         if (this.hasAudioTrack) {
