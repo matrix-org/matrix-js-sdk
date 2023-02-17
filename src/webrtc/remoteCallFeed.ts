@@ -138,6 +138,7 @@ export class RemoteCallFeed extends CallFeed {
     }
 
     private set connected(connected: boolean) {
+        if (this._connected === connected) return;
         this._connected = connected;
         this.emit(CallFeedEvent.ConnectedChanged, this.connected);
     }
