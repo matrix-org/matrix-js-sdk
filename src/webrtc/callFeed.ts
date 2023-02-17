@@ -57,7 +57,7 @@ type EventHandlerMap = {
 };
 
 export abstract class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
-    public abstract get id(): string | undefined;
+    public abstract get id(): string;
     public abstract get streamId(): string | undefined;
     public abstract get purpose(): SDPStreamMetadataPurpose;
     public abstract get connected(): boolean;

@@ -64,7 +64,7 @@ export class RemoteCallFeed extends CallFeed {
         this.updateConnected();
     }
 
-    public get id(): string | undefined {
+    public get id(): string {
         return this.streamId;
     }
 
