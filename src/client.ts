@@ -1897,15 +1897,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             type,
             isPtt,
             intent,
+            this.isVoipWithNoMediaAllowed,
             undefined,
             dataChannelsEnabled || this.isVoipWithNoMediaAllowed,
             dataChannelOptions,
-        )
-            .create()
-            .then((groupCall) => {
-                groupCall.initCallWithoutVideoAndAudio = this.isVoipWithNoMediaAllowed;
-                return groupCall;
-            });
+        ).create();
     }
 
     /**

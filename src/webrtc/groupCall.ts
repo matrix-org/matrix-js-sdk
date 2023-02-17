@@ -209,7 +209,6 @@ export class GroupCall extends TypedEventEmitter<
     private initWithAudioMuted = false;
     private initWithVideoMuted = false;
     private initCallFeedPromise?: Promise<void>;
-    private allowCallWithOutVideoAndAudio = false;
 
     public constructor(
         private client: MatrixClient,
@@ -217,6 +216,7 @@ export class GroupCall extends TypedEventEmitter<
         public type: GroupCallType,
         public isPtt: boolean,
         public intent: GroupCallIntent,
+        public readonly initCallWithoutVideoAndAudio: boolean,
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
@@ -378,7 +378,7 @@ export class GroupCall extends TypedEventEmitter<
             // If is allowed to join a call without a media stream, then we
             // don't throw an error here. But we need an empty Local Feed to establish
             // a connection later.
-            if (this.allowCallWithOutVideoAndAudio) {
+            if (this.initCallWithoutVideoAndAudio) {
                 stream = new MediaStream();
             } else {
                 this.state = GroupCallState.LocalCallFeedUninitialized;
@@ -619,7 +619,7 @@ export class GroupCall extends TypedEventEmitter<
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
         // Because we need a Local Call Feed to establish a call connection, we avoid muting video in case of empty
         // video track. In this way we go sure if a client implements muting we don't raise an error.
-        if (this.allowCallWithOutVideoAndAudio && this.localCallFeed?.stream.getVideoTracks().length === 0) {
+        if (this.initCallWithoutVideoAndAudio && this.localCallFeed?.stream.getVideoTracks().length === 0) {
             return false;
         }
         // hasAudioDevice can block indefinitely if the window has lost focus,
@@ -1474,19 +1474,4 @@ export class GroupCall extends TypedEventEmitter<
             );
         }
     };
-
-    /**
-     * allowCallWithOutVideoAndAudio should be a GroupCall property. However, I make it as runtime configurable
-     * property because this additional behavior has a big impact on other features and is a big API change.
-     * Joining without a camera and video should only be explicitly allowed, because there can be unexpected behavior
-     * when later querying the media access rights from browser that the client cannot intercept. Join without came
-     * and audio should be a property like PTT.
-     */
-    public get initCallWithoutVideoAndAudio(): boolean {
-        return this.allowCallWithOutVideoAndAudio;
-    }
-
-    public set initCallWithoutVideoAndAudio(allowCallWithOutVideoAndAudio: boolean) {
-        this.allowCallWithOutVideoAndAudio = allowCallWithOutVideoAndAudio;
-    }
 }
