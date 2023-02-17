@@ -22,7 +22,7 @@ limitations under the License.
  */
 
 import { v4 as uuidv4 } from "uuid";
-import { parse as parseSdp, write as writeSdp } from "sdp-transform";
+import { parse as parseSdp, SessionDescription, write as writeSdp } from "sdp-transform";
 
 import { logger } from "../logger";
 import * as utils from "../utils";
@@ -48,7 +48,6 @@ import {
     FocusTrackSubscriptionEvent,
     FocusNegotiateEvent,
     FocusSDPStreamMetadataChangedEvent,
-    SDPStreamMetadataTracks,
     FocusEvent,
     SDPStreamMetadataKeyStable,
     FocusEventBaseContent,
@@ -60,6 +59,9 @@ import { DeviceInfo } from "../crypto/deviceinfo";
 import { IScreensharingOpts } from "./mediaHandler";
 import { GroupCallUnknownDeviceError } from "./groupCall";
 import { MatrixError } from "../http-api";
+import { RemoteCallFeed } from "./remoteCallFeed";
+import { LocalCallFeed } from "./localCallFeed";
+import { LocalCallTrack } from "./localCallTrack";
 
 interface CallOpts {
     // The room ID for this call.
@@ -91,12 +93,6 @@ interface TurnServer {
 interface AssertedIdentity {
     id: string;
     displayName: string;
-}
-
-export enum SimulcastResolution {
-    Full = "f",
-    Half = "h",
-    Quarter = "q",
 }
 
 enum MediaType {
@@ -279,59 +275,6 @@ const ICE_DISCONNECTED_TIMEOUT = 30 * 1000; // ms
  */
 const SUBSCRIBE_TO_FOCUS_TIMEOUT = 2 * 1000;
 
-// Order is important here: some browsers (e.g.
-// Chrome) will only send some of the encodings, if
-// the track has a resolution to low for it to send
-// all, in that case the encoding higher in the list
-// has priority and therefore we put full as first
-// as we always want to send the full resolution
-const SIMULCAST_USERMEDIA_ENCODINGS: RTCRtpEncodingParameters[] = [
-    {
-        // 720p (base)
-        maxFramerate: 30,
-        maxBitrate: 1_700_000,
-        rid: SimulcastResolution.Full,
-    },
-    {
-        // 360p
-        maxFramerate: 20,
-        maxBitrate: 300_000,
-        rid: SimulcastResolution.Half,
-        scaleResolutionDownBy: 2.0,
-    },
-    {
-        // 180p
-        maxFramerate: 15,
-        maxBitrate: 120_000,
-
-        rid: SimulcastResolution.Quarter,
-        scaleResolutionDownBy: 4.0,
-    },
-];
-
-const SIMULCAST_SCREENSHARING_ENCODINGS: RTCRtpEncodingParameters[] = [
-    {
-        // 1080p (base)
-        maxFramerate: 30,
-        maxBitrate: 3_000_000,
-        rid: SimulcastResolution.Full,
-    },
-    {
-        // 720p
-        maxFramerate: 15,
-        maxBitrate: 1_000_000,
-        rid: SimulcastResolution.Half,
-        scaleResolutionDownBy: 1.5,
-    },
-    {
-        // 360p
-        maxFramerate: 3,
-        maxBitrate: 200_000,
-        rid: SimulcastResolution.Quarter,
-        scaleResolutionDownBy: 3,
-    },
-];
-
 export class CallError extends Error {
     public readonly code: string;
 
@@ -342,18 +285,6 @@ export class CallError extends Error {
         this.code = code;
     }
 }
-
-export const getSimulcastEncodings = (purpose: SDPStreamMetadataPurpose): RTCRtpEncodingParameters[] => {
-    if (purpose === SDPStreamMetadataPurpose.Usermedia) {
-        return SIMULCAST_USERMEDIA_ENCODINGS;
-    }
-    if (purpose === SDPStreamMetadataPurpose.Screenshare) {
-        return SIMULCAST_SCREENSHARING_ENCODINGS;
-    }
-
-    // Fallback to usermedia encodings
-    return SIMULCAST_USERMEDIA_ENCODINGS;
-};
 
 export function genCallID(): string {
     return Date.now().toString() + randomString(16);
@@ -392,16 +323,6 @@ export type CallEventHandlerMap = {
     [CallEvent.SendVoipEvent]: (event: Record<string, any>) => void;
 };
 
-// The key of the transceiver map (purpose + media type, separated by ':')
-type TransceiverKey = string;
-
-// generates keys for the map of transceivers
-// kind is unfortunately a string rather than MediaType as this is the type of
-// track.kind
-function getTransceiverKey(purpose: SDPStreamMetadataPurpose, kind: TransceiverKey): string {
-    return purpose + ":" + kind;
-}
-
 export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
     public roomId?: string;
     public callId: string;
@@ -410,7 +331,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public hangupReason?: string;
     public direction?: CallDirection;
     public ourPartyId: string;
-    public peerConn?: RTCPeerConnection;
     public toDeviceSeq = 0;
 
     // whether this call should have push-to-talk semantics
@@ -419,6 +339,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public readonly isFocus: boolean = false;
 
     private _state = CallState.Fledgling;
+    private peerConn?: RTCPeerConnection;
     private readonly client: MatrixClient;
     private readonly forceTURN?: boolean;
     private readonly turnServers: Array<TurnServer>;
@@ -429,9 +350,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private candidateSendTries = 0;
     private candidatesEnded = false;
     private feeds: Array<CallFeed> = [];
-
-    // our transceivers for each purpose and type of media
-    private transceivers = new Map<TransceiverKey, RTCRtpTransceiver>();
 
     private inviteOrAnswerSent = false;
     private waitForLocalAVStream = false;
@@ -569,6 +487,22 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.remoteAssertedIdentity;
     }
 
+    public get localSDPString(): string | undefined {
+        return this.peerConn?.localDescription?.sdp;
+    }
+
+    public get localSDP(): SessionDescription | undefined {
+        return this.localSDPString ? parseSdp(this.localSDPString) : undefined;
+    }
+
+    public get remoteSDPString(): string | undefined {
+        return this.peerConn?.remoteDescription?.sdp;
+    }
+
+    public get remoteSDP(): SessionDescription | undefined {
+        return this.remoteSDPString ? parseSdp(this.remoteSDPString) : undefined;
+    }
+
     public get state(): CallState {
         return this._state;
     }
@@ -606,18 +540,18 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private get hasUserMediaAudioSender(): boolean {
-        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "audio"))?.sender);
+        return Boolean(this.localUsermediaFeed?.tracks?.find((t) => t.kind === "audio")?.sender);
     }
 
     private get hasUserMediaVideoSender(): boolean {
-        return Boolean(this.transceivers.get(getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"))?.sender);
+        return Boolean(this.localUsermediaFeed?.tracks?.find((t) => t.kind === "video")?.sender);
     }
 
-    public get localUsermediaFeed(): CallFeed | undefined {
+    public get localUsermediaFeed(): LocalCallFeed | undefined {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
     }
 
-    public get localScreensharingFeed(): CallFeed | undefined {
+    public get localScreensharingFeed(): LocalCallFeed | undefined {
         return this.getLocalFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
     }
 
@@ -629,11 +563,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.localScreensharingFeed?.stream;
     }
 
-    public get remoteUsermediaFeed(): CallFeed | undefined {
+    public get remoteUsermediaFeed(): RemoteCallFeed | undefined {
         return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
     }
 
-    public get remoteScreensharingFeed(): CallFeed | undefined {
+    public get remoteScreensharingFeed(): RemoteCallFeed | undefined {
         return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
     }
 
@@ -645,8 +579,68 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return this.remoteScreensharingFeed?.stream;
     }
 
-    private getFeedById(feedId: string): CallFeed | undefined {
-        return this.getFeeds().find((feed) => feed.feedId === feedId);
+    public getFreeTransceiverByKind(kind: string): RTCRtpTransceiver | undefined {
+        return this.peerConn?.getTransceivers().find((transceiver) => {
+            if (transceiver.sender.track) return false;
+            if (!transceiver.mid) return false;
+            if (this.getLocalMediaTypeByMid(transceiver.mid) !== kind) return false;
+
+            return true;
+        });
+    }
+
+    public getLocalMediaLineByMid(mid: string): SessionDescription["media"][number] | undefined {
+        return this.localSDP?.media?.find((m) => m.mid == mid);
+    }
+
+    public getLocalMediaTypeByMid(mid: string): string | undefined {
+        return this.getLocalMediaLineByMid(mid)?.type;
+    }
+
+    public getLocalMSIDByMid(mid: string): string[] | undefined {
+        return this.getLocalMediaLineByMid(mid)?.msid?.split(" ");
+    }
+
+    public getLocalStreamIdByMid(mid: string): string | undefined {
+        return this.getLocalMSIDByMid(mid)?.[0];
+    }
+
+    public getLocalTrackIdByMid(mid: string): string | undefined {
+        return this.getLocalMSIDByMid(mid)?.[1];
+    }
+
+    public getRemoteMediaLineByMid(mid: string): SessionDescription["media"][number] | undefined {
+        return this.remoteSDP?.media?.find((m) => m.mid == mid);
+    }
+
+    public getRemoteMediaTypeByMid(mid: string): string | undefined {
+        return this.getRemoteMediaLineByMid(mid)?.type;
+    }
+
+    public getRemoteMSIDByMid(mid: string): string[] | undefined {
+        return this.getRemoteMediaLineByMid(mid)?.msid?.split(" ");
+    }
+
+    public getRemoteStreamIdByMid(mid: string): string | undefined {
+        return this.getRemoteMSIDByMid(mid)?.[0];
+    }
+
+    public getRemoteTrackIdByMid(mid: string): string | undefined {
+        return this.getRemoteMSIDByMid(mid)?.[1];
+    }
+
+    public getRemoteTrackInfoByMid(mid: string): string {
+        return `streamId=${this.getRemoteStreamIdByMid(mid)}, trackId=${this.getRemoteTrackIdByMid(
+            mid,
+        )}, mid=${mid}, kind=${this.getRemoteMediaTypeByMid(mid)}`;
+    }
+
+    private getLocalFeedById(feedId: string): LocalCallFeed | undefined {
+        return this.getLocalFeeds().find((feed) => feed.id === feedId);
+    }
+
+    private getLocalFeedByStream(stream: MediaStream): LocalCallFeed | undefined {
+        return this.getLocalFeeds().find((feed) => feed.stream === stream);
     }
 
     /**
@@ -661,16 +655,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * Returns an array of all local CallFeeds
      * @returns local CallFeeds
      */
-    public getLocalFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => feed.isLocal());
+    public getLocalFeeds(): Array<LocalCallFeed> {
+        return this.feeds.filter((feed) => feed instanceof LocalCallFeed) as LocalCallFeed[];
     }
 
     /**
      * Returns an array of all remote CallFeeds
      * @returns remote CallFeeds
      */
-    public getRemoteFeeds(): Array<CallFeed> {
-        return this.feeds.filter((feed) => !feed.isLocal());
+    public getRemoteFeeds(): Array<RemoteCallFeed> {
+        return this.feeds.filter((feed) => feed instanceof RemoteCallFeed) as RemoteCallFeed[];
     }
 
     private async initOpponentCrypto(): Promise<void> {
@@ -704,54 +698,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * Generates and returns localSDPStreamMetadata
      * @returns localSDPStreamMetadata
      */
-    private getLocalSDPStreamMetadata(): SDPStreamMetadata {
-        const sdp = this.peerConn?.localDescription?.sdp ? parseSdp(this.peerConn.localDescription.sdp) : null;
-        const metadata: SDPStreamMetadata = {};
-        for (const localFeed of this.getLocalFeeds()) {
-            // We use transceivers here because we need to send the actual
-            // trackIds and streamIds which the focus will see which will
-            // probably differ from the local trackIds and streamIds
-            let streamId = localFeed.feedId;
-            const tracks = Array.from(this.transceivers.entries()).reduce((tracks, [transceiverKey, transceiver]) => {
-                if (!transceiver.sender.track) return tracks;
-                if (
-                    ![
-                        getTransceiverKey(localFeed.purpose, "audio"),
-                        getTransceiverKey(localFeed.purpose, "video"),
-                    ].includes(transceiverKey)
-                ) {
-                    return tracks;
-                }
+    private get metadata(): SDPStreamMetadata {
+        return this.getLocalFeeds().reduce((metadata: SDPStreamMetadata, feed: LocalCallFeed) => {
+            if (!feed.streamId) return metadata;
 
-                // XXX: We only use double equals because MediaDescription::mid is in fact a number
-                const msid = sdp?.media?.find((m) => m.mid == transceiver.mid)?.msid?.split(" ");
-                if (msid?.[0]) {
-                    streamId = msid?.[0];
-                }
-                if (msid?.[1]) {
-                    tracks[msid[1]] = {
-                        kind: transceiver.sender.track?.kind,
-                        width: transceiver.sender.track.getSettings().width,
-                        height: transceiver.sender.track.getSettings().height,
-                    };
-                }
-                return tracks;
-            }, {} as SDPStreamMetadataTracks);
-            if (!Object.keys(tracks).length) continue;
-
-            metadata[streamId] = {
-                // FIXME: This allows for impersonation - the focus should be
-                // handling these
-                user_id: this.client.getUserId()!,
-                device_id: this.client.getDeviceId()!,
-                purpose: localFeed.purpose,
-                // FIXME: This is very ineffective as state is slow, we should really be sending this over DC
-                audio_muted: localFeed.isAudioMuted(),
-                video_muted: localFeed.isVideoMuted(),
-                tracks: tracks,
-            };
-        }
-        return metadata;
+            metadata[feed.streamId] = feed.metadata;
+            return metadata;
+        }, {});
     }
 
     /**
@@ -760,82 +713,20 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @returns no incoming feeds
      */
     public noIncomingFeeds(): boolean {
-        return !this.feeds.some((feed) => !feed.isLocal());
+        return !this.feeds.some((feed) => !feed.isLocal);
     }
 
-    private pushRemoteStream(stream: MediaStream): void {
-        // Fallback to old behavior if the other side doesn't support SDPStreamMetadata
-        if (!this.opponentSupportsSDPStreamMetadata()) {
-            this.pushRemoteStreamWithoutMetadata(stream);
-            return;
-        }
-
-        const feed = this.getFeedById(stream.id);
-        if (!feed) {
+    private addLocalFeedFromStream(
+        stream: MediaStream,
+        purpose: SDPStreamMetadataPurpose,
+        addToPeerConnection = true,
+    ): void {
+        if (this.getLocalFeedByStream(stream)) {
             logger.warn(
-                `Call ${this.callId} Ignoring stream because we don't have a feed for it (streamId=${stream.id})`,
+                `Call ${this.callId} addLocalFeedFromStream() ignoring stream for which we already have a feed (streamId=${stream.id})`,
             );
             return;
         }
-
-        feed.setNewStream(stream);
-
-        logger.info(
-            `Call ${this.callId} Pushed remote stream (feedId=${feed.feedId}, active=${stream.active}, purpose=${feed.purpose}, userId=${feed.userId}, deviceId=${feed.deviceId})`,
-        );
-    }
-
-    /**
-     * This method is used ONLY if the other client doesn't support sending SDPStreamMetadata
-     */
-    private pushRemoteStreamWithoutMetadata(stream: MediaStream): void {
-        const userId = this.getOpponentMember()!.userId;
-        // We can guess the purpose here since the other client can only send one stream
-        const purpose = SDPStreamMetadataPurpose.Usermedia;
-        const oldRemoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
-
-        // Note that we check by ID and always set the remote stream: Chrome appears
-        // to make new stream objects when transceiver directionality is changed and the 'active'
-        // status of streams change - Dave
-        // If we already have a stream, check this stream has the same id
-        if (oldRemoteStream && stream.id !== oldRemoteStream.id) {
-            logger.warn(
-                `Call ${this.callId} pushRemoteFeedWithoutMetadata() ignoring new stream because we already have stream (streamId=${stream.id})`,
-            );
-            return;
-        }
-
-        if (this.getFeedById(stream.id)) {
-            logger.warn(
-                `Call ${this.callId} pushRemoteFeedWithoutMetadata() ignoring stream because we already have a feed for it (streamId=${stream.id})`,
-            );
-            return;
-        }
-
-        this.feeds.push(
-            new CallFeed({
-                client: this.client,
-                call: this,
-                roomId: this.roomId,
-                audioMuted: false,
-                videoMuted: false,
-                userId,
-                deviceId: this.getOpponentDeviceId(),
-                feedId: stream.id,
-                stream,
-                purpose,
-            }),
-        );
-
-        this.emit(CallEvent.FeedsChanged, this.feeds);
-
-        logger.info(
-            `Call ${this.callId} pushRemoteFeedWithoutMetadata() pushed stream (streamId=${stream.id}, active=${stream.active})`,
-        );
-    }
-
-    private pushNewLocalFeed(stream: MediaStream, purpose: SDPStreamMetadataPurpose, addToPeerConnection = true): void {
-        const userId = this.client.getUserId()!;
 
         // Tracks don't always start off enabled, eg. chrome will give a disabled
         // audio track if you ask for user media audio and already had one that
@@ -843,22 +734,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         setTracksEnabled(stream.getAudioTracks(), true);
         setTracksEnabled(stream.getVideoTracks(), true);
 
-        if (this.getFeedById(stream.id)) {
-            logger.warn(
-                `Call ${this.callId} pushNewLocalFeed() ignoring stream because we already have a feed for it (streamId=${stream.id})`,
-            );
-            return;
-        }
-
         this.pushLocalFeed(
-            new CallFeed({
+            new LocalCallFeed({
                 client: this.client,
                 roomId: this.roomId,
-                audioMuted: false,
-                videoMuted: false,
-                userId,
-                deviceId: this.getOpponentDeviceId(),
-                feedId: stream.id,
                 stream,
                 purpose,
             }),
@@ -871,165 +750,91 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @param feed - to push
      * @param addToPeerConnection - whether to add the tracks to the peer connection
      */
-    public pushLocalFeed(feed: CallFeed, addToPeerConnection = true): void {
-        if (this.getFeedById(feed.feedId)) {
-            logger.info(`Call ${this.callId} pushLocalFeed() ignoring duplicate local stream (feedId=${feed.feedId})`);
+    public pushLocalFeed(feed: LocalCallFeed, addToPeerConnection = true): void {
+        if (this.getLocalFeedById(feed.id)) {
+            logger.info(`Call ${this.callId} pushLocalFeed() ignoring duplicate local stream (feedId=${feed.id})`);
             return;
         }
 
         this.feeds.push(feed);
         this.emit(CallEvent.FeedsChanged, this.feeds);
-        logger.info(`Call ${this.callId} pushLocalFeed() succeeded (id=${feed.feedId} purpose=${feed.purpose})`);
+        logger.info(`Call ${this.callId} pushLocalFeed() succeeded (id=${feed.id} purpose=${feed.purpose})`);
 
         if (addToPeerConnection) {
-            this.addTracksOfFeedToPeerConnection(feed);
+            feed.publish(this);
         }
     }
 
-    /**
-     * This method takes the feeds tracks and adds them to the peer connection.
-     * It tries to re-use transceivers/senders by using replaceTrack(), if
-     * possible.
-     * @param callFeed - feed whose tracks we add to the peer connection
-     */
-    private async addTracksOfFeedToPeerConnection(callFeed: CallFeed): Promise<void> {
-        const purpose = callFeed.purpose;
-        const feedId = callFeed.feedId;
-        const stream = callFeed.stream;
-        if (!stream) {
-            logger.warn(
-                `Call ${this.callId} addTracksOfFeedToPeerConnection() failed: no stream (feedId=${feedId} purpose=${purpose})`,
-            );
-            return;
+    public publishTrack(track: LocalCallTrack): RTCRtpTransceiver {
+        if (!this.peerConn) {
+            throw new Error("MatrixCall publish() called on call without a peer connection");
+        }
+        logger.info(`Call ${this.callId} publishTrack() running (id=${track.id}, kind=${track.kind})`);
+
+        const { stream, encodings } = track;
+
+        const transceiver = this.peerConn.addTransceiver(track.track, {
+            streams: stream ? [stream] : undefined,
+            // Chrome does not allow us to change the encodings
+            // later, so we have to use addTransceiver() to set them
+            // (It's fine to specify the parameter on Firefox too,
+            // it just won't work.)
+            sendEncodings: this.isFocus ? track.encodings : undefined,
+            direction: track.purpose === SDPStreamMetadataPurpose.Usermedia ? "sendrecv" : "sendonly",
+        });
+
+        if (this.isFocus && isFirefox()) {
+            const parameters = transceiver.sender.getParameters();
+            transceiver.sender.setParameters({
+                ...parameters,
+                // Firefox does not support the sendEncodings
+                // parameter on addTransceiver(), so we use
+                // setParameters() to set them
+                encodings: encodings,
+            });
         }
 
-        for (const track of stream.getTracks()) {
-            logger.info(
-                `Call ${this.callId} addTracksOfFeedToPeerConnection() running (feedId=${feedId} streamPurpose=${purpose} kind=${track.kind} enabled=${track.enabled})`,
-            );
+        return transceiver;
+    }
 
-            const encodings = track.kind === "video" ? getSimulcastEncodings(callFeed.purpose) : undefined;
-            const transceiverKey = getTransceiverKey(purpose, track.kind);
-            const transceiver = this.transceivers.get(transceiverKey);
-            const sender = transceiver?.sender;
-
-            let added = false;
-            // XXX: We don't re-use transceivers for screen shares with the SFU: this is to work around
-            // https://github.com/matrix-org/waterfall/issues/98 - see the bug for more.
-            // Since we use WebRTC data channels to renegotiate with the SFU, we're not
-            // limited to the size of a Matrix event, so it's 'ok' if the SDP grows
-            // indefinitely (although presumably this would break if we tried to do
-            // an ICE restart over to-device messages after you'd turned screen sharing
-            // on & off too many times...)
-            // The reason we're OK re-using transceivers for user media is that we establish
-            // usermedia transceivers in sendrecv mode anyway and let the SFU use the other
-            // direction to send us some other media (for better or worse) so the same bug
-            // doesn't occur.
-            if (sender && (!this.isFocus || callFeed.purpose == SDPStreamMetadataPurpose.Usermedia)) {
-                try {
-                    // We already have a sender, so we re-use it. We try to
-                    // re-use transceivers as much as possible because they
-                    // can't be removed once added, so otherwise they just
-                    // accumulate which makes the SDP very large very quickly:
-                    // in fact it only takes about 6 video tracks to exceed the
-                    // maximum size of an Olm-encrypted Matrix event - Dave
-
-                    // setStreams() is currently not supported by Firefox but we
-                    // try to use it at least in other browsers (once we switch
-                    // to using mids and throw away streamIds we will be able to
-                    // throw this away)
-                    if (sender.setStreams) sender.setStreams(stream);
-
-                    sender.replaceTrack(track);
-
-                    // We don't need to set simulcast encodings in here since we
-                    // have already done that the first time we added the
-                    // transceiver
-
-                    // Set the direction of the transceiver to indicate we're
-                    // going to be sending. This may trigger re-negotiation, if
-                    // we weren't sending until now
-                    transceiver.direction = transceiver.direction === "inactive" ? "sendonly" : "sendrecv";
-
-                    added = true;
-                } catch (error) {
-                    logger.info(
-                        `Call ${this.callId} addTracksOfFeedToPeerConnection() failed to replaceTrack()`,
-                        error,
-                    );
-                }
-            }
-
-            if (!added) {
-                try {
-                    // We either don't have a sender or we failed to do
-                    // replaceTrack(), so we use addTransceiver() to add the
-                    // track
-                    const newTransceiver = this.peerConn!.addTransceiver(track, {
-                        streams: [stream],
-                        // Chrome does not allow us to change the encodings
-                        // later, so we have to use addTransceiver() to set them
-                        // (It's fine to specify the parameter on Firefox too,
-                        // it just won't work.)
-                        sendEncodings: this.isFocus ? encodings : undefined,
-                        direction: callFeed.purpose === SDPStreamMetadataPurpose.Usermedia ? "sendrecv" : "sendonly",
-                    });
-
-                    if (this.isFocus && isFirefox()) {
-                        const parameters = newTransceiver.sender.getParameters();
-                        newTransceiver.sender.setParameters({
-                            ...parameters,
-                            // Firefox does not support the sendEncodings
-                            // parameter on addTransceiver(), so we use
-                            // setParameters() to set them
-                            encodings: encodings ?? parameters.encodings,
-                        });
-                    }
-
-                    this.transceivers.set(transceiverKey, newTransceiver);
-
-                    added = true;
-                } catch (error) {
-                    logger.error(
-                        `Call ${this.callId} addTracksOfFeedToPeerConnection() failed to addTransceiver()`,
-                        error,
-                    );
-                }
-            }
+    public unpublishTrack(track: LocalCallTrack): void {
+        if (!this.peerConn) {
+            throw new Error("MatrixCall unpublish() called on call without a peer connection");
         }
+        if (!track.sender) {
+            throw new Error("MatrixCall unpublish() called with track without sender");
+        }
+        logger.info(`Call ${this.callId} unpublishTrack() running (id=${track.id}, kind=${track.kind})`);
+
+        this.peerConn?.removeTrack(track.sender);
     }
 
     /**
      * Removes local call feed from the call and its tracks from the peer
      * connection
-     * @param callFeed - to remove
+     * @param feed - to remove
      */
-    public removeLocalFeed(callFeed: CallFeed): void {
-        const audioTransceiverKey = getTransceiverKey(callFeed.purpose, "audio");
-        const videoTransceiverKey = getTransceiverKey(callFeed.purpose, "video");
+    public removeLocalFeed(feed: LocalCallFeed): void {
+        feed.unpublish();
 
-        for (const transceiverKey of [audioTransceiverKey, videoTransceiverKey]) {
-            // this is slightly mixing the track and transceiver API but is basically just shorthand.
-            // There is no way to actually remove a transceiver, so this just sets it to inactive
-            // (or recvonly) and replaces the source with nothing.
-            if (this.transceivers.has(transceiverKey)) {
-                const transceiver = this.transceivers.get(transceiverKey)!;
-                if (transceiver.sender) {
-                    this.peerConn!.removeTrack(transceiver.sender);
-                }
+        if (feed.stream) {
+            switch (feed.purpose) {
+                case SDPStreamMetadataPurpose.Usermedia:
+                    this.client.getMediaHandler().stopUserMediaStream(feed.stream);
+                    break;
+
+                case SDPStreamMetadataPurpose.Screenshare:
+                    this.client.getMediaHandler().stopScreensharingStream(feed.stream);
+                    break;
             }
         }
 
-        if (callFeed.purpose === SDPStreamMetadataPurpose.Screenshare && callFeed.stream) {
-            this.client.getMediaHandler().stopScreensharingStream(callFeed.stream);
-        }
-
-        this.deleteFeed(callFeed);
+        this.removeFeed(feed);
     }
 
     private deleteAllFeeds(): void {
         for (const feed of this.feeds) {
-            if (!feed.isLocal()) {
+            if (!feed.isLocal) {
                 feed.removeListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
                 if (!this.groupCallId) {
                     feed.dispose();
@@ -1042,17 +847,23 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     }
 
     private deleteFeedByStream(stream: MediaStream): void {
-        const feed = this.getFeedById(stream.id);
+        const feed = this.getLocalFeedByStream(stream);
         if (!feed) {
             logger.warn(
                 `Call ${this.callId} deleteFeedByStream() didn't find the feed to delete (streamId=${stream.id})`,
             );
             return;
         }
-        this.deleteFeed(feed);
+        this.removeFeed(feed);
     }
 
-    private addRemoteFeed(feed: CallFeed, emit = true): void {
+    private addRemoteFeed(feed: RemoteCallFeed, emit = true): void {
+        if (!this.opponentSupportsSDPStreamMetadata() && this.getRemoteFeeds().length > 0) {
+            throw new Error(
+                "MatrixCall addRemoteFeed() cannot add multiple remote feeds if opponent does not support sdp_stream_metadata",
+            );
+        }
+
         this.feeds.push(feed);
         feed.addListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
 
@@ -1061,7 +872,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
-    private deleteFeed(feed: CallFeed, emit = true): void {
+    private removeFeed(feed: CallFeed, emit = true): void {
         feed.dispose();
         this.feeds.splice(this.feeds.indexOf(feed), 1);
         feed.removeListener(CallFeedEvent.SizeChanged, this.onCallFeedSizeChanged);
@@ -1113,12 +924,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const sdpStreamMetadata = invite[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
-            this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
+            this.onMetadata(sdpStreamMetadata);
         } else if (!this.isFocus) {
             logger.debug(
                 `Call ${this.callId} initWithInvite() did not get any SDPStreamMetadata! Can not send/receive multiple streams`,
             );
         }
+
+        //const trackInfo = invite.track_info;
+        //if (trackInfo) {
+        //    this.onTrackInfo(trackInfo);
+        //} else {
+        //    logger.info(`Call ${this.callId} initWithInvite() did not get any track_info`);
+        //}
 
         this.peerConn = this.createPeerConnection();
         // we must set the party ID before await-ing on anything: the call event
@@ -1135,7 +953,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             return;
         }
 
-        const remoteStream = this.feeds.find((feed) => !feed.isLocal())?.stream;
+        const remoteStream = this.feeds.find((feed) => !feed.isLocal)?.stream;
 
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started arriving on them. Testing latest firefox
@@ -1229,16 +1047,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             try {
                 const stream = await this.client.getMediaHandler().getUserMediaStream(answerWithAudio, answerWithVideo);
                 this.waitForLocalAVStream = false;
-                const usermediaFeed = new CallFeed({
+                const usermediaFeed = new LocalCallFeed({
                     client: this.client,
                     roomId: this.roomId,
-                    userId: this.client.getUserId()!,
-                    deviceId: this.client.getDeviceId() ?? undefined,
-                    feedId: stream.id,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Usermedia,
-                    audioMuted: false,
-                    videoMuted: false,
                 });
 
                 const feeds = [usermediaFeed];
@@ -1267,7 +1080,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         }
     }
 
-    public answerWithCallFeeds(callFeeds: CallFeed[]): void {
+    public answerWithCallFeeds(callFeeds: LocalCallFeed[]): void {
         if (this.inviteOrAnswerSent) return;
 
         this.queueGotCallFeedsForAnswer(callFeeds);
@@ -1418,28 +1231,16 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             try {
                 const stream = await this.client.getMediaHandler().getScreensharingStream(opts);
                 if (!stream) return false;
-                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare);
+                this.addLocalFeedFromStream(stream, SDPStreamMetadataPurpose.Screenshare);
                 return true;
             } catch (err) {
                 logger.error(`Call ${this.callId} setScreensharingEnabled() failed to get screen-sharing stream:`, err);
                 return false;
             }
         } else {
-            const audioTransceiver = this.transceivers.get(
-                getTransceiverKey(SDPStreamMetadataPurpose.Screenshare, "audio"),
-            );
-            const videoTransceiver = this.transceivers.get(
-                getTransceiverKey(SDPStreamMetadataPurpose.Screenshare, "video"),
-            );
-
-            for (const transceiver of [audioTransceiver, videoTransceiver]) {
-                // this is slightly mixing the track and transceiver API but is basically just shorthand
-                // for removing the sender.
-                if (transceiver && transceiver.sender) this.peerConn!.removeTrack(transceiver.sender);
+            if (this.localScreensharingFeed) {
+                this.removeLocalFeed(this.localScreensharingFeed);
             }
-
-            this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream!);
-            this.deleteFeedByStream(this.localScreensharingStream!);
             return false;
         }
     }
@@ -1460,18 +1261,15 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         );
         if (enabled) {
             try {
-                const stream = await this.client.getMediaHandler().getScreensharingStream(opts);
-                if (!stream) return false;
+                const screensharingStream = await this.client.getMediaHandler().getScreensharingStream(opts);
+                if (!screensharingStream) return false;
+                const screensharingTrack = screensharingStream.getTracks().find((track) => track.kind === "video");
+                if (!screensharingTrack) return false;
+                const usermediaTrack = this.localUsermediaFeed?.tracks?.find((track) => track.kind === "video");
+                if (!usermediaTrack) return false;
 
-                const track = stream.getTracks().find((track) => track.kind === "video");
-
-                const sender = this.transceivers.get(
-                    getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"),
-                )?.sender;
-
-                sender?.replaceTrack(track ?? null);
-
-                this.pushNewLocalFeed(stream, SDPStreamMetadataPurpose.Screenshare, false);
+                usermediaTrack?.setNewTrack(screensharingTrack);
+                this.addLocalFeedFromStream(screensharingStream, SDPStreamMetadataPurpose.Screenshare, false);
 
                 return true;
             } catch (err) {
@@ -1482,12 +1280,13 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 return false;
             }
         } else {
-            const track = this.localUsermediaStream?.getTracks().find((track) => track.kind === "video");
-            const sender = this.transceivers.get(
-                getTransceiverKey(SDPStreamMetadataPurpose.Usermedia, "video"),
-            )?.sender;
-            sender?.replaceTrack(track ?? null);
+            const usermediaTrack = this.localUsermediaStream?.getTracks().find((track) => track.kind === "video");
+            if (!usermediaTrack) return true;
+            // We get the screensharing track here from the USERMEDIA feed
+            const screensharingTrack = this.localUsermediaFeed?.tracks?.find((track) => track.kind === "video");
+            if (!screensharingTrack) return true;
 
+            screensharingTrack.setNewTrack(usermediaTrack);
             this.client.getMediaHandler().stopScreensharingStream(this.localScreensharingStream!);
             this.deleteFeedByStream(this.localScreensharingStream!);
 
@@ -1521,6 +1320,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             `Call ${this.callId} updateLocalUsermediaStream() running (streamId=${newStream.id}, audio=${audioEnabled}, video=${videoEnabled})`,
         );
 
+        this.localUsermediaFeed?.setNewStream(newStream);
         // Firstly, make sure we keep the mute state
         setTracksEnabled(newStream.getAudioTracks(), audioEnabled);
         setTracksEnabled(newStream.getVideoTracks(), videoEnabled);
@@ -1531,12 +1331,6 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             oldStream.removeTrack(track);
             track.stop();
         }
-        for (const track of newStream.getTracks()) {
-            oldStream.addTrack(track);
-        }
-
-        // Then, we add the feed's tracks to the peer connection
-        this.addTracksOfFeedToPeerConnection(feed);
     }
 
     /**
@@ -1545,7 +1339,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @returns the new mute state
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
-        logger.log(`Call ${this.callId} setLocalVideoMuted() running ${muted}`);
+        logger.log(`Call ${this.callId} setLocalVideoMuted() running (muted=${muted})`);
 
         // if we were still thinking about stopping and removing the video
         // track: don't, because we want it back.
@@ -1706,9 +1500,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const vidShouldBeMuted = this.isLocalVideoMuted() || this.remoteOnHold;
 
         logger.log(
-            `Call ${this.callId} updateMuteStatus stream ${
+            `Call ${this.callId} updateMuteStatus (streamId=${
                 this.localUsermediaStream!.id
-            } micShouldBeMuted ${micShouldBeMuted} vidShouldBeMuted ${vidShouldBeMuted}`,
+            }, micShouldBeMuted=${micShouldBeMuted}, vidShouldBeMuted=${vidShouldBeMuted})`,
         );
 
         setTracksEnabled(this.localUsermediaStream!.getAudioTracks(), !micShouldBeMuted);
@@ -1720,12 +1514,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             this.sendFocusEvent(EventType.CallSDPStreamMetadataChanged);
         } else {
             await this.sendVoipEvent(EventType.CallSDPStreamMetadataChangedPrefix, {
-                [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+                [SDPStreamMetadataKey]: this.metadata,
             });
         }
     }
 
-    private gotCallFeedsForInvite(callFeeds: CallFeed[], requestScreenshareFeed = false): void {
+    private gotCallFeedsForInvite(callFeeds: LocalCallFeed[], requestScreenshareFeed = false): void {
         if (this.successor) {
             this.successor.queueGotCallFeedsForAnswer(callFeeds);
             return;
@@ -1759,7 +1553,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 // required to still be sent for backwards compat
                 type: this.peerConn!.localDescription!.type,
             },
-            [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+            [SDPStreamMetadataKey]: this.metadata,
         } as MCallAnswer;
 
         answerContent.capabilities = {
@@ -1800,7 +1594,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.sendCandidateQueue();
     }
 
-    private queueGotCallFeedsForAnswer(callFeeds: CallFeed[]): void {
+    private queueGotCallFeedsForAnswer(callFeeds: LocalCallFeed[]): void {
         // Ensure only one negotiate/answer event is being processed at a time.
         if (this.responsePromiseChain) {
             this.responsePromiseChain = this.responsePromiseChain.then(() => this.gotCallFeedsForAnswer(callFeeds));
@@ -1871,7 +1665,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         return answer;
     }
 
-    private async gotCallFeedsForAnswer(callFeeds: CallFeed[]): Promise<void> {
+    private async gotCallFeedsForAnswer(callFeeds: LocalCallFeed[]): Promise<void> {
         if (this.callHasEnded()) return;
 
         this.waitForLocalAVStream = false;
@@ -2020,12 +1814,19 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
 
         const sdpStreamMetadata = content[SDPStreamMetadataKey];
         if (sdpStreamMetadata) {
-            this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
+            this.onMetadata(sdpStreamMetadata);
         } else if (!this.isFocus) {
             logger.warn(
                 `Call ${this.callId} onAnswerReceived() did not get any SDPStreamMetadata! Can not send/receive multiple streams`,
             );
         }
+
+        //const trackInfo = content.track_info;
+        //if (trackInfo) {
+        //    this.onTrackInfo(trackInfo);
+        //} else {
+        //    logger.info(`Call ${this.callId} onAnswerReceived() did not get any track_info`);
+        //}
 
         try {
             await this.peerConn!.setRemoteDescription(content.answer);
@@ -2111,7 +1912,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         const prevLocalOnHold = this.isLocalOnHold();
 
         if (sdpStreamMetadata) {
-            this.updateRemoteSDPStreamMetadata(sdpStreamMetadata);
+            this.onMetadata(sdpStreamMetadata);
         } else {
             logger.warn(
                 `Call ${this.callId} onNegotiateReceived() received negotiation event without SDPStreamMetadata!`,
@@ -2141,7 +1942,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 } else {
                     this.sendVoipEvent(EventType.CallNegotiate, {
                         description: this.peerConn!.localDescription?.toJSON(),
-                        [SDPStreamMetadataKey]: this.getLocalSDPStreamMetadata(),
+                        [SDPStreamMetadataKey]: this.metadata,
                     });
                 }
             }
@@ -2164,11 +1965,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         try {
             json = JSON.parse(event.data);
         } catch (e) {
-            logger.warn("Ignoring non-JSON DC event:", event.data);
+            logger.warn(`Call ${this.callId} onDataChannelMessage() ignoring non-JSON message:"`, event.data);
             return;
         }
 
-        logger.info(`Received DC ${json.type} event`, json);
+        logger.info(`Call ${this.callId} onDataChannelMessage() received event (type=${json.type})`, json);
 
         switch (json.type) {
             case EventType.CallNegotiate:
@@ -2180,7 +1981,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             case EventType.CallSDPStreamMetadataChanged:
                 {
                     const metadata = json.content as FocusSDPStreamMetadataChangedEvent;
-                    this.updateRemoteSDPStreamMetadata(metadata[SDPStreamMetadataKeyStable]!);
+                    this.onMetadata(metadata[SDPStreamMetadataKeyStable]!);
                 }
                 break;
             case EventType.CallPing:
@@ -2189,7 +1990,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 }
                 break;
             default:
-                logger.warn("Ignoring unrecognized DC event op ", json.type);
+                logger.warn(
+                    `Call ${this.callId} onDataChannelMessage() received event of unknown type (type=${json.type})`,
+                );
 
                 break;
         }
@@ -2233,14 +2036,20 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     private sendSubscriptionFocusEvent(): void {
         const subscribe: FocusTrackDescription[] = [];
         const unsubscribe: FocusTrackDescription[] = [];
-        for (const { feedId, tracksMetadata, isVisible, width, height } of this.getRemoteFeeds()) {
-            for (const [trackId, trackMetadata] of Object.entries(tracksMetadata)) {
+        for (const { streamId, tracks, isVisible, width, height } of this.getRemoteFeeds()) {
+            if (!streamId) continue;
+            if (!tracks) continue;
+            if (!Object.keys(tracks).length) continue;
+
+            for (const { trackId, isAudio } of tracks) {
+                if (!trackId) continue;
+
                 const trackDescription: FocusTrackDescription = {
                     track_id: trackId,
-                    stream_id: feedId,
+                    stream_id: streamId,
                 };
 
-                if (trackMetadata.kind === "audio") {
+                if (isAudio) {
                     // We want audio from everyone
                     subscribe.push(trackDescription);
                 } else if (isVisible && width !== 0 && height !== 0) {
@@ -2270,40 +2079,59 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.subscribeToFocus();
     };
 
-    public updateRemoteSDPStreamMetadata(metadata: SDPStreamMetadata): void {
+    /**
+     * If the opponent
+     */
+    private addRemoteFeedWithoutMetadata(stream: MediaStream): void {
+        if (this.opponentSupportsSDPStreamMetadata()) {
+            throw new Error("createRemoteFeedWithoutMetadata() called with sdp_stream_metadata support");
+        }
+
+        logger.info(`Call ${this.callId} addRemoteFeedWithoutMetadata() running`);
+
+        this.addRemoteFeed(
+            new RemoteCallFeed({
+                client: this.client,
+                call: this,
+                roomId: this.roomId,
+                stream: stream,
+                streamId: stream.id,
+            }),
+        );
+    }
+
+    private onMetadata(metadata: SDPStreamMetadata): void {
         this._opponentSupportsSDPStreamMetadata = true;
 
         let feedsChanged = false;
 
         // Add new feeds and update existing ones
         for (const [streamId, streamMetadata] of Object.entries(metadata)) {
-            let feed = this.getRemoteFeeds().find((f) => f.feedId === streamId);
+            const feed = this.getRemoteFeeds().find((f) => f.streamId === streamId);
             if (feed) {
-                feed.purpose = streamMetadata.purpose;
-                feed.tracksMetadata = streamMetadata.tracks;
-            } else {
-                feed = new CallFeed({
+                feed.metadata = streamMetadata;
+                continue;
+            }
+
+            // We don't emit here and only emit at the end of onMetadata to
+            // avoid spam
+            this.addRemoteFeed(
+                new RemoteCallFeed({
                     client: this.client,
                     call: this,
                     roomId: this.roomId,
-                    userId: this.isFocus ? streamMetadata.user_id : this.getOpponentMember()!.userId,
-                    deviceId: this.isFocus ? streamMetadata.device_id : this.getOpponentDeviceId()!,
-                    feedId: streamId,
-                    purpose: streamMetadata.purpose,
-                    audioMuted: streamMetadata.audio_muted,
-                    videoMuted: streamMetadata.video_muted,
-                    tracksMetadata: streamMetadata.tracks,
-                });
-                this.addRemoteFeed(feed, false);
-                feedsChanged = true;
-            }
-            feed.setAudioVideoMuted(streamMetadata.audio_muted, streamMetadata.video_muted);
+                    streamId: streamId,
+                    metadata: streamMetadata,
+                }),
+                false,
+            );
+            feedsChanged = true;
         }
 
         // Remove old feeds
         for (const feed of this.getRemoteFeeds()) {
-            if (!Object.keys(metadata).includes(feed.feedId)) {
-                this.deleteFeed(feed, false);
+            if (!Object.keys(metadata).includes(feed.streamId ?? "")) {
+                this.removeFeed(feed, false);
                 feedsChanged = true;
             }
         }
@@ -2319,7 +2147,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     public onSDPStreamMetadataChangedReceived(event: MatrixEvent): void {
         const metadata = event.getContent<MCallSDPStreamMetadataChanged>()?.[SDPStreamMetadataKey];
         if (metadata) {
-            this.updateRemoteSDPStreamMetadata(metadata);
+            this.onMetadata(metadata);
         }
     }
 
@@ -2435,7 +2263,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             "m.call.dtmf": false,
         };
 
-        content[SDPStreamMetadataKey] = this.getLocalSDPStreamMetadata();
+        content[SDPStreamMetadataKey] = this.metadata;
 
         // Get rid of any candidates waiting to be sent: they'll be included in the local
         // description we just got and will send in the offer.
@@ -2568,28 +2396,50 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     };
 
     private onTrack = (ev: RTCTrackEvent): void => {
-        if (ev.streams.length === 0) {
-            logger.warn(
-                `Call ${this.callId} onTrack() called with streamless track streamless (kind=${ev.track.kind})`,
-            );
+        const stream = ev.streams[0];
+        const transceiver = ev.transceiver;
+
+        if (!stream) {
+            logger.warn(`Call ${this.callId} onTrack() called with streamless track (kind=${ev.track.kind})`);
+            return;
+        }
+        if (!transceiver?.mid) {
+            logger.warn(`Call ${this.callId} onTrack() called with transceiver without an mid (kind=${ev.track.kind})`);
+            return;
+        }
+        if (!this.opponentSupportsSDPStreamMetadata()) {
+            this.addRemoteFeedWithoutMetadata(stream);
+            if (!this.removeTrackListeners.has(stream)) {
+                const onRemoveTrack = (): void => {
+                    if (stream.getTracks().length === 0) {
+                        logger.info(`Call ${this.callId} onTrack() removing track (streamId=${stream.id})`);
+                        this.deleteFeedByStream(stream);
+                        stream.removeEventListener("removetrack", onRemoveTrack);
+                        this.removeTrackListeners.delete(stream);
+                    }
+                };
+                stream.addEventListener("removetrack", onRemoveTrack);
+                this.removeTrackListeners.set(stream, onRemoveTrack);
+            }
             return;
         }
 
-        const stream = ev.streams[0];
-        this.pushRemoteStream(stream);
+        logger.log(
+            `Call ${this.callId} onTrack() running  (mid=${transceiver.mid}, kind=${transceiver.receiver.track.kind})`,
+        );
 
-        if (!this.removeTrackListeners.has(stream)) {
-            const onRemoveTrack = (): void => {
-                if (stream.getTracks().length === 0) {
-                    logger.info(`Call ${this.callId} onTrack() removing track (streamId=${stream.id})`);
-                    this.deleteFeedByStream(stream);
-                    stream.removeEventListener("removetrack", onRemoveTrack);
-                    this.removeTrackListeners.delete(stream);
-                }
-            };
-            stream.addEventListener("removetrack", onRemoveTrack);
-            this.removeTrackListeners.set(stream, onRemoveTrack);
+        const feed = this.getRemoteFeeds().find((feed) => feed.canAddTransceiver(transceiver));
+        if (!feed) {
+            logger.warn(
+                `Call ${
+                    this.callId
+                } onTrack() did not find feed for transceiver (streamId=${this.getRemoteStreamIdByMid(
+                    transceiver.mid,
+                )}, trackId=${this.getRemoteTrackIdByMid(transceiver.mid)} kind=${transceiver.receiver.track.kind})`,
+            );
+            return;
         }
+        feed.addTransceiver(transceiver);
     };
 
     private onDataChannel = (ev: RTCDataChannelEvent): void => {
@@ -2630,10 +2480,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             }
         }
 
-        const screenshareVideoTransceiver = this.transceivers.get(
-            getTransceiverKey(SDPStreamMetadataPurpose.Screenshare, "video"),
-        );
-        if (screenshareVideoTransceiver) screenshareVideoTransceiver.setCodecPreferences(codecs);
+        const screensharingVideoTransceiver = this.localScreensharingFeed?.videoTrack?.transceiver;
+        if (screensharingVideoTransceiver) screensharingVideoTransceiver.setCodecPreferences(codecs);
     }
 
     private onNegotiationNeeded = async (): Promise<void> => {
@@ -2772,12 +2620,12 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         };
 
         if ([EventType.CallNegotiate, EventType.CallSDPStreamMetadataChanged].includes(type)) {
-            event.content[SDPStreamMetadataKeyStable] = this.getLocalSDPStreamMetadata();
+            event.content[SDPStreamMetadataKeyStable] = this.metadata;
         }
 
         // FIXME: RPC reliability over DC
         this.dataChannel!.send(JSON.stringify(event));
-        logger.info(`Sent ${event.type} over DC:`, event);
+        logger.info(`Call ${this.callId} sendFocusEvent() sent event (type=${event.type}):`, event);
     }
 
     /**
@@ -2964,11 +2812,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             // NB. We clone local streams when passing them to individual calls in a group
             // call, so we can (and should) stop the clones once we no longer need them:
             // the other clones will continue fine.
-            if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
+            if (feed.isLocal && feed.purpose === SDPStreamMetadataPurpose.Usermedia) {
                 this.client.getMediaHandler().stopUserMediaStream(feed.stream);
-            } else if (feed.isLocal() && feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
+            } else if (feed.isLocal && feed.purpose === SDPStreamMetadataPurpose.Screenshare) {
                 this.client.getMediaHandler().stopScreensharingStream(feed.stream);
-            } else if (!feed.isLocal()) {
+            } else if (!feed.isLocal) {
                 logger.debug(`Call ${this.callId} stopAllMedia() stopping stream (streamId=${feed.stream.id})`);
                 for (const track of feed.stream.getTracks()) {
                     track.stop();
@@ -3061,16 +2909,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             setTracksEnabled(stream.getAudioTracks(), true);
             setTracksEnabled(stream.getVideoTracks(), true);
 
-            const callFeed = new CallFeed({
+            const callFeed = new LocalCallFeed({
                 client: this.client,
                 roomId: this.roomId,
-                userId: this.client.getUserId()!,
-                deviceId: this.client.getDeviceId() ?? undefined,
-                feedId: stream.id,
                 stream,
                 purpose: SDPStreamMetadataPurpose.Usermedia,
-                audioMuted: false,
-                videoMuted: false,
             });
             await this.placeCallWithCallFeeds([callFeed]);
         } catch (e) {
@@ -3085,7 +2928,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
      * @throws if you have not specified a listener for 'error' events.
      * @throws if have passed audio=false.
      */
-    public async placeCallWithCallFeeds(callFeeds: CallFeed[], requestScreenshareFeed = false): Promise<void> {
+    public async placeCallWithCallFeeds(callFeeds: LocalCallFeed[], requestScreenshareFeed = false): Promise<void> {
         this.checkForErrorListener();
         this.direction = CallDirection.Outbound;
 

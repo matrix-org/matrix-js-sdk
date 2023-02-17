@@ -33,6 +33,7 @@ import {
     RoomStateEventHandlerMap,
 } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
+import { randomString } from "../../src/randomstring";
 import { ReEmitter } from "../../src/ReEmitter";
 import { SyncState } from "../../src/sync";
 import { CallEvent, CallEventHandlerMap, CallState, MatrixCall } from "../../src/webrtc/call";
@@ -95,6 +96,30 @@ export const FAKE_USER_ID_2 = "@bob:test.dummy";
 export const FAKE_DEVICE_ID_2 = "@BBBBBB";
 export const FAKE_SESSION_ID_2 = "bob1";
 export const FAKE_USER_ID_3 = "@charlie:test.dummy";
+
+export const runOnTrackForStream = (call: MatrixCall, stream: MediaStream) => {
+    let sdp = "v=0\n" + "o=- 7135465365607179083 2 IN IP4 127.0.0.1\n" + "s=-\n" + "t=0 0\n" + "a=group:BUNDLE 0 1 2\n";
+
+    stream.getTracks().forEach((track, index) => {
+        sdp += `m=${track.kind}\n`;
+        sdp += `a=mid:${index}\n`;
+        sdp += `a=msid:${stream.id} ${track.id}\n`;
+    });
+
+    // @ts-ignore
+    call.peerConn.remoteDescription = {
+        sdp: sdp,
+    };
+
+    stream.getTracks().forEach((track, index) => {
+        // @ts-ignore
+        call.onTrack({
+            track,
+            streams: [stream],
+            transceiver: { mid: `${index}`, receiver: { track } },
+        } as TrackEvent);
+    });
+};
 
 class MockMediaStreamAudioSourceNode {
     public connect() {}
@@ -227,7 +252,7 @@ export class MockRTCPeerConnection {
 
         let newSDP = this.localDescription.sdp;
         init?.streams?.forEach((stream) => {
-            newSDP += `m=${track.kind}\r\n`;
+            newSDP += `m=${track.kind === "audio" ? "audio 50609 UDP 126" : "video 9 UDP 114"} \r\n`;
             newSDP += `a=sendrecv\r\n`;
             newSDP += `a=mid:${this.transceivers.length}\r\n`;
             newSDP += `a=msid:${stream.id} ${track.id}\r\n`;
@@ -240,9 +265,12 @@ export class MockRTCPeerConnection {
         return this.addTransceiver(track, { streams }).sender as unknown as MockRTCRtpSender;
     }
 
-    public removeTrack() {
-        this.needsNegotiation = true;
-        if (this.onReadyToNegotiate) this.onReadyToNegotiate();
+    public removeTrack(sender: MockRTCRtpSender) {
+        const transceiver = this.transceivers.find((transceiver) => transceiver.sender === sender.typed());
+        transceiver?.sender?.replaceTrack(null);
+        if (transceiver) {
+            transceiver.direction = transceiver?.direction === "sendrecv" ? "recvonly" : "inactive";
+        }
     }
 
     public getTransceivers(): MockRTCRtpTransceiver[] {
@@ -269,6 +297,10 @@ export class MockRTCRtpSender {
 
     public getParameters() {}
     public setParameters() {}
+
+    public typed(): RTCRtpSender {
+        return this as unknown as RTCRtpSender;
+    }
 }
 
 export class MockRTCRtpReceiver {
@@ -281,7 +313,15 @@ export class MockRTCRtpTransceiver {
     public sender?: RTCRtpSender;
     public receiver?: RTCRtpReceiver;
 
-    public set direction(_: string) {
+    private _direction = "sendrecv";
+
+    public get direction() {
+        return this._direction;
+    }
+
+    public set direction(newDirection: string) {
+        if (this._direction === newDirection) return;
+        this._direction = newDirection;
         this.peerConn.needsNegotiation = true;
     }
 
@@ -326,7 +366,7 @@ export class MockMediaStreamTrack {
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
 // implementation
 export class MockMediaStream {
-    constructor(public id: string, private tracks: MockMediaStreamTrack[] = []) {}
+    constructor(public id: string = randomString(32), private tracks: MockMediaStreamTrack[] = []) {}
 
     public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
@@ -547,6 +587,7 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     public reject = jest.fn<void, []>();
     public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
     public hangup = jest.fn<void, []>();
+    public opponentSupportsSDPStreamMetadata = jest.fn();
 
     public sendMetadataUpdate = jest.fn<void, []>();
 
@@ -567,7 +608,7 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
     }
 
     public getRemoteFeeds(): CallFeed[] {
-        return this.feeds.filter((feed) => !feed.isLocal());
+        return this.feeds.filter((feed) => !feed.isLocal);
     }
 
     public typed(): MatrixCall {
@@ -580,6 +621,7 @@ export class MockCallFeed {
         public userId: string,
         public deviceId: string | undefined,
         public stream: MockMediaStream,
+        public isLocal?: boolean,
         public purpose?: SDPStreamMetadataPurpose,
     ) {}
 
@@ -589,7 +631,6 @@ export class MockCallFeed {
     public dispose() {
         this.disposed = true;
     }
-    public isLocal: () => boolean = jest.fn();
 
     public typed(): CallFeed {
         return this as unknown as CallFeed;
@@ -603,6 +644,8 @@ export function installWebRTCMocks() {
     } as unknown as Navigator;
 
     global.window = {
+        // @ts-ignore Mock
+        MediaStream: MockMediaStream,
         // @ts-ignore Mock
         RTCPeerConnection: MockRTCPeerConnection,
         // @ts-ignore Mock
