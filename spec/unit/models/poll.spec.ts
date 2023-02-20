@@ -76,6 +76,7 @@ describe("Poll", () => {
         expect(poll.pollId).toEqual(basePollStartEvent.getId());
         expect(poll.pollEvent).toEqual(basePollStartEvent.unstableExtensibleEvent);
         expect(poll.isEnded).toBe(false);
+        expect(poll.endEventId).toBe(undefined);
     });
 
     it("throws when poll start has no room id", () => {
@@ -249,6 +250,7 @@ describe("Poll", () => {
 
                 expect(maySendRedactionForEventSpy).toHaveBeenCalledWith(basePollStartEvent, "@bob@server.org");
                 expect(poll.isEnded).toBe(true);
+                expect(poll.endEventId).toBe(stablePollEndEvent.getId()!);
                 expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
             });
 
