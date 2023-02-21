@@ -44,6 +44,10 @@ export interface IEventDecryptionResult {
      */
     claimedEd25519Key?: string;
     untrusted?: boolean;
+    /**
+     * The sender doesn't authorize the unverified devices to decrypt his messages
+     */
+    encryptedDisabledForUnverifiedDevices?: boolean;
 }
 
 interface Extensible {

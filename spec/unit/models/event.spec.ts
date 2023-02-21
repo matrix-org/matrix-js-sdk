@@ -126,9 +126,28 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.isEncrypted()).toBeTruthy();
             expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
             expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
+            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeFalsy();
             expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: Error: test error **",
+            });
+        });
+
+        it(`should report "DecryptionError: The sender has disabled encrypting to unverified devices."`, async () => {
+            const crypto = {
+                decryptEvent: jest
+                    .fn()
+                    .mockRejectedValue("DecryptionError: The sender has disabled encrypting to unverified devices."),
+            } as unknown as Crypto;
+
+            await encryptedEvent.attemptDecryption(crypto);
+            expect(encryptedEvent.isEncrypted()).toBeTruthy();
+            expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
+            expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
+            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeTruthy();
+            expect(encryptedEvent.getContent()).toEqual({
+                msgtype: "m.bad.encrypted",
+                body: "** Unable to decrypt: DecryptionError: The sender has disabled encrypting to unverified devices. **",
             });
         });
 
