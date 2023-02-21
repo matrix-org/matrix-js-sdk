@@ -67,6 +67,7 @@ jobs:
         if: github.event_name == 'merge_group'
         uses: matrix-org/matrix-react-sdk/.github/workflows/tests.yml@develop
         with:
+            disable_coverage: true
             matrix-js-sdk-sha: ${{ github.sha }}
 
     # Hook for branch protection to work outside merge queues
