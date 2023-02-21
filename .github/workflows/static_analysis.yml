@@ -2,7 +2,7 @@ name: Static Analysis
 on:
     pull_request: {}
     merge_group:
-       types: [checks_requested]
+        types: [checks_requested]
     push:
         branches: [develop, master]
 concurrency:
