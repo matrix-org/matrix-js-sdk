@@ -126,7 +126,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.isEncrypted()).toBeTruthy();
             expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
             expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
-            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices()).toBeFalsy();
+            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeFalsy();
             expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: Error: test error **",
@@ -144,7 +144,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.isEncrypted()).toBeTruthy();
             expect(encryptedEvent.isBeingDecrypted()).toBeFalsy();
             expect(encryptedEvent.isDecryptionFailure()).toBeTruthy();
-            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices()).toBeTruthy();
+            expect(encryptedEvent.isEncryptedDisabledForUnverifiedDevices).toBeTruthy();
             expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: The sender has disabled encrypting to unverified devices. **",
