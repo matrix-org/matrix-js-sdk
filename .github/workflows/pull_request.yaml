@@ -3,7 +3,7 @@ on:
     pull_request_target:
         types: [opened, edited, labeled, unlabeled, synchronize]
     merge_group:
-      types: [checks_requested]
+        types: [checks_requested]
     workflow_call:
         inputs:
             labels:
