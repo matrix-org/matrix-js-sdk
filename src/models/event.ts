@@ -324,6 +324,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public verificationRequest?: VerificationRequest;
 
+    /*
+     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
+     * the sender has disabled encrypting to unverified devices.
+     */
+    public isEncryptedDisabledForUnverifiedDevices = false;
+
     private readonly reEmitter: TypedReEmitter<MatrixEventEmittedEvents, MatrixEventHandlerMap>;
 
     /**
@@ -704,22 +710,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
     }
 
-    /**
-     * Check if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
-     * the sender has disabled encrypting to unverified devices.
-     *
-     * (This implies that we might retry decryption at some point in the future)
-     *
-     * @returns boolean
-     */
-    public isEncryptedDisabledForUnverifiedDevices(): boolean {
-        return (
-            this.isDecryptionFailure() &&
-            this.clearEvent?.content?.reason ===
-                "DecryptionError: The sender has disabled encrypting to unverified devices."
-        );
-    }
-
     public shouldAttemptDecryption(): boolean {
         if (this.isRedacted()) return false;
         if (this.isBeingDecrypted()) return false;
@@ -913,9 +903,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 content: {
                     msgtype: "m.bad.encrypted",
                     body: "** Unable to decrypt: " + reason + " **",
-                    reason,
                 },
             },
+            isEncryptedDisabledForUnverifiedDevices:
+                reason === "DecryptionError: The sender has disabled encrypting to unverified devices.",
         };
     }
 
@@ -937,6 +928,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
         this.forwardingCurve25519KeyChain = decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
+        this.isEncryptedDisabledForUnverifiedDevices =
+            decryptionResult.isEncryptedDisabledForUnverifiedDevices || false;
         this.invalidateExtensibleEvent();
     }
 
