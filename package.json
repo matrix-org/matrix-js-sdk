@@ -60,7 +60,7 @@
         "bs58": "^5.0.0",
         "content-type": "^1.0.4",
         "loglevel": "^1.7.1",
-        "matrix-events-sdk": "0.0.1",
+        "matrix-events-sdk": "2.0.0",
         "matrix-widget-api": "^1.0.0",
         "p-retry": "4",
         "sdp-transform": "^2.14.1",
