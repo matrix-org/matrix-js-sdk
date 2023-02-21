@@ -973,22 +973,24 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * the roomId and last eventId of the predecessor room.
      * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
      * as well as m.room.create events to find predecessors.
-     * Note: if an m.predecessor event is used, eventId is null since those
-     * events do not include an event_id property.
+     * Note: if an m.predecessor event is used, eventId may be undefined
+     * since last_known_event_id is optional.
      */
-    public findPredecessor(
-        msc3946ProcessDynamicPredecessor = false,
-    ): { roomId: string; eventId: string | null } | null {
+    public findPredecessor(msc3946ProcessDynamicPredecessor = false): { roomId: string; eventId?: string } | null {
         // Note: the tests for this function are against Room.findPredecessor,
         // which just calls through to here.
 
         if (msc3946ProcessDynamicPredecessor) {
             const predecessorEvent = this.getStateEvents(EventType.RoomPredecessor, "");
             if (predecessorEvent) {
-                const roomId = predecessorEvent.getContent()["predecessor_room_id"];
-                let eventId = predecessorEvent.getContent()["last_known_event_id"];
+                const content = predecessorEvent.getContent<{
+                    predecessor_room_id: string;
+                    last_known_event_id?: string;
+                }>();
+                const roomId = content.predecessor_room_id;
+                let eventId = content.last_known_event_id;
                 if (typeof eventId !== "string") {
-                    eventId = null;
+                    eventId = undefined;
                 }
                 if (typeof roomId === "string") {
                     return { roomId, eventId };
@@ -998,13 +1000,18 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         const createEvent = this.getStateEvents(EventType.RoomCreate, "");
         if (createEvent) {
-            const predecessor = createEvent.getContent()["predecessor"];
+            const predecessor = createEvent.getContent<{
+                predecessor?: Partial<{
+                    room_id: string;
+                    event_id: string;
+                }>;
+            }>()["predecessor"];
             if (predecessor) {
                 const roomId = predecessor["room_id"];
                 if (typeof roomId === "string") {
                     let eventId = predecessor["event_id"];
                     if (typeof eventId !== "string" || eventId === "") {
-                        eventId = null;
+                        eventId = undefined;
                     }
                     return { roomId, eventId };
                 }

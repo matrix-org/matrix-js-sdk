@@ -202,6 +202,9 @@ export type TopicState = {
 
 export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
     const mtopic = M_TOPIC.findIn<MTopicContent>(content);
+    if (!Array.isArray(mtopic)) {
+        return { text: content.topic };
+    }
     const text = mtopic?.find((r) => !isProvided(r.mimetype) || r.mimetype === "text/plain")?.body ?? content.topic;
     const html = mtopic?.find((r) => r.mimetype === "text/html")?.body;
     return { text, html };
