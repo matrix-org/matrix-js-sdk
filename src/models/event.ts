@@ -711,6 +711,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
     }
 
+    /*
+     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
+     * the sender has disabled encrypting to unverified devices.
+     */
     public get isEncryptedDisabledForUnverifiedDevices(): boolean {
         return this.isDecryptionFailure() && this.encryptedDisabledForUnverifiedDevices;
     }
