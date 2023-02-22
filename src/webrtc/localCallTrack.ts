@@ -98,6 +98,7 @@ export interface LocalCallTrackOpts extends CallTrackOpts {
 
 export class LocalCallTrack extends CallTrack {
     private _track: MediaStreamTrack;
+    private _muted = false;
     private feed: LocalCallFeed;
     private call?: MatrixCall;
 
@@ -149,6 +150,15 @@ export class LocalCallTrack extends CallTrack {
 
     public get kind(): string {
         return this.track.kind;
+    }
+
+    public get muted(): boolean {
+        return !this.track.enabled || this._muted;
+    }
+
+    public set muted(muted: boolean) {
+        this.track.enabled = !muted;
+        this._muted = muted;
     }
 
     public get purpose(): SDPStreamMetadataPurpose {

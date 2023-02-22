@@ -2386,7 +2386,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // fast enough.
         if (this.isPtt && ["failed", "disconnected"].includes(this.peerConn!.iceConnectionState)) {
             for (const feed of this.getRemoteFeeds()) {
-                feed.setAudioVideoMuted(true, true);
+                feed.tracks.forEach((track) => (track.metadataMuted = true));
             }
         }
     };
