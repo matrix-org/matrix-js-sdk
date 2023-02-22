@@ -1336,18 +1336,25 @@ describe("MatrixClient", function () {
         it.each([
             {
                 userId: "alice@localhost",
+                powerLevel: 100,
                 expectation: {
                     "alice@localhost": 100,
                 },
             },
             {
                 userId: ["alice@localhost", "bob@localhost"],
+                powerLevel: 100,
                 expectation: {
                     "alice@localhost": 100,
                     "bob@localhost": 100,
                 },
             },
-        ])("should modify power levels of $userId correctly", async ({ userId, expectation }) => {
+            {
+                userId: "alice@localhost",
+                powerLevel: undefined,
+                expectation: {},
+            },
+        ])("should modify power levels of $userId correctly", async ({ userId, powerLevel, expectation }) => {
             const event = {
                 getType: () => "m.room.power_levels",
                 getContent: () => ({
@@ -1364,7 +1371,7 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, {});
 
-            const prom = client!.setPowerLevel("!room_id:server", userId, 100, event);
+            const prom = client!.setPowerLevel("!room_id:server", userId, powerLevel, event);
             await httpBackend!.flushAllExpected();
             await prom;
         });
