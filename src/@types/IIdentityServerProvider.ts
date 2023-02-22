@@ -20,5 +20,5 @@ export interface IIdentityServerProvider {
      * for the associated client.
      * @returns Promise which resolves to the access token.
      */
-    getAccessToken(): Promise<string>;
+    getAccessToken(): Promise<string | null>;
 }
