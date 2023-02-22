@@ -1,3 +1,9 @@
+Changes in [23.4.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.4.0-rc.2) (2023-02-22)
+============================================================================================================
+
+## ✨ Features
+ * Add easy way to determine if the decryption failure is due to "DecryptionError: The sender has disabled encrypting to unverified devices." ([\#3167](https://github.com/matrix-org/matrix-js-sdk/pull/3167)). Contributed by @florianduros.
+
 Changes in [23.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.4.0-rc.1) (2023-02-21)
 ============================================================================================================
 
