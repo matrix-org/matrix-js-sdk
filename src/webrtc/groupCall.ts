@@ -619,7 +619,7 @@ export class GroupCall extends TypedEventEmitter<
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
         // Because we need a Local Call Feed to establish a call connection, we avoid muting video in case of empty
         // video track. In this way we go sure if a client implements muting we don't raise an error.
-        if (this.initCallWithoutVideoAndAudio && this.localCallFeed?.stream.getVideoTracks().length === 0) {
+        if (this.localCallFeed?.stream.getVideoTracks().length === 0) {
             return false;
         }
         // hasAudioDevice can block indefinitely if the window has lost focus,
