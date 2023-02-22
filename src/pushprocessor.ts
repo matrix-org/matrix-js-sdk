@@ -63,6 +63,7 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             {
                 kind: ConditionKind.EventMatch,
                 key: "type",
+                keyParts: ["type"],
                 pattern: "m.reaction",
             },
         ],
@@ -77,11 +78,13 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             {
                 kind: ConditionKind.EventMatch,
                 key: "type",
+                keyParts: ["type"],
                 pattern: EventType.RoomServerAcl,
             },
             {
                 kind: ConditionKind.EventMatch,
                 key: "state_key",
+                keyParts: ["state_key"],
                 pattern: "",
             },
         ],
@@ -99,6 +102,7 @@ const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
             {
                 kind: ConditionKind.EventMatch,
                 key: "type",
+                keyParts: ["type"],
                 pattern: "org.matrix.msc3401.call",
             },
             {
@@ -122,12 +126,6 @@ export class PushProcessor {
      * @param client - The Matrix client object to use
      */
     public constructor(private readonly client: MatrixClient) {}
-
-    /**
-     * Maps the original key from the push rules to a list of property names
-     * after unescaping.
-     */
-    private readonly parsedKeys = new Map<string, string[]>();
 
     /**
      * Convert a list of actions into a object with the actions as keys and their values
@@ -168,6 +166,8 @@ export class PushProcessor {
         if (!newRules) newRules = {} as IPushRules;
         if (!newRules.global) newRules.global = {} as PushRuleSet;
         if (!newRules.global.override) newRules.global.override = [];
+        if (!newRules.global.room) newRules.global.room = [];
+        if (!newRules.global.sender) newRules.global.sender = [];
         if (!newRules.global.override) newRules.global.underride = [];
 
         // Merge the client-level defaults with the ones from the server
@@ -202,6 +202,26 @@ export class PushProcessor {
                 const ruleId = underride.rule_id;
                 logger.warn(`Adding default global underride for ${ruleId}`);
                 globalUnderrides.push(underride);
+            }
+        }
+
+        // Process the 'key' property on event_match conditions to unescape and
+        // split it.
+        for (const ruleset of [globalOverrides, newRules.global.room, newRules.global.sender, globalUnderrides]) {
+            for (const rule of ruleset) {
+                if (!rule.conditions) {
+                    continue;
+                }
+
+                for (const condition of rule.conditions) {
+                    if (condition.kind !== ConditionKind.EventMatch) {
+                        continue;
+                    }
+
+                    // The homeserver might have returned an object with this key
+                    // already, but we want to always stomp over it.
+                    condition.keyParts = PushProcessor.partsForDottedKey(condition.key);
+                }
             }
         }
 
@@ -259,6 +279,7 @@ export class PushProcessor {
                 rawrule.conditions!.push({
                     kind: ConditionKind.EventMatch,
                     key: "room_id",
+                    keyParts: ["room_id"],
                     value: tprule.rule_id,
                 });
                 break;
@@ -269,6 +290,7 @@ export class PushProcessor {
                 rawrule.conditions!.push({
                     kind: ConditionKind.EventMatch,
                     key: "user_id",
+                    keyParts: ["user_id"],
                     value: tprule.rule_id,
                 });
                 break;
@@ -279,6 +301,7 @@ export class PushProcessor {
                 rawrule.conditions!.push({
                     kind: ConditionKind.EventMatch,
                     key: "content.body",
+                    keyParts: ["content", "body"],
                     pattern: tprule.pattern,
                 });
                 break;
@@ -389,11 +412,11 @@ export class PushProcessor {
     }
 
     private eventFulfillsEventMatchCondition(cond: IEventMatchCondition, ev: MatrixEvent): boolean {
-        if (!cond.key) {
+        if (!cond.key || !cond.keyParts) {
             return false;
         }
 
-        const val = this.valueForDottedKey(cond.key, ev);
+        const val = this.valueForDottedKey(cond.keyParts, ev);
         if (typeof val !== "string") {
             return false;
         }
@@ -501,18 +524,11 @@ export class PushProcessor {
      * For a dotted field and event, fetch the value at that position, if one
      * exists.
      *
-     * @param key - The key of the push rule condition: a dotted field to fetch.
+     * @param parts - The pre-split key of the push rule condition to fetch.
      * @param ev - The matrix event to fetch the field from.
      * @returns The value at the dotted path given by key.
      */
-    private valueForDottedKey(key: string, ev: MatrixEvent): any {
-        // Cache the parsed key since it is per rule, not per event (and there's
-        // no reason to keep calculating it).
-        let parts = this.parsedKeys.get(key);
-        if (parts === undefined) {
-            parts = PushProcessor.partsForDottedKey(key);
-            this.parsedKeys.set(key, parts);
-        }
+    private valueForDottedKey(parts: string[], ev: MatrixEvent): any {
         let val: any;
 
         // special-case the first component to deal with encrypted messages
