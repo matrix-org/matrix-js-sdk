@@ -23,11 +23,13 @@ export interface RemoteCallTrackOpts extends CallTrackOpts {
     call: MatrixCall;
     trackId?: string;
     metadata?: SDPStreamMetadataTrack;
+    metadataMuted?: boolean;
 }
 
 export class RemoteCallTrack extends CallTrack {
     private readonly _trackId?: string;
     private _metadata?: SDPStreamMetadataTrack;
+    private _metadataMuted?: boolean;
     private call: MatrixCall;
 
     public constructor(opts: RemoteCallTrackOpts) {
@@ -35,6 +37,8 @@ export class RemoteCallTrack extends CallTrack {
 
         this.call = opts.call;
         this._trackId = opts.trackId;
+        this.metadata = opts.metadata;
+        this.metadataMuted = opts.metadataMuted;
     }
 
     public get id(): string | undefined {
@@ -60,6 +64,16 @@ export class RemoteCallTrack extends CallTrack {
 
     public get kind(): string | undefined {
         return this.track?.kind ?? this._metadata?.kind;
+    }
+
+    public get muted(): boolean {
+        if (!this.track) return true;
+
+        return this._metadataMuted ?? false;
+    }
+
+    public set metadataMuted(metadataMuted: boolean | undefined) {
+        this._metadataMuted = metadataMuted;
     }
 
     public canSetTransceiver(transceiver: RTCRtpTransceiver): boolean {

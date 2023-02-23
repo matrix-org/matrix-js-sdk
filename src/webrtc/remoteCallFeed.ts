@@ -75,8 +75,10 @@ export class RemoteCallFeed extends CallFeed {
     public set metadata(metadata: SDPStreamMetadataObject | undefined) {
         if (!metadata) return;
 
-        this.setAudioVideoMuted(metadata.audio_muted ?? false, metadata.video_muted ?? false);
         this._metadata = metadata;
+
+        this.audioTracks.forEach((track) => (track.metadataMuted = metadata.audio_muted ?? false));
+        this.videoTracks.forEach((track) => (track.metadataMuted = metadata.video_muted ?? false));
 
         if (!metadata.tracks) return;
         for (const [metadataTrackId, metadataTrack] of Object.entries(metadata.tracks)) {
@@ -93,6 +95,8 @@ export class RemoteCallFeed extends CallFeed {
                 new RemoteCallTrack({
                     call: this.call,
                     trackId: metadataTrackId,
+                    metadataMuted:
+                        (metadataTrack.kind === "audio" ? metadata.audio_muted : metadata.video_muted) ?? false,
                     metadata: metadataTrack,
                 }),
             );
@@ -110,6 +114,8 @@ export class RemoteCallFeed extends CallFeed {
                 }
             }
         }
+
+        this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 
     public get purpose(): SDPStreamMetadataPurpose {
@@ -131,6 +137,14 @@ export class RemoteCallFeed extends CallFeed {
 
     public get tracks(): RemoteCallTrack[] {
         return [...this._tracks];
+    }
+
+    public get audioTracks(): RemoteCallTrack[] {
+        return super.audioTracks as RemoteCallTrack[];
+    }
+
+    public get videoTracks(): RemoteCallTrack[] {
+        return super.videoTracks as RemoteCallTrack[];
     }
 
     public get connected(): boolean {
@@ -206,6 +220,10 @@ export class RemoteCallFeed extends CallFeed {
             logger.info(`RemoteCallFeed ${this.id} addTransceiver() adding track (${trackInfo})`);
             const track = new RemoteCallTrack({
                 call: this.call,
+                metadataMuted:
+                    (transceiver.receiver.track.kind === "audio"
+                        ? this._metadata?.audio_muted
+                        : this._metadata?.video_muted) ?? false,
                 trackId,
             });
             track.setTransceiver(transceiver);
@@ -218,6 +236,7 @@ export class RemoteCallFeed extends CallFeed {
         }
 
         this.stream?.addTrack(transceiver.receiver.track);
+        this.startMeasuringVolume();
         this.updateConnected();
         this.emit(CallFeedEvent.NewStream, this.stream);
     }

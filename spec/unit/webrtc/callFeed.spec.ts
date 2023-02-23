@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import { SDPStreamMetadataPurpose } from "../../../src/webrtc/callEventTypes";
-import { CallFeed } from "../../../src/webrtc/callFeed";
 import { TestClient } from "../../TestClient";
 import { installWebRTCMocks, MockMatrixCall, MockMediaStream, MockMediaStreamTrack } from "../../test-utils/webrtc";
 import { CallEvent, CallState } from "../../../src/webrtc/call";
@@ -26,7 +25,7 @@ describe("CallFeed", () => {
     const roomId = "room1";
     let client: TestClient;
     let call: MockMatrixCall;
-    let feed: CallFeed;
+    let feed: LocalCallFeed;
 
     beforeEach(() => {
         installWebRTCMocks();
@@ -54,41 +53,41 @@ describe("CallFeed", () => {
     describe("muting", () => {
         describe("muting by default", () => {
             it("should mute audio by default", () => {
-                expect(feed.isAudioMuted()).toBeTruthy();
+                expect(feed.audioMuted).toBeTruthy();
             });
 
             it("should mute video by default", () => {
-                expect(feed.isVideoMuted()).toBeTruthy();
+                expect(feed.videoMuted).toBeTruthy();
             });
         });
 
         describe("muting after adding a track", () => {
             it("should un-mute audio", () => {
                 // @ts-ignore Mock
-                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
-                expect(feed.isAudioMuted()).toBeFalsy();
+                feed.setNewStream(new MockMediaStream("stream", [new MockMediaStreamTrack("track", "audio", true)]));
+                expect(feed.audioMuted).toBeFalsy();
             });
 
             it("should un-mute video", () => {
                 // @ts-ignore Mock
-                feed.stream.addTrack(new MockMediaStreamTrack("track", "video", true));
-                expect(feed.isVideoMuted()).toBeFalsy();
+                feed.setNewStream(new MockMediaStream("stream", [new MockMediaStreamTrack("track", "video", true)]));
+                expect(feed.videoMuted).toBeFalsy();
             });
         });
 
         describe("muting after calling setAudioVideoMuted()", () => {
             it("should mute audio by default ", () => {
                 // @ts-ignore Mock
-                feed.stream.addTrack(new MockMediaStreamTrack("track", "audio", true));
+                feed.setNewStream(new MockMediaStream("stream", [new MockMediaStreamTrack("track", "audio", true)]));
                 feed.setAudioVideoMuted(true, false);
-                expect(feed.isAudioMuted()).toBeTruthy();
+                expect(feed.audioMuted).toBeTruthy();
             });
 
             it("should mute video by default", () => {
                 // @ts-ignore Mock
-                feed.stream.addTrack(new MockMediaStreamTrack("track", "video", true));
+                feed.setNewStream(new MockMediaStream("stream", [new MockMediaStreamTrack("track", "video", true)]));
                 feed.setAudioVideoMuted(false, true);
-                expect(feed.isVideoMuted()).toBeTruthy();
+                expect(feed.videoMuted).toBeTruthy();
             });
         });
     });

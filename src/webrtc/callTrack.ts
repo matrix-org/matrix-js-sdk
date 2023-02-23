@@ -25,6 +25,7 @@ export abstract class CallTrack {
     public abstract get trackId(): string | undefined;
     public abstract get metadata(): SDPStreamMetadataTrack | undefined;
     public abstract get kind(): string | undefined;
+    public abstract get muted(): boolean;
 
     protected readonly _id: string;
     protected _transceiver?: RTCRtpTransceiver;

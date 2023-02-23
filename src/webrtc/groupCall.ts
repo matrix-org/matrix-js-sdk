@@ -424,11 +424,11 @@ export class GroupCall extends TypedEventEmitter<
     public async updateLocalUsermediaStream(stream: MediaStream): Promise<void> {
         if (this.localCallFeed) {
             const oldStream = this.localCallFeed.stream;
-            this.localCallFeed.setNewStream(stream);
-            const micShouldBeMuted = this.localCallFeed.isAudioMuted();
-            const vidShouldBeMuted = this.localCallFeed.isVideoMuted();
+            const micShouldBeMuted = this.localCallFeed.audioMuted;
+            const vidShouldBeMuted = this.localCallFeed.videoMuted;
             setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
             setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
+            this.localCallFeed.setNewStream(stream);
 
             if (oldStream) {
                 this.client.getMediaHandler().stopUserMediaStream(oldStream);
@@ -576,7 +576,7 @@ export class GroupCall extends TypedEventEmitter<
 
     public isLocalVideoMuted(): boolean {
         if (this.localCallFeed) {
-            return this.localCallFeed.isVideoMuted();
+            return this.localCallFeed.videoMuted;
         }
 
         return true;
@@ -584,7 +584,7 @@ export class GroupCall extends TypedEventEmitter<
 
     public isMicrophoneMuted(): boolean {
         if (this.localCallFeed) {
-            return this.localCallFeed.isAudioMuted();
+            return this.localCallFeed.audioMuted;
         }
 
         return true;

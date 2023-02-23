@@ -17,7 +17,7 @@ limitations under the License.
 import { logger } from "../logger";
 import { MatrixCall } from "./call";
 import { SDPStreamMetadataObject, SDPStreamMetadataPurpose, SDPStreamMetadataTracks } from "./callEventTypes";
-import { CallFeed, ICallFeedOpts } from "./callFeed";
+import { CallFeed, CallFeedEvent, ICallFeedOpts } from "./callFeed";
 import { LocalCallTrack } from "./localCallTrack";
 
 export interface LocalCallFeedOpts extends ICallFeedOpts {
@@ -54,6 +54,14 @@ export class LocalCallFeed extends CallFeed {
         return super.tracks as LocalCallTrack[];
     }
 
+    public get audioTracks(): LocalCallTrack[] {
+        return super.audioTracks as LocalCallTrack[];
+    }
+
+    public get videoTracks(): LocalCallTrack[] {
+        return super.videoTracks as LocalCallTrack[];
+    }
+
     public get metadata(): SDPStreamMetadataObject {
         return {
             user_id: this.userId,
@@ -84,6 +92,28 @@ export class LocalCallFeed extends CallFeed {
 
     public get streamId(): string | undefined {
         return this._tracks[0]?.streamId;
+    }
+
+    /**
+     * Set one or both of feed's internal audio and video video mute state
+     * Either value may be null to leave it as-is
+     * @param audioMuted - is the feed's audio muted?
+     * @param videoMuted - is the feed's video muted?
+     */
+    public setAudioVideoMuted(audioMuted: boolean | null, videoMuted: boolean | null): void {
+        logger.log(`CallFeed ${this.id} setAudioVideoMuted() running (audio=${audioMuted}, video=${videoMuted})`);
+
+        if (audioMuted !== null) {
+            if (this.audioMuted !== audioMuted) {
+                this.speakingVolumeSamples.fill(-Infinity);
+            }
+            this.audioTracks.forEach((track) => (track.muted = audioMuted));
+        }
+        if (videoMuted !== null) {
+            this.videoTracks.forEach((track) => (track.muted = videoMuted));
+        }
+
+        this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 
     public clone(): LocalCallFeed {

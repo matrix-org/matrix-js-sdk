@@ -317,6 +317,14 @@ describe("Call", function () {
             }),
         );
 
+        runOnTrackForStream(
+            call,
+            new MockMediaStream("remote_stream", [
+                new MockMediaStreamTrack("audio", "audio"),
+                new MockMediaStreamTrack("video", "video"),
+            ]).typed(),
+        );
+
         const feed = call.getFeeds().find((feed) => feed.streamId === "remote_stream");
         expect(feed?.purpose).toBe(SDPStreamMetadataPurpose.Usermedia);
         // @ts-ignore

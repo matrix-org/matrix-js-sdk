@@ -151,6 +151,14 @@ export class LocalCallTrack extends CallTrack {
         return this.track.kind;
     }
 
+    public get muted(): boolean {
+        return !this.track.enabled;
+    }
+
+    public set muted(muted: boolean) {
+        this.track.enabled = !muted;
+    }
+
     public get purpose(): SDPStreamMetadataPurpose {
         return this.feed.purpose;
     }
