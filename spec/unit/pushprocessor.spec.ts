@@ -292,7 +292,7 @@ describe("NotificationService", function () {
     // See https://spec.matrix.org/v1.5/client-server-api/#conditions-1 which
     // describes pattern should glob:
     //
-    // 1. * matches 0 or ore characters;
+    // 1. * matches 0 or more characters;
     // 2. ? matches exactly one character
     it("should bing on character group ([abc]) bing words.", function () {
         testEvent.event.content!.body = "Ping!";
