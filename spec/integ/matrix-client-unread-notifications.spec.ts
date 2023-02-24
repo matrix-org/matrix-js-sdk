@@ -18,8 +18,21 @@ import "fake-indexeddb/auto";
 
 import HttpBackend from "matrix-mock-request";
 
-import { Category, ISyncResponse, MatrixClient, NotificationCountType, Room } from "../../src";
+import {
+    Category,
+    ClientEvent,
+    EventType,
+    ISyncResponse,
+    MatrixClient,
+    MatrixEvent,
+    NotificationCountType,
+    RelationType,
+    Room,
+} from "../../src";
 import { TestClient } from "../TestClient";
+import { ReceiptType } from "../../src/@types/read_receipts";
+import { mkThread } from "../test-utils/thread";
+import { SyncState } from "../../src/sync";
 
 describe("MatrixClient syncing", () => {
     const userA = "@alice:localhost";
@@ -49,6 +62,86 @@ describe("MatrixClient syncing", () => {
         httpBackend!.verifyNoOutstandingExpectation();
         client!.stopClient();
         return httpBackend!.stop();
+    });
+
+    it("reactions in thread set the correct timeline to unread", async () => {
+        const roomId = "!room:localhost";
+
+        // start the client, and wait for it to initialise
+        httpBackend!.when("GET", "/sync").respond(200, {
+            next_batch: "s_5_3",
+            rooms: {
+                [Category.Join]: {},
+                [Category.Leave]: {},
+                [Category.Invite]: {},
+            },
+        });
+        client!.startClient({ threadSupport: true });
+        await Promise.all([
+            httpBackend?.flushAllExpected(),
+            new Promise<void>((resolve) => {
+                client!.on(ClientEvent.Sync, (state) => state === SyncState.Syncing && resolve());
+            }),
+        ]);
+
+        const room = new Room(roomId, client!, selfUserId);
+        jest.spyOn(client!, "getRoom").mockImplementation((id) => (id === roomId ? room : null));
+
+        const thread = mkThread({ room, client: client!, authorId: selfUserId, participantUserIds: [selfUserId] });
+        const threadReply = thread.events.at(-1)!;
+        room.addLiveEvents([thread.rootEvent]);
+
+        // Initialize read receipt datastructure before testing the reaction
+        room.addReceiptToStructure(thread.rootEvent.getId()!, ReceiptType.Read, selfUserId, { ts: 1 }, false);
+        thread.thread.addReceiptToStructure(
+            threadReply.getId()!,
+            ReceiptType.Read,
+            selfUserId,
+            { thread_id: thread.thread.id, ts: 1 },
+            false,
+        );
+        expect(room.getReadReceiptForUserId(selfUserId, false)?.eventId).toEqual(thread.rootEvent.getId());
+        expect(thread.thread.getReadReceiptForUserId(selfUserId, false)?.eventId).toEqual(threadReply.getId());
+
+        const reactionEventId = `$9-${Math.random()}-${Math.random()}`;
+        let lastEvent: MatrixEvent | null = null;
+        jest.spyOn(client! as any, "sendEventHttpRequest").mockImplementation((event) => {
+            lastEvent = event as MatrixEvent;
+            return { event_id: reactionEventId };
+        });
+
+        await client!.sendEvent(roomId, EventType.Reaction, {
+            "m.relates_to": {
+                rel_type: RelationType.Annotation,
+                event_id: threadReply.getId(),
+                key: "",
+            },
+        });
+
+        expect(lastEvent!.getId()).toEqual(reactionEventId);
+        room.handleRemoteEcho(new MatrixEvent(lastEvent!.event), lastEvent!);
+
+        // Our ideal state after this is the following:
+        //
+        // Room: [synthetic: threadroot, actual: threadroot]
+        // Thread: [synthetic: threadreaction, actual: threadreply]
+        //
+        // The reaction and reply are both in the thread, and their receipts should be isolated to the thread.
+        // The reaction has not been acknowledged in a dedicated read receipt message, so only the synthetic receipt
+        // should be updated.
+
+        // Ensure the synthetic receipt for the room has not been updated
+        expect(room.getReadReceiptForUserId(selfUserId, false)?.eventId).toEqual(thread.rootEvent.getId());
+        expect(room.getEventReadUpTo(selfUserId, false)).toEqual(thread.rootEvent.getId());
+        // Ensure the actual receipt for the room has not been updated
+        expect(room.getReadReceiptForUserId(selfUserId, true)?.eventId).toEqual(thread.rootEvent.getId());
+        expect(room.getEventReadUpTo(selfUserId, true)).toEqual(thread.rootEvent.getId());
+        // Ensure the synthetic receipt for the thread has been updated
+        expect(thread.thread.getReadReceiptForUserId(selfUserId, false)?.eventId).toEqual(reactionEventId);
+        expect(thread.thread.getEventReadUpTo(selfUserId, false)).toEqual(reactionEventId);
+        // Ensure the actual receipt for the thread has not been updated
+        expect(thread.thread.getReadReceiptForUserId(selfUserId, true)?.eventId).toEqual(threadReply.getId());
+        expect(thread.thread.getEventReadUpTo(selfUserId, true)).toEqual(threadReply.getId());
     });
 
     describe("Stuck unread notifications integration tests", () => {

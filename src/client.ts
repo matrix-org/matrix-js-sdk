@@ -4142,7 +4142,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public setPowerLevel(
         roomId: string,
         userId: string | string[],
-        powerLevel: number,
+        powerLevel: number | undefined,
         event: MatrixEvent | null,
     ): Promise<ISendEventResponse> {
         let content = {
@@ -4153,13 +4153,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             // existing client state with a failed power level change
             content = utils.deepCopy(event.getContent());
         }
-        if (Array.isArray(userId)) {
-            for (const user of userId) {
+
+        const users = Array.isArray(userId) ? userId : [userId];
+        for (const user of users) {
+            if (powerLevel == null) {
+                delete content.users[user];
+            } else {
                 content.users[user] = powerLevel;
             }
-        } else {
-            content.users[userId] = powerLevel;
         }
+
         const path = utils.encodeUri("/rooms/$roomId/state/m.room.power_levels", {
             $roomId: roomId,
         });
@@ -8758,18 +8761,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         email: string,
         clientSecret: string,
         sendAttempt: number,
-        nextLink: string,
+        nextLink?: string,
         identityAccessToken?: string,
-    ): Promise<any> {
-        // TODO: Types
-        const params = {
+    ): Promise<IRequestTokenResponse> {
+        const params: Record<string, string> = {
             client_secret: clientSecret,
             email: email,
             send_attempt: sendAttempt?.toString(),
-            next_link: nextLink,
         };
+        if (nextLink) {
+            params.next_link = nextLink;
+        }
 
-        return this.http.idServerRequest(
+        return this.http.idServerRequest<IRequestTokenResponse>(
             Method.Post,
             "/validate/email/requestToken",
             params,
@@ -8800,7 +8804,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param identityAccessToken - The `access_token` field of the Identity
      * Server `/account/register` response (see {@link registerWithIdentityServer}).
      *
-     * @returns Promise which resolves: TODO
+     * @returns Promise which resolves to an object with a sid string
      * @returns Rejects: with an error response.
      * @throws Error if no identity server is set
      */
@@ -8809,19 +8813,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         phoneNumber: string,
         clientSecret: string,
         sendAttempt: number,
-        nextLink: string,
+        nextLink?: string,
         identityAccessToken?: string,
-    ): Promise<any> {
-        // TODO: Types
-        const params = {
+    ): Promise<IRequestMsisdnTokenResponse> {
+        const params: Record<string, string> = {
             client_secret: clientSecret,
             country: phoneCountry,
             phone_number: phoneNumber,
             send_attempt: sendAttempt?.toString(),
-            next_link: nextLink,
         };
+        if (nextLink) {
+            params.next_link = nextLink;
+        }
 
-        return this.http.idServerRequest(
+        return this.http.idServerRequest<IRequestMsisdnTokenResponse>(
             Method.Post,
             "/validate/msisdn/requestToken",
             params,
