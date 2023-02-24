@@ -2152,6 +2152,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         this.cachedThreadReadReceipts.delete(threadId);
 
         // If we managed to create a thread and figure out its `id` then we can use it
+        // This has to happen before thread.addEvents, because that adds events to the eventtimeline, and the
+        // eventtimeline sometimes looks up thread information via the room.
         this.threads.set(thread.id, thread);
 
         // This is necessary to be able to jump to events in threads:
