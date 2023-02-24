@@ -553,23 +553,16 @@ export class GroupCall extends TypedEventEmitter<
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through
-        const hasAudioDevice = await this.client
-            .getMediaHandler()
-            .hasAudioDevice()
-            .then(
-                (v) => v,
-                (_) => {
-                    logger.log(
-                        `GroupCall ${this.groupCallId} setMicrophoneMuted() no audio device or permission for audio device, muted=${muted}`,
-                    );
-                    return false;
-                },
+        try {
+            if (!muted && !(await this.client.getMediaHandler().hasAudioDevice())) {
+                return false;
+            }
+        } catch (e) {
+            logger.log(
+                `GroupCall ${this.groupCallId} setMicrophoneMuted() no audio device or permission for audio device, muted=${muted}`,
             );
-
-        if (!muted && !hasAudioDevice) {
             return false;
         }
-
         const sendUpdatesBefore = !muted && this.isPtt;
 
         // set a timer for the maximum transmit time on PTT calls
@@ -607,21 +600,25 @@ export class GroupCall extends TypedEventEmitter<
             );
 
             // We needed this here to avoid an error in case user join a call without a device.
-            if (!muted) {
-                const stream = await this.client
-                    .getMediaHandler()
-                    .getUserMediaStream(true, !this.localCallFeed.isVideoMuted())
-                    .then(
-                        (s) => s,
-                        (_) => null,
-                    );
-                if (stream === null) {
-                    // if case permission denied to get a stream stop this here
-                    logger.log(
-                        `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
-                    );
-                    return false;
+            // I can not use .then .catch functions because linter :-(
+            try {
+                if (!muted) {
+                    const stream = await this.client
+                        .getMediaHandler()
+                        .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
+                    if (stream === null) {
+                        // if case permission denied to get a stream stop this here
+                        logger.log(
+                            `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
+                        );
+                        return false;
+                    }
                 }
+            } catch (e) {
+                logger.log(
+                    `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
+                );
+                return false;
             }
 
             this.localCallFeed.setAudioVideoMuted(muted, null);
@@ -652,20 +649,14 @@ export class GroupCall extends TypedEventEmitter<
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through
-        const hasVideoDevice = await this.client
-            .getMediaHandler()
-            .hasVideoDevice()
-            .then(
-                (value) => value,
-                (_) => {
-                    logger.log(
-                        `GroupCall ${this.groupCallId} setLocalVideoMuted() no video device or permission for video device, muted=${muted}`,
-                    );
-                    return false;
-                },
+        try {
+            if (!muted && !(await this.client.getMediaHandler().hasVideoDevice())) {
+                return false;
+            }
+        } catch (e) {
+            logger.log(
+                `GroupCall ${this.groupCallId} setLocalVideoMuted() no video device or permission for video device, muted=${muted}`,
             );
-
-        if (!muted && !hasVideoDevice) {
             return false;
         }
 
@@ -674,23 +665,18 @@ export class GroupCall extends TypedEventEmitter<
                 `GroupCall ${this.groupCallId} setLocalVideoMuted() (stream=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
 
-            const stream = await this.client
-                .getMediaHandler()
-                .getUserMediaStream(true, !muted)
-                .then(
-                    (s) => s,
-                    (_) => null,
-                );
-            if (stream === null) {
-                // if case permission denied to get a stream stop this here
+            try {
+                const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
+                await this.updateLocalUsermediaStream(stream);
+                this.localCallFeed.setAudioVideoMuted(null, muted);
+                setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+            } catch (_) {
+                // No permission to video device
                 logger.log(
                     `GroupCall ${this.groupCallId} setLocalVideoMuted() no device or permission to receive local stream, muted=${muted}`,
                 );
                 return false;
             }
-            await this.updateLocalUsermediaStream(stream);
-            this.localCallFeed.setAudioVideoMuted(null, muted);
-            setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
         } else {
             logger.log(`GroupCall ${this.groupCallId} setLocalVideoMuted() no stream muted (muted=${muted})`);
             this.initWithVideoMuted = muted;
