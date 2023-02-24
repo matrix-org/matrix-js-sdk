@@ -216,7 +216,7 @@ export class GroupCall extends TypedEventEmitter<
         public type: GroupCallType,
         public isPtt: boolean,
         public intent: GroupCallIntent,
-        public readonly initCallWithoutVideoAndAudio: boolean,
+        public readonly allowCallWithoutVideoAndAudio: boolean,
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
@@ -378,7 +378,7 @@ export class GroupCall extends TypedEventEmitter<
             // If is allowed to join a call without a media stream, then we
             // don't throw an error here. But we need an empty Local Feed to establish
             // a connection later.
-            if (this.initCallWithoutVideoAndAudio) {
+            if (this.allowCallWithoutVideoAndAudio) {
                 stream = new MediaStream();
             } else {
                 this.state = GroupCallState.LocalCallFeedUninitialized;
