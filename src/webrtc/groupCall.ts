@@ -556,12 +556,15 @@ export class GroupCall extends TypedEventEmitter<
         const hasAudioDevice = await this.client
             .getMediaHandler()
             .hasAudioDevice()
-            .catch((_) => {
-                logger.log(
-                    `GroupCall ${this.groupCallId} setMicrophoneMuted() no audio device or permission for audio device, muted=${muted}`,
-                );
-                return false;
-            });
+            .then(
+                (v) => v,
+                (_) => {
+                    logger.log(
+                        `GroupCall ${this.groupCallId} setMicrophoneMuted() no audio device or permission for audio device, muted=${muted}`,
+                    );
+                    return false;
+                },
+            );
 
         if (!muted && !hasAudioDevice) {
             return false;
@@ -608,7 +611,10 @@ export class GroupCall extends TypedEventEmitter<
                 const stream = await this.client
                     .getMediaHandler()
                     .getUserMediaStream(true, !this.localCallFeed.isVideoMuted())
-                    .catch((_) => null);
+                    .then(
+                        (s) => s,
+                        (_) => null,
+                    );
                 if (stream === null) {
                     // if case permission denied to get a stream stop this here
                     logger.log(
@@ -649,12 +655,15 @@ export class GroupCall extends TypedEventEmitter<
         const hasVideoDevice = await this.client
             .getMediaHandler()
             .hasVideoDevice()
-            .catch((_) => {
-                logger.log(
-                    `GroupCall ${this.groupCallId} setLocalVideoMuted() no video device or permission for video device, muted=${muted}`,
-                );
-                return false;
-            });
+            .then(
+                (value) => value,
+                (_) => {
+                    logger.log(
+                        `GroupCall ${this.groupCallId} setLocalVideoMuted() no video device or permission for video device, muted=${muted}`,
+                    );
+                    return false;
+                },
+            );
 
         if (!muted && !hasVideoDevice) {
             return false;
@@ -668,7 +677,10 @@ export class GroupCall extends TypedEventEmitter<
             const stream = await this.client
                 .getMediaHandler()
                 .getUserMediaStream(true, !muted)
-                .catch((_) => null);
+                .then(
+                    (s) => s,
+                    (_) => null,
+                );
             if (stream === null) {
                 // if case permission denied to get a stream stop this here
                 logger.log(
