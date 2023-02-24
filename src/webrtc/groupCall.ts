@@ -553,7 +553,17 @@ export class GroupCall extends TypedEventEmitter<
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through
-        if (!muted && !(await this.client.getMediaHandler().hasAudioDevice())) {
+        const hasAudioDevice = await this.client
+            .getMediaHandler()
+            .hasAudioDevice()
+            .catch((_) => {
+                logger.log(
+                    `GroupCall ${this.groupCallId} setMicrophoneMuted() no audio device or permission for audio device, muted=${muted}`,
+                );
+                return false;
+            });
+
+        if (!muted && !hasAudioDevice) {
             return false;
         }
 
@@ -592,6 +602,22 @@ export class GroupCall extends TypedEventEmitter<
             logger.log(
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() (streamId=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
+
+            // We needed this here to avoid an error in case user join a call without a device.
+            if (!muted) {
+                const stream = await this.client
+                    .getMediaHandler()
+                    .getUserMediaStream(true, !this.localCallFeed.isVideoMuted())
+                    .catch((_) => null);
+                if (stream === null) {
+                    // if case permission denied to get a stream stop this here
+                    logger.log(
+                        `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
+                    );
+                    return false;
+                }
+            }
+
             this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
             // are the one on the GroupCall's own CallFeed and are cloned before being
@@ -617,15 +643,20 @@ export class GroupCall extends TypedEventEmitter<
      * @returns Whether muting/unmuting was successful
      */
     public async setLocalVideoMuted(muted: boolean): Promise<boolean> {
-        // Because we need a Local Call Feed to establish a call connection, we avoid muting video in case of empty
-        // video track. In this way we go sure if a client implements muting we don't raise an error.
-        if (this.localCallFeed?.stream.getVideoTracks().length === 0) {
-            return false;
-        }
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through
-        if (!muted && !(await this.client.getMediaHandler().hasVideoDevice())) {
+        const hasVideoDevice = await this.client
+            .getMediaHandler()
+            .hasVideoDevice()
+            .catch((_) => {
+                logger.log(
+                    `GroupCall ${this.groupCallId} setLocalVideoMuted() no video device or permission for video device, muted=${muted}`,
+                );
+                return false;
+            });
+
+        if (!muted && !hasVideoDevice) {
             return false;
         }
 
@@ -634,7 +665,17 @@ export class GroupCall extends TypedEventEmitter<
                 `GroupCall ${this.groupCallId} setLocalVideoMuted() (stream=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
 
-            const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
+            const stream = await this.client
+                .getMediaHandler()
+                .getUserMediaStream(true, !muted)
+                .catch((_) => null);
+            if (stream === null) {
+                // if case permission denied to get a stream stop this here
+                logger.log(
+                    `GroupCall ${this.groupCallId} setLocalVideoMuted() no device or permission to receive local stream, muted=${muted}`,
+                );
+                return false;
+            }
             await this.updateLocalUsermediaStream(stream);
             this.localCallFeed.setAudioVideoMuted(null, muted);
             setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
