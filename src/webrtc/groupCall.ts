@@ -558,6 +558,7 @@ export class GroupCall extends TypedEventEmitter<
                 return false;
             }
         } catch (e) {
+            /* istanbul ignore next */
             logger.log(
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() no audio device or permission for audio device, muted=${muted}`,
             );
@@ -608,6 +609,7 @@ export class GroupCall extends TypedEventEmitter<
                         .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
                     if (stream === null) {
                         // if case permission denied to get a stream stop this here
+                        /* istanbul ignore next */
                         logger.log(
                             `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
                         );
@@ -615,6 +617,7 @@ export class GroupCall extends TypedEventEmitter<
                     }
                 }
             } catch (e) {
+                /* istanbul ignore next */
                 logger.log(
                     `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
                 );
@@ -654,6 +657,7 @@ export class GroupCall extends TypedEventEmitter<
                 return false;
             }
         } catch (e) {
+            /* istanbul ignore next */
             logger.log(
                 `GroupCall ${this.groupCallId} setLocalVideoMuted() no video device or permission for video device, muted=${muted}`,
             );
@@ -661,6 +665,7 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         if (this.localCallFeed) {
+            /* istanbul ignore next */
             logger.log(
                 `GroupCall ${this.groupCallId} setLocalVideoMuted() (stream=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
@@ -672,6 +677,7 @@ export class GroupCall extends TypedEventEmitter<
                 setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
             } catch (_) {
                 // No permission to video device
+                /* istanbul ignore next */
                 logger.log(
                     `GroupCall ${this.groupCallId} setLocalVideoMuted() no device or permission to receive local stream, muted=${muted}`,
                 );
