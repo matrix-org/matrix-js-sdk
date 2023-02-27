@@ -76,11 +76,6 @@ export interface IPushRuleCondition<N extends ConditionKind | string> {
 
 export interface IEventMatchCondition extends IPushRuleCondition<ConditionKind.EventMatch> {
     key: string;
-    /**
-     * keyParts is calculated by rewriteDefaultRules by unescaping and spitting
-     * key.
-     */
-    keyParts: string[];
     pattern?: string;
     value?: string;
 }
