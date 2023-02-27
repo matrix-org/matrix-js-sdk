@@ -2151,14 +2151,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // a reference to the cached receipts anymore.
         this.cachedThreadReadReceipts.delete(threadId);
 
+        // If we managed to create a thread and figure out its `id` then we can use it
+        // This has to happen before thread.addEvents, because that adds events to the eventtimeline, and the
+        // eventtimeline sometimes looks up thread information via the room.
+        this.threads.set(thread.id, thread);
+
         // This is necessary to be able to jump to events in threads:
         // If we jump to an event in a thread where neither the event, nor the root,
         // nor any thread event are loaded yet, we'll load the event as well as the thread root, create the thread,
         // and pass the event through this.
         thread.addEvents(events, false);
 
-        // If we managed to create a thread and figure out its `id` then we can use it
-        this.threads.set(thread.id, thread);
         this.reEmitter.reEmit(thread, [
             ThreadEvent.Delete,
             ThreadEvent.Update,
@@ -2467,6 +2470,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(remoteEvent);
         const thread = threadId ? this.getThread(threadId) : null;
+        thread?.setEventMetadata(localEvent);
         thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
         if (shouldLiveInRoom) {
@@ -2548,6 +2552,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             const { shouldLiveInRoom, threadId } = this.eventShouldLiveIn(event);
             const thread = threadId ? this.getThread(threadId) : undefined;
+            thread?.setEventMetadata(event);
             thread?.timelineSet.replaceEventId(oldEventId, newEventId!);
 
             if (shouldLiveInRoom) {
