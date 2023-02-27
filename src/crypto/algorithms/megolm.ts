@@ -1635,6 +1635,11 @@ export class MegolmDecryption extends DecryptionAlgorithm {
     private wasRoomKeyForwardedAsHistory(roomKey: RoomKey): boolean {
         const room = this.baseApis.getRoom(roomKey.roomId);
 
+        // If the key is not for a known room, then something fishy is going on,
+        // so we reject the key out of caution. In practice, this is a bit moot
+        // because we'll only accept shared_history forwarded by the inviter, and
+        // we won't know who was the inviter for an unknown room, so we'll reject
+        // it anyway.
         if (room && roomKey.extraSessionData.sharedHistory) {
             return true;
         } else {
