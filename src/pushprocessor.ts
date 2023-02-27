@@ -128,6 +128,12 @@ export class PushProcessor {
     public constructor(private readonly client: MatrixClient) {}
 
     /**
+     * Maps the original key from the push rules to a list of property names
+     * after unescaping.
+     */
+    private readonly parsedKeys = new Map<string, string[]>();
+
+    /**
      * Convert a list of actions into a object with the actions as keys and their values
      * @example
      * eg. `[ 'notify', { set_tweak: 'sound', value: 'default' } ]`
@@ -166,9 +172,7 @@ export class PushProcessor {
         if (!newRules) newRules = {} as IPushRules;
         if (!newRules.global) newRules.global = {} as PushRuleSet;
         if (!newRules.global.override) newRules.global.override = [];
-        if (!newRules.global.room) newRules.global.room = [];
-        if (!newRules.global.sender) newRules.global.sender = [];
-        if (!newRules.global.override) newRules.global.underride = [];
+        if (!newRules.global.underride) newRules.global.underride = [];
 
         // Merge the client-level defaults with the ones from the server
         const globalOverrides = newRules.global.override;
@@ -205,9 +209,33 @@ export class PushProcessor {
             }
         }
 
-        // Process the 'key' property on event_match conditions to unescape and
-        // split it.
-        for (const ruleset of [globalOverrides, newRules.global.room, newRules.global.sender, globalUnderrides]) {
+        return newRules;
+    }
+
+    /**
+     * Pre-caches the parsed keys for push rules and cleans out any obsolete cache
+     * entries. Should be called after push rules are updated.
+     * @param newRules - The new push rules.
+     */
+    public updateCachedPushRuleKeys(newRules: IPushRules): void {
+        // These lines are mostly to make the tests happy. We shouldn't run into these
+        // properties missing in practice.
+        if (!newRules) newRules = {} as IPushRules;
+        if (!newRules.global) newRules.global = {} as PushRuleSet;
+        if (!newRules.global.override) newRules.global.override = [];
+        if (!newRules.global.room) newRules.global.room = [];
+        if (!newRules.global.sender) newRules.global.sender = [];
+        if (!newRules.global.underride) newRules.global.underride = [];
+
+        // Process the 'key' property on event_match conditions pre-cache the
+        // values and clean-out any unused values.
+        const toRemoveKeys = new Set(this.parsedKeys.keys());
+        for (const ruleset of [
+            newRules.global.override,
+            newRules.global.room,
+            newRules.global.sender,
+            newRules.global.underride,
+        ]) {
             for (const rule of ruleset) {
                 if (!rule.conditions) {
                     continue;
@@ -218,14 +246,17 @@ export class PushProcessor {
                         continue;
                     }
 
-                    // The homeserver might have returned an object with this key
-                    // already, but we want to always stomp over it.
-                    condition.keyParts = PushProcessor.partsForDottedKey(condition.key);
+                    // Ensure we keep this key.
+                    toRemoveKeys.delete(condition.key);
+
+                    // Pre-process the key.
+                    this.parsedKeys.set(condition.key, PushProcessor.partsForDottedKey(condition.key));
                 }
             }
         }
-
-        return newRules;
+        // Any keys that were previously cached, but are no longer needed should
+        // be removed.
+        toRemoveKeys.forEach((k) => this.parsedKeys.delete(k));
     }
 
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
@@ -412,11 +443,11 @@ export class PushProcessor {
     }
 
     private eventFulfillsEventMatchCondition(cond: IEventMatchCondition, ev: MatrixEvent): boolean {
-        if (!cond.key || !cond.keyParts) {
+        if (!cond.key) {
             return false;
         }
 
-        const val = this.valueForDottedKey(cond.keyParts, ev);
+        const val = this.valueForDottedKey(cond.key, ev);
         if (typeof val !== "string") {
             return false;
         }
@@ -524,11 +555,19 @@ export class PushProcessor {
      * For a dotted field and event, fetch the value at that position, if one
      * exists.
      *
-     * @param parts - The pre-split key of the push rule condition to fetch.
+     * @param key - The key of the push rule condition: a dotted field to fetch.
      * @param ev - The matrix event to fetch the field from.
      * @returns The value at the dotted path given by key.
      */
-    private valueForDottedKey(parts: string[], ev: MatrixEvent): any {
+    private valueForDottedKey(key: string, ev: MatrixEvent): any {
+        // The key should already have been parsed via updateCachedPushRuleKeys,
+        // but if it hasn't (maybe via an old consumer of the SDK which hasn't
+        // been updated?) then lazily calculate it here.
+        let parts = this.parsedKeys.get(key);
+        if (parts === undefined) {
+            parts = PushProcessor.partsForDottedKey(key);
+            this.parsedKeys.set(key, parts);
+        }
         let val: any;
 
         // special-case the first component to deal with encrypted messages

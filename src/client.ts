@@ -8499,8 +8499,20 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getPushRules(): Promise<IPushRules> {
         return this.http.authedRequest<IPushRules>(Method.Get, "/pushrules/").then((rules: IPushRules) => {
-            return PushProcessor.rewriteDefaultRules(rules);
+            this.setPushRules(rules);
+            return this.pushRules!;
         });
+    }
+
+    /**
+     * Update the push rules for the account. This should be called whenever
+     * updated push rules are available.
+     */
+    public setPushRules(rules: IPushRules): void {
+        // Fix-up defaults, if applicable.
+        this.pushRules = PushProcessor.rewriteDefaultRules(rules);
+        // Pre-calculate any necessary caches.
+        this.pushProcessor.updateCachedPushRuleKeys(this.pushRules);
     }
 
     /**
