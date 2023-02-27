@@ -539,7 +539,6 @@ describe("NotificationService", function () {
                         {
                             kind: ConditionKind.EventMatch,
                             key: key,
-                            keyParts: PushProcessor.partsForDottedKey(key),
                             pattern: pattern,
                         },
                     ],

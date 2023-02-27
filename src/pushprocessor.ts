@@ -63,7 +63,6 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             {
                 kind: ConditionKind.EventMatch,
                 key: "type",
-                keyParts: ["type"],
                 pattern: "m.reaction",
             },
         ],
@@ -78,13 +77,11 @@ const DEFAULT_OVERRIDE_RULES: IPushRule[] = [
             {
                 kind: ConditionKind.EventMatch,
                 key: "type",
-                keyParts: ["type"],
                 pattern: EventType.RoomServerAcl,
             },
             {
                 kind: ConditionKind.EventMatch,
                 key: "state_key",
-                keyParts: ["state_key"],
                 pattern: "",
             },
         ],
@@ -102,7 +99,6 @@ const DEFAULT_UNDERRIDE_RULES: IPushRule[] = [
             {
                 kind: ConditionKind.EventMatch,
                 key: "type",
-                keyParts: ["type"],
                 pattern: "org.matrix.msc3401.call",
             },
             {
@@ -310,7 +306,6 @@ export class PushProcessor {
                 rawrule.conditions!.push({
                     kind: ConditionKind.EventMatch,
                     key: "room_id",
-                    keyParts: ["room_id"],
                     value: tprule.rule_id,
                 });
                 break;
@@ -321,7 +316,6 @@ export class PushProcessor {
                 rawrule.conditions!.push({
                     kind: ConditionKind.EventMatch,
                     key: "user_id",
-                    keyParts: ["user_id"],
                     value: tprule.rule_id,
                 });
                 break;
@@ -332,7 +326,6 @@ export class PushProcessor {
                 rawrule.conditions!.push({
                     kind: ConditionKind.EventMatch,
                     key: "content.body",
-                    keyParts: ["content", "body"],
                     pattern: tprule.pattern,
                 });
                 break;
