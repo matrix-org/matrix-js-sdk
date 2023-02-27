@@ -77,6 +77,8 @@ export interface IPushRuleCondition<N extends ConditionKind | string> {
 export interface IEventMatchCondition extends IPushRuleCondition<ConditionKind.EventMatch> {
     key: string;
     pattern?: string;
+    // Note that value property is an optimization for patterns which do not do
+    // any globbing and when the key is not "content.body".
     value?: string;
 }
 

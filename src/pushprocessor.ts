@@ -435,6 +435,13 @@ export class PushProcessor {
         return content.body.search(pat) > -1;
     }
 
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing against the condition's glob-based
+     * pattern.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
     private eventFulfillsEventMatchCondition(cond: IEventMatchCondition, ev: MatrixEvent): boolean {
         if (!cond.key) {
             return false;
@@ -445,6 +452,9 @@ export class PushProcessor {
             return false;
         }
 
+        // XXX This does not match in a case-insensitive manner.
+        //
+        // See https://spec.matrix.org/v1.5/client-server-api/#conditions-1
         if (cond.value) {
             return cond.value === val;
         }
