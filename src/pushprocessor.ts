@@ -25,6 +25,7 @@ import {
     ICallStartedPrefixCondition,
     IContainsDisplayNameCondition,
     IEventMatchCondition,
+    IExactEventMatchPrefixCondition,
     IPushRule,
     IPushRules,
     IRoomMemberCountCondition,
@@ -337,6 +338,8 @@ export class PushProcessor {
         switch (cond.kind) {
             case ConditionKind.EventMatch:
                 return this.eventFulfillsEventMatchCondition(cond, ev);
+            case ConditionKind.ExactEventMatchPrefix:
+                return this.eventFulfillsExactEventMatchCondition(cond, ev);
             case ConditionKind.ContainsDisplayName:
                 return this.eventFulfillsDisplayNameCondition(cond, ev);
             case ConditionKind.RoomMemberCount:
@@ -471,6 +474,20 @@ export class PushProcessor {
         return !!val.match(regex);
     }
 
+    /**
+     * Check whether the given event matches the push rule condition by fetching
+     * the property from the event and comparing exactly against the condition's
+     * value.
+     * @param cond - The push rule condition to check for a match.
+     * @param ev - The event to check for a match.
+     */
+    private eventFulfillsExactEventMatchCondition(cond: IExactEventMatchPrefixCondition, ev: MatrixEvent): boolean {
+        if (!cond.key || cond.value === undefined) {
+            return false;
+        }
+        return cond.value === this.valueForDottedKey(cond.key, ev);
+    }
+
     private eventFulfillsCallStartedCondition(
         _cond: ICallStartedCondition | ICallStartedPrefixCondition,
         ev: MatrixEvent,
@@ -588,10 +605,13 @@ export class PushProcessor {
         }
 
         for (; currentIndex < parts.length; ++currentIndex) {
-            const thisPart = parts[currentIndex];
-            if (isNullOrUndefined(val[thisPart])) {
-                return null;
+            // The previous iteration resulted in null or undefined, bail (and
+            // avoid the type error of attempting to retrieve a property).
+            if (isNullOrUndefined(val)) {
+                return undefined;
             }
+
+            const thisPart = parts[currentIndex];
             val = val[thisPart];
         }
         return val;

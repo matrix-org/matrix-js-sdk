@@ -62,6 +62,7 @@ export function isDmMemberCountCondition(condition: AnyMemberCountCondition): bo
 
 export enum ConditionKind {
     EventMatch = "event_match",
+    ExactEventMatchPrefix = "com.beeper.msc3758.exact_event_match",
     ContainsDisplayName = "contains_display_name",
     RoomMemberCount = "room_member_count",
     SenderNotificationPermission = "sender_notification_permission",
@@ -80,6 +81,11 @@ export interface IEventMatchCondition extends IPushRuleCondition<ConditionKind.E
     // Note that value property is an optimization for patterns which do not do
     // any globbing and when the key is not "content.body".
     value?: string;
+}
+
+export interface IExactEventMatchPrefixCondition extends IPushRuleCondition<ConditionKind.ExactEventMatchPrefix> {
+    key: string;
+    value: string | boolean | null | number;
 }
 
 export interface IContainsDisplayNameCondition extends IPushRuleCondition<ConditionKind.ContainsDisplayName> {
@@ -107,6 +113,7 @@ export interface ICallStartedPrefixCondition extends IPushRuleCondition<Conditio
 // IPushRuleCondition<Exclude<string, ConditionKind>> unfortunately does not resolve this at the time of writing.
 export type PushRuleCondition =
     | IEventMatchCondition
+    | IExactEventMatchPrefixCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition
