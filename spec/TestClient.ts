@@ -16,11 +16,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// `expect` is allowed in helper functions which are called within `test`/`it` blocks
+/* eslint-disable jest/no-standalone-expect */
+
 // load olm before the sdk if possible
 import "./olm-loader";
 
 import MockHttpBackend from "matrix-mock-request";
 
+import type { IDeviceKeys, IOneTimeKey } from "../src/@types/crypto";
+import type { IE2EKeyReceiver } from "./test-utils/E2EKeyReceiver";
 import { LocalStorageCryptoStore } from "../src/crypto/store/localStorage-crypto-store";
 import { logger } from "../src/logger";
 import { syncPromise } from "./test-utils/test-utils";
@@ -28,14 +33,18 @@ import { createClient, IStartClientOpts } from "../src/matrix";
 import { ICreateClientOpts, IDownloadKeyResult, MatrixClient, PendingEventOrdering } from "../src/client";
 import { MockStorageApi } from "./MockStorageApi";
 import { encodeUri } from "../src/utils";
-import { IDeviceKeys, IOneTimeKey } from "../src/crypto/dehydration";
 import { IKeyBackupSession } from "../src/crypto/keybackup";
 import { IKeysUploadResponse, IUploadKeysRequest } from "../src/client";
+import { ISyncResponder } from "./test-utils/SyncResponder";
 
 /**
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
+ *
+ * @deprecated Avoid using this; it is tied too tightly to matrix-mock-request and is generally inconvenient to use.
+ *    Instead, construct a MatrixClient manually, use fetch-mock-jest to intercept the HTTP requests, and
+ *    use things like {@link E2EKeyReceiver} and {@link SyncResponder} to manage the requests.
  */
-export class TestClient {
+export class TestClient implements IE2EKeyReceiver, ISyncResponder {
     public readonly httpBackend: MockHttpBackend;
     public readonly client: MatrixClient;
     public deviceKeys?: IDeviceKeys | null;
@@ -240,8 +249,22 @@ export class TestClient {
         return this.deviceKeys!.keys[keyId];
     }
 
+    /** Next time we see a sync request (or immediately, if there is one waiting), send the given response
+     *
+     * Calling this will register a response for `/sync`, and then, in the background, flush a single `/sync` request.
+     * Try calling {@link syncPromise} to wait for the sync to complete.
+     *
+     * @param response - response to /sync request
+     */
+    public sendOrQueueSyncResponse(syncResponse: object): void {
+        this.httpBackend.when("GET", "/sync").respond(200, syncResponse);
+        this.httpBackend.flush("/sync", 1);
+    }
+
     /**
      * flush a single /sync request, and wait for the syncing event
+     *
+     * @deprecated: prefer to use {@link #sendOrQueueSyncResponse} followed by {@link syncPromise}.
      */
     public flushSync(): Promise<void> {
         logger.log(`${this}: flushSync`);

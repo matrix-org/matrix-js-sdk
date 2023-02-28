@@ -211,7 +211,7 @@ describe("MegolmDecryption", function () {
                 .then(() => {
                     // check that it called encryptMessageForDevice with
                     // appropriate args.
-                    expect(mockOlmLib.encryptMessageForDevice).toBeCalledTimes(1);
+                    expect(mockOlmLib.encryptMessageForDevice).toHaveBeenCalledTimes(1);
 
                     const call = mockOlmLib.encryptMessageForDevice.mock.calls[0];
                     const payload = call[6];

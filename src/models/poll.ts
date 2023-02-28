@@ -28,6 +28,7 @@ export enum PollEvent {
     Update = "Poll.update",
     Responses = "Poll.Responses",
     Destroy = "Poll.Destroy",
+    UndecryptableRelations = "Poll.UndecryptableRelations",
 }
 
 export type PollEventHandlerMap = {
@@ -35,6 +36,7 @@ export type PollEventHandlerMap = {
     [PollEvent.Destroy]: (pollIdentifier: string) => void;
     [PollEvent.End]: () => void;
     [PollEvent.Responses]: (responses: Relations) => void;
+    [PollEvent.UndecryptableRelations]: (count: number) => void;
 };
 
 const filterResponseRelations = (
@@ -45,7 +47,6 @@ const filterResponseRelations = (
 } => {
     const responseEvents = relationEvents.filter((event) => {
         if (event.isDecryptionFailure()) {
-            // @TODO(kerrya) PSG-1023 track and return these
             return;
         }
         return (
@@ -66,6 +67,11 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
     private relationsNextBatch: string | undefined;
     private responses: null | Relations = null;
     private endEvent: MatrixEvent | undefined;
+    /**
+     * Keep track of undecryptable relations
+     * As incomplete result sets affect poll results
+     */
+    private undecryptableRelationEventIds = new Set<string>();
 
     public constructor(public readonly rootEvent: MatrixEvent, private matrixClient: MatrixClient, private room: Room) {
         super();
@@ -80,12 +86,20 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         return this.rootEvent.getId()!;
     }
 
+    public get endEventId(): string | undefined {
+        return this.endEvent?.getId();
+    }
+
     public get isEnded(): boolean {
         return !!this.endEvent;
     }
 
     public get isFetchingResponses(): boolean {
         return this._isFetchingResponses;
+    }
+
+    public get undecryptableRelationsCount(): number {
+        return this.undecryptableRelationEventIds.size;
     }
 
     public async getResponses(): Promise<Relations> {
@@ -124,10 +138,13 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
         const pollEndTimestamp = this.endEvent?.getTs() || Number.MAX_SAFE_INTEGER;
         const { responseEvents } = filterResponseRelations([event], pollEndTimestamp);
 
+        this.countUndecryptableEvents([event]);
+
         if (responseEvents.length) {
             responseEvents.forEach((event) => {
                 this.responses!.addEvent(event);
             });
+
             this.emit(PollEvent.Responses, this.responses);
         }
     }
@@ -149,11 +166,14 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
             },
         );
 
+        await Promise.all(allRelations.events.map((event) => this.matrixClient.decryptEventIfNeeded(event)));
+
         const responses =
             this.responses ||
             new Relations("m.reference", M_POLL_RESPONSE.name, this.matrixClient, [M_POLL_RESPONSE.altName!]);
 
         const pollEndEvent = allRelations.events.find((event) => M_POLL_END.matches(event.getType()));
+
         if (this.validateEndEvent(pollEndEvent)) {
             this.endEvent = pollEndEvent;
             this.refilterResponsesOnEnd();
@@ -170,6 +190,7 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
         this.relationsNextBatch = allRelations.nextBatch ?? undefined;
         this.responses = responses;
+        this.countUndecryptableEvents(allRelations.events);
 
         // while there are more pages of relations
         // fetch them
@@ -205,6 +226,19 @@ export class Poll extends TypedEventEmitter<Exclude<PollEvent, PollEvent.New>, P
 
         this.emit(PollEvent.Responses, this.responses);
     }
+
+    private countUndecryptableEvents = (events: MatrixEvent[]): void => {
+        const undecryptableEventIds = events
+            .filter((event) => event.isDecryptionFailure())
+            .map((event) => event.getId()!);
+
+        const previousCount = this.undecryptableRelationsCount;
+        this.undecryptableRelationEventIds = new Set([...this.undecryptableRelationEventIds, ...undecryptableEventIds]);
+
+        if (this.undecryptableRelationsCount !== previousCount) {
+            this.emit(PollEvent.UndecryptableRelations, this.undecryptableRelationsCount);
+        }
+    };
 
     private validateEndEvent(endEvent?: MatrixEvent): boolean {
         if (!endEvent) {

@@ -48,7 +48,7 @@ describe("Media Handler", function () {
         } as unknown as MatrixClient);
     });
 
-    it("does not trigger update after restore media settings ", () => {
+    it("does not trigger update after restore media settings", () => {
         mediaHandler.restoreMediaSettings(FAKE_AUDIO_INPUT_ID, FAKE_VIDEO_INPUT_ID);
 
         expect(mockMediaDevices.getUserMedia).not.toHaveBeenCalled();
@@ -401,7 +401,7 @@ describe("Media Handler", function () {
         });
     });
 
-    describe("stopUserMediaStream", () => {
+    describe("stopScreensharingStream", () => {
         let stream: MediaStream;
 
         beforeEach(async () => {

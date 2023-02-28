@@ -76,7 +76,7 @@ describe("CallFeed", () => {
         });
 
         describe("muting after calling setAudioVideoMuted()", () => {
-            it("should mute audio by default ", () => {
+            it("should mute audio by default", () => {
                 // @ts-ignore Mock
                 feed.setNewStream(new MockMediaStream("stream", [new MockMediaStreamTrack("track", "audio", true)]));
                 feed.setAudioVideoMuted(true, false);

@@ -148,7 +148,7 @@ describe("Group Call", function () {
             async (state: GroupCallState) => {
                 // @ts-ignore
                 groupCall.state = state;
-                await expect(groupCall.initLocalCallFeed()).rejects.toThrowError();
+                await expect(groupCall.initLocalCallFeed()).rejects.toThrow();
             },
         );
 
@@ -383,6 +383,14 @@ describe("Group Call", function () {
                 call = new MockMatrixCall(room.roomId, groupCall.groupCallId);
 
                 await groupCall.create();
+            });
+
+            it("ignores changes, if we can't get user id of opponent", async () => {
+                const call = new MockMatrixCall(room.roomId, groupCall.groupCallId);
+                jest.spyOn(call, "getOpponentMember").mockReturnValue({ userId: undefined });
+
+                // @ts-ignore Mock
+                expect(() => groupCall.onCallFeedsChanged(call)).toThrow();
             });
 
             describe("usermedia feeds", () => {
