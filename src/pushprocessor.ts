@@ -507,6 +507,18 @@ export class PushProcessor {
      * @returns The push rule, or null if no such rule was found
      */
     public getPushRuleById(ruleId: string): IPushRule | null {
+        const result = this.getPushRuleAndKindById(ruleId);
+        return result?.rule ?? null;
+    }
+
+    /**
+     * Get one of the users push rules by its ID
+     *
+     * @param ruleId - The ID of the rule to search for
+     * @returns rule The push rule, or null if no such rule was found
+     * @returns kind - The PushRuleKind of the rule to search for
+     */
+    public getPushRuleAndKindById(ruleId: string): { rule: IPushRule; kind: PushRuleKind } | null {
         for (const scope of ["global"] as const) {
             if (this.client.pushRules?.[scope] === undefined) continue;
 
@@ -514,7 +526,7 @@ export class PushProcessor {
                 if (this.client.pushRules[scope][kind] === undefined) continue;
 
                 for (const rule of this.client.pushRules[scope][kind]!) {
-                    if (rule.rule_id === ruleId) return rule;
+                    if (rule.rule_id === ruleId) return { rule, kind };
                 }
             }
         }
