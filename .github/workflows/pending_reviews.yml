@@ -25,8 +25,8 @@ jobs:
               env:
                   PR_ID: ${{ steps.prdetails.outputs.pr_id }}
                   HEAD_SHA: ${{ fromJSON(steps.prdetails.outputs.data).head.sha }}
-                  REQUESTED_REVIEWERS: ${{ fromJSON(steps.prdetails.outputs.data).requested_reviewers }}
-                  REQUESTED_TEAMS: ${{ fromJSON(steps.prdetails.outputs.data).requested_teams }}
+                  REQUESTED_REVIEWERS: ${{ toJSON(fromJSON(steps.prdetails.outputs.data).requested_reviewers) }}
+                  REQUESTED_TEAMS: ${{ toJSON(fromJSON(steps.prdetails.outputs.data).requested_teams) }}
               with:
                   script: |
                       const { PR_ID: pull_number, HEAD_SHA: sha, REQUESTED_REVIEWERS, REQUESTED_TEAMS } = process.env;
