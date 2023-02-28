@@ -1,17 +1,14 @@
-Changes in [23.4.0-rc.2](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.4.0-rc.2) (2023-02-22)
-============================================================================================================
+Changes in [23.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.4.0) (2023-02-28)
+==================================================================================================
 
 ## ✨ Features
  * Add easy way to determine if the decryption failure is due to "DecryptionError: The sender has disabled encrypting to unverified devices." ([\#3167](https://github.com/matrix-org/matrix-js-sdk/pull/3167)). Contributed by @florianduros.
-
-Changes in [23.4.0-rc.1](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v23.4.0-rc.1) (2023-02-21)
-============================================================================================================
-
-## ✨ Features
  * Polls: expose end event id on poll model ([\#3160](https://github.com/matrix-org/matrix-js-sdk/pull/3160)). Contributed by @kerryarchibald.
  * Polls: count undecryptable poll relations ([\#3163](https://github.com/matrix-org/matrix-js-sdk/pull/3163)). Contributed by @kerryarchibald.
 
 ## 🐛 Bug Fixes
+ * Fix spec compliance issue around encrypted `m.relates_to` ([\#3178](https://github.com/matrix-org/matrix-js-sdk/pull/3178)).
+ * Fix reactions in threads sometimes causing stuck notifications ([\#3146](https://github.com/matrix-org/matrix-js-sdk/pull/3146)). Fixes vector-im/element-web#24000. Contributed by @justjanne.
  * Better type guard parseTopicContent ([\#3165](https://github.com/matrix-org/matrix-js-sdk/pull/3165)). Fixes matrix-org/element-web-rageshakes#20177 and matrix-org/element-web-rageshakes#20178.
  * Fix a bug where events in encrypted rooms would sometimes erroneously increment the total unread counter after being processed locally. ([\#3130](https://github.com/matrix-org/matrix-js-sdk/pull/3130)). Fixes vector-im/element-web#24448. Contributed by @Half-Shot.
  * Stop the ICE disconnected timer on call terminate ([\#3147](https://github.com/matrix-org/matrix-js-sdk/pull/3147)).
