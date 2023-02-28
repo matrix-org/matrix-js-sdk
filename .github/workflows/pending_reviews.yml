@@ -14,38 +14,38 @@ jobs:
             pull-requests: read
             checks: write
         steps:
-            - id: prdetails
-              uses: matrix-org/pr-details-action@v1.2
-              with:
-                  owner: ${{ github.event.workflow_run.head_repository.owner.login }}
-                  branch: ${{ github.event.workflow_run.head_branch }}
-
             - name: 🔍 Check reviewers
               uses: actions/github-script@v5
               env:
-                  PR_ID: ${{ steps.prdetails.outputs.pr_id }}
-                  HEAD_SHA: ${{ fromJSON(steps.prdetails.outputs.data).head.sha }}
-                  REQUESTED_REVIEWERS: ${{ toJSON(fromJSON(steps.prdetails.outputs.data).requested_reviewers) }}
-                  REQUESTED_TEAMS: ${{ toJSON(fromJSON(steps.prdetails.outputs.data).requested_teams) }}
+                  head: ${{ github.event.workflow_run.head_repository.owner.login }}:${{ github.event.workflow_run.head_branch }}
+                  repo: ${{ github.repository }}
               with:
+                  # We need to find the PR number that corresponds to the branch, which we do by searching the GH API
+                  # The workflow_run event includes a list of pull requests, but it doesn't get populated for
+                  # forked PRs: https://docs.github.com/en/rest/reference/checks#create-a-check-run
                   script: |
-                      const { PR_ID: pull_number, HEAD_SHA: sha, REQUESTED_REVIEWERS, REQUESTED_TEAMS } = process.env;
-                      const requested_reviewers = JSON.parse(REQUESTED_REVIEWERS);
-                      const requested_teams = JSON.parse(REQUESTED_TEAMS);
-
+                      const { repo: ownerRepo, head } = process.env;
+                      const [owner, repo] = ownerRepo.split("/");
+                      const pulls = await github.rest.pulls.list({
+                          head,
+                          owner,
+                          repo,
+                      });
+                      const pull = pulls[0];
+                      const pull_number = pull.number;
                       const reviews = await github.rest.pulls.listReviews({
                           pull_number,
                           owner,
                           repo,
                       });
 
-                      const pending = requested_reviewers.length
-                          || requested_teams.length
+                      const pending = pull.requested_reviewers.length
+                          || pull.requested_teams.length
                           || reviews.some(r => r.state !== "APPROVED");
 
                       await octokit.rest.repos.createCommitStatus({
                           context: "Pending reviews",
-                          sha,
+                          sha: pull.head.sha,
                           state: pending ? "failure" : "success",
                           description: pending ? "Outstanding pending reviews" : undefined,
                           owner,
