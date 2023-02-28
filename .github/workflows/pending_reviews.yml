@@ -16,22 +16,13 @@ jobs:
         steps:
             - name: 🔍 Check reviewers
               uses: actions/github-script@v5
-              env:
-                  head: ${{ github.event.workflow_run.head_repository.owner.login }}:${{ github.event.workflow_run.head_branch }}
-                  repo: ${{ github.repository }}
               with:
                   # We need to find the PR number that corresponds to the branch, which we do by searching the GH API
                   # The workflow_run event includes a list of pull requests, but it doesn't get populated for
                   # forked PRs: https://docs.github.com/en/rest/reference/checks#create-a-check-run
                   script: |
-                      const { repo: ownerRepo, head } = process.env;
-                      const [owner, repo] = ownerRepo.split("/");
-                      const pulls = await github.rest.pulls.list({
-                          head,
-                          owner,
-                          repo,
-                      });
-                      const pull = pulls[0];
+                      const { owner, repo } = context.repo;
+                      const pull = context.payload.pull_request;
                       const pull_number = pull.number;
                       const reviews = await github.rest.pulls.listReviews({
                           pull_number,
