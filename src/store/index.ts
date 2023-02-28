@@ -17,12 +17,14 @@ limitations under the License.
 import { EventType } from "../@types/event";
 import { Room } from "../models/room";
 import { User } from "../models/user";
-import { MatrixEvent } from "../models/event";
+import { IEvent, MatrixEvent } from "../models/event";
 import { Filter } from "../filter";
 import { RoomSummary } from "../models/room-summary";
 import { IMinimalEvent, IRooms, ISyncResponse } from "../sync-accumulator";
 import { IStartClientOpts } from "../client";
 import { IStateEventWithRoomId } from "../@types/search";
+import { IndexedToDeviceBatch, ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage";
+import { EventEmitterEvents } from "../models/typed-event-emitter";
 
 export interface ISavedSync {
     nextBatch: string;
@@ -31,150 +33,142 @@ export interface ISavedSync {
 }
 
 /**
- * Construct a stub store. This does no-ops on most store methods.
- * @constructor
+ * A store for most of the data js-sdk needs to store, apart from crypto data
  */
 export interface IStore {
     readonly accountData: Record<string, MatrixEvent>; // type : content
 
     // XXX: The indexeddb store exposes a non-standard emitter for the "degraded" event
     // for when it falls back to being a memory store due to errors.
-    on?: (event: string, handler: (...args: any[]) => void) => void;
+    on?: (event: EventEmitterEvents | "degraded", handler: (...args: any[]) => void) => void;
 
-    /** @return {Promise<boolean>} whether or not the database was newly created in this session. */
+    /** @returns whether or not the database was newly created in this session. */
     isNewlyCreated(): Promise<boolean>;
 
     /**
      * Get the sync token.
-     * @return {string}
      */
     getSyncToken(): string | null;
 
     /**
      * Set the sync token.
-     * @param {string} token
      */
     setSyncToken(token: string): void;
 
     /**
-     * No-op.
-     * @param {Room} room
+     * Store the given room.
+     * @param room - The room to be stored. All properties must be stored.
      */
     storeRoom(room: Room): void;
 
     /**
-     * No-op.
-     * @param {string} roomId
-     * @return {null}
+     * Retrieve a room by its' room ID.
+     * @param roomId - The room ID.
+     * @returns The room or null.
      */
     getRoom(roomId: string): Room | null;
 
     /**
-     * No-op.
-     * @return {Array} An empty array.
+     * Retrieve all known rooms.
+     * @returns A list of rooms, which may be empty.
      */
     getRooms(): Room[];
 
     /**
      * Permanently delete a room.
-     * @param {string} roomId
      */
     removeRoom(roomId: string): void;
 
     /**
-     * No-op.
-     * @return {Array} An empty array.
+     * Retrieve a summary of all the rooms.
+     * @returns A summary of each room.
      */
     getRoomSummaries(): RoomSummary[];
 
     /**
-     * No-op.
-     * @param {User} user
+     * Store a User.
+     * @param user - The user to store.
      */
     storeUser(user: User): void;
 
     /**
-     * No-op.
-     * @param {string} userId
-     * @return {null}
+     * Retrieve a User by its' user ID.
+     * @param userId - The user ID.
+     * @returns The user or null.
      */
     getUser(userId: string): User | null;
 
     /**
-     * No-op.
-     * @return {User[]}
+     * Retrieve all known users.
+     * @returns A list of users, which may be empty.
      */
     getUsers(): User[];
 
     /**
-     * No-op.
-     * @param {Room} room
-     * @param {number} limit
-     * @return {Array}
+     * Retrieve scrollback for this room.
+     * @param room - The matrix room
+     * @param limit - The max number of old events to retrieve.
+     * @returns An array of objects which will be at most 'limit'
+     * length and at least 0. The objects are the raw event JSON.
      */
     scrollback(room: Room, limit: number): MatrixEvent[];
 
     /**
      * Store events for a room.
-     * @param {Room} room The room to store events for.
-     * @param {Array<MatrixEvent>} events The events to store.
-     * @param {string} token The token associated with these events.
-     * @param {boolean} toStart True if these are paginated results.
+     * @param room - The room to store events for.
+     * @param events - The events to store.
+     * @param token - The token associated with these events.
+     * @param toStart - True if these are paginated results.
      */
-    storeEvents(room: Room, events: MatrixEvent[], token: string, toStart: boolean): void;
+    storeEvents(room: Room, events: MatrixEvent[], token: string | null, toStart: boolean): void;
 
     /**
      * Store a filter.
-     * @param {Filter} filter
      */
     storeFilter(filter: Filter): void;
 
     /**
      * Retrieve a filter.
-     * @param {string} userId
-     * @param {string} filterId
-     * @return {?Filter} A filter or null.
+     * @returns A filter or null.
      */
     getFilter(userId: string, filterId: string): Filter | null;
 
     /**
      * Retrieve a filter ID with the given name.
-     * @param {string} filterName The filter name.
-     * @return {?string} The filter ID or null.
+     * @param filterName - The filter name.
+     * @returns The filter ID or null.
      */
     getFilterIdByName(filterName: string): string | null;
 
     /**
      * Set a filter name to ID mapping.
-     * @param {string} filterName
-     * @param {string} filterId
      */
-    setFilterIdByName(filterName: string, filterId: string): void;
+    setFilterIdByName(filterName: string, filterId?: string): void;
 
     /**
      * Store user-scoped account data events
-     * @param {Array<MatrixEvent>} events The events to store.
+     * @param events - The events to store.
      */
     storeAccountDataEvents(events: MatrixEvent[]): void;
 
     /**
      * Get account data event by event type
-     * @param {string} eventType The event type being queried
+     * @param eventType - The event type being queried
      */
-    getAccountData(eventType: EventType | string): MatrixEvent;
+    getAccountData(eventType: EventType | string): MatrixEvent | undefined;
 
     /**
      * setSyncData does nothing as there is no backing data store.
      *
-     * @param {Object} syncData The sync data
-     * @return {Promise} An immediately resolved promise.
+     * @param syncData - The sync data
+     * @returns An immediately resolved promise.
      */
     setSyncData(syncData: ISyncResponse): Promise<void>;
 
     /**
      * We never want to save because we have nothing to save to.
      *
-     * @return {boolean} If the store wants to save
+     * @returns If the store wants to save
      */
     wantsSave(): boolean;
 
@@ -185,19 +179,19 @@ export interface IStore {
 
     /**
      * Startup does nothing.
-     * @return {Promise} An immediately resolved promise.
+     * @returns An immediately resolved promise.
      */
     startup(): Promise<void>;
 
     /**
-     * @return {Promise} Resolves with a sync response to restore the
+     * @returns Promise which resolves with a sync response to restore the
      * client state to where it was at the last save, or null if there
      * is no saved sync data.
      */
-    getSavedSync(): Promise<ISavedSync>;
+    getSavedSync(): Promise<ISavedSync | null>;
 
     /**
-     * @return {Promise} If there is a saved sync, the nextBatch token
+     * @returns If there is a saved sync, the nextBatch token
      * for this sync, otherwise null.
      */
     getSavedSyncToken(): Promise<string | null>;
@@ -205,17 +199,49 @@ export interface IStore {
     /**
      * Delete all data from this store. Does nothing since this store
      * doesn't store anything.
-     * @return {Promise} An immediately resolved promise.
+     * @returns An immediately resolved promise.
      */
     deleteAllData(): Promise<void>;
 
+    /**
+     * Returns the out-of-band membership events for this room that
+     * were previously loaded.
+     * @returns the events, potentially an empty array if OOB loading didn't yield any new members
+     * @returns in case the members for this room haven't been stored yet
+     */
     getOutOfBandMembers(roomId: string): Promise<IStateEventWithRoomId[] | null>;
 
+    /**
+     * Stores the out-of-band membership events for this room. Note that
+     * it still makes sense to store an empty array as the OOB status for the room is
+     * marked as fetched, and getOutOfBandMembers will return an empty array instead of null
+     * @param membershipEvents - the membership events to store
+     * @returns when all members have been stored
+     */
     setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void>;
 
     clearOutOfBandMembers(roomId: string): Promise<void>;
 
-    getClientOptions(): Promise<IStartClientOpts>;
+    getClientOptions(): Promise<IStartClientOpts | undefined>;
 
     storeClientOptions(options: IStartClientOpts): Promise<void>;
+
+    getPendingEvents(roomId: string): Promise<Partial<IEvent>[]>;
+
+    setPendingEvents(roomId: string, events: Partial<IEvent>[]): Promise<void>;
+
+    /**
+     * Stores batches of outgoing to-device messages
+     */
+    saveToDeviceBatches(batch: ToDeviceBatchWithTxnId[]): Promise<void>;
+
+    /**
+     * Fetches the oldest batch of to-device messages in the queue
+     */
+    getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
+
+    /**
+     * Removes a specific batch of to-device messages from the queue
+     */
+    removeToDeviceBatch(id: number): Promise<void>;
 }

@@ -1,6 +1,5 @@
 This is a functional terminal app which allows you to see the room list for a user, join rooms, send messages and view room membership lists.
 
-
 To try it out, you will need to edit `app.js` to configure it for your `homeserver`, `access_token` and `user_id`. Then run:
 
 ```
@@ -24,7 +23,7 @@ Room list index commands:
 Room commands:
   '/exit' Return to the room list index.
   '/members' Show the room member list.
-  
+
 $ /enter 2
 
 [2015-06-12 15:14:54] Megan2 <<< herro

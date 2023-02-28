@@ -1,9 +1,10 @@
 To try it out, **you must build the SDK first** and then host this folder:
 
 ```
- $ npm run build
+ $ yarn install
+ $ yarn build
  $ cd examples/browser
- $ python -m SimpleHTTPServer 8003
+ $ python -m http.server 8003
 ```
 
-Then visit ``http://localhost:8003``.
+Then visit `http://localhost:8003`.

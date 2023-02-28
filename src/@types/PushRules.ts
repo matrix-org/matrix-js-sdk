@@ -30,7 +30,7 @@ export enum TweakName {
 
 export type Tweak<N extends TweakName, V> = {
     set_tweak: N;
-    value: V;
+    value?: V;
 };
 
 export type TweakHighlight = Tweak<TweakName.Highlight, boolean>;
@@ -48,9 +48,9 @@ export enum ConditionOperator {
 
 export type PushRuleAction = Tweaks | PushRuleActionName;
 
-export type MemberCountCondition
-    <N extends number, Op extends ConditionOperator = ConditionOperator.ExactEquals>
-    = `${Op}${N}` | (Op extends ConditionOperator.ExactEquals ? `${N}` : never);
+export type MemberCountCondition<N extends number, Op extends ConditionOperator = ConditionOperator.ExactEquals> =
+    | `${Op}${N}`
+    | (Op extends ConditionOperator.ExactEquals ? `${N}` : never);
 
 export type AnyMemberCountCondition = MemberCountCondition<number, ConditionOperator>;
 
@@ -65,6 +65,8 @@ export enum ConditionKind {
     ContainsDisplayName = "contains_display_name",
     RoomMemberCount = "room_member_count",
     SenderNotificationPermission = "sender_notification_permission",
+    CallStarted = "call_started",
+    CallStartedPrefix = "org.matrix.msc3914.call_started",
 }
 
 export interface IPushRuleCondition<N extends ConditionKind | string> {
@@ -74,7 +76,8 @@ export interface IPushRuleCondition<N extends ConditionKind | string> {
 
 export interface IEventMatchCondition extends IPushRuleCondition<ConditionKind.EventMatch> {
     key: string;
-    pattern: string;
+    pattern?: string;
+    value?: string;
 }
 
 export interface IContainsDisplayNameCondition extends IPushRuleCondition<ConditionKind.ContainsDisplayName> {
@@ -90,12 +93,23 @@ export interface ISenderNotificationPermissionCondition
     key: string;
 }
 
+export interface ICallStartedCondition extends IPushRuleCondition<ConditionKind.CallStarted> {
+    // no additional fields
+}
+
+export interface ICallStartedPrefixCondition extends IPushRuleCondition<ConditionKind.CallStartedPrefix> {
+    // no additional fields
+}
+
 // XXX: custom conditions are possible but always fail, and break the typescript discriminated union so ignore them here
 // IPushRuleCondition<Exclude<string, ConditionKind>> unfortunately does not resolve this at the time of writing.
-export type PushRuleCondition = IEventMatchCondition
+export type PushRuleCondition =
+    | IEventMatchCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
-    | ISenderNotificationPermissionCondition;
+    | ISenderNotificationPermissionCondition
+    | ICallStartedCondition
+    | ICallStartedPrefixCondition;
 
 export enum PushRuleKind {
     Override = "override",
@@ -144,21 +158,25 @@ export interface IPushRules {
 }
 
 export interface IPusher {
-    app_display_name: string;
-    app_id: string;
-    data: {
+    "app_display_name": string;
+    "app_id": string;
+    "data": {
         format?: string;
         url?: string; // TODO: Required if kind==http
         brand?: string; // TODO: For email notifications only? Unspecced field
     };
-    device_display_name: string;
-    kind: "http" | string;
-    lang: string;
-    profile_tag?: string;
-    pushkey: string;
+    "device_display_name": string;
+    "kind": "http" | string;
+    "lang": string;
+    "profile_tag"?: string;
+    "pushkey": string;
+    "enabled"?: boolean | null;
+    "org.matrix.msc3881.enabled"?: boolean | null;
+    "device_id"?: string | null;
+    "org.matrix.msc3881.device_id"?: string | null;
 }
 
-export interface IPusherRequest extends IPusher {
+export interface IPusherRequest extends Omit<IPusher, "device_id" | "org.matrix.msc3881.device_id"> {
     append?: boolean;
 }
 

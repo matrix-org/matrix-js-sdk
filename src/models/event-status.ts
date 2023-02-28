@@ -17,7 +17,6 @@ limitations under the License.
 /**
  * Enum for event statuses.
  * @readonly
- * @enum {string}
  */
 export enum EventStatus {
     /** The event was not sent and will no longer be retried. */

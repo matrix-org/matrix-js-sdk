@@ -15,10 +15,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/** @module auto-discovery */
-
 import { IClientWellKnown, IWellKnownConfig } from "./client";
-import { logger } from './logger';
+import { logger } from "./logger";
+import { MatrixError, Method, timeoutSignal } from "./http-api";
 
 // Dev note: Auto discovery is part of the spec.
 // See: https://matrix.org/docs/spec/client_server/r0.4.0.html#server-discovery
@@ -31,6 +30,28 @@ export enum AutoDiscoveryAction {
     FAIL_ERROR = "FAIL_ERROR",
 }
 
+enum AutoDiscoveryError {
+    Invalid = "Invalid homeserver discovery response",
+    GenericFailure = "Failed to get autodiscovery configuration from server",
+    InvalidHsBaseUrl = "Invalid base_url for m.homeserver",
+    InvalidHomeserver = "Homeserver URL does not appear to be a valid Matrix homeserver",
+    InvalidIsBaseUrl = "Invalid base_url for m.identity_server",
+    InvalidIdentityServer = "Identity server URL does not appear to be a valid identity server",
+    InvalidIs = "Invalid identity server discovery response",
+    MissingWellknown = "No .well-known JSON file found",
+    InvalidJson = "Invalid JSON",
+}
+
+interface WellKnownConfig extends Omit<IWellKnownConfig, "error"> {
+    state: AutoDiscoveryAction;
+    error?: IWellKnownConfig["error"] | null;
+}
+
+export interface ClientConfig extends Omit<IClientWellKnown, "m.homeserver" | "m.identity_server"> {
+    "m.homeserver": WellKnownConfig;
+    "m.identity_server": WellKnownConfig;
+}
+
 /**
  * Utilities for automatically discovery resources, such as homeservers
  * for users to log in to.
@@ -41,42 +62,29 @@ export class AutoDiscovery {
     // translate the meaning of the states in the spec, but also
     // support our own if needed.
 
-    public static readonly ERROR_INVALID = "Invalid homeserver discovery response";
+    public static readonly ERROR_INVALID = AutoDiscoveryError.Invalid;
 
-    public static readonly ERROR_GENERIC_FAILURE = "Failed to get autodiscovery configuration from server";
+    public static readonly ERROR_GENERIC_FAILURE = AutoDiscoveryError.GenericFailure;
 
-    public static readonly ERROR_INVALID_HS_BASE_URL = "Invalid base_url for m.homeserver";
+    public static readonly ERROR_INVALID_HS_BASE_URL = AutoDiscoveryError.InvalidHsBaseUrl;
 
-    public static readonly ERROR_INVALID_HOMESERVER = "Homeserver URL does not appear to be a valid Matrix homeserver";
+    public static readonly ERROR_INVALID_HOMESERVER = AutoDiscoveryError.InvalidHomeserver;
 
-    public static readonly ERROR_INVALID_IS_BASE_URL = "Invalid base_url for m.identity_server";
+    public static readonly ERROR_INVALID_IS_BASE_URL = AutoDiscoveryError.InvalidIsBaseUrl;
 
-    // eslint-disable-next-line
-    public static readonly ERROR_INVALID_IDENTITY_SERVER = "Identity server URL does not appear to be a valid identity server";
+    public static readonly ERROR_INVALID_IDENTITY_SERVER = AutoDiscoveryError.InvalidIdentityServer;
 
-    public static readonly ERROR_INVALID_IS = "Invalid identity server discovery response";
+    public static readonly ERROR_INVALID_IS = AutoDiscoveryError.InvalidIs;
 
-    public static readonly ERROR_MISSING_WELLKNOWN = "No .well-known JSON file found";
+    public static readonly ERROR_MISSING_WELLKNOWN = AutoDiscoveryError.MissingWellknown;
 
-    public static readonly ERROR_INVALID_JSON = "Invalid JSON";
+    public static readonly ERROR_INVALID_JSON = AutoDiscoveryError.InvalidJson;
 
-    public static readonly ALL_ERRORS = [
-        AutoDiscovery.ERROR_INVALID,
-        AutoDiscovery.ERROR_GENERIC_FAILURE,
-        AutoDiscovery.ERROR_INVALID_HS_BASE_URL,
-        AutoDiscovery.ERROR_INVALID_HOMESERVER,
-        AutoDiscovery.ERROR_INVALID_IS_BASE_URL,
-        AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER,
-        AutoDiscovery.ERROR_INVALID_IS,
-        AutoDiscovery.ERROR_MISSING_WELLKNOWN,
-        AutoDiscovery.ERROR_INVALID_JSON,
-    ];
+    public static readonly ALL_ERRORS = Object.keys(AutoDiscoveryError);
 
     /**
      * The auto discovery failed. The client is expected to communicate
      * the error to the user and refuse logging in.
-     * @return {string}
-     * @constructor
      */
     public static readonly FAIL_ERROR = AutoDiscoveryAction.FAIL_ERROR;
 
@@ -86,8 +94,6 @@ export class AutoDiscovery {
      * action it would for PROMPT while also warning the user about
      * what went wrong. The client may also treat this the same as
      * a FAIL_ERROR state.
-     * @return {string}
-     * @constructor
      */
     public static readonly FAIL_PROMPT = AutoDiscoveryAction.FAIL_PROMPT;
 
@@ -95,15 +101,11 @@ export class AutoDiscovery {
      * The auto discovery didn't fail but did not find anything of
      * interest. The client is expected to prompt the user for more
      * information, or fail if it prefers.
-     * @return {string}
-     * @constructor
      */
     public static readonly PROMPT = AutoDiscoveryAction.PROMPT;
 
     /**
      * The auto discovery was successful.
-     * @return {string}
-     * @constructor
      */
     public static readonly SUCCESS = AutoDiscoveryAction.SUCCESS;
 
@@ -113,19 +115,19 @@ export class AutoDiscovery {
      * and identity server URL the client would want. Additional details
      * may also be included, and will be transparently brought into the
      * response object unaltered.
-     * @param {object} wellknown The configuration object itself, as returned
+     * @param wellknown - The configuration object itself, as returned
      * by the .well-known auto-discovery endpoint.
-     * @return {Promise<DiscoveredClientConfig>} Resolves to the verified
+     * @returns Promise which resolves to the verified
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when verification fails.
      */
-    public static async fromDiscoveryConfig(wellknown: any): Promise<IClientWellKnown> {
+    public static async fromDiscoveryConfig(wellknown: IClientWellKnown): Promise<ClientConfig> {
         // Step 1 is to get the config, which is provided to us here.
 
         // We default to an error state to make the first few checks easier to
         // write. We'll update the properties of this object over the duration
         // of this function.
-        const clientConfig = {
+        const clientConfig: ClientConfig = {
             "m.homeserver": {
                 state: AutoDiscovery.FAIL_ERROR,
                 error: AutoDiscovery.ERROR_INVALID,
@@ -160,9 +162,7 @@ export class AutoDiscovery {
 
         // Step 2: Make sure the homeserver URL is valid *looking*. We'll make
         // sure it points to a homeserver in Step 3.
-        const hsUrl = this.sanitizeWellKnownUrl(
-            wellknown["m.homeserver"]["base_url"],
-        );
+        const hsUrl = this.sanitizeWellKnownUrl(wellknown["m.homeserver"]["base_url"]);
         if (!hsUrl) {
             logger.error("Invalid base_url for m.homeserver");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HS_BASE_URL;
@@ -170,10 +170,8 @@ export class AutoDiscovery {
         }
 
         // Step 3: Make sure the homeserver URL points to a homeserver.
-        const hsVersions = await this.fetchWellKnownObject(
-            `${hsUrl}/_matrix/client/versions`,
-        );
-        if (!hsVersions || !hsVersions.raw["versions"]) {
+        const hsVersions = await this.fetchWellKnownObject(`${hsUrl}/_matrix/client/versions`);
+        if (!hsVersions || !hsVersions.raw?.["versions"]) {
             logger.error("Invalid /versions response");
             clientConfig["m.homeserver"].error = AutoDiscovery.ERROR_INVALID_HOMESERVER;
 
@@ -196,7 +194,7 @@ export class AutoDiscovery {
         if (wellknown["m.identity_server"]) {
             // We prepare a failing identity server response to save lines later
             // in this branch.
-            const failingClientConfig = {
+            const failingClientConfig: ClientConfig = {
                 "m.homeserver": clientConfig["m.homeserver"],
                 "m.identity_server": {
                     state: AutoDiscovery.FAIL_PROMPT,
@@ -207,25 +205,19 @@ export class AutoDiscovery {
 
             // Step 5a: Make sure the URL is valid *looking*. We'll make sure it
             // points to an identity server in Step 5b.
-            isUrl = this.sanitizeWellKnownUrl(
-                wellknown["m.identity_server"]["base_url"],
-            );
+            isUrl = this.sanitizeWellKnownUrl(wellknown["m.identity_server"]["base_url"]);
             if (!isUrl) {
                 logger.error("Invalid base_url for m.identity_server");
-                failingClientConfig["m.identity_server"].error =
-                    AutoDiscovery.ERROR_INVALID_IS_BASE_URL;
+                failingClientConfig["m.identity_server"].error = AutoDiscovery.ERROR_INVALID_IS_BASE_URL;
                 return Promise.resolve(failingClientConfig);
             }
 
             // Step 5b: Verify there is an identity server listening on the provided
             // URL.
-            const isResponse = await this.fetchWellKnownObject(
-                `${isUrl}/_matrix/identity/api/v1`,
-            );
-            if (!isResponse || !isResponse.raw || isResponse.action !== AutoDiscoveryAction.SUCCESS) {
-                logger.error("Invalid /api/v1 response");
-                failingClientConfig["m.identity_server"].error =
-                    AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
+            const isResponse = await this.fetchWellKnownObject(`${isUrl}/_matrix/identity/v2`);
+            if (!isResponse?.raw || isResponse.action !== AutoDiscoveryAction.SUCCESS) {
+                logger.error("Invalid /v2 response");
+                failingClientConfig["m.identity_server"].error = AutoDiscovery.ERROR_INVALID_IDENTITY_SERVER;
 
                 // Supply the base_url to the caller because they may be ignoring
                 // liveliness errors, like this one.
@@ -247,14 +239,16 @@ export class AutoDiscovery {
 
         // Step 7: Copy any other keys directly into the clientConfig. This is for
         // things like custom configuration of services.
-        Object.keys(wellknown).forEach((k) => {
+        Object.keys(wellknown).forEach((k: keyof IClientWellKnown) => {
             if (k === "m.homeserver" || k === "m.identity_server") {
                 // Only copy selected parts of the config to avoid overwriting
                 // properties computed by the validation logic above.
                 const notProps = ["error", "state", "base_url"];
-                for (const prop of Object.keys(wellknown[k])) {
+                for (const prop of Object.keys(wellknown[k]!)) {
                     if (notProps.includes(prop)) continue;
-                    clientConfig[k][prop] = wellknown[k][prop];
+                    type Prop = Exclude<keyof IWellKnownConfig, "error" | "state" | "base_url">;
+                    // @ts-ignore - ts gets unhappy as we're mixing types here
+                    clientConfig[k][prop as Prop] = wellknown[k]![prop as Prop];
                 }
             } else {
                 // Just copy the whole thing over otherwise
@@ -272,14 +266,14 @@ export class AutoDiscovery {
      * and identity server URL the client would want. Additional details
      * may also be discovered, and will be transparently included in the
      * response object unaltered.
-     * @param {string} domain The homeserver domain to perform discovery
+     * @param domain - The homeserver domain to perform discovery
      * on. For example, "matrix.org".
-     * @return {Promise<DiscoveredClientConfig>} Resolves to the discovered
+     * @returns Promise which resolves to the discovered
      * configuration, which may include error states. Rejects on unexpected
      * failure, not when discovery fails.
      */
-    public static async findClientConfig(domain: string): Promise<IClientWellKnown> {
-        if (!domain || typeof(domain) !== "string" || domain.length === 0) {
+    public static async findClientConfig(domain: string): Promise<ClientConfig> {
+        if (!domain || typeof domain !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
 
@@ -297,7 +291,7 @@ export class AutoDiscovery {
         // We default to an error state to make the first few checks easier to
         // write. We'll update the properties of this object over the duration
         // of this function.
-        const clientConfig = {
+        const clientConfig: ClientConfig = {
             "m.homeserver": {
                 state: AutoDiscovery.FAIL_ERROR,
                 error: AutoDiscovery.ERROR_INVALID,
@@ -314,9 +308,7 @@ export class AutoDiscovery {
 
         // Step 1: Actually request the .well-known JSON file and make sure it
         // at least has a homeserver definition.
-        const wellknown = await this.fetchWellKnownObject(
-            `https://${domain}/.well-known/matrix/client`,
-        );
+        const wellknown = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
         if (!wellknown || wellknown.action !== AutoDiscoveryAction.SUCCESS) {
             logger.error("No response or error when parsing .well-known");
             if (wellknown.reason) logger.error(wellknown.reason);
@@ -335,25 +327,23 @@ export class AutoDiscovery {
         }
 
         // Step 2: Validate and parse the config
-        return AutoDiscovery.fromDiscoveryConfig(wellknown.raw);
+        return AutoDiscovery.fromDiscoveryConfig(wellknown.raw!);
     }
 
     /**
      * Gets the raw discovery client configuration for the given domain name.
      * Should only be used if there's no validation to be done on the resulting
      * object, otherwise use findClientConfig().
-     * @param {string} domain The domain to get the client config for.
-     * @returns {Promise<object>} Resolves to the domain's client config. Can
+     * @param domain - The domain to get the client config for.
+     * @returns Promise which resolves to the domain's client config. Can
      * be an empty object.
      */
-    public static async getRawClientConfig(domain: string): Promise<IClientWellKnown> {
-        if (!domain || typeof(domain) !== "string" || domain.length === 0) {
+    public static async getRawClientConfig(domain?: string): Promise<IClientWellKnown> {
+        if (!domain || typeof domain !== "string" || domain.length === 0) {
             throw new Error("'domain' must be a string of non-zero length");
         }
 
-        const response = await this.fetchWellKnownObject(
-            `https://${domain}/.well-known/matrix/client`,
-        );
+        const response = await this.fetchWellKnownObject(`https://${domain}/.well-known/matrix/client`);
         if (!response) return {};
         return response.raw || {};
     }
@@ -362,22 +352,22 @@ export class AutoDiscovery {
      * Sanitizes a given URL to ensure it is either an HTTP or HTTP URL and
      * is suitable for the requirements laid out by .well-known auto discovery.
      * If valid, the URL will also be stripped of any trailing slashes.
-     * @param {string} url The potentially invalid URL to sanitize.
-     * @return {string|boolean} The sanitized URL or a falsey value if the URL is invalid.
-     * @private
+     * @param url - The potentially invalid URL to sanitize.
+     * @returns The sanitized URL or a falsey value if the URL is invalid.
+     * @internal
      */
-    private static sanitizeWellKnownUrl(url: string): string | boolean {
+    private static sanitizeWellKnownUrl(url?: string | null): string | false {
         if (!url) return false;
 
         try {
-            let parsed = null;
+            let parsed: URL | undefined;
             try {
                 parsed = new URL(url);
             } catch (e) {
                 logger.error("Could not parse url", e);
             }
 
-            if (!parsed || !parsed.hostname) return false;
+            if (!parsed?.hostname) return false;
             if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
 
             const port = parsed.port ? `:${parsed.port}` : "";
@@ -393,6 +383,19 @@ export class AutoDiscovery {
         }
     }
 
+    private static fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof global.fetch> {
+        if (this.fetchFn) {
+            return this.fetchFn(resource, options);
+        }
+        return global.fetch(resource, options);
+    }
+
+    private static fetchFn?: typeof global.fetch;
+
+    public static setFetchFn(fetchFn: typeof global.fetch): void {
+        AutoDiscovery.fetchFn = fetchFn;
+    }
+
     /**
      * Fetches a JSON object from a given URL, as expected by all .well-known
      * related lookups. If the server gives a 404 then the `action` will be
@@ -405,47 +408,65 @@ export class AutoDiscovery {
      *   action: One of SUCCESS, IGNORE, or FAIL_PROMPT.
      *   reason: Relatively human-readable description of what went wrong.
      *   error: The actual Error, if one exists.
-     * @param {string} url The URL to fetch a JSON object from.
-     * @return {Promise<object>} Resolves to the returned state.
-     * @private
+     * @param url - The URL to fetch a JSON object from.
+     * @returns Promise which resolves to the returned state.
+     * @internal
      */
-    private static fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
-        return new Promise(function(resolve) {
-            // eslint-disable-next-line
-            const request = require("./matrix").getRequest();
-            if (!request) throw new Error("No request library available");
-            request(
-                { method: "GET", uri: url, timeout: 5000 },
-                (err, response, body) => {
-                    if (err || response &&
-                        (response.statusCode < 200 || response.statusCode >= 300)
-                    ) {
-                        let action = AutoDiscoveryAction.FAIL_PROMPT;
-                        let reason = (err ? err.message : null) || "General failure";
-                        if (response && response.statusCode === 404) {
-                            action = AutoDiscoveryAction.IGNORE;
-                            reason = AutoDiscovery.ERROR_MISSING_WELLKNOWN;
-                        }
-                        resolve({ raw: {}, action: action, reason: reason, error: err });
-                        return;
-                    }
+    private static async fetchWellKnownObject(url: string): Promise<IWellKnownConfig> {
+        let response: Response;
 
-                    try {
-                        resolve({ raw: JSON.parse(body), action: AutoDiscoveryAction.SUCCESS });
-                    } catch (e) {
-                        let reason = AutoDiscovery.ERROR_INVALID;
-                        if (e.name === "SyntaxError") {
-                            reason = AutoDiscovery.ERROR_INVALID_JSON;
-                        }
-                        resolve({
-                            raw: {},
-                            action: AutoDiscoveryAction.FAIL_PROMPT,
-                            reason: reason,
-                            error: e,
-                        });
-                    }
-                },
-            );
-        });
+        try {
+            response = await AutoDiscovery.fetch(url, {
+                method: Method.Get,
+                signal: timeoutSignal(5000),
+            });
+
+            if (response.status === 404) {
+                return {
+                    raw: {},
+                    action: AutoDiscoveryAction.IGNORE,
+                    reason: AutoDiscovery.ERROR_MISSING_WELLKNOWN,
+                };
+            }
+
+            if (!response.ok) {
+                return {
+                    raw: {},
+                    action: AutoDiscoveryAction.FAIL_PROMPT,
+                    reason: "General failure",
+                };
+            }
+        } catch (err) {
+            const error = err as AutoDiscoveryError | string | undefined;
+            let reason = "";
+            if (typeof error === "object") {
+                reason = (<Error>error)?.message;
+            }
+
+            return {
+                error,
+                raw: {},
+                action: AutoDiscoveryAction.FAIL_PROMPT,
+                reason: reason || "General failure",
+            };
+        }
+
+        try {
+            return {
+                raw: await response.json(),
+                action: AutoDiscoveryAction.SUCCESS,
+            };
+        } catch (err) {
+            const error = err as Error;
+            return {
+                error,
+                raw: {},
+                action: AutoDiscoveryAction.FAIL_PROMPT,
+                reason:
+                    (error as MatrixError)?.name === "SyntaxError"
+                        ? AutoDiscovery.ERROR_INVALID_JSON
+                        : AutoDiscovery.ERROR_INVALID,
+            };
+        }
     }
 }

@@ -14,21 +14,33 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/**
- * @module models/room-state
- */
-
 import { RoomMember } from "./room-member";
-import { logger } from '../logger';
+import { logger } from "../logger";
 import * as utils from "../utils";
-import { EventType } from "../@types/event";
-import { MatrixEvent, MatrixEventEvent } from "./event";
+import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event";
+import { IEvent, MatrixEvent, MatrixEventEvent } from "./event";
 import { MatrixClient } from "../client";
 import { GuestAccess, HistoryVisibility, IJoinRuleEventContent, JoinRule } from "../@types/partials";
 import { TypedEventEmitter } from "./typed-event-emitter";
 import { Beacon, BeaconEvent, BeaconEventHandlerMap, getBeaconInfoIdentifier, BeaconIdentifier } from "./beacon";
 import { TypedReEmitter } from "../ReEmitter";
 import { M_BEACON, M_BEACON_INFO } from "../@types/beacon";
+
+export interface IMarkerFoundOptions {
+    /** Whether the timeline was empty before the marker event arrived in the
+     *  room. This could be happen in a variety of cases:
+     *  1. From the initial sync
+     *  2. It's the first state we're seeing after joining the room
+     *  3. Or whether it's coming from `syncFromCache`
+     *
+     * A marker event refers to `UNSTABLE_MSC2716_MARKER` and indicates that
+     * history was imported somewhere back in time. It specifically points to an
+     * MSC2716 insertion event where the history was imported at. Marker events
+     * are sent as state events so they are easily discoverable by clients and
+     * homeservers and don't get lost in timeline gaps.
+     */
+    timelineWasEmpty?: boolean;
+}
 
 // possible statuses for out-of-band member loading
 enum OobStatus {
@@ -37,20 +49,80 @@ enum OobStatus {
     Finished,
 }
 
+export interface IPowerLevelsContent {
+    users?: Record<string, number>;
+    events?: Record<string, number>;
+    // eslint-disable-next-line camelcase
+    users_default?: number;
+    // eslint-disable-next-line camelcase
+    events_default?: number;
+    // eslint-disable-next-line camelcase
+    state_default?: number;
+    ban?: number;
+    kick?: number;
+    redact?: number;
+}
+
 export enum RoomStateEvent {
     Events = "RoomState.events",
     Members = "RoomState.members",
     NewMember = "RoomState.newMember",
     Update = "RoomState.update", // signals batches of updates without specificity
     BeaconLiveness = "RoomState.BeaconLiveness",
+    Marker = "RoomState.Marker",
 }
 
 export type RoomStateEventHandlerMap = {
+    /**
+     * Fires whenever the event dictionary in room state is updated.
+     * @param event - The matrix event which caused this event to fire.
+     * @param state - The room state whose RoomState.events dictionary
+     * was updated.
+     * @param prevEvent - The event being replaced by the new state, if
+     * known. Note that this can differ from `getPrevContent()` on the new state event
+     * as this is the store's view of the last state, not the previous state provided
+     * by the server.
+     * @example
+     * ```
+     * matrixClient.on("RoomState.events", function(event, state, prevEvent){
+     *   var newStateEvent = event;
+     * });
+     * ```
+     */
     [RoomStateEvent.Events]: (event: MatrixEvent, state: RoomState, lastStateEvent: MatrixEvent | null) => void;
+    /**
+     * Fires whenever a member in the members dictionary is updated in any way.
+     * @param event - The matrix event which caused this event to fire.
+     * @param state - The room state whose RoomState.members dictionary
+     * was updated.
+     * @param member - The room member that was updated.
+     * @example
+     * ```
+     * matrixClient.on("RoomState.members", function(event, state, member){
+     *   var newMembershipState = member.membership;
+     * });
+     * ```
+     */
     [RoomStateEvent.Members]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
+    /**
+     * Fires whenever a member is added to the members dictionary. The RoomMember
+     * will not be fully populated yet (e.g. no membership state) but will already
+     * be available in the members dictionary.
+     * @param event - The matrix event which caused this event to fire.
+     * @param state - The room state whose RoomState.members dictionary
+     * was updated with a new entry.
+     * @param member - The room member that was added.
+     * @example
+     * ```
+     * matrixClient.on("RoomState.newMember", function(event, state, member){
+     *   // add event listeners on 'member'
+     * });
+     * ```
+     */
     [RoomStateEvent.NewMember]: (event: MatrixEvent, state: RoomState, member: RoomMember) => void;
     [RoomStateEvent.Update]: (state: RoomState) => void;
     [RoomStateEvent.BeaconLiveness]: (state: RoomState, hasLiveBeacons: boolean) => void;
+    [RoomStateEvent.Marker]: (event: MatrixEvent, setStateOptions?: IMarkerFoundOptions) => void;
     [BeaconEvent.New]: (event: MatrixEvent, beacon: Beacon) => void;
 };
 
@@ -61,25 +133,28 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public readonly reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
     private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
     // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
-    private displayNameToUserIds: Record<string, string[]> = {};
+    private displayNameToUserIds = new Map<string, string[]>();
     private userIdsToDisplayNames: Record<string, string> = {};
     private tokenToInvite: Record<string, MatrixEvent> = {}; // 3pid invite state_key to m.room.member invite
-    private joinedMemberCount: number = null; // cache of the number of joined members
+    private joinedMemberCount: number | null = null; // cache of the number of joined members
     // joined members count from summary api
     // once set, we know the server supports the summary api
     // and we should only trust that
     // we could also only trust that before OOB members
     // are loaded but doesn't seem worth the hassle atm
-    private summaryJoinedMemberCount: number = null;
+    private summaryJoinedMemberCount: number | null = null;
     // same for invited member count
-    private invitedMemberCount: number = null;
-    private summaryInvitedMemberCount: number = null;
-    private modified: number;
+    private invitedMemberCount: number | null = null;
+    private summaryInvitedMemberCount: number | null = null;
+    private modified = -1;
 
     // XXX: Should be read-only
+    // The room member dictionary, keyed on the user's ID.
     public members: Record<string, RoomMember> = {}; // userId: RoomMember
+    // The state events dictionary, keyed on the event type and then the state_key value.
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
-    public paginationToken: string = null;
+    // The pagination token for this state.
+    public paginationToken: string | null = null;
 
     public readonly beacons = new Map<BeaconIdentifier, Beacon>();
     private _liveBeaconIds: BeaconIdentifier[] = [];
@@ -91,8 +166,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * It can be mutated by adding state events to it.
      * There are two types of room member associated with a state event:
      * normal member objects (accessed via getMember/getMembers) which mutate
-     * with the state to represent the current state of that room/user, eg.
-     * the object returned by getMember('@bob:example.com') will mutate to
+     * with the state to represent the current state of that room/user, e.g.
+     * the object returned by `getMember('@bob:example.com')` will mutate to
      * get a different display name if Bob later changes his display name
      * in the room.
      * There are also 'sentinel' members (accessed via getSentinelMember).
@@ -105,20 +180,14 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * after the display name change will return a new RoomMember object
      * with Bob's new display name.
      *
-     * @constructor
-     * @param {?string} roomId Optional. The ID of the room which has this state.
+     * @param roomId - Optional. The ID of the room which has this state.
      * If none is specified it just tracks paginationTokens, useful for notifTimelineSet
-     * @param {?object} oobMemberFlags Optional. The state of loading out of bound members.
+     * @param oobMemberFlags - Optional. The state of loading out of bound members.
      * As the timeline might get reset while they are loading, this state needs to be inherited
      * and shared when the room state is cloned for the new timeline.
      * This should only be passed from clone.
-     * @prop {Object.<string, RoomMember>} members The room member dictionary, keyed
-     * on the user's ID.
-     * @prop {Object.<string, Object.<string, MatrixEvent>>} events The state
-     * events dictionary, keyed on the event type and then the state_key value.
-     * @prop {string} paginationToken The pagination token for this state.
      */
-    constructor(public readonly roomId: string, private oobMemberFlags = { status: OobStatus.NotStarted }) {
+    public constructor(public readonly roomId: string, private oobMemberFlags = { status: OobStatus.NotStarted }) {
         super();
         this.updateModifiedTime();
     }
@@ -126,7 +195,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Returns the number of joined members in this room
      * This method caches the result.
-     * @return {number} The number of members in this room whose membership is 'join'
+     * @returns The number of members in this room whose membership is 'join'
      */
     public getJoinedMemberCount(): number {
         if (this.summaryJoinedMemberCount !== null) {
@@ -134,7 +203,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.joinedMemberCount === null) {
             this.joinedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === 'join' ? count + 1 : count;
+                return m.membership === "join" ? count + 1 : count;
             }, 0);
         }
         return this.joinedMemberCount;
@@ -142,7 +211,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Set the joined member count explicitly (like from summary part of the sync response)
-     * @param {number} count the amount of joined members
+     * @param count - the amount of joined members
      */
     public setJoinedMemberCount(count: number): void {
         this.summaryJoinedMemberCount = count;
@@ -150,7 +219,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Returns the number of invited members in this room
-     * @return {number} The number of members in this room whose membership is 'invite'
+     * @returns The number of members in this room whose membership is 'invite'
      */
     public getInvitedMemberCount(): number {
         if (this.summaryInvitedMemberCount !== null) {
@@ -158,7 +227,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
         if (this.invitedMemberCount === null) {
             this.invitedMemberCount = this.getMembers().reduce((count, m) => {
-                return m.membership === 'invite' ? count + 1 : count;
+                return m.membership === "invite" ? count + 1 : count;
             }, 0);
         }
         return this.invitedMemberCount;
@@ -166,7 +235,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Set the amount of invited members in this room
-     * @param {number} count the amount of invited members
+     * @param count - the amount of invited members
      */
     public setInvitedMemberCount(count: number): void {
         this.summaryInvitedMemberCount = count;
@@ -174,7 +243,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Get all RoomMembers in this room.
-     * @return {Array<RoomMember>} A list of RoomMembers.
+     * @returns A list of RoomMembers.
      */
     public getMembers(): RoomMember[] {
         return Object.values(this.members);
@@ -182,8 +251,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Get all RoomMembers in this room, excluding the user IDs provided.
-     * @param {Array<string>} excludedIds The user IDs to exclude.
-     * @return {Array<RoomMember>} A list of RoomMembers.
+     * @param excludedIds - The user IDs to exclude.
+     * @returns A list of RoomMembers.
      */
     public getMembersExcept(excludedIds: string[]): RoomMember[] {
         return this.getMembers().filter((m) => !excludedIds.includes(m.userId));
@@ -191,8 +260,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Get a room member by their user ID.
-     * @param {string} userId The room member's user ID.
-     * @return {RoomMember} The member or null if they do not exist.
+     * @param userId - The room member's user ID.
+     * @returns The member or null if they do not exist.
      */
     public getMember(userId: string): RoomMember | null {
         return this.members[userId] || null;
@@ -204,8 +273,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * may no longer be represented correctly by Room.currentState or Room.oldState.
      * The term 'sentinel' refers to the fact that this RoomMember is an unchanging
      * guardian for state at this particular point in time.
-     * @param {string} userId The room member's user ID.
-     * @return {RoomMember} The member or null if they do not exist.
+     * @param userId - The room member's user ID.
+     * @returns The member or null if they do not exist.
      */
     public getSentinelMember(userId: string): RoomMember | null {
         if (!userId) return null;
@@ -214,7 +283,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (sentinel === undefined) {
             sentinel = new RoomMember(this.roomId, userId);
             const member = this.members[userId];
-            if (member) {
+            if (member?.events.member) {
                 sentinel.setMembershipEvent(member.events.member, this);
             }
             this.sentinels[userId] = sentinel;
@@ -224,24 +293,25 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Get state events from the state of the room.
-     * @param {string} eventType The event type of the state event.
-     * @param {string} stateKey Optional. The state_key of the state event. If
-     * this is <code>undefined</code> then all matching state events will be
+     * @param eventType - The event type of the state event.
+     * @param stateKey - Optional. The state_key of the state event. If
+     * this is `undefined` then all matching state events will be
      * returned.
-     * @return {MatrixEvent[]|MatrixEvent} A list of events if state_key was
-     * <code>undefined</code>, else a single event (or null if no match found).
+     * @returns A list of events if state_key was
+     * `undefined`, else a single event (or null if no match found).
      */
     public getStateEvents(eventType: EventType | string): MatrixEvent[];
-    public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent;
-    public getStateEvents(eventType: EventType | string, stateKey?: string) {
+    public getStateEvents(eventType: EventType | string, stateKey: string): MatrixEvent | null;
+    public getStateEvents(eventType: EventType | string, stateKey?: string): MatrixEvent[] | MatrixEvent | null {
         if (!this.events.has(eventType)) {
             // no match
             return stateKey === undefined ? [] : null;
         }
-        if (stateKey === undefined) { // return all values
-            return Array.from(this.events.get(eventType).values());
+        if (stateKey === undefined) {
+            // return all values
+            return Array.from(this.events.get(eventType)!.values());
         }
-        const event = this.events.get(eventType).get(stateKey);
+        const event = this.events.get(eventType)!.get(stateKey);
         return event ? event : null;
     }
 
@@ -255,7 +325,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Creates a copy of this room state so that mutations to either won't affect the other.
-     * @return {RoomState} the copy of the room state
+     * @returns the copy of the room state
      */
     public clone(): RoomState {
         const copy = new RoomState(this.roomId, this.oobMemberFlags);
@@ -288,8 +358,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // copy markOutOfBand flags
             this.getMembers().forEach((member) => {
                 if (member.isOutOfBand()) {
-                    const copyMember = copy.getMember(member.userId);
-                    copyMember.markOutOfBand();
+                    copy.getMember(member.userId)?.markOutOfBand();
                 }
             });
         }
@@ -302,38 +371,36 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * When lazy loading members while back-paginating,
      * the relevant room state for the timeline chunk at the end
      * of the chunk can be set with this method.
-     * @param {MatrixEvent[]} events state events to prepend
+     * @param events - state events to prepend
      */
     public setUnknownStateEvents(events: MatrixEvent[]): void {
         const unknownStateEvents = events.filter((event) => {
-            return !this.events.has(event.getType()) ||
-                !this.events.get(event.getType()).has(event.getStateKey());
+            return !this.events.has(event.getType()) || !this.events.get(event.getType())!.has(event.getStateKey()!);
         });
 
         this.setStateEvents(unknownStateEvents);
     }
 
     /**
-     * Add an array of one or more state MatrixEvents, overwriting
-     * any existing state with the same {type, stateKey} tuple. Will fire
-     * "RoomState.events" for every event added. May fire "RoomState.members"
-     * if there are <code>m.room.member</code> events.
-     * @param {MatrixEvent[]} stateEvents a list of state events for this room.
-     * @fires module:client~MatrixClient#event:"RoomState.members"
-     * @fires module:client~MatrixClient#event:"RoomState.newMember"
-     * @fires module:client~MatrixClient#event:"RoomState.events"
+     * Add an array of one or more state MatrixEvents, overwriting any existing
+     * state with the same `{type, stateKey}` tuple. Will fire "RoomState.events"
+     * for every event added. May fire "RoomState.members" if there are
+     * `m.room.member` events. May fire "RoomStateEvent.Marker" if there are
+     * `UNSTABLE_MSC2716_MARKER` events.
+     * @param stateEvents - a list of state events for this room.
+     *
+     * @remarks
+     * Fires {@link RoomStateEvent.Members}
+     * Fires {@link RoomStateEvent.NewMember}
+     * Fires {@link RoomStateEvent.Events}
+     * Fires {@link RoomStateEvent.Marker}
      */
-    public setStateEvents(stateEvents: MatrixEvent[]) {
+    public setStateEvents(stateEvents: MatrixEvent[], markerFoundOptions?: IMarkerFoundOptions): void {
         this.updateModifiedTime();
 
         // update the core event dict
         stateEvents.forEach((event) => {
-            if (event.getRoomId() !== this.roomId) {
-                return;
-            }
-            if (!event.isState()) {
-                return;
-            }
+            if (event.getRoomId() !== this.roomId || !event.isState()) return;
 
             if (M_BEACON_INFO.matches(event.getType())) {
                 this.setBeacon(event);
@@ -342,45 +409,34 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const lastStateEvent = this.getStateEventMatching(event);
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
-                this.updateDisplayNameCache(event.getStateKey(), event.getContent().displayname);
+                this.updateDisplayNameCache(event.getStateKey()!, event.getContent().displayname ?? "");
                 this.updateThirdPartyTokenCache(event);
             }
             this.emit(RoomStateEvent.Events, event, this, lastStateEvent);
         });
 
         this.onBeaconLivenessChange();
-
         // update higher level data structures. This needs to be done AFTER the
         // core event dict as these structures may depend on other state events in
         // the given array (e.g. disambiguating display names in one go to do both
         // clashing names rather than progressively which only catches 1 of them).
         stateEvents.forEach((event) => {
-            if (event.getRoomId() !== this.roomId) {
-                return;
-            }
-            if (!event.isState()) {
-                return;
-            }
+            if (event.getRoomId() !== this.roomId || !event.isState()) return;
 
             if (event.getType() === EventType.RoomMember) {
-                const userId = event.getStateKey();
+                const userId = event.getStateKey()!;
 
                 // leave events apparently elide the displayname or avatar_url,
                 // so let's fake one up so that we don't leak user ids
                 // into the timeline
-                if (event.getContent().membership === "leave" ||
-                    event.getContent().membership === "ban") {
-                    event.getContent().avatar_url =
-                        event.getContent().avatar_url ||
-                        event.getPrevContent().avatar_url;
+                if (event.getContent().membership === "leave" || event.getContent().membership === "ban") {
+                    event.getContent().avatar_url = event.getContent().avatar_url || event.getPrevContent().avatar_url;
                     event.getContent().displayname =
-                        event.getContent().displayname ||
-                        event.getPrevContent().displayname;
+                        event.getContent().displayname || event.getPrevContent().displayname;
                 }
 
                 const member = this.getOrCreateMember(userId, event);
                 member.setMembershipEvent(event, this);
-
                 this.updateMember(member);
                 this.emit(RoomStateEvent.Members, event, this, member);
             } else if (event.getType() === EventType.RoomPowerLevels) {
@@ -403,6 +459,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
                 // assume all our sentinels are now out-of-date
                 this.sentinels = {};
+            } else if (UNSTABLE_MSC2716_MARKER.matches(event.getType())) {
+                this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
             }
         });
 
@@ -418,8 +476,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return;
         }
 
-        const beaconByEventIdDict: Record<string, Beacon> =
-            [...this.beacons.values()].reduce((dict, beacon) => ({ ...dict, [beacon.beaconInfoId]: beacon }), {});
+        const beaconByEventIdDict: Record<string, Beacon> = [...this.beacons.values()].reduce(
+            (dict, beacon) => ({ ...dict, [beacon.beaconInfoId]: beacon }),
+            {},
+        );
 
         const processBeaconRelation = (beaconInfoEventId: string, event: MatrixEvent): void => {
             if (!M_BEACON.matches(event.getType())) {
@@ -435,11 +495,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
         events.forEach((event: MatrixEvent) => {
             const relatedToEventId = event.getRelation()?.event_id;
-            // not related to a beacon we know about
-            // discard
-            if (!beaconByEventIdDict[relatedToEventId]) {
-                return;
-            }
+            // not related to a beacon we know about; discard
+            if (!relatedToEventId || !beaconByEventIdDict[relatedToEventId]) return;
 
             matrixClient.decryptEventIfNeeded(event);
 
@@ -459,10 +516,12 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * create it and emit the `RoomState.newMember` event.
      * This method makes sure the member is added to the members dictionary
      * before emitting, as this is done from setStateEvents and setOutOfBandMember.
-     * @param {string} userId the id of the user to look up
-     * @param {MatrixEvent} event the membership event for the (new) member. Used to emit.
-     * @fires module:client~MatrixClient#event:"RoomState.newMember"
-     * @returns {RoomMember} the member, existing or newly created.
+     * @param userId - the id of the user to look up
+     * @param event - the membership event for the (new) member. Used to emit.
+     * @returns the member, existing or newly created.
+     *
+     * @remarks
+     * Fires {@link RoomStateEvent.NewMember}
      */
     private getOrCreateMember(userId: string, event: MatrixEvent): RoomMember {
         let member = this.members[userId];
@@ -480,7 +539,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (!this.events.has(event.getType())) {
             this.events.set(event.getType(), new Map());
         }
-        this.events.get(event.getType()).set(event.getStateKey(), event);
+        this.events.get(event.getType())!.set(event.getStateKey()!, event);
     }
 
     /**
@@ -490,10 +549,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const beaconIdentifier = getBeaconInfoIdentifier(event);
 
         if (this.beacons.has(beaconIdentifier)) {
-            const beacon = this.beacons.get(beaconIdentifier);
+            const beacon = this.beacons.get(beaconIdentifier)!;
 
             if (event.isRedacted()) {
-                if (beacon.beaconInfoId === event.getRedactionEvent()?.['redacts']) {
+                if (beacon.beaconInfoId === (<IEvent>event.getRedactionEvent())?.redacts) {
                     beacon.destroy();
                     this.beacons.delete(beaconIdentifier);
                 }
@@ -530,14 +589,14 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      */
     private onBeaconLivenessChange(): void {
         this._liveBeaconIds = Array.from(this.beacons.values())
-            .filter(beacon => beacon.isLive)
-            .map(beacon => beacon.identifier);
+            .filter((beacon) => beacon.isLive)
+            .map((beacon) => beacon.identifier);
 
         this.emit(RoomStateEvent.BeaconLiveness, this, this.hasLiveBeacons);
     }
 
     private getStateEventMatching(event: MatrixEvent): MatrixEvent | null {
-        return this.events.get(event.getType())?.get(event.getStateKey()) ?? null;
+        return this.events.get(event.getType())?.get(event.getStateKey()!) ?? null;
     }
 
     private updateMember(member: RoomMember): void {
@@ -558,10 +617,20 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Get the out-of-band members loading state, whether loading is needed or not.
      * Note that loading might be in progress and hence isn't needed.
-     * @return {boolean} whether or not the members of this room need to be loaded
+     * @returns whether or not the members of this room need to be loaded
      */
     public needsOutOfBandMembers(): boolean {
         return this.oobMemberFlags.status === OobStatus.NotStarted;
+    }
+
+    /**
+     * Check if loading of out-of-band-members has completed
+     *
+     * @returns true if the full membership list of this room has been loaded. False if it is not started or is in
+     *    progress.
+     */
+    public outOfBandMembersReady(): boolean {
+        return this.oobMemberFlags.status === OobStatus.Finished;
     }
 
     /**
@@ -604,7 +673,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Sets the loaded out-of-band members.
-     * @param {MatrixEvent[]} stateEvents array of membership state events
+     * @param stateEvents - array of membership state events
      */
     public setOutOfBandMembers(stateEvents: MatrixEvent[]): void {
         logger.log(`LL: RoomState about to set ${stateEvents.length} OOB members ...`);
@@ -619,13 +688,13 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Sets a single out of band member, used by both setOutOfBandMembers and clone
-     * @param {MatrixEvent} stateEvent membership state event
+     * @param stateEvent - membership state event
      */
     private setOutOfBandMember(stateEvent: MatrixEvent): void {
         if (stateEvent.getType() !== EventType.RoomMember) {
             return;
         }
-        const userId = stateEvent.getStateKey();
+        const userId = stateEvent.getStateKey()!;
         const existingMember = this.getMember(userId);
         // never replace members received as part of the sync
         if (existingMember && !existingMember.isOutOfBand()) {
@@ -648,10 +717,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Set the current typing event for this room.
-     * @param {MatrixEvent} event The typing event
+     * @param event - The typing event
      */
     public setTypingEvent(event: MatrixEvent): void {
-        Object.values(this.members).forEach(function(member) {
+        Object.values(this.members).forEach(function (member) {
             member.setTypingEvent(event);
         });
     }
@@ -659,8 +728,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Get the m.room.member event which has the given third party invite token.
      *
-     * @param {string} token The token
-     * @return {?MatrixEvent} The m.room.member event or null
+     * @param token - The token
+     * @returns The m.room.member event or null
      */
     public getInviteForThreePidToken(token: string): MatrixEvent | null {
         return this.tokenToInvite[token] || null;
@@ -676,7 +745,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Get the timestamp when this room state was last updated. This timestamp is
      * updated when this object has received new state events.
-     * @return {number} The timestamp
+     * @returns The timestamp
      */
     public getLastModifiedTime(): number {
         return this.modified;
@@ -684,23 +753,23 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Get user IDs with the specified or similar display names.
-     * @param {string} displayName The display name to get user IDs from.
-     * @return {string[]} An array of user IDs or an empty array.
+     * @param displayName - The display name to get user IDs from.
+     * @returns An array of user IDs or an empty array.
      */
     public getUserIdsWithDisplayName(displayName: string): string[] {
-        return this.displayNameToUserIds[utils.removeHiddenChars(displayName)] || [];
+        return this.displayNameToUserIds.get(utils.removeHiddenChars(displayName)) ?? [];
     }
 
     /**
      * Returns true if userId is in room, event is not redacted and either sender of
      * mxEvent or has power level sufficient to redact events other than their own.
-     * @param {MatrixEvent} mxEvent The event to test permission for
-     * @param {string} userId The user ID of the user to test permission for
-     * @return {boolean} true if the given used ID can redact given event
+     * @param mxEvent - The event to test permission for
+     * @param userId - The user ID of the user to test permission for
+     * @returns true if the given used ID can redact given event
      */
     public maySendRedactionForEvent(mxEvent: MatrixEvent, userId: string): boolean {
         const member = this.getMember(userId);
-        if (!member || member.membership === 'leave') return false;
+        if (!member || member.membership === "leave") return false;
 
         if (mxEvent.status || mxEvent.isRedacted()) return false;
 
@@ -709,26 +778,26 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const canRedact = this.maySendEvent(EventType.RoomRedaction, userId);
         if (mxEvent.getSender() === userId) return canRedact;
 
-        return this.hasSufficientPowerLevelFor('redact', member.powerLevel);
+        return this.hasSufficientPowerLevelFor("redact", member.powerLevel);
     }
 
     /**
      * Returns true if the given power level is sufficient for action
-     * @param {string} action The type of power level to check
-     * @param {number} powerLevel The power level of the member
-     * @return {boolean} true if the given power level is sufficient
+     * @param action - The type of power level to check
+     * @param powerLevel - The power level of the member
+     * @returns true if the given power level is sufficient
      */
-    public hasSufficientPowerLevelFor(action: string, powerLevel: number): boolean {
+    public hasSufficientPowerLevelFor(action: "ban" | "kick" | "redact", powerLevel: number): boolean {
         const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
-        let powerLevels = {};
+        let powerLevels: IPowerLevelsContent = {};
         if (powerLevelsEvent) {
             powerLevels = powerLevelsEvent.getContent();
         }
 
         let requiredLevel = 50;
         if (utils.isNumber(powerLevels[action])) {
-            requiredLevel = powerLevels[action];
+            requiredLevel = powerLevels[action]!;
         }
 
         return powerLevel >= requiredLevel;
@@ -736,8 +805,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Short-form for maySendEvent('m.room.message', userId)
-     * @param {string} userId The user ID of the user to test permission for
-     * @return {boolean} true if the given user ID should be permitted to send
+     * @param userId - The user ID of the user to test permission for
+     * @returns true if the given user ID should be permitted to send
      *                   message events into the given room.
      */
     public maySendMessage(userId: string): boolean {
@@ -747,9 +816,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Returns true if the given user ID has permission to send a normal
      * event of type `eventType` into this room.
-     * @param {string} eventType The type of event to test
-     * @param {string} userId The user ID of the user to test permission for
-     * @return {boolean} true if the given user ID should be permitted to send
+     * @param eventType - The type of event to test
+     * @param userId - The user ID of the user to test permission for
+     * @returns true if the given user ID should be permitted to send
      *                        the given type of event into this room,
      *                        according to the room's state.
      */
@@ -758,16 +827,16 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-      * Returns true if the given MatrixClient has permission to send a state
-      * event of type `stateEventType` into this room.
-      * @param {string} stateEventType The type of state events to test
-      * @param {MatrixClient} cli The client to test permission for
-      * @return {boolean} true if the given client should be permitted to send
-      *                        the given type of state event into this room,
-      *                        according to the room's state.
-      */
+     * Returns true if the given MatrixClient has permission to send a state
+     * event of type `stateEventType` into this room.
+     * @param stateEventType - The type of state events to test
+     * @param cli - The client to test permission for
+     * @returns true if the given client should be permitted to send
+     *                        the given type of state event into this room,
+     *                        according to the room's state.
+     */
     public mayClientSendStateEvent(stateEventType: EventType | string, cli: MatrixClient): boolean {
-        if (cli.isGuest()) {
+        if (cli.isGuest() || !cli.credentials.userId) {
             return false;
         }
         return this.maySendStateEvent(stateEventType, cli.credentials.userId);
@@ -776,9 +845,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Returns true if the given user ID has permission to send a state
      * event of type `stateEventType` into this room.
-     * @param {string} stateEventType The type of state events to test
-     * @param {string} userId The user ID of the user to test permission for
-     * @return {boolean} true if the given user ID should be permitted to send
+     * @param stateEventType - The type of state events to test
+     * @param userId - The user ID of the user to test permission for
+     * @returns true if the given user ID should be permitted to send
      *                        the given type of state event into this room,
      *                        according to the room's state.
      */
@@ -789,20 +858,20 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Returns true if the given user ID has permission to send a normal or state
      * event of type `eventType` into this room.
-     * @param {string} eventType The type of event to test
-     * @param {string} userId The user ID of the user to test permission for
-     * @param {boolean} state If true, tests if the user may send a state
+     * @param eventType - The type of event to test
+     * @param userId - The user ID of the user to test permission for
+     * @param state - If true, tests if the user may send a state
      event of this type. Otherwise tests whether
      they may send a regular event.
-     * @return {boolean} true if the given user ID should be permitted to send
+     * @returns true if the given user ID should be permitted to send
      *                        the given type of event into this room,
      *                        according to the room's state.
      */
     private maySendEventOfType(eventType: EventType | string, userId: string, state: boolean): boolean {
-        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
+        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
-        let powerLevels;
-        let eventsLevels = {};
+        let powerLevels: IPowerLevelsContent;
+        let eventsLevels: Record<EventType | string, number> = {};
 
         let stateDefault = 0;
         let eventsDefault = 0;
@@ -812,20 +881,20 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             eventsLevels = powerLevels.events || {};
 
             if (Number.isSafeInteger(powerLevels.state_default)) {
-                stateDefault = powerLevels.state_default;
+                stateDefault = powerLevels.state_default!;
             } else {
                 stateDefault = 50;
             }
 
             const userPowerLevel = powerLevels.users && powerLevels.users[userId];
             if (Number.isSafeInteger(userPowerLevel)) {
-                powerLevel = userPowerLevel;
+                powerLevel = userPowerLevel!;
             } else if (Number.isSafeInteger(powerLevels.users_default)) {
-                powerLevel = powerLevels.users_default;
+                powerLevel = powerLevels.users_default!;
             }
 
             if (Number.isSafeInteger(powerLevels.events_default)) {
-                eventsDefault = powerLevels.events_default;
+                eventsDefault = powerLevels.events_default!;
             }
         }
 
@@ -839,9 +908,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     /**
      * Returns true if the given user ID has permission to trigger notification
      * of type `notifLevelKey`
-     * @param {string} notifLevelKey The level of notification to test (eg. 'room')
-     * @param {string} userId The user ID of the user to test permission for
-     * @return {boolean} true if the given user ID has permission to trigger a
+     * @param notifLevelKey - The level of notification to test (eg. 'room')
+     * @param userId - The user ID of the user to test permission for
+     * @returns true if the given user ID has permission to trigger a
      *                        notification of this type.
      */
     public mayTriggerNotifOfType(notifLevelKey: string, userId: string): boolean {
@@ -850,7 +919,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return false;
         }
 
-        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, '');
+        const powerLevelsEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
 
         let notifLevel = 50;
         if (
@@ -867,17 +936,17 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Returns the join rule based on the m.room.join_rule state event, defaulting to `invite`.
-     * @returns {string} the join_rule applied to this room
+     * @returns the join_rule applied to this room
      */
     public getJoinRule(): JoinRule {
         const joinRuleEvent = this.getStateEvents(EventType.RoomJoinRules, "");
-        const joinRuleContent = joinRuleEvent?.getContent<IJoinRuleEventContent>() ?? {};
+        const joinRuleContent: Partial<IJoinRuleEventContent> = joinRuleEvent?.getContent() ?? {};
         return joinRuleContent["join_rule"] || JoinRule.Invite;
     }
 
     /**
      * Returns the history visibility based on the m.room.history_visibility state event, defaulting to `shared`.
-     * @returns {HistoryVisibility} the history_visibility applied to this room
+     * @returns the history_visibility applied to this room
      */
     public getHistoryVisibility(): HistoryVisibility {
         const historyVisibilityEvent = this.getStateEvents(EventType.RoomHistoryVisibility, "");
@@ -887,12 +956,68 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     /**
      * Returns the guest access based on the m.room.guest_access state event, defaulting to `shared`.
-     * @returns {GuestAccess} the guest_access applied to this room
+     * @returns the guest_access applied to this room
      */
     public getGuestAccess(): GuestAccess {
         const guestAccessEvent = this.getStateEvents(EventType.RoomGuestAccess, "");
         const guestAccessContent = guestAccessEvent?.getContent() ?? {};
         return guestAccessContent["guest_access"] || GuestAccess.Forbidden;
+    }
+
+    /**
+     * Find the predecessor room based on this room state.
+     *
+     * @param msc3946ProcessDynamicPredecessor - if true, look for an
+     * m.room.predecessor state event and use it if found (MSC3946).
+     * @returns null if this room has no predecessor. Otherwise, returns
+     * the roomId and last eventId of the predecessor room.
+     * If msc3946ProcessDynamicPredecessor is true, use m.predecessor events
+     * as well as m.room.create events to find predecessors.
+     * Note: if an m.predecessor event is used, eventId may be undefined
+     * since last_known_event_id is optional.
+     */
+    public findPredecessor(msc3946ProcessDynamicPredecessor = false): { roomId: string; eventId?: string } | null {
+        // Note: the tests for this function are against Room.findPredecessor,
+        // which just calls through to here.
+
+        if (msc3946ProcessDynamicPredecessor) {
+            const predecessorEvent = this.getStateEvents(EventType.RoomPredecessor, "");
+            if (predecessorEvent) {
+                const content = predecessorEvent.getContent<{
+                    predecessor_room_id: string;
+                    last_known_event_id?: string;
+                }>();
+                const roomId = content.predecessor_room_id;
+                let eventId = content.last_known_event_id;
+                if (typeof eventId !== "string") {
+                    eventId = undefined;
+                }
+                if (typeof roomId === "string") {
+                    return { roomId, eventId };
+                }
+            }
+        }
+
+        const createEvent = this.getStateEvents(EventType.RoomCreate, "");
+        if (createEvent) {
+            const predecessor = createEvent.getContent<{
+                predecessor?: Partial<{
+                    room_id: string;
+                    event_id: string;
+                }>;
+            }>()["predecessor"];
+            if (predecessor) {
+                const roomId = predecessor["room_id"];
+                if (typeof roomId === "string") {
+                    let eventId = predecessor["event_id"];
+                    if (typeof eventId !== "string" || eventId === "") {
+                        eventId = undefined;
+                    }
+                    return { roomId, eventId };
+                }
+            }
+        }
+        return null;
     }
 
     private updateThirdPartyTokenCache(memberEvent: MatrixEvent): void {
@@ -920,11 +1045,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // the lot.
             const strippedOldName = utils.removeHiddenChars(oldName);
 
-            const existingUserIds = this.displayNameToUserIds[strippedOldName];
+            const existingUserIds = this.displayNameToUserIds.get(strippedOldName);
             if (existingUserIds) {
                 // remove this user ID from this array
                 const filteredUserIDs = existingUserIds.filter((id) => id !== userId);
-                this.displayNameToUserIds[strippedOldName] = filteredUserIDs;
+                this.displayNameToUserIds.set(strippedOldName, filteredUserIDs);
             }
         }
 
@@ -933,54 +1058,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const strippedDisplayname = displayName && utils.removeHiddenChars(displayName);
         // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
         if (strippedDisplayname) {
-            if (!this.displayNameToUserIds[strippedDisplayname]) {
-                this.displayNameToUserIds[strippedDisplayname] = [];
-            }
-            this.displayNameToUserIds[strippedDisplayname].push(userId);
+            const arr = this.displayNameToUserIds.get(strippedDisplayname) ?? [];
+            arr.push(userId);
+            this.displayNameToUserIds.set(strippedDisplayname, arr);
         }
     }
 }
-
-/**
- * Fires whenever the event dictionary in room state is updated.
- * @event module:client~MatrixClient#"RoomState.events"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomState} state The room state whose RoomState.events dictionary
- * was updated.
- * @param {MatrixEvent} prevEvent The event being replaced by the new state, if
- * known. Note that this can differ from `getPrevContent()` on the new state event
- * as this is the store's view of the last state, not the previous state provided
- * by the server.
- * @example
- * matrixClient.on("RoomState.events", function(event, state, prevEvent){
- *   var newStateEvent = event;
- * });
- */
-
-/**
- * Fires whenever a member in the members dictionary is updated in any way.
- * @event module:client~MatrixClient#"RoomState.members"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomState} state The room state whose RoomState.members dictionary
- * was updated.
- * @param {RoomMember} member The room member that was updated.
- * @example
- * matrixClient.on("RoomState.members", function(event, state, member){
- *   var newMembershipState = member.membership;
- * });
- */
-
-/**
- * Fires whenever a member is added to the members dictionary. The RoomMember
- * will not be fully populated yet (e.g. no membership state) but will already
- * be available in the members dictionary.
- * @event module:client~MatrixClient#"RoomState.newMember"
- * @param {MatrixEvent} event The matrix event which caused this event to fire.
- * @param {RoomState} state The room state whose RoomState.members dictionary
- * was updated with a new entry.
- * @param {RoomMember} member The room member that was added.
- * @example
- * matrixClient.on("RoomState.newMember", function(event, state, member){
- *   // add event listeners on 'member'
- * });
- */

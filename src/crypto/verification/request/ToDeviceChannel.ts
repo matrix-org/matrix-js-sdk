@@ -15,8 +15,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from '../../../randomstring';
-import { logger } from '../../../logger';
+import { randomString } from "../../../randomstring";
+import { logger } from "../../../logger";
 import {
     CANCEL_TYPE,
     PHASE_STARTED,
@@ -30,7 +30,7 @@ import { errorFromEvent, newUnexpectedMessageError } from "../Error";
 import { MatrixEvent } from "../../../models/event";
 import { IVerificationChannel } from "./Channel";
 import { MatrixClient } from "../../../client";
-import { IRequestsMap } from '../..';
+import { IRequestsMap } from "../..";
 
 export type Request = VerificationRequest<ToDeviceChannel>;
 
@@ -42,12 +42,12 @@ export class ToDeviceChannel implements IVerificationChannel {
     public request?: VerificationRequest;
 
     // userId and devices of user we're about to verify
-    constructor(
+    public constructor(
         private readonly client: MatrixClient,
         public readonly userId: string,
         private readonly devices: string[],
-        public transactionId: string = null,
-        public deviceId: string = null,
+        public transactionId?: string,
+        public deviceId?: string,
     ) {}
 
     public isToDevices(devices: string[]): boolean {
@@ -69,8 +69,8 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Extract the transaction id used by a given key verification event, if any
-     * @param {MatrixEvent} event the event
-     * @returns {string} the transaction id
+     * @param event - the event
+     * @returns the transaction id
      */
     public static getTransactionId(event: MatrixEvent): string {
         const content = event.getContent();
@@ -79,8 +79,8 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Checks whether the given event type should be allowed to initiate a new VerificationRequest over this channel
-     * @param {string} type the event type to check
-     * @returns {boolean} boolean flag
+     * @param type - the event type to check
+     * @returns boolean flag
      */
     public static canCreateRequest(type: string): boolean {
         return type === REQUEST_TYPE || type === START_TYPE;
@@ -95,14 +95,13 @@ export class ToDeviceChannel implements IVerificationChannel {
      * This only does checks that don't rely on the current state of a potentially already channel
      * so we can prevent channels being created by invalid events.
      * `handleEvent` can do more checks and choose to ignore invalid events.
-     * @param {MatrixEvent} event the event to validate
-     * @param {MatrixClient} client the client to get the current user and device id from
-     * @returns {boolean} whether the event is valid and should be passed to handleEvent
+     * @param event - the event to validate
+     * @param client - the client to get the current user and device id from
+     * @returns whether the event is valid and should be passed to handleEvent
      */
     public static validateEvent(event: MatrixEvent, client: MatrixClient): boolean {
         if (event.isCancelled()) {
-            logger.warn("Ignoring flagged verification request from "
-                 + event.getSender());
+            logger.warn("Ignoring flagged verification request from " + event.getSender());
             return false;
         }
         const content = event.getContent();
@@ -123,9 +122,7 @@ export class ToDeviceChannel implements IVerificationChannel {
                 logger.warn("ToDeviceChannel.validateEvent: invalid: no timestamp");
                 return false;
             }
-            if (event.getSender() === client.getUserId() &&
-                    content.from_device == client.getDeviceId()
-            ) {
+            if (event.getSender() === client.getUserId() && content.from_device == client.getDeviceId()) {
                 // ignore requests from ourselves, because it doesn't make sense for a
                 // device to verify itself
                 logger.warn("ToDeviceChannel.validateEvent: invalid: from own device");
@@ -137,8 +134,8 @@ export class ToDeviceChannel implements IVerificationChannel {
     }
 
     /**
-     * @param {MatrixEvent} event the event to get the timestamp of
-     * @return {number} the timestamp when the event was sent
+     * @param event - the event to get the timestamp of
+     * @returns the timestamp when the event was sent
      */
     public getTimestamp(event: MatrixEvent): number {
         const content = event.getContent();
@@ -147,10 +144,10 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Changes the state of the channel, request, and verifier in response to a key verification event.
-     * @param {MatrixEvent} event to handle
-     * @param {VerificationRequest} request the request to forward handling to
-     * @param {boolean} isLiveEvent whether this is an even received through sync or not
-     * @returns {Promise} a promise that resolves when any requests as an answer to the passed-in event are sent.
+     * @param event - to handle
+     * @param request - the request to forward handling to
+     * @param isLiveEvent - whether this is an even received through sync or not
+     * @returns a promise that resolves when any requests as an answer to the passed-in event are sent.
      */
     public async handleEvent(event: MatrixEvent, request: Request, isLiveEvent = false): Promise<void> {
         const type = event.getType();
@@ -173,20 +170,16 @@ export class ToDeviceChannel implements IVerificationChannel {
                 return this.sendToDevices(CANCEL_TYPE, cancelContent, [deviceId]);
             }
         }
-        const wasStarted = request.phase === PHASE_STARTED ||
-                           request.phase === PHASE_READY;
+        const wasStarted = request.phase === PHASE_STARTED || request.phase === PHASE_READY;
 
         await request.handleEvent(event.getType(), event, isLiveEvent, false, false);
 
-        const isStarted = request.phase === PHASE_STARTED ||
-                          request.phase === PHASE_READY;
+        const isStarted = request.phase === PHASE_STARTED || request.phase === PHASE_READY;
 
         const isAcceptingEvent = type === START_TYPE || type === READY_TYPE;
         // the request has picked a ready or start event, tell the other devices about it
         if (isAcceptingEvent && !wasStarted && isStarted && this.deviceId) {
-            const nonChosenDevices = this.devices.filter(
-                d => d !== this.deviceId && d !== this.client.getDeviceId(),
-            );
+            const nonChosenDevices = this.devices.filter((d) => d !== this.deviceId && d !== this.client.getDeviceId());
             if (nonChosenDevices.length) {
                 const message = this.completeContent(CANCEL_TYPE, {
                     code: "m.accepted",
@@ -198,9 +191,9 @@ export class ToDeviceChannel implements IVerificationChannel {
     }
 
     /**
-     * See {InRoomChannel.completedContentFromEvent} why this is needed.
-     * @param {MatrixEvent} event the received event
-     * @returns {Object} the content object
+     * See {@link InRoomChannel#completedContentFromEvent} for why this is needed.
+     * @param event - the received event
+     * @returns the content object
      */
     public completedContentFromEvent(event: MatrixEvent): Record<string, any> {
         return event.getContent();
@@ -211,9 +204,9 @@ export class ToDeviceChannel implements IVerificationChannel {
      * This is public so verification methods (SAS uses this) can get the exact
      * content that will be sent independent of the used channel,
      * as they need to calculate the hash of it.
-     * @param {string} type the event type
-     * @param {object} content the (incomplete) content
-     * @returns {object} the complete content, as it will be sent.
+     * @param type - the event type
+     * @param content - the (incomplete) content
+     * @returns the complete content, as it will be sent.
      */
     public completeContent(type: string, content: Record<string, any>): Record<string, any> {
         // make a copy
@@ -232,9 +225,9 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Send an event over the channel with the content not having gone through `completeContent`.
-     * @param {string} type the event type
-     * @param {object} uncompletedContent the (incomplete) content
-     * @returns {Promise} the promise of the request
+     * @param type - the event type
+     * @param uncompletedContent - the (incomplete) content
+     * @returns the promise of the request
      */
     public send(type: string, uncompletedContent: Record<string, any> = {}): Promise<void> {
         // create transaction id when sending request
@@ -247,30 +240,29 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Send an event over the channel with the content having gone through `completeContent` already.
-     * @param {string} type the event type
-     * @param {object} content
-     * @returns {Promise} the promise of the request
+     * @param type - the event type
+     * @returns the promise of the request
      */
     public async sendCompleted(type: string, content: Record<string, any>): Promise<void> {
         let result;
         if (type === REQUEST_TYPE || (type === CANCEL_TYPE && !this.deviceId)) {
             result = await this.sendToDevices(type, content, this.devices);
         } else {
-            result = await this.sendToDevices(type, content, [this.deviceId]);
+            result = await this.sendToDevices(type, content, [this.deviceId!]);
         }
         // the VerificationRequest state machine requires remote echos of the event
         // the client sends itself, so we fake this for to_device messages
         const remoteEchoEvent = new MatrixEvent({
-            sender: this.client.getUserId(),
+            sender: this.client.getUserId()!,
             content,
             type,
         });
-        await this.request.handleEvent(
+        await this.request!.handleEvent(
             type,
             remoteEchoEvent,
-            /*isLiveEvent=*/true,
-            /*isRemoteEcho=*/true,
-            /*isSentByUs=*/true,
+            /*isLiveEvent=*/ true,
+            /*isRemoteEcho=*/ true,
+            /*isSentByUs=*/ true,
         );
         return result;
     }
@@ -288,7 +280,7 @@ export class ToDeviceChannel implements IVerificationChannel {
 
     /**
      * Allow Crypto module to create and know the transaction id before the .start event gets sent.
-     * @returns {string} the transaction id
+     * @returns the transaction id
      */
     public static makeTransactionId(): string {
         return randomString(32);
@@ -298,18 +290,15 @@ export class ToDeviceChannel implements IVerificationChannel {
 export class ToDeviceRequests implements IRequestsMap {
     private requestsByUserId = new Map<string, Map<string, Request>>();
 
-    public getRequest(event: MatrixEvent): Request {
-        return this.getRequestBySenderAndTxnId(
-            event.getSender(),
-            ToDeviceChannel.getTransactionId(event),
-        );
+    public getRequest(event: MatrixEvent): Request | undefined {
+        return this.getRequestBySenderAndTxnId(event.getSender()!, ToDeviceChannel.getTransactionId(event));
     }
 
-    public getRequestByChannel(channel: ToDeviceChannel): Request {
-        return this.getRequestBySenderAndTxnId(channel.userId, channel.transactionId);
+    public getRequestByChannel(channel: ToDeviceChannel): Request | undefined {
+        return this.getRequestBySenderAndTxnId(channel.userId, channel.transactionId!);
     }
 
-    public getRequestBySenderAndTxnId(sender: string, txnId: string): Request {
+    public getRequestBySenderAndTxnId(sender: string, txnId: string): Request | undefined {
         const requestsByTxnId = this.requestsByUserId.get(sender);
         if (requestsByTxnId) {
             return requestsByTxnId.get(txnId);
@@ -317,11 +306,11 @@ export class ToDeviceRequests implements IRequestsMap {
     }
 
     public setRequest(event: MatrixEvent, request: Request): void {
-        this.setRequestBySenderAndTxnId(event.getSender(), ToDeviceChannel.getTransactionId(event), request);
+        this.setRequestBySenderAndTxnId(event.getSender()!, ToDeviceChannel.getTransactionId(event), request);
     }
 
     public setRequestByChannel(channel: ToDeviceChannel, request: Request): void {
-        this.setRequestBySenderAndTxnId(channel.userId, channel.transactionId, request);
+        this.setRequestBySenderAndTxnId(channel.userId, channel.transactionId!, request);
     }
 
     public setRequestBySenderAndTxnId(sender: string, txnId: string, request: Request): void {
@@ -334,7 +323,7 @@ export class ToDeviceRequests implements IRequestsMap {
     }
 
     public removeRequest(event: MatrixEvent): void {
-        const userId = event.getSender();
+        const userId = event.getSender()!;
         const requestsByTxnId = this.requestsByUserId.get(userId);
         if (requestsByTxnId) {
             requestsByTxnId.delete(ToDeviceChannel.getTransactionId(event));
@@ -344,7 +333,7 @@ export class ToDeviceRequests implements IRequestsMap {
         }
     }
 
-    public findRequestInProgress(userId: string, devices: string[]): Request {
+    public findRequestInProgress(userId: string, devices: string[]): Request | undefined {
         const requestsByTxnId = this.requestsByUserId.get(userId);
         if (requestsByTxnId) {
             for (const request of requestsByTxnId.values()) {
@@ -358,7 +347,7 @@ export class ToDeviceRequests implements IRequestsMap {
     public getRequestsInProgress(userId: string): Request[] {
         const requestsByTxnId = this.requestsByUserId.get(userId);
         if (requestsByTxnId) {
-            return Array.from(requestsByTxnId.values()).filter(r => r.pending);
+            return Array.from(requestsByTxnId.values()).filter((r) => r.pending);
         }
         return [];
     }

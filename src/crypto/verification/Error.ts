@@ -16,22 +16,21 @@ limitations under the License.
 
 /**
  * Error messages.
- *
- * @module crypto/verification/Error
  */
 
 import { MatrixEvent } from "../../models/event";
+import { EventType } from "../../@types/event";
 
-export function newVerificationError(code: string, reason: string, extraData: Record<string, any>): MatrixEvent {
+export function newVerificationError(code: string, reason: string, extraData?: Record<string, any>): MatrixEvent {
     const content = Object.assign({}, { code, reason }, extraData);
     return new MatrixEvent({
-        type: "m.key.verification.cancel",
+        type: EventType.KeyVerificationCancel,
         content,
     });
 }
 
 export function errorFactory(code: string, reason: string): (extraData?: Record<string, any>) => MatrixEvent {
-    return function(extraData?: Record<string, any>) {
+    return function (extraData?: Record<string, any>) {
         return newVerificationError(code, reason, extraData);
     };
 }
@@ -47,13 +46,6 @@ export const newUserCancelledError = errorFactory("m.user", "Cancelled by user")
 export const newTimeoutError = errorFactory("m.timeout", "Timed out");
 
 /**
- * The transaction is unknown.
- */
-export const newUnknownTransactionError = errorFactory(
-    "m.unknown_transaction", "Unknown transaction",
-);
-
-/**
  * An unknown method was selected.
  */
 export const newUnknownMethodError = errorFactory("m.unknown_method", "Unknown method");
@@ -61,30 +53,19 @@ export const newUnknownMethodError = errorFactory("m.unknown_method", "Unknown m
 /**
  * An unexpected message was sent.
  */
-export const newUnexpectedMessageError = errorFactory(
-    "m.unexpected_message", "Unexpected message",
-);
+export const newUnexpectedMessageError = errorFactory("m.unexpected_message", "Unexpected message");
 
 /**
  * The key does not match.
  */
-export const newKeyMismatchError = errorFactory(
-    "m.key_mismatch", "Key mismatch",
-);
-
-/**
- * The user does not match.
- */
-export const newUserMismatchError = errorFactory("m.user_error", "User mismatch");
+export const newKeyMismatchError = errorFactory("m.key_mismatch", "Key mismatch");
 
 /**
  * An invalid message was sent.
  */
-export const newInvalidMessageError = errorFactory(
-    "m.invalid_message", "Invalid message",
-);
+export const newInvalidMessageError = errorFactory("m.invalid_message", "Invalid message");
 
-export function errorFromEvent(event: MatrixEvent): { code: string, reason: string } {
+export function errorFromEvent(event: MatrixEvent): { code: string; reason: string } {
     const content = event.getContent();
     if (content) {
         const { code, reason } = content;

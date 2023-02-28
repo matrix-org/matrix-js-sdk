@@ -17,16 +17,14 @@ limitations under the License.
 import { MatrixEvent } from "../../src";
 import { M_BEACON, M_BEACON_INFO } from "../../src/@types/beacon";
 import { LocationAssetType } from "../../src/@types/location";
-import {
-    makeBeaconContent,
-    makeBeaconInfoContent,
-} from "../../src/content-helpers";
+import { makeBeaconContent, makeBeaconInfoContent } from "../../src/content-helpers";
 
 type InfoContentProps = {
     timeout: number;
     isLive?: boolean;
     assetType?: LocationAssetType;
     description?: string;
+    timestamp?: number;
 };
 const DEFAULT_INFO_CONTENT_PROPS: InfoContentProps = {
     timeout: 3600000,
@@ -43,9 +41,7 @@ export const makeBeaconInfoEvent = (
     contentProps: Partial<InfoContentProps> = {},
     eventId?: string,
 ): MatrixEvent => {
-    const {
-        timeout, isLive, description, assetType,
-    } = {
+    const { timeout, isLive, description, assetType, timestamp } = {
         ...DEFAULT_INFO_CONTENT_PROPS,
         ...contentProps,
     };
@@ -53,10 +49,10 @@ export const makeBeaconInfoEvent = (
         type: M_BEACON_INFO.name,
         room_id: roomId,
         state_key: sender,
-        content: makeBeaconInfoContent(timeout, isLive, description, assetType),
+        content: makeBeaconInfoContent(timeout, isLive, description, assetType, timestamp),
     });
 
-    event.event.origin_server_ts = Date.now();
+    event.event.origin_server_ts = timestamp || Date.now();
 
     // live beacons use the beacon_info event id
     // set or default this
@@ -72,9 +68,9 @@ type ContentProps = {
     description?: string;
 };
 const DEFAULT_CONTENT_PROPS: ContentProps = {
-    uri: 'geo:-36.24484561954707,175.46884959563613;u=10',
+    uri: "geo:-36.24484561954707,175.46884959563613;u=10",
     timestamp: 123,
-    beaconInfoId: '$123',
+    beaconInfoId: "$123",
 };
 
 /**
@@ -82,10 +78,7 @@ const DEFAULT_CONTENT_PROPS: ContentProps = {
  * all required properties are mocked
  * override with contentProps
  */
-export const makeBeaconEvent = (
-    sender: string,
-    contentProps: Partial<ContentProps> = {},
-): MatrixEvent => {
+export const makeBeaconEvent = (sender: string, contentProps: Partial<ContentProps> = {}): MatrixEvent => {
     const { uri, timestamp, beaconInfoId, description } = {
         ...DEFAULT_CONTENT_PROPS,
         ...contentProps,
@@ -102,10 +95,13 @@ export const makeBeaconEvent = (
  * Create a mock geolocation position
  * defaults all required properties
  */
-export const makeGeolocationPosition = (
-    { timestamp, coords }:
-        { timestamp?: number, coords: Partial<GeolocationCoordinates> },
-): GeolocationPosition => ({
+export const makeGeolocationPosition = ({
+    timestamp,
+    coords,
+}: {
+    timestamp?: number;
+    coords: Partial<GeolocationCoordinates>;
+}): GeolocationPosition => ({
     timestamp: timestamp ?? 1647256791840,
     coords: {
         accuracy: 1,

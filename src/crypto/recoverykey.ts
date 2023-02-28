@@ -14,14 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as bs58 from 'bs58';
+import * as bs58 from "bs58";
 
 // picked arbitrarily but to try & avoid clashing with any bitcoin ones
 // (which are also base58 encoded, but bitcoin's involve a lot more hashing)
-const OLM_RECOVERY_KEY_PREFIX = [0x8B, 0x01];
+const OLM_RECOVERY_KEY_PREFIX = [0x8b, 0x01];
 
-export function encodeRecoveryKey(key: ArrayLike<number>): string {
-    const buf = new Buffer(OLM_RECOVERY_KEY_PREFIX.length + key.length + 1);
+export function encodeRecoveryKey(key: ArrayLike<number>): string | undefined {
+    const buf = Buffer.alloc(OLM_RECOVERY_KEY_PREFIX.length + key.length + 1);
     buf.set(OLM_RECOVERY_KEY_PREFIX, 0);
     buf.set(key, OLM_RECOVERY_KEY_PREFIX.length);
 
@@ -32,11 +32,11 @@ export function encodeRecoveryKey(key: ArrayLike<number>): string {
     buf[buf.length - 1] = parity;
     const base58key = bs58.encode(buf);
 
-    return base58key.match(/.{1,4}/g).join(" ");
+    return base58key.match(/.{1,4}/g)?.join(" ");
 }
 
 export function decodeRecoveryKey(recoveryKey: string): Uint8Array {
-    const result = bs58.decode(recoveryKey.replace(/ /g, ''));
+    const result = bs58.decode(recoveryKey.replace(/ /g, ""));
 
     let parity = 0;
     for (const b of result) {
@@ -52,15 +52,11 @@ export function decodeRecoveryKey(recoveryKey: string): Uint8Array {
         }
     }
 
-    if (
-        result.length !==
-        OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH + 1
-    ) {
+    if (result.length !== OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH + 1) {
         throw new Error("Incorrect length");
     }
 
-    return Uint8Array.from(result.slice(
-        OLM_RECOVERY_KEY_PREFIX.length,
-        OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH,
-    ));
+    return Uint8Array.from(
+        result.slice(OLM_RECOVERY_KEY_PREFIX.length, OLM_RECOVERY_KEY_PREFIX.length + global.Olm.PRIVATE_KEY_LENGTH),
+    );
 }

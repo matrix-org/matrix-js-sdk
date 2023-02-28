@@ -20,7 +20,7 @@ import { IContent, MatrixEvent } from "./event";
 import { MSC3089TreeSpace } from "./MSC3089TreeSpace";
 import { EventTimeline } from "./event-timeline";
 import { FileType } from "../http-api";
-import type { ISendEventResponse } from "..";
+import type { ISendEventResponse } from "../@types/requests";
 
 /**
  * Represents a [MSC3089](https://github.com/matrix-org/matrix-doc/pull/3089) branch - a reference
@@ -62,12 +62,12 @@ export class MSC3089Branch {
     }
 
     private get roomId(): string {
-        return this.indexEvent.getRoomId();
+        return this.indexEvent.getRoomId()!;
     }
 
     /**
      * Deletes the file from the tree, including all prior edits/versions.
-     * @returns {Promise<void>} Resolves when complete.
+     * @returns Promise which resolves when complete.
      */
     public async delete(): Promise<void> {
         await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {}, this.id);
@@ -79,56 +79,66 @@ export class MSC3089Branch {
 
     /**
      * Gets the name for this file.
-     * @returns {string} The name, or "Unnamed File" if unknown.
+     * @returns The name, or "Unnamed File" if unknown.
      */
     public getName(): string {
-        return this.indexEvent.getContent()['name'] || "Unnamed File";
+        return this.indexEvent.getContent()["name"] || "Unnamed File";
     }
 
     /**
      * Sets the name for this file.
-     * @param {string} name The new name for this file.
-     * @returns {Promise<void>} Resolves when complete.
+     * @param name - The new name for this file.
+     * @returns Promise which resolves when complete.
      */
     public async setName(name: string): Promise<void> {
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            ...this.indexEvent.getContent(),
-            name: name,
-        }, this.id);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                ...this.indexEvent.getContent(),
+                name: name,
+            },
+            this.id,
+        );
     }
 
     /**
      * Gets whether or not a file is locked.
-     * @returns {boolean} True if locked, false otherwise.
+     * @returns True if locked, false otherwise.
      */
     public isLocked(): boolean {
-        return this.indexEvent.getContent()['locked'] || false;
+        return this.indexEvent.getContent()["locked"] || false;
     }
 
     /**
      * Sets a file as locked or unlocked.
-     * @param {boolean} locked True to lock the file, false otherwise.
-     * @returns {Promise<void>} Resolves when complete.
+     * @param locked - True to lock the file, false otherwise.
+     * @returns Promise which resolves when complete.
      */
     public async setLocked(locked: boolean): Promise<void> {
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            ...this.indexEvent.getContent(),
-            locked: locked,
-        }, this.id);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                ...this.indexEvent.getContent(),
+                locked: locked,
+            },
+            this.id,
+        );
     }
 
     /**
      * Gets information about the file needed to download it.
-     * @returns {Promise<{info: IEncryptedFile, httpUrl: string}>} Information about the file.
+     * @returns Information about the file.
      */
-    public async getFileInfo(): Promise<{ info: IEncryptedFile, httpUrl: string }> {
+    public async getFileInfo(): Promise<{ info: IEncryptedFile; httpUrl: string }> {
         const event = await this.getFileEvent();
 
-        const file = event.getOriginalContent()['file'];
-        const httpUrl = this.client.mxcUrlToHttp(file['url']);
+        const file = event.getOriginalContent()["file"];
+        const httpUrl = this.client.mxcUrlToHttp(file["url"]);
 
         if (!httpUrl) {
-            throw new Error(`No HTTP URL available for ${file['url']}`);
+            throw new Error(`No HTTP URL available for ${file["url"]}`);
         }
 
         return { info: file, httpUrl: httpUrl };
@@ -136,7 +146,7 @@ export class MSC3089Branch {
 
     /**
      * Gets the event the file points to.
-     * @returns {Promise<MatrixEvent>} Resolves to the file's event.
+     * @returns Promise which resolves to the file's event.
      */
     public async getFileEvent(): Promise<MatrixEvent> {
         const room = this.client.getRoom(this.roomId);
@@ -145,7 +155,7 @@ export class MSC3089Branch {
         let event: MatrixEvent | undefined = room.getUnfilteredTimelineSet().findEventById(this.id);
 
         // keep scrolling back if needed until we find the event or reach the start of the room:
-        while (!event && room.getLiveTimeline().getState(EventTimeline.BACKWARDS).paginationToken) {
+        while (!event && room.getLiveTimeline().getState(EventTimeline.BACKWARDS)!.paginationToken) {
             await this.client.scrollback(room, 100);
             event = room.getUnfilteredTimelineSet().findEventById(this.id);
         }
@@ -161,11 +171,11 @@ export class MSC3089Branch {
 
     /**
      * Creates a new version of this file with contents in a type that is compatible with MatrixClient.uploadContent().
-     * @param {string} name The name of the file.
-     * @param {File | String | Buffer | ReadStream | Blob} encryptedContents The encrypted contents.
-     * @param {Partial<IEncryptedFile>} info The encrypted file information.
-     * @param {IContent} additionalContent Optional event content fields to include in the message.
-     * @returns {Promise<ISendEventResponse>} Resolves to the file event's sent response.
+     * @param name - The name of the file.
+     * @param encryptedContents - The encrypted contents.
+     * @param info - The encrypted file information.
+     * @param additionalContent - Optional event content fields to include in the message.
+     * @returns Promise which resolves to the file event's sent response.
      */
     public async createNewVersion(
         name: string,
@@ -177,30 +187,40 @@ export class MSC3089Branch {
             ...(additionalContent ?? {}),
             "m.new_content": true,
             "m.relates_to": {
-                "rel_type": RelationType.Replace,
-                "event_id": this.id,
+                rel_type: RelationType.Replace,
+                event_id: this.id,
             },
         });
 
         // Update the version of the new event
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            active: true,
-            name: name,
-            version: this.version + 1,
-        }, fileEventResponse['event_id']);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                active: true,
+                name: name,
+                version: this.version + 1,
+            },
+            fileEventResponse["event_id"],
+        );
 
         // Deprecate ourselves
-        await this.client.sendStateEvent(this.roomId, UNSTABLE_MSC3089_BRANCH.name, {
-            ...(this.indexEvent.getContent()),
-            active: false,
-        }, this.id);
+        await this.client.sendStateEvent(
+            this.roomId,
+            UNSTABLE_MSC3089_BRANCH.name,
+            {
+                ...this.indexEvent.getContent(),
+                active: false,
+            },
+            this.id,
+        );
 
         return fileEventResponse;
     }
 
     /**
      * Gets the file's version history, starting at this file.
-     * @returns {Promise<MSC3089Branch[]>} Resolves to the file's version history, with the
+     * @returns Promise which resolves to the file's version history, with the
      * first element being the current version and the last element being the first version.
      */
     public async getVersionHistory(): Promise<MSC3089Branch[]> {
@@ -221,9 +241,9 @@ export class MSC3089Branch {
         let childEvent: MatrixEvent | undefined;
         let parentEvent = await this.getFileEvent();
         do {
-            childEvent = timelineEvents.find(e => e.replacingEventId() === parentEvent.getId());
+            childEvent = timelineEvents.find((e) => e.replacingEventId() === parentEvent.getId());
             if (childEvent) {
-                const branch = this.directory.getFile(childEvent.getId());
+                const branch = this.directory.getFile(childEvent.getId()!);
                 if (branch) {
                     fileHistory.push(branch);
                     parentEvent = childEvent;

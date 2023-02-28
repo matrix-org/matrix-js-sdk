@@ -22,18 +22,18 @@ export class RelatedRelations {
     private relations: Relations[];
 
     public constructor(relations: Relations[]) {
-        this.relations = relations.filter(r => !!r);
+        this.relations = relations.filter((r) => !!r);
     }
 
     public getRelations(): MatrixEvent[] {
-        return this.relations.reduce((c, p) => [...c, ...p.getRelations()], []);
+        return this.relations.reduce<MatrixEvent[]>((c, p) => [...c, ...p.getRelations()], []);
     }
 
-    public on<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>) {
-        this.relations.forEach(r => r.on(ev, fn));
+    public on<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>): void {
+        this.relations.forEach((r) => r.on(ev, fn));
     }
 
-    public off<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>) {
-        this.relations.forEach(r => r.off(ev, fn));
+    public off<T extends RelationsEvent>(ev: T, fn: Listener<RelationsEvent, EventHandlerMap, T>): void {
+        this.relations.forEach((r) => r.off(ev, fn));
     }
 }

@@ -15,24 +15,26 @@ limitations under the License.
 */
 
 import { ISigned } from "../@types/signed";
+import { IEncryptedPayload } from "./aes";
 
-export interface IKeyBackupSession {
-    first_message_index: number; // eslint-disable-line camelcase
-    forwarded_count: number; // eslint-disable-line camelcase
-    is_verified: boolean; // eslint-disable-line camelcase
-    session_data: { // eslint-disable-line camelcase
-        ciphertext: string;
-        ephemeral: string;
-        mac: string;
-        iv: string;
-    };
+export interface Curve25519SessionData {
+    ciphertext: string;
+    ephemeral: string;
+    mac: string;
+}
+
+/* eslint-disable camelcase */
+export interface IKeyBackupSession<T = Curve25519SessionData | IEncryptedPayload> {
+    first_message_index: number;
+    forwarded_count: number;
+    is_verified: boolean;
+    session_data: T;
 }
 
 export interface IKeyBackupRoomSessions {
     [sessionId: string]: IKeyBackupSession;
 }
 
-/* eslint-disable camelcase */
 export interface ICurve25519AuthData {
     public_key: string;
     private_key_salt?: string;
@@ -57,6 +59,10 @@ export interface IKeyBackupInfo {
 /* eslint-enable camelcase */
 
 export interface IKeyBackupPrepareOpts {
+    /**
+     * Whether to use Secure Secret Storage to store the key encrypting key backups.
+     * Optional, defaults to false.
+     */
     secureSecretStorage: boolean;
 }
 

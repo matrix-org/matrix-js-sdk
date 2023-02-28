@@ -14,11 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { randomString } from '../randomstring';
-import { getCrypto } from '../utils';
-
-const subtleCrypto = (typeof window !== "undefined" && window.crypto) ?
-    (window.crypto.subtle || window.crypto.webkitSubtle) : null;
+import { randomString } from "../randomstring";
+import { subtleCrypto, TextEncoder } from "./crypto";
 
 const DEFAULT_ITERATIONS = 500000;
 
@@ -44,14 +41,12 @@ export function keyFromAuthData(authData: IAuthData, password: string): Promise<
     }
 
     if (!authData.private_key_salt || !authData.private_key_iterations) {
-        throw new Error(
-            "Salt and/or iterations not found: " +
-            "this backup cannot be restored with a passphrase",
-        );
+        throw new Error("Salt and/or iterations not found: " + "this backup cannot be restored with a passphrase");
     }
 
     return deriveKey(
-        password, authData.private_key_salt,
+        password,
+        authData.private_key_salt,
         authData.private_key_iterations,
         authData.private_key_bits || DEFAULT_BITSIZE,
     );
@@ -75,55 +70,24 @@ export async function deriveKey(
     iterations: number,
     numBits = DEFAULT_BITSIZE,
 ): Promise<Uint8Array> {
-    return subtleCrypto
-        ? deriveKeyBrowser(password, salt, iterations, numBits)
-        : deriveKeyNode(password, salt, iterations, numBits);
-}
-
-async function deriveKeyBrowser(
-    password: string,
-    salt: string,
-    iterations: number,
-    numBits: number,
-): Promise<Uint8Array> {
-    const subtleCrypto = global.crypto.subtle;
-    const TextEncoder = global.TextEncoder;
     if (!subtleCrypto || !TextEncoder) {
-        throw new Error("Password-based backup is not avaiable on this platform");
+        throw new Error("Password-based backup is not available on this platform");
     }
 
-    const key = await subtleCrypto.importKey(
-        'raw',
-        new TextEncoder().encode(password),
-        { name: 'PBKDF2' },
-        false,
-        ['deriveBits'],
-    );
+    const key = await subtleCrypto.importKey("raw", new TextEncoder().encode(password), { name: "PBKDF2" }, false, [
+        "deriveBits",
+    ]);
 
     const keybits = await subtleCrypto.deriveBits(
         {
-            name: 'PBKDF2',
+            name: "PBKDF2",
             salt: new TextEncoder().encode(salt),
             iterations: iterations,
-            hash: 'SHA-512',
+            hash: "SHA-512",
         },
         key,
         numBits,
     );
 
     return new Uint8Array(keybits);
-}
-
-async function deriveKeyNode(
-    password: string,
-    salt: string,
-    iterations: number,
-    numBits: number,
-): Promise<Uint8Array> {
-    const crypto = getCrypto();
-    if (!crypto) {
-        throw new Error("No usable crypto implementation");
-    }
-
-    return crypto.pbkdf2Sync(password, Buffer.from(salt, 'binary'), iterations, numBits, 'sha512');
 }

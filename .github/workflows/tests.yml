@@ -1,37 +1,83 @@
 name: Tests
 on:
-  pull_request: { }
-  push:
-    branches: [ develop, master ]
+    pull_request: {}
+    merge_group:
+        types: [checks_requested]
+    push:
+        branches: [develop, master]
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+    group: ${{ github.workflow }}-${{ github.ref }}
+    cancel-in-progress: true
 jobs:
-  jest:
-    name: Jest
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
+    jest:
+        name: "Jest [${{ matrix.specs }}] (Node ${{ matrix.node }})"
+        runs-on: ubuntu-latest
+        timeout-minutes: 10
+        strategy:
+            matrix:
+                specs: [browserify, integ, unit]
+                node: [16, 18, latest]
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v3
 
-      - name: Yarn cache
-        uses: actions/setup-node@v3
+            - name: Setup Node
+              uses: actions/setup-node@v3
+              with:
+                  cache: "yarn"
+                  node-version: ${{ matrix.node }}
+
+            - name: Install dependencies
+              run: "yarn install"
+
+            - name: Build
+              if: matrix.specs == 'browserify'
+              run: "yarn build"
+
+            - name: Get number of CPU cores
+              id: cpu-cores
+              uses: SimenB/github-actions-cpu-cores@v1
+
+            - name: Load metrics reporter
+              id: metrics
+              if: github.ref == 'refs/heads/develop'
+              run: |
+                  echo "extra-reporter='--reporters=<rootDir>/spec/slowReporter.js'" >> $GITHUB_OUTPUT
+
+            - name: Run tests
+              run: |
+                  yarn coverage \
+                      --ci \
+                      --reporters github-actions ${{ steps.metrics.outputs.extra-reporter }} \
+                      --max-workers ${{ steps.cpu-cores.outputs.count }} \
+                      ./spec/${{ matrix.specs }}
+                  mv coverage/lcov.info coverage/${{ matrix.node }}-${{ matrix.specs }}.lcov.info
+              env:
+                  JEST_SONAR_UNIQUE_OUTPUT_NAME: true
+
+            - name: Upload Artifact
+              uses: actions/upload-artifact@v3
+              with:
+                  name: coverage
+                  path: |
+                      coverage
+                      !coverage/lcov-report
+
+    matrix-react-sdk:
+        name: Downstream test matrix-react-sdk
+        if: github.event_name == 'merge_group'
+        uses: matrix-org/matrix-react-sdk/.github/workflows/tests.yml@develop
         with:
-          cache: 'yarn'
+            disable_coverage: true
+            matrix-js-sdk-sha: ${{ github.sha }}
 
-      - name: Install dependencies
-        run: "yarn install"
-
-      - name: Build
-        run: "yarn build"
-
-      - name: Run tests with coverage
-        run: "yarn coverage --ci"
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: coverage
-          path: |
-            coverage
-            !coverage/lcov-report
+    # Hook for branch protection to work outside merge queues
+    downstream:
+        name: Downstream tests
+        runs-on: ubuntu-latest
+        if: always()
+        needs:
+            - matrix-react-sdk
+        steps:
+            - if: needs.matrix-react-sdk.result != 'skipped' && needs.matrix-react-sdk.result != 'success'
+              run: exit 1
