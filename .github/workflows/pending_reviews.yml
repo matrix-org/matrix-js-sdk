@@ -24,7 +24,7 @@ jobs:
                       const { owner, repo } = context.repo;
                       const pull = context.payload.pull_request;
                       const pull_number = pull.number;
-                      const reviews = await github.rest.pulls.listReviews({
+                      const { data: reviews } = await github.rest.pulls.listReviews({
                           pull_number,
                           owner,
                           repo,
