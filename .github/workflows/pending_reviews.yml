@@ -12,7 +12,7 @@ jobs:
         runs-on: ubuntu-latest
         permissions:
             pull-requests: read
-            checks: write
+            statuses: write
         steps:
             - name: 🔍 Check reviewers
               uses: actions/github-script@v5
