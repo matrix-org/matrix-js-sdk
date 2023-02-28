@@ -34,7 +34,7 @@ jobs:
                           || pull.requested_teams.length
                           || reviews.some(r => r.state !== "APPROVED");
 
-                      await octokit.rest.repos.createCommitStatus({
+                      await github.rest.repos.createCommitStatus({
                           context: "Pending reviews",
                           sha: pull.head.sha,
                           state: pending ? "failure" : "success",
