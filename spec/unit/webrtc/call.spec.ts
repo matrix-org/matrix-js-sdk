@@ -911,32 +911,7 @@ describe("Call", function () {
                     new MockMediaStreamTrack("track1", "audio"),
                     new MockMediaStreamTrack("track2", "video"),
                 ]);
-                let sdp =
-                    "v=0\n" +
-                    "o=- 7135465365607179083 2 IN IP4 127.0.0.1\n" +
-                    "s=-\n" +
-                    "t=0 0\n" +
-                    "a=group:BUNDLE 0 1 2\n";
-
-                stream.getTracks().forEach((track, index) => {
-                    sdp += `m=${track.kind}\n`;
-                    sdp += `a=mid:${index}\n`;
-                    sdp += `a=msid:${stream.id} ${track.id}\n`;
-                });
-
-                // @ts-ignore
-                call.peerConn.remoteDescription = {
-                    sdp: sdp,
-                };
-
-                stream.getTracks().forEach((track, index) => {
-                    // @ts-ignore
-                    call.onTrack({
-                        track,
-                        streams: [stream],
-                        transceiver: { mid: `${index}`, receiver: { track } },
-                    } as TrackEvent);
-                });
+                runOnTrackForStream(call, stream);
             };
 
             it("should handle incoming sdp_stream_metadata_changed with audio muted", async () => {
