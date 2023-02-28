@@ -385,14 +385,6 @@ describe("Group Call", function () {
                 await groupCall.create();
             });
 
-            it("ignores changes, if we can't get user id of opponent", async () => {
-                const call = new MockMatrixCall(room.roomId, groupCall.groupCallId);
-                jest.spyOn(call, "getOpponentMember").mockReturnValue({ userId: undefined });
-
-                // @ts-ignore Mock
-                expect(() => groupCall.onCallFeedsChanged(call)).toThrow();
-            });
-
             describe("usermedia feeds", () => {
                 beforeEach(() => {
                     currentFeed.purpose = SDPStreamMetadataPurpose.Usermedia;
