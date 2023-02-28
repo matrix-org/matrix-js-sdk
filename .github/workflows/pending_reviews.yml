@@ -24,24 +24,28 @@ jobs:
               uses: actions/github-script@v5
               env:
                   PR_ID: ${{ steps.prdetails.outputs.pr_id }}
-                  PR_DATA: ${{ steps.prdetails.outputs.data }}
+                  HEAD_SHA: ${{ fromJSON(steps.prdetails.outputs.data).head.sha }}
+                  REQUESTED_REVIEWERS: ${{ fromJSON(steps.prdetails.outputs.data).requested_reviewers }}
+                  REQUESTED_TEAMS: ${{ fromJSON(steps.prdetails.outputs.data).requested_teams }}
               with:
                   script: |
-                      const { PR_ID: pull_number, PR_DATA } = process.env;
-                      const pull = JSON.parse(PR_DATA);
+                      const { PR_ID: pull_number, HEAD_SHA: sha, REQUESTED_REVIEWERS, REQUESTED_TEAMS } = process.env;
+                      const requested_reviewers = JSON.parse(REQUESTED_REVIEWERS);
+                      const requested_teams = JSON.parse(REQUESTED_TEAMS);
+
                       const reviews = await github.rest.pulls.listReviews({
                           pull_number,
                           owner,
                           repo,
                       });
 
-                      const pending = pull.requested_reviewers.length
-                          || pull.requested_teams.length
+                      const pending = requested_reviewers.length
+                          || requested_teams.length
                           || reviews.some(r => r.state !== "APPROVED");
 
                       await octokit.rest.repos.createCommitStatus({
                           context: "Pending reviews",
-                          sha: pull.head.sha,
+                          sha,
                           state: pending ? "failure" : "success",
                           description: pending ? "Outstanding pending reviews" : undefined,
                           owner,
