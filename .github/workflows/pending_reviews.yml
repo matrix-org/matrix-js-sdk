@@ -1,14 +1,50 @@
-# Can be workflow_call'd only from pull_request & pull_request_review
 name: Pending Reviews
 on:
-  pull_request:
-    types: [ opened, synchronize, review_requested, review_request_removed, ready_for_review ]
-  pull_request_review:
-    types: [ submitted, dismissed ]
-concurrency: ${{ github.workflow }}-${{ github.ref }}
+    pull_request:
+        types: [opened, synchronize, review_requested, review_request_removed, ready_for_review]
+    pull_request_review:
+        types: [submitted, dismissed]
+    workflow_call: {}
+concurrency: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch }}
 jobs:
-  dummy:
-    name: Trigger Pending Reviews workflow_run
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "I am a dummy"
+    reviews:
+        name: Assert no outstanding reviews
+        runs-on: ubuntu-latest
+        permissions:
+            pull-requests: read
+            checks: write
+        steps:
+            - id: prdetails
+              if: github.event.workflow_run.event == 'pull_request'
+              uses: matrix-org/pr-details-action@v1.2
+              with:
+                  owner: ${{ github.event.workflow_run.head_repository.owner.login }}
+                  branch: ${{ github.event.workflow_run.head_branch }}
+
+            - name: 🔍 Check reviewers
+              uses: actions/github-script@v5
+              env:
+                  PR_ID: ${{ steps.prdetails.outputs.pr_id }}
+                  PR_DATA: ${{ steps.prdetails.outputs.data }}
+              with:
+                  script: |
+                      const { PR_ID: pull_number, PR_DATA } = process.env;
+                      const pull = JSON.parse(PR_DATA);
+                      const reviews = await github.rest.pulls.listReviews({
+                          pull_number,
+                          owner,
+                          repo,
+                      });
+
+                      const pending = pull.requested_reviewers.length
+                          || pull.requested_teams.length
+                          || reviews.some(r => r.state !== "APPROVED");
+
+                      await octokit.rest.repos.createCommitStatus({
+                          context: "Pending reviews",
+                          sha: pull.head.sha,
+                          state: pending ? "failure" : "success",
+                          description: pending ? "Outstanding pending reviews" : undefined,
+                          owner,
+                          repo,
+                      });
