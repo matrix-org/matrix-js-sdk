@@ -43,7 +43,6 @@ import {
 } from "./sliding-sync";
 import { EventType } from "./@types/event";
 import { IPushRules } from "./@types/PushRules";
-import { PushProcessor } from "./pushprocessor";
 import { RoomStateEvent } from "./models/room-state";
 import { RoomMemberEvent } from "./models/room-member";
 
@@ -262,7 +261,7 @@ class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, Ext
             // (see sync) before syncing over the network.
             if (accountDataEvent.getType() === EventType.PushRules) {
                 const rules = accountDataEvent.getContent<IPushRules>();
-                this.client.pushRules = PushProcessor.rewriteDefaultRules(rules);
+                this.client.setPushRules(rules);
             }
             const prevEvent = prevEventsMap[accountDataEvent.getType()];
             this.client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);

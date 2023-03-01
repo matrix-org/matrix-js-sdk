@@ -32,7 +32,6 @@ import * as utils from "./utils";
 import { IDeferred } from "./utils";
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
-import { PushProcessor } from "./pushprocessor";
 import { logger } from "./logger";
 import { InvalidStoreError, InvalidStoreState } from "./errors";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client";
@@ -1162,7 +1161,7 @@ export class SyncApi {
                 // (see sync) before syncing over the network.
                 if (accountDataEvent.getType() === EventType.PushRules) {
                     const rules = accountDataEvent.getContent<IPushRules>();
-                    client.pushRules = PushProcessor.rewriteDefaultRules(rules);
+                    client.setPushRules(rules);
                 }
                 const prevEvent = prevEventsMap[accountDataEvent.getType()!];
                 client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
