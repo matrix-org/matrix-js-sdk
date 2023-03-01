@@ -712,6 +712,16 @@ export class PushProcessor {
     }
 
     public ruleMatchesEvent(rule: Partial<IPushRule> & Pick<IPushRule, "conditions">, ev: MatrixEvent): boolean {
+        // Disable the deprecated mentions push rules if the new mentions property exists.
+        if (
+            ev.getContent()["org.matrix.msc3952.mentions"] !== undefined &&
+            (rule.rule_id === RuleId.ContainsUserName ||
+                rule.rule_id === RuleId.ContainsDisplayName ||
+                rule.rule_id === RuleId.AtRoomNotification)
+        ) {
+            return false;
+        }
+
         return !rule.conditions?.some((cond) => !this.eventFulfillsCondition(cond, ev));
     }
 
