@@ -1,5 +1,5 @@
 /*
-Copyright 2015 - 2022 The Matrix.org Foundation C.I.C.
+Copyright 2015 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
 import { DecryptionError } from "../crypto/algorithms";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
 
 export { EventStatus } from "./event-status";
 
@@ -267,11 +268,16 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     private txnId?: string;
 
     /**
-     * @experimental
      * A reference to the thread this event belongs to
      */
     private thread?: Thread;
     private threadId?: string;
+
+    /*
+     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
+     * the sender has disabled encrypting to unverified devices.
+     */
+    private encryptedDisabledForUnverifiedDevices = false;
 
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
@@ -546,7 +552,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
      * Get the event ID of the thread head
      */
     public get threadRootId(): string | undefined {
@@ -559,7 +564,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
+     * A helper to check if an event is a thread's head or not
      */
     public get isThreadRoot(): boolean {
         const threadDetails = this.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
@@ -571,13 +576,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     public get replyEventId(): string | undefined {
-        // We're prefer ev.getContent() over ev.getWireContent() to make sure
-        // we grab the latest edit with potentially new relations. But we also
-        // can't just rely on ev.getContent() by itself because historically we
-        // still show the reply from the original message even though the edit
-        // event does not include the relation reply.
-        const mRelatesTo = this.getContent()["m.relates_to"] || this.getWireContent()["m.relates_to"];
-        return mRelatesTo?.["m.in_reply_to"]?.event_id;
+        return this.getWireContent()["m.relates_to"]?.["m.in_reply_to"]?.event_id;
     }
 
     public get relationEventId(): string | undefined {
@@ -706,6 +705,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
     }
 
+    /*
+     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
+     * the sender has disabled encrypting to unverified devices.
+     */
+    public get isEncryptedDisabledForUnverifiedDevices(): boolean {
+        return this.isDecryptionFailure() && this.encryptedDisabledForUnverifiedDevices;
+    }
+
     public shouldAttemptDecryption(): boolean {
         if (this.isRedacted()) return false;
         if (this.isBeingDecrypted()) return false;
@@ -820,17 +827,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     }
                 }
             } catch (e) {
-                if ((<Error>e).name !== "DecryptionError") {
-                    // not a decryption error: log the whole exception as an error
-                    // (and don't bother with a retry)
-                    const re = options.isRetry ? "re" : "";
-                    // For find results: this can produce "Error decrypting event (id=$ev)" and
-                    // "Error redecrypting event (id=$ev)".
-                    logger.error(`Error ${re}decrypting event (${this.getDetails()})`, e);
-                    this.decryptionPromise = null;
-                    this.retryDecryption = false;
-                    return;
-                }
+                const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
 
                 err = e as Error;
 
@@ -850,10 +847,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 if (this.retryDecryption) {
                     // decryption error, but we have a retry queued.
-                    logger.log(
-                        `Error decrypting event (${this.getDetails()}), but retrying: ` +
-                            (<DecryptionError>e).detailedString,
-                    );
+                    logger.log(`Error decrypting event (${this.getDetails()}), but retrying: ${detailedError}`);
                     continue;
                 }
 
@@ -862,9 +856,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 //
                 // the detailedString already includes the name and message of the error, and the stack isn't much use,
                 // so we don't bother to log `e` separately.
-                logger.warn(`Error decrypting event (${this.getDetails()}): ` + (<DecryptionError>e).detailedString);
+                logger.warn(`Error decrypting event (${this.getDetails()}): ${detailedError}`);
 
-                res = this.badEncryptedMessage((<DecryptionError>e).message);
+                res = this.badEncryptedMessage(String(e));
             }
 
             // at this point, we've either successfully decrypted the event, or have given up
@@ -906,6 +900,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     body: "** Unable to decrypt: " + reason + " **",
                 },
             },
+            encryptedDisabledForUnverifiedDevices: reason === `DecryptionError: ${WITHHELD_MESSAGES["m.unverified"]}`,
         };
     }
 
@@ -927,6 +922,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
         this.forwardingCurve25519KeyChain = decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
+        this.encryptedDisabledForUnverifiedDevices = decryptionResult.encryptedDisabledForUnverifiedDevices || false;
         this.invalidateExtensibleEvent();
     }
 
@@ -1562,7 +1558,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
+     * Set the instance of a thread associated with the current event
+     * @param thread - the thread
      */
     public setThread(thread?: Thread): void {
         if (this.thread) {
@@ -1576,7 +1573,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     /**
-     * @experimental
+     * Get the instance of the thread associated with the current event
      */
     public getThread(): Thread | undefined {
         return this.thread;

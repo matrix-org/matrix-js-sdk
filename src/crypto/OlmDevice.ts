@@ -21,8 +21,7 @@ import { IndexedDBCryptoStore } from "./store/indexeddb-crypto-store";
 import * as algorithms from "./algorithms";
 import { CryptoStore, IProblem, ISessionInfo, IWithheld } from "./store/base";
 import { IOlmDevice, IOutboundGroupSessionKey } from "./algorithms/megolm";
-import { IMegolmSessionData } from "./index";
-import { OlmGroupSessionExtraData } from "../@types/crypto";
+import { IMegolmSessionData, OlmGroupSessionExtraData } from "../@types/crypto";
 import { IMessage } from "./algorithms/olm";
 
 // The maximum size of an event is 65K, and we base64 the content, so this is a
@@ -369,6 +368,11 @@ export class OlmDevice {
      */
     private saveSession(deviceKey: string, sessionInfo: IUnpickledSessionInfo, txn: unknown): void {
         const sessionId = sessionInfo.session.session_id();
+        logger.debug(`Saving Olm session ${sessionId} with device ${deviceKey}: ${sessionInfo.session.describe()}`);
+
+        // Why do we re-use the input object for this, overwriting the same key with a different
+        // type? Is it because we want to erase the unpickled session to enforce that it's no longer
+        // used? A comment would be great.
         const pickledSessionInfo = Object.assign(sessionInfo, {
             session: sessionInfo.session.pickle(this.pickleKey),
         });

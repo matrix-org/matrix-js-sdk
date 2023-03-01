@@ -180,11 +180,11 @@ yarn version --no-git-tag-version --new-version "$release"
 # they exist). This small bit of gymnastics allows us to use the TypeScript
 # source directly for development without needing to build before linting or
 # testing.
-for i in main typings
+for i in main typings browser
 do
     lib_value=$(jq -r ".matrix_lib_$i" package.json)
     if [ "$lib_value" != "null" ]; then
-        jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json
+        jq ".$i = .matrix_lib_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
     fi
 done
 

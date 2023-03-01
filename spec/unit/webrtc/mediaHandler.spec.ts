@@ -48,7 +48,7 @@ describe("Media Handler", function () {
         } as unknown as MatrixClient);
     });
 
-    it("does not trigger update after restore media settings ", () => {
+    it("does not trigger update after restore media settings", () => {
         mediaHandler.restoreMediaSettings(FAKE_AUDIO_INPUT_ID, FAKE_VIDEO_INPUT_ID);
 
         expect(mockMediaDevices.getUserMedia).not.toHaveBeenCalled();
@@ -308,20 +308,18 @@ describe("Media Handler", function () {
             expect(stream2.isCloneOf(stream1)).toEqual(false);
         });
 
-        it("strips unwanted audio tracks from re-used stream", async () => {
-            const stream1 = await mediaHandler.getUserMediaStream(true, true);
-            const stream2 = (await mediaHandler.getUserMediaStream(false, true)) as unknown as MockMediaStream;
+        it("creates new stream when we no longer want audio", async () => {
+            await mediaHandler.getUserMediaStream(true, true);
+            const stream = await mediaHandler.getUserMediaStream(false, true);
 
-            expect(stream2.isCloneOf(stream1)).toEqual(true);
-            expect(stream2.getAudioTracks().length).toEqual(0);
+            expect(stream.getAudioTracks().length).toEqual(0);
         });
 
-        it("strips unwanted video tracks from re-used stream", async () => {
-            const stream1 = await mediaHandler.getUserMediaStream(true, true);
-            const stream2 = (await mediaHandler.getUserMediaStream(true, false)) as unknown as MockMediaStream;
+        it("creates new stream when we no longer want video", async () => {
+            await mediaHandler.getUserMediaStream(true, true);
+            const stream = await mediaHandler.getUserMediaStream(true, false);
 
-            expect(stream2.isCloneOf(stream1)).toEqual(true);
-            expect(stream2.getVideoTracks().length).toEqual(0);
+            expect(stream.getVideoTracks().length).toEqual(0);
         });
     });
 
@@ -403,7 +401,7 @@ describe("Media Handler", function () {
         });
     });
 
-    describe("stopUserMediaStream", () => {
+    describe("stopScreensharingStream", () => {
         let stream: MediaStream;
 
         beforeEach(async () => {

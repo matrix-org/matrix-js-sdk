@@ -11,7 +11,7 @@ jq --version > /dev/null || (echo "jq is required: please install it"; kill $$)
 
 if [ "$(git branch -lr | grep origin/develop -c)" -ge 1 ]; then
     # When merging to develop, we need revert the `main` and `typings` fields if we adjusted them previously.
-    for i in main typings
+    for i in main typings browser
     do
         # If a `lib` prefixed value is present, it means we adjusted the field
         # earlier at publish time, so we should revert it now.
@@ -21,9 +21,9 @@ if [ "$(git branch -lr | grep origin/develop -c)" -ge 1 ]; then
             # to the TypeScript source.
             src_value=$(jq -r ".matrix_src_$i" package.json)
             if [ "$src_value" != "null" ]; then
-                jq ".$i = .matrix_src_$i" package.json > package.json.new && mv package.json.new package.json
+                jq ".$i = .matrix_src_$i" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
             else
-                jq "del(.$i)" package.json > package.json.new && mv package.json.new package.json
+                jq "del(.$i)" package.json > package.json.new && mv package.json.new package.json && yarn prettier --write package.json
             fi
         fi
     done

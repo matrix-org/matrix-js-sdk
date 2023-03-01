@@ -167,6 +167,38 @@ describe("Crypto", function () {
 
             client.stopClient();
         });
+
+        it("doesn't throw an error when attempting to decrypt a redacted event", async () => {
+            const client = new TestClient("@alice:example.com", "deviceid").client;
+            await client.initCrypto();
+
+            const event = new MatrixEvent({
+                content: {},
+                event_id: "$event_id",
+                room_id: "!room_id",
+                sender: "@bob:example.com",
+                type: "m.room.encrypted",
+                unsigned: {
+                    redacted_because: {
+                        content: {},
+                        event_id: "$redaction_event_id",
+                        redacts: "$event_id",
+                        room_id: "!room_id",
+                        origin_server_ts: 1234567890,
+                        sender: "@bob:example.com",
+                        type: "m.room.redaction",
+                        unsigned: {},
+                    },
+                },
+            });
+            await event.attemptDecryption(client.crypto!);
+            expect(event.isDecryptionFailure()).toBeFalsy();
+            // since the redaction event isn't encrypted, the redacted_because
+            // should be the same as in the original event
+            expect(event.getRedactionEvent()).toEqual(event.getUnsigned().redacted_because);
+
+            client.stopClient();
+        });
     });
 
     describe("Session management", function () {
@@ -222,6 +254,7 @@ describe("Crypto", function () {
                 sendToDevice: jest.fn(),
                 getKeyBackupVersion: jest.fn(),
                 isGuest: jest.fn(),
+                emit: jest.fn(),
             } as unknown as MatrixClient;
             mockRoomList = {} as unknown as RoomList;
 
@@ -521,7 +554,7 @@ describe("Crypto", function () {
             aliceClient.crypto!.outgoingRoomKeyRequestManager.sendQueuedRequests();
             jest.runAllTimers();
             await Promise.resolve();
-            expect(aliceSendToDevice).toBeCalledTimes(1);
+            expect(aliceSendToDevice).toHaveBeenCalledTimes(1);
             const txnId = aliceSendToDevice.mock.calls[0][2];
 
             // give the room key request manager time to update the state
@@ -535,7 +568,7 @@ describe("Crypto", function () {
             // cancelAndResend will call sendToDevice twice:
             // the first call to sendToDevice will be the cancellation
             // the second call to sendToDevice will be the key request
-            expect(aliceSendToDevice).toBeCalledTimes(3);
+            expect(aliceSendToDevice).toHaveBeenCalledTimes(3);
             expect(aliceSendToDevice.mock.calls[2][2]).not.toBe(txnId);
         });
 

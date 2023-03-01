@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2022 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -24,10 +24,13 @@ import {
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
+    RelationType,
     Room,
+    RoomEvent,
 } from "../../src";
-import { Thread } from "../../src/models/thread";
+import { FeatureSupport, Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
+import { eventMapperFor } from "../../src/event-mapper";
 
 describe("EventTimelineSet", () => {
     const roomId = "!foo:bar";
@@ -144,7 +147,7 @@ describe("EventTimelineSet", () => {
         let thread: Thread;
 
         beforeEach(() => {
-            (client.supportsExperimentalThreads as jest.Mock).mockReturnValue(true);
+            (client.supportsThreads as jest.Mock).mockReturnValue(true);
             thread = new Thread("!thread_id:server", messageEvent, { room, client });
         });
 
@@ -176,7 +179,7 @@ describe("EventTimelineSet", () => {
                 eventTimelineSet.addEventToTimeline(messageEvent, liveTimeline2, {
                     toStartOfTimeline: true,
                 });
-            }).toThrowError();
+            }).toThrow();
         });
 
         it("should not add a threaded reply to the main room timeline", () => {
@@ -200,6 +203,88 @@ describe("EventTimelineSet", () => {
                 toStartOfTimeline: true,
             });
             expect(liveTimeline.getEvents().length).toStrictEqual(0);
+        });
+
+        it("should allow edits to be added to thread timeline", async () => {
+            jest.spyOn(client, "supportsThreads").mockReturnValue(true);
+            jest.spyOn(client, "getEventMapper").mockReturnValue(eventMapperFor(client, {}));
+            Thread.hasServerSideSupport = FeatureSupport.Stable;
+
+            const sender = "@alice:matrix.org";
+
+            const root = utils.mkEvent({
+                event: true,
+                content: {
+                    body: "Thread root",
+                },
+                type: EventType.RoomMessage,
+                sender,
+            });
+            room.addLiveEvents([root]);
+
+            const threadReply = utils.mkEvent({
+                event: true,
+                content: {
+                    "body": "Thread reply",
+                    "m.relates_to": {
+                        event_id: root.getId()!,
+                        rel_type: RelationType.Thread,
+                    },
+                },
+                type: EventType.RoomMessage,
+                sender,
+            });
+
+            root.setUnsigned({
+                "m.relations": {
+                    [RelationType.Thread]: {
+                        count: 1,
+                        latest_event: {
+                            content: threadReply.getContent(),
+                            origin_server_ts: 5,
+                            room_id: room.roomId,
+                            sender,
+                            type: EventType.RoomMessage,
+                            event_id: threadReply.getId()!,
+                            user_id: sender,
+                            age: 1,
+                        },
+                        current_user_participated: true,
+                    },
+                },
+            });
+
+            const editToThreadReply = utils.mkEvent({
+                event: true,
+                content: {
+                    "body": " * edit",
+                    "m.new_content": {
+                        "body": "edit",
+                        "msgtype": "m.text",
+                        "org.matrix.msc1767.text": "edit",
+                    },
+                    "m.relates_to": {
+                        event_id: threadReply.getId()!,
+                        rel_type: RelationType.Replace,
+                    },
+                },
+                type: EventType.RoomMessage,
+                sender,
+            });
+
+            jest.spyOn(client, "paginateEventTimeline").mockImplementation(async () => {
+                thread.timelineSet.getLiveTimeline().addEvent(threadReply, { toStartOfTimeline: true });
+                return true;
+            });
+            jest.spyOn(client, "relations").mockResolvedValue({
+                events: [],
+            });
+
+            const thread = room.createThread(root.getId()!, root, [threadReply, editToThreadReply], false);
+            thread.once(RoomEvent.TimelineReset, () => {
+                const lastEvent = thread.timeline.at(-1)!;
+                expect(lastEvent.getContent().body).toBe(" * edit");
+            });
         });
 
         describe("non-room timeline", () => {
@@ -308,13 +393,13 @@ describe("EventTimelineSet", () => {
         let thread: Thread;
 
         beforeEach(() => {
-            (client.supportsExperimentalThreads as jest.Mock).mockReturnValue(true);
+            (client.supportsThreads as jest.Mock).mockReturnValue(true);
             thread = new Thread("!thread_id:server", messageEvent, { room, client });
         });
 
         it("should throw if timeline set has no room", () => {
             const eventTimelineSet = new EventTimelineSet(undefined, {}, client);
-            expect(() => eventTimelineSet.canContain(messageEvent)).toThrowError();
+            expect(() => eventTimelineSet.canContain(messageEvent)).toThrow();
         });
 
         it("should return false if timeline set is for thread but event is not threaded", () => {
