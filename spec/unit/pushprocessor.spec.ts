@@ -546,7 +546,7 @@ describe("NotificationService", function () {
                             actions: [PushRuleActionName.Notify],
                             conditions: [
                                 {
-                                    kind: ConditionKind.ExactEventMatchPrefix,
+                                    kind: ConditionKind.EventPropertyIs,
                                     key: "content.foo",
                                     value: value,
                                 },

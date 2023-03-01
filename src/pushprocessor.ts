@@ -25,7 +25,7 @@ import {
     ICallStartedPrefixCondition,
     IContainsDisplayNameCondition,
     IEventMatchCondition,
-    IExactEventMatchPrefixCondition,
+    IEventPropertyIsCondition,
     IPushRule,
     IPushRules,
     IRoomMemberCountCondition,
@@ -338,8 +338,8 @@ export class PushProcessor {
         switch (cond.kind) {
             case ConditionKind.EventMatch:
                 return this.eventFulfillsEventMatchCondition(cond, ev);
-            case ConditionKind.ExactEventMatchPrefix:
-                return this.eventFulfillsExactEventMatchCondition(cond, ev);
+            case ConditionKind.EventPropertyIs:
+                return this.eventFulfillsEventPropertyIsCondition(cond, ev);
             case ConditionKind.ContainsDisplayName:
                 return this.eventFulfillsDisplayNameCondition(cond, ev);
             case ConditionKind.RoomMemberCount:
@@ -481,7 +481,7 @@ export class PushProcessor {
      * @param cond - The push rule condition to check for a match.
      * @param ev - The event to check for a match.
      */
-    private eventFulfillsExactEventMatchCondition(cond: IExactEventMatchPrefixCondition, ev: MatrixEvent): boolean {
+    private eventFulfillsEventPropertyIsCondition(cond: IEventPropertyIsCondition, ev: MatrixEvent): boolean {
         if (!cond.key || cond.value === undefined) {
             return false;
         }
