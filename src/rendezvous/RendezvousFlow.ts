@@ -1,5 +1,5 @@
 /*
-Copyright 2022 The Matrix.org Foundation C.I.C.
+Copyright 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RendezvousTransportDetails, RendezvousIntent, RendezvousFlow } from ".";
+import { UnstableValue } from "../NamespacedValue";
 
-export interface RendezvousCode {
-    intent: RendezvousIntent;
-    /**
-     * In MSC3906 v1 there wasn't a flow, hence why it's optional for now.
-     */
-    flow?: RendezvousFlow;
-    rendezvous?: {
-        transport: RendezvousTransportDetails;
-        algorithm: string;
-    };
-}
+export const SETUP_ADDITIONAL_DEVICE_FLOW_V2 = new UnstableValue(
+    "m.setup.additional_device.v2",
+    "org.matrix.msc3906.setup.additional_device.v2",
+);
+
+export type RendezvousFlow =
+    | typeof SETUP_ADDITIONAL_DEVICE_FLOW_V2.name
+    | typeof SETUP_ADDITIONAL_DEVICE_FLOW_V2.altName;

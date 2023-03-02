@@ -16,7 +16,14 @@ limitations under the License.
 
 import { UnstableValue } from "matrix-events-sdk";
 
-import { RendezvousChannel, RendezvousFailureListener, RendezvousFailureReason, RendezvousIntent } from ".";
+import {
+    RendezvousChannel,
+    RendezvousFailureListener,
+    RendezvousFailureReason,
+    RendezvousFlow,
+    RendezvousIntent,
+    SETUP_ADDITIONAL_DEVICE_FLOW_V2,
+} from ".";
 import { MatrixClient } from "../client";
 import { CrossSigningInfo } from "../crypto/CrossSigning";
 import { DeviceInfo } from "../crypto/deviceinfo";
@@ -25,11 +32,23 @@ import { logger } from "../logger";
 import { sleep } from "../utils";
 
 enum PayloadType {
-    Start = "m.login.start",
+    /**
+     * @deprecated Only used in MSC3906 v1
+     */
     Finish = "m.login.finish",
     Progress = "m.login.progress",
+    Protocol = "m.login.protocol",
+    Protocols = "m.login.protocols",
+    Approved = "m.login.approved",
+    Success = "m.login.success",
+    Verified = "m.login.verified",
+    Failure = "m.login.failure",
+    Declined = "m.login.declined",
 }
 
+/**
+ * @deprecated Only used in MSC3906 v1
+ */
 enum Outcome {
     Success = "success",
     Failure = "failure",
@@ -38,10 +57,21 @@ enum Outcome {
     Unsupported = "unsupported",
 }
 
+enum FailureReason {
+    Cancelled = "cancelled",
+    Unsupported = "unsupported",
+    E2EESecurityError = "e2ee_security_error",
+    IncompatibleIntent = "incompatible_intent",
+}
+
 export interface MSC3906RendezvousPayload {
     type: PayloadType;
     intent?: RendezvousIntent;
+    /**
+     * @deprecated Only used in MSC3906 v1. Instead the type field should be used in future
+     */
     outcome?: Outcome;
+    reason?: FailureReason;
     device_id?: string;
     device_key?: string;
     verifying_device_id?: string;
@@ -64,18 +94,24 @@ export class MSC3906Rendezvous {
     private newDeviceId?: string;
     private newDeviceKey?: string;
     private ourIntent: RendezvousIntent = RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE;
+    private flow: RendezvousFlow = SETUP_ADDITIONAL_DEVICE_FLOW_V2.name;
+    private v1FallbackEnabled: boolean;
     private _code?: string;
 
     /**
      * @param channel - The secure channel used for communication
      * @param client - The Matrix client in used on the device already logged in
      * @param onFailure - Callback for when the rendezvous fails
+     * @param startInV1FallbackMode - Whether to start in v1 fallback mode
      */
     public constructor(
         private channel: RendezvousChannel<MSC3906RendezvousPayload>,
         private client: MatrixClient,
         public onFailure?: RendezvousFailureListener,
-    ) {}
+        startInV1FallbackMode = false,
+    ) {
+        this.v1FallbackEnabled = startInV1FallbackMode ?? false;
+    }
 
     /**
      * Returns the code representing the rendezvous suitable for rendering in a QR code or undefined if not generated yet.
@@ -92,7 +128,10 @@ export class MSC3906Rendezvous {
             return;
         }
 
-        this._code = JSON.stringify(await this.channel.generateCode(this.ourIntent));
+        const raw = this.v1FallbackEnabled
+            ? await this.channel.generateCode(this.ourIntent)
+            : await this.channel.generateCode(this.ourIntent, this.flow);
+        this._code = JSON.stringify(raw);
     }
 
     public async startAfterShowingCode(): Promise<string | undefined> {
@@ -104,33 +143,85 @@ export class MSC3906Rendezvous {
         // determine available protocols
         if (features.get(Feature.LoginTokenRequest) === ServerSupport.Unsupported) {
             logger.info("Server doesn't support MSC3882");
-            await this.send({ type: PayloadType.Finish, outcome: Outcome.Unsupported });
+            await this.send(
+                this.v1FallbackEnabled
+                    ? { type: PayloadType.Finish, outcome: Outcome.Unsupported }
+                    : { type: PayloadType.Failure, reason: FailureReason.Unsupported },
+            );
             await this.cancel(RendezvousFailureReason.HomeserverLacksSupport);
             return undefined;
         }
 
-        await this.send({ type: PayloadType.Progress, protocols: [LOGIN_TOKEN_PROTOCOL.name] });
+        await this.send({
+            type: this.v1FallbackEnabled ? PayloadType.Progress : PayloadType.Protocols,
+            protocols: [LOGIN_TOKEN_PROTOCOL.name],
+        });
 
         logger.info("Waiting for other device to chose protocol");
-        const { type, protocol, outcome } = await this.receive();
+        const { type, protocol, outcome, reason, intent } = await this.receive();
 
+        // even if we didn't start in v1 fallback we might detect that the other device is v1
+        if (type === PayloadType.Finish || type === PayloadType.Progress) {
+            // this is a PDU from a v1 flow so use fallback mode
+            this.v1FallbackEnabled = true;
+        }
+
+        // fallback for v1 flow
         if (type === PayloadType.Finish) {
+            this.v1FallbackEnabled = true;
             // new device decided not to complete
-            switch (outcome ?? "") {
-                case "unsupported":
-                    await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
-                    break;
-                default:
-                    await this.cancel(RendezvousFailureReason.Unknown);
+            let reason: RendezvousFailureReason;
+            if (intent) {
+                reason =
+                    this.ourIntent === RendezvousIntent.LOGIN_ON_NEW_DEVICE
+                        ? RendezvousFailureReason.OtherDeviceNotSignedIn
+                        : RendezvousFailureReason.OtherDeviceAlreadySignedIn;
+            } else if (outcome === Outcome.Unsupported) {
+                reason = RendezvousFailureReason.UnsupportedAlgorithm;
+            } else {
+                reason = RendezvousFailureReason.Unknown;
             }
+            await this.cancel(reason);
             return undefined;
         }
 
-        if (type !== PayloadType.Progress) {
+        // v2 flow
+        if (type === PayloadType.Failure) {
+            // new device decided not to complete
+            let failureReason: RendezvousFailureReason;
+            switch (reason ?? "") {
+                case FailureReason.Cancelled:
+                    failureReason = RendezvousFailureReason.UserCancelled;
+                    break;
+                case FailureReason.IncompatibleIntent:
+                    failureReason =
+                        this.ourIntent === RendezvousIntent.LOGIN_ON_NEW_DEVICE
+                            ? RendezvousFailureReason.OtherDeviceNotSignedIn
+                            : RendezvousFailureReason.OtherDeviceAlreadySignedIn;
+                    break;
+                case FailureReason.Unsupported:
+                    failureReason = RendezvousFailureReason.UnsupportedAlgorithm;
+                    break;
+                default:
+                    failureReason = RendezvousFailureReason.Unknown;
+            }
+            await this.cancel(failureReason);
+            return undefined;
+        }
+
+        // v1 unexpected payload
+        if (this.v1FallbackEnabled && type !== PayloadType.Progress) {
             await this.cancel(RendezvousFailureReason.Unknown);
             return undefined;
         }
 
+        // v2 unexpected payload
+        if (!this.v1FallbackEnabled && type !== PayloadType.Protocol) {
+            await this.cancel(RendezvousFailureReason.Unknown);
+            return undefined;
+        }
+
+        // invalid protocol
         if (!protocol || !LOGIN_TOKEN_PROTOCOL.matches(protocol)) {
             await this.cancel(RendezvousFailureReason.UnsupportedAlgorithm);
             return undefined;
@@ -149,21 +240,31 @@ export class MSC3906Rendezvous {
 
     public async declineLoginOnExistingDevice(): Promise<void> {
         logger.info("User declined sign in");
-        await this.send({ type: PayloadType.Finish, outcome: Outcome.Declined });
+        await this.send(
+            this.v1FallbackEnabled
+                ? { type: PayloadType.Finish, outcome: Outcome.Declined }
+                : { type: PayloadType.Declined },
+        );
     }
 
     public async approveLoginOnExistingDevice(loginToken: string): Promise<string | undefined> {
-        // eslint-disable-next-line camelcase
-        await this.send({ type: PayloadType.Progress, login_token: loginToken, homeserver: this.client.baseUrl });
+        await this.channel.send({
+            type: this.v1FallbackEnabled ? PayloadType.Progress : PayloadType.Approved,
+            login_token: loginToken,
+            homeserver: this.client.baseUrl,
+        });
 
         logger.info("Waiting for outcome");
         const res = await this.receive();
         if (!res) {
             return undefined;
         }
-        const { outcome, device_id: deviceId, device_key: deviceKey } = res;
+        const { type, outcome, device_id: deviceId, device_key: deviceKey } = res;
 
-        if (outcome !== "success") {
+        if (
+            (this.v1FallbackEnabled && outcome !== "success") ||
+            (!this.v1FallbackEnabled && type !== PayloadType.Success)
+        ) {
             throw new Error("Linking failed");
         }
 
@@ -201,8 +302,8 @@ export class MSC3906Rendezvous {
         const masterPublicKey = this.client.crypto.crossSigningInfo.getId("master")!;
 
         await this.send({
-            type: PayloadType.Finish,
-            outcome: Outcome.Verified,
+            type: this.v1FallbackEnabled ? PayloadType.Finish : PayloadType.Verified,
+            outcome: this.v1FallbackEnabled ? Outcome.Verified : undefined,
             verifying_device_id: this.client.getDeviceId()!,
             verifying_device_key: this.client.getDeviceEd25519Key()!,
             master_key: masterPublicKey,
