@@ -30,6 +30,7 @@ export class RemoteCallTrack extends CallTrack {
     private readonly _trackId?: string;
     private _metadata?: SDPStreamMetadataTrack;
     private _metadataMuted?: boolean;
+    private _transceiver?: RTCRtpTransceiver;
     private call: MatrixCall;
 
     public constructor(opts: RemoteCallTrackOpts) {

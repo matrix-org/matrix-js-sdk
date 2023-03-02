@@ -20,7 +20,6 @@ import { acquireContext, releaseContext } from "./audioContext";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { MatrixCall } from "./call";
 import { CallTrack } from "./callTrack";
 import { randomString } from "../randomstring";
 
@@ -57,7 +56,6 @@ type EventHandlerMap = {
 
 export abstract class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
     public abstract get id(): string;
-    public abstract get streamId(): string | undefined;
     public abstract get purpose(): SDPStreamMetadataPurpose;
     public abstract get connected(): boolean;
     public abstract get userId(): string;
@@ -71,7 +69,6 @@ export abstract class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHan
     protected readonly _id: string;
     protected _tracks: CallTrack[] = [];
     protected _stream?: MediaStream;
-    protected call?: MatrixCall;
     protected roomId?: string;
     protected client: MatrixClient;
 
