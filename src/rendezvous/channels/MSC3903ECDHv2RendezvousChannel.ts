@@ -24,6 +24,7 @@ import {
     RendezvousTransportDetails,
     RendezvousTransport,
     RendezvousFailureReason,
+    RendezvousFlow,
 } from "..";
 import { encodeUnpaddedBase64, decodeBase64 } from "../../crypto/olmlib";
 import { crypto, subtleCrypto, TextEncoder } from "../../crypto/crypto";
@@ -85,7 +86,7 @@ export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
         this.ourPublicKey = decodeBase64(this.olmSAS.get_pubkey());
     }
 
-    public async generateCode(intent: RendezvousIntent): Promise<ECDHv2RendezvousCode> {
+    public async generateCode(intent: RendezvousIntent, flow?: RendezvousFlow): Promise<ECDHv2RendezvousCode> {
         if (this.transport.ready) {
             throw new Error("Code already generated");
         }
@@ -98,6 +99,7 @@ export class MSC3903ECDHv2RendezvousChannel<T> implements RendezvousChannel<T> {
                 key: encodeUnpaddedBase64(this.ourPublicKey),
                 transport: await this.transport.details(),
             },
+            flow,
             intent,
         };
 
