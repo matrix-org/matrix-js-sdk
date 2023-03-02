@@ -29,7 +29,6 @@ import { encodeUnpaddedBase64, decodeBase64 } from "../../crypto/olmlib";
 import { crypto, subtleCrypto, TextEncoder } from "../../crypto/crypto";
 import { generateDecimalSas } from "../../crypto/verification/SASDecimal";
 import { UnstableValue } from "../../NamespacedValue";
-import { ECDH_V1 } from "./MSC3903ECDHv1RendezvousChannel";
 
 const ECDH_V2 = new UnstableValue(
     "m.rendezvous.v2.curve25519-aes-sha256",
