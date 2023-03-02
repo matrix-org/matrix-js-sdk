@@ -185,13 +185,23 @@ export class MediaHandler extends TypedEventEmitter<
     }
 
     public async hasAudioDevice(): Promise<boolean> {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter((device) => device.kind === "audioinput").length > 0;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            return devices.filter((device) => device.kind === "audioinput").length > 0;
+        } catch (err) {
+            logger.log(`MediaHandler hasAudioDevice() calling navigator.mediaDevices.enumerateDevices with error`, err);
+            return false;
+        }
     }
 
     public async hasVideoDevice(): Promise<boolean> {
-        const devices = await navigator.mediaDevices.enumerateDevices();
-        return devices.filter((device) => device.kind === "videoinput").length > 0;
+        try {
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            return devices.filter((device) => device.kind === "videoinput").length > 0;
+        } catch (err) {
+            logger.log(`MediaHandler hasVideoDevice() calling navigator.mediaDevices.enumerateDevices with error`, err);
+            return false;
+        }
     }
 
     /**
