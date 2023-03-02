@@ -21,3 +21,4 @@ export * from "./RendezvousError";
 export * from "./RendezvousFailureReason";
 export * from "./RendezvousIntent";
 export * from "./RendezvousTransport";
+export * from "./RendezvousFlow";

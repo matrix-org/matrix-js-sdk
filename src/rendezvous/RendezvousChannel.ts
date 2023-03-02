@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { RendezvousCode, RendezvousIntent, RendezvousFailureReason } from ".";
+import { RendezvousCode, RendezvousIntent, RendezvousFailureReason, RendezvousFlow } from ".";
 
 export interface RendezvousChannel<T> {
     /**
@@ -40,9 +40,18 @@ export interface RendezvousChannel<T> {
     close(): Promise<void>;
 
     /**
+     * Always uses the MSC3906 v1 flow.
+     *
      * @returns a representation of the channel that can be encoded in a QR or similar
+     *
+     * @deprecated use generateCode instead
      */
     generateCode(intent: RendezvousIntent): Promise<RendezvousCode>;
+
+    /**
+     * @returns a representation of the channel that can be encoded in a QR or similar
+     */
+    generateCode(intent: RendezvousIntent, flow: RendezvousFlow): Promise<RendezvousCode>;
 
     cancel(reason: RendezvousFailureReason): Promise<void>;
 }
