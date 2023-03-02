@@ -133,6 +133,14 @@ export enum RuleId {
     IncomingCall = ".m.rule.call",
     SuppressNotices = ".m.rule.suppress_notices",
     Tombstone = ".m.rule.tombstone",
+    PollStart = ".m.rule.poll_start",
+    PollStartUnstable = ".org.matrix.msc3930.rule.poll_start",
+    PollEnd = ".m.rule.poll_end",
+    PollEndUnstable = ".org.matrix.msc3930.rule.poll_end",
+    PollStartOneToOne = ".m.rule.poll_start_one_to_one",
+    PollStartOneToOneUnstable = ".org.matrix.msc3930.rule.poll_start_one_to_one",
+    PollEndOneToOne = ".m.rule.poll_end_one_to_one",
+    PollEndOneToOneUnstable = ".org.matrix.msc3930.rule.poll_end_one_to_one",
 }
 
 export type PushRuleSet = {
