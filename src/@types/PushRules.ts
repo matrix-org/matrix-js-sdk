@@ -63,7 +63,7 @@ export function isDmMemberCountCondition(condition: AnyMemberCountCondition): bo
 export enum ConditionKind {
     EventMatch = "event_match",
     EventPropertyIs = "event_property_is",
-    EventPropertyContainsPrefix = "org.matrix.msc3966.exact_event_property_contains",
+    EventPropertyContains = "event_property_contains",
     ContainsDisplayName = "contains_display_name",
     RoomMemberCount = "room_member_count",
     SenderNotificationPermission = "sender_notification_permission",
@@ -89,8 +89,7 @@ export interface IEventPropertyIsCondition extends IPushRuleCondition<ConditionK
     value: string | boolean | null | number;
 }
 
-export interface IEventPropertyContainsPrefixCondition
-    extends IPushRuleCondition<ConditionKind.EventPropertyContainsPrefix> {
+export interface IEventPropertyContainsCondition extends IPushRuleCondition<ConditionKind.EventPropertyContains> {
     key: string;
     value: string | boolean | null | number;
 }
@@ -121,7 +120,7 @@ export interface ICallStartedPrefixCondition extends IPushRuleCondition<Conditio
 export type PushRuleCondition =
     | IEventMatchCondition
     | IEventPropertyIsCondition
-    | IEventPropertyContainsPrefixCondition
+    | IEventPropertyContainsCondition
     | IContainsDisplayNameCondition
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition

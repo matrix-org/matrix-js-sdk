@@ -26,7 +26,7 @@ import {
     IContainsDisplayNameCondition,
     IEventMatchCondition,
     IEventPropertyIsCondition,
-    IEventPropertyContainsPrefixCondition,
+    IEventPropertyContainsCondition,
     IPushRule,
     IPushRules,
     IRoomMemberCountCondition,
@@ -341,7 +341,7 @@ export class PushProcessor {
                 return this.eventFulfillsEventMatchCondition(cond, ev);
             case ConditionKind.EventPropertyIs:
                 return this.eventFulfillsEventPropertyIsCondition(cond, ev);
-            case ConditionKind.EventPropertyContainsPrefix:
+            case ConditionKind.EventPropertyContains:
                 return this.eventFulfillsEventPropertyContains(cond, ev);
             case ConditionKind.ContainsDisplayName:
                 return this.eventFulfillsDisplayNameCondition(cond, ev);
@@ -498,7 +498,7 @@ export class PushProcessor {
      * @param cond - The push rule condition to check for a match.
      * @param ev - The event to check for a match.
      */
-    private eventFulfillsEventPropertyContains(cond: IEventPropertyContainsPrefixCondition, ev: MatrixEvent): boolean {
+    private eventFulfillsEventPropertyContains(cond: IEventPropertyContainsCondition, ev: MatrixEvent): boolean {
         if (!cond.key || cond.value === undefined) {
             return false;
         }

@@ -621,7 +621,7 @@ describe("NotificationService", function () {
                             actions: [PushRuleActionName.Notify],
                             conditions: [
                                 {
-                                    kind: ConditionKind.EventPropertyContainsPrefix,
+                                    kind: ConditionKind.EventPropertyContains,
                                     key: "content.foo",
                                     value: value,
                                 },
