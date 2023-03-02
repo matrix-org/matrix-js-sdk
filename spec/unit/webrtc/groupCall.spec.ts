@@ -109,7 +109,7 @@ const mockGetStateEvents = (type: EventType, userId?: string): MatrixEvent[] | M
 const ONE_HOUR = 1000 * 60 * 60;
 
 const createAndEnterGroupCall = async (cli: MatrixClient, room: Room): Promise<GroupCall> => {
-    const groupCall = new GroupCall(cli, room, GroupCallType.Video, false, GroupCallIntent.Prompt, false, FAKE_CONF_ID);
+    const groupCall = new GroupCall(cli, room, GroupCallType.Video, false, GroupCallIntent.Prompt, FAKE_CONF_ID);
 
     await groupCall.create();
     await groupCall.enter();
@@ -135,7 +135,7 @@ describe("Group Call", function () {
             mockClient = typedMockClient as unknown as MatrixClient;
 
             room = new Room(FAKE_ROOM_ID, mockClient, FAKE_USER_ID_1);
-            groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt, false);
+            groupCall = new GroupCall(mockClient, room, GroupCallType.Video, false, GroupCallIntent.Prompt);
             room.currentState.members[FAKE_USER_ID_1] = {
                 userId: FAKE_USER_ID_1,
                 membership: "join",
@@ -484,7 +484,7 @@ describe("Group Call", function () {
         describe("PTT calls", () => {
             beforeEach(async () => {
                 // replace groupcall with a PTT one
-                groupCall = new GroupCall(mockClient, room, GroupCallType.Video, true, GroupCallIntent.Prompt, false);
+                groupCall = new GroupCall(mockClient, room, GroupCallType.Video, true, GroupCallIntent.Prompt);
 
                 await groupCall.create();
 
@@ -647,7 +647,6 @@ describe("Group Call", function () {
                 GroupCallType.Video,
                 false,
                 GroupCallIntent.Prompt,
-                false,
                 FAKE_CONF_ID,
             );
 
@@ -657,7 +656,6 @@ describe("Group Call", function () {
                 GroupCallType.Video,
                 false,
                 GroupCallIntent.Prompt,
-                false,
                 FAKE_CONF_ID,
             );
         });
@@ -1483,7 +1481,6 @@ describe("Group Call", function () {
                 GroupCallType.Video,
                 false,
                 GroupCallIntent.Prompt,
-                false,
                 FAKE_CONF_ID,
             );
             await groupCall.create();
