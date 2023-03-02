@@ -793,22 +793,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * @returns array of recipients
      */
     public getKeyRequestRecipients(userId: string): IKeyRequestRecipient[] {
-        // send the request to all of our own devices, and the
-        // original sending device if it wasn't us.
-        const wireContent = this.getWireContent();
+        // send the request to all of our own devices
         const recipients = [
             {
                 userId,
                 deviceId: "*",
             },
         ];
-        const sender = this.getSender();
-        if (sender !== userId) {
-            recipients.push({
-                userId: sender!,
-                deviceId: wireContent.device_id,
-            });
-        }
+
         return recipients;
     }
 
