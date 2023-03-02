@@ -196,6 +196,7 @@ export class GroupCall extends TypedEventEmitter<
     public readonly userMediaFeeds: CallFeed[] = [];
     public readonly screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
+    public readonly allowCallWithoutVideoAndAudio: boolean;
 
     private readonly calls = new Map<string, Map<string, MatrixCall>>(); // user_id -> device_id -> MatrixCall
     private callHandlers = new Map<string, Map<string, ICallHandlers>>(); // user_id -> device_id -> ICallHandlers
@@ -216,10 +217,10 @@ export class GroupCall extends TypedEventEmitter<
         public type: GroupCallType,
         public isPtt: boolean,
         public intent: GroupCallIntent,
-        public readonly allowCallWithoutVideoAndAudio: boolean,
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
+        isCallWithoutVideoAndAudio?: boolean,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
@@ -232,6 +233,7 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.ParticipantsChanged, this.onParticipantsChanged);
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
+        this.allowCallWithoutVideoAndAudio = !!isCallWithoutVideoAndAudio;
     }
 
     public async create(): Promise<GroupCall> {
