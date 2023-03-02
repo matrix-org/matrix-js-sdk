@@ -165,8 +165,8 @@
         ]
     },
     "browserify-swap": {
-       "no-rust-crypto": {
-           "src/rust-crypto/index.ts$": "./src/rust-crypto/browserify-index.ts"
-       }
+        "no-rust-crypto": {
+            "src/rust-crypto/index.ts$": "./src/rust-crypto/browserify-index.ts"
+        }
     }
 }
