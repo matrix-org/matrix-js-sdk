@@ -14,7 +14,7 @@
         "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
-        "build:compile-browser": "mkdir dist && browserify -d src/browser-index.ts -p [ tsify -p ./tsconfig-build.json ] -t [ babelify --sourceMaps=inline --presets [ @babel/preset-env @babel/preset-typescript ] ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
+        "build:compile-browser": "mkdir dist && browserify -d src/browser-index.ts -p [ tsify -p ./tsconfig-build.json ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
         "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
         "gendoc": "typedoc",
         "lint": "yarn lint:types && yarn lint:js",
@@ -147,5 +147,13 @@
         "outputDirectory": "coverage",
         "outputName": "jest-sonar-report.xml",
         "relativePaths": true
+    },
+    "browserify": {
+        "transform": [
+            ["babelify", {
+                "sourceMaps": "inline",
+                "presets": [ "@babel/preset-env", "@babel/preset-typescript" ]
+            }]
+        ]
     }
 }
