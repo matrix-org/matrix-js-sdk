@@ -884,14 +884,6 @@ describe("Group Call", function () {
                 expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
             });
 
-            it("returns false when no permission for audio device", async () => {
-                const groupCall = await createAndEnterGroupCall(mockClient, room);
-                jest.spyOn(mockClient.getMediaHandler(), "hasAudioDevice").mockRejectedValueOnce(
-                    new Error("No Permission"),
-                );
-                expect(await groupCall.setMicrophoneMuted(false)).toBe(false);
-            });
-
             it("returns false when no permission for audio stream", async () => {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
                 jest.spyOn(mockClient.getMediaHandler(), "getUserMediaStream").mockRejectedValueOnce(
@@ -903,14 +895,6 @@ describe("Group Call", function () {
             it("returns false when unmuting video with no video device", async () => {
                 const groupCall = await createAndEnterGroupCall(mockClient, room);
                 jest.spyOn(mockClient.getMediaHandler(), "hasVideoDevice").mockResolvedValue(false);
-                expect(await groupCall.setLocalVideoMuted(false)).toBe(false);
-            });
-
-            it("returns false when no permission for video device", async () => {
-                const groupCall = await createAndEnterGroupCall(mockClient, room);
-                jest.spyOn(mockClient.getMediaHandler(), "hasVideoDevice").mockRejectedValueOnce(
-                    new Error("No Permission"),
-                );
                 expect(await groupCall.setLocalVideoMuted(false)).toBe(false);
             });
 

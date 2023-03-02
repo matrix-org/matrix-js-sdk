@@ -553,17 +553,10 @@ export class GroupCall extends TypedEventEmitter<
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through
-        try {
-            if (!muted && !(await this.client.getMediaHandler().hasAudioDevice())) {
-                return false;
-            }
-        } catch (e) {
-            /* istanbul ignore next */
-            logger.log(
-                `GroupCall ${this.groupCallId} setMicrophoneMuted() no audio device or permission for audio device, muted=${muted}`,
-            );
+        if (!muted && !(await this.client.getMediaHandler().hasAudioDevice())) {
             return false;
         }
+
         const sendUpdatesBefore = !muted && this.isPtt;
 
         // set a timer for the maximum transmit time on PTT calls
@@ -652,15 +645,7 @@ export class GroupCall extends TypedEventEmitter<
         // hasAudioDevice can block indefinitely if the window has lost focus,
         // and it doesn't make much sense to keep a device from being muted, so
         // we always allow muted = true changes to go through
-        try {
-            if (!muted && !(await this.client.getMediaHandler().hasVideoDevice())) {
-                return false;
-            }
-        } catch (e) {
-            /* istanbul ignore next */
-            logger.log(
-                `GroupCall ${this.groupCallId} setLocalVideoMuted() no video device or permission for video device, muted=${muted}`,
-            );
+        if (!muted && !(await this.client.getMediaHandler().hasVideoDevice())) {
             return false;
         }
 
