@@ -21,10 +21,10 @@ limitations under the License.
 import anotherjson from "another-json";
 
 import type { PkSigning } from "@matrix-org/olm";
+import type { IOneTimeKey } from "../@types/crypto";
 import { OlmDevice } from "./OlmDevice";
 import { DeviceInfo } from "./deviceinfo";
 import { logger } from "../logger";
-import { IOneTimeKey } from "./dehydration";
 import { IClaimOTKsResult, MatrixClient } from "../client";
 import { ISignatures } from "../@types/signed";
 import { MatrixEvent } from "../models/event";

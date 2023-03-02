@@ -20,6 +20,7 @@ import { M_POLL_END, M_POLL_KIND_DISCLOSED, M_POLL_RESPONSE } from "../../../src
 import { PollStartEvent } from "../../../src/extensible_events_v1/PollStartEvent";
 import { Poll } from "../../../src/models/poll";
 import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test-utils/client";
+import { flushPromises } from "../../test-utils/flushPromises";
 
 jest.useFakeTimers();
 
@@ -27,6 +28,7 @@ describe("Poll", () => {
     const userId = "@alice:server.org";
     const mockClient = getMockClientWithEventEmitter({
         ...mockClientMethodsUser(userId),
+        decryptEventIfNeeded: jest.fn().mockResolvedValue(true),
         relations: jest.fn(),
     });
     const roomId = "!room:server";
@@ -74,6 +76,7 @@ describe("Poll", () => {
         expect(poll.pollId).toEqual(basePollStartEvent.getId());
         expect(poll.pollEvent).toEqual(basePollStartEvent.unstableExtensibleEvent);
         expect(poll.isEnded).toBe(false);
+        expect(poll.endEventId).toBe(undefined);
     });
 
     it("throws when poll start has no room id", () => {
@@ -130,7 +133,7 @@ describe("Poll", () => {
         });
 
         it("filters relations for relevent response events", async () => {
-            const replyEvent = new MatrixEvent({ type: "m.room.message" });
+            const replyEvent = makeRelatedEvent({ type: "m.room.message" });
             const stableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.stable! });
             const unstableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
 
@@ -172,6 +175,8 @@ describe("Poll", () => {
                 jest.spyOn(poll, "emit");
                 const responses = await poll.getResponses();
 
+                await flushPromises();
+
                 expect(mockClient.relations.mock.calls).toEqual([
                     [roomId, basePollStartEvent.getId(), "m.reference", undefined, { from: undefined }],
                     [roomId, basePollStartEvent.getId(), "m.reference", undefined, { from: "test-next-1" }],
@@ -181,6 +186,47 @@ describe("Poll", () => {
                 expect(poll.emit).toHaveBeenCalledTimes(3);
                 expect(poll.isFetchingResponses).toBeFalsy();
                 expect(responses.getRelations().length).toEqual(6);
+            });
+        });
+
+        describe("undecryptable relations", () => {
+            it("counts undecryptable relation events when getting responses", async () => {
+                const replyEvent = makeRelatedEvent({ type: "m.room.message" });
+                const stableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.stable! });
+                const undecryptableEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
+                jest.spyOn(undecryptableEvent, "isDecryptionFailure").mockReturnValue(true);
+
+                mockClient.relations.mockResolvedValue({
+                    events: [replyEvent, stableResponseEvent, undecryptableEvent],
+                });
+                const poll = new Poll(basePollStartEvent, mockClient, room);
+                jest.spyOn(poll, "emit");
+                await poll.getResponses();
+                expect(poll.undecryptableRelationsCount).toBe(1);
+                expect(poll.emit).toHaveBeenCalledWith(PollEvent.UndecryptableRelations, 1);
+            });
+
+            it("adds to undercryptable event count when new relation is undecryptable", async () => {
+                const replyEvent = makeRelatedEvent({ type: "m.room.message" });
+                const stableResponseEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.stable! });
+                const undecryptableEvent = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
+                const undecryptableEvent2 = makeRelatedEvent({ type: M_POLL_RESPONSE.unstable });
+                jest.spyOn(undecryptableEvent, "isDecryptionFailure").mockReturnValue(true);
+                jest.spyOn(undecryptableEvent2, "isDecryptionFailure").mockReturnValue(true);
+
+                mockClient.relations.mockResolvedValue({
+                    events: [replyEvent, stableResponseEvent, undecryptableEvent],
+                });
+                const poll = new Poll(basePollStartEvent, mockClient, room);
+                jest.spyOn(poll, "emit");
+                await poll.getResponses();
+                expect(poll.undecryptableRelationsCount).toBe(1);
+
+                await poll.onNewRelation(undecryptableEvent2);
+
+                expect(poll.undecryptableRelationsCount).toBe(2);
+
+                expect(poll.emit).toHaveBeenCalledWith(PollEvent.UndecryptableRelations, 2);
             });
         });
 
@@ -204,6 +250,7 @@ describe("Poll", () => {
 
                 expect(maySendRedactionForEventSpy).toHaveBeenCalledWith(basePollStartEvent, "@bob@server.org");
                 expect(poll.isEnded).toBe(true);
+                expect(poll.endEventId).toBe(stablePollEndEvent.getId()!);
                 expect(poll.emit).toHaveBeenCalledWith(PollEvent.End);
             });
 

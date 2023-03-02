@@ -20,7 +20,7 @@ limitations under the License.
 import anotherjson from "another-json";
 import { v4 as uuidv4 } from "uuid";
 
-import type { IEventDecryptionResult, IMegolmSessionData } from "../@types/crypto";
+import type { IDeviceKeys, IEventDecryptionResult, IMegolmSessionData, IOneTimeKey } from "../@types/crypto";
 import type { PkDecryption, PkSigning } from "@matrix-org/olm";
 import { EventType, ToDeviceMessageId } from "../@types/event";
 import { TypedReEmitter } from "../ReEmitter";
@@ -63,7 +63,7 @@ import { ToDeviceChannel, ToDeviceRequests, Request } from "./verification/reque
 import { IllegalMethod } from "./verification/IllegalMethod";
 import { KeySignatureUploadError } from "../errors";
 import { calculateKeyCheck, decryptAES, encryptAES } from "./aes";
-import { DehydrationManager, IDeviceKeys, IOneTimeKey } from "./dehydration";
+import { DehydrationManager } from "./dehydration";
 import { BackupManager } from "./backup";
 import { IStore } from "../store";
 import { Room, RoomEvent } from "../models/room";
@@ -151,7 +151,7 @@ export interface ICryptoCallbacks {
         requestId: string,
         secretName: string,
         deviceTrust: DeviceTrustLevel,
-    ) => Promise<string>;
+    ) => Promise<string | undefined>;
     getDehydrationKey?: (keyInfo: ISecretStorageKeyInfo, checkFunc: (key: Uint8Array) => void) => Promise<Uint8Array>;
     getBackupKey?: () => Promise<Uint8Array>;
 }

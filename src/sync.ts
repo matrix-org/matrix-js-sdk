@@ -32,7 +32,6 @@ import * as utils from "./utils";
 import { IDeferred } from "./utils";
 import { Filter } from "./filter";
 import { EventTimeline } from "./models/event-timeline";
-import { PushProcessor } from "./pushprocessor";
 import { logger } from "./logger";
 import { InvalidStoreError, InvalidStoreState } from "./errors";
 import { ClientEvent, IStoredClientOpts, MatrixClient, PendingEventOrdering, ResetTimelineCallback } from "./client";
@@ -1162,7 +1161,7 @@ export class SyncApi {
                 // (see sync) before syncing over the network.
                 if (accountDataEvent.getType() === EventType.PushRules) {
                     const rules = accountDataEvent.getContent<IPushRules>();
-                    client.pushRules = PushProcessor.rewriteDefaultRules(rules);
+                    client.setPushRules(rules);
                 }
                 const prevEvent = prevEventsMap[accountDataEvent.getType()!];
                 client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
@@ -1299,18 +1298,29 @@ export class SyncApi {
             const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
 
             const encrypted = client.isRoomEncrypted(room.roomId);
-            // we do this first so it's correct when any of the events fire
+            // We store the server-provided value first so it's correct when any of the events fire.
             if (joinObj.unread_notifications) {
-                room.setUnreadNotificationCount(
-                    NotificationCountType.Total,
-                    joinObj.unread_notifications.notification_count ?? 0,
-                );
+                /**
+                 * We track unread notifications ourselves in encrypted rooms, so don't
+                 * bother setting it here. We trust our calculations better than the
+                 * server's for this case, and therefore will assume that our non-zero
+                 * count is accurate.
+                 *
+                 * @see import("./client").fixNotificationCountOnDecryption
+                 */
+                if (!encrypted || joinObj.unread_notifications.notification_count === 0) {
+                    // In an encrypted room, if the room has notifications enabled then it's typical for
+                    // the server to flag all new messages as notifying. However, some push rules calculate
+                    // events as ignored based on their event contents (e.g. ignoring msgtype=m.notice messages)
+                    // so we want to calculate this figure on the client in all cases.
+                    room.setUnreadNotificationCount(
+                        NotificationCountType.Total,
+                        joinObj.unread_notifications.notification_count ?? 0,
+                    );
+                }
 
-                // We track unread notifications ourselves in encrypted rooms, so don't
-                // bother setting it here. We trust our calculations better than the
-                // server's for this case, and therefore will assume that our non-zero
-                // count is accurate.
                 if (!encrypted || room.getUnreadNotificationCount(NotificationCountType.Highlight) <= 0) {
+                    // If the locally stored highlight count is zero, use the server provided value.
                     room.setUnreadNotificationCount(
                         NotificationCountType.Highlight,
                         joinObj.unread_notifications.highlight_count ?? 0,
@@ -1327,11 +1337,13 @@ export class SyncApi {
                 // decryption
                 room.resetThreadUnreadNotificationCount(Object.keys(unreadThreadNotifications));
                 for (const [threadId, unreadNotification] of Object.entries(unreadThreadNotifications)) {
-                    room.setThreadUnreadNotificationCount(
-                        threadId,
-                        NotificationCountType.Total,
-                        unreadNotification.notification_count ?? 0,
-                    );
+                    if (!encrypted || unreadNotification.notification_count === 0) {
+                        room.setThreadUnreadNotificationCount(
+                            threadId,
+                            NotificationCountType.Total,
+                            unreadNotification.notification_count ?? 0,
+                        );
+                    }
 
                     const hasNoNotifications =
                         room.getThreadUnreadNotificationCount(threadId, NotificationCountType.Highlight) <= 0;

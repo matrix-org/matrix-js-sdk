@@ -36,6 +36,7 @@ import { TypedEventEmitter } from "./typed-event-emitter";
 import { EventStatus } from "./event-status";
 import { DecryptionError } from "../crypto/algorithms";
 import { CryptoBackend } from "../common-crypto/CryptoBackend";
+import { WITHHELD_MESSAGES } from "../crypto/OlmDevice";
 
 export { EventStatus } from "./event-status";
 
@@ -271,6 +272,12 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     private thread?: Thread;
     private threadId?: string;
+
+    /*
+     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
+     * the sender has disabled encrypting to unverified devices.
+     */
+    private encryptedDisabledForUnverifiedDevices = false;
 
     /* Set an approximate timestamp for the event relative the local clock.
      * This will inherently be approximate because it doesn't take into account
@@ -569,13 +576,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     public get replyEventId(): string | undefined {
-        // We're prefer ev.getContent() over ev.getWireContent() to make sure
-        // we grab the latest edit with potentially new relations. But we also
-        // can't just rely on ev.getContent() by itself because historically we
-        // still show the reply from the original message even though the edit
-        // event does not include the relation reply.
-        const mRelatesTo = this.getContent()["m.relates_to"] || this.getWireContent()["m.relates_to"];
-        return mRelatesTo?.["m.in_reply_to"]?.event_id;
+        return this.getWireContent()["m.relates_to"]?.["m.in_reply_to"]?.event_id;
     }
 
     public get relationEventId(): string | undefined {
@@ -702,6 +703,14 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public isDecryptionFailure(): boolean {
         return this.clearEvent?.content?.msgtype === "m.bad.encrypted";
+    }
+
+    /*
+     * True if this event is an encrypted event which we failed to decrypt, the receiver's device is unverified and
+     * the sender has disabled encrypting to unverified devices.
+     */
+    public get isEncryptedDisabledForUnverifiedDevices(): boolean {
+        return this.isDecryptionFailure() && this.encryptedDisabledForUnverifiedDevices;
     }
 
     public shouldAttemptDecryption(): boolean {
@@ -899,6 +908,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                     body: "** Unable to decrypt: " + reason + " **",
                 },
             },
+            encryptedDisabledForUnverifiedDevices: reason === `DecryptionError: ${WITHHELD_MESSAGES["m.unverified"]}`,
         };
     }
 
@@ -920,6 +930,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.claimedEd25519Key = decryptionResult.claimedEd25519Key ?? null;
         this.forwardingCurve25519KeyChain = decryptionResult.forwardingCurve25519KeyChain || [];
         this.untrusted = decryptionResult.untrusted || false;
+        this.encryptedDisabledForUnverifiedDevices = decryptionResult.encryptedDisabledForUnverifiedDevices || false;
         this.invalidateExtensibleEvent();
     }
 
