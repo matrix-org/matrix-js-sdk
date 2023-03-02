@@ -29,7 +29,6 @@ import { encodeUnpaddedBase64, decodeBase64 } from "../../crypto/olmlib";
 import { crypto, subtleCrypto, TextEncoder } from "../../crypto/crypto";
 import { generateDecimalSas } from "../../crypto/verification/SASDecimal";
 import { UnstableValue } from "../../NamespacedValue";
-import { ECDH_V1 } from "./MSC3903ECDHv1RendezvousChannel";
 
 const ECDH_V2 = new UnstableValue(
     "m.rendezvous.v2.curve25519-aes-sha256",
@@ -39,7 +38,7 @@ const ECDH_V2 = new UnstableValue(
 export interface ECDHv2RendezvousCode extends RendezvousCode {
     rendezvous: {
         transport: RendezvousTransportDetails;
-        algorithm: typeof ECDH_V2.name | typeof ECDH_V2.altName | typeof ECDH_V1.name | typeof ECDH_V1.altName;
+        algorithm: typeof ECDH_V2.name | typeof ECDH_V2.altName;
         key: string;
     };
 }
@@ -47,7 +46,7 @@ export interface ECDHv2RendezvousCode extends RendezvousCode {
 export type MSC3903ECDHPayload = PlainTextPayload | EncryptedPayload;
 
 export interface PlainTextPayload {
-    algorithm: typeof ECDH_V2.name | typeof ECDH_V2.altName | typeof ECDH_V1.name | typeof ECDH_V1.altName;
+    algorithm: typeof ECDH_V2.name | typeof ECDH_V2.altName;
     key?: string;
 }
 
