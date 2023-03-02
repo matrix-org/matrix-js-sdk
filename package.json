@@ -33,7 +33,10 @@
         "matrix-org"
     ],
     "main": "./src/index.ts",
-    "browser": "./src/browser-index.ts",
+    "browser": {
+        "./src/index.ts": "./src/browser-index.ts",
+        "./src/rust-crypto": "./src/rust-crypto/browserify-index.ts"
+    },
     "matrix_src_main": "./src/index.ts",
     "matrix_src_browser": "./src/browser-index.ts",
     "matrix_lib_main": "./lib/index.js",
