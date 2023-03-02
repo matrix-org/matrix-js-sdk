@@ -14,7 +14,7 @@
         "build:dev": "yarn clean && git rev-parse HEAD > git-revision.txt && yarn build:compile && yarn build:types",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel -d lib --verbose --extensions \".ts,.js\" src",
-        "build:compile-browser": "mkdir dist && browserify -d src/browser-index.ts -p [ tsify -p ./tsconfig-build.json ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
+        "build:compile-browser": "mkdir dist && BROWSERIFYSWAP_ENV='no-rust-crypto' browserify -d src/browser-index.ts -p [ tsify -p ./tsconfig-build.json ] | exorcist dist/browser-matrix.js.map > dist/browser-matrix.js",
         "build:minify-browser": "terser dist/browser-matrix.js --compress --mangle --source-map --output dist/browser-matrix.min.js",
         "gendoc": "typedoc",
         "lint": "yarn lint:types && yarn lint:js",
@@ -33,10 +33,7 @@
         "matrix-org"
     ],
     "main": "./src/index.ts",
-    "browser": {
-        "./src/index.ts": "./src/browser-index.ts",
-        "./src/rust-crypto": "./src/rust-crypto/browserify-index.ts"
-    },
+    "browser": "./src/browser-index.ts",
     "matrix_src_main": "./src/index.ts",
     "matrix_src_browser": "./src/browser-index.ts",
     "matrix_lib_main": "./lib/index.js",
@@ -100,6 +97,7 @@
         "babelify": "^10.0.0",
         "better-docs": "^2.4.0-beta.9",
         "browserify": "^17.0.0",
+        "browserify-swap": "^0.2.2",
         "debug": "^4.3.4",
         "docdash": "^2.0.0",
         "domexception": "^4.0.0",
@@ -153,10 +151,22 @@
     },
     "browserify": {
         "transform": [
-            ["babelify", {
-                "sourceMaps": "inline",
-                "presets": [ "@babel/preset-env", "@babel/preset-typescript" ]
-            }]
+            "browserify-swap",
+            [
+                "babelify",
+                {
+                    "sourceMaps": "inline",
+                    "presets": [
+                        "@babel/preset-env",
+                        "@babel/preset-typescript"
+                    ]
+                }
+            ]
         ]
+    },
+    "browserify-swap": {
+       "no-rust-crypto": {
+           "src/rust-crypto/index.ts$": "./src/rust-crypto/browserify-index.ts"
+       }
     }
 }
