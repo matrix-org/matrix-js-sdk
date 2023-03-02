@@ -189,7 +189,7 @@ export class MediaHandler extends TypedEventEmitter<
             const devices = await navigator.mediaDevices.enumerateDevices();
             return devices.filter((device) => device.kind === "audioinput").length > 0;
         } catch (err) {
-            logger.log(`MediaHandler hasAudioDevice() calling navigator.mediaDevices.enumerateDevices with error`);
+            logger.log(`MediaHandler hasAudioDevice() calling navigator.mediaDevices.enumerateDevices with error`, err);
             return false;
         }
     }
@@ -199,7 +199,7 @@ export class MediaHandler extends TypedEventEmitter<
             const devices = await navigator.mediaDevices.enumerateDevices();
             return devices.filter((device) => device.kind === "videoinput").length > 0;
         } catch (err) {
-            logger.log(`MediaHandler hasVideoDevice() calling navigator.mediaDevices.enumerateDevices with error`);
+            logger.log(`MediaHandler hasVideoDevice() calling navigator.mediaDevices.enumerateDevices with error`, err);
             return false;
         }
     }
