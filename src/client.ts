@@ -367,6 +367,16 @@ export interface ICreateClientOpts {
     cryptoCallbacks?: ICryptoCallbacks;
 
     /**
+     * The user ID for the local SFU to use for group calling, if any
+     */
+    localSfuUserId?: string;
+
+    /**
+     * The device ID for the local SFU to use for group calling, if any
+     */
+    localSfuDeviceId?: string;
+
+    /**
      * Method to generate room names for empty rooms and rooms names based on membership.
      * Defaults to a built-in English handler with basic pluralisation.
      */
@@ -834,6 +844,11 @@ interface ITimestampToEventResponse {
     origin_server_ts: string;
 }
 
+export interface IFocusInfo {
+    user_id: string;
+    device_id: string;
+}
+
 interface IWhoamiResponse {
     user_id: string;
     device_id?: string;
@@ -1215,6 +1230,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected sessionId: string;
     protected pendingEventEncryption = new Map<string, Promise<void>>();
 
+    private localSfuUserId?: string;
+    private localSfuDeviceId?: string;
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
 
@@ -1290,6 +1307,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 return res;
             });
         }
+
+        this.localSfuUserId = opts.localSfuUserId;
+        this.localSfuDeviceId = opts.localSfuDeviceId;
 
         if (supportsMatrixCall()) {
             this.callEventHandler = new CallEventHandler(this);
@@ -1843,6 +1863,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getUseE2eForGroupCall(): boolean {
         return this.useE2eForGroupCall;
+    }
+
+    public getFoci(): IFocusInfo[] {
+        if (!this.localSfuUserId || !this.localSfuDeviceId) return [];
+
+        return [
+            {
+                user_id: this.localSfuUserId,
+                device_id: this.localSfuDeviceId,
+            },
+        ];
     }
 
     /**

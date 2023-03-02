@@ -44,29 +44,22 @@ declare global {
     }
 
     interface MediaDevices {
-        // This is experimental and types don't know about it yet
-        // https://github.com/microsoft/TypeScript/issues/33232
-        getDisplayMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
-        getUserMedia(constraints: MediaStreamConstraints | DesktopCapturerConstraints): Promise<MediaStream>;
+        getDisplayMedia(constraints: ExtendedMediaStreamConstraints): Promise<MediaStream>;
+        getUserMedia(constraints: ExtendedMediaStreamConstraints): Promise<MediaStream>;
     }
 
-    interface DesktopCapturerConstraints {
-        audio:
-            | boolean
-            | {
-                  mandatory: {
-                      chromeMediaSource: string;
-                      chromeMediaSourceId: string;
-                  };
-              };
-        video:
-            | boolean
-            | {
-                  mandatory: {
-                      chromeMediaSource: string;
-                      chromeMediaSourceId: string;
-                  };
-              };
+    interface ChromeMediaSourceConstraints {
+        chromeMediaSource: string;
+        chromeMediaSourceId: string;
+    }
+
+    interface ExtendedMediaTrackConstraints extends MediaTrackConstraints {
+        mandatory?: ChromeMediaSourceConstraints;
+    }
+
+    interface ExtendedMediaStreamConstraints {
+        audio: boolean | ExtendedMediaTrackConstraints;
+        video: boolean | ExtendedMediaTrackConstraints;
     }
 
     interface DummyInterfaceWeShouldntBeUsingThis {}

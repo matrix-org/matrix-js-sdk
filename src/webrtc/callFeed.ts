@@ -1,5 +1,6 @@
 /*
-Copyright 2021 Šimon Brandner <simon.bra.ag@gmail.com>
+Copyright 2021 - 2022 Šimon Brandner <simon.bra.ag@gmail.com>
+Copyright 2021 - 2023 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,9 +19,10 @@ import { SDPStreamMetadataPurpose } from "./callEventTypes";
 import { acquireContext, releaseContext } from "./audioContext";
 import { MatrixClient } from "../client";
 import { RoomMember } from "../models/room-member";
-import { logger } from "../logger";
 import { TypedEventEmitter } from "../models/typed-event-emitter";
-import { CallEvent, CallState, MatrixCall } from "./call";
+import { MatrixCall } from "./call";
+import { CallTrack } from "./callTrack";
+import { randomString } from "../randomstring";
 
 const POLLING_INTERVAL = 200; // ms
 export const SPEAKING_THRESHOLD = -60; // dB
@@ -29,22 +31,6 @@ const SPEAKING_SAMPLE_COUNT = 8; // samples
 export interface ICallFeedOpts {
     client: MatrixClient;
     roomId?: string;
-    userId: string;
-    deviceId: string | undefined;
-    stream: MediaStream;
-    purpose: SDPStreamMetadataPurpose;
-    /**
-     * Whether or not the remote SDPStreamMetadata says audio is muted
-     */
-    audioMuted: boolean;
-    /**
-     * Whether or not the remote SDPStreamMetadata says video is muted
-     */
-    videoMuted: boolean;
-    /**
-     * The MatrixCall which is the source of this CallFeed
-     */
-    call?: MatrixCall;
 }
 
 export enum CallFeedEvent {
@@ -53,130 +39,192 @@ export enum CallFeedEvent {
     LocalVolumeChanged = "local_volume_changed",
     VolumeChanged = "volume_changed",
     ConnectedChanged = "connected_changed",
+    SizeChanged = "size_changed",
     Speaking = "speaking",
     Disposed = "disposed",
 }
 
 type EventHandlerMap = {
-    [CallFeedEvent.NewStream]: (stream: MediaStream) => void;
+    [CallFeedEvent.NewStream]: (stream?: MediaStream) => void;
     [CallFeedEvent.MuteStateChanged]: (audioMuted: boolean, videoMuted: boolean) => void;
     [CallFeedEvent.LocalVolumeChanged]: (localVolume: number) => void;
     [CallFeedEvent.VolumeChanged]: (volume: number) => void;
     [CallFeedEvent.ConnectedChanged]: (connected: boolean) => void;
+    [CallFeedEvent.SizeChanged]: () => void;
     [CallFeedEvent.Speaking]: (speaking: boolean) => void;
     [CallFeedEvent.Disposed]: () => void;
 };
 
-export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
-    public stream: MediaStream;
-    public sdpMetadataStreamId: string;
-    public userId: string;
-    public readonly deviceId: string | undefined;
-    public purpose: SDPStreamMetadataPurpose;
+export abstract class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
+    public abstract get id(): string;
+    public abstract get streamId(): string | undefined;
+    public abstract get purpose(): SDPStreamMetadataPurpose;
+    public abstract get connected(): boolean;
+    public abstract get userId(): string;
+    public abstract get deviceId(): string | undefined;
+
+    public abstract isLocal: boolean;
+    public abstract isRemote: boolean;
+
     public speakingVolumeSamples: number[];
 
-    private client: MatrixClient;
-    private call?: MatrixCall;
-    private roomId?: string;
-    private audioMuted: boolean;
-    private videoMuted: boolean;
+    protected readonly _id: string;
+    protected _tracks: CallTrack[] = [];
+    protected _stream?: MediaStream;
+    protected call?: MatrixCall;
+    protected roomId?: string;
+    protected client: MatrixClient;
+
     private localVolume = 1;
     private measuringVolumeActivity = false;
     private audioContext?: AudioContext;
     private analyser?: AnalyserNode;
+    private audioSourceNode?: MediaStreamAudioSourceNode;
     private frequencyBinCount?: Float32Array;
     private speakingThreshold = SPEAKING_THRESHOLD;
     private speaking = false;
     private volumeLooperTimeout?: ReturnType<typeof setTimeout>;
     private _disposed = false;
-    private _connected = false;
+    private _width = 0;
+    private _height = 0;
+    private _isVisible = false;
 
     public constructor(opts: ICallFeedOpts) {
         super();
 
+        this._id = randomString(32);
         this.client = opts.client;
-        this.call = opts.call;
         this.roomId = opts.roomId;
-        this.userId = opts.userId;
-        this.deviceId = opts.deviceId;
-        this.purpose = opts.purpose;
-        this.audioMuted = opts.audioMuted;
-        this.videoMuted = opts.videoMuted;
         this.speakingVolumeSamples = new Array(SPEAKING_SAMPLE_COUNT).fill(-Infinity);
-        this.sdpMetadataStreamId = opts.stream.id;
 
-        this.updateStream(null, opts.stream);
-        this.stream = opts.stream; // updateStream does this, but this makes TS happier
-
-        if (this.hasAudioTrack) {
-            this.initVolumeMeasuring();
-        }
-
-        if (opts.call) {
-            opts.call.addListener(CallEvent.State, this.onCallState);
-            this.onCallState(opts.call.state);
-        }
+        this.startMeasuringVolume();
     }
 
-    public get connected(): boolean {
-        // Local feeds are always considered connected
-        return this.isLocal() || this._connected;
+    public get stream(): MediaStream | undefined {
+        return this._stream;
     }
 
-    private set connected(connected: boolean) {
-        this._connected = connected;
-        this.emit(CallFeedEvent.ConnectedChanged, this.connected);
+    public get isVisible(): boolean {
+        return this._isVisible;
+    }
+
+    public get width(): number | undefined {
+        return this._width;
+    }
+
+    public get height(): number | undefined {
+        return this._height;
+    }
+
+    public get audioTracks(): CallTrack[] {
+        return this._tracks.filter((track) => track.isAudio);
+    }
+
+    public get videoTracks(): CallTrack[] {
+        return this._tracks.filter((track) => track.isVideo);
+    }
+
+    public get audioTrack(): CallTrack | undefined {
+        return this.audioTracks[0];
+    }
+
+    public get videoTrack(): CallTrack | undefined {
+        return this.videoTracks[0];
+    }
+
+    public get audioMuted(): boolean {
+        return !this.audioTracks.some((track) => !track.muted);
+    }
+
+    public get videoMuted(): boolean {
+        return !this.videoTracks.some((track) => !track.muted);
     }
 
     private get hasAudioTrack(): boolean {
-        return this.stream.getAudioTracks().length > 0;
+        return this.stream ? this.stream.getAudioTracks().length > 0 : false;
     }
 
-    private updateStream(oldStream: MediaStream | null, newStream: MediaStream): void {
+    protected get tracks(): CallTrack[] {
+        return [...this._tracks];
+    }
+
+    protected updateStream(oldStream?: MediaStream, newStream?: MediaStream): void {
         if (newStream === oldStream) return;
 
         if (oldStream) {
-            oldStream.removeEventListener("addtrack", this.onAddTrack);
-            this.measureVolumeActivity(false);
+            clearTimeout(this.volumeLooperTimeout);
         }
 
-        this.stream = newStream;
-        newStream.addEventListener("addtrack", this.onAddTrack);
+        this._stream = newStream;
 
-        if (this.hasAudioTrack) {
-            this.initVolumeMeasuring();
-        } else {
-            this.measureVolumeActivity(false);
-        }
+        this.startMeasuringVolume();
 
         this.emit(CallFeedEvent.NewStream, this.stream);
     }
 
-    private initVolumeMeasuring(): void {
+    /**
+     * Sets up the volume measuring and/or starts the measuring loop
+     */
+    protected startMeasuringVolume(): void {
+        if (!this.stream) return;
         if (!this.hasAudioTrack) return;
         if (!this.audioContext) this.audioContext = acquireContext();
 
-        this.analyser = this.audioContext.createAnalyser();
-        this.analyser.fftSize = 512;
-        this.analyser.smoothingTimeConstant = 0.1;
+        // If streams changed, setup the things we need for measuring volume
+        if (this.audioSourceNode?.mediaStream !== this.stream) {
+            this.analyser = this.audioContext.createAnalyser();
+            this.analyser.fftSize = 512;
+            this.analyser.smoothingTimeConstant = 0.1;
 
-        const mediaStreamAudioSourceNode = this.audioContext.createMediaStreamSource(this.stream);
-        mediaStreamAudioSourceNode.connect(this.analyser);
+            this.audioSourceNode = this.audioContext.createMediaStreamSource(this.stream);
+            this.audioSourceNode.connect(this.analyser);
 
-        this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
-    }
-
-    private onAddTrack = (): void => {
-        this.emit(CallFeedEvent.NewStream, this.stream);
-    };
-
-    private onCallState = (state: CallState): void => {
-        if (state === CallState.Connected) {
-            this.connected = true;
-        } else if (state === CallState.Connecting) {
-            this.connected = false;
+            this.frequencyBinCount = new Float32Array(this.analyser.frequencyBinCount);
         }
-    };
+
+        // If we should not be measuring volume activity atm, don't start the loop
+        if (!this.measuringVolumeActivity) return;
+
+        const loop = (): void => {
+            if (!this.analyser || !this.frequencyBinCount) {
+                clearTimeout(this.volumeLooperTimeout);
+                this.volumeLooperTimeout = undefined;
+                return;
+            }
+
+            this.analyser.getFloatFrequencyData(this.frequencyBinCount);
+
+            let maxVolume = -Infinity;
+            for (const volume of this.frequencyBinCount!) {
+                if (volume > maxVolume) {
+                    maxVolume = volume;
+                }
+            }
+
+            this.speakingVolumeSamples.shift();
+            this.speakingVolumeSamples.push(maxVolume);
+
+            this.emit(CallFeedEvent.VolumeChanged, maxVolume);
+
+            let newSpeaking = false;
+
+            for (const volume of this.speakingVolumeSamples) {
+                if (volume > this.speakingThreshold) {
+                    newSpeaking = true;
+                    break;
+                }
+            }
+
+            if (this.speaking !== newSpeaking) {
+                this.speaking = newSpeaking;
+                this.emit(CallFeedEvent.Speaking, this.speaking);
+            }
+
+            this.volumeLooperTimeout = setTimeout(loop, POLLING_INTERVAL);
+        };
+
+        loop();
+    }
 
     /**
      * Returns callRoom member
@@ -188,65 +236,27 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     }
 
     /**
-     * Returns true if CallFeed is local, otherwise returns false
-     * @returns is local?
-     */
-    public isLocal(): boolean {
-        return (
-            this.userId === this.client.getUserId() &&
-            (this.deviceId === undefined || this.deviceId === this.client.getDeviceId())
-        );
-    }
-
-    /**
      * Returns true if audio is muted or if there are no audio
      * tracks, otherwise returns false
+     * @deprecated use audioMuted instead
      * @returns is audio muted?
      */
     public isAudioMuted(): boolean {
-        return this.stream.getAudioTracks().length === 0 || this.audioMuted;
+        return this.audioMuted;
     }
 
     /**
      * Returns true video is muted or if there are no video
      * tracks, otherwise returns false
+     * @deprecated use videoMuted instead
      * @returns is video muted?
      */
     public isVideoMuted(): boolean {
-        // We assume only one video track
-        return this.stream.getVideoTracks().length === 0 || this.videoMuted;
+        return this.videoMuted;
     }
 
     public isSpeaking(): boolean {
         return this.speaking;
-    }
-
-    /**
-     * Replaces the current MediaStream with a new one.
-     * The stream will be different and new stream as remote parties are
-     * concerned, but this can be used for convenience locally to set up
-     * volume listeners automatically on the new stream etc.
-     * @param newStream - new stream with which to replace the current one
-     */
-    public setNewStream(newStream: MediaStream): void {
-        this.updateStream(this.stream, newStream);
-    }
-
-    /**
-     * Set one or both of feed's internal audio and video video mute state
-     * Either value may be null to leave it as-is
-     * @param audioMuted - is the feed's audio muted?
-     * @param videoMuted - is the feed's video muted?
-     */
-    public setAudioVideoMuted(audioMuted: boolean | null, videoMuted: boolean | null): void {
-        if (audioMuted !== null) {
-            if (this.audioMuted !== audioMuted) {
-                this.speakingVolumeSamples.fill(-Infinity);
-            }
-            this.audioMuted = audioMuted;
-        }
-        if (videoMuted !== null) this.videoMuted = videoMuted;
-        this.emit(CallFeedEvent.MuteStateChanged, this.audioMuted, this.videoMuted);
     }
 
     /**
@@ -255,10 +265,9 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
      */
     public measureVolumeActivity(enabled: boolean): void {
         if (enabled) {
-            if (!this.analyser || !this.frequencyBinCount || !this.hasAudioTrack) return;
-
+            clearTimeout(this.volumeLooperTimeout);
             this.measuringVolumeActivity = true;
-            this.volumeLooper();
+            this.startMeasuringVolume();
         } else {
             this.measuringVolumeActivity = false;
             this.speakingVolumeSamples.fill(-Infinity);
@@ -270,69 +279,8 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
         this.speakingThreshold = threshold;
     }
 
-    private volumeLooper = (): void => {
-        if (!this.analyser) return;
-
-        if (!this.measuringVolumeActivity) return;
-
-        this.analyser.getFloatFrequencyData(this.frequencyBinCount!);
-
-        let maxVolume = -Infinity;
-        for (const volume of this.frequencyBinCount!) {
-            if (volume > maxVolume) {
-                maxVolume = volume;
-            }
-        }
-
-        this.speakingVolumeSamples.shift();
-        this.speakingVolumeSamples.push(maxVolume);
-
-        this.emit(CallFeedEvent.VolumeChanged, maxVolume);
-
-        let newSpeaking = false;
-
-        for (const volume of this.speakingVolumeSamples) {
-            if (volume > this.speakingThreshold) {
-                newSpeaking = true;
-                break;
-            }
-        }
-
-        if (this.speaking !== newSpeaking) {
-            this.speaking = newSpeaking;
-            this.emit(CallFeedEvent.Speaking, this.speaking);
-        }
-
-        this.volumeLooperTimeout = setTimeout(this.volumeLooper, POLLING_INTERVAL);
-    };
-
-    public clone(): CallFeed {
-        const mediaHandler = this.client.getMediaHandler();
-        const stream = this.stream.clone();
-        logger.log(`CallFeed clone() cloning stream (originalStreamId=${this.stream.id}, newStreamId${stream.id})`);
-
-        if (this.purpose === SDPStreamMetadataPurpose.Usermedia) {
-            mediaHandler.userMediaStreams.push(stream);
-        } else {
-            mediaHandler.screensharingStreams.push(stream);
-        }
-
-        return new CallFeed({
-            client: this.client,
-            roomId: this.roomId,
-            userId: this.userId,
-            deviceId: this.deviceId,
-            stream,
-            purpose: this.purpose,
-            audioMuted: this.audioMuted,
-            videoMuted: this.videoMuted,
-        });
-    }
-
     public dispose(): void {
         clearTimeout(this.volumeLooperTimeout);
-        this.stream?.removeEventListener("addtrack", this.onAddTrack);
-        this.call?.removeListener(CallEvent.State, this.onCallState);
         if (this.audioContext) {
             this.audioContext = undefined;
             this.analyser = undefined;
@@ -357,5 +305,18 @@ export class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> 
     public setLocalVolume(localVolume: number): void {
         this.localVolume = localVolume;
         this.emit(CallFeedEvent.LocalVolumeChanged, localVolume);
+    }
+
+    public setResolution(width: number, height: number): void {
+        this._width = Math.round(width);
+        this._height = Math.round(height);
+
+        this.emit(CallFeedEvent.SizeChanged);
+    }
+
+    public setIsVisible(isVisible: boolean): void {
+        this._isVisible = isVisible;
+
+        this.emit(CallFeedEvent.SizeChanged);
     }
 }

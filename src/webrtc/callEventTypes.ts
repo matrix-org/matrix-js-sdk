@@ -1,20 +1,35 @@
 // allow non-camelcase as these are events type that go onto the wire
 /* eslint-disable camelcase */
 
+import { EventType } from "../matrix";
 import { CallErrorCode } from "./call";
 
 // TODO: Change to "sdp_stream_metadata" when MSC3077 is merged
 export const SDPStreamMetadataKey = "org.matrix.msc3077.sdp_stream_metadata";
+export const SDPStreamMetadataKeyStable = "sdp_stream_metadata";
 
 export enum SDPStreamMetadataPurpose {
     Usermedia = "m.usermedia",
     Screenshare = "m.screenshare",
 }
 
+export interface SDPStreamMetadataTrack {
+    kind: string;
+    width?: number;
+    height?: number;
+}
+
+export interface SDPStreamMetadataTracks {
+    [key: string]: SDPStreamMetadataTrack;
+}
+
 export interface SDPStreamMetadataObject {
+    user_id?: string;
+    device_id?: string;
     purpose: SDPStreamMetadataPurpose;
-    audio_muted: boolean;
-    video_muted: boolean;
+    audio_muted?: boolean;
+    video_muted?: boolean;
+    tracks?: SDPStreamMetadataTracks;
 }
 
 export interface SDPStreamMetadata {
@@ -88,5 +103,39 @@ export interface MCallCandidates extends MCallBase {
 export interface MCallHangupReject extends MCallBase {
     reason?: CallErrorCode;
 }
+
+export interface FocusTrackDescription {
+    stream_id: string;
+    track_id: string;
+    width?: number;
+    height?: number;
+}
+
+export interface FocusEvent {
+    type: EventType;
+    content: FocusEventBaseContent;
+}
+
+export interface FocusEventBaseContent {
+    [SDPStreamMetadataKeyStable]?: SDPStreamMetadata;
+}
+
+export interface FocusTrackSubscriptionEvent extends FocusEventBaseContent {
+    subscribe: FocusTrackDescription[];
+    unsubscribe: FocusTrackDescription[];
+}
+
+export interface FocusNegotiateEvent extends FocusEventBaseContent {
+    description: RTCSessionDescription;
+    [SDPStreamMetadataKeyStable]: SDPStreamMetadata;
+}
+
+export interface FocusSDPStreamMetadataChangedEvent extends FocusEventBaseContent {
+    [SDPStreamMetadataKeyStable]: SDPStreamMetadata;
+}
+
+export interface FocusPingEvent extends FocusEventBaseContent {}
+
+export interface FocusPongEvent extends FocusEventBaseContent {}
 
 /* eslint-enable camelcase */

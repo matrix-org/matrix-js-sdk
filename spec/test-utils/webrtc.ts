@@ -22,6 +22,7 @@ import {
     GroupCallIntent,
     GroupCallType,
     IContent,
+    IFocusInfo,
     ISendEventResponse,
     MatrixClient,
     MatrixEvent,
@@ -32,10 +33,12 @@ import {
     RoomStateEventHandlerMap,
 } from "../../src";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
+import { randomString } from "../../src/randomstring";
 import { ReEmitter } from "../../src/ReEmitter";
 import { SyncState } from "../../src/sync";
 import { CallEvent, CallEventHandlerMap, CallState, MatrixCall } from "../../src/webrtc/call";
 import { CallEventHandlerEvent, CallEventHandlerEventHandlerMap } from "../../src/webrtc/callEventHandler";
+import { SDPStreamMetadataPurpose } from "../../src/webrtc/callEventTypes";
 import { CallFeed } from "../../src/webrtc/callFeed";
 import { GroupCallEventHandlerMap } from "../../src/webrtc/groupCall";
 import { GroupCallEventHandlerEvent } from "../../src/webrtc/groupCallEventHandler";
@@ -94,6 +97,30 @@ export const FAKE_DEVICE_ID_2 = "@BBBBBB";
 export const FAKE_SESSION_ID_2 = "bob1";
 export const FAKE_USER_ID_3 = "@charlie:test.dummy";
 
+export const runOnTrackForStream = (call: MatrixCall, stream: MediaStream) => {
+    let sdp = "v=0\n" + "o=- 7135465365607179083 2 IN IP4 127.0.0.1\n" + "s=-\n" + "t=0 0\n" + "a=group:BUNDLE 0 1 2\n";
+
+    stream.getTracks().forEach((track, index) => {
+        sdp += `m=${track.kind}\n`;
+        sdp += `a=mid:${index}\n`;
+        sdp += `a=msid:${stream.id} ${track.id}\n`;
+    });
+
+    // @ts-ignore
+    call.peerConn.remoteDescription = {
+        sdp: sdp,
+    };
+
+    stream.getTracks().forEach((track, index) => {
+        // @ts-ignore
+        call.onTrack({
+            track,
+            streams: [stream],
+            transceiver: { mid: `${index}`, receiver: { track } },
+        } as TrackEvent);
+    });
+};
+
 class MockMediaStreamAudioSourceNode {
     public connect() {}
 }
@@ -115,6 +142,22 @@ export class MockAudioContext {
     public close() {}
 }
 
+export class MockRTCDataChannel {
+    constructor(public readonly label: string, public readonly id?: number) {}
+
+    public typed(): RTCDataChannel {
+        return this as unknown as RTCDataChannel;
+    }
+
+    addEventListener() {}
+}
+
+export interface MockRTCSessionDescription {
+    sdp: string;
+    type: RTCSdpType;
+    toJSON: () => any;
+}
+
 export class MockRTCPeerConnection {
     private static instances: MockRTCPeerConnection[] = [];
 
@@ -125,7 +168,7 @@ export class MockRTCPeerConnection {
     public needsNegotiation = false;
     public readyToNegotiate: Promise<void>;
     private onReadyToNegotiate?: () => void;
-    public localDescription: RTCSessionDescription;
+    public localDescription: MockRTCSessionDescription;
     public signalingState: RTCSignalingState = "stable";
     public iceConnectionState: RTCIceConnectionState = "connected";
     public transceivers: MockRTCRtpTransceiver[] = [];
@@ -148,7 +191,7 @@ export class MockRTCPeerConnection {
         this.localDescription = {
             sdp: DUMMY_SDP,
             type: "offer",
-            toJSON: function () {},
+            toJSON: () => {},
         };
 
         this.readyToNegotiate = new Promise<void>((resolve) => {
@@ -169,8 +212,8 @@ export class MockRTCPeerConnection {
             this.onTrackListener = listener;
         }
     }
-    public createDataChannel(label: string, opts: RTCDataChannelInit) {
-        return { label, ...opts };
+    public createDataChannel(label: string, opts: RTCDataChannelInit): MockRTCDataChannel {
+        return new MockRTCDataChannel(label, opts.id);
     }
     public createOffer() {
         return Promise.resolve({
@@ -194,28 +237,40 @@ export class MockRTCPeerConnection {
     public getStats() {
         return [];
     }
-    public addTransceiver(track: MockMediaStreamTrack): MockRTCRtpTransceiver {
+    public addTransceiver(track: MockMediaStreamTrack, init?: RTCRtpTransceiverInit): MockRTCRtpTransceiver {
         this.needsNegotiation = true;
         if (this.onReadyToNegotiate) this.onReadyToNegotiate();
 
         const newSender = new MockRTCRtpSender(track);
         const newReceiver = new MockRTCRtpReceiver(track);
 
-        const newTransceiver = new MockRTCRtpTransceiver(this);
+        const newTransceiver = new MockRTCRtpTransceiver(this, (this.transceivers.length + 1).toString());
         newTransceiver.sender = newSender as unknown as RTCRtpSender;
         newTransceiver.receiver = newReceiver as unknown as RTCRtpReceiver;
 
         this.transceivers.push(newTransceiver);
 
+        let newSDP = this.localDescription.sdp;
+        init?.streams?.forEach((stream) => {
+            newSDP += `m=${track.kind === "audio" ? "audio 50609 UDP 126" : "video 9 UDP 114"} \r\n`;
+            newSDP += `a=sendrecv\r\n`;
+            newSDP += `a=mid:${this.transceivers.length}\r\n`;
+            newSDP += `a=msid:${stream.id} ${track.id}\r\n`;
+        });
+        this.localDescription.sdp = newSDP;
+
         return newTransceiver;
     }
-    public addTrack(track: MockMediaStreamTrack): MockRTCRtpSender {
-        return this.addTransceiver(track).sender as unknown as MockRTCRtpSender;
+    public addTrack(track: MockMediaStreamTrack, ...streams: MediaStream[]): MockRTCRtpSender {
+        return this.addTransceiver(track, { streams }).sender as unknown as MockRTCRtpSender;
     }
 
-    public removeTrack() {
-        this.needsNegotiation = true;
-        if (this.onReadyToNegotiate) this.onReadyToNegotiate();
+    public removeTrack(sender: MockRTCRtpSender) {
+        const transceiver = this.transceivers.find((transceiver) => transceiver.sender === sender.typed());
+        transceiver?.sender?.replaceTrack(null);
+        if (transceiver) {
+            transceiver.direction = transceiver?.direction === "sendrecv" ? "recvonly" : "inactive";
+        }
     }
 
     public getTransceivers(): MockRTCRtpTransceiver[] {
@@ -239,6 +294,13 @@ export class MockRTCRtpSender {
     public replaceTrack(track: MockMediaStreamTrack) {
         this.track = track;
     }
+
+    public getParameters() {}
+    public setParameters() {}
+
+    public typed(): RTCRtpSender {
+        return this as unknown as RTCRtpSender;
+    }
 }
 
 export class MockRTCRtpReceiver {
@@ -246,12 +308,20 @@ export class MockRTCRtpReceiver {
 }
 
 export class MockRTCRtpTransceiver {
-    constructor(private peerConn: MockRTCPeerConnection) {}
+    constructor(private peerConn: MockRTCPeerConnection, public readonly mid: string) {}
 
     public sender?: RTCRtpSender;
     public receiver?: RTCRtpReceiver;
 
-    public set direction(_: string) {
+    private _direction = "sendrecv";
+
+    public get direction() {
+        return this._direction;
+    }
+
+    public set direction(newDirection: string) {
+        if (this._direction === newDirection) return;
+        this._direction = newDirection;
         this.peerConn.needsNegotiation = true;
     }
 
@@ -265,7 +335,7 @@ export class MockMediaStreamTrack {
 
     public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
-    public settings?: MediaTrackSettings;
+    public settings: MediaTrackSettings = {};
 
     public getSettings(): MediaTrackSettings {
         return this.settings!;
@@ -296,7 +366,7 @@ export class MockMediaStreamTrack {
 // XXX: Using EventTarget in jest doesn't seem to work, so we write our own
 // implementation
 export class MockMediaStream {
-    constructor(public id: string, private tracks: MockMediaStreamTrack[] = []) {}
+    constructor(public id: string = randomString(32), private tracks: MockMediaStreamTrack[] = []) {}
 
     public listeners: [string, (...args: any[]) => any][] = [];
     public isStopped = false;
@@ -492,6 +562,10 @@ export class MockCallMatrixClient extends TypedEventEmitter<EmittedEvents, Emitt
     public emitRoomState(event: MatrixEvent, state: RoomState): void {
         this.emit(RoomStateEvent.Events, event, state, null);
     }
+
+    public getFoci(): IFocusInfo[] {
+        return [];
+    }
 }
 
 export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap> {
@@ -508,14 +582,22 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
         setAudioVideoMuted: jest.fn<void, [boolean, boolean]>(),
         stream: new MockMediaStream("stream"),
     };
-    public remoteUsermediaFeed?: CallFeed;
-    public remoteScreensharingFeed?: CallFeed;
+    public feeds: CallFeed[] = [];
 
     public reject = jest.fn<void, []>();
     public answerWithCallFeeds = jest.fn<void, [CallFeed[]]>();
     public hangup = jest.fn<void, []>();
+    public opponentSupportsSDPStreamMetadata = jest.fn();
 
     public sendMetadataUpdate = jest.fn<void, []>();
+
+    public get remoteUsermediaFeed(): CallFeed | undefined {
+        return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Usermedia);
+    }
+
+    public get remoteScreensharingFeed(): CallFeed | undefined {
+        return this.getRemoteFeeds().find((feed) => feed.purpose === SDPStreamMetadataPurpose.Screenshare);
+    }
 
     public getOpponentMember(): Partial<RoomMember> {
         return this.opponentMember;
@@ -525,16 +607,30 @@ export class MockMatrixCall extends TypedEventEmitter<CallEvent, CallEventHandle
         return this.opponentDeviceId;
     }
 
+    public getRemoteFeeds(): CallFeed[] {
+        return this.feeds.filter((feed) => !feed.isLocal);
+    }
+
     public typed(): MatrixCall {
         return this as unknown as MatrixCall;
     }
 }
 
 export class MockCallFeed {
-    constructor(public userId: string, public deviceId: string | undefined, public stream: MockMediaStream) {}
+    constructor(
+        public userId: string,
+        public deviceId: string | undefined,
+        public stream: MockMediaStream,
+        public isLocal?: boolean,
+        public purpose?: SDPStreamMetadataPurpose,
+    ) {}
+
+    public disposed = false;
 
     public measureVolumeActivity(val: boolean) {}
-    public dispose() {}
+    public dispose() {
+        this.disposed = true;
+    }
 
     public typed(): CallFeed {
         return this as unknown as CallFeed;
@@ -544,9 +640,12 @@ export class MockCallFeed {
 export function installWebRTCMocks() {
     global.navigator = {
         mediaDevices: new MockMediaDevices().typed(),
+        userAgent: "This is definitely a user agent string",
     } as unknown as Navigator;
 
     global.window = {
+        // @ts-ignore Mock
+        MediaStream: MockMediaStream,
         // @ts-ignore Mock
         RTCPeerConnection: MockRTCPeerConnection,
         // @ts-ignore Mock

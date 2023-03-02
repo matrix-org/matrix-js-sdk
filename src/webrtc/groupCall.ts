@@ -1,6 +1,6 @@
 import { TypedEventEmitter } from "../models/typed-event-emitter";
 import { CallFeed, SPEAKING_THRESHOLD } from "./callFeed";
-import { MatrixClient, IMyDevice } from "../client";
+import { IFocusInfo, MatrixClient, IMyDevice } from "../client";
 import {
     CallErrorCode,
     CallEvent,
@@ -24,6 +24,7 @@ import { CallEventHandlerEvent } from "./callEventHandler";
 import { GroupCallEventHandlerEvent } from "./groupCallEventHandler";
 import { IScreensharingOpts } from "./mediaHandler";
 import { mapsEqual } from "../utils";
+import { LocalCallFeed } from "./localCallFeed";
 
 export enum GroupCallIntent {
     Ring = "m.ring",
@@ -137,15 +138,16 @@ export interface IGroupCallRoomMemberFeed {
 }
 
 export interface IGroupCallRoomMemberDevice {
-    device_id: string;
-    session_id: string;
-    expires_ts: number;
-    feeds: IGroupCallRoomMemberFeed[];
+    "device_id": string;
+    "session_id": string;
+    "expires_ts": number;
+    "feeds": IGroupCallRoomMemberFeed[];
+    "org.matrix.msc3898.foci.active"?: IFocusInfo[];
+    "org.matrix.msc3898.foci.preferred"?: IFocusInfo[];
 }
 
 export interface IGroupCallRoomMemberCallState {
     "m.call_id": string;
-    "m.foci"?: string[];
     "m.devices": IGroupCallRoomMemberDevice[];
 }
 
@@ -174,6 +176,7 @@ interface ICallHandlers {
 }
 
 const DEVICE_TIMEOUT = 1000 * 60 * 60; // 1 hour
+const FOCUS_SESSION_ID = "sfu";
 
 function getCallUserId(call: MatrixCall): string | null {
     return call.getOpponentMember()?.userId || call.invitee || null;
@@ -190,12 +193,13 @@ export class GroupCall extends TypedEventEmitter<
     public pttMaxTransmitTime = 1000 * 20;
 
     public activeSpeaker?: CallFeed;
-    public localCallFeed?: CallFeed;
-    public localScreenshareFeed?: CallFeed;
+    public localCallFeed?: LocalCallFeed;
+    public localScreenshareFeed?: LocalCallFeed;
     public localDesktopCapturerSourceId?: string;
     public readonly userMediaFeeds: CallFeed[] = [];
     public readonly screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
+    public foci: IFocusInfo[] = [];
 
     private readonly calls = new Map<string, Map<string, MatrixCall>>(); // user_id -> device_id -> MatrixCall
     private callHandlers = new Map<string, Map<string, ICallHandlers>>(); // user_id -> device_id -> ICallHandlers
@@ -332,8 +336,19 @@ export class GroupCall extends TypedEventEmitter<
         }
     }
 
-    public getLocalFeeds(): CallFeed[] {
-        const feeds: CallFeed[] = [];
+    private getPreferredFoci(): IFocusInfo[] {
+        const preferredFoci = this.client.getFoci();
+        const isUsingPreferredFocus = Boolean(
+            preferredFoci.find((pf) =>
+                this.foci.find((f) => pf.user_id === f.user_id && pf.device_id === pf.device_id),
+            ),
+        );
+
+        return isUsingPreferredFocus ? [] : preferredFoci;
+    }
+
+    public getLocalFeeds(): LocalCallFeed[] {
+        const feeds: LocalCallFeed[] = [];
 
         if (this.localCallFeed) feeds.push(this.localCallFeed);
         if (this.localScreenshareFeed) feeds.push(this.localScreenshareFeed);
@@ -386,16 +401,16 @@ export class GroupCall extends TypedEventEmitter<
             throw new Error("Group call disposed while gathering media stream");
         }
 
-        const callFeed = new CallFeed({
+        const callFeed = new LocalCallFeed({
             client: this.client,
             roomId: this.room.roomId,
-            userId: this.client.getUserId()!,
-            deviceId: this.client.getDeviceId()!,
             stream,
             purpose: SDPStreamMetadataPurpose.Usermedia,
-            audioMuted: this.initWithAudioMuted || stream.getAudioTracks().length === 0 || this.isPtt,
-            videoMuted: this.initWithVideoMuted || stream.getVideoTracks().length === 0,
         });
+        callFeed.setAudioVideoMuted(
+            this.initWithAudioMuted || stream.getAudioTracks().length === 0 || this.isPtt,
+            this.initWithVideoMuted || stream.getVideoTracks().length === 0,
+        );
 
         setTracksEnabled(stream.getAudioTracks(), !callFeed.isAudioMuted());
         setTracksEnabled(stream.getVideoTracks(), !callFeed.isVideoMuted());
@@ -409,15 +424,18 @@ export class GroupCall extends TypedEventEmitter<
     public async updateLocalUsermediaStream(stream: MediaStream): Promise<void> {
         if (this.localCallFeed) {
             const oldStream = this.localCallFeed.stream;
-            this.localCallFeed.setNewStream(stream);
-            const micShouldBeMuted = this.localCallFeed.isAudioMuted();
-            const vidShouldBeMuted = this.localCallFeed.isVideoMuted();
-            logger.log(
-                `GroupCall ${this.groupCallId} updateLocalUsermediaStream() (oldStreamId=${oldStream.id}, newStreamId=${stream.id}, micShouldBeMuted=${micShouldBeMuted}, vidShouldBeMuted=${vidShouldBeMuted})`,
-            );
+            const micShouldBeMuted = this.localCallFeed.audioMuted;
+            const vidShouldBeMuted = this.localCallFeed.videoMuted;
             setTracksEnabled(stream.getAudioTracks(), !micShouldBeMuted);
             setTracksEnabled(stream.getVideoTracks(), !vidShouldBeMuted);
-            this.client.getMediaHandler().stopUserMediaStream(oldStream);
+            this.localCallFeed.setNewStream(stream);
+
+            if (oldStream) {
+                this.client.getMediaHandler().stopUserMediaStream(oldStream);
+                logger.log(
+                    `GroupCall ${this.groupCallId} updateLocalUsermediaStream() (oldStreamId=${oldStream.id}, newStreamId=${stream.id}, micShouldBeMuted=${micShouldBeMuted}, vidShouldBeMuted=${vidShouldBeMuted})`,
+                );
+            }
         }
     }
 
@@ -427,6 +445,15 @@ export class GroupCall extends TypedEventEmitter<
         } else if (this.state !== GroupCallState.LocalCallFeedInitialized) {
             throw new Error(`Cannot enter call in the "${this.state}" state`);
         }
+
+        // TODO: Call preferred foci
+
+        // This needs to be done before we set the state to entered. With the
+        // state set to entered, we'll start calling other participants full-mesh
+        // which we don't want, if we have a focus
+        this.chooseFocus();
+
+        await this.updateMemberState();
 
         logger.log(`GroupCall ${this.groupCallId} enter() running`);
         this.state = GroupCallState.Entered;
@@ -444,6 +471,28 @@ export class GroupCall extends TypedEventEmitter<
         this.activeSpeakerLoopInterval = setInterval(this.onActiveSpeakerLoop, this.activeSpeakerInterval);
     }
 
+    private chooseFocus(): void {
+        // TODO: Go through all state and find best focus and try to use that
+
+        // Try to find a focus of another user to use
+        let focusOfAnotherMember: IFocusInfo | undefined;
+        for (const event of this.getMemberStateEvents()) {
+            const focus =
+                event.getContent<IGroupCallRoomMemberState>()?.["m.calls"]?.[0]?.["m.devices"]?.[0]?.[
+                    "org.matrix.msc3898.foci.active"
+                ]?.[0];
+            if (focus) {
+                focusOfAnotherMember = focus;
+                break;
+            }
+        }
+
+        const focus = focusOfAnotherMember ?? this.client.getFoci()[0];
+        if (focus && !this.foci.some((f) => f.user_id === focus.user_id && f.device_id === focus.device_id)) {
+            this.foci.push(focus);
+        }
+    }
+
     private dispose(): void {
         if (this.localCallFeed) {
             this.removeUserMediaFeed(this.localCallFeed);
@@ -451,11 +500,16 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         if (this.localScreenshareFeed) {
-            this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
+            if (this.localScreenshareFeed.stream) {
+                this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
+            }
             this.removeScreenshareFeed(this.localScreenshareFeed);
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
         }
+
+        this.userMediaFeeds.splice(0, this.userMediaFeeds.length);
+        this.screenshareFeeds.splice(0, this.screenshareFeeds.length);
 
         this.client.getMediaHandler().stopAllStreams();
 
@@ -522,7 +576,7 @@ export class GroupCall extends TypedEventEmitter<
 
     public isLocalVideoMuted(): boolean {
         if (this.localCallFeed) {
-            return this.localCallFeed.isVideoMuted();
+            return this.localCallFeed.videoMuted;
         }
 
         return true;
@@ -530,7 +584,7 @@ export class GroupCall extends TypedEventEmitter<
 
     public isMicrophoneMuted(): boolean {
         if (this.localCallFeed) {
-            return this.localCallFeed.isAudioMuted();
+            return this.localCallFeed.audioMuted;
         }
 
         return true;
@@ -582,20 +636,26 @@ export class GroupCall extends TypedEventEmitter<
 
         if (this.localCallFeed) {
             logger.log(
-                `GroupCall ${this.groupCallId} setMicrophoneMuted() (streamId=${this.localCallFeed.stream.id}, muted=${muted})`,
+                `GroupCall ${this.groupCallId} setMicrophoneMuted() (feedId=${this.localCallFeed.id}, muted=${muted})`,
             );
             this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
             // are the one on the GroupCall's own CallFeed and are cloned before being
             // given to any of the actual calls, so these tracks don't actually go
             // anywhere. Let's do it anyway to avoid confusion.
-            setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
+            if (this.localCallFeed.stream) {
+                setTracksEnabled(this.localCallFeed.stream.getAudioTracks(), !muted);
+            }
         } else {
             logger.log(`GroupCall ${this.groupCallId} setMicrophoneMuted() no stream muted (muted=${muted})`);
             this.initWithAudioMuted = muted;
         }
 
-        this.forEachCall((call) => setTracksEnabled(call.localUsermediaFeed!.stream.getAudioTracks(), !muted));
+        this.forEachCall((call) => {
+            if (call.localUsermediaStream) {
+                setTracksEnabled(call.localUsermediaStream.getAudioTracks(), !muted);
+            }
+        });
         this.emit(GroupCallEvent.LocalMuteStateChanged, muted, this.isLocalVideoMuted());
 
         if (!sendUpdatesBefore) await sendUpdates();
@@ -618,13 +678,15 @@ export class GroupCall extends TypedEventEmitter<
 
         if (this.localCallFeed) {
             logger.log(
-                `GroupCall ${this.groupCallId} setLocalVideoMuted() (stream=${this.localCallFeed.stream.id}, muted=${muted})`,
+                `GroupCall ${this.groupCallId} setLocalVideoMuted() running (feedId=${this.localCallFeed.id}, muted=${muted})`,
             );
 
             const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
             await this.updateLocalUsermediaStream(stream);
             this.localCallFeed.setAudioVideoMuted(null, muted);
-            setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+            if (this.localCallFeed.stream) {
+                setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+            }
         } else {
             logger.log(`GroupCall ${this.groupCallId} setLocalVideoMuted() no stream muted (muted=${muted})`);
             this.initWithVideoMuted = muted;
@@ -665,15 +727,11 @@ export class GroupCall extends TypedEventEmitter<
                 );
 
                 this.localDesktopCapturerSourceId = opts.desktopCapturerSourceId;
-                this.localScreenshareFeed = new CallFeed({
+                this.localScreenshareFeed = new LocalCallFeed({
                     client: this.client,
                     roomId: this.room.roomId,
-                    userId: this.client.getUserId()!,
-                    deviceId: this.client.getDeviceId()!,
                     stream,
                     purpose: SDPStreamMetadataPurpose.Screenshare,
-                    audioMuted: false,
-                    videoMuted: false,
                 });
                 this.addScreenshareFeed(this.localScreenshareFeed);
 
@@ -708,7 +766,11 @@ export class GroupCall extends TypedEventEmitter<
             this.forEachCall((call) => {
                 if (call.localScreensharingFeed) call.removeLocalFeed(call.localScreensharingFeed);
             });
-            this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed!.stream);
+            if (this.localScreenshareFeed?.stream) {
+                this.client.getMediaHandler().stopScreensharingStream(this.localScreenshareFeed.stream);
+            }
+            // We have to remove the feed manually as MatrixCall has its clone,
+            // so it won't be removed automatically
             this.removeScreenshareFeed(this.localScreenshareFeed!);
             this.localScreenshareFeed = undefined;
             this.localDesktopCapturerSourceId = undefined;
@@ -800,84 +862,125 @@ export class GroupCall extends TypedEventEmitter<
     private placeOutgoingCalls(): void {
         let callsChanged = false;
 
-        for (const [{ userId }, participantMap] of this.participants) {
-            const callMap = this.calls.get(userId) ?? new Map<string, MatrixCall>();
+        const onError = (
+            error: Error,
+            userId: string,
+            deviceId: string,
+            newCall: MatrixCall | null,
+            callMap: Map<string, MatrixCall>,
+        ): void => {
+            logger.error(
+                `GroupCall ${this.groupCallId} placeOutgoingCalls() failed to place call (userId=${userId}, device=${deviceId})`,
+            );
 
-            for (const [deviceId, participant] of participantMap) {
-                const prevCall = callMap.get(deviceId);
-
-                if (
-                    prevCall?.getOpponentSessionId() !== participant.sessionId &&
-                    this.wantsOutgoingCall(userId, deviceId)
-                ) {
-                    callsChanged = true;
-
-                    if (prevCall !== undefined) {
-                        logger.debug(
-                            `GroupCall ${this.groupCallId} placeOutgoingCalls() replacing call (userId=${userId}, deviceId=${deviceId}, callId=${prevCall.callId})`,
-                        );
-                        this.disposeCall(prevCall, CallErrorCode.NewSession);
-                    }
-
-                    const newCall = createNewMatrixCall(this.client, this.room.roomId, {
-                        invitee: userId,
-                        opponentDeviceId: deviceId,
-                        opponentSessionId: participant.sessionId,
-                        groupCallId: this.groupCallId,
-                    });
-
-                    if (newCall === null) {
-                        logger.error(
-                            `GroupCall ${this.groupCallId} placeOutgoingCalls() failed to create call (userId=${userId}, device=${deviceId})`,
-                        );
-                        callMap.delete(deviceId);
-                    } else {
-                        this.initCall(newCall);
-                        callMap.set(deviceId, newCall);
-
-                        logger.debug(
-                            `GroupCall ${this.groupCallId} placeOutgoingCalls() placing call (userId=${userId}, deviceId=${deviceId}, sessionId=${participant.sessionId})`,
-                        );
-
-                        newCall
-                            .placeCallWithCallFeeds(
-                                this.getLocalFeeds().map((feed) => feed.clone()),
-                                participant.screensharing,
-                            )
-                            .then(() => {
-                                if (this.dataChannelsEnabled) {
-                                    newCall.createDataChannel("datachannel", this.dataChannelOptions);
-                                }
-                            })
-                            .catch((e) => {
-                                logger.warn(
-                                    `GroupCall ${this.groupCallId} placeOutgoingCalls() failed to place call (userId=${userId})`,
-                                    e,
-                                );
-
-                                if (e instanceof CallError && e.code === GroupCallErrorCode.UnknownDevice) {
-                                    this.emit(GroupCallEvent.Error, e);
-                                } else {
-                                    this.emit(
-                                        GroupCallEvent.Error,
-                                        new GroupCallError(
-                                            GroupCallErrorCode.PlaceCallFailed,
-                                            `Failed to place call to ${userId}`,
-                                        ),
-                                    );
-                                }
-
-                                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
-                                if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
-                            });
-                    }
-                }
+            if (error instanceof CallError && error.code === GroupCallErrorCode.UnknownDevice) {
+                this.emit(GroupCallEvent.Error, error);
+            } else {
+                this.emit(GroupCallEvent.Error, new GroupCallError(GroupCallErrorCode.PlaceCallFailed, error.message));
             }
+
+            if (newCall !== null) {
+                this.disposeCall(newCall, CallErrorCode.SignallingFailed);
+                if (callMap.get(deviceId) === newCall) callMap.delete(deviceId);
+            }
+        };
+
+        const replaceSession = (
+            userId: string,
+            deviceId: string,
+            prevCall: MatrixCall | undefined,
+            opponentSessionId: string,
+            opponentIsScreensharing: boolean,
+            callMap: Map<string, MatrixCall>,
+        ): void => {
+            callsChanged = true;
+
+            if (prevCall) {
+                logger.debug(
+                    `GroupCall ${this.groupCallId} placeOutgoingCalls() replacing call (userId=${userId}, deviceId=${deviceId}, callId=${prevCall.callId})`,
+                );
+                this.disposeCall(prevCall, CallErrorCode.NewSession);
+            }
+
+            const newCall = createNewMatrixCall(this.client, this.room.roomId, {
+                invitee: userId,
+                opponentDeviceId: deviceId,
+                opponentSessionId: opponentSessionId,
+                groupCallId: this.groupCallId,
+                isFocus: opponentSessionId === FOCUS_SESSION_ID,
+            });
+
+            if (newCall === null) {
+                onError(new Error("Failed to create new call"), userId, deviceId, newCall, callMap);
+                return;
+            }
+
+            this.initCall(newCall);
+            callMap.set(deviceId, newCall);
+
+            logger.debug(
+                `GroupCall ${this.groupCallId} placeOutgoingCalls() placing call (userId=${userId}, deviceId=${deviceId}, sessionId=${opponentSessionId})`,
+            );
+
+            newCall
+                .placeCallWithCallFeeds(
+                    this.getLocalFeeds().map((feed) => feed.clone()),
+                    opponentIsScreensharing,
+                )
+                .then(() => {
+                    if (this.dataChannelsEnabled || opponentSessionId === FOCUS_SESSION_ID) {
+                        newCall.createDataChannel("datachannel", this.dataChannelOptions);
+                    }
+                })
+                .catch((e) => {
+                    onError(e, userId, deviceId, newCall, callMap);
+                });
 
             if (callMap.size > 0) {
                 this.calls.set(userId, callMap);
             } else {
                 this.calls.delete(userId);
+            }
+        };
+
+        if (this.foci.length > 0) {
+            // We have a focus to call, so we call it
+            for (const { user_id: userId, device_id: deviceId } of this.foci) {
+                const callMap = this.calls.get(userId) ?? new Map<string, MatrixCall>();
+                const prevCall = callMap.get(deviceId);
+
+                if (prevCall && !prevCall.callHasEnded()) {
+                    continue;
+                }
+
+                callsChanged = true;
+                replaceSession(userId, deviceId, prevCall, FOCUS_SESSION_ID, false, callMap);
+            }
+        } else {
+            // There is no focus to call, so we connect full-mesh
+            for (const [{ userId }, participantMap] of this.participants) {
+                const callMap = this.calls.get(userId) ?? new Map<string, MatrixCall>();
+
+                for (const [deviceId, participant] of participantMap) {
+                    const prevCall = callMap.get(deviceId);
+
+                    if (
+                        prevCall?.getOpponentSessionId() === participant.sessionId ||
+                        !this.wantsOutgoingCall(userId, deviceId)
+                    ) {
+                        continue;
+                    }
+
+                    callsChanged = true;
+                    replaceSession(
+                        userId,
+                        deviceId,
+                        prevCall,
+                        participant.sessionId,
+                        participant.screensharing,
+                        callMap,
+                    );
+                }
             }
         }
 
@@ -919,6 +1022,21 @@ export class GroupCall extends TypedEventEmitter<
                     retriesMap.set(deviceId, retries + 1);
                     needsRetry = true;
                 }
+            }
+        }
+
+        for (const { user_id: userId, device_id: deviceId } of this.foci) {
+            const call = this.calls.get(userId)?.get(deviceId);
+            let retriesMap = this.retryCallCounts.get(userId);
+            const retries = retriesMap?.get(deviceId) ?? 0;
+
+            if ((!call || call.callHasEnded()) && retries < 3) {
+                if (retriesMap === undefined) {
+                    retriesMap = new Map();
+                    this.retryCallCounts.set(userId, retriesMap);
+                }
+                retriesMap.set(deviceId, retries + 1);
+                needsRetry = true;
             }
         }
 
@@ -1005,40 +1123,33 @@ export class GroupCall extends TypedEventEmitter<
     }
 
     private onCallFeedsChanged = (call: MatrixCall): void => {
-        const opponentMemberId = getCallUserId(call);
-        const opponentDeviceId = call.getOpponentDeviceId()!;
+        // Find replaced feeds
+        call.getRemoteFeeds().filter((cf) => {
+            [...this.userMediaFeeds, ...this.screenshareFeeds].forEach((gf) => {
+                if (gf !== cf && gf.userId === cf.userId && gf.deviceId === cf.deviceId && gf.purpose === cf.purpose) {
+                    if (cf.purpose === SDPStreamMetadataPurpose.Usermedia) this.replaceUserMediaFeed(gf, cf);
+                    else if (cf.purpose === SDPStreamMetadataPurpose.Screenshare) this.replaceScreenshareFeed(gf, cf);
+                }
+            });
+        });
 
-        if (!opponentMemberId) {
-            throw new Error("Cannot change call feeds without user id");
-        }
+        // Find removed feeds
+        [...this.userMediaFeeds, ...this.screenshareFeeds]
+            .filter((gf) => gf.disposed)
+            .forEach((feed) => {
+                if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.removeUserMediaFeed(feed);
+                else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.removeScreenshareFeed(feed);
+            });
 
-        const currentUserMediaFeed = this.getUserMediaFeed(opponentMemberId, opponentDeviceId);
-        const remoteUsermediaFeed = call.remoteUsermediaFeed;
-        const remoteFeedChanged = remoteUsermediaFeed !== currentUserMediaFeed;
-
-        if (remoteFeedChanged) {
-            if (!currentUserMediaFeed && remoteUsermediaFeed) {
-                this.addUserMediaFeed(remoteUsermediaFeed);
-            } else if (currentUserMediaFeed && remoteUsermediaFeed) {
-                this.replaceUserMediaFeed(currentUserMediaFeed, remoteUsermediaFeed);
-            } else if (currentUserMediaFeed && !remoteUsermediaFeed) {
-                this.removeUserMediaFeed(currentUserMediaFeed);
-            }
-        }
-
-        const currentScreenshareFeed = this.getScreenshareFeed(opponentMemberId, opponentDeviceId);
-        const remoteScreensharingFeed = call.remoteScreensharingFeed;
-        const remoteScreenshareFeedChanged = remoteScreensharingFeed !== currentScreenshareFeed;
-
-        if (remoteScreenshareFeedChanged) {
-            if (!currentScreenshareFeed && remoteScreensharingFeed) {
-                this.addScreenshareFeed(remoteScreensharingFeed);
-            } else if (currentScreenshareFeed && remoteScreensharingFeed) {
-                this.replaceScreenshareFeed(currentScreenshareFeed, remoteScreensharingFeed);
-            } else if (currentScreenshareFeed && !remoteScreensharingFeed) {
-                this.removeScreenshareFeed(currentScreenshareFeed);
-            }
-        }
+        // Find new feeds
+        call.getRemoteFeeds()
+            .filter((cf) => {
+                return ![...this.userMediaFeeds, ...this.screenshareFeeds].find((gf) => gf === cf);
+            })
+            .forEach((feed) => {
+                if (feed.purpose === SDPStreamMetadataPurpose.Usermedia) this.addUserMediaFeed(feed);
+                else if (feed.purpose === SDPStreamMetadataPurpose.Screenshare) this.addScreenshareFeed(feed);
+            });
     };
 
     private onCallStateChanged = (call: MatrixCall, state: CallState, _oldState: CallState | undefined): void => {
@@ -1054,18 +1165,26 @@ export class GroupCall extends TypedEventEmitter<
             call.setLocalVideoMuted(videoMuted);
         }
 
-        const opponentUserId = call.getOpponentMember()?.userId;
-        if (state === CallState.Connected && opponentUserId) {
-            const retriesMap = this.retryCallCounts.get(opponentUserId);
-            retriesMap?.delete(call.getOpponentDeviceId()!);
-            if (retriesMap?.size === 0) this.retryCallCounts.delete(opponentUserId);
+        if (state === CallState.Connected) {
+            if (call.isFocus) {
+                call.subscribeToFocus(true);
+            }
+
+            const opponentUserId = call.getOpponentMember()?.userId || call.invitee;
+            if (opponentUserId) {
+                const retriesMap = this.retryCallCounts.get(opponentUserId);
+                retriesMap?.delete(call.getOpponentDeviceId()!);
+                if (retriesMap?.size === 0) this.retryCallCounts.delete(opponentUserId);
+            }
         }
     };
 
     private onCallHangup = (call: MatrixCall): void => {
         if (call.hangupReason === CallErrorCode.Replaced) return;
 
-        const opponentUserId = call.getOpponentMember()?.userId ?? this.room.getMember(call.invitee!)!.userId;
+        const opponentUserId = call.invitee ?? call.getOpponentMember()?.userId;
+        if (!opponentUserId) return;
+
         const deviceMap = this.calls.get(opponentUserId);
 
         // Sanity check that this call is in fact in the map
@@ -1147,7 +1266,7 @@ export class GroupCall extends TypedEventEmitter<
         let nextActiveSpeaker: CallFeed | undefined = undefined;
 
         for (const callFeed of this.userMediaFeeds) {
-            if (callFeed.isLocal() && this.userMediaFeeds.length > 1) continue;
+            if (callFeed.isLocal && this.userMediaFeeds.length > 1) continue;
 
             const total = callFeed.speakingVolumeSamples.reduce(
                 (acc, volume) => acc + Math.max(volume, SPEAKING_THRESHOLD),
@@ -1360,10 +1479,12 @@ export class GroupCall extends TypedEventEmitter<
         await this.updateDevices((devices) => [
             ...devices.filter((d) => d.device_id !== this.client.getDeviceId()!),
             {
-                device_id: this.client.getDeviceId()!,
-                session_id: this.client.getSessionId(),
-                expires_ts: Date.now() + DEVICE_TIMEOUT,
-                feeds: this.getLocalFeeds().map((feed) => ({ purpose: feed.purpose })),
+                "device_id": this.client.getDeviceId()!,
+                "session_id": this.client.getSessionId(),
+                "expires_ts": Date.now() + DEVICE_TIMEOUT,
+                "feeds": this.getLocalFeeds().map((feed) => ({ purpose: feed.purpose })),
+                "org.matrix.msc3898.foci.active": this.foci,
+                "org.matrix.msc3898.foci.preferred": this.getPreferredFoci(),
                 // TODO: Add data channels
             },
         ]);
