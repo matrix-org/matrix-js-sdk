@@ -180,11 +180,11 @@ describe("NotificationService", function () {
                         enabled: true,
                         rule_id: ".m.rule.room_one_to_one",
                     },
-                    msc3914RoomCallRule,
                 ],
                 room: [],
                 sender: [],
                 underride: [
+                    msc3914RoomCallRule,
                     {
                         actions: ["dont-notify"],
                         conditions: [
@@ -569,7 +569,7 @@ describe("NotificationService", function () {
 
         it("returns push rule when it is found in rule set", () => {
             expect(pushProcessor.getPushRuleAndKindById(".org.matrix.msc3914.rule.room.call")).toEqual({
-                kind: "override",
+                kind: "underride",
                 rule: msc3914RoomCallRule,
             });
         });
