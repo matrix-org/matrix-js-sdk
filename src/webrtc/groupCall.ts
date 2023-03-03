@@ -196,6 +196,7 @@ export class GroupCall extends TypedEventEmitter<
     public readonly userMediaFeeds: CallFeed[] = [];
     public readonly screenshareFeeds: CallFeed[] = [];
     public groupCallId: string;
+    public readonly allowCallWithoutVideoAndAudio: boolean;
 
     private readonly calls = new Map<string, Map<string, MatrixCall>>(); // user_id -> device_id -> MatrixCall
     private callHandlers = new Map<string, Map<string, ICallHandlers>>(); // user_id -> device_id -> ICallHandlers
@@ -219,6 +220,7 @@ export class GroupCall extends TypedEventEmitter<
         groupCallId?: string,
         private dataChannelsEnabled?: boolean,
         private dataChannelOptions?: IGroupCallDataChannelOptions,
+        isCallWithoutVideoAndAudio?: boolean,
     ) {
         super();
         this.reEmitter = new ReEmitter(this);
@@ -231,6 +233,7 @@ export class GroupCall extends TypedEventEmitter<
         this.on(GroupCallEvent.ParticipantsChanged, this.onParticipantsChanged);
         this.on(GroupCallEvent.GroupCallStateChanged, this.onStateChanged);
         this.on(GroupCallEvent.LocalScreenshareStateChanged, this.onLocalFeedsChanged);
+        this.allowCallWithoutVideoAndAudio = !!isCallWithoutVideoAndAudio;
     }
 
     public async create(): Promise<GroupCall> {
@@ -374,8 +377,15 @@ export class GroupCall extends TypedEventEmitter<
         try {
             stream = await this.client.getMediaHandler().getUserMediaStream(true, this.type === GroupCallType.Video);
         } catch (error) {
-            this.state = GroupCallState.LocalCallFeedUninitialized;
-            throw error;
+            // If is allowed to join a call without a media stream, then we
+            // don't throw an error here. But we need an empty Local Feed to establish
+            // a connection later.
+            if (this.allowCallWithoutVideoAndAudio) {
+                stream = new MediaStream();
+            } else {
+                this.state = GroupCallState.LocalCallFeedUninitialized;
+                throw error;
+            }
         }
 
         // The call could've been disposed while we were waiting, and could
@@ -584,6 +594,31 @@ export class GroupCall extends TypedEventEmitter<
             logger.log(
                 `GroupCall ${this.groupCallId} setMicrophoneMuted() (streamId=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
+
+            // We needed this here to avoid an error in case user join a call without a device.
+            // I can not use .then .catch functions because linter :-(
+            try {
+                if (!muted) {
+                    const stream = await this.client
+                        .getMediaHandler()
+                        .getUserMediaStream(true, !this.localCallFeed.isVideoMuted());
+                    if (stream === null) {
+                        // if case permission denied to get a stream stop this here
+                        /* istanbul ignore next */
+                        logger.log(
+                            `GroupCall ${this.groupCallId} setMicrophoneMuted() no device to receive local stream, muted=${muted}`,
+                        );
+                        return false;
+                    }
+                }
+            } catch (e) {
+                /* istanbul ignore next */
+                logger.log(
+                    `GroupCall ${this.groupCallId} setMicrophoneMuted() no device or permission to receive local stream, muted=${muted}`,
+                );
+                return false;
+            }
+
             this.localCallFeed.setAudioVideoMuted(muted, null);
             // I don't believe its actually necessary to enable these tracks: they
             // are the one on the GroupCall's own CallFeed and are cloned before being
@@ -617,14 +652,24 @@ export class GroupCall extends TypedEventEmitter<
         }
 
         if (this.localCallFeed) {
+            /* istanbul ignore next */
             logger.log(
                 `GroupCall ${this.groupCallId} setLocalVideoMuted() (stream=${this.localCallFeed.stream.id}, muted=${muted})`,
             );
 
-            const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
-            await this.updateLocalUsermediaStream(stream);
-            this.localCallFeed.setAudioVideoMuted(null, muted);
-            setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+            try {
+                const stream = await this.client.getMediaHandler().getUserMediaStream(true, !muted);
+                await this.updateLocalUsermediaStream(stream);
+                this.localCallFeed.setAudioVideoMuted(null, muted);
+                setTracksEnabled(this.localCallFeed.stream.getVideoTracks(), !muted);
+            } catch (_) {
+                // No permission to video device
+                /* istanbul ignore next */
+                logger.log(
+                    `GroupCall ${this.groupCallId} setLocalVideoMuted() no device or permission to receive local stream, muted=${muted}`,
+                );
+                return false;
+            }
         } else {
             logger.log(`GroupCall ${this.groupCallId} setLocalVideoMuted() no stream muted (muted=${muted})`);
             this.initWithVideoMuted = muted;

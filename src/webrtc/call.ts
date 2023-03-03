@@ -390,6 +390,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
     // Used to keep the timer for the delay before actually stopping our
     // video track after muting (see setLocalVideoMuted)
     private stopVideoTrackTimer?: ReturnType<typeof setTimeout>;
+    // Used to allow connection without Video and Audio. To establish a webrtc connection without media a Data channel is
+    // needed At the moment this property is true if we allow MatrixClient with isVoipWithNoMediaAllowed = true
+    private readonly isOnlyDataChannelAllowed: boolean;
 
     /**
      * Construct a new Matrix Call.
@@ -420,6 +423,8 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             utils.checkObjectHasKeys(server, ["urls"]);
         }
         this.callId = genCallID();
+        // If the Client provides calls without audio and video we need a datachannel for a webrtc connection
+        this.isOnlyDataChannelAllowed = this.client.isVoipWithNoMediaAllowed;
     }
 
     /**
@@ -944,7 +949,11 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         // According to previous comments in this file, firefox at some point did not
         // add streams until media started arriving on them. Testing latest firefox
         // (81 at time of writing), this is no longer a problem, so let's do it the correct way.
-        if (!remoteStream || remoteStream.getTracks().length === 0) {
+        //
+        // For example in case of no media webrtc connections like screen share only call we have to allow webrtc
+        // connections without remote media. In this case we always use a data channel. At the moment we allow as well
+        // only data channel as media in the WebRTC connection with this setup here.
+        if (!this.isOnlyDataChannelAllowed && (!remoteStream || remoteStream.getTracks().length === 0)) {
             logger.error(
                 `Call ${this.callId} initWithInvite() no remote stream or no tracks after setting remote description!`,
             );

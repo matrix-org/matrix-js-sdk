@@ -19,9 +19,9 @@ import MockHttpBackend from "matrix-mock-request";
 import "../../olm-loader";
 import { MSC3906Rendezvous, RendezvousCode, RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
 import {
-    ECDHv1RendezvousCode,
+    ECDHv2RendezvousCode as ECDHRendezvousCode,
     MSC3903ECDHPayload,
-    MSC3903ECDHv1RendezvousChannel,
+    MSC3903ECDHv2RendezvousChannel as MSC3903ECDHRendezvousChannel,
 } from "../../../src/rendezvous/channels";
 import { MatrixClient } from "../../../src";
 import {
@@ -126,7 +126,7 @@ describe("Rendezvous", function () {
             fallbackRzServer: "https://fallbackserver/rz",
             fetchFn,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
 
         expect(aliceRz.code).toBeUndefined();
@@ -143,7 +143,7 @@ describe("Rendezvous", function () {
         const code = JSON.parse(aliceRz.code!) as RendezvousCode;
 
         expect(code.intent).toEqual(RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE);
-        expect(code.rendezvous?.algorithm).toEqual("org.matrix.msc3903.rendezvous.v1.curve25519-aes-sha256");
+        expect(code.rendezvous?.algorithm).toEqual("org.matrix.msc3903.rendezvous.v2.curve25519-aes-sha256");
         expect(code.rendezvous?.transport.type).toEqual("org.matrix.msc3886.http.v1");
         expect((code.rendezvous?.transport as MSC3886SimpleHttpRendezvousTransportDetails).uri).toEqual(
             "https://fallbackserver/rz/123",
@@ -181,11 +181,11 @@ describe("Rendezvous", function () {
             msc3882Enabled: false,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -193,7 +193,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -235,11 +235,11 @@ describe("Rendezvous", function () {
             msc3882Enabled: true,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -247,7 +247,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -293,11 +293,11 @@ describe("Rendezvous", function () {
             msc3882Enabled: true,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -305,7 +305,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -351,11 +351,11 @@ describe("Rendezvous", function () {
             msc3882Enabled: true,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -363,7 +363,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -411,11 +411,11 @@ describe("Rendezvous", function () {
             msc3882Enabled: true,
             msc3886Enabled: false,
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -423,7 +423,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,
@@ -485,11 +485,11 @@ describe("Rendezvous", function () {
                 master: "mmmmm",
             },
         });
-        const aliceEcdh = new MSC3903ECDHv1RendezvousChannel(aliceTransport, undefined, aliceOnFailure);
+        const aliceEcdh = new MSC3903ECDHRendezvousChannel(aliceTransport, undefined, aliceOnFailure);
         const aliceRz = new MSC3906Rendezvous(aliceEcdh, alice);
         aliceTransport.onCancelled = aliceOnFailure;
         await aliceRz.generateCode();
-        const code = JSON.parse(aliceRz.code!) as ECDHv1RendezvousCode;
+        const code = JSON.parse(aliceRz.code!) as ECDHRendezvousCode;
 
         expect(code.rendezvous.key).toBeDefined();
 
@@ -497,7 +497,7 @@ describe("Rendezvous", function () {
 
         // bob is try to sign in and scans the code
         const bobOnFailure = jest.fn();
-        const bobEcdh = new MSC3903ECDHv1RendezvousChannel(
+        const bobEcdh = new MSC3903ECDHRendezvousChannel(
             bobTransport,
             decodeBase64(code.rendezvous.key), // alice's public key
             bobOnFailure,

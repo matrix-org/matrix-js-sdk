@@ -11,6 +11,23 @@ describe("NotificationService", function () {
 
     let pushProcessor: PushProcessor;
 
+    const msc3914RoomCallRule = {
+        rule_id: ".org.matrix.msc3914.rule.room.call",
+        default: true,
+        enabled: true,
+        conditions: [
+            {
+                kind: "event_match",
+                key: "type",
+                pattern: "org.matrix.msc3401.call",
+            },
+            {
+                kind: "call_started",
+            },
+        ],
+        actions: ["notify", { set_tweak: "sound", value: "default" }],
+    };
+
     // These would be better if individual rules were configured in the tests themselves.
     const matrixClient = {
         getRoom: function () {
@@ -163,26 +180,11 @@ describe("NotificationService", function () {
                         enabled: true,
                         rule_id: ".m.rule.room_one_to_one",
                     },
-                    {
-                        rule_id: ".org.matrix.msc3914.rule.room.call",
-                        default: true,
-                        enabled: true,
-                        conditions: [
-                            {
-                                kind: "event_match",
-                                key: "type",
-                                pattern: "org.matrix.msc3401.call",
-                            },
-                            {
-                                kind: "call_started",
-                            },
-                        ],
-                        actions: ["notify", { set_tweak: "sound", value: "default" }],
-                    },
                 ],
                 room: [],
                 sender: [],
                 underride: [
+                    msc3914RoomCallRule,
                     {
                         actions: ["dont-notify"],
                         conditions: [
@@ -621,6 +623,29 @@ describe("NotificationService", function () {
                 testEvent,
             ),
         ).toBe(expected);
+    });
+
+    describe("getPushRuleById()", () => {
+        it("returns null when rule id is not in rule set", () => {
+            expect(pushProcessor.getPushRuleById("non-existant-rule")).toBeNull();
+        });
+
+        it("returns push rule when it is found in rule set", () => {
+            expect(pushProcessor.getPushRuleById(".org.matrix.msc3914.rule.room.call")).toEqual(msc3914RoomCallRule);
+        });
+    });
+
+    describe("getPushRuleAndKindById()", () => {
+        it("returns null when rule id is not in rule set", () => {
+            expect(pushProcessor.getPushRuleAndKindById("non-existant-rule")).toBeNull();
+        });
+
+        it("returns push rule when it is found in rule set", () => {
+            expect(pushProcessor.getPushRuleAndKindById(".org.matrix.msc3914.rule.room.call")).toEqual({
+                kind: "underride",
+                rule: msc3914RoomCallRule,
+            });
+        });
     });
 });
 

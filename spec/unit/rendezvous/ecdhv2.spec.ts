@@ -16,7 +16,7 @@ limitations under the License.
 
 import "../../olm-loader";
 import { RendezvousFailureReason, RendezvousIntent } from "../../../src/rendezvous";
-import { MSC3903ECDHPayload, MSC3903ECDHv1RendezvousChannel } from "../../../src/rendezvous/channels";
+import { MSC3903ECDHPayload, MSC3903ECDHv2RendezvousChannel } from "../../../src/rendezvous/channels";
 import { decodeBase64 } from "../../../src/crypto/olmlib";
 import { DummyTransport } from "./DummyTransport";
 
@@ -24,7 +24,7 @@ function makeTransport(name: string) {
     return new DummyTransport<any, MSC3903ECDHPayload>(name, { type: "dummy" });
 }
 
-describe("ECDHv1", function () {
+describe("ECDHv2", function () {
     beforeAll(async function () {
         await global.Olm.init();
     });
@@ -37,9 +37,9 @@ describe("ECDHv1", function () {
             bobTransport.otherParty = aliceTransport;
 
             // alice is signing in initiates and generates a code
-            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const alice = new MSC3903ECDHv2RendezvousChannel(aliceTransport);
             const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+            const bob = new MSC3903ECDHv2RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
             const bobChecksum = await bob.connect();
             const aliceChecksum = await alice.connect();
@@ -62,9 +62,9 @@ describe("ECDHv1", function () {
             bobTransport.otherParty = aliceTransport;
 
             // alice is signing in initiates and generates a code
-            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const alice = new MSC3903ECDHv2RendezvousChannel(aliceTransport);
             const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+            const bob = new MSC3903ECDHv2RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
             const bobChecksum = await bob.connect();
             const aliceChecksum = await alice.connect();
@@ -87,9 +87,9 @@ describe("ECDHv1", function () {
             bobTransport.otherParty = aliceTransport;
 
             // alice is signing in initiates and generates a code
-            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const alice = new MSC3903ECDHv2RendezvousChannel(aliceTransport);
             const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+            const bob = new MSC3903ECDHv2RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
             const bobChecksum = await bob.connect();
             const aliceChecksum = await alice.connect();
@@ -109,9 +109,9 @@ describe("ECDHv1", function () {
             bobTransport.otherParty = aliceTransport;
 
             // alice is signing in initiates and generates a code
-            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const alice = new MSC3903ECDHv2RendezvousChannel(aliceTransport);
             const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+            const bob = new MSC3903ECDHv2RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
             const bobChecksum = await bob.connect();
             const aliceChecksum = await alice.connect();
@@ -135,9 +135,9 @@ describe("ECDHv1", function () {
             bobTransport.otherParty = aliceTransport;
 
             // alice is signing in initiates and generates a code
-            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const alice = new MSC3903ECDHv2RendezvousChannel(aliceTransport);
             const aliceCode = await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
-            const bob = new MSC3903ECDHv1RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
+            const bob = new MSC3903ECDHv2RendezvousChannel(bobTransport, decodeBase64(aliceCode.rendezvous.key));
 
             const bobChecksum = await bob.connect();
             const aliceChecksum = await alice.connect();
@@ -159,7 +159,7 @@ describe("ECDHv1", function () {
             bobTransport.otherParty = aliceTransport;
 
             // alice is signing in initiates and generates a code
-            const alice = new MSC3903ECDHv1RendezvousChannel(aliceTransport);
+            const alice = new MSC3903ECDHv2RendezvousChannel(aliceTransport);
             await alice.generateCode(RendezvousIntent.LOGIN_ON_NEW_DEVICE);
 
             await bobTransport.send({ iv: "dummy", ciphertext: "dummy" });
