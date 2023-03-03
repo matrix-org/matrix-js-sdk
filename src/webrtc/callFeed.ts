@@ -54,6 +54,12 @@ type EventHandlerMap = {
     [CallFeedEvent.Disposed]: () => void;
 };
 
+/**
+ * CallFeed is a wrapper around a MediaStream. It includes useful information
+ * such as the userId and deviceId of the stream's sender, mute state, volume
+ * activity etc. This class would be usually used to display the video tiles in
+ * the UI.
+ */
 export abstract class CallFeed extends TypedEventEmitter<CallFeedEvent, EventHandlerMap> {
     public abstract get id(): string;
     public abstract get purpose(): SDPStreamMetadataPurpose;

@@ -25,6 +25,10 @@ interface TrackPublicationOpts {
     transceiver: RTCRtpTransceiver;
 }
 
+/**
+ * TrackPublication represents a LocalCallTrack being published to a specific peer
+ * connection.
+ */
 export class TrackPublication {
     public readonly call: MatrixCall;
     public readonly track: LocalCallTrack;

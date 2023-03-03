@@ -26,6 +26,12 @@ export interface LocalCallFeedOpts extends ICallFeedOpts {
     stream: MediaStream;
 }
 
+/**
+ * LocalCallFeed is a wrapper around MediaStream. It represents a stream that
+ * we've created locally by getting user/display media. N.B. that this is not
+ * linked to a specific peer connection, a FeedPublication is used for that
+ * purpose.
+ */
 export class LocalCallFeed extends CallFeed {
     protected _tracks: LocalCallTrack[] = [];
     protected publications: FeedPublication[] = [];

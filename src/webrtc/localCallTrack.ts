@@ -97,6 +97,12 @@ export interface LocalCallTrackOpts extends CallTrackOpts {
     track: MediaStreamTrack;
 }
 
+/**
+ * LocalCallTrack is a wrapper around a MediaStream. It represents a track of a
+ * stream which we retrieved using get user/display media. N.B. that this is not
+ * linked to a specific peer connection, a TrackPublication is used for that
+ * purpose.
+ */
 export class LocalCallTrack extends CallTrack {
     private _track: MediaStreamTrack;
     private feed: LocalCallFeed;

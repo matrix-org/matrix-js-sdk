@@ -24,6 +24,12 @@ interface CallFeedPublicationOpts {
     feed: LocalCallFeed;
 }
 
+/**
+ * FeedPublication represents a LocalCallFeed being published to a specific peer
+ * connection. It stores an array of track publications. This class needs to
+ * exist, so that we are able elegantly retrieve feed's track publications on a
+ * given peer connection.
+ */
 export class FeedPublication {
     public readonly call: MatrixCall;
     public readonly feed: LocalCallFeed;

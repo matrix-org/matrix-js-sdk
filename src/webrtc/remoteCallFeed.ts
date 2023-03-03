@@ -31,6 +31,10 @@ export interface RemoteCallFeedOpts extends ICallFeedOpts {
     stream?: MediaStream;
 }
 
+/**
+ * RemoteCallFeed is a wrapper around MediaStream. It represents an incoming
+ * stream.
+ */
 export class RemoteCallFeed extends CallFeed {
     private _connected = false;
     private _metadata?: SDPStreamMetadataObject;

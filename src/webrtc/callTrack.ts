@@ -18,6 +18,10 @@ import { randomString } from "../randomstring";
 
 export interface CallTrackOpts {}
 
+/**
+ * CallTrack is a wrapper around MediaStreamTrack. It includes some additional
+ * useful information such as the mute state.
+ */
 export abstract class CallTrack {
     public abstract get id(): string | undefined;
     public abstract get track(): MediaStreamTrack | undefined;
